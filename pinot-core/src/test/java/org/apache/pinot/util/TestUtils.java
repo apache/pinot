@@ -140,35 +140,25 @@ public class TestUtils {
    * @param timeoutMs Timeout in milliseconds
    * @param errorMessage Error message if condition is not met before timed out
    */
-  public static void waitForCondition(@Nonnull Function<Void, Boolean> condition, long checkIntervalMs, long timeoutMs,
-      @Nullable String errorMessage)
-      throws Exception {
+  public static void waitForCondition(Function<Void, Boolean> condition, long checkIntervalMs, long timeoutMs,
+      @Nullable String errorMessage) {
     long endTime = System.currentTimeMillis() + timeoutMs;
-    try {
-      while (System.currentTimeMillis() < endTime) {
-        Boolean isConditionMet = condition.apply(null);
-        if ((isConditionMet != null) && isConditionMet) {
+    String errorMessageSuffix = errorMessage != null ? ", error message: " + errorMessage : "";
+    while (System.currentTimeMillis() < endTime) {
+      try {
+        if (Boolean.TRUE.equals(condition.apply(null))) {
           return;
         }
         Thread.sleep(checkIntervalMs);
-      }
-      if (errorMessage != null) {
-        Assert.fail("Failed to meet condition in " + timeoutMs + "ms, error message: " + errorMessage);
-      } else {
-        Assert.fail("Failed to meet condition in " + timeoutMs + "ms");
-      }
-    } catch (Exception e) {
-      if (errorMessage != null) {
-        Assert.fail("Caught exception while checking the condition, error message: " + errorMessage, e);
-      } else {
-        Assert.fail("Caught exception while checking the condition", e);
+      } catch (Exception e) {
+        Assert.fail("Caught exception while checking the condition" + errorMessageSuffix, e);
       }
     }
+    Assert.fail("Failed to meet condition in " + timeoutMs + "ms" + errorMessageSuffix);
   }
 
-  public static void waitForCondition(@Nonnull Function<Void, Boolean> condition, long timeoutMs,
-      @Nullable String errorMessage)
-      throws Exception {
+  public static void waitForCondition(Function<Void, Boolean> condition, long timeoutMs,
+      @Nullable String errorMessage) {
     waitForCondition(condition, 1000L, timeoutMs, errorMessage);
   }
 }

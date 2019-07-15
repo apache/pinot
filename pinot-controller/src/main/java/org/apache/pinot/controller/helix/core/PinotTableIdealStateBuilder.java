@@ -20,7 +20,6 @@ package org.apache.pinot.controller.helix.core;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
@@ -31,7 +30,6 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.retry.RetryPolicies;
@@ -69,28 +67,6 @@ public class PinotTableIdealStateBuilder {
         .setNumPartitions(0).setNumReplica(replicas).setMaxPartitionsPerNode(1);
     final IdealState idealState = customModeIdealStateBuilder.build();
     idealState.setInstanceGroupTag(tableName);
-    idealState.setBatchMessageMode(enableBatchMessageMode);
-    return idealState;
-  }
-
-  /**
-   *
-   * Building an empty idealState for a given table.
-   * Used when creating a new table.
-   *
-   * @param helixAdmin
-   * @param helixClusterName
-   * @return
-   */
-  public static IdealState buildEmptyIdealStateForBrokerResource(HelixAdmin helixAdmin, String helixClusterName,
-      boolean enableBatchMessageMode) {
-    final CustomModeISBuilder customModeIdealStateBuilder =
-        new CustomModeISBuilder(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    customModeIdealStateBuilder.setStateModel(
-        PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.PINOT_BROKER_RESOURCE_ONLINE_OFFLINE_STATE_MODEL)
-        .setMaxPartitionsPerNode(Integer.MAX_VALUE).setNumReplica(Integer.MAX_VALUE)
-        .setNumPartitions(Integer.MAX_VALUE);
-    final IdealState idealState = customModeIdealStateBuilder.build();
     idealState.setBatchMessageMode(enableBatchMessageMode);
     return idealState;
   }

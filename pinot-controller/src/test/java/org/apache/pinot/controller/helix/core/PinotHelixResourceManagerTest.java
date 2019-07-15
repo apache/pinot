@@ -62,8 +62,11 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.*;
-import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.*;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE;
+import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.InvalidTableConfigException;
 
 
 public class PinotHelixResourceManagerTest extends ControllerTest {
@@ -82,28 +85,32 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   private final String _helixClusterName = getHelixClusterName();
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     startZk();
     ControllerConf config = getDefaultControllerConfiguration();
     config.setTenantIsolationEnabled(false);
     startController(config);
 
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(_helixClusterName,
-        ZkStarter.DEFAULT_ZK_STR, NUM_INSTANCES, false);
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(_helixClusterName, ZkStarter.DEFAULT_ZK_STR,
-        NUM_INSTANCES, false, BASE_SERVER_ADMIN_PORT);
+    ControllerRequestBuilderUtil
+        .addFakeBrokerInstancesToAutoJoinHelixCluster(_helixClusterName, ZkStarter.DEFAULT_ZK_STR, NUM_INSTANCES,
+            false);
+    ControllerRequestBuilderUtil
+        .addFakeDataInstancesToAutoJoinHelixCluster(_helixClusterName, ZkStarter.DEFAULT_ZK_STR, NUM_INSTANCES, false,
+            BASE_SERVER_ADMIN_PORT);
 
     // Create server tenant on all Servers
-    Tenant serverTenant = new Tenant.TenantBuilder(SERVER_TENANT_NAME).setRole(TenantRole.SERVER)
-        .setOfflineInstances(NUM_INSTANCES)
-        .build();
+    Tenant serverTenant =
+        new Tenant.TenantBuilder(SERVER_TENANT_NAME).setRole(TenantRole.SERVER).setOfflineInstances(NUM_INSTANCES)
+            .build();
     _helixResourceManager.createServerTenant(serverTenant);
 
     _helixAdmin.enableResource(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, true);
   }
 
   @Test
-  public void testGetInstanceEndpoints() throws InvalidConfigException {
+  public void testGetInstanceEndpoints()
+      throws InvalidConfigException {
     Set<String> servers = _helixResourceManager.getAllInstancesForServerTenant(SERVER_TENANT_NAME);
     BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(servers);
     for (int i = 0; i < NUM_INSTANCES; i++) {
@@ -112,7 +119,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   }
 
   @Test
-  public void testGetInstanceConfigs() throws Exception {
+  public void testGetInstanceConfigs()
+      throws Exception {
     Set<String> servers = _helixResourceManager.getAllInstancesForServerTenant(SERVER_TENANT_NAME);
     for (String server : servers) {
       InstanceConfig cachedInstanceConfig = _helixResourceManager.getHelixInstanceConfig(server);
@@ -129,7 +137,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     zkClient.close();
   }
 
-  private void modifyExistingInstanceConfig(ZkClient zkClient) throws InterruptedException {
+  private void modifyExistingInstanceConfig(ZkClient zkClient)
+      throws InterruptedException {
     String instanceName = "Server_localhost_" + new Random().nextInt(NUM_INSTANCES);
     String instanceConfigPath = PropertyPathBuilder.instanceConfig(_helixClusterName, instanceName);
     Assert.assertTrue(zkClient.exists(instanceConfigPath));
@@ -160,7 +169,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     zkClient.writeData(instanceConfigPath, znRecord);
   }
 
-  private void addAndRemoveNewInstanceConfig(ZkClient zkClient) throws Exception {
+  private void addAndRemoveNewInstanceConfig(ZkClient zkClient)
+      throws Exception {
     int biggerRandomNumber = NUM_INSTANCES + new Random().nextInt(NUM_INSTANCES);
     String instanceName = "Server_localhost_" + String.valueOf(biggerRandomNumber);
     String instanceConfigPath = PropertyPathBuilder.instanceConfig(_helixClusterName, instanceName);
@@ -193,18 +203,16 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   }
 
   @Test
-  public void testRebuildBrokerResourceFromHelixTags() throws Exception {
+  public void testRebuildBrokerResourceFromHelixTags()
+      throws Exception {
     // Create broker tenant on 3 Brokers
     Tenant brokerTenant =
         new Tenant.TenantBuilder(BROKER_TENANT_NAME).setRole(TenantRole.BROKER).setTotalInstances(3).build();
     _helixResourceManager.createBrokerTenant(brokerTenant);
 
     // Create the table
-    TableConfig tableConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNumReplicas(3)
-        .setBrokerTenant(BROKER_TENANT_NAME)
-        .setServerTenant(SERVER_TENANT_NAME)
-        .build();
+    TableConfig tableConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(3)
+        .setBrokerTenant(BROKER_TENANT_NAME).setServerTenant(SERVER_TENANT_NAME).build();
     _helixResourceManager.addTable(tableConfig);
 
     // Check that the BrokerResource ideal state has 3 Brokers assigned to the table
@@ -214,8 +222,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
 
     // Untag all Brokers assigned to broker tenant
     for (String brokerInstance : _helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME)) {
-      _helixAdmin.removeInstanceTag(_helixClusterName, brokerInstance,
-          TagNameUtils.getBrokerTagForTenant(BROKER_TENANT_NAME));
+      _helixAdmin
+          .removeInstanceTag(_helixClusterName, brokerInstance, TagNameUtils.getBrokerTagForTenant(BROKER_TENANT_NAME));
       _helixAdmin.addInstanceTag(_helixClusterName, brokerInstance, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     }
 
@@ -238,7 +246,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   }
 
   @Test
-  public void testRetrieveMetadata() throws Exception {
+  public void testRetrieveMetadata() {
     String segmentName = "testSegment";
 
     // Test retrieving OFFLINE segment ZK metadata
@@ -463,8 +471,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   }
 
   @Test
-  public void testLeadControllerResource()
-      throws Exception {
+  public void testLeadControllerResource() {
     IdealState leadControllerResourceIdealState = _helixResourceManager.getHelixAdmin()
         .getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
     Assert.assertTrue(leadControllerResourceIdealState.isValid());
@@ -476,25 +483,23 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     Assert.assertEquals(leadControllerResourceIdealState.getReplicas(),
         Integer.toString(LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT));
     Assert.assertEquals(leadControllerResourceIdealState.getRebalanceMode(), IdealState.RebalanceMode.FULL_AUTO);
-    Assert.assertTrue(leadControllerResourceIdealState.getInstanceSet(
-        leadControllerResourceIdealState.getPartitionSet().iterator().next()).isEmpty());
+    Assert.assertTrue(leadControllerResourceIdealState
+        .getInstanceSet(leadControllerResourceIdealState.getPartitionSet().iterator().next()).isEmpty());
 
-    TestUtils
-        .waitForCondition(aVoid -> {
-              ExternalView leadControllerResourceExternalView = _helixResourceManager.getHelixAdmin()
-                  .getResourceExternalView(getHelixClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
-              for (String partition : leadControllerResourceExternalView.getPartitionSet()) {
-                Map<String, String> stateMap = leadControllerResourceExternalView.getStateMap(partition);
-                Map.Entry<String, String> entry = stateMap.entrySet().iterator().next();
-                boolean result = (PREFIX_OF_CONTROLLER_INSTANCE + LOCAL_HOST + "_" + _controllerPort).equals(entry.getKey());
-                result &= "MASTER".equals(entry.getValue());
-                if (!result) {
-                  return false;
-                }
-              }
-              return true;
-            },
-            TIMEOUT_IN_MS, "Failed to assign controller hosts to lead controller resource in " + TIMEOUT_IN_MS + " ms.");
+    TestUtils.waitForCondition(aVoid -> {
+      ExternalView leadControllerResourceExternalView = _helixResourceManager.getHelixAdmin()
+          .getResourceExternalView(getHelixClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+      for (String partition : leadControllerResourceExternalView.getPartitionSet()) {
+        Map<String, String> stateMap = leadControllerResourceExternalView.getStateMap(partition);
+        Map.Entry<String, String> entry = stateMap.entrySet().iterator().next();
+        boolean result = (PREFIX_OF_CONTROLLER_INSTANCE + LOCAL_HOST + "_" + _controllerPort).equals(entry.getKey());
+        result &= "MASTER".equals(entry.getValue());
+        if (!result) {
+          return false;
+        }
+      }
+      return true;
+    }, TIMEOUT_IN_MS, "Failed to assign controller hosts to lead controller resource in " + TIMEOUT_IN_MS + " ms.");
   }
 
   @Test
@@ -536,9 +541,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
             + port + "}{}{TAG_LIST=[controller]}"));
       }
       clusterDataCache.setInstanceConfigMap(instanceConfigMap);
-      ZNRecord znRecord =
-          crushEdRebalanceStrategy.computePartitionAssignment(instanceNames, instanceNames, new HashMap<>(0),
-              clusterDataCache);
+      ZNRecord znRecord = crushEdRebalanceStrategy
+          .computePartitionAssignment(instanceNames, instanceNames, new HashMap<>(0), clusterDataCache);
 
       Assert.assertNotNull(znRecord);
       Map<String, List<String>> listFields = znRecord.getListFields();
@@ -551,8 +555,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
         if (!instanceToMasterAssignmentCountMap.containsKey(assignments.get(0))) {
           instanceToMasterAssignmentCountMap.put(assignments.get(0), 1);
         } else {
-          instanceToMasterAssignmentCountMap.put(assignments.get(0),
-              instanceToMasterAssignmentCountMap.get(assignments.get(0)) + 1);
+          instanceToMasterAssignmentCountMap
+              .put(assignments.get(0), instanceToMasterAssignmentCountMap.get(assignments.get(0)) + 1);
         }
         maxCount = Math.max(instanceToMasterAssignmentCountMap.get(assignments.get(0)), maxCount);
       }
@@ -568,8 +572,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   public void cleanUpBrokerTags() {
     // Untag all Brokers for other tests
     for (String brokerInstance : _helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME)) {
-      _helixAdmin.removeInstanceTag(_helixClusterName, brokerInstance,
-          TagNameUtils.getBrokerTagForTenant(BROKER_TENANT_NAME));
+      _helixAdmin
+          .removeInstanceTag(_helixClusterName, brokerInstance, TagNameUtils.getBrokerTagForTenant(BROKER_TENANT_NAME));
       _helixAdmin.addInstanceTag(_helixClusterName, brokerInstance, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     }
   }
