@@ -141,7 +141,9 @@ public class MinionStarter {
     MetricsHelper.initializeMetrics(_config);
     MetricsRegistry metricsRegistry = new MetricsRegistry();
     MetricsHelper.registerMetricsRegistry(metricsRegistry);
-    final MinionMetrics minionMetrics = new MinionMetrics(metricsRegistry);
+    final MinionMetrics minionMetrics = new MinionMetrics(
+        _config.getString(CommonConstants.Minion.METRICS_PREFIX_CONFIG, CommonConstants.Minion.METRICS_PREFIX),
+        metricsRegistry);
     minionMetrics.initializeGlobalMeters();
     minionContext.setMinionMetrics(minionMetrics);
 
