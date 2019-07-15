@@ -6,7 +6,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.tools.tuner.query.src.BasicQueryStats;
-import org.apache.pinot.tools.tuner.strategy.ColumnStatsObj;
+import org.apache.pinot.tools.tuner.strategy.MergerObj;
 
 
 /*
@@ -21,8 +21,8 @@ public abstract class StandaloneDriver extends TunerDriver {
     return this;
   }
 
-  private Map<Long, Map<String, Map<String, ColumnStatsObj>>> _threadAccumulator = null;
-  private Map<String, Map<String, ColumnStatsObj>> _mergedResults;
+  private Map<Long, Map<String, Map<String, MergerObj>>> _threadAccumulator = null;
+  private Map<String, Map<String, MergerObj>> _mergedResults;
 
   /*
    * Execute strategy
@@ -63,7 +63,7 @@ public abstract class StandaloneDriver extends TunerDriver {
      */
     LOGGER.debug("Setting up _mergedResults for merging");
     _mergedResults = new HashMap<>();
-    for (Map.Entry<Long, Map<String, Map<String, ColumnStatsObj>>> threadEntry : _threadAccumulator.entrySet()) {
+    for (Map.Entry<Long, Map<String, Map<String, MergerObj>>> threadEntry : _threadAccumulator.entrySet()) {
       for (String tableNameWithType : threadEntry.getValue().keySet()) {
         _mergedResults.putIfAbsent(tableNameWithType, new HashMap<>());
       }
@@ -76,8 +76,8 @@ public abstract class StandaloneDriver extends TunerDriver {
     for (String tableNameWithType : _mergedResults.keySet()) {
       mergeExecutor.execute(() -> {
         LOGGER.debug("Thread {} working on table {}",Thread.currentThread().getId(), tableNameWithType);
-        for (Map.Entry<Long, Map<String, Map<String, ColumnStatsObj>>> tableEntries : _threadAccumulator.entrySet()) {
-          for (Map.Entry<String, ColumnStatsObj> columnEntry : tableEntries.getValue()
+        for (Map.Entry<Long, Map<String, Map<String, MergerObj>>> tableEntries : _threadAccumulator.entrySet()) {
+          for (Map.Entry<String, MergerObj> columnEntry : tableEntries.getValue()
               .getOrDefault(tableNameWithType, new HashMap<>()).entrySet()) {
             try {
               _mergedResults.get(tableNameWithType)
@@ -102,7 +102,7 @@ public abstract class StandaloneDriver extends TunerDriver {
     /*
      * Report
      */
-    for (Map.Entry<String, Map<String, ColumnStatsObj>> tableStat: _mergedResults.entrySet()){
+    for (Map.Entry<String, Map<String, MergerObj>> tableStat: _mergedResults.entrySet()){
       _strategy.reporter(tableStat.getKey(),tableStat.getValue());
     }
   }

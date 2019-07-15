@@ -30,9 +30,11 @@ public class ParserBasedImpl implements BasicStrategy {
 
   public final static int FIRST_ORDER = 1;
   public final static int THIRD_ORDER = 3;
+
   public final static long NO_IN_FILTER_THRESHOLD = 0;
-  public final static int NO_WEIGHT_FOR_VOTE=0;
-  public final static int IN_FILTER_WEIGHT_FOR_VOTE=1;
+
+  public final static int NO_WEIGHT_FOR_VOTE = 0;
+  public final static int IN_FILTER_WEIGHT_FOR_VOTE = 1;
 
   private int _algorithmOrder;
   private HashSet<String> _tableNamesWorkonWithType;
@@ -87,13 +89,13 @@ public class ParserBasedImpl implements BasicStrategy {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     long numEntriesScannedInFilter = Long.parseLong(indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter());
     return (_tableNamesWorkonWithType.isEmpty() || _tableNamesWorkonWithType
-        .contains(indexSuggestQueryStatsImpl.getTableNameWithType())) &&
-        (numEntriesScannedInFilter >= _numEntriesScannedThreshold);
+        .contains(indexSuggestQueryStatsImpl.getTableNameWithType())) && (numEntriesScannedInFilter
+        >= _numEntriesScannedThreshold);
   }
 
   @Override
   public void accumulator(BasicQueryStats queryStats, MetaDataProperties metaDataProperties,
-      Map<String, Map<String, ColumnStatsObj>> AccumulatorOut) {
+      Map<String, Map<String, MergerObj>> AccumulatorOut) {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     String tableNameWithType = indexSuggestQueryStatsImpl.getTableNameWithType();
     String numEntriesScannedInFilter = indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter();
@@ -101,37 +103,45 @@ public class ParserBasedImpl implements BasicStrategy {
 
     DimensionScoring dimensionScoring = new DimensionScoring(tableNameWithType, metaDataProperties, query);
     List<Tuple2<List<String>, BigFraction>> columnScores = dimensionScoring.parseQuery();
-    cropList(columnScores,_algorithmOrder);
+    cropList(columnScores, _algorithmOrder);
 
-    for (Tuple2<List<String>, BigFraction> tupleNamesScore: columnScores){
-      for(String colName: tupleNamesScore._1()){
+    for (Tuple2<List<String>, BigFraction> tupleNamesScore : columnScores) {
+      for (String colName : tupleNamesScore._1()) {
         AccumulatorOut.putIfAbsent(tableNameWithType, new HashMap<>());
-        AccumulatorOut.get(tableNameWithType).putIfAbsent(colName, new ParseBasedObj());
-        BigFraction weigthedScore=BigFraction.ONE.subtract(tupleNamesScore._2().reciprocal()).multiply(new BigInteger(numEntriesScannedInFilter));
-        ((ParseBasedObj)AccumulatorOut.get(tableNameWithType).get(colName)).merge(1,weigthedScore.bigDecimalValue(RoundingMode.HALF_EVEN.ordinal()).toBigInteger());
+        AccumulatorOut.get(tableNameWithType).putIfAbsent(colName, new ParseBasedMergerObj());
+        BigFraction weigthedScore = BigFraction.ONE.subtract(tupleNamesScore._2().reciprocal())
+            .multiply(new BigInteger(numEntriesScannedInFilter));
+        ((ParseBasedMergerObj) AccumulatorOut.get(tableNameWithType).get(colName))
+            .merge(1, weigthedScore.bigDecimalValue(RoundingMode.HALF_EVEN.ordinal()).toBigInteger());
       }
     }
   }
 
   @Override
-  public void merger(ColumnStatsObj p1, ColumnStatsObj p2) {
-    ((ParseBasedObj)p1).merge((ParseBasedObj)p2);
+  public void merger(MergerObj p1, MergerObj p2) {
+    ((ParseBasedMergerObj) p1).merge((ParseBasedMergerObj) p2);
   }
 
   @Override
-  public void reporter(String tableNameWithType, Map<String, ColumnStatsObj> MergedOut) {
+  public void reporter(String tableNameWithType, Map<String, MergerObj> mergedOut) {
+    String tableName = "**********************Report For Table: "+tableNameWithType+"**********************\n";
+    String mergerOut = "";
+    for(Map.Entry<String, MergerObj> entry: mergedOut.entrySet()){
+      mergerOut+=entry.getKey()+": "+entry.getValue().toString()+"\n";
+    }
+    LOGGER.debug(mergerOut);
   }
 
   /*
    * Crop a list to finalLength
    */
-  private static void cropList(List list, int finalLength){
+  private static void cropList(List list, int finalLength) {
     int listSize = list.size();
     int numToReMove = listSize - finalLength;
     for (int i = 1; i <= numToReMove; i++) {
       list.remove(listSize - i);
     }
-  };
+  }
 
   class DimensionScoring {
     private String _tableNameWithType;
@@ -148,6 +158,8 @@ public class ParserBasedImpl implements BasicStrategy {
      * Navigate from root to predicateListContext of whereClauseContext, where all the filtering happens
      */
     List<Tuple2<List<String>, BigFraction>> parseQuery() {
+      LOGGER.debug("Parsing query: {}", _queryString);
+
       PQL2Lexer lexer = new PQL2Lexer(new ANTLRInputStream(_queryString));
       PQL2Parser parser = new PQL2Parser(new CommonTokenStream(lexer));
       ParseTree selectStatement = parser.root().statement().selectStatement();
@@ -171,7 +183,6 @@ public class ParserBasedImpl implements BasicStrategy {
       if (whereClauseContext == null) {
         return null;
       }
-
       return parsePredicateList(whereClauseContext.predicateList());
     }
 
@@ -182,10 +193,13 @@ public class ParserBasedImpl implements BasicStrategy {
      *  OR connected: ([colName1]+[colName2]+[colName3], 1/(1/Score(predicate1)+1/Score(predicate2)+1/Score(predicate3))) i.e. Harmonic mean of scores
      */
     List<Tuple2<List<String>, BigFraction>> parsePredicateList(PQL2Parser.PredicateListContext predicateListContext) {
+      LOGGER.debug("Parsing predicate list {}", predicateListContext.getText());
       if (predicateListContext.getChildCount() == 1) {
+        LOGGER.debug("Parsing parenthesis group");
         return parsePredicate((PQL2Parser.PredicateContext) predicateListContext.getChild(0));
       }
       else if (predicateListContext.getChild(1) instanceof SemanticContext.AND) {
+        LOGGER.debug("Parsing AND list");
         List<Tuple2<List<String>, BigFraction>> childResults = new ArrayList<>();
         for (int i = 0; i < predicateListContext.getChildCount(); i += 2) {
           List<Tuple2<List<String>, BigFraction>> childResult =
@@ -195,11 +209,14 @@ public class ParserBasedImpl implements BasicStrategy {
           }
         }
 
-        childResults.sort(Comparator.comparing((Function<Tuple2<List<String>, BigFraction>, BigFraction>) Tuple2::_2).reversed());
+        childResults.sort(
+            Comparator.comparing((Function<Tuple2<List<String>, BigFraction>, BigFraction>) Tuple2::_2).reversed());
         cropList(childResults, _algorithmOrder);
+        LOGGER.debug("AND rank: {}", childResults.toString());
         return childResults;
       }
       else if (predicateListContext.getChild(1) instanceof SemanticContext.OR) {
+        LOGGER.debug("Parsing OR list");
         BigFraction weight = BigFraction.ZERO;
         List<String> colNames = new ArrayList<>();
         for (int i = 0; i < predicateListContext.getChildCount(); i += 2) {
@@ -213,9 +230,9 @@ public class ParserBasedImpl implements BasicStrategy {
         weight = weight.reciprocal();
         List<Tuple2<List<String>, BigFraction>> childResults = new ArrayList<>();
         childResults.add(new Tuple2<>(colNames, weight));
+        LOGGER.debug("OR rank: {}", childResults.toString());
         return childResults;
-      }
-      else {
+      } else {
         LOGGER.error("Query: " + _queryString + " parsing exception: " + predicateListContext.getText());
         return null;
       }
@@ -239,6 +256,7 @@ public class ParserBasedImpl implements BasicStrategy {
      *
      */
     List<Tuple2<List<String>, BigFraction>> parsePredicate(PQL2Parser.PredicateContext predicateContext) {
+      LOGGER.debug("Parsing predicate {}", predicateContext.getText());
       if (predicateContext instanceof PQL2Parser.PredicateParenthesisGroupContext) {
         PQL2Parser.PredicateParenthesisGroupContext predicateParenthesisGroupContext =
             (PQL2Parser.PredicateParenthesisGroupContext) predicateContext;
@@ -256,6 +274,7 @@ public class ParserBasedImpl implements BasicStrategy {
         } else {
           ret.add(new Tuple2<>(colNameList, cardinality.divide(lenFilter)));
         }
+        LOGGER.debug("IN clause ret {} {}", ret.toString());
         return ret;
       } else if (predicateContext instanceof PQL2Parser.ComparisonPredicateContext) {
         String colName =
@@ -270,9 +289,11 @@ public class ParserBasedImpl implements BasicStrategy {
 
         if (comparisonOp.equals("=")) {
           ret.add(new Tuple2<>(colNameList, cardinality));
+          LOGGER.debug("Comp clause ret {} {}", ret.toString());
           return ret;
         } else if (comparisonOp.equals("!=") || comparisonOp.equals("<>")) {
           ret.add(new Tuple2<>(colNameList, cardinality.divide(cardinality.subtract(BigFraction.ONE))));
+          LOGGER.debug("Comp clause ret {} {}", ret.toString());
           return ret;
         } else {
           return null;

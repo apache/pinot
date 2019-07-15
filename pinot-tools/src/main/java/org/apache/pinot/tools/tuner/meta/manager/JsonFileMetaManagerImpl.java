@@ -106,6 +106,8 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     String cardNumerator = getColField(tableNameWithType, columnName, WEIGHTED_SUM_CARDINALITY);
     String cardDenominator = getColField(tableNameWithType, columnName, SUM_DOCS);
 
+
+
     if (cardNumerator == null || cardDenominator == null) {
       LOGGER.error("{} {} {}'s cardinality does not exist!", tableNameWithType, columnName, columnName);
       return new BigFraction(1);
@@ -121,8 +123,14 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     }
 
     BigFraction averageCard= new BigFraction(new BigInteger(cardNumerator), new BigInteger(cardDenominator));
+    BigFraction ret=averageCard.multiply(sorted_ratio);
 
-    return averageCard.multiply(sorted_ratio);
+    LOGGER.debug("Table:{} column:{} card: {}/{}, sort: {}/{}, final {}",
+        tableNameWithType, columnName, cardNumerator,
+        cardDenominator, nSortedNuemrator, nSortedDenominator, ret
+        );
+
+    return ret;
   }
 
   public String getSegmentField(String tableNameWithType, String columnName, String segmentName, String fieldName) {
