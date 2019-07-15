@@ -48,7 +48,7 @@
       <AppenderRef ref="console"/>
     </AsyncRoot>
     <AsyncLogger name="org.apache.pinot" level="info" additivity="false"/>
-    <AsyncLogger name="org.apache.pinot.tools" level="info" additivity="false">
+    <AsyncLogger name="org.apache.pinot.tools" level="debug" additivity="false">
       <AppenderRef ref="console"/>
     </AsyncLogger>
 

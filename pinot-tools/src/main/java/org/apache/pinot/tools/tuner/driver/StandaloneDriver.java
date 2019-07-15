@@ -5,21 +5,43 @@ import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.tools.tuner.meta.manager.MetaManager;
 import org.apache.pinot.tools.tuner.query.src.BasicQueryStats;
+import org.apache.pinot.tools.tuner.query.src.QuerySrc;
+import org.apache.pinot.tools.tuner.strategy.BasicStrategy;
 import org.apache.pinot.tools.tuner.strategy.MergerObj;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /*
  * Local concurrent driver
  */
 public abstract class StandaloneDriver extends TunerDriver {
+  protected static final Logger LOGGER = LoggerFactory.getLogger(StandaloneDriver.class);
 
   private int _coreSize = 0;
 
-  public StandaloneDriver setCoreSize(int coreSize) {
+  protected StandaloneDriver setCoreSize(int coreSize) {
     _coreSize = coreSize;
     return this;
   }
+
+  public StandaloneDriver setQuerySrc(QuerySrc querySrc) {
+    _querySrc = querySrc;
+    return this;
+  }
+
+  public StandaloneDriver setMetaManager(MetaManager metaManager) {
+    _metaManager = metaManager;
+    return this;
+  }
+
+  public StandaloneDriver setStrategy(BasicStrategy strategy) {
+    _strategy = strategy;
+    return this;
+  }
+
 
   private Map<Long, Map<String, Map<String, MergerObj>>> _threadAccumulator = null;
   private Map<String, Map<String, MergerObj>> _mergedResults;
@@ -39,7 +61,7 @@ public abstract class StandaloneDriver extends TunerDriver {
 
     while (_querySrc.hasNext()) {
       BasicQueryStats basicQueryStats = _querySrc.next();
-      if (_strategy.filter(basicQueryStats)) {
+      if (basicQueryStats!=null && _strategy.filter(basicQueryStats)) {
         LOGGER.debug("Master thread {} submitting: {}",Thread.currentThread().getId(),basicQueryStats.toString());
         accumulateExecutor.execute(() -> {
           long threadID = Thread.currentThread().getId();
@@ -68,7 +90,7 @@ public abstract class StandaloneDriver extends TunerDriver {
         _mergedResults.putIfAbsent(tableNameWithType, new HashMap<>());
       }
     }
-    LOGGER.debug("tableNames: ", _mergedResults.keySet().toString());
+    LOGGER.debug("tableNames: {}", _mergedResults.keySet().toString());
 
     LOGGER.debug("Setting up executor for merging: {} threads",this._coreSize);
     ThreadPoolExecutor mergeExecutor = new ThreadPoolExecutor(this._coreSize, this._coreSize, 60, TimeUnit.SECONDS,

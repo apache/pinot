@@ -20,26 +20,10 @@ TunerDriver is an executable interface, has three pluggable modules:
         Reporter: A function to postprocess and print(email) out the final results of a table.
 */
 public abstract class TunerDriver {
-  protected static final Logger LOGGER = LoggerFactory.getLogger(TunerDriver.class);
 
   protected QuerySrc _querySrc = null;
   protected MetaManager _metaManager = null;
   protected BasicStrategy _strategy = null;
-
-  protected TunerDriver setQuerySrc(QuerySrc querySrc) {
-    _querySrc = querySrc;
-    return this;
-  }
-
-  protected TunerDriver setMetaManager(MetaManager metaManager) {
-    _metaManager = metaManager;
-    return this;
-  }
-
-  protected TunerDriver setStrategy(BasicStrategy strategy) {
-    _strategy = strategy;
-    return this;
-  }
 
   public abstract void excute();
 }
