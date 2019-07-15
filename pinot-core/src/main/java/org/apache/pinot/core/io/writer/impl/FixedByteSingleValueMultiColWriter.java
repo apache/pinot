@@ -28,7 +28,7 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 public class FixedByteSingleValueMultiColWriter implements Closeable {
   private final int[] columnOffsets;
-  private final PinotDataBuffer indexDataBuffer;
+  private PinotDataBuffer indexDataBuffer;
   private int rowSizeInBytes;
 
   public FixedByteSingleValueMultiColWriter(File file, int rows, int cols, int[] columnSizes)
@@ -103,6 +103,9 @@ public class FixedByteSingleValueMultiColWriter implements Closeable {
   @Override
   public void close()
       throws IOException {
-    this.indexDataBuffer.close();
+    if (this.indexDataBuffer != null) {
+      this.indexDataBuffer.close();
+      this.indexDataBuffer = null;
+    }
   }
 }
