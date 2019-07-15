@@ -100,6 +100,11 @@ public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
     segmentGeneratorConfig.setInvertedIndexCreationColumns(Arrays.asList("column3", "column7", "column8", "column9"));
+    // The segment generation code in SegmentColumnarIndexCreator will throw
+    // exception if start and end time in time column are not in acceptable
+    // range. For this test, we first need to fix the input avro data
+    // to have the time column values in allowed range. Until then, the check
+    // is explicitly disabled
     segmentGeneratorConfig.setCheckTimeColumnValidityDuringGeneration(false);
 
     // Build the index segment.
