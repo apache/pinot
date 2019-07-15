@@ -1088,7 +1088,10 @@ export default Component.extend({
       //Update the time range option selected
       set(this, 'analysisRange', [startDate, endDate]);
       set(this, 'duration', duration);
-      this._fetchAnomalies();
+      // This makes sure we don't fetch if the preview is collapsed
+      if(get(this, 'showDetails') && get(this, 'dataIsCurrent')){
+        this._fetchAnomalies();
+      }
     },
 
     /**
