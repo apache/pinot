@@ -95,6 +95,7 @@ public class RealtimeSegmentConverter {
       reader = new RealtimeSegmentRecordReader(realtimeSegmentImpl, dataSchema, sortedColumn);
     }
     SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(dataSchema);
+    genConfig.setCheckTimeColumnValidityDuringGeneration(false);
     if (invertedIndexColumns != null && !invertedIndexColumns.isEmpty()) {
       for (String column : invertedIndexColumns) {
         genConfig.createInvertedIndexForColumn(column);
