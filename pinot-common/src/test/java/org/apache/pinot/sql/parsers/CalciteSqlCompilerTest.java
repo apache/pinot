@@ -29,8 +29,7 @@ import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.pql.parsers.PinotQuery2BrokerRequestConverter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -40,10 +39,8 @@ import org.testng.annotations.Test;
  */
 public class CalciteSqlCompilerTest {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlCompilerTest.class);
   @Test
   public void testQuotedStrings() {
-
     PinotQuery pinotQuery =
         CalciteSqlParser.compileToPinotQuery("select * from vegetables where origin = 'Martha''s Vineyard'");
     Assert.assertEquals(
@@ -340,59 +337,22 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
-  public void testConverter()
-      throws IOException {
-    CalciteSqlParser.compileToPinotQuery("SELECT MIN(div(DaysSinceEpoch,2)) FROM mytable");
-    CalciteSqlParser.compileToPinotQuery(
-        "SELECT SUM(DepDelayMinutes), SUM(ArrDel15), SUM(DepDelay), SUM(DepDel15) FROM myStarTable WHERE Carrier IN ('UA', 'WN', 'FL', 'F9') AND Carrier NOT IN ('EV', 'AS', 'FL') AND DayofMonth > 5 AND DayofMonth <= 17 AND Diverted > 0 AND OriginCityName > 'Detroit, MI' GROUP BY CRSDepTime");
-    CalciteSqlParser.compileToPinotQuery("Select * from T where a > 1 and a < 10");
-    CalciteSqlParser.compileToPinotQuery("Select * from T where a between 1 and 10");
-
-    final BufferedReader br = new BufferedReader(
-        new InputStreamReader(CalciteSqlCompilerTest.class.getClassLoader().getResourceAsStream("sql_queries.list")));
-    String sql;
-    int seqId = 0;
-    while ((sql = br.readLine()) != null) {
-      BrokerRequest brokerRequest;
-      PinotQuery pinotQuery;
-      try {
-        LOGGER.info("Trying to compile SQL Id - {}, SQL: {}", seqId, sql);
-        System.out.println(String.format("Trying to compile SQL Id - %d, SQL: %s", seqId, sql));
-        pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
-        brokerRequest = new PinotQuery2BrokerRequestConverter().convert(pinotQuery);
-        LOGGER.debug("Compiled SQL: Id - {}, PinotQuery: {}, BrokerRequest: {}", seqId, pinotQuery, brokerRequest);
-        seqId++;
-      } catch (Exception e) {
-        LOGGER.error("Failed to compile SQL {} to BrokerRequest.", sql, e);
-        throw e;
-      }
-    }
-  }
-
-
-  @Test
   public void testPqlAndSqlCompatible()
       throws IOException {
-    final BufferedReader brSql = new BufferedReader(
+    try (BufferedReader sqlReader = new BufferedReader(
         new InputStreamReader(CalciteSqlCompilerTest.class.getClassLoader().getResourceAsStream("sql_queries.list")));
-    final BufferedReader brPql = new BufferedReader(
-        new InputStreamReader(CalciteSqlCompilerTest.class.getClassLoader().getResourceAsStream("pql_queries.list")));
-    String sql;
-    int seqId = 0;
-    while ((sql = brSql.readLine()) != null) {
-      final String pql = brPql.readLine();
-      BrokerRequest brokerRequest;
-      PinotQuery pinotQuery;
-      try {
-        LOGGER.info("Trying to compile SQL Id - {}, SQL: {}", seqId, sql);
-        System.out.println(String.format("Trying to compile SQL Id - %d, SQL: %s", seqId, sql));
-        pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
-        brokerRequest = new PinotQuery2BrokerRequestConverter().convert(pinotQuery);
-        LOGGER.debug("Compiled SQL: Id - {}, PinotQuery: {}, BrokerRequest: {}", seqId, pinotQuery, brokerRequest);
-        seqId++;
-      } catch (Exception e) {
-        LOGGER.error("Failed to compile SQL {} to BrokerRequest.", sql, e);
-        throw e;
+        BufferedReader pqlReader = new BufferedReader(new InputStreamReader(
+            CalciteSqlCompilerTest.class.getClassLoader().getResourceAsStream("pql_queries.list")))) {
+      PinotQuery2BrokerRequestConverter pinotQuery2BrokerRequestConverter = new PinotQuery2BrokerRequestConverter();
+      Pql2Compiler pqlCompiler = new Pql2Compiler();
+      String sql;
+      while ((sql = sqlReader.readLine()) != null) {
+        // Compilation should not throw exception
+        PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+        BrokerRequest sqlBrokerRequest = pinotQuery2BrokerRequestConverter.convert(pinotQuery);
+
+        BrokerRequest pqlBrokerRequest = pqlCompiler.compileToBrokerRequest(pqlReader.readLine());
+        // TODO: compare SQL/PQL broker request
       }
     }
   }
