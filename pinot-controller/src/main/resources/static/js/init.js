@@ -128,6 +128,16 @@ $(document).ready(function() {
         columns: columnList,
         scrollX: true
       });
+
+      new $.fn.dataTable.Buttons(table, {
+        buttons: [
+          'copy', 'excel', 'csv'
+        ]
+      });
+
+      table.buttons().container().prependTo(
+        table.table().container()
+      );
     })
   });
 });
