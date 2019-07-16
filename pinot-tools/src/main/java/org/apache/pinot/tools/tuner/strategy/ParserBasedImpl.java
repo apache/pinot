@@ -15,7 +15,6 @@ import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.apache.commons.math.fraction.BigFraction;
-import org.apache.commons.math.fraction.Fraction;
 import org.apache.pinot.pql.parsers.PQL2Lexer;
 import org.apache.pinot.pql.parsers.PQL2Parser;
 import org.apache.pinot.tools.tuner.meta.manager.MetaDataProperties;
@@ -23,7 +22,6 @@ import org.apache.pinot.tools.tuner.query.src.BasicQueryStats;
 import org.apache.pinot.tools.tuner.query.src.IndexSuggestQueryStatsImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.rmi.runtime.Log;
 
 
 public class ParserBasedImpl implements BasicStrategy {
@@ -104,12 +102,16 @@ public class ParserBasedImpl implements BasicStrategy {
     String query = indexSuggestQueryStatsImpl.getQuery();
     LOGGER.debug("Accumulator: accumulating table {}", tableNameWithType);
 
-    if(Long.parseLong(numEntriesScannedInFilter)==0) return; //Early return if the query is not scanning in filter
+    if (Long.parseLong(numEntriesScannedInFilter) == 0) {
+      return; //Early return if the query is not scanning in filter
+    }
 
     DimensionScoring dimensionScoring = new DimensionScoring(tableNameWithType, metaDataProperties, query);
     List<Tuple2<List<String>, BigFraction>> columnScores = dimensionScoring.parseQuery();
-    if (columnScores == null) return;
-    LOGGER.debug("Accumulator map: {}",columnScores.toString());
+    if (columnScores == null) {
+      return;
+    }
+    LOGGER.debug("Accumulator map: {}", columnScores.toString());
 
     cropList(columnScores, _algorithmOrder);
     for (Tuple2<List<String>, BigFraction> tupleNamesScore : columnScores) {
@@ -133,22 +135,22 @@ public class ParserBasedImpl implements BasicStrategy {
   public void reporter(String tableNameWithType, Map<String, MergerObj> mergedOut) {
     String tableName = "\n**********************Report For Table: " + tableNameWithType + "**********************\n";
     String mergerOut = "";
-    List<Tuple2<String, Long>> sortedPure = new ArrayList<Tuple2<String, Long>>();
-    List<Tuple2<String, BigInteger>> sortedWeighted = new ArrayList<Tuple2<String, BigInteger>>();
-    for (Map.Entry<String, MergerObj> entry : mergedOut.entrySet()){
-      sortedPure.add(new Tuple2<>(entry.getKey(), ((ParseBasedMergerObj)entry.getValue()).getPureScore()));
-      sortedWeighted.add(new Tuple2<>(entry.getKey(), ((ParseBasedMergerObj)entry.getValue()).getWeigtedScore()));
+    List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
+    List<Tuple2<String, BigInteger>> sortedWeighted = new ArrayList<>();
+    for (Map.Entry<String, MergerObj> entry : mergedOut.entrySet()) {
+      sortedPure.add(new Tuple2<>(entry.getKey(), ((ParseBasedMergerObj) entry.getValue()).getPureScore()));
+      sortedWeighted.add(new Tuple2<>(entry.getKey(), ((ParseBasedMergerObj) entry.getValue()).getWeigtedScore()));
     }
     sortedPure.sort(Comparator.comparing(Tuple2::_2));
     sortedWeighted.sort(Comparator.comparing(Tuple2::_2));
-    for (Tuple2<String,Long> tuple2: sortedPure) {
-      mergerOut +="Dimension: " + tuple2._1() + tuple2._2().toString() + "\n";
+    for (Tuple2<String, Long> tuple2 : sortedPure) {
+      mergerOut += "Dimension: " + tuple2._1() + tuple2._2().toString() + "\n";
     }
-    mergerOut +="\n*********************************************************************\n";
-    for (Tuple2<String,BigInteger> tuple2: sortedWeighted) {
-      mergerOut +="Dimension: " + tuple2._1() + tuple2._2().toString() + "\n";
+    mergerOut += "\n*********************************************************************\n";
+    for (Tuple2<String, BigInteger> tuple2 : sortedWeighted) {
+      mergerOut += "Dimension: " + tuple2._1() + tuple2._2().toString() + "\n";
     }
-    LOGGER.info(tableName+mergerOut);
+    LOGGER.info(tableName + mergerOut);
   }
 
   /*
@@ -200,8 +202,7 @@ public class ParserBasedImpl implements BasicStrategy {
             }
           }
         }
-      }
-      catch (Exception e){
+      } catch (Exception e) {
         return null;
       }
       if (whereClauseContext == null) {
@@ -250,14 +251,15 @@ public class ParserBasedImpl implements BasicStrategy {
         for (int i = 0; i < predicateListContext.getChildCount(); i += 2) {
           List<Tuple2<List<String>, BigFraction>> childResult =
               parsePredicate((PQL2Parser.PredicateContext) predicateListContext.getChild(i));
-          if (childResult != null && childResult.size()>0 && childResult.get(0)._2().compareTo(BigFraction.ZERO)>0) {
+          if (childResult != null && childResult.size() > 0
+              && childResult.get(0)._2().compareTo(BigFraction.ZERO) > 0) {
             colNames.addAll(childResult.get(0)._1());
             weight = weight.add(childResult.get(0)._2().reciprocal());
           }
         }
         LOGGER.debug("OR rank sum weight: {}", weight);
 
-        if(weight.compareTo(BigFraction.ZERO)<=0){
+        if (weight.compareTo(BigFraction.ZERO) <= 0) {
           return childResults;
         }
 

@@ -42,7 +42,6 @@ public abstract class StandaloneDriver extends TunerDriver {
     return this;
   }
 
-
   private Map<Long, Map<String, Map<String, MergerObj>>> _threadAccumulator = null;
   private Map<String, Map<String, MergerObj>> _mergedResults;
 
@@ -55,14 +54,14 @@ public abstract class StandaloneDriver extends TunerDriver {
      * Accumulate all the queries to threadAccumulator:/threadID/table/column
      */
     _threadAccumulator = new HashMap<>();
-    LOGGER.info("Setting up executor for accumulation: {} threads",this._coreSize);
+    LOGGER.info("Setting up executor for accumulation: {} threads", this._coreSize);
     ThreadPoolExecutor accumulateExecutor = new ThreadPoolExecutor(this._coreSize, this._coreSize, 365, TimeUnit.DAYS,
         new LinkedBlockingQueue<>(Integer.MAX_VALUE), new ThreadPoolExecutor.CallerRunsPolicy());
 
     while (_querySrc.hasNext()) {
       BasicQueryStats basicQueryStats = _querySrc.next();
-      if (basicQueryStats!=null && _strategy.filter(basicQueryStats)) {
-        LOGGER.debug("Master thread {} submitting: {}",Thread.currentThread().getId(),basicQueryStats.toString());
+      if (basicQueryStats != null && _strategy.filter(basicQueryStats)) {
+        LOGGER.debug("Master thread {} submitting: {}", Thread.currentThread().getId(), basicQueryStats.toString());
         accumulateExecutor.execute(() -> {
           long threadID = Thread.currentThread().getId();
           LOGGER.debug("Thread {} accumulating: {}", threadID, basicQueryStats.toString());
@@ -92,12 +91,12 @@ public abstract class StandaloneDriver extends TunerDriver {
     }
     LOGGER.info("tableNames: {}", _mergedResults.keySet().toString());
 
-    LOGGER.info("Setting up executor for merging: {} threads",this._coreSize);
+    LOGGER.info("Setting up executor for merging: {} threads", this._coreSize);
     ThreadPoolExecutor mergeExecutor = new ThreadPoolExecutor(this._coreSize, this._coreSize, 365, TimeUnit.DAYS,
         new LinkedBlockingQueue<>(Integer.MAX_VALUE), new ThreadPoolExecutor.CallerRunsPolicy());
     for (String tableNameWithType : _mergedResults.keySet()) {
       mergeExecutor.execute(() -> {
-        LOGGER.debug("Thread {} working on table {}",Thread.currentThread().getId(), tableNameWithType);
+        LOGGER.debug("Thread {} working on table {}", Thread.currentThread().getId(), tableNameWithType);
         for (Map.Entry<Long, Map<String, Map<String, MergerObj>>> tableEntries : _threadAccumulator.entrySet()) {
           for (Map.Entry<String, MergerObj> columnEntry : tableEntries.getValue()
               .getOrDefault(tableNameWithType, new HashMap<>()).entrySet()) {
@@ -124,8 +123,8 @@ public abstract class StandaloneDriver extends TunerDriver {
     /*
      * Report
      */
-    for (Map.Entry<String, Map<String, MergerObj>> tableStat: _mergedResults.entrySet()){
-      _strategy.reporter(tableStat.getKey(),tableStat.getValue());
+    for (Map.Entry<String, Map<String, MergerObj>> tableStat : _mergedResults.entrySet()) {
+      _strategy.reporter(tableStat.getKey(), tableStat.getValue());
     }
   }
 }

@@ -21,14 +21,14 @@ public class JsonFileMetaManagerImpl implements MetaManager {
    COL_META: Aggregated (sum and weighted sum of metadata)
    SEGMENT_META: Individually stored metadata of each segment
    */
-  public static final Boolean IGNORE_EXISTING_INDEX=false;
-  public static final Boolean USE_EXISTING_INDEX=true;
+  public static final Boolean IGNORE_EXISTING_INDEX = false;
+  public static final Boolean USE_EXISTING_INDEX = true;
 
   private static final String COL_META = "col_meta";
   private static final String SEGMENT_META = "segment_meta";
-  private static final String TYPE_REALTIME="_REALTIME";
-  private static final String TYPE_OFFLINE="_OFFLINE";
-  private static final String TYPE_HYBRID="_HYBRID";
+  private static final String TYPE_REALTIME = "_REALTIME";
+  private static final String TYPE_OFFLINE = "_OFFLINE";
+  private static final String TYPE_HYBRID = "_HYBRID";
 
   private String _path;
   private Boolean _use_existing_index;
@@ -46,7 +46,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
   public static final class Builder {
     private String _path;
     private Boolean _use_existing_index = USE_EXISTING_INDEX;
-    private HashMap<String, HashSet<String>> _additional_masking_cols=new HashMap<>();
+    private HashMap<String, HashSet<String>> _additional_masking_cols = new HashMap<>();
 
     public Builder() {
     }
@@ -96,31 +96,31 @@ public class JsonFileMetaManagerImpl implements MetaManager {
   }
 
   public BigFraction getAverageCardinality(String tableNameWithType, String columnName) {
-    if(tableNameWithType.endsWith(TYPE_OFFLINE) || tableNameWithType.endsWith(TYPE_REALTIME) || tableNameWithType.endsWith(TYPE_HYBRID)){
-      tableNameWithType=tableNameWithType.replace(TYPE_OFFLINE,"");
-      tableNameWithType=tableNameWithType.replace(TYPE_REALTIME,"");
-      tableNameWithType=tableNameWithType.replace(TYPE_HYBRID,"");
+    if (tableNameWithType.endsWith(TYPE_OFFLINE) || tableNameWithType.endsWith(TYPE_REALTIME) || tableNameWithType
+        .endsWith(TYPE_HYBRID)) {
+      tableNameWithType = tableNameWithType.replace(TYPE_OFFLINE, "");
+      tableNameWithType = tableNameWithType.replace(TYPE_REALTIME, "");
+      tableNameWithType = tableNameWithType.replace(TYPE_HYBRID, "");
     }
-    LOGGER.debug("Getting card from: {} {}",tableNameWithType,columnName);
-    if(_use_existing_index){
-      if (_additional_masking_cols.getOrDefault(tableNameWithType, new HashSet<>()).contains(columnName)){
+    LOGGER.debug("Getting card from: {} {}", tableNameWithType, columnName);
+    if (_use_existing_index) {
+      if (_additional_masking_cols.getOrDefault(tableNameWithType, new HashSet<>()).contains(columnName)) {
         return BigFraction.ONE;
       }
-      String _numHasInv=getColField(tableNameWithType,columnName,NUM_SEGMENTS_HAS_INVERTED_INDEX);
-      if (_numHasInv==null || Integer.parseInt(_numHasInv)>0){
+      String _numHasInv = getColField(tableNameWithType, columnName, NUM_SEGMENTS_HAS_INVERTED_INDEX);
+      if (_numHasInv == null || Integer.parseInt(_numHasInv) > 0) {
         return BigFraction.ONE;
       }
     }
 
-    String nSortedNuemrator=getColField(tableNameWithType, columnName, NUM_SEGMENTS_SORTED);
-    String nSortedDenominator=getColField(tableNameWithType, columnName, NUM_SEGMENTS_COUNT);
+    String nSortedNuemrator = getColField(tableNameWithType, columnName, NUM_SEGMENTS_SORTED);
+    String nSortedDenominator = getColField(tableNameWithType, columnName, NUM_SEGMENTS_COUNT);
     String cardNumerator = getColField(tableNameWithType, columnName, WEIGHTED_SUM_CARDINALITY);
     String cardDenominator = getColField(tableNameWithType, columnName, SUM_DOCS);
 
-    LOGGER.debug("Cardinality table:{} column:{} card: {}/{}, sort: {}/{}",
-        tableNameWithType, columnName, cardNumerator,
-        cardDenominator, nSortedNuemrator, nSortedDenominator
-    );
+    LOGGER
+        .debug("Cardinality table:{} column:{} card: {}/{}, sort: {}/{}", tableNameWithType, columnName, cardNumerator,
+            cardDenominator, nSortedNuemrator, nSortedDenominator);
 
     if (cardNumerator == null || cardDenominator == null) {
       LOGGER.error("{} {}'s cardinality does not exist!", tableNameWithType, columnName);
@@ -128,20 +128,18 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     }
 
     BigFraction sorted_ratio;
-    if (nSortedNuemrator == null || nSortedDenominator==null){
+    if (nSortedNuemrator == null || nSortedDenominator == null) {
       LOGGER.error("{} {}'s sort info does not exist!", tableNameWithType, columnName);
-      sorted_ratio=BigFraction.ONE;
-    }
-    else if(nSortedNuemrator.equals(nSortedDenominator)){
+      sorted_ratio = BigFraction.ONE;
+    } else if (nSortedNuemrator.equals(nSortedDenominator)) {
       return BigFraction.ONE;
-    }
-    else{
+    } else {
       sorted_ratio = new BigFraction(new BigInteger(nSortedNuemrator), new BigInteger(nSortedDenominator));
     }
 
-    sorted_ratio=BigFraction.ONE.subtract(sorted_ratio);
-    BigFraction averageCard= new BigFraction(new BigInteger(cardNumerator), new BigInteger(cardDenominator));
-    BigFraction ret=averageCard.multiply(sorted_ratio);
+    sorted_ratio = BigFraction.ONE.subtract(sorted_ratio);
+    BigFraction averageCard = new BigFraction(new BigInteger(cardNumerator), new BigInteger(cardDenominator));
+    BigFraction ret = averageCard.multiply(sorted_ratio);
 
 //    LOGGER.debug("Cardinality: table:{} column:{} card: {}/{}, sort: {}/{}, final {}",
 //        tableNameWithType, columnName, cardNumerator,
@@ -154,23 +152,24 @@ public class JsonFileMetaManagerImpl implements MetaManager {
   public String getSegmentField(String tableNameWithType, String columnName, String segmentName, String fieldName) {
     JsonNode ret = _aggregatedMap.get(tableNameWithType).get(columnName).get(segmentName).get(fieldName);
     if (ret == null) {
-      LOGGER.error("tableNameWithType:{} columnName:{} segmentName:{} fieldName:{} Does not exist!", tableNameWithType, columnName, segmentName, fieldName);
+      LOGGER.error("tableNameWithType:{} columnName:{} segmentName:{} fieldName:{} Does not exist!", tableNameWithType,
+          columnName, segmentName, fieldName);
       return null;
     }
     return ret.asText();
   }
 
   public String getColField(String tableNameWithType, String columnName, String fieldName) {
-    JsonNode ret=null;
+    JsonNode ret = null;
     try {
       ret = _aggregatedMap.get(tableNameWithType).get(columnName).get(fieldName);
-    }
-    catch (NullPointerException e){
+    } catch (NullPointerException e) {
       LOGGER.debug("tableNameWithType:{} columnName:{} Does not exist!", tableNameWithType, columnName);
       return null;
     }
     if (ret == null) {
-      LOGGER.debug("tableNameWithType:{} columnName:{} fieldName:{} Does not exist!", tableNameWithType, columnName, fieldName);
+      LOGGER.debug("tableNameWithType:{} columnName:{} fieldName:{} Does not exist!", tableNameWithType, columnName,
+          fieldName);
       return null;
     }
     return ret.asText();

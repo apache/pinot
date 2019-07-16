@@ -31,7 +31,7 @@ public class BrokerLogParserImpl implements BasicQueryParser {
   public BasicQueryStats parse(String line) {
     Matcher match = _compiledPattern.matcher(line);
     LOGGER.debug("Original line: " + line);
-    if(match.find()){
+    if (match.find()) {
       IndexSuggestQueryStatsImpl ret = new IndexSuggestQueryStatsImpl.Builder()
           ._tableNameWithType(match.group(GROUP_NAMES.TABLE_NAME_WITH_TYPE.ordinal()))
           ._numEntriesScannedInFilter(match.group(GROUP_NAMES.NUM_ENTRIES_SCANNED_IN_FILTER.ordinal()))
