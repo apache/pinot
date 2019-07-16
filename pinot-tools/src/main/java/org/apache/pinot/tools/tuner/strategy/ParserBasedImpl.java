@@ -120,6 +120,7 @@ public class ParserBasedImpl implements BasicStrategy {
         AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new ParseBasedMergerObj());
         BigFraction weigthedScore = BigFraction.ONE.subtract(tupleNamesScore._2().reciprocal())
             .multiply(new BigInteger(numEntriesScannedInFilter));
+        LOGGER.debug("Weighte score: reciprocal {} score {}", BigFraction.ONE.subtract(tupleNamesScore._2().reciprocal()), weigthedScore.toString());
         ((ParseBasedMergerObj) AccumulatorOut.get(tableNameWithoutType).get(colName))
             .merge(1, weigthedScore.bigDecimalValue(RoundingMode.DOWN.ordinal()).toBigInteger());
       }
@@ -133,7 +134,7 @@ public class ParserBasedImpl implements BasicStrategy {
 
   @Override
   public void reporter(String tableNameWithoutType, Map<String, MergerObj> mergedOut) {
-    String tableName = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
+    String tableName = "\n\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
     String mergerOut = "";
     List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
     List<Tuple2<String, BigInteger>> sortedWeighted = new ArrayList<>();
@@ -141,12 +142,12 @@ public class ParserBasedImpl implements BasicStrategy {
       sortedPure.add(new Tuple2<>(entry.getKey(), ((ParseBasedMergerObj) entry.getValue()).getPureScore()));
       sortedWeighted.add(new Tuple2<>(entry.getKey(), ((ParseBasedMergerObj) entry.getValue()).getWeigtedScore()));
     }
-    sortedPure.sort(Comparator.reverseOrder());
-    sortedWeighted.sort(Comparator.reverseOrder());
+    sortedPure.sort((p1,p2)->(p2._2().compareTo(p1._2())));
+    sortedWeighted.sort((p1,p2)->(p2._2().compareTo(p1._2())));
     for (Tuple2<String, Long> tuple2 : sortedPure) {
       mergerOut += "Dimension: " + tuple2._1()+ "  " + tuple2._2().toString() + "\n";
     }
-    mergerOut += "\n*********************************************************************\n";
+    mergerOut += "\n***********************************************************************************\n";
     for (Tuple2<String, BigInteger> tuple2 : sortedWeighted) {
       mergerOut += "Dimension: " + tuple2._1()+ "  " + tuple2._2().toString() + "\n";
     }

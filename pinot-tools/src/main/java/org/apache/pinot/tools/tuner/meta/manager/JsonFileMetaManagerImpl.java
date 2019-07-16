@@ -124,8 +124,8 @@ public class JsonFileMetaManagerImpl implements MetaManager {
 
     BigFraction sorted_ratio;
     if (nSortedNuemrator == null || nSortedDenominator == null) {
-      LOGGER.error("{} {}'s sort info does not exist!", tableNameWithoutType, columnName);
-      sorted_ratio = BigFraction.ONE;
+      //LOGGER.error("{} {}'s sort info does not exist!", tableNameWithoutType, columnName);
+      sorted_ratio = BigFraction.ZERO;
     } else if (nSortedNuemrator.equals(nSortedDenominator)) {
       return BigFraction.ONE;
     } else {

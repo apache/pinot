@@ -101,7 +101,7 @@ public class LogFileSrcImpl implements QuerySrc {
       LOGGER.error(e.getMessage());
       _stringBufferNext = null;
     } finally {
-      LOGGER.debug("FileReaderReturning: {}", _stringBuffer);
+      LOGGER.trace("FileReader returning: {}", _stringBuffer);
       return _parser.parse(_stringBuffer);
     }
   }
