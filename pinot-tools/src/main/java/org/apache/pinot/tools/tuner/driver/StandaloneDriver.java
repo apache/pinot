@@ -22,7 +22,7 @@ public abstract class StandaloneDriver extends TunerDriver {
   public static final int NO_CONCURRENCY=0;
   private int _coreSize = 0;
 
-  protected StandaloneDriver setCoreSize(int coreSize) {
+  protected StandaloneDriver setThreadPoolSize(int coreSize) {
     _coreSize = coreSize;
     return this;
   }

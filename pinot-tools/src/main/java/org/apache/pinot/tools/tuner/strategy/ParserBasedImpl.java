@@ -112,10 +112,14 @@ public class ParserBasedImpl implements BasicStrategy {
       return;
     }
     LOGGER.debug("Accumulator map: {}", columnScores.toString());
+    //System.out.println(columnScores.get(0)._1().toString());
 
+    HashSet<String> counted=new HashSet<>();
     cropList(columnScores, _algorithmOrder);
     for (Tuple2<List<String>, BigFraction> tupleNamesScore : columnScores) {
       for (String colName : tupleNamesScore._1()) {
+        if(counted.contains(colName)) continue;
+        counted.add(colName);
         AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
         AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new ParseBasedMergerObj());
         BigFraction weigthedScore = BigFraction.ONE.subtract(tupleNamesScore._2().reciprocal())
