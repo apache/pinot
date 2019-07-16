@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
+import javax.validation.constraints.NotNull;
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
@@ -100,35 +101,29 @@ public class ParserBasedImpl implements BasicStrategy {
     String tableNameWithoutType = indexSuggestQueryStatsImpl.getTableNameWithoutType();
     String numEntriesScannedInFilter = indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter();
     String query = indexSuggestQueryStatsImpl.getQuery();
-    LOGGER.debug("Accumulator: accumulating table {}", tableNameWithoutType);
+    LOGGER.debug("Accumulator: scoring query {}", query);
 
-    if (Long.parseLong(numEntriesScannedInFilter) == 0) {
-      return; //Early return if the query is not scanning in filter
-    }
+    if (Long.parseLong(numEntriesScannedInFilter) == 0) return; //Early return if the query is not scanning in filter
 
     DimensionScoring dimensionScoring = new DimensionScoring(tableNameWithoutType, metaDataProperties, query);
     List<Tuple2<List<String>, BigFraction>> columnScores = dimensionScoring.parseQuery();
-    if (columnScores == null) {
-      return;
-    }
-    LOGGER.debug("Accumulator map: {}", columnScores.toString());
-    //System.out.println(columnScores.get(0)._1().toString());
+    LOGGER.debug("Accumulator: query score: {}", columnScores.toString());
 
     HashSet<String> counted=new HashSet<>();
-    cropList(columnScores, _algorithmOrder);
-    for (Tuple2<List<String>, BigFraction> tupleNamesScore : columnScores) {
-      for (String colName : tupleNamesScore._1()) {
-        if(counted.contains(colName)) continue;
-        counted.add(colName);
-        AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-        AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new ParseBasedMergerObj());
-        BigFraction weigthedScore = BigFraction.ONE.subtract(tupleNamesScore._2().reciprocal())
-            .multiply(new BigInteger(numEntriesScannedInFilter));
-        LOGGER.debug("Weighte score: reciprocal {} score {}", BigFraction.ONE.subtract(tupleNamesScore._2().reciprocal()), weigthedScore.toString());
-        ((ParseBasedMergerObj) AccumulatorOut.get(tableNameWithoutType).get(colName))
-            .merge(1, weigthedScore.bigDecimalValue(RoundingMode.DOWN.ordinal()).toBigInteger());
-      }
-    }
+    //Discard if the effective cardinality is less than one.
+    columnScores.stream().filter(tupleNamesScore -> tupleNamesScore._2().compareTo(BigFraction.ONE) > 0)
+        .forEach(tupleNamesScore -> {
+          //Do not count if already counted
+          tupleNamesScore._1().stream().filter(colName -> !counted.contains(colName)).forEach(colName -> {
+            counted.add(colName);
+            AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
+            AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new ParseBasedMergerObj());
+            BigFraction weigthedScore = BigFraction.ONE.subtract(tupleNamesScore._2().reciprocal())
+                .multiply(new BigInteger(numEntriesScannedInFilter));
+            ((ParseBasedMergerObj) AccumulatorOut.get(tableNameWithoutType).get(colName))
+                .merge(1, weigthedScore.bigDecimalValue(RoundingMode.DOWN.ordinal()).toBigInteger());
+          });
+        });
   }
 
   @Override
@@ -161,14 +156,11 @@ public class ParserBasedImpl implements BasicStrategy {
   /*
    * Crop a list to finalLength
    */
-  private static void cropList(List list, int finalLength) {
-    int listSize = list.size();
-    int numToReMove = listSize - finalLength;
-    for (int i = 1; i <= numToReMove; i++) {
-      list.remove(listSize - i);
-    }
-  }
 
+
+  /*
+   * Parse and score the dimensions in a query
+   */
   class DimensionScoring {
     static final String AND = "AND";
     static final String OR = "OR";
@@ -176,6 +168,14 @@ public class ParserBasedImpl implements BasicStrategy {
     private MetaDataProperties _metaDataProperties;
     private String _queryString;
     private final Logger LOGGER = LoggerFactory.getLogger(DimensionScoring.class);
+
+    private void cropList(List list, int finalLength) {
+      int listSize = list.size();
+      int numToReMove = listSize - finalLength;
+      for (int i = 1; i <= numToReMove; i++) {
+        list.remove(listSize - i);
+      }
+    }
 
     DimensionScoring(String tableNameWithoutType, MetaDataProperties metaDataProperties, String queryString) {
       _tableNameWithoutType = tableNameWithoutType;
@@ -186,6 +186,7 @@ public class ParserBasedImpl implements BasicStrategy {
     /*
      * Navigate from root to predicateListContext of whereClauseContext, where all the filtering happens
      */
+    @NotNull
     List<Tuple2<List<String>, BigFraction>> parseQuery() {
       LOGGER.debug("Parsing query: {}", _queryString);
       PQL2Parser.OptionalClauseContext optionalClauseContext = null;
@@ -208,15 +209,16 @@ public class ParserBasedImpl implements BasicStrategy {
           }
         }
       } catch (Exception e) {
-        return null;
+        return new ArrayList<>();
       }
       if (whereClauseContext == null) {
-        return null;
+        return new ArrayList<>();
       }
-
       LOGGER.debug("whereClauseContext: {}", whereClauseContext.getText());
 
-      return parsePredicateList(whereClauseContext.predicateList());
+      List<Tuple2<List<String>, BigFraction>> results = parsePredicateList(whereClauseContext.predicateList());
+      cropList(results, _algorithmOrder);
+      return results;
     }
 
     /*
@@ -321,7 +323,8 @@ public class ParserBasedImpl implements BasicStrategy {
             return ret;
           }
           ret.add(new Tuple2<>(colNameList, cardinality.divide(cardinality.subtract(lenFilter))));
-        } else {
+        }
+        {
           ret.add(new Tuple2<>(colNameList, cardinality.divide(lenFilter)));
         }
         LOGGER.debug("IN clause ret {}", ret.toString());
@@ -348,15 +351,17 @@ public class ParserBasedImpl implements BasicStrategy {
           ret.add(new Tuple2<>(colNameList, cardinality));
           LOGGER.debug("COMP clause ret {}", ret.toString());
           return ret;
-        } else if (comparisonOp.equals("!=") || comparisonOp.equals("<>")) {
+        }
+        else if (comparisonOp.equals("!=") || comparisonOp.equals("<>")) {
           if (cardinality.subtract(BigInteger.ONE).compareTo(BigFraction.ZERO) <= 0) {
-            ret.add(new Tuple2<>(colNameList, cardinality));
+            ret.add(new Tuple2<>(colNameList, BigFraction.ONE));
             return ret;
           }
           ret.add(new Tuple2<>(colNameList, cardinality.divide(cardinality.subtract(BigFraction.ONE))));
           LOGGER.debug("COMP clause ret {}", ret.toString());
           return ret;
-        } else {
+        }
+        else {
           return ret;
         }
       } else {
