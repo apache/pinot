@@ -19,6 +19,7 @@
 package org.apache.pinot.core.segment.creator.impl;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterables;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
@@ -34,6 +35,7 @@ import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.FieldSpec.FieldType;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
+import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -532,14 +534,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @Override
   public void close()
       throws IOException {
-    for (SegmentDictionaryCreator dictionaryCreator : _dictionaryCreatorMap.values()) {
-      dictionaryCreator.close();
-    }
-    for (ForwardIndexCreator forwardIndexCreator : _forwardIndexCreatorMap.values()) {
-      forwardIndexCreator.close();
-    }
-    for (InvertedIndexCreator invertedIndexCreator : _invertedIndexCreatorMap.values()) {
-      invertedIndexCreator.close();
-    }
+    FileUtils.close(Iterables
+        .concat(_dictionaryCreatorMap.values(), _forwardIndexCreatorMap.values(), _invertedIndexCreatorMap.values()));
   }
 }
