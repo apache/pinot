@@ -156,7 +156,7 @@ public class SegmentValidator {
     long startMillis = interval.getStartMillis();
     long endMillis = interval.getEndMillis();
 
-    if (!TimeUtils.timeValueInValidRange(startMillis) || !TimeUtils.timeValueInValidRange(endMillis)) {
+    if (!TimeUtils.checkSegmentTimeValidity(startMillis, endMillis)) {
       Date minDate = new Date(TimeUtils.getValidMinTimeMillis());
       Date maxDate = new Date(TimeUtils.getValidMaxTimeMillis());
 

@@ -69,11 +69,13 @@ public class SegmentConverter {
   private RecordAggregator _recordAggregator;
   private List<String> _groupByColumns;
   private IndexingConfig _indexingConfig;
+  private boolean _checkTimeValidityDuringGeneration;
 
   public SegmentConverter(@Nonnull List<File> inputIndexDirs, @Nonnull File workingDir, @Nonnull String tableName,
       @Nonnull String segmentName, int totalNumPartition, @Nonnull RecordTransformer recordTransformer,
       @Nullable RecordPartitioner recordPartitioner, @Nullable RecordAggregator recordAggregator,
-      @Nullable List<String> groupByColumns, @Nullable IndexingConfig indexingConfig) {
+      @Nullable List<String> groupByColumns, @Nullable IndexingConfig indexingConfig,
+      boolean checkTimeValidityDuringGeneration) {
     _inputIndexDirs = inputIndexDirs;
     _workingDir = workingDir;
     _recordTransformer = recordTransformer;
@@ -86,6 +88,8 @@ public class SegmentConverter {
     _recordAggregator = recordAggregator;
     _groupByColumns = groupByColumns;
     _indexingConfig = indexingConfig;
+
+    _checkTimeValidityDuringGeneration = checkTimeValidityDuringGeneration;
   }
 
   public List<File> convertSegment()
@@ -148,6 +152,7 @@ public class SegmentConverter {
     segmentGeneratorConfig.setOutDir(outputPath);
     segmentGeneratorConfig.setTableName(tableName);
     segmentGeneratorConfig.setSegmentName(segmentName);
+    segmentGeneratorConfig.setCheckTimeColumnValidityDuringGeneration(_checkTimeValidityDuringGeneration);
     if (indexingConfig != null) {
       segmentGeneratorConfig.setInvertedIndexCreationColumns(indexingConfig.getInvertedIndexColumns());
       if (indexingConfig.getStarTreeIndexSpec() != null) {
@@ -173,6 +178,9 @@ public class SegmentConverter {
     private RecordAggregator _recordAggregator;
     private List<String> _groupByColumns;
     private IndexingConfig _indexingConfig;
+
+    // enabled by default
+    private boolean _checkTimeValidityDuringGeneration = true;
 
     public Builder setInputIndexDirs(List<File> inputIndexDirs) {
       _inputIndexDirs = inputIndexDirs;
@@ -224,6 +232,11 @@ public class SegmentConverter {
       return this;
     }
 
+    public Builder setCheckTimeValidityDuringGeneration(final boolean checkTimeValidity) {
+      _checkTimeValidityDuringGeneration = checkTimeValidity;
+      return this;
+    }
+
     public SegmentConverter build() {
       // Check that the group-by columns and record aggregator are configured together
       if (_groupByColumns != null && _groupByColumns.size() > 0) {
@@ -235,7 +248,8 @@ public class SegmentConverter {
       }
 
       return new SegmentConverter(_inputIndexDirs, _workingDir, _tableName, _segmentName, _totalNumPartition,
-          _recordTransformer, _recordPartitioner, _recordAggregator, _groupByColumns, _indexingConfig);
+          _recordTransformer, _recordPartitioner, _recordAggregator, _groupByColumns, _indexingConfig,
+          _checkTimeValidityDuringGeneration);
     }
   }
 }

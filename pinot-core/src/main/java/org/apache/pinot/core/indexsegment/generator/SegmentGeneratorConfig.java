@@ -112,6 +112,7 @@ public class SegmentGeneratorConfig {
   private String _simpleDateFormat = null;
   // Use on-heap or off-heap memory to generate index (currently only affect inverted index and star-tree v2)
   private boolean _onHeap = false;
+  private boolean _checkTimeColumnValidityDuringGeneration = true;
 
   public SegmentGeneratorConfig() {
   }
@@ -160,6 +161,7 @@ public class SegmentGeneratorConfig {
     _simpleDateFormat = config._simpleDateFormat;
     _onHeap = config._onHeap;
     _recordReaderPath = config._recordReaderPath;
+    _checkTimeColumnValidityDuringGeneration = config._checkTimeColumnValidityDuringGeneration;
   }
 
   /**
@@ -591,6 +593,14 @@ public class SegmentGeneratorConfig {
 
   public void setOnHeap(boolean onHeap) {
     _onHeap = onHeap;
+  }
+
+  public boolean isCheckTimeColumnValidityDuringGeneration() {
+    return _checkTimeColumnValidityDuringGeneration;
+  }
+
+  public void setCheckTimeColumnValidityDuringGeneration(boolean checkTimeColumnValidityDuringGeneration) {
+    _checkTimeColumnValidityDuringGeneration = checkTimeColumnValidityDuringGeneration;
   }
 
   public Map<String, ChunkCompressorFactory.CompressionType> getRawIndexCompressionType() {

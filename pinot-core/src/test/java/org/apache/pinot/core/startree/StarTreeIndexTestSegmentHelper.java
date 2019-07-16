@@ -85,6 +85,12 @@ public class StarTreeIndexTestSegmentHelper {
     config.setFormat(FileFormat.AVRO);
     config.setSegmentName(segmentName);
     config.setHllConfig(hllConfig);
+    // The segment generation code in SegmentColumnarIndexCreator will throw
+    // exception if start and end time in time column are not in acceptable
+    // range. For this test, we first need to fix the input avro data
+    // to have the time column values in allowed range. Until then, the check
+    // is explicitly disabled
+    config.setCheckTimeColumnValidityDuringGeneration(false);
 
     List<GenericRow> rows = new ArrayList<>(numRows);
     for (int rowId = 0; rowId < numRows; rowId++) {

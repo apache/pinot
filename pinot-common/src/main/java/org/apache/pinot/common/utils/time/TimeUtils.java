@@ -167,4 +167,19 @@ public class TimeUtils {
     }
     return periodStr;
   }
+
+  /**
+   * Verify that start and end time (should be in milliseconds from epoch) of the segment
+   * are in valid range.
+   * @param startMillis start time (in milliseconds)
+   * @param endMillis end time (in milliseconds)
+   * @return true if start and end time are in range, false otherwise
+   *
+   * Note: this function assumes that given times are in milliseconds. The
+   * caller should take care of converting to millis from epoch before
+   * trying to validate the times.
+   */
+  public static boolean checkSegmentTimeValidity(final long startMillis, final long endMillis) {
+    return timeValueInValidRange(startMillis) && timeValueInValidRange(endMillis);
+  }
 }

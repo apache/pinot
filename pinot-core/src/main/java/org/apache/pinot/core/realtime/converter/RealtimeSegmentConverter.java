@@ -95,6 +95,12 @@ public class RealtimeSegmentConverter {
       reader = new RealtimeSegmentRecordReader(realtimeSegmentImpl, dataSchema, sortedColumn);
     }
     SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(dataSchema);
+    // The segment generation code in SegmentColumnarIndexCreator will throw
+    // exception if start and end time in time column are not in acceptable
+    // range. We don't want the realtime consumption to stop (if an exception
+    // is thrown) and thus the time validity check is explicitly disabled for
+    // realtime segment generation
+    genConfig.setCheckTimeColumnValidityDuringGeneration(false);
     if (invertedIndexColumns != null && !invertedIndexColumns.isEmpty()) {
       for (String column : invertedIndexColumns) {
         genConfig.createInvertedIndexForColumn(column);
