@@ -13,12 +13,12 @@ public interface BasicStrategy {
   //Filter out some irrelevant tables.
 
   void accumulator(BasicQueryStats queryStats, MetaDataProperties metaDataProperties,
-      Map<String, Map<String, MergerObj>> MapperOut);
-  //Accumulate the stats of a query to /table/column/MergerObj
+      Map<String, Map<String, BasicMergerObj>> MapperOut);
+  //Accumulate the stats of a query to /table/column/BasicMergerObj
 
-  void merger(MergerObj mergerObj, MergerObj mergerObjToMerge);
-  //Merge two MergerObj from same /table/column
+  void merger(BasicMergerObj basicMergerObj, BasicMergerObj basicMergerObjToMerge);
+  //Merge two BasicMergerObj from same /table/column
 
-  void reporter(String tableNameWithoutType, Map<String, MergerObj> mergedOut);
+  void reporter(String tableNameWithoutType, Map<String, BasicMergerObj> mergedOut);
   //print/email results
 }

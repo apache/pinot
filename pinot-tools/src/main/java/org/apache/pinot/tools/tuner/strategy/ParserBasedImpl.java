@@ -95,7 +95,7 @@ public class ParserBasedImpl implements BasicStrategy {
 
   @Override
   public void accumulator(BasicQueryStats queryStats, MetaDataProperties metaDataProperties,
-      Map<String, Map<String, MergerObj>> AccumulatorOut) {
+      Map<String, Map<String, BasicMergerObj>> AccumulatorOut) {
 
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     String tableNameWithoutType = indexSuggestQueryStatsImpl.getTableNameWithoutType();
@@ -117,46 +117,41 @@ public class ParserBasedImpl implements BasicStrategy {
           tupleNamesScore._1().stream().filter(colName -> !counted.contains(colName)).forEach(colName -> {
             counted.add(colName);
             AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-            AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new ParseBasedMergerObj());
+            AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new ParseBasedBasicMergerObj());
             BigFraction weigthedScore = BigFraction.ONE.subtract(tupleNamesScore._2().reciprocal())
                 .multiply(new BigInteger(numEntriesScannedInFilter));
-            ((ParseBasedMergerObj) AccumulatorOut.get(tableNameWithoutType).get(colName))
+            ((ParseBasedBasicMergerObj) AccumulatorOut.get(tableNameWithoutType).get(colName))
                 .merge(1, weigthedScore.bigDecimalValue(RoundingMode.DOWN.ordinal()).toBigInteger());
           });
         });
   }
 
   @Override
-  public void merger(MergerObj p1, MergerObj p2) {
-    ((ParseBasedMergerObj) p1).merge((ParseBasedMergerObj) p2);
+  public void merger(BasicMergerObj p1, BasicMergerObj p2) {
+    ((ParseBasedBasicMergerObj) p1).merge((ParseBasedBasicMergerObj) p2);
   }
 
   @Override
-  public void reporter(String tableNameWithoutType, Map<String, MergerObj> mergedOut) {
-    String tableName = "\n\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
+  public void reporter(String tableNameWithoutType, Map<String, BasicMergerObj> mergedOut) {
+    String tableName = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
     String mergerOut = "";
     List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
     List<Tuple2<String, BigInteger>> sortedWeighted = new ArrayList<>();
-    for (Map.Entry<String, MergerObj> entry : mergedOut.entrySet()) {
-      sortedPure.add(new Tuple2<>(entry.getKey(), ((ParseBasedMergerObj) entry.getValue()).getPureScore()));
-      sortedWeighted.add(new Tuple2<>(entry.getKey(), ((ParseBasedMergerObj) entry.getValue()).getWeigtedScore()));
-    }
+    mergedOut.forEach((colName, score) -> {
+      sortedPure.add(new Tuple2<>(colName, ((ParseBasedBasicMergerObj) score).getPureScore()));
+      sortedWeighted.add(new Tuple2<>(colName, ((ParseBasedBasicMergerObj) score).getWeigtedScore()));
+    });
     sortedPure.sort((p1,p2)->(p2._2().compareTo(p1._2())));
     sortedWeighted.sort((p1,p2)->(p2._2().compareTo(p1._2())));
-    for (Tuple2<String, Long> tuple2 : sortedPure) {
-      mergerOut += "Dimension: " + tuple2._1()+ "  " + tuple2._2().toString() + "\n";
+    for(Tuple2<String, Long> tuple2 : sortedPure) {
+      mergerOut += "Dimension: " + tuple2._1() + "  " + tuple2._2().toString() + "\n";
     }
-    mergerOut += "\n***********************************************************************************\n";
+    mergerOut += "***********************************************************************************\n";
     for (Tuple2<String, BigInteger> tuple2 : sortedWeighted) {
       mergerOut += "Dimension: " + tuple2._1()+ "  " + tuple2._2().toString() + "\n";
     }
     LOGGER.info(tableName + mergerOut);
   }
-
-  /*
-   * Crop a list to finalLength
-   */
-
 
   /*
    * Parse and score the dimensions in a query
@@ -169,6 +164,9 @@ public class ParserBasedImpl implements BasicStrategy {
     private String _queryString;
     private final Logger LOGGER = LoggerFactory.getLogger(DimensionScoring.class);
 
+    /*
+     * Crop a list to finalLength
+     */
     private void cropList(List list, int finalLength) {
       int listSize = list.size();
       int numToReMove = listSize - finalLength;

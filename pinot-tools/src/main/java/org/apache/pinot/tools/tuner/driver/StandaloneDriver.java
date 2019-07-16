@@ -8,8 +8,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.tools.tuner.meta.manager.MetaManager;
 import org.apache.pinot.tools.tuner.query.src.BasicQueryStats;
 import org.apache.pinot.tools.tuner.query.src.QuerySrc;
+import org.apache.pinot.tools.tuner.strategy.BasicMergerObj;
 import org.apache.pinot.tools.tuner.strategy.BasicStrategy;
-import org.apache.pinot.tools.tuner.strategy.MergerObj;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,8 +42,8 @@ public abstract class StandaloneDriver extends TunerDriver {
     return this;
   }
 
-  private Map<Long, Map<String, Map<String, MergerObj>>> _threadAccumulator = null;
-  private Map<String, Map<String, MergerObj>> _mergedResults;
+  private Map<Long, Map<String, Map<String, BasicMergerObj>>> _threadAccumulator = null;
+  private Map<String, Map<String, BasicMergerObj>> _mergedResults;
 
   /*
    * Execute strategy
@@ -97,7 +97,7 @@ public abstract class StandaloneDriver extends TunerDriver {
      */
     LOGGER.info("Setting up _mergedResults for merging");
     _mergedResults = new HashMap<>();
-    for (Map.Entry<Long, Map<String, Map<String, MergerObj>>> threadEntry : _threadAccumulator.entrySet()) {
+    for (Map.Entry<Long, Map<String, Map<String, BasicMergerObj>>> threadEntry : _threadAccumulator.entrySet()) {
       for (String tableNameWithoutType : threadEntry.getValue().keySet()) {
         _mergedResults.putIfAbsent(tableNameWithoutType, new HashMap<>());
       }
@@ -156,7 +156,7 @@ public abstract class StandaloneDriver extends TunerDriver {
     /*
      * Report
      */
-    for (Map.Entry<String, Map<String, MergerObj>> tableStat : _mergedResults.entrySet()) {
+    for (Map.Entry<String, Map<String, BasicMergerObj>> tableStat : _mergedResults.entrySet()) {
       _strategy.reporter(tableStat.getKey(), tableStat.getValue());
     }
   }
