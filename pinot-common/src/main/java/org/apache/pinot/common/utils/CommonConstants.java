@@ -294,7 +294,7 @@ public class CommonConstants {
     public static final String METADATA_EVENT_OBSERVER_PREFIX = "metadata.event.notifier";
 
     // Config keys
-    public static final String METRICS_PREFIX_CONFIG = "metrics.prefix.config";
+    public static final String METRICS_PREFIX_CONFIG = "metricsPrefix";
     public static final String METRICS_REGISTRY_REGISTRATION_LISTENERS_KEY = "metricsRegistryRegistrationListeners";
 
     // Default settings
