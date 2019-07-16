@@ -26,7 +26,7 @@
       <table border="0" cellpadding="0" cellspacing="0" style="border:1px solid #E9E9E9; border-radius: 2px; width: 100%;">
 
         <!-- List all the alerts -->
-        <#list entityToAnomalyDetailsMap?keys as entity>
+        <#list entitySortedByScoreList as entity>
           <@utils.addBlock title="" align="left">
             <!-- Display Entity Name -->
             <p>
@@ -38,7 +38,7 @@
             <table border="0" width="100%" align="center" style="width:100%; padding:0; margin:0; border-collapse: collapse;text-align:left;">
               <tr style="text-align:center; background-color: #F6F8FA; border-top: 2px solid #C7D1D8; border-bottom: 2px solid #C7D1D8;">
                 <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Feature</th>
-                <th style="padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Criticality Score</th>
+                <th style="padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Criticality Score*</th>
                 <th style="padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Current</th>
                 <th style="padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Predicted</th>
               </tr>
@@ -46,10 +46,9 @@
               <#list entityToAnomalyDetailsMap[entity] as anomaly>
                 <tr style="border-bottom: 1px solid #C7D1D8;">
                   <td style="padding: 6px 12px;white-space: nowrap;">
-                    <div style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px;">${anomaly.groupKey}</div>
-                    <span style="color: rgba(0,0,0,0.6); font-size:12px; line-height:16px;">${anomaly.duration}</span>
                     <a style="font-weight: bold; text-decoration: none; font-size:14px; line-height:20px; color: #0073B1;" href="${dashboardHost}/app/#/anomalies?anomalyIds=${entityToAnomalyIdsMap[entity]}"
-                       target="_blank">(view)</a>
+                       target="_blank">${anomaly.groupKey}</a>
+                    <span style="color: rgba(0,0,0,0.6); font-size:12px; line-height:16px;">${anomaly.duration}</span>
                   </td>
                   <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">${anomaly.score}</td>
                   <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">${anomaly.currentVal}</td>

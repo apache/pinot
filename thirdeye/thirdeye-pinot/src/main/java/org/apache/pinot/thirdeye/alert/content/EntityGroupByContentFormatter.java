@@ -23,10 +23,14 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -51,6 +55,7 @@ public class EntityGroupByContentFormatter extends BaseEmailContentFormatter{
   static final String PROP_GROUP_KEY = "groupKey";
 
   private DetectionConfigManager configDAO = null;
+  private Map<String, Double> entityAnomalyToScoreMap = new HashMap<>();
   private Multimap<String, AnomalyReportEntity> entityAnomalyReports = ArrayListMultimap.create();
   private Map<String, String> entityToAnomalyIdsMap = new HashMap<>();
 
@@ -83,8 +88,14 @@ public class EntityGroupByContentFormatter extends BaseEmailContentFormatter{
       updateEntityToAnomalyDetailsMap(anomaly, config);
     }
 
+    List<Map.Entry<String, Double>> anomaliesSortedByScores = new ArrayList<>(entityAnomalyToScoreMap.entrySet());
+    anomaliesSortedByScores.sort(Map.Entry.comparingByValue());
+    List<String> entityList = anomaliesSortedByScores.stream().map(Map.Entry::getKey).collect(Collectors.toList());
+    entityList.sort(Collections.reverseOrder());
+
     templateData.put("emailHeading", config.getName());
     templateData.put("entityToAnomalyIdsMap", entityToAnomalyIdsMap);
+    templateData.put("entitySortedByScoreList", entityList);
     templateData.put("entityToAnomalyDetailsMap", entityAnomalyReports.asMap());
   }
 
@@ -102,8 +113,11 @@ public class EntityGroupByContentFormatter extends BaseEmailContentFormatter{
           getDateString(anomaly.getStartTime(), dateTimeZone), getDateString(anomaly.getEndTime(), dateTimeZone),
           getTimezoneString(dateTimeZone), getIssueType(anomaly));
 
+      // Criticality score ranges from [0 to infinity)
+      double score = -1;
       if (anomaly.getProperties().containsKey(PROP_ANOMALY_SCORE)) {
-        anomalyReport.setScore(ThirdEyeUtils.getRoundedValue(Double.parseDouble(anomaly.getProperties().get(PROP_ANOMALY_SCORE))));
+        score = Double.parseDouble(anomaly.getProperties().get(PROP_ANOMALY_SCORE));
+        anomalyReport.setScore(ThirdEyeUtils.getRoundedValue(score));
       } else {
         anomalyReport.setScore("-");
       }
@@ -114,6 +128,7 @@ public class EntityGroupByContentFormatter extends BaseEmailContentFormatter{
       // include notified alerts only in the email
       if (!includeSentAnomaliesOnly || anomaly.isNotified()) {
         entityToAnomalyIdsMap.put(anomaly.getProperties().get(PROP_ENTITY_NAME), Joiner.on(",").join(anomaly.getChildIds()));
+        entityAnomalyToScoreMap.put(anomaly.getProperties().get(PROP_ENTITY_NAME), score);
         entityAnomalyReports.put(anomaly.getProperties().get(PROP_ENTITY_NAME), anomalyReport);
       }
     } else {
