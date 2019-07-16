@@ -19,6 +19,6 @@ public interface BasicStrategy {
   void merger(MergerObj mergerObj, MergerObj mergerObjToMerge);
   //Merge two MergerObj from same /table/column
 
-  void reporter(String tableNameWithType, Map<String, MergerObj> mergedOut);
+  void reporter(String tableNameWithoutType, Map<String, MergerObj> mergedOut);
   //print/email results
 }

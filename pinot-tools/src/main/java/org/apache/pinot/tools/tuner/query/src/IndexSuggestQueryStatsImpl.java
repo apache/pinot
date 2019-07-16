@@ -5,13 +5,13 @@ import javax.annotation.Nonnull;
 
 public class IndexSuggestQueryStatsImpl extends BasicQueryStats {
 
-  private String _tableNameWithType;
+  private String _tableNameWithoutType;
   private String _numEntriesScannedInFilter;
   private String _numEntriesScannedPostFilter;
   private String _query;
 
   public static final class Builder {
-    private String _tableNameWithType;
+    private String _tableNameWithoutType;
     private String _numEntriesScannedInFilter;
     private String _numEntriesScannedPostFilter;
     private String _query;
@@ -26,8 +26,8 @@ public class IndexSuggestQueryStatsImpl extends BasicQueryStats {
     }
 
     @Nonnull
-    Builder _tableNameWithType(@Nonnull String val) {
-      _tableNameWithType = val;
+    Builder _tableNameWithoutType(@Nonnull String val) {
+      _tableNameWithoutType = val;
       return this;
     }
 
@@ -51,13 +51,13 @@ public class IndexSuggestQueryStatsImpl extends BasicQueryStats {
 
   @Override
   public String toString() {
-    return "IndexSuggestQueryStatsImpl{" + "_tableNameWithType='" + _tableNameWithType + '\''
+    return "IndexSuggestQueryStatsImpl{" + "_tableNameWithoutType='" + _tableNameWithoutType + '\''
         + ", _numEntriesScannedInFilter=" + _numEntriesScannedInFilter + ", _numEntriesScannedPostFilter="
         + _numEntriesScannedPostFilter + ", _query='" + _query + '\'' + '}';
   }
 
   private IndexSuggestQueryStatsImpl(Builder builder) {
-    _tableNameWithType = builder._tableNameWithType;
+    _tableNameWithoutType = builder._tableNameWithoutType;
     _numEntriesScannedInFilter = builder._numEntriesScannedInFilter;
     _numEntriesScannedPostFilter = builder._numEntriesScannedPostFilter;
     _query = builder._query;
@@ -67,8 +67,8 @@ public class IndexSuggestQueryStatsImpl extends BasicQueryStats {
     return _query;
   }
 
-  public String getTableNameWithType() {
-    return _tableNameWithType;
+  public String getTableNameWithoutType() {
+    return _tableNameWithoutType;
   }
 
   public String getNumEntriesScannedInFilter() {

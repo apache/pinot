@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.math.fraction.BigFraction;
@@ -29,7 +30,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
   private static final String TYPE_REALTIME = "_REALTIME";
   private static final String TYPE_OFFLINE = "_OFFLINE";
   private static final String TYPE_HYBRID = "_HYBRID";
-
+  private static final String TYPE_REGEX="(_REALTIME|_OFFLINE|_HYBRID)";
   private String _path;
   private Boolean _use_existing_index;
   private HashMap<String, HashSet<String>> _additional_masking_cols;
@@ -95,41 +96,35 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     return this;
   }
 
-  public BigFraction getAverageCardinality(String tableNameWithType, String columnName) {
-    if (tableNameWithType.endsWith(TYPE_OFFLINE) || tableNameWithType.endsWith(TYPE_REALTIME) || tableNameWithType
-        .endsWith(TYPE_HYBRID)) {
-      tableNameWithType = tableNameWithType.replace(TYPE_OFFLINE, "");
-      tableNameWithType = tableNameWithType.replace(TYPE_REALTIME, "");
-      tableNameWithType = tableNameWithType.replace(TYPE_HYBRID, "");
-    }
-    LOGGER.debug("Getting card from: {} {}", tableNameWithType, columnName);
+  public BigFraction getAverageCardinality(String tableNameWithoutType, String columnName) {
+    LOGGER.debug("Getting card from: {} {}", tableNameWithoutType, columnName);
     if (_use_existing_index) {
-      if (_additional_masking_cols.getOrDefault(tableNameWithType, new HashSet<>()).contains(columnName)) {
+      if (_additional_masking_cols.getOrDefault(tableNameWithoutType, new HashSet<>()).contains(columnName)) {
         return BigFraction.ONE;
       }
-      String _numHasInv = getColField(tableNameWithType, columnName, NUM_SEGMENTS_HAS_INVERTED_INDEX);
+      String _numHasInv = getColField(tableNameWithoutType, columnName, NUM_SEGMENTS_HAS_INVERTED_INDEX);
       if (_numHasInv == null || Integer.parseInt(_numHasInv) > 0) {
         return BigFraction.ONE;
       }
     }
 
-    String nSortedNuemrator = getColField(tableNameWithType, columnName, NUM_SEGMENTS_SORTED);
-    String nSortedDenominator = getColField(tableNameWithType, columnName, NUM_SEGMENTS_COUNT);
-    String cardNumerator = getColField(tableNameWithType, columnName, WEIGHTED_SUM_CARDINALITY);
-    String cardDenominator = getColField(tableNameWithType, columnName, SUM_DOCS);
+    String nSortedNuemrator = getColField(tableNameWithoutType, columnName, NUM_SEGMENTS_SORTED);
+    String nSortedDenominator = getColField(tableNameWithoutType, columnName, NUM_SEGMENTS_COUNT);
+    String cardNumerator = getColField(tableNameWithoutType, columnName, WEIGHTED_SUM_CARDINALITY);
+    String cardDenominator = getColField(tableNameWithoutType, columnName, SUM_DOCS);
 
     LOGGER
-        .debug("Cardinality table:{} column:{} card: {}/{}, sort: {}/{}", tableNameWithType, columnName, cardNumerator,
+        .debug("Cardinality table:{} column:{} card: {}/{}, sort: {}/{}", tableNameWithoutType, columnName, cardNumerator,
             cardDenominator, nSortedNuemrator, nSortedDenominator);
 
     if (cardNumerator == null || cardDenominator == null) {
-      LOGGER.error("{} {}'s cardinality does not exist!", tableNameWithType, columnName);
+      LOGGER.error("{} {}'s cardinality does not exist!", tableNameWithoutType, columnName);
       return BigFraction.ONE;
     }
 
     BigFraction sorted_ratio;
     if (nSortedNuemrator == null || nSortedDenominator == null) {
-      LOGGER.error("{} {}'s sort info does not exist!", tableNameWithType, columnName);
+      LOGGER.error("{} {}'s sort info does not exist!", tableNameWithoutType, columnName);
       sorted_ratio = BigFraction.ONE;
     } else if (nSortedNuemrator.equals(nSortedDenominator)) {
       return BigFraction.ONE;
@@ -142,33 +137,35 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     BigFraction ret = averageCard.multiply(sorted_ratio);
 
 //    LOGGER.debug("Cardinality: table:{} column:{} card: {}/{}, sort: {}/{}, final {}",
-//        tableNameWithType, columnName, cardNumerator,
+//        tableNameWithoutType, columnName, cardNumerator,
 //        cardDenominator, nSortedNuemrator, nSortedDenominator, ret
 //        );
 
     return ret;
   }
 
-  public String getSegmentField(String tableNameWithType, String columnName, String segmentName, String fieldName) {
-    JsonNode ret = _aggregatedMap.get(tableNameWithType).get(columnName).get(segmentName).get(fieldName);
+  public String getSegmentField(String tableNameWithoutType, String columnName, String segmentName, String fieldName) {
+    tableNameWithoutType=Pattern.compile(TYPE_REGEX).matcher(tableNameWithoutType).replaceFirst("");
+    JsonNode ret = _aggregatedMap.get(tableNameWithoutType).get(columnName).get(segmentName).get(fieldName);
     if (ret == null) {
-      LOGGER.error("tableNameWithType:{} columnName:{} segmentName:{} fieldName:{} Does not exist!", tableNameWithType,
+      LOGGER.error("tableNameWithoutType:{} columnName:{} segmentName:{} fieldName:{} Does not exist!", tableNameWithoutType,
           columnName, segmentName, fieldName);
       return null;
     }
     return ret.asText();
   }
 
-  public String getColField(String tableNameWithType, String columnName, String fieldName) {
+  public String getColField(String tableNameWithoutType, String columnName, String fieldName) {
+    tableNameWithoutType=Pattern.compile(TYPE_REGEX).matcher(tableNameWithoutType).replaceFirst("");
     JsonNode ret = null;
     try {
-      ret = _aggregatedMap.get(tableNameWithType).get(columnName).get(fieldName);
+      ret = _aggregatedMap.get(tableNameWithoutType).get(columnName).get(fieldName);
     } catch (NullPointerException e) {
-      LOGGER.debug("tableNameWithType:{} columnName:{} Does not exist!", tableNameWithType, columnName);
+      LOGGER.debug("tableNameWithoutType:{} columnName:{} Does not exist!", tableNameWithoutType, columnName);
       return null;
     }
     if (ret == null) {
-      LOGGER.debug("tableNameWithType:{} columnName:{} fieldName:{} Does not exist!", tableNameWithType, columnName,
+      LOGGER.debug("tableNameWithoutType:{} columnName:{} fieldName:{} Does not exist!", tableNameWithoutType, columnName,
           fieldName);
       return null;
     }

@@ -13,11 +13,11 @@ public interface MetaDataProperties {
   String NUM_SEGMENTS_SORTED = "n_isSorted";
   String NUM_SEGMENTS_COUNT = "n_segments_count";
 
-  String getColField(String tableNameWithType, String columnName,
+  String getColField(String tableNameWithoutType, String columnName,
       String fieldName); //get aggregated (sum and weighted sum) of metadata
 
-  String getSegmentField(String tableNameWithType, String columnName, String segmentName,
+  String getSegmentField(String tableNameWithoutType, String columnName, String segmentName,
       String fieldName); //get metadata of individual segment
 
-  BigFraction getAverageCardinality(String tableNameWithType, String columnName);
+  BigFraction getAverageCardinality(String tableNameWithoutType, String columnName);
 }

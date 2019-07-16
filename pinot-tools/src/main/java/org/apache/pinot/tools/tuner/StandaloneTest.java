@@ -1,5 +1,6 @@
 package org.apache.pinot.tools.tuner;
 
+import java.util.regex.Pattern;
 import org.apache.pinot.tools.tuner.driver.StandaloneDriver;
 import org.apache.pinot.tools.tuner.meta.manager.JsonFileMetaManagerImpl;
 import org.apache.pinot.tools.tuner.query.src.BrokerLogParserImpl;

@@ -36,18 +36,18 @@ public class ParserBasedImpl implements BasicStrategy {
   public final static int IN_FILTER_WEIGHT_FOR_VOTE = 1;
 
   private int _algorithmOrder;
-  private HashSet<String> _tableNamesWorkonWithType;
+  private HashSet<String> _tableNamesWorkonWithoutType;
   private long _numEntriesScannedThreshold;
 
   private ParserBasedImpl(Builder builder) {
     _algorithmOrder = builder._algorithmOrder;
-    _tableNamesWorkonWithType = builder._tableNamesWorkonWithType;
+    _tableNamesWorkonWithoutType = builder._tableNamesWorkonWithoutType;
     _numEntriesScannedThreshold = builder._numEntriesScannedThreshold;
   }
 
   public static final class Builder {
     private int _algorithmOrder = FIRST_ORDER;
-    private HashSet<String> _tableNamesWorkonWithType = new HashSet<>();
+    private HashSet<String> _tableNamesWorkonWithoutType = new HashSet<>();
     private long _numEntriesScannedThreshold = NO_IN_FILTER_THRESHOLD;
 
     public Builder() {
@@ -65,8 +65,8 @@ public class ParserBasedImpl implements BasicStrategy {
     }
 
     @Nonnull
-    public Builder _tableNamesWorkonWithType(@Nonnull HashSet<String> val) {
-      _tableNamesWorkonWithType = val;
+    public Builder _tableNamesWorkonWithoutType(@Nonnull HashSet<String> val) {
+      _tableNamesWorkonWithoutType = val;
       return this;
     }
 
@@ -77,8 +77,8 @@ public class ParserBasedImpl implements BasicStrategy {
     }
 
     @Nonnull
-    public Builder _tableNamesWorkonWithType(@Nonnull List<String> val) {
-      _tableNamesWorkonWithType.addAll(val);
+    public Builder _tableNamesWorkonWithoutType(@Nonnull List<String> val) {
+      _tableNamesWorkonWithoutType.addAll(val);
       return this;
     }
   }
@@ -87,8 +87,8 @@ public class ParserBasedImpl implements BasicStrategy {
   public boolean filter(BasicQueryStats queryStats) {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     long numEntriesScannedInFilter = Long.parseLong(indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter());
-    return (_tableNamesWorkonWithType.isEmpty() || _tableNamesWorkonWithType
-        .contains(indexSuggestQueryStatsImpl.getTableNameWithType())) && (numEntriesScannedInFilter
+    return (_tableNamesWorkonWithoutType.isEmpty() || _tableNamesWorkonWithoutType
+        .contains(indexSuggestQueryStatsImpl.getTableNameWithoutType())) && (numEntriesScannedInFilter
         >= _numEntriesScannedThreshold);
   }
 
@@ -97,16 +97,16 @@ public class ParserBasedImpl implements BasicStrategy {
       Map<String, Map<String, MergerObj>> AccumulatorOut) {
 
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
-    String tableNameWithType = indexSuggestQueryStatsImpl.getTableNameWithType();
+    String tableNameWithoutType = indexSuggestQueryStatsImpl.getTableNameWithoutType();
     String numEntriesScannedInFilter = indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter();
     String query = indexSuggestQueryStatsImpl.getQuery();
-    LOGGER.debug("Accumulator: accumulating table {}", tableNameWithType);
+    LOGGER.debug("Accumulator: accumulating table {}", tableNameWithoutType);
 
     if (Long.parseLong(numEntriesScannedInFilter) == 0) {
       return; //Early return if the query is not scanning in filter
     }
 
-    DimensionScoring dimensionScoring = new DimensionScoring(tableNameWithType, metaDataProperties, query);
+    DimensionScoring dimensionScoring = new DimensionScoring(tableNameWithoutType, metaDataProperties, query);
     List<Tuple2<List<String>, BigFraction>> columnScores = dimensionScoring.parseQuery();
     if (columnScores == null) {
       return;
@@ -116,11 +116,11 @@ public class ParserBasedImpl implements BasicStrategy {
     cropList(columnScores, _algorithmOrder);
     for (Tuple2<List<String>, BigFraction> tupleNamesScore : columnScores) {
       for (String colName : tupleNamesScore._1()) {
-        AccumulatorOut.putIfAbsent(tableNameWithType, new HashMap<>());
-        AccumulatorOut.get(tableNameWithType).putIfAbsent(colName, new ParseBasedMergerObj());
+        AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
+        AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new ParseBasedMergerObj());
         BigFraction weigthedScore = BigFraction.ONE.subtract(tupleNamesScore._2().reciprocal())
             .multiply(new BigInteger(numEntriesScannedInFilter));
-        ((ParseBasedMergerObj) AccumulatorOut.get(tableNameWithType).get(colName))
+        ((ParseBasedMergerObj) AccumulatorOut.get(tableNameWithoutType).get(colName))
             .merge(1, weigthedScore.bigDecimalValue(RoundingMode.DOWN.ordinal()).toBigInteger());
       }
     }
@@ -132,8 +132,8 @@ public class ParserBasedImpl implements BasicStrategy {
   }
 
   @Override
-  public void reporter(String tableNameWithType, Map<String, MergerObj> mergedOut) {
-    String tableName = "\n**********************Report For Table: " + tableNameWithType + "**********************\n";
+  public void reporter(String tableNameWithoutType, Map<String, MergerObj> mergedOut) {
+    String tableName = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
     String mergerOut = "";
     List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
     List<Tuple2<String, BigInteger>> sortedWeighted = new ArrayList<>();
@@ -141,14 +141,14 @@ public class ParserBasedImpl implements BasicStrategy {
       sortedPure.add(new Tuple2<>(entry.getKey(), ((ParseBasedMergerObj) entry.getValue()).getPureScore()));
       sortedWeighted.add(new Tuple2<>(entry.getKey(), ((ParseBasedMergerObj) entry.getValue()).getWeigtedScore()));
     }
-    sortedPure.sort(Comparator.comparing(Tuple2::_2));
-    sortedWeighted.sort(Comparator.comparing(Tuple2::_2));
+    sortedPure.sort(Comparator.reverseOrder());
+    sortedWeighted.sort(Comparator.reverseOrder());
     for (Tuple2<String, Long> tuple2 : sortedPure) {
-      mergerOut += "Dimension: " + tuple2._1() + tuple2._2().toString() + "\n";
+      mergerOut += "Dimension: " + tuple2._1()+ "  " + tuple2._2().toString() + "\n";
     }
     mergerOut += "\n*********************************************************************\n";
     for (Tuple2<String, BigInteger> tuple2 : sortedWeighted) {
-      mergerOut += "Dimension: " + tuple2._1() + tuple2._2().toString() + "\n";
+      mergerOut += "Dimension: " + tuple2._1()+ "  " + tuple2._2().toString() + "\n";
     }
     LOGGER.info(tableName + mergerOut);
   }
@@ -167,13 +167,13 @@ public class ParserBasedImpl implements BasicStrategy {
   class DimensionScoring {
     static final String AND = "AND";
     static final String OR = "OR";
-    private String _tableNameWithType;
+    private String _tableNameWithoutType;
     private MetaDataProperties _metaDataProperties;
     private String _queryString;
     private final Logger LOGGER = LoggerFactory.getLogger(DimensionScoring.class);
 
-    DimensionScoring(String tableNameWithType, MetaDataProperties metaDataProperties, String queryString) {
-      _tableNameWithType = tableNameWithType;
+    DimensionScoring(String tableNameWithoutType, MetaDataProperties metaDataProperties, String queryString) {
+      _tableNameWithoutType = tableNameWithoutType;
       _metaDataProperties = metaDataProperties;
       _queryString = queryString;
     }
@@ -303,8 +303,8 @@ public class ParserBasedImpl implements BasicStrategy {
         colNameList.add(colName);
         ArrayList<Tuple2<List<String>, BigFraction>> ret = new ArrayList<>();
 
-        BigFraction cardinality = _metaDataProperties.getAverageCardinality(_tableNameWithType, colName);
-        LOGGER.debug("Final Cardinality: {} {} {}", cardinality, _tableNameWithType, colName);
+        BigFraction cardinality = _metaDataProperties.getAverageCardinality(_tableNameWithoutType, colName);
+        LOGGER.debug("Final Cardinality: {} {} {}", cardinality, _tableNameWithoutType, colName);
         if (cardinality.compareTo(BigFraction.ONE) <= 0) {
           return ret;
         }
@@ -329,8 +329,8 @@ public class ParserBasedImpl implements BasicStrategy {
         colNameList.add(colName);
         ArrayList<Tuple2<List<String>, BigFraction>> ret = new ArrayList<>();
 
-        BigFraction cardinality = _metaDataProperties.getAverageCardinality(_tableNameWithType, colName);
-        LOGGER.debug("Final Cardinality: {} {} {}", cardinality, _tableNameWithType, colName);
+        BigFraction cardinality = _metaDataProperties.getAverageCardinality(_tableNameWithoutType, colName);
+        LOGGER.debug("Final Cardinality: {} {} {}", cardinality, _tableNameWithoutType, colName);
         if (cardinality.compareTo(BigFraction.ONE) <= 0) {
           return ret;
         }

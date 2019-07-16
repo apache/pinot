@@ -85,8 +85,8 @@ public abstract class StandaloneDriver extends TunerDriver {
     LOGGER.info("Setting up _mergedResults for merging");
     _mergedResults = new HashMap<>();
     for (Map.Entry<Long, Map<String, Map<String, MergerObj>>> threadEntry : _threadAccumulator.entrySet()) {
-      for (String tableNameWithType : threadEntry.getValue().keySet()) {
-        _mergedResults.putIfAbsent(tableNameWithType, new HashMap<>());
+      for (String tableNameWithoutType : threadEntry.getValue().keySet()) {
+        _mergedResults.putIfAbsent(tableNameWithoutType, new HashMap<>());
       }
     }
     LOGGER.info("tableNames: {}", _mergedResults.keySet().toString());
@@ -94,20 +94,20 @@ public abstract class StandaloneDriver extends TunerDriver {
     LOGGER.info("Setting up executor for merging: {} threads", this._coreSize);
     ThreadPoolExecutor mergeExecutor = new ThreadPoolExecutor(this._coreSize, this._coreSize, 365, TimeUnit.DAYS,
         new LinkedBlockingQueue<>(Integer.MAX_VALUE), new ThreadPoolExecutor.CallerRunsPolicy());
-    for (String tableNameWithType : _mergedResults.keySet()) {
+    for (String tableNameWithoutType : _mergedResults.keySet()) {
       mergeExecutor.execute(() -> {
-        LOGGER.debug("Thread {} working on table {}", Thread.currentThread().getId(), tableNameWithType);
+        LOGGER.debug("Thread {} working on table {}", Thread.currentThread().getId(), tableNameWithoutType);
         for (Map.Entry<Long, Map<String, Map<String, MergerObj>>> tableEntries : _threadAccumulator.entrySet()) {
           for (Map.Entry<String, MergerObj> columnEntry : tableEntries.getValue()
-              .getOrDefault(tableNameWithType, new HashMap<>()).entrySet()) {
+              .getOrDefault(tableNameWithoutType, new HashMap<>()).entrySet()) {
             try {
-              _mergedResults.get(tableNameWithType)
+              _mergedResults.get(tableNameWithoutType)
                   .putIfAbsent(columnEntry.getKey(), columnEntry.getValue().getClass().newInstance());
             } catch (Exception e) {
               LOGGER.error("Instantiation Exception in Merger!");
               LOGGER.error(e.toString());
             }
-            _strategy.merger(_mergedResults.get(tableNameWithType).get(columnEntry.getKey()), columnEntry.getValue());
+            _strategy.merger(_mergedResults.get(tableNameWithoutType).get(columnEntry.getKey()), columnEntry.getValue());
           }
         }
       });
