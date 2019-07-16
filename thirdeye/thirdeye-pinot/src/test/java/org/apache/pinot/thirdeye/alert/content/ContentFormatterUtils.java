@@ -27,12 +27,13 @@ import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
 public class ContentFormatterUtils {
 
   static String getHtmlContent(String htmlPath) throws IOException {
-    BufferedReader br = new BufferedReader(new FileReader(htmlPath));
-    StringBuilder htmlContent = new StringBuilder();
-    for(String line = br.readLine(); line != null; line = br.readLine()) {
-      htmlContent.append(line).append("\n");
+    StringBuilder htmlContent;
+    try (BufferedReader br = new BufferedReader(new FileReader(htmlPath))) {
+      htmlContent = new StringBuilder();
+      for (String line = br.readLine(); line != null; line = br.readLine()) {
+        htmlContent.append(line).append("\n");
+      }
     }
-    br.close();
 
     return htmlContent.toString();
   }

@@ -134,7 +134,7 @@ public class TestMetricAnomaliesEmailContentFormatter {
     EmailEntity emailEntity = contentFormatter.getEmailEntity(alertConfigDTO, recipients, TEST,
         null, "", anomalies, null);
 
-    String htmlPath = ClassLoader.getSystemResource("test-multiple-anomalies-email-content-formatter.html").getPath();
+    String htmlPath = ClassLoader.getSystemResource("test-metric-anomalies-template.html").getPath();
     Assert.assertEquals(
         ContentFormatterUtils.getEmailHtml(emailEntity).replaceAll("\\s", ""),
         ContentFormatterUtils.getHtmlContent(htmlPath).replaceAll("\\s", ""));

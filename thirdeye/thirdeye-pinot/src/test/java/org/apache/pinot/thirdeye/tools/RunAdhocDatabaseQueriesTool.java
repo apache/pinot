@@ -444,10 +444,10 @@ public class RunAdhocDatabaseQueriesTool {
     disableAllActiveFunction(null);
   }
 
-  private void disableAllActiveFunction(Collection<Long> exception){
+  private void disableAllActiveFunction(Collection<Long> excludeIds){
     List<AnomalyFunctionDTO> functionSpecs = anomalyFunctionDAO.findAllActiveFunctions();
     for (AnomalyFunctionDTO functionSpec : functionSpecs) {
-      if (functionSpec.getIsActive() && (CollectionUtils.isEmpty(exception) || !exception
+      if (functionSpec.getIsActive() && (CollectionUtils.isEmpty(excludeIds) || !excludeIds
           .contains(functionSpec.getId()))) {
         functionSpec.setActive(false);
         anomalyFunctionDAO.update(functionSpec);
@@ -455,10 +455,13 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
-  private void disableAllActiveSubsGroups(Collection<Long> exception){
+  /**
+   * Disable all subscription groups except groups with id in excludeIds
+   */
+  private void disableAllActiveSubsGroups(Collection<Long> excludeIds){
     List<DetectionAlertConfigDTO> subsConfigs = detectionAlertConfigDAO.findAll();
     for (DetectionAlertConfigDTO subsConfig : subsConfigs) {
-      if (subsConfig.isActive() && (CollectionUtils.isEmpty(exception) || !exception
+      if (subsConfig.isActive() && (CollectionUtils.isEmpty(excludeIds) || !excludeIds
           .contains(subsConfig.getId()))) {
         subsConfig.setActive(false);
         detectionAlertConfigDAO.update(subsConfig);
@@ -592,8 +595,8 @@ public class RunAdhocDatabaseQueriesTool {
    * Replayed anomalies are flagged accordingly and such anomalies are excluded from the email report.
    * This method removes the replay flag to test an email report from replayed results.
    */
-  private void removeReplayFlagFromAnomalies() {
-    List<MergedAnomalyResultDTO> anomalies = mergedResultDAO.findByDetectionConfigAndIdGreaterThan(116257854l,0l);
+  private void removeReplayFlagFromAnomalies(long detectionConfigId) {
+    List<MergedAnomalyResultDTO> anomalies = mergedResultDAO.findByDetectionConfigAndIdGreaterThan(detectionConfigId,0l);
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       if (!anomaly.isChild()) {
         anomaly.setAnomalyResultSource(AnomalyResultSource.DEFAULT_ANOMALY_DETECTION);

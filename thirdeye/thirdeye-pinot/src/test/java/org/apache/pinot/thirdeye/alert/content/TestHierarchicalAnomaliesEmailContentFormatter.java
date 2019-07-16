@@ -153,7 +153,7 @@ public class TestHierarchicalAnomaliesEmailContentFormatter {
     EmailEntity emailEntity = contentFormatter.getEmailEntity(alertConfigDTO, recipients, TEST,
         null, "", anomalies, null);
 
-    String htmlPath = ClassLoader.getSystemResource("test-hierarchical-anomalies-email-content-formatter.html").getPath();
+    String htmlPath = ClassLoader.getSystemResource("test-hierarchical-metric-anomalies-template.html").getPath();
     Assert.assertEquals(
         ContentFormatterUtils.getEmailHtml(emailEntity).replaceAll("\\s", ""),
         ContentFormatterUtils.getHtmlContent(htmlPath).replaceAll("\\s", ""));

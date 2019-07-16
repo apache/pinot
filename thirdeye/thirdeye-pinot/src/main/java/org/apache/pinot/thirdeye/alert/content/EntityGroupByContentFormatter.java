@@ -27,9 +27,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
@@ -103,7 +105,7 @@ public class EntityGroupByContentFormatter extends BaseEmailContentFormatter{
    * Recursively find the anomalies having a groupKey and display them in the email
    */
   private void updateEntityToAnomalyDetailsMap(MergedAnomalyResultDTO anomaly, DetectionConfigDTO detectionConfig) {
-    if (anomaly.getProperties() != null && anomaly.getProperties().containsKey(PROP_GROUP_KEY) && anomaly.getChildIds() != null) {
+    if (anomaly.getProperties() != null && anomaly.getProperties().containsKey(PROP_GROUP_KEY)) {
       AnomalyReportEntity anomalyReport = new AnomalyReportEntity(String.valueOf(anomaly.getId()),
           getAnomalyURL(anomaly, emailContentFormatterConfiguration.getDashboardHost()),
           ThirdEyeUtils.getRoundedValue(anomaly.getAvgBaselineVal()),
@@ -125,9 +127,14 @@ public class EntityGroupByContentFormatter extends BaseEmailContentFormatter{
       anomalyReport.setGroupKey(anomaly.getProperties().get(PROP_GROUP_KEY));
       anomalyReport.setEntityName(anomaly.getProperties().getOrDefault(PROP_ENTITY_NAME, "UNKNOWN_ENTITY"));
 
+      Set<Long> childIds = new HashSet<>();
+      if (anomaly.getChildIds() != null) {
+        childIds.addAll(anomaly.getChildIds());
+      }
+
       // include notified alerts only in the email
       if (!includeSentAnomaliesOnly || anomaly.isNotified()) {
-        entityToAnomalyIdsMap.put(anomaly.getProperties().get(PROP_ENTITY_NAME), Joiner.on(",").join(anomaly.getChildIds()));
+        entityToAnomalyIdsMap.put(anomaly.getProperties().get(PROP_ENTITY_NAME), Joiner.on(",").join(childIds));
         entityAnomalyToScoreMap.put(anomaly.getProperties().get(PROP_ENTITY_NAME), score);
         entityAnomalyReports.put(anomaly.getProperties().get(PROP_ENTITY_NAME), anomalyReport);
       }
