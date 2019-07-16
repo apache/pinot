@@ -24,16 +24,10 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import java.util.Random;
-import javax.annotation.Nonnull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 public class FileUtils {
   private FileUtils() {
   }
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(FileUtils.class);
   private static final Random RANDOM = new Random();
 
   public static String getRandomFileName() {
@@ -93,7 +87,6 @@ public class FileUtils {
    */
   public static void close(Iterable<? extends Closeable> closeables)
       throws IOException {
-
     IOException topLevelException = null;
 
     for (Closeable closeable : closeables) {
