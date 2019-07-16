@@ -60,7 +60,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
 
   private static final Comparator<AnomalyResult> COMPARATOR_DESC =
       (o1, o2) -> -1 * Long.compare(o1.getStartTime(), o2.getStartTime());
-  private static final String DEFAULT_EMAIL_FORMATTER_TYPE = "MultipleAnomaliesEmailContentFormatter";
+  private static final String DEFAULT_EMAIL_FORMATTER_TYPE = "MetricAnomaliesEmailContentFormatter";
   private static final String ENTITY_REPORT_FORMATTER_TYPE = "EntityContentFormatter";
   private static final String EMAIL_WHITELIST_KEY = "emailWhitelist";
   private static final String PROP_EMAIL_SCHEME = "emailScheme";
