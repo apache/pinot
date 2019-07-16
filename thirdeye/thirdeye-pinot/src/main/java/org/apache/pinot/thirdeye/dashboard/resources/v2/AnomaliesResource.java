@@ -313,7 +313,6 @@ public class AnomaliesResource {
    * @param startTime
    * @param endTime
    * @param anomalyIdsString
-   * @param functionName
    * @return
    * @throws Exception
    */
@@ -324,7 +323,6 @@ public class AnomaliesResource {
       @PathParam("endTime") Long endTime,
       @PathParam("pageNumber") int pageNumber,
       @QueryParam("anomalyIds") String anomalyIdsString,
-      @QueryParam("functionName") String functionName,
       @QueryParam("searchFilters") String searchFiltersJSON,
       @QueryParam("filterOnly") @DefaultValue("false") boolean filterOnly) throws Exception {
 
@@ -338,7 +336,7 @@ public class AnomaliesResource {
       }
     }
     AnomaliesWrapper
-        anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(removeChildren(mergedAnomalies), searchFiltersJSON, pageNumber, filterOnly);
+        anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, searchFiltersJSON, pageNumber, filterOnly);
     return anomaliesWrapper;
   }
 
