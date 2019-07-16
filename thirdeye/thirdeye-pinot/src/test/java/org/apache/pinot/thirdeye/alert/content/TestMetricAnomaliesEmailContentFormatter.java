@@ -54,7 +54,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.*;
 
 
-public class TestMultipleAnomaliesEmailContentFormatter {
+public class TestMetricAnomaliesEmailContentFormatter {
   private static final String TEST = "test";
   private int id = 0;
   private String dashboardHost = "http://localhost:8080/dashboard";
@@ -131,14 +131,14 @@ public class TestMultipleAnomaliesEmailContentFormatter {
 
     AlertConfigDTO alertConfigDTO = DaoTestUtils.getTestAlertConfiguration("Test Config");
 
-    EmailContentFormatter contentFormatter = new MultipleAnomaliesEmailContentFormatter();
+    EmailContentFormatter contentFormatter = new MetricAnomaliesEmailContentFormatter();
     contentFormatter.init(new Properties(), EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(thirdeyeAnomalyConfig));
     DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
         EmailUtils.getValidEmailAddresses("a@b.com"));
     EmailEntity emailEntity = contentFormatter.getEmailEntity(alertConfigDTO, recipients, TEST,
         null, "", anomalies, null);
 
-    String htmlPath = ClassLoader.getSystemResource("test-multiple-anomalies-email-content-formatter.html").getPath();
+    String htmlPath = ClassLoader.getSystemResource("test-metric-anomalies-template.html").getPath();
     BufferedReader br = new BufferedReader(new FileReader(htmlPath));
     StringBuilder htmlContent = new StringBuilder();
     for(String line = br.readLine(); line != null; line = br.readLine()) {

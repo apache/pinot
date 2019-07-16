@@ -157,7 +157,7 @@ public class TestHierarchicalAnomaliesEmailContentFormatter {
     EmailEntity emailEntity = contentFormatter.getEmailEntity(alertConfigDTO, recipients, TEST,
         null, "", anomalies, null);
 
-    String htmlPath = ClassLoader.getSystemResource("test-hierarchical-anomalies-email-content-formatter.html").getPath();
+    String htmlPath = ClassLoader.getSystemResource("test-hierarchical-metric-anomalies-template.html").getPath();
     BufferedReader br = new BufferedReader(new FileReader(htmlPath));
     StringBuilder htmlContent = new StringBuilder();
     for(String line = br.readLine(); line != null; line = br.readLine()) {
