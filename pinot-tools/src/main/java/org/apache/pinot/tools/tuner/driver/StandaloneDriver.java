@@ -55,8 +55,8 @@ public abstract class StandaloneDriver extends TunerDriver {
      * Accumulate all the queries to threadAccumulator:/threadID/table/column
      */
     _threadAccumulator = new HashMap<>();
-    LOGGER.debug("Setting up executor for accumulation: {} threads",this._coreSize);
-    ThreadPoolExecutor accumulateExecutor = new ThreadPoolExecutor(this._coreSize, this._coreSize, 60, TimeUnit.SECONDS,
+    LOGGER.info("Setting up executor for accumulation: {} threads",this._coreSize);
+    ThreadPoolExecutor accumulateExecutor = new ThreadPoolExecutor(this._coreSize, this._coreSize, 365, TimeUnit.DAYS,
         new LinkedBlockingQueue<>(Integer.MAX_VALUE), new ThreadPoolExecutor.CallerRunsPolicy());
 
     while (_querySrc.hasNext()) {
@@ -72,28 +72,28 @@ public abstract class StandaloneDriver extends TunerDriver {
       }
     }
     accumulateExecutor.shutdown();
-    LOGGER.debug("All queries waiting for accumulation");
+    LOGGER.info("All queries waiting for accumulation");
     try {
-      accumulateExecutor.awaitTermination(24, TimeUnit.HOURS);
+      accumulateExecutor.awaitTermination(365, TimeUnit.DAYS);
     } catch (InterruptedException e) {
       LOGGER.error(e.toString());
     }
-    LOGGER.debug("All accumulation done");
+    LOGGER.info("All accumulation done");
 
     /*
      * Merge corresponding entries
      */
-    LOGGER.debug("Setting up _mergedResults for merging");
+    LOGGER.info("Setting up _mergedResults for merging");
     _mergedResults = new HashMap<>();
     for (Map.Entry<Long, Map<String, Map<String, MergerObj>>> threadEntry : _threadAccumulator.entrySet()) {
       for (String tableNameWithType : threadEntry.getValue().keySet()) {
         _mergedResults.putIfAbsent(tableNameWithType, new HashMap<>());
       }
     }
-    LOGGER.debug("tableNames: {}", _mergedResults.keySet().toString());
+    LOGGER.info("tableNames: {}", _mergedResults.keySet().toString());
 
-    LOGGER.debug("Setting up executor for merging: {} threads",this._coreSize);
-    ThreadPoolExecutor mergeExecutor = new ThreadPoolExecutor(this._coreSize, this._coreSize, 60, TimeUnit.SECONDS,
+    LOGGER.info("Setting up executor for merging: {} threads",this._coreSize);
+    ThreadPoolExecutor mergeExecutor = new ThreadPoolExecutor(this._coreSize, this._coreSize, 365, TimeUnit.DAYS,
         new LinkedBlockingQueue<>(Integer.MAX_VALUE), new ThreadPoolExecutor.CallerRunsPolicy());
     for (String tableNameWithType : _mergedResults.keySet()) {
       mergeExecutor.execute(() -> {
@@ -113,14 +113,14 @@ public abstract class StandaloneDriver extends TunerDriver {
         }
       });
     }
-    LOGGER.debug("All tables waiting for merge");
+    LOGGER.info("All tables waiting for merge");
     mergeExecutor.shutdown();
     try {
-      mergeExecutor.awaitTermination(24, TimeUnit.HOURS);
+      mergeExecutor.awaitTermination(365, TimeUnit.DAYS);
     } catch (InterruptedException e) {
       LOGGER.error(e.toString());
     }
-    LOGGER.debug("All merge done");
+    LOGGER.info("All merge done");
     /*
      * Report
      */

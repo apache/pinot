@@ -11,8 +11,8 @@ public class BrokerLogParserImpl implements BasicQueryParser {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerLogParserImpl.class);
   /*Regex to parse Broker Log*/
   private static final String BROKER_LOG_REGEX =
-      ".*, table:(.*), timeMs:(\\d+), docs:(\\d+)/(\\d+).*, entries:(\\d+)/(\\d+),.*, query:(.*)";
-      //"(.*)";
+      ".*, table:(.*), timeMs:(\\d+), docs:(\\d+)/(\\d+).*, entries:(\\d+)/(\\d+),.*, query:(.+)";
+
   private static final Pattern _compiledPattern = Pattern.compile(BROKER_LOG_REGEX);
 
   private enum GROUP_NAMES {
@@ -35,7 +35,7 @@ public class BrokerLogParserImpl implements BasicQueryParser {
       IndexSuggestQueryStatsImpl ret = new IndexSuggestQueryStatsImpl.Builder()
           ._tableNameWithType(match.group(GROUP_NAMES.TABLE_NAME_WITH_TYPE.ordinal()))
           ._numEntriesScannedInFilter(match.group(GROUP_NAMES.NUM_ENTRIES_SCANNED_IN_FILTER.ordinal()))
-          ._numEntriesScannedPostFilter(match.group(GROUP_NAMES.NUM_ENTRIES_SCANNED_IN_FILTER.ordinal()))
+          ._numEntriesScannedPostFilter(match.group(GROUP_NAMES.NUM_ENTRIES_SCANNED_POST_FILTER.ordinal()))
           ._query(match.group(GROUP_NAMES.QUERY.ordinal())).build();
       LOGGER.debug("Parsed line: " + ret.toString());
       return ret;

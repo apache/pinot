@@ -5,6 +5,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.NoSuchElementException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,8 +21,11 @@ public class LogFileSrcImpl implements QuerySrc {
   private FileInputStream _fileInputStream= null;
   private BufferedReader _bufferedReader= null;
   private String _stringBuffer = null;
+  private String _stringBufferNext=null;
   private BasicQueryParser _parser;
   private String _path;
+  private static final String VALID_LINE_REGEX="(\\d{4})/(\\d{2})/(\\d{2}) [\\d:.s].*";
+  private static final Pattern valid_line_beginner=Pattern.compile(VALID_LINE_REGEX);
 
   private LogFileSrcImpl(Builder builder) {
     _parser = builder._parser;
@@ -56,10 +61,10 @@ public class LogFileSrcImpl implements QuerySrc {
     try {
       _fileInputStream = new FileInputStream(this._path);
       _bufferedReader = new BufferedReader(new InputStreamReader(_fileInputStream));
-      _stringBuffer = _bufferedReader.readLine();
+      _stringBufferNext = _bufferedReader.readLine();
     } catch(IOException e){
       LOGGER.error(e.toString());
-      _stringBuffer = null;
+      _stringBufferNext = null;
       System.exit(1);
     }
     return this;
@@ -67,7 +72,7 @@ public class LogFileSrcImpl implements QuerySrc {
 
   @Override
   public boolean hasNext() {
-    if(this._stringBuffer!=null){
+    if(this._stringBufferNext!=null){
       return true;
     }
     else{
@@ -85,19 +90,22 @@ public class LogFileSrcImpl implements QuerySrc {
 
   @Override
   public BasicQueryStats next() throws NoSuchElementException{
-    if(_stringBuffer==null)
+    if(_stringBufferNext==null)
       throw new NoSuchElementException();
-
-    String _ret=_stringBuffer;
+    _stringBuffer = _stringBufferNext;
     try {
-      _stringBuffer = _bufferedReader.readLine();
+      while((_stringBufferNext=_bufferedReader.readLine())!=null && !valid_line_beginner.matcher(_stringBufferNext).find()){
+        _stringBuffer= _stringBuffer + _stringBufferNext;
+        _stringBufferNext=null;
+      }
     }
     catch (IOException e){
       LOGGER.error(e.getMessage());
-      _stringBuffer = null;
+      _stringBufferNext = null;
     }
     finally {
-      return _parser.parse(_ret);
+      LOGGER.debug("FileReaderReturning: {}", _stringBuffer);
+      return _parser.parse(_stringBuffer);
     }
   }
 }

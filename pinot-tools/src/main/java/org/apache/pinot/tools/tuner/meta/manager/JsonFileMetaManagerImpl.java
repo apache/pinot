@@ -111,26 +111,25 @@ public class JsonFileMetaManagerImpl implements MetaManager {
         return BigFraction.ONE;
       }
     }
-    LOGGER.debug("Getting card from: {} {}",tableNameWithType,columnName);
 
     String nSortedNuemrator=getColField(tableNameWithType, columnName, NUM_SEGMENTS_SORTED);
     String nSortedDenominator=getColField(tableNameWithType, columnName, NUM_SEGMENTS_COUNT);
     String cardNumerator = getColField(tableNameWithType, columnName, WEIGHTED_SUM_CARDINALITY);
     String cardDenominator = getColField(tableNameWithType, columnName, SUM_DOCS);
 
-    LOGGER.debug("Cardinality: table:{} column:{} card: {}/{}, sort: {}/{}",
+    LOGGER.debug("Cardinality table:{} column:{} card: {}/{}, sort: {}/{}",
         tableNameWithType, columnName, cardNumerator,
         cardDenominator, nSortedNuemrator, nSortedDenominator
     );
 
     if (cardNumerator == null || cardDenominator == null) {
-      LOGGER.error("{} {} {}'s cardinality does not exist!", tableNameWithType, columnName, columnName);
-      return new BigFraction(1);
+      LOGGER.error("{} {}'s cardinality does not exist!", tableNameWithType, columnName);
+      return BigFraction.ONE;
     }
 
     BigFraction sorted_ratio;
     if (nSortedNuemrator == null || nSortedDenominator==null){
-      LOGGER.error("{} {} {}'s sort info does not exist!", tableNameWithType, columnName, columnName);
+      LOGGER.error("{} {}'s sort info does not exist!", tableNameWithType, columnName);
       sorted_ratio=BigFraction.ONE;
     }
     else if(nSortedNuemrator.equals(nSortedDenominator)){
@@ -155,7 +154,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
   public String getSegmentField(String tableNameWithType, String columnName, String segmentName, String fieldName) {
     JsonNode ret = _aggregatedMap.get(tableNameWithType).get(columnName).get(segmentName).get(fieldName);
     if (ret == null) {
-      LOGGER.error("{} {} {} {} Does not exist!", tableNameWithType, columnName, segmentName, fieldName);
+      LOGGER.error("tableNameWithType:{} columnName:{} segmentName:{} fieldName:{} Does not exist!", tableNameWithType, columnName, segmentName, fieldName);
       return null;
     }
     return ret.asText();
@@ -167,11 +166,11 @@ public class JsonFileMetaManagerImpl implements MetaManager {
       ret = _aggregatedMap.get(tableNameWithType).get(columnName).get(fieldName);
     }
     catch (NullPointerException e){
-      LOGGER.error("{} {} Does not exist!", tableNameWithType, columnName);
+      LOGGER.debug("tableNameWithType:{} columnName:{} Does not exist!", tableNameWithType, columnName);
       return null;
     }
     if (ret == null) {
-      LOGGER.error("{} {} {} Does not exist!", tableNameWithType, columnName, fieldName);
+      LOGGER.debug("tableNameWithType:{} columnName:{} fieldName:{} Does not exist!", tableNameWithType, columnName, fieldName);
       return null;
     }
     return ret.asText();
