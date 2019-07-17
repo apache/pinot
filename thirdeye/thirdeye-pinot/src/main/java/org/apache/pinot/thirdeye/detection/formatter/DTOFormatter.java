@@ -24,6 +24,6 @@ import java.util.Map;
 import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
 
 
-public interface ConfigFormatter<T extends AbstractDTO> {
+public interface DTOFormatter<T extends AbstractDTO> {
   Map<String, Object> format(T config);
 }

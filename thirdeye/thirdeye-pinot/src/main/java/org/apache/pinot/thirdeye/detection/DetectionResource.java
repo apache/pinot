@@ -135,7 +135,7 @@ public class DetectionResource {
     this.loader = new DetectionPipelineLoader();
 
     this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, evaluationDAO, timeseriesLoader, aggregationLoader, loader);
-    this.detectionConfigFormatter = new DetectionConfigFormatter();
+    this.detectionConfigFormatter = new DetectionConfigFormatter(metricDAO, datasetDAO);
     this.detectionAlertConfigFormatter = new DetectionAlertConfigFormatter();
   }
 
