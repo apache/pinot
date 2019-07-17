@@ -1,6 +1,7 @@
 package org.apache.pinot.tools.tuner.strategy;
 
 import io.vavr.Tuple2;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -18,7 +19,7 @@ import org.apache.pinot.tools.tuner.query.src.BasicQueryStats;
 import org.apache.pinot.tools.tuner.query.src.IndexSuggestQueryStatsImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import org.apache.commons.math3.stat.descriptive.rank.Percentile;
 
 public class OLSAnalysisImpl implements BasicStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(OLSAnalysisImpl.class);
@@ -127,8 +128,29 @@ public class OLSAnalysisImpl implements BasicStrategy {
     if(!mergedOut.containsKey("*")){
       return;
     }
+
+
+
     OLSMergerObj olsMergerObj=(OLSMergerObj)mergedOut.get("*");
-    LOGGER.info(olsMergerObj.getMinBin().toString());
+    LOGGER.debug(olsMergerObj.getMinBin().toString());
+
+    double[] timeAll=new double[olsMergerObj.getTimeList().size()];
+    double[] inFilterAll=new double[olsMergerObj.getInFilterList().size()];
+
+    ArrayList<Long> timeList = olsMergerObj.getTimeList();
+    ArrayList<Long> inFilterList = olsMergerObj.getInFilterList();
+    for (int i = 0; i < timeList.size(); i++) {
+      timeAll[i]=timeList.get(i);
+      inFilterAll[i]=inFilterList.get(i);
+    }
+
+    Percentile percentile=new Percentile();
+    percentile.setData(timeAll);
+    percentile.evaluate(10);
+
+    //TODO:PRINT PERCERNTILES
+
+
     OLSMultipleLinearRegression regression = new OLSMultipleLinearRegression();
     regression.setNoIntercept(true);
 
