@@ -31,12 +31,16 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 public class DetectionAlertConfigFormatter implements DTOFormatter<DetectionAlertConfigDTO> {
   private static final String ATTR_NAME = "name";
   private static final String ATTR_YAML = "yaml";
+  private static final String ATTR_ACTIVE = "active";
+  private static final String ATTR_ID = "id";
 
   @Override
   public Map<String, Object> format(DetectionAlertConfigDTO config) {
     Map<String, Object> output = new HashMap<>();
     output.put(ATTR_NAME, config.getName());
     output.put(ATTR_YAML, config.getYaml());
+    output.put(ATTR_ID, config.getId());
+    output.put(ATTR_ACTIVE, config.isActive());
     return output;
   }
 }

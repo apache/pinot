@@ -110,7 +110,6 @@ public class DetectionResource {
   private final DetectionConfigManager configDAO;
   private final EvaluationManager evaluationDAO;
   private final TaskManager taskDAO;
-
   private final DetectionAlertConfigManager detectionAlertConfigDAO;
   private final DetectionConfigFormatter detectionConfigFormatter;
   private final DetectionAlertConfigFormatter detectionAlertConfigFormatter;
@@ -183,7 +182,7 @@ public class DetectionResource {
   @ApiOperation("get all detection alert configs")
   public Response getAllSubscriptionGroups(){
     List<DetectionAlertConfigDTO> detectionAlertConfigDTOs = this.detectionAlertConfigDAO.findAll();
-    return Response.ok(detectionAlertConfigDTOs).build();
+    return Response.ok(detectionAlertConfigDTOs.stream().map(this.detectionAlertConfigFormatter::format).collect(Collectors.toList())).build();
   }
 
   @Path("{id}/anomalies")
