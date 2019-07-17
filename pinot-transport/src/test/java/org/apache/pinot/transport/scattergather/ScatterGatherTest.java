@@ -19,12 +19,9 @@
 package org.apache.pinot.transport.scattergather;
 
 import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.yammer.metrics.core.MetricsRegistry;
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
@@ -305,20 +302,15 @@ public class ScatterGatherTest {
 
     @Override
     public RequestHandler createNewRequestHandler() {
-      return new RequestHandler() {
-        @Override
-        public ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request) {
-          Uninterruptibles.sleepUninterruptibly(_delayMs, TimeUnit.MILLISECONDS);
+      return request -> {
+        Uninterruptibles.sleepUninterruptibly(_delayMs, TimeUnit.MILLISECONDS);
 
-          if (_throwError) {
-            throw new RuntimeException();
-          }
-
-          // Return the request as response
-          byte[] requestBytes = new byte[request.readableBytes()];
-          request.readBytes(requestBytes);
-          return Futures.immediateFuture(requestBytes);
+        if (_throwError) {
+          throw new RuntimeException();
         }
+
+        // Return the request as response
+        return Futures.immediateFuture(request);
       };
     }
   }
