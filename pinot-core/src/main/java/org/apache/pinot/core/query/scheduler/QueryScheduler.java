@@ -201,11 +201,12 @@ public abstract class QueryScheduler {
       LOGGER.info(
           "Processed requestId={},table={},segments(queried/processed/matched/consuming)={}/{}/{}/{},"
               + "schedulerWaitMs={},totalExecMs={},totalTimeMs={},minConsumingFreshnessMs={},broker={},"
-              + "numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
+              + "numDocsScanned={},scanInFilter={},scanPostFilter={},sched={},query={}",
           requestId, tableNameWithType, numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched,
           numSegmentsConsuming, schedulerWaitMs, timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
           timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), minConsumingFreshnessMs,
-          queryRequest.getBrokerId(), numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, name());
+          queryRequest.getBrokerId(), numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, name(),
+          queryRequest.getSelectionExpressions().toString()+queryRequest.getFilterQueryTree().getExpression().toString());
 
       // Limit the dropping log message at most once per second.
       if (numDroppedLogRateLimiter.tryAcquire()) {
