@@ -42,16 +42,16 @@ import org.slf4j.LoggerFactory;
  * The detection config formatter
  */
 public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO> {
-  private static final String ATTR_ID = "id";
-  private static final String ATTR_CREATED_BY = "createdBy";
-  private static final String ATTR_UPDATED_BY = "updatedBy";
-  private static final String ATTR_NAME = "name";
-  private static final String ATTR_DESCRIPTION = "description";
-  private static final String ATTR_LAST_TIMESTAMP = "lastTimestamp";
-  private static final String ATTR_YAML = "yaml";
-  private static final String ATTR_METRIC_URNS = "metricUrns";
-  private static final String ATTR_IS_ACTIVE = "active";
-  private static final String ATTR_ALERT_DETAILS_WINDOW_SIZE = "alertDetailsDefaultWindowSize";
+  static final String ATTR_ID = "id";
+  static final String ATTR_CREATED_BY = "createdBy";
+  static final String ATTR_UPDATED_BY = "updatedBy";
+  static final String ATTR_NAME = "name";
+  static final String ATTR_DESCRIPTION = "description";
+  static final String ATTR_LAST_TIMESTAMP = "lastTimestamp";
+  static final String ATTR_YAML = "yaml";
+  static final String ATTR_METRIC_URNS = "metricUrns";
+  static final String ATTR_IS_ACTIVE = "active";
+  static final String ATTR_ALERT_DETAILS_WINDOW_SIZE = "alertDetailsDefaultWindowSize";
 
   private static final String PROP_NESTED_METRIC_URNS_KEY = "nestedMetricUrns";
   private static final String PROP_NESTED_PROPERTIES_KEY = "nested";
