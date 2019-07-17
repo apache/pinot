@@ -1,8 +1,8 @@
 package org.apache.pinot.tools.tuner.strategy;
 
-public class FrequencyBasicMergerObj extends BasicMergerObj {
+public class FrequencyMergerObj extends BasicMergerObj {
 
-  public FrequencyBasicMergerObj() {
+  public FrequencyMergerObj() {
     _pureScore = 0;
   }
 
@@ -16,12 +16,12 @@ public class FrequencyBasicMergerObj extends BasicMergerObj {
     this._pureScore += _pureScore;
   }
 
-  public void merge(FrequencyBasicMergerObj fobj) {
+  public void merge(FrequencyMergerObj fobj) {
     this._pureScore += fobj._pureScore;
   }
 
   @Override
   public String toString() {
-    return "ParseBasedBasicMergerObj{" + "_pureScore=" + _pureScore + '}';
+    return "ParseBasedMergerObj{" + "_pureScore=" + _pureScore + '}';
   }
 }

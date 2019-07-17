@@ -96,12 +96,26 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     return this;
   }
 
+  public boolean hasInvertedIndex(String tableNameWithoutType, String columnName){
+    if (_additional_masking_cols.getOrDefault(tableNameWithoutType, new HashSet<>()).contains(columnName)) {
+      return true;
+    }
+    if (_use_existing_index) {
+      String _numHasInv = getColField(tableNameWithoutType, columnName, NUM_SEGMENTS_HAS_INVERTED_INDEX);
+      if (_numHasInv != null && Integer.parseInt(_numHasInv) > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   public BigFraction getAverageCardinality(String tableNameWithoutType, String columnName) {
     LOGGER.debug("Getting card from: {} {}", tableNameWithoutType, columnName);
+
+    if (_additional_masking_cols.getOrDefault(tableNameWithoutType, new HashSet<>()).contains(columnName)) {
+      return BigFraction.ONE;
+    }
     if (_use_existing_index) {
-      if (_additional_masking_cols.getOrDefault(tableNameWithoutType, new HashSet<>()).contains(columnName)) {
-        return BigFraction.ONE;
-      }
       String _numHasInv = getColField(tableNameWithoutType, columnName, NUM_SEGMENTS_HAS_INVERTED_INDEX);
       if (_numHasInv == null || Integer.parseInt(_numHasInv) > 0) {
         return BigFraction.ONE;

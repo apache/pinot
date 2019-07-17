@@ -23,7 +23,7 @@ public class LogFileSrcImpl implements QuerySrc {
   private String _stringBufferNext = null;
   private BasicQueryParser _parser;
   private String _path;
-  private static final String VALID_LINE_REGEX = "^(\\d{4})/(\\d{2})/(\\d{2}) [\\d:.s].*$";
+  private static final String VALID_LINE_REGEX = "^(\\d{4})/(\\d{2})/(\\d{2}) [\\d:.].*$";
   private static final Pattern valid_line_beginner = Pattern.compile(VALID_LINE_REGEX);
 
   private LogFileSrcImpl(Builder builder) {

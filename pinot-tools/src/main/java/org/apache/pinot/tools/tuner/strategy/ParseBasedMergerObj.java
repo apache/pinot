@@ -3,7 +3,7 @@ package org.apache.pinot.tools.tuner.strategy;
 import java.math.BigInteger;
 
 
-public class ParseBasedBasicMergerObj extends BasicMergerObj {
+public class ParseBasedMergerObj extends BasicMergerObj {
   private long _pureScore;
   private BigInteger _weigtedScore;
 
@@ -15,7 +15,7 @@ public class ParseBasedBasicMergerObj extends BasicMergerObj {
     return _weigtedScore;
   }
 
-  public ParseBasedBasicMergerObj() {
+  public ParseBasedMergerObj() {
     _pureScore = 0;
     _weigtedScore = BigInteger.ZERO;
   }
@@ -25,13 +25,13 @@ public class ParseBasedBasicMergerObj extends BasicMergerObj {
     this._weigtedScore = this._weigtedScore.add(_weigtedScore);
   }
 
-  public void merge(ParseBasedBasicMergerObj pb) {
+  public void merge(ParseBasedMergerObj pb) {
     this._pureScore += pb._pureScore;
     this._weigtedScore = this._weigtedScore.add(pb._weigtedScore);
   }
 
   @Override
   public String toString() {
-    return "ParseBasedBasicMergerObj{" + "_pureScore=" + _pureScore + ", _weigtedScore=" + _weigtedScore + '}';
+    return "ParseBasedMergerObj{" + "_pureScore=" + _pureScore + ", _weigtedScore=" + _weigtedScore + '}';
   }
 }

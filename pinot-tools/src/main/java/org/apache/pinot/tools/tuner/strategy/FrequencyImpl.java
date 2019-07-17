@@ -38,7 +38,7 @@ public class FrequencyImpl implements BasicStrategy {
   public static final class Builder {
     private HashSet<String> _tableNamesWorkonWithoutType = new HashSet<>();
     private long _numEntriesScannedThreshold = NO_IN_FILTER_THRESHOLD;
-    private long _cardinalityThreshold=CARD_THRESHOLD_ONE;
+    private long _cardinalityThreshold = CARD_THRESHOLD_ONE;
 
     public Builder() {
     }
@@ -92,6 +92,7 @@ public class FrequencyImpl implements BasicStrategy {
     String query = indexSuggestQueryStatsImpl.getQuery();
     LOGGER.debug("Accumulator: scoring query {}", query);
     HashSet<String> counted=new HashSet<>();
+
     if (Long.parseLong(numEntriesScannedInFilter) == 0) return; //Early return if the query is not scanning in filter
 
     Matcher matcher=_dimensionPattern.matcher(query);
@@ -104,17 +105,18 @@ public class FrequencyImpl implements BasicStrategy {
       }
       else{}
     }
+
     counted.stream().filter(colName->metaDataProperties.getAverageCardinality(tableNameWithoutType,colName).compareTo(new BigFraction(_cardinalityThreshold))>0)
         .forEach(colName->{
           AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-          AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new FrequencyBasicMergerObj());
-          ((FrequencyBasicMergerObj)AccumulatorOut.get(tableNameWithoutType).get(colName)).merge(1);
+          AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new FrequencyMergerObj());
+          ((FrequencyMergerObj)AccumulatorOut.get(tableNameWithoutType).get(colName)).merge(1);
         });
   }
 
   @Override
   public void merger(BasicMergerObj p1, BasicMergerObj p2) {
-    ((FrequencyBasicMergerObj) p1).merge((FrequencyBasicMergerObj) p2);
+    ((FrequencyMergerObj) p1).merge((FrequencyMergerObj) p2);
   }
 
   @Override
@@ -123,7 +125,7 @@ public class FrequencyImpl implements BasicStrategy {
     String mergerOut = "";
     List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
     mergedOut
-        .forEach((colName, score) -> sortedPure.add(new Tuple2<>(colName, ((FrequencyBasicMergerObj) score).getPureScore())));
+        .forEach((colName, score) -> sortedPure.add(new Tuple2<>(colName, ((FrequencyMergerObj) score).getPureScore())));
     sortedPure.sort((p1,p2)->(p2._2().compareTo(p1._2())));
     for (Tuple2<String, Long> tuple2 : sortedPure) {
       mergerOut += "Dimension: " + tuple2._1()+ "  " + tuple2._2().toString() + "\n";

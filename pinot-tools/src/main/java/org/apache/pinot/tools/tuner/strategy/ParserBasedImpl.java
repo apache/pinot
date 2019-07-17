@@ -117,10 +117,10 @@ public class ParserBasedImpl implements BasicStrategy {
           tupleNamesScore._1().stream().filter(colName -> !counted.contains(colName)).forEach(colName -> {
             counted.add(colName);
             AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-            AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new ParseBasedBasicMergerObj());
+            AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new ParseBasedMergerObj());
             BigFraction weigthedScore = BigFraction.ONE.subtract(tupleNamesScore._2().reciprocal())
                 .multiply(new BigInteger(numEntriesScannedInFilter));
-            ((ParseBasedBasicMergerObj) AccumulatorOut.get(tableNameWithoutType).get(colName))
+            ((ParseBasedMergerObj) AccumulatorOut.get(tableNameWithoutType).get(colName))
                 .merge(1, weigthedScore.bigDecimalValue(RoundingMode.DOWN.ordinal()).toBigInteger());
           });
         });
@@ -128,7 +128,7 @@ public class ParserBasedImpl implements BasicStrategy {
 
   @Override
   public void merger(BasicMergerObj p1, BasicMergerObj p2) {
-    ((ParseBasedBasicMergerObj) p1).merge((ParseBasedBasicMergerObj) p2);
+    ((ParseBasedMergerObj) p1).merge((ParseBasedMergerObj) p2);
   }
 
   @Override
@@ -138,8 +138,8 @@ public class ParserBasedImpl implements BasicStrategy {
     List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
     List<Tuple2<String, BigInteger>> sortedWeighted = new ArrayList<>();
     mergedOut.forEach((colName, score) -> {
-      sortedPure.add(new Tuple2<>(colName, ((ParseBasedBasicMergerObj) score).getPureScore()));
-      sortedWeighted.add(new Tuple2<>(colName, ((ParseBasedBasicMergerObj) score).getWeigtedScore()));
+      sortedPure.add(new Tuple2<>(colName, ((ParseBasedMergerObj) score).getPureScore()));
+      sortedWeighted.add(new Tuple2<>(colName, ((ParseBasedMergerObj) score).getWeigtedScore()));
     });
     sortedPure.sort((p1,p2)->(p2._2().compareTo(p1._2())));
     sortedWeighted.sort((p1,p2)->(p2._2().compareTo(p1._2())));
@@ -322,7 +322,7 @@ public class ParserBasedImpl implements BasicStrategy {
           }
           ret.add(new Tuple2<>(colNameList, cardinality.divide(cardinality.subtract(lenFilter))));
         }
-        {
+        else {
           ret.add(new Tuple2<>(colNameList, cardinality.divide(lenFilter)));
         }
         LOGGER.debug("IN clause ret {}", ret.toString());
