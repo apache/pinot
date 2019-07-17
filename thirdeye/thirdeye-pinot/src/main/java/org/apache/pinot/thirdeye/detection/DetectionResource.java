@@ -74,6 +74,8 @@ import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.finetune.GridSearchTuningAlgorithm;
 import org.apache.pinot.thirdeye.detection.finetune.TuningAlgorithm;
+import org.apache.pinot.thirdeye.detection.formatter.DetectionAlertConfigFormatter;
+import org.apache.pinot.thirdeye.detection.formatter.DetectionConfigFormatter;
 import org.apache.pinot.thirdeye.detection.health.DetectionHealth;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detector.function.BaseAnomalyFunction;
@@ -110,6 +112,8 @@ public class DetectionResource {
   private final TaskManager taskDAO;
 
   private final DetectionAlertConfigManager detectionAlertConfigDAO;
+  private final DetectionConfigFormatter detectionConfigFormatter;
+  private final DetectionAlertConfigFormatter detectionAlertConfigFormatter;
 
   public DetectionResource() {
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
@@ -131,6 +135,8 @@ public class DetectionResource {
     this.loader = new DetectionPipelineLoader();
 
     this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, evaluationDAO, timeseriesLoader, aggregationLoader, loader);
+    this.detectionConfigFormatter = new DetectionConfigFormatter();
+    this.detectionAlertConfigFormatter = new DetectionAlertConfigFormatter();
   }
 
   @Path("/{id}")
@@ -138,7 +144,7 @@ public class DetectionResource {
   @ApiOperation("get a detection config with yaml")
   public Response getDetectionConfig(@ApiParam("the detection config id") @PathParam("id") long id){
     DetectionConfigDTO config = this.configDAO.findById(id);
-    return Response.ok(config).build();
+    return Response.ok(this.detectionConfigFormatter.format(config)).build();
   }
 
   @Path("/notification/{id}")
@@ -146,7 +152,7 @@ public class DetectionResource {
   @ApiOperation("get a detection alert config with yaml")
   public Response getDetectionAlertConfig(@ApiParam("the detection alert config id") @PathParam("id") long id){
     DetectionAlertConfigDTO config = this.detectionAlertConfigDAO.findById(id);
-    return Response.ok(config).build();
+    return Response.ok(this.detectionAlertConfigFormatter.format(config)).build();
   }
 
   @Path("/dataset")
@@ -168,7 +174,7 @@ public class DetectionResource {
         subscriptionGroupAlertDTOs.add(alertConfigDTO);
       }
     }
-    return Response.ok(new ArrayList<>(subscriptionGroupAlertDTOs)).build();
+    return Response.ok(subscriptionGroupAlertDTOs.stream().map(this.detectionAlertConfigFormatter::format).collect(Collectors.toList())).build();
   }
 
 
