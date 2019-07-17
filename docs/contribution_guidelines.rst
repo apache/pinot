@@ -124,7 +124,7 @@ Automated tests are always recommended for contributions. Make sure you write te
 
 #. You verify the correctness of your contribution. This serves as proof to you as well as the reviewers.
 
-#. You future proof your contributions against code refactors or other changes. While this may not always be possible (see :ref:`testing-guidelines`), its a good goal to aim for.
+#. You future proof your contributions against code refactors or other changes. While this may not always be possible (see :ref:`testing_guidelines`), its a good goal to aim for.
 
 Identify a list of tests for the changes you have made. Depending on the scope of changes, you may need one or more of the following tests:
 
@@ -139,6 +139,7 @@ Identify a list of tests for the changes you have made. Depending on the scope o
   Add integration tests to cover End-to-End paths without relying on *mocking* (see note below). You ``MUST`` add integration tests for REST APIs, and must include tests that cover different error codes; i.e., 200 OK, 4xx or 5xx errors that are explicit contracts of the API.
 
 .. _testing_guidelines:
+
 Testing Guidelines
 ^^^^^^^^^^^^^^^^^^
 * Mocking
