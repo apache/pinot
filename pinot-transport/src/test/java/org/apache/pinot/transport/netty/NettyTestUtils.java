@@ -21,8 +21,6 @@ package org.apache.pinot.transport.netty;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -51,10 +49,8 @@ public class NettyTestUtils {
     }
 
     @Override
-    public ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request) {
-      byte[] bytes = new byte[request.readableBytes()];
-      request.readBytes(bytes);
-      _request = new String(bytes);
+    public ListenableFuture<byte[]> processRequest(byte[] request) {
+      _request = new String(request);
       if (_responseHandlingLatch != null) {
         while (true) {
           try {
