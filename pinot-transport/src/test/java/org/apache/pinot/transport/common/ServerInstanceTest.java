@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.transport.common;
 
+import java.net.InetAddress;
 import org.apache.pinot.common.response.ServerInstance;
 import org.testng.annotations.Test;
 
@@ -28,21 +29,23 @@ import static org.testng.Assert.assertNotEquals;
 public class ServerInstanceTest {
 
   @Test
-  public void testServerInstance() {
+  public void testServerInstance()
+      throws Exception {
     // Same local host name and port
     assertEquals(new ServerInstance("localhost", 8080), new ServerInstance("localhost", 8080));
 
-    // Same IP address host and port
+    // Same local host IP address and port
     assertEquals(new ServerInstance("127.0.0.1", 8080), new ServerInstance("127.0.0.1", 8080));
 
     // Same other host name and port
     assertEquals(new ServerInstance("test-host", 8080), new ServerInstance("test-host", 8080));
 
-    // Same other IP address host and port
+    // Same other host IP address and port
     assertEquals(new ServerInstance("192.168.0.1", 8080), new ServerInstance("192.168.0.1", 8080));
 
-    // Same local host and port, one with host name and one with IP address
-    assertEquals(new ServerInstance("localhost", 8080), new ServerInstance("127.0.0.1", 8080));
+    // Same local host and port, one with IP address and one with host name
+    assertEquals(new ServerInstance("127.0.0.1", 8080),
+        new ServerInstance(InetAddress.getByName("127.0.0.1").getHostName(), 8080));
 
     // Same host but different port
     assertNotEquals(new ServerInstance("localhost", 8081), new ServerInstance("localhost", 8082));
