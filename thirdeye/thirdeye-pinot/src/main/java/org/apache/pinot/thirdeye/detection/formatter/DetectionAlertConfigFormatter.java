@@ -25,6 +25,9 @@ import java.util.Map;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 
 
+/**
+ * The detection alert config formatter
+ */
 public class DetectionAlertConfigFormatter implements DTOFormatter<DetectionAlertConfigDTO> {
   private static final String ATTR_NAME = "name";
   private static final String ATTR_YAML = "yaml";

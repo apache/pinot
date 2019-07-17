@@ -34,8 +34,13 @@ import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
+/**
+ * The detection config formatter
+ */
 public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO> {
   private static final String ATTR_ID = "id";
   private static final String ATTR_CREATED_BY = "createdBy";
@@ -51,6 +56,8 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
   private static final String PROP_NESTED_METRIC_URNS_KEY = "nestedMetricUrns";
   private static final String PROP_NESTED_PROPERTIES_KEY = "nested";
   private static final String PROP_MONITORING_GRANULARITY = "monitoringGranularity";
+
+  private static final Logger LOG = LoggerFactory.getLogger(DetectionConfigFormatter.class);
 
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
@@ -72,7 +79,9 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
     output.put(ATTR_YAML, config.getYaml());
     output.put(ATTR_LAST_TIMESTAMP, config.getLastTimestamp());
     List<String> metricUrns = extractMetricUrnsFromProperties(config.getProperties());
+    // the metric urns monitored by this detection config
     output.put(ATTR_METRIC_URNS, metricUrns);
+    // the default window size of the alert details page
     output.put(ATTR_ALERT_DETAILS_WINDOW_SIZE, getAlertDetailsDefaultWindowSize(config, metricUrns));
     return output;
   }
@@ -83,6 +92,7 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
       metricUrns.addAll(ConfigUtils.getList(properties.get(PROP_NESTED_METRIC_URNS_KEY)));
     }
     List<Map<String, Object>> nestedProperties = ConfigUtils.getList(properties.get(PROP_NESTED_PROPERTIES_KEY));
+    // extract the metric urns recursively from the nested properties
     for (Map<String, Object> nestedProperty : nestedProperties) {
       metricUrns.addAll(extractMetricUrnsFromProperties(nestedProperty));
     }
@@ -90,13 +100,19 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
   }
 
   private long getAlertDetailsDefaultWindowSize(DetectionConfigDTO config, List<String> metricUrns) {
-    List<TimeGranularity> granularities = getMonitoringGranularities(config);
-    if (granularities.isEmpty()) {
-      granularities = metricUrns.stream().map(this::getGranularityForMetricUrn).collect(Collectors.toList());
+    try {
+      List<TimeGranularity> granularities = getMonitoringGranularities(config);
+      // if monitoring granularities is not set, use the metric granularity to decide the default window
+      if (granularities.isEmpty()) {
+        granularities = metricUrns.stream().map(this::getGranularityForMetricUrn).collect(Collectors.toList());
+      }
+      List<Long> windowSizes =
+          granularities.stream().map(this::getDefaultWindowSizeForGranularity).collect(Collectors.toList());
+      return Collections.min(windowSizes);
+    } catch (Exception e) {
+      LOG.warn("Exception thrown when getting granularities for detection config {}, use default presenting window size", config.getId(), e);
+      return TimeUnit.DAYS.toMillis(30);
     }
-    List<Long> windowSizes =
-        granularities.stream().map(this::getDefaultWindowSizeForGranularity).collect(Collectors.toList());
-    return Collections.min(windowSizes);
   }
 
   private List<TimeGranularity> getMonitoringGranularities(DetectionConfigDTO config) {
@@ -110,6 +126,11 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
     return monitoringGranularities;
   }
 
+  private TimeGranularity getGranularityForMetricUrn(String metricUrn) {
+    MetricEntity me = MetricEntity.fromURN(metricUrn);
+    return this.datasetDAO.findByDataset(this.metricDAO.findById(me.getId()).getDataset()).bucketTimeGranularity();
+  }
+
   private long getDefaultWindowSizeForGranularity(TimeGranularity granularity) {
     TimeUnit unit = granularity.getUnit();
     if (unit == TimeUnit.MINUTES || unit == TimeUnit.HOURS) {
@@ -117,10 +138,5 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
     } else {
       return TimeUnit.DAYS.toMillis(30);
     }
-  }
-
-  private TimeGranularity getGranularityForMetricUrn(String metricUrn) {
-    MetricEntity me = MetricEntity.fromURN(metricUrn);
-    return this.datasetDAO.findByDataset(this.metricDAO.findById(me.getId()).getDataset()).bucketTimeGranularity();
   }
 }
