@@ -43,6 +43,7 @@ import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.helix.model.builder.FullAutoModeISBuilder;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixBrokerResourceOnlineOfflineStateModelGenerator;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import org.slf4j.Logger;
@@ -158,7 +159,7 @@ public class HelixSetupUtils {
       // Initialize partitions and replicas
       idealStateBuilder.setNumPartitions(NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
       for (int i = 0; i < NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
-        idealStateBuilder.add(LEAD_CONTROLLER_RESOURCE_NAME + "_" + i);
+        idealStateBuilder.add(LeadControllerUtils.formPartitionName(i));
       }
       idealStateBuilder.setNumReplica(LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT);
       // The below config guarantees if active number of replicas is no less than minimum active replica, there will not be partition movements happened.

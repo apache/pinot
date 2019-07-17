@@ -18,12 +18,13 @@
  */
 package org.apache.pinot.controller;
 
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.statemodel.LeadControllerChecker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,12 +35,12 @@ import static org.apache.pinot.common.utils.CommonConstants.Helix.NUMBER_OF_PART
 public class LeadControllerManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerManager.class);
 
-  private final LeadControllerChecker _leadControllerChecker;
+  private Map<Integer, Integer> _partitionIndexCache;
   private PinotHelixResourceManager _pinotHelixResourceManager;
-  private boolean _amIHelixLeader = false;
+  private volatile boolean _amIHelixLeader = false;
 
   public LeadControllerManager() {
-    _leadControllerChecker = new LeadControllerChecker();
+    _partitionIndexCache = new ConcurrentHashMap<>();
   }
 
   public void registerResourceManager(PinotHelixResourceManager pinotHelixResourceManager) {
@@ -54,8 +55,8 @@ public class LeadControllerManager {
   public boolean isLeaderForTable(String tableName) {
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     int partitionIndex =
-        HelixHelper.getPartitionIdForTable(rawTableName, NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
-    if (_leadControllerChecker.isPartitionLeader(partitionIndex)) {
+        LeadControllerUtils.getPartitionIdForTable(rawTableName, NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
+    if (_partitionIndexCache.containsKey(partitionIndex)) {
       return true;
     } else {
       return isHelixLeader();
@@ -80,17 +81,22 @@ public class LeadControllerManager {
     }
 
     int numPartitions = partitionSet.size();
-    int partitionIndex = HelixHelper.getPartitionIdForTable(rawTableName, numPartitions);
-    String leadControllerId = HelixHelper.getLeadControllerForTable(leadControllerResourceExternalView, rawTableName);
+    int partitionIndex = LeadControllerUtils.getPartitionIdForTable(rawTableName, numPartitions);
+    String leadControllerId =
+        LeadControllerUtils.getLeadControllerForTable(leadControllerResourceExternalView, rawTableName);
     return new LeadControllerResponse(partitionIndex, leadControllerId);
   }
 
   public synchronized void addPartitionLeader(String partitionName) {
-    _leadControllerChecker.addPartitionLeader(partitionName);
+    LOGGER.info("Add Partition: {} to LeadControllerManager", partitionName);
+    int partitionIndex = LeadControllerUtils.extractPartitionIndex(partitionName);
+    _partitionIndexCache.put(partitionIndex, partitionIndex);
   }
 
   public synchronized void removePartitionLeader(String partitionName) {
-    _leadControllerChecker.removePartitionLeader(partitionName);
+    LOGGER.info("Remove Partition: {} from LeadControllerManager", partitionName);
+    int partitionIndex = LeadControllerUtils.extractPartitionIndex(partitionName);
+    _partitionIndexCache.remove(partitionIndex);
   }
 
   /**

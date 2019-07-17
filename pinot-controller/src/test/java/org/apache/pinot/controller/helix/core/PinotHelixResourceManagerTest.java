@@ -51,6 +51,8 @@ import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.TenantRole;
+import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.util.TestUtils;
@@ -62,7 +64,6 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
 import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT;
 import static org.apache.pinot.common.utils.CommonConstants.Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE;
-import static org.apache.pinot.common.utils.CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE;
 import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.InvalidTableConfigException;
 
 
@@ -422,7 +423,9 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
       for (String partition : leadControllerResourceExternalView.getPartitionSet()) {
         Map<String, String> stateMap = leadControllerResourceExternalView.getStateMap(partition);
         Map.Entry<String, String> entry = stateMap.entrySet().iterator().next();
-        boolean result = (PREFIX_OF_CONTROLLER_INSTANCE + LOCAL_HOST + "_" + _controllerPort).equals(entry.getKey());
+        boolean result =
+            (LeadControllerUtils.generateControllerParticipantId(LOCAL_HOST, Integer.toString(_controllerPort)))
+                .equals(entry.getKey());
         result &= MasterSlaveSMD.States.MASTER.name().equals(entry.getValue());
         if (!result) {
           return false;
@@ -439,13 +442,13 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
       List<String> instanceNames = new ArrayList<>(nInstances);
       List<Integer> ports = new ArrayList<>(nInstances);
       for (int i = 0; i < nInstances; i++) {
-        instanceNames.add(PREFIX_OF_CONTROLLER_INSTANCE + LOCAL_HOST + "_" + i);
+        instanceNames.add(LeadControllerUtils.generateControllerParticipantId(LOCAL_HOST, Integer.toString(i)));
         ports.add(i);
       }
 
       List<String> partitions = new ArrayList<>(NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
       for (int i = 0; i < NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
-        partitions.add(LEAD_CONTROLLER_RESOURCE_NAME + "_" + i);
+        partitions.add(LeadControllerUtils.formPartitionName(i));
       }
 
       LinkedHashMap<String, Integer> states = new LinkedHashMap<>(2);

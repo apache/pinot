@@ -94,6 +94,7 @@ import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnl
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
 import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.apache.pinot.common.utils.retry.RetryPolicy;
@@ -158,7 +159,7 @@ public class PinotHelixResourceManager {
     _isSingleTenantCluster = isSingleTenantCluster;
     _enableBatchMessageMode = enableBatchMessageMode;
     _allowHLCTables = allowHLCTables;
-    _helixInstanceType = InstanceType.valueOf(helixInstanceType);
+    _helixInstanceType = helixInstanceType;
   }
 
   public PinotHelixResourceManager(@Nonnull ControllerConf controllerConf) {

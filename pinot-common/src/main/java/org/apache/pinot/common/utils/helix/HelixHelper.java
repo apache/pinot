@@ -40,7 +40,6 @@ import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -49,8 +48,6 @@ import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.apache.pinot.common.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
 
 
 public class HelixHelper {
@@ -502,56 +499,5 @@ public class HelixHelper {
    */
   public static Set<String> getBrokerInstancesForTenant(List<InstanceConfig> instanceConfigs, String tenant) {
     return new HashSet<>(HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getBrokerTagForTenant(tenant)));
-  }
-
-  /**
-   * Gets hash code for table.
-   * Note: This method CANNOT be changed when lead controller resource has been enabled.
-   * Otherwise it will assign different controller for the same table, which will mess up the controller periodic tasks and realtime segment completion.
-   * @param rawTableName table name
-   * @return hash code
-   */
-  private static int getHashCodeForTable(String rawTableName) {
-    return rawTableName.hashCode();
-  }
-
-  /**
-   * Given a raw table name and number of partitions, returns the partition id in lead controller resource.
-   * @param rawTableName raw table name
-   * @param numPartitions number of partitions
-   * @return partition id in lead controller resource.
-   */
-  public static int getPartitionIdForTable(String rawTableName, int numPartitions) {
-    return getHashCodeForTable(rawTableName) % numPartitions;
-  }
-
-  /**
-   * Gets lead controller for table from lead controller resource.
-   * If the resource is disabled or no controller registered as participant, there is no instance in "MASTER" state.
-   * @param leadControllerResourceExternalView external view of lead controller resource
-   * @param rawTableName table name without type
-   * @return leader of partition, null if not found or resource is disabled.
-   */
-  public static String getLeadControllerForTable(ExternalView leadControllerResourceExternalView,  String rawTableName) {
-    if (leadControllerResourceExternalView == null) {
-      return null;
-    }
-    Set<String> partitionSet = leadControllerResourceExternalView.getPartitionSet();
-    if (partitionSet == null || partitionSet.isEmpty()) {
-      return null;
-    }
-    int numPartitions = partitionSet.size();
-    int partitionIndex = getPartitionIdForTable(rawTableName, numPartitions);
-    String partitionName = LEAD_CONTROLLER_RESOURCE_NAME + "_" + partitionIndex;
-    Map<String, String> partitionStateMap = leadControllerResourceExternalView.getStateMap(partitionName);
-
-    // Get master host from partition map. Return null if no master found.
-    for (Map.Entry<String, String> entry : partitionStateMap.entrySet()) {
-      if (MasterSlaveSMD.States.MASTER.name().equals(entry.getValue())) {
-        return entry.getKey();
-      }
-    }
-    LOGGER.info("No host in MASTER state in Partition: {} for Table: {}", partitionIndex, rawTableName);
-    return null;
   }
 }

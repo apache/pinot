@@ -24,7 +24,7 @@ import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
-import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.core.query.utils.Pair;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -108,16 +108,17 @@ public class ControllerLeaderLocator {
    * If partition leader exists, use this as the leader for realtime segment completion.
    * Otherwise, try to use Helix leader.
    * @param rawTableName table name without type
-   * @return the leader for this table.
+   * @return the controller leader id with hostname and port for this table, e.g. localhost_9000
    */
   private String getLeaderForTable(String rawTableName) {
     String leaderForTable;
     ExternalView leadControllerResourceExternalView =
         _helixManager.getClusterManagmentTool().getResourceExternalView(_clusterName, LEAD_CONTROLLER_RESOURCE_NAME);
-    String partitionLeader = HelixHelper.getLeadControllerForTable(leadControllerResourceExternalView, rawTableName);
+    String partitionLeader =
+        LeadControllerUtils.getLeadControllerForTable(leadControllerResourceExternalView, rawTableName);
     if (partitionLeader != null) {
       // Converts participant id (with Prefix "Controller_") to controller id and assigns it as the leader.
-      leaderForTable = partitionLeader.substring(partitionLeader.indexOf("_") + 1);
+      leaderForTable = LeadControllerUtils.extractLeadControllerHostNameAndPort(partitionLeader);
     } else {
       // Gets Helix leader to be the leader to this table, otherwise returns null.
       leaderForTable = getHelixClusterLeader();
@@ -145,6 +146,10 @@ public class ControllerLeaderLocator {
     }
   }
 
+  /**
+   * Generates a pair of hostname and port given a controller leader id.
+   * @param controllerLeaderId controller leader id, e.g. localhost_9000
+   */
   private Pair<String, Integer> generateControllerLeaderHostPortPair(String controllerLeaderId) {
     int index = controllerLeaderId.lastIndexOf('_');
     String leaderHost = controllerLeaderId.substring(0, index);

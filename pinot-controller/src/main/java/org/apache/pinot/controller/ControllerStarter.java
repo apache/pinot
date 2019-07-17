@@ -148,11 +148,11 @@ public class ControllerStarter {
     } else {
       _adminApp =
           new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), _config.getQueryConsoleUseHttps());
-      // Helix instance type should explicitly be set to PARTICIPANT ONLY in {@link ControllerStarter}.
-      // Other places like {@link PerfBenchmarkDriver} which directly call {@link PinotHelixResourceManager} should NOT register as PARTICIPANT, which would be put to lead controller resource and mess up the leadership assignment. Those places should use ADMINISTRATOR other than PARTICIPANT.
-      _config.setHelixInstanceType(InstanceType.PARTICIPANT);
+      // Helix instance type should be explicitly set to PARTICIPANT ONLY in {@link ControllerStarter}.
+      // Other places like {@link PerfBenchmarkDriver} which directly call {@link PinotHelixResourceManager} should NOT register as PARTICIPANT,
+      // which would be put to lead controller resource and mess up the leadership assignment. Those places should use ADMINISTRATOR other than PARTICIPANT.
       // Do not use this before the invocation of {@link PinotHelixResourceManager::start()}, which happens in {@link ControllerStarter::start()}
-      _helixResourceManager = new PinotHelixResourceManager(_config);
+      _helixResourceManager = new PinotHelixResourceManager(_config, InstanceType.PARTICIPANT);
       _executorService =
           Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("restapi-multiget-thread-%d").build());
     }
@@ -275,6 +275,9 @@ public class ControllerStarter {
     // Get lead controller manager from resource manager.
     _leadControllerManager = _helixResourceManager.getLeadControllerManager();
 
+    // This registration is not needed when the resource is enabled.
+    // However, the resource can be disabled sometime while the cluster is in operation, so we keep it here. Plus, it does not add much overhead.
+    // At some point in future when we stop supporting the disabled resource, we will remove this line altogether and the logic that goes with it.
     LOGGER.info("Registering helix controller listener");
     helixParticipantManager.addControllerListener(
         (ControllerChangeListener) changeContext -> _leadControllerManager.onHelixControllerChange());
