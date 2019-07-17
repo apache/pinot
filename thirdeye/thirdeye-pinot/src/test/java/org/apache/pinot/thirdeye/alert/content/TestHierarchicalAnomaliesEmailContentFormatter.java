@@ -32,16 +32,12 @@ import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.mail.HtmlEmail;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.testng.Assert;
@@ -158,18 +154,8 @@ public class TestHierarchicalAnomaliesEmailContentFormatter {
         null, "", anomalies, null);
 
     String htmlPath = ClassLoader.getSystemResource("test-hierarchical-metric-anomalies-template.html").getPath();
-    BufferedReader br = new BufferedReader(new FileReader(htmlPath));
-    StringBuilder htmlContent = new StringBuilder();
-    for(String line = br.readLine(); line != null; line = br.readLine()) {
-      htmlContent.append(line + "\n");
-    }
-    br.close();
-
-    HtmlEmail email = emailEntity.getContent();
-    Field field = email.getClass().getDeclaredField("html");
-    field.setAccessible(true);
-    String emailHtml = field.get(email).toString();
-    Assert.assertEquals(emailHtml.replaceAll("\\s", ""),
-        htmlContent.toString().replaceAll("\\s", ""));
+    Assert.assertEquals(
+        ContentFormatterUtils.getEmailHtml(emailEntity).replaceAll("\\s", ""),
+        ContentFormatterUtils.getHtmlContent(htmlPath).replaceAll("\\s", ""));
   }
 }

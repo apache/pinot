@@ -24,7 +24,7 @@ recipients:
 alertSchemes:
 - type: EMAIL
   params:
-    template: ENTITY_REPORT
+    template: ENTITY_GROUPBY_REPORT
     subject: METRICS
 - type: IRIS
   params:

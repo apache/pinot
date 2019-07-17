@@ -16,6 +16,15 @@
 
 package org.apache.pinot.thirdeye.alert.content;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConfiguration;
@@ -24,21 +33,15 @@ import org.apache.pinot.thirdeye.anomaly.utils.EmailUtils;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datalayer.DaoTestUtils;
-import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
-import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.testng.Assert;
@@ -46,33 +49,45 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.thirdeye.alert.content.EntityGroupByContentFormatter.*;
 import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.*;
 
 
-public class TestOnboardingNotificationContentFormatter {
+public class TestEntityGroupByEmailContentFormatter {
   private static final String TEST = "test";
   private int id = 0;
   private String dashboardHost = "http://localhost:8080/dashboard";
   private DAOTestBase testDAOProvider;
-  private AnomalyFunctionManager anomalyFunctionDAO;
+  private DetectionConfigManager detectionDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
-  private AlertConfigManager alertConfigDAO;
+  private MetricConfigManager metricDAO;
+
   @BeforeClass
   public void beforeClass(){
     testDAOProvider = DAOTestBase.getInstance();
     DAORegistry daoRegistry = DAORegistry.getInstance();
-    anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
+    detectionDAO = daoRegistry.getDetectionConfigManager();
     mergedAnomalyResultDAO = daoRegistry.getMergedAnomalyResultDAO();
-    alertConfigDAO = daoRegistry.getAlertConfigDAO();
+    metricDAO = daoRegistry.getMetricConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
     testDAOProvider.cleanup();
   }
+
+  /**
+   * Entity Alert Trigger Condition: Sub-Entity-A OR Sub-Entity-B
+   * Where Sub-Entity-A and Sub-Entity-B anomalies have a groupKey and a groupScore
+   */
   @Test
   public void testGetEmailEntity() throws Exception {
-    DateTimeZone dateTimeZone = DateTimeZone.forID("America/Los_Angeles");
+    MetricConfigDTO metric = new MetricConfigDTO();
+    metric.setName(TEST);
+    metric.setDataset(TEST);
+    metric.setAlias(TEST + "::" + TEST);
+    metricDAO.save(metric);
+
     ThirdEyeAnomalyConfiguration thirdeyeAnomalyConfig = new ThirdEyeAnomalyConfiguration();
     thirdeyeAnomalyConfig.setId(id);
     thirdeyeAnomalyConfig.setDashboardHost(dashboardHost);
@@ -93,45 +108,61 @@ public class TestOnboardingNotificationContentFormatter {
     alerters.put("smtpConfiguration", smtpProps);
     thirdeyeAnomalyConfig.setAlerterConfiguration(alerters);
 
-    List<AnomalyResult> anomalies = new ArrayList<>();
-    AnomalyFunctionDTO anomalyFunction = DaoTestUtils.getTestFunctionSpec(TEST, TEST);
-    anomalyFunctionDAO.save(anomalyFunction);
-    MergedAnomalyResultDTO anomaly = DaoTestUtils.getTestMergedAnomalyResult(
-        new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis(),
-        new DateTime(2017, 11, 6, 13, 0, dateTimeZone).getMillis(),
-        TEST, TEST, 0.1, 1l, new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis());
-    anomaly.setFunction(anomalyFunction);
-    anomaly.setAvgCurrentVal(1.1);
-    anomaly.setAvgBaselineVal(1.0);
-    mergedAnomalyResultDAO.save(anomaly);
-    anomalies.add(anomaly);
-    anomaly = DaoTestUtils.getTestMergedAnomalyResult(
+    DetectionConfigDTO detection = new DetectionConfigDTO();
+    detection.setName("test_report");
+    long id = detectionDAO.save(detection);
+
+    DateTimeZone dateTimeZone = DateTimeZone.forID("America/Los_Angeles");
+
+    MergedAnomalyResultDTO subGroupedAnomaly1 = DaoTestUtils.getTestGroupedAnomalyResult(
         new DateTime(2017, 11, 7, 10, 0, dateTimeZone).getMillis(),
         new DateTime(2017, 11, 7, 17, 0, dateTimeZone).getMillis(),
-        TEST, TEST, 0.1, 1l, new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis());
-    anomaly.setFunction(anomalyFunction);
-    anomaly.setAvgCurrentVal(0.9);
-    anomaly.setAvgBaselineVal(1.0);
-    mergedAnomalyResultDAO.save(anomaly);
-    anomalies.add(anomaly);
+        new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis(),
+        id);
+    Map<String, String> properties = new HashMap<>();
+    properties.put(PROP_GROUP_KEY, "group-1");
+    properties.put(PROP_ENTITY_NAME, "sub-entity-A");
+    properties.put(PROP_ANOMALY_SCORE, "10");
+    subGroupedAnomaly1.setProperties(properties);
+    subGroupedAnomaly1.setChildIds(Collections.singleton(1l));
+    mergedAnomalyResultDAO.save(subGroupedAnomaly1);
 
-    AlertConfigDTO alertConfigDTO = DaoTestUtils.getTestAlertConfiguration("Test Config");
-    alertConfigDAO.save(alertConfigDTO);
+    MergedAnomalyResultDTO subGroupedAnomaly2 = DaoTestUtils.getTestGroupedAnomalyResult(
+        new DateTime(2017, 11, 7, 10, 0, dateTimeZone).getMillis(),
+        new DateTime(2017, 11, 7, 17, 0, dateTimeZone).getMillis(),
+        new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis(),
+        id);
+    Map<String, String> properties2 = new HashMap<>();
+    properties2.put(PROP_GROUP_KEY, "group-2");
+    properties2.put(PROP_ENTITY_NAME, "sub-entity-B");
+    properties2.put(PROP_ANOMALY_SCORE, "20");
+    subGroupedAnomaly2.setProperties(properties2);
+    subGroupedAnomaly2.setChildIds(Collections.singleton(2l));
+    mergedAnomalyResultDAO.save(subGroupedAnomaly2);
 
-    EmailContentFormatterContext context = new EmailContentFormatterContext();
-    context.setAnomalyFunctionSpec(anomalyFunction);
-    context.setAlertConfig(alertConfigDTO);
-    EmailContentFormatter contentFormatter = new OnboardingNotificationEmailContentFormatter();
+    MergedAnomalyResultDTO parentGroupedAnomaly = DaoTestUtils.getTestGroupedAnomalyResult(
+        new DateTime(2017, 11, 7, 10, 0, dateTimeZone).getMillis(),
+        new DateTime(2017, 11, 7, 17, 0, dateTimeZone).getMillis(),
+        new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis(),
+        id);
+    Set<MergedAnomalyResultDTO> childrenAnomalies = new HashSet<>();
+    childrenAnomalies.add(subGroupedAnomaly1);
+    childrenAnomalies.add(subGroupedAnomaly2);
+    parentGroupedAnomaly.setChildren(childrenAnomalies);
+    mergedAnomalyResultDAO.save(parentGroupedAnomaly);
+    List<AnomalyResult> anomalies = new ArrayList<>();
+    anomalies.add(parentGroupedAnomaly);
+
+    EmailContentFormatter contentFormatter = new EntityGroupByContentFormatter();
     contentFormatter.init(new Properties(), EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(thirdeyeAnomalyConfig));
-    DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
-        EmailUtils.getValidEmailAddresses("a@b.com"));
-    EmailEntity emailEntity = contentFormatter.getEmailEntity(alertConfigDTO, recipients, TEST,
-        null, "", anomalies, context);
+    EmailEntity emailEntity = contentFormatter.getEmailEntity(
+        DaoTestUtils.getTestAlertConfiguration("Test Config"),
+        new DetectionAlertFilterRecipients(EmailUtils.getValidEmailAddresses("a@b.com")),
+        TEST, null, "", anomalies, null);
+    String htmlPath = ClassLoader.getSystemResource("test-entity-groupby-email-content-formatter.html").getPath();
 
-    String htmlPath = ClassLoader.getSystemResource("test-onboard-notification-email-content-formatter.html").getPath();
     Assert.assertEquals(
         ContentFormatterUtils.getEmailHtml(emailEntity).replaceAll("\\s", ""),
         ContentFormatterUtils.getHtmlContent(htmlPath).replaceAll("\\s", ""));
   }
-
 }

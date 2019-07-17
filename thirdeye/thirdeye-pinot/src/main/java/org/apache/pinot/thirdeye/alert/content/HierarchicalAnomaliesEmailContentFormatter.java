@@ -82,6 +82,7 @@ public class HierarchicalAnomaliesEmailContentFormatter extends BaseEmailContent
   @Override
   protected void updateTemplateDataByAnomalyResults(Map<String, Object> templateData,
       Collection<AnomalyResult> anomalies, EmailContentFormatterContext context) {
+    enrichMetricInfo(templateData, anomalies);
     List<AnomalyReportEntity> rootAnomalyDetails = new ArrayList<>();
     SortedMap<String, List<AnomalyReportEntity>> leafAnomalyDetails = new TreeMap<>();
     List<String> anomalyIds = new ArrayList<>();

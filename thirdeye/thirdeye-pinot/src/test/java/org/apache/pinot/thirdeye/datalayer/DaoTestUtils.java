@@ -326,7 +326,20 @@ public class DaoTestUtils {
     anomaly.setMetric(metric);
     anomaly.setWeight(weight);
     anomaly.setFunctionId(functionId);
+    anomaly.setDetectionConfigId(functionId);
     anomaly.setCreatedTime(createdTime);
+
+    return anomaly;
+  }
+
+  public static MergedAnomalyResultDTO getTestGroupedAnomalyResult(long startTime, long endTime, long createdTime, long id) {
+    MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
+    anomaly.setStartTime(startTime);
+    anomaly.setEndTime(endTime);
+    anomaly.setCollection(null);
+    anomaly.setMetric(null);
+    anomaly.setCreatedTime(createdTime);
+    anomaly.setDetectionConfigId(id);
 
     return anomaly;
   }
