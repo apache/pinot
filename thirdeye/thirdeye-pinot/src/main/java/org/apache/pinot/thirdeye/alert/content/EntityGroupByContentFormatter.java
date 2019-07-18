@@ -23,16 +23,13 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -57,9 +54,10 @@ public class EntityGroupByContentFormatter extends BaseEmailContentFormatter{
   static final String PROP_GROUP_KEY = "groupKey";
 
   private DetectionConfigManager configDAO = null;
-  private Map<String, Double> entityAnomalyToScoreMap = new HashMap<>();
-  private Multimap<String, AnomalyReportEntity> entityAnomalyReports = ArrayListMultimap.create();
-  private Map<String, String> entityToAnomalyIdsMap = new HashMap<>();
+  private Multimap<String, AnomalyReportEntity> entityToAnomaliesMap = ArrayListMultimap.create();
+  private Map<String, List<AnomalyReportEntity>> entityToSortedAnomaliesMap = new HashMap<>();
+  private Map<AnomalyReportEntity, Double> anomalyToGroupScoreMap = new HashMap<>();
+  private Map<String, String> anomalyToChildIdsMap = new HashMap<>();
 
   public EntityGroupByContentFormatter() {}
 
@@ -90,15 +88,16 @@ public class EntityGroupByContentFormatter extends BaseEmailContentFormatter{
       updateEntityToAnomalyDetailsMap(anomaly, config);
     }
 
-    List<Map.Entry<String, Double>> anomaliesSortedByScores = new ArrayList<>(entityAnomalyToScoreMap.entrySet());
-    anomaliesSortedByScores.sort(Map.Entry.comparingByValue());
-    List<String> entityList = anomaliesSortedByScores.stream().map(Map.Entry::getKey).collect(Collectors.toList());
-    entityList.sort(Collections.reverseOrder());
+    // Sort the anomalies within each entity by crticality score
+    for (String entityName : entityToAnomaliesMap.keySet()) {
+      List<AnomalyReportEntity> groupedAnomalies = (List<AnomalyReportEntity>) entityToAnomaliesMap.get(entityName);
+      groupedAnomalies.sort((u1, u2) -> anomalyToGroupScoreMap.get(u2).compareTo(anomalyToGroupScoreMap.get(u1)));
+      entityToSortedAnomaliesMap.put(entityName, groupedAnomalies);
+    }
 
     templateData.put("emailHeading", config.getName());
-    templateData.put("entityToAnomalyIdsMap", entityToAnomalyIdsMap);
-    templateData.put("entitySortedByScoreList", entityList);
-    templateData.put("entityToAnomalyDetailsMap", entityAnomalyReports.asMap());
+    templateData.put("anomalyToChildIdsMap", anomalyToChildIdsMap);
+    templateData.put("entityToSortedAnomaliesMap", entityToSortedAnomaliesMap);
   }
 
   /**
@@ -108,8 +107,8 @@ public class EntityGroupByContentFormatter extends BaseEmailContentFormatter{
     if (anomaly.getProperties() != null && anomaly.getProperties().containsKey(PROP_GROUP_KEY)) {
       AnomalyReportEntity anomalyReport = new AnomalyReportEntity(String.valueOf(anomaly.getId()),
           getAnomalyURL(anomaly, emailContentFormatterConfiguration.getDashboardHost()),
-          ThirdEyeUtils.getRoundedValue(anomaly.getAvgBaselineVal()),
-          ThirdEyeUtils.getRoundedValue(anomaly.getAvgCurrentVal()), 0d, null,
+          anomaly.getAvgBaselineVal(),
+          anomaly.getAvgCurrentVal(), 0d, null,
           getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()), getFeedbackValue(anomaly.getFeedback()),
           detectionConfig.getName(), detectionConfig.getDescription(), anomaly.getMetric(),
           getDateString(anomaly.getStartTime(), dateTimeZone), getDateString(anomaly.getEndTime(), dateTimeZone),
@@ -134,9 +133,12 @@ public class EntityGroupByContentFormatter extends BaseEmailContentFormatter{
 
       // include notified alerts only in the email
       if (!includeSentAnomaliesOnly || anomaly.isNotified()) {
-        entityToAnomalyIdsMap.put(anomaly.getProperties().get(PROP_ENTITY_NAME), Joiner.on(",").join(childIds));
-        entityAnomalyToScoreMap.put(anomaly.getProperties().get(PROP_ENTITY_NAME), score);
-        entityAnomalyReports.put(anomaly.getProperties().get(PROP_ENTITY_NAME), anomalyReport);
+        // Freemarker doesn't support non-string key in the map. Hence the custom generated key using groupKey and startTime
+        // See https://freemarker.apache.org/docs/app_faq.html#faq_nonstring_keys
+        anomalyToChildIdsMap.put(anomalyReport.getGroupKey() + anomalyReport.getStartDateTime(), Joiner.on(",").join(childIds));
+
+        anomalyToGroupScoreMap.put(anomalyReport, score);
+        entityToAnomaliesMap.put(anomaly.getProperties().get(PROP_ENTITY_NAME), anomalyReport);
       }
     } else {
       for (MergedAnomalyResultDTO childAnomaly : anomaly.getChildren()) {

@@ -26,12 +26,12 @@
       <table border="0" cellpadding="0" cellspacing="0" style="border:1px solid #E9E9E9; border-radius: 2px; width: 100%;">
 
         <!-- List all the alerts -->
-        <#list entitySortedByScoreList as entity>
+        <#list entityToSortedAnomaliesMap as entityName, groupedAnomalies>
           <@utils.addBlock title="" align="left">
             <!-- Display Entity Name -->
             <p>
               <span style="color: #1D1D1D; font-size: 20px; font-weight: bold; display:inline-block; vertical-align: middle;">Entity:&nbsp;</span>
-              <span style="color: #606060; font-size: 20px; text-decoration: none; display:inline-block; vertical-align: middle; width: 70%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${entity}</span>
+              <span style="color: #606060; font-size: 20px; text-decoration: none; display:inline-block; vertical-align: middle; width: 70%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${entityName}</span>
             </p>
 
             <!-- List all the anomalies under this entity in a table -->
@@ -43,11 +43,12 @@
                 <th style="padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Predicted</th>
               </tr>
 
-              <#list entityToAnomalyDetailsMap[entity] as anomaly>
+              <#list groupedAnomalies as anomaly>
                 <tr style="border-bottom: 1px solid #C7D1D8;">
                   <td style="padding: 6px 12px;white-space: nowrap;">
-                    <a style="font-weight: bold; text-decoration: none; font-size:14px; line-height:20px; color: #0073B1;" href="${dashboardHost}/app/#/anomalies?anomalyIds=${entityToAnomalyIdsMap[entity]}"
+                    <a style="font-weight: bold; text-decoration: none; font-size:14px; line-height:20px; color: #0073B1;" href="${dashboardHost}/app/#/anomalies?anomalyIds=${anomalyToChildIdsMap[anomaly.groupKey + anomaly.startDateTime]}"
                        target="_blank">${anomaly.groupKey}</a>
+                    <div style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px;">${anomaly.startDateTime} ${anomaly.timezone}</div>
                     <span style="color: rgba(0,0,0,0.6); font-size:12px; line-height:16px;">${anomaly.duration}</span>
                   </td>
                   <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">${anomaly.score}</td>

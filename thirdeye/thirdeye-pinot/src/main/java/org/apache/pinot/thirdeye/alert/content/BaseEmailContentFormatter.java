@@ -599,13 +599,13 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     private static String RAW_VALUE_FORMAT = "%.0f";
     private static String PERCENTAGE_FORMAT = "%.2f %%";
 
-    public AnomalyReportEntity(String anomalyId, String anomalyURL, String baselineVal, String currentVal, Double swi,
+    public AnomalyReportEntity(String anomalyId, String anomalyURL, double baselineVal, double currentVal, Double swi,
         List<String> dimensions, String duration, String feedback, String function, String funcDescription,
         String metric, String startTime, String endTime, String timezone, String issueType) {
       this.anomalyId = anomalyId;
       this.anomalyURL = anomalyURL;
-      this.baselineVal = baselineVal;
-      this.currentVal = currentVal;
+      this.baselineVal = ThirdEyeUtils.getRoundedValue(baselineVal);
+      this.currentVal = ThirdEyeUtils.getRoundedValue(currentVal);
       this.dimensions = dimensions;
       this.duration = duration;
       this.feedback = feedback;
@@ -615,7 +615,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
       if (swi != null) {
         this.swi = String.format(PERCENTAGE_FORMAT, swi * 100);
       }
-      double lift = BaseEmailContentFormatter.getLift(Double.valueOf(currentVal), Double.valueOf(baselineVal));
+      double lift = BaseEmailContentFormatter.getLift(currentVal, baselineVal);
       this.lift = String.format(PERCENTAGE_FORMAT, lift * 100);
       this.positiveLift = getLiftDirection(lift);
       this.metric = metric;

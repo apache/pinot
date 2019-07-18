@@ -598,10 +598,8 @@ public class RunAdhocDatabaseQueriesTool {
   private void removeReplayFlagFromAnomalies(long detectionConfigId) {
     List<MergedAnomalyResultDTO> anomalies = mergedResultDAO.findByDetectionConfigAndIdGreaterThan(detectionConfigId,0l);
     for (MergedAnomalyResultDTO anomaly : anomalies) {
-      if (!anomaly.isChild()) {
-        anomaly.setAnomalyResultSource(AnomalyResultSource.DEFAULT_ANOMALY_DETECTION);
-        mergedResultDAO.save(anomaly);
-      }
+      anomaly.setAnomalyResultSource(AnomalyResultSource.DEFAULT_ANOMALY_DETECTION);
+      mergedResultDAO.save(anomaly);
     }
   }
 
