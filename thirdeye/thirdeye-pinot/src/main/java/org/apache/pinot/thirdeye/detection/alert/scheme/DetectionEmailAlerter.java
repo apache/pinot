@@ -25,7 +25,7 @@ import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
 import org.apache.pinot.thirdeye.alert.content.EmailContentFormatter;
 import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterConfiguration;
 import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterContext;
-import org.apache.pinot.thirdeye.alert.content.EntityGroupByContentFormatter;
+import org.apache.pinot.thirdeye.alert.content.EntityGroupKeyContentFormatter;
 import org.apache.pinot.thirdeye.alert.content.MetricAnomaliesEmailContentFormatter;
 import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
@@ -151,7 +151,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
         return EmailContentFormatterFactory.fromClassName(className);
 
       case ENTITY_GROUPBY_REPORT:
-        className = EntityGroupByContentFormatter.class.getSimpleName();
+        className = EntityGroupKeyContentFormatter.class.getSimpleName();
         LOG.info("Using " + className + " to render the template.");
         return EmailContentFormatterFactory.fromClassName(className);
 

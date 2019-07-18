@@ -43,11 +43,11 @@ import org.slf4j.LoggerFactory;
 /**
  * This email formatter generates a report/alert from the anomalies having a groupKey
  */
-public class EntityGroupByContentFormatter extends BaseEmailContentFormatter{
-  private static final Logger LOG = LoggerFactory.getLogger(EntityGroupByContentFormatter.class);
+public class EntityGroupKeyContentFormatter extends BaseEmailContentFormatter{
+  private static final Logger LOG = LoggerFactory.getLogger(EntityGroupKeyContentFormatter.class);
 
   private static final String EMAIL_TEMPLATE = "emailTemplate";
-  private static final String DEFAULT_EMAIL_TEMPLATE = "entity-groupby-anomaly-report.ftl";
+  private static final String DEFAULT_EMAIL_TEMPLATE = "entity-groupkey-anomaly-report.ftl";
 
   static final String PROP_ENTITY_NAME = "entityName";
   static final String PROP_ANOMALY_SCORE = "groupScore";
@@ -59,7 +59,7 @@ public class EntityGroupByContentFormatter extends BaseEmailContentFormatter{
   private Map<AnomalyReportEntity, Double> anomalyToGroupScoreMap = new HashMap<>();
   private Map<String, String> anomalyToChildIdsMap = new HashMap<>();
 
-  public EntityGroupByContentFormatter() {}
+  public EntityGroupKeyContentFormatter() {}
 
   @Override
   public void init(Properties properties, EmailContentFormatterConfiguration configuration) {

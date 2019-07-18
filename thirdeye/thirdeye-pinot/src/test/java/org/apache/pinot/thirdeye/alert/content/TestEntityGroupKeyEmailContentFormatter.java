@@ -49,11 +49,11 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.thirdeye.alert.content.EntityGroupByContentFormatter.*;
+import static org.apache.pinot.thirdeye.alert.content.EntityGroupKeyContentFormatter.*;
 import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.*;
 
 
-public class TestEntityGroupByEmailContentFormatter {
+public class TestEntityGroupKeyEmailContentFormatter {
   private static final String TEST = "test";
   private int id = 0;
   private String dashboardHost = "http://localhost:8080/dashboard";
@@ -153,7 +153,7 @@ public class TestEntityGroupByEmailContentFormatter {
     List<AnomalyResult> anomalies = new ArrayList<>();
     anomalies.add(parentGroupedAnomaly);
 
-    EmailContentFormatter contentFormatter = new EntityGroupByContentFormatter();
+    EmailContentFormatter contentFormatter = new EntityGroupKeyContentFormatter();
     contentFormatter.init(new Properties(), EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(thirdeyeAnomalyConfig));
     EmailEntity emailEntity = contentFormatter.getEmailEntity(
         DaoTestUtils.getTestAlertConfiguration("Test Config"),
