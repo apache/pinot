@@ -419,11 +419,32 @@
                 </div>
         {{else}}
         <div class="yaml-editor-msg">Alert configuration has changed.</div>
+          {{range-pill-selectors
+            title="Show me"
+            uiDateFormat=pill.uiDateFormat
+            activeRangeEnd=pill.activeRangeEnd
+            activeRangeStart=pill.activeRangeStart
+            timeRangeOptions=pill.timeRangeOptions
+            timePickerIncrement=pill.timePickerIncrement
+            predefinedRanges=pill.predefinedRanges
+            selectAction=(action "onRangeSelection")
+          }}
         {{/if}}
       {{/if}}
     {{else}}
       {{#if disablePreviewButton}}
         <p>Enter YAML configuration to enable preview.</p>
+      {{else}}
+        {{range-pill-selectors
+          title="Show me"
+          uiDateFormat=pill.uiDateFormat
+          activeRangeEnd=pill.activeRangeEnd
+          activeRangeStart=pill.activeRangeStart
+          timeRangeOptions=pill.timeRangeOptions
+          timePickerIncrement=pill.timePickerIncrement
+          predefinedRanges=pill.predefinedRanges
+          selectAction=(action "onRangeSelection")
+        }}
       {{/if}}
     {{/if}}
   {{/unless}}
