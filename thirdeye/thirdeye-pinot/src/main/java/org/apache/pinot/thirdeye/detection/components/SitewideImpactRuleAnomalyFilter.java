@@ -64,7 +64,6 @@ public class SitewideImpactRuleAnomalyFilter implements AnomalyFilter<SitewideIm
     MetricEntity me = MetricEntity.fromURN(anomaly.getMetricUrn());
     List<MetricSlice> slices = new ArrayList<>();
     MetricSlice currentSlice = MetricSlice.from(me.getId(), anomaly.getStartTime(), anomaly.getEndTime(), me.getFilters());
-    slices.add(currentSlice);
 
     // customize baseline offset
     MetricSlice baselineSlice = null;
@@ -85,13 +84,11 @@ public class SitewideImpactRuleAnomalyFilter implements AnomalyFilter<SitewideIm
     }
     slices.add(siteWideSlice);
 
-
-
     Map<MetricSlice, DataFrame> aggregates = this.dataFetcher.fetchData(
         new InputDataSpec().withAggregateSlices(slices))
         .getAggregates();
 
-    double currentValue = getValueFromAggregates(currentSlice, aggregates);
+    double currentValue = anomaly.getAvgCurrentVal();
     double baselineValue = baseline == null ? anomaly.getAvgBaselineVal() :  this.baseline.gather(currentSlice, aggregates).getDouble(COL_VALUE, 0);
     double siteWideValue = getValueFromAggregates(siteWideSlice, aggregates);
 
