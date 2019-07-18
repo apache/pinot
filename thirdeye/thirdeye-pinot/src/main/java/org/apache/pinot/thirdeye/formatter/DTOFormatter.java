@@ -18,7 +18,7 @@
  *
  */
 
-package org.apache.pinot.thirdeye.detection.formatter;
+package org.apache.pinot.thirdeye.formatter;
 
 import java.util.Map;
 import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;

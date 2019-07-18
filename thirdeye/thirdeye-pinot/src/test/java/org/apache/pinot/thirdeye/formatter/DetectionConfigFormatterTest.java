@@ -18,10 +18,9 @@
  *
  */
 
-package org.apache.pinot.thirdeye.detection.formatter;
+package org.apache.pinot.thirdeye.formatter;
 
 import com.google.common.collect.ImmutableMap;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
@@ -35,7 +34,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.thirdeye.detection.formatter.DetectionConfigFormatter.*;
+import static org.apache.pinot.thirdeye.formatter.DetectionConfigFormatter.*;
 
 
 public class DetectionConfigFormatterTest {
@@ -49,7 +48,7 @@ public class DetectionConfigFormatterTest {
   }
 
   @Test
-  public void testDetectionConfigFormatter() throws IOException {
+  public void testDetectionConfigFormatter() {
     DetectionConfigDTO configDTO = new DetectionConfigDTO();
     configDTO.setName("test");
     configDTO.setActive(true);
