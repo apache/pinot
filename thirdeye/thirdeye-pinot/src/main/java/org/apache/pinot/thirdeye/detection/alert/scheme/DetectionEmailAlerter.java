@@ -25,6 +25,8 @@ import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
 import org.apache.pinot.thirdeye.alert.content.EmailContentFormatter;
 import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterConfiguration;
 import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterContext;
+import org.apache.pinot.thirdeye.alert.content.EntityGroupByContentFormatter;
+import org.apache.pinot.thirdeye.alert.content.MetricAnomaliesEmailContentFormatter;
 import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
@@ -60,8 +62,6 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
 
   private static final Comparator<AnomalyResult> COMPARATOR_DESC =
       (o1, o2) -> -1 * Long.compare(o1.getStartTime(), o2.getStartTime());
-  private static final String DEFAULT_EMAIL_FORMATTER_TYPE = "MetricAnomaliesEmailContentFormatter";
-  private static final String ENTITY_REPORT_FORMATTER_TYPE = "EntityContentFormatter";
   private static final String EMAIL_WHITELIST_KEY = "emailWhitelist";
   private static final String PROP_EMAIL_SCHEME = "emailScheme";
   private static final String PROP_EMAIL_TEMPLATE = "template";
@@ -143,17 +143,20 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
       template = EmailTemplate.valueOf(emailParams.get(PROP_EMAIL_TEMPLATE).toString());
     }
 
+    String className;
     switch (template) {
       case DEFAULT_EMAIL:
-        LOG.info("Using the " + DEFAULT_EMAIL_FORMATTER_TYPE + " email template.");
-        return EmailContentFormatterFactory.fromClassName(DEFAULT_EMAIL_FORMATTER_TYPE);
+        className = MetricAnomaliesEmailContentFormatter.class.getSimpleName();
+        LOG.info("Using " + className + " to render the template.");
+        return EmailContentFormatterFactory.fromClassName(className);
 
       case ENTITY_GROUPBY_REPORT:
-        LOG.info("Using the " + template + " email template.");
-        return EmailContentFormatterFactory.fromClassName(ENTITY_REPORT_FORMATTER_TYPE);
+        className = EntityGroupByContentFormatter.class.getSimpleName();
+        LOG.info("Using " + className + " to render the template.");
+        return EmailContentFormatterFactory.fromClassName(className);
 
       default:
-        throw new IllegalArgumentException(String.format("Unknown type '%s'", template));
+        throw new IllegalArgumentException(String.format("Unknown email template '%s'", template));
     }
   }
 
@@ -209,7 +212,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   }
 
   private void generateAndSendEmails(DetectionAlertFilterResult detectionResult) throws Exception {
-    LOG.info("Sending Email alert for {}", config.getId());
+    LOG.info("Preparing an email alert for subscription group id {}", config.getId());
     Preconditions.checkNotNull(detectionResult.getResult());
     for (Map.Entry<DetectionAlertFilterRecipients, Set<MergedAnomalyResultDTO>> entry : detectionResult.getResult().entrySet()) {
       DetectionAlertFilterRecipients recipients = entry.getKey();

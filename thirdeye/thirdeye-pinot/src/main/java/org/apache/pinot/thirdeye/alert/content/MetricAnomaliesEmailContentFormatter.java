@@ -129,8 +129,8 @@ public class MetricAnomaliesEmailContentFormatter extends BaseEmailContentFormat
 
       AnomalyReportEntity anomalyReport = new AnomalyReportEntity(String.valueOf(anomaly.getId()),
           getAnomalyURL(anomaly, emailContentFormatterConfiguration.getDashboardHost()),
-          ThirdEyeUtils.getRoundedValue(anomaly.getAvgBaselineVal()),
-          ThirdEyeUtils.getRoundedValue(anomaly.getAvgCurrentVal()),
+          anomaly.getAvgBaselineVal(),
+          anomaly.getAvgCurrentVal(),
           0d,
           getDimensionsList(anomaly.getDimensions()),
           getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()), // duration

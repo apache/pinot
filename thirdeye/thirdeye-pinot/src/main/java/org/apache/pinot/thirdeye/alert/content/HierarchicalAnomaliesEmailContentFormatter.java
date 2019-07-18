@@ -140,8 +140,8 @@ public class HierarchicalAnomaliesEmailContentFormatter extends BaseEmailContent
     AnomalyReportEntity
         anomalyReport = new AnomalyReportEntity(String.valueOf(anomaly.getId()),
         getAnomalyURL(anomaly, dashboardHost),
-        ThirdEyeUtils.getRoundedValue(anomaly.getAvgBaselineVal()),
-        ThirdEyeUtils.getRoundedValue(anomaly.getAvgCurrentVal()),
+        anomaly.getAvgBaselineVal(),
+        anomaly.getAvgCurrentVal(),
         anomaly.getImpactToGlobal(),
         getDimensionsList(anomaly.getDimensions()),
         getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()), // duration

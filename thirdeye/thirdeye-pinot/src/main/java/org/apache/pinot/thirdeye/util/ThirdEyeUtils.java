@@ -88,8 +88,8 @@ public abstract class ThirdEyeUtils {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
-  private static final String TWO_DECIMALS_FORMAT = "##.##";
-  private static final String MAX_DECIMALS_FORMAT = "##.#####";
+  private static final String TWO_DECIMALS_FORMAT = "#,###.##";
+  private static final String MAX_DECIMALS_FORMAT = "#,###.#####";
   private static final String DECIMALS_FORMAT_TOKEN = "#";
 
   private static final int DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE = 50;
@@ -436,6 +436,7 @@ public abstract class ThirdEyeUtils {
       compareValue = compareValue * 0.1;
     }
     DecimalFormat decimalFormat = new DecimalFormat(decimalFormatBuffer.toString());
+
     return decimalFormat.format(value);
   }
 
