@@ -22,19 +22,21 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.MasterSlaveSMD;
+import org.apache.pinot.common.utils.HashUtils;
+import org.apache.pinot.common.utils.StringUtil;
 
 
 public class LeadControllerUtils {
 
   /**
-   * Gets hash code for table, ignores the most significant bit.
+   * Gets hash code for table using murmur2 function, ignores the most significant bit.
    * Note: This method CANNOT be changed when lead controller resource is enabled.
    * Otherwise it will assign different controller for the same table, which will mess up the controller periodic tasks and realtime segment completion.
    * @param rawTableName table name
-   * @return hash code
+   * @return hash code ignoring the most significant bit.
    */
   private static int getHashCodeForTable(String rawTableName) {
-    return (rawTableName.hashCode() & Integer.MAX_VALUE);
+    return (HashUtils.murmur2(StringUtil.encodeUtf8(rawTableName)) & 0x7fffffff);
   }
 
   /**
