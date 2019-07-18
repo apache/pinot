@@ -203,6 +203,7 @@ public class PinotHelixResourceManager {
    * Stop the Pinot controller instance.
    */
   public synchronized void stop() {
+    _leadControllerManager.unregisterResourceManager();
     _segmentDeletionManager.stop();
     _helixZkManager.disconnect();
   }
@@ -263,7 +264,6 @@ public class PinotHelixResourceManager {
     return _propertyStore;
   }
 
-
   /**
    * Get lead controller manager.
    *
@@ -282,9 +282,8 @@ public class PinotHelixResourceManager {
 
     // Registers Master-Slave state model to state machine engine, which is for calculating participant assignment in lead controller resource.
     if (_helixInstanceType.equals(InstanceType.PARTICIPANT)) {
-      helixManager.getStateMachineEngine()
-          .registerStateModelFactory(MasterSlaveSMD.name,
-              new LeadControllerResourceMasterSlaveStateModelFactory(_leadControllerManager));
+      helixManager.getStateMachineEngine().registerStateModelFactory(MasterSlaveSMD.name,
+          new LeadControllerResourceMasterSlaveStateModelFactory(_leadControllerManager));
     }
     try {
       helixManager.connect();

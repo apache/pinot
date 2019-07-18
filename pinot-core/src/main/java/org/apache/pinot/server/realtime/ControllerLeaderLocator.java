@@ -80,10 +80,10 @@ public class ControllerLeaderLocator {
   }
 
   /**
-   * Locate the controller leader so that we can send LLC segment completion requests to it.
+   * Locates the controller leader so that we can send LLC segment completion requests to it.
    * Checks the {@link ControllerLeaderLocator::_cachedControllerLeaderInvalid} flag and fetches the leader from helix if cached value is invalid
    * @param rawTableName table name without type.
-   * @return The host:port string of the current controller leader.
+   * @return The host-port pair of the current controller leader.
    */
   public synchronized Pair<String, Integer> getControllerLeader(String rawTableName) {
     if (!_cachedControllerLeaderInvalid) {
@@ -114,11 +114,12 @@ public class ControllerLeaderLocator {
     String leaderForTable;
     ExternalView leadControllerResourceExternalView =
         _helixManager.getClusterManagmentTool().getResourceExternalView(_clusterName, LEAD_CONTROLLER_RESOURCE_NAME);
-    String partitionLeader =
-        LeadControllerUtils.getLeadControllerForTable(leadControllerResourceExternalView, rawTableName);
-    if (partitionLeader != null) {
-      // Converts participant id (with Prefix "Controller_") to controller id and assigns it as the leader.
-      leaderForTable = LeadControllerUtils.extractLeadControllerHostNameAndPort(partitionLeader);
+    String leadControllerInstance =
+        LeadControllerUtils.getLeadControllerInstanceForTable(leadControllerResourceExternalView, rawTableName);
+    if (leadControllerInstance != null) {
+      // Converts participant id (with Prefix "Controller_") to controller id and assigns it as the leader,
+      // since realtime segment completion protocol doesn't need the prefix in controller instance id.
+      leaderForTable = LeadControllerUtils.extractLeadControllerHostNameAndPort(leadControllerInstance);
     } else {
       // Gets Helix leader to be the leader to this table, otherwise returns null.
       leaderForTable = getHelixClusterLeader();
@@ -128,7 +129,7 @@ public class ControllerLeaderLocator {
 
   /**
    * Gets Helix leader in the cluster. Null if there is no leader.
-   * @return Helix leader.
+   * @return instance id of Helix cluster leader, e.g. localhost_9000.
    */
   private String getHelixClusterLeader() {
     BaseDataAccessor<ZNRecord> dataAccessor = _helixManager.getHelixDataAccessor().getBaseDataAccessor();

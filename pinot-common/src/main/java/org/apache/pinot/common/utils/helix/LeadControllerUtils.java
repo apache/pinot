@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.MasterSlaveSMD;
-import org.apache.pinot.common.utils.HashUtils;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.StringUtil;
 
 
@@ -36,7 +36,7 @@ public class LeadControllerUtils {
    * @return hash code ignoring the most significant bit.
    */
   private static int getHashCodeForTable(String rawTableName) {
-    return (HashUtils.murmur2(StringUtil.encodeUtf8(rawTableName)) & 0x7fffffff);
+    return (HashUtil.murmur2(StringUtil.encodeUtf8(rawTableName)) & 0x7fffffff);
   }
 
   /**
@@ -50,13 +50,13 @@ public class LeadControllerUtils {
   }
 
   /**
-   * Gets lead controller for table from lead controller resource.
+   * Gets lead controller participant id for table from lead controller resource.
    * If the resource is disabled or no controller registered as participant, there is no instance in "MASTER" state.
    * @param leadControllerResourceExternalView external view of lead controller resource
    * @param rawTableName table name without type
-   * @return leader of partition, null if not found or resource is disabled.
+   * @return controller participant id for partition leader, e.g. Controller_localhost_9000. Null if not found or resource is disabled.
    */
-  public static String getLeadControllerForTable(ExternalView leadControllerResourceExternalView, String rawTableName) {
+  public static String getLeadControllerInstanceForTable(ExternalView leadControllerResourceExternalView, String rawTableName) {
     if (leadControllerResourceExternalView == null) {
       return null;
     }
@@ -66,7 +66,7 @@ public class LeadControllerUtils {
     }
     int numPartitions = partitionSet.size();
     int partitionIndex = getPartitionIdForTable(rawTableName, numPartitions);
-    String partitionName = formPartitionName(partitionIndex);
+    String partitionName = generatePartitionName(partitionIndex);
     Map<String, String> partitionStateMap = leadControllerResourceExternalView.getStateMap(partitionName);
 
     // Get master host from partition map. Return null if no master found.
@@ -78,20 +78,32 @@ public class LeadControllerUtils {
     return null;
   }
 
+  /**
+   * Generates controller participant id, e.g. returns Controller_localhost_9000 given localhost as hostname and 9000 as port.
+   */
   public static String generateControllerParticipantId(String controllerHost, String controllerPort) {
     return org.apache.pinot.common.utils.CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + controllerHost + "_"
         + controllerPort;
   }
 
-  public static String formPartitionName(int partitionIndex) {
+  /**
+   * Extracts lead controller hostname and port from controller participant id, e.g. returns localhost_9000 given Controller_localhost_9000 as controller participant id.
+   */
+  public static String extractLeadControllerHostNameAndPort(String controllerParticipantId) {
+    return controllerParticipantId.substring(controllerParticipantId.indexOf("_") + 1);
+  }
+
+  /**
+   * Generates partition name, e.g. returns leadControllerResource_0 given 0 as partition index.
+   */
+  public static String generatePartitionName(int partitionIndex) {
     return org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME + "_" + partitionIndex;
   }
 
+  /**
+   * Extracts partition index from partition name, e.g. returns 0 given leadControllerResource_0 as partition name.
+   */
   public static int extractPartitionIndex(String partitionName) {
     return Integer.parseInt(partitionName.substring(partitionName.lastIndexOf("_") + 1));
-  }
-
-  public static String extractLeadControllerHostNameAndPort(String controllerParticipantId) {
-    return controllerParticipantId.substring(controllerParticipantId.indexOf("_") + 1);
   }
 }

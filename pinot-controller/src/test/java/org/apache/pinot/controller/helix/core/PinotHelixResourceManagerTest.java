@@ -448,7 +448,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
 
       List<String> partitions = new ArrayList<>(NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
       for (int i = 0; i < NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
-        partitions.add(LeadControllerUtils.formPartitionName(i));
+        partitions.add(LeadControllerUtils.generatePartitionName(i));
       }
 
       LinkedHashMap<String, Integer> states = new LinkedHashMap<>(2);

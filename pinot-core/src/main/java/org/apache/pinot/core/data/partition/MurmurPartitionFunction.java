@@ -20,7 +20,7 @@ package org.apache.pinot.core.data.partition;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.utils.HashUtils;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.StringUtil;
 
 
@@ -65,6 +65,6 @@ public class MurmurPartitionFunction implements PartitionFunction {
    */
   @VisibleForTesting
   int murmur2(final byte[] data) {
-    return HashUtils.murmur2(data);
+    return HashUtil.murmur2(data);
   }
 }

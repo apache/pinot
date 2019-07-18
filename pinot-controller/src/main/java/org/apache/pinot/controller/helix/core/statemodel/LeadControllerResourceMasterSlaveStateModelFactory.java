@@ -23,13 +23,9 @@ import org.apache.helix.examples.MasterSlaveStateModelFactory;
 import org.apache.helix.model.Message;
 import org.apache.helix.participant.statemachine.StateModel;
 import org.apache.pinot.controller.LeadControllerManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class LeadControllerResourceMasterSlaveStateModelFactory extends MasterSlaveStateModelFactory {
-  private static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerResourceMasterSlaveStateModelFactory.class);
-
   private final LeadControllerManager _leadControllerManager;
 
   public LeadControllerResourceMasterSlaveStateModelFactory(LeadControllerManager leadControllerManager) {
@@ -51,7 +47,6 @@ public class LeadControllerResourceMasterSlaveStateModelFactory extends MasterSl
       super.onBecomeMasterFromSlave(message, context);
       String partitionName = message.getPartitionName();
       _leadControllerManager.addPartitionLeader(partitionName);
-      _leadControllerManager.onLeadControllerChange();
     }
 
     @Override
@@ -59,7 +54,6 @@ public class LeadControllerResourceMasterSlaveStateModelFactory extends MasterSl
       super.onBecomeSlaveFromMaster(message, context);
       String partitionName = message.getPartitionName();
       _leadControllerManager.removePartitionLeader(partitionName);
-      _leadControllerManager.onLeadControllerChange();
     }
   }
 }

@@ -159,7 +159,7 @@ public class HelixSetupUtils {
       // Initialize partitions and replicas
       idealStateBuilder.setNumPartitions(NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
       for (int i = 0; i < NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
-        idealStateBuilder.add(LeadControllerUtils.formPartitionName(i));
+        idealStateBuilder.add(LeadControllerUtils.generatePartitionName(i));
       }
       idealStateBuilder.setNumReplica(LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT);
       // The below config guarantees if active number of replicas is no less than minimum active replica, there will not be partition movements happened.
