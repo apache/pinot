@@ -21,7 +21,9 @@ package org.apache.pinot.controller.helix.core;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.exception.ZkBadVersionException;
 import org.apache.commons.configuration.Configuration;
@@ -212,39 +214,87 @@ public class TableRebalancer {
   }
 
   /**
-   * Updates a segment mapping if needed. In "downtime" mode or if there are common elements between source and
-   * target mapping, the segment mapping is set to the target mapping directly.
-   * In a no-downtime, if there are no commmon elements, one element of the source mapping is replaced with one
-   * from the target mapping.
+   * Updates a segment mapping if needed. In "downtime" mode.
+   * the segment mapping is set to the target mapping directly.
+   * In no-downtime mode, one element of the source mapping is replaced
+   * with one from the target mapping. Secondly, with downtime mode
+   * and if there are some common hosts, then we check if the number
+   * of common hosts are enough to satisfy the minimum number
+   * of serving replicas requirement as specified in rebalance
+   * config.
+   *
+   * @param segmentId segment id
+   * @param currentIdealStateSegmentHosts map of this segment's hosts (replicas)
+   *                                     in current ideal state
+   * @param targetIdealStateSegmentHosts map of this segment's hosts (replicas)
+   *                                     in target ideal state
+   * @param idealStateToUpdate the ideal state that is updated as (caller
+   *                           passes this as a copy of current ideal state)
+   * @param rebalanceUserConfig rebalance configuration
    */
   @VisibleForTesting
-  public void updateSegmentIfNeeded(String segmentId, Map<String, String> srcMap, Map<String, String> targetMap,
-      IdealState idealState, Configuration rebalanceUserConfig) {
+  public void updateSegmentIfNeeded(String segmentId, Map<String, String> currentIdealStateSegmentHosts,
+      Map<String, String> targetIdealStateSegmentHosts, IdealState idealStateToUpdate,
+      Configuration rebalanceUserConfig) {
 
-    if (srcMap == null) {
+    if (currentIdealStateSegmentHosts == null) {
       //segment can be missing if retention manager has deleted it
       LOGGER.info("Segment " + segmentId + " missing from current idealState. Skipping it.");
       return;
     }
 
     if (rebalanceUserConfig
+        // in downtime mode, set the current ideal state to target at one go
         .getBoolean(RebalanceUserConfigConstants.DOWNTIME, RebalanceUserConfigConstants.DEFAULT_DOWNTIME)) {
-      setTargetState(idealState, segmentId, targetMap);
+      setTargetState(idealStateToUpdate, segmentId, targetIdealStateSegmentHosts);
       return;
     }
 
-    MapDifference difference = Maps.difference(targetMap, srcMap);
-    if (!difference.entriesInCommon().isEmpty()) {
-      // if there are entries in common, there won't be downtime
+    // we are in no-downtime mode
+    int minReplicasToKeepUp = rebalanceUserConfig.getInt(RebalanceUserConfigConstants.MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME,
+        RebalanceUserConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME);
+    if (minReplicasToKeepUp >= currentIdealStateSegmentHosts.size()) {
+      // if the minimum number of serving replicas in rebalance config is
+      // greater than or equal to number of replicas of a segment, then it
+      // is impossible to honor the request. so we use the default number
+      // of minimum serving replicas we will keep for no downtime mode
+      // (currently 1)
+      minReplicasToKeepUp = RebalanceUserConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME;
+    }
+    MapDifference difference = Maps.difference(targetIdealStateSegmentHosts, currentIdealStateSegmentHosts);
+    if (difference.entriesInCommon().size() >= minReplicasToKeepUp) {
+      // if there are enough hosts in common between current and target ideal states
+      // to satisfy the min replicas condition, then there won't be any downtime
+      // and we can directly set the current ideal state to target ideal state
       LOGGER.debug("Segment " + segmentId + " has common entries between current and expected ideal state");
-      setTargetState(idealState, segmentId, targetMap);
+      setTargetState(idealStateToUpdate, segmentId, targetIdealStateSegmentHosts);
     } else {
       // remove one entry
-      idealState.getInstanceStateMap(segmentId).remove(srcMap.keySet().stream().findFirst().get());
+      String hostToRemove = "";
+      for (String host : currentIdealStateSegmentHosts.keySet()) {
+        // the common host between current and target ideal
+        // states should be ignored
+        if (!targetIdealStateSegmentHosts.containsKey(host)) {
+          hostToRemove = host;
+          break;
+        }
+      }
+      idealStateToUpdate.getInstanceStateMap(segmentId).remove(hostToRemove);
       // add an entry from the target state to ensure there is no downtime
-      String instanceId = targetMap.keySet().stream().findFirst().get();
-      idealState.setPartitionState(segmentId, instanceId, targetMap.get(instanceId));
-      LOGGER.debug("Adding " + instanceId + " to serve segment " + segmentId);
+      final Map<String, String> updatedSegmentInstancesMap = idealStateToUpdate.getInstanceStateMap(segmentId);
+      String hostToAdd = "";
+      for (String host : targetIdealStateSegmentHosts.keySet()) {
+        // the hosts host that has already been added from target
+        // ideal state to new state should be ignored
+        if (!updatedSegmentInstancesMap.containsKey(host)) {
+          hostToAdd = host;
+          break;
+        }
+      }
+      if (!hostToAdd.equals("")) {
+        idealStateToUpdate.setPartitionState(segmentId, hostToAdd, targetIdealStateSegmentHosts.get(hostToAdd));
+        LOGGER.debug("Adding " + hostToAdd + " to serve segment " + segmentId);
+      }
     }
   }
 
