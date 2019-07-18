@@ -26,7 +26,6 @@ import org.joda.time.MutableDateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import scala.collection.mutable.StringBuilder;
 
 
 public class FunctionExpressionEvaluatorTest {

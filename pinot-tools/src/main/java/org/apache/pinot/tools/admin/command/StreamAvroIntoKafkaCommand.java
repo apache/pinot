@@ -24,15 +24,14 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
-import kafka.javaapi.producer.Producer;
-import kafka.producer.KeyedMessage;
-import kafka.producer.ProducerConfig;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.apache.pinot.core.util.AvroUtils;
+import org.apache.pinot.core.realtime.stream.StreamDataProducer;
+import org.apache.pinot.core.realtime.stream.StreamDataProvider;
 import org.apache.pinot.tools.Command;
+import org.apache.pinot.tools.KafkaStarterUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +42,6 @@ import org.slf4j.LoggerFactory;
  */
 public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamAvroIntoKafkaCommand.class);
-
   @Option(name = "-avroFile", required = true, metaVar = "<String>", usage = "Avro file to stream.")
   private String _avroFile = null;
 
@@ -104,8 +102,12 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
 
-    ProducerConfig producerConfig = new ProducerConfig(properties);
-    Producer<byte[], byte[]> producer = new Producer<byte[], byte[]>(producerConfig);
+    StreamDataProducer streamDataProducer;
+    try {
+      streamDataProducer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_09_PRODUCER_CLASS_NAME, properties);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get StreamDataProducer - " + KafkaStarterUtils.KAFKA_09_PRODUCER_CLASS_NAME, e);
+    }
     try {
       // Open the Avro file
       DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(new File(_avroFile));
@@ -115,11 +117,7 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
         // Write the message to Kafka
         String recordJson = genericRecord.toString();
         byte[] bytes = recordJson.getBytes("utf-8");
-        KeyedMessage<byte[], byte[]> data =
-            new KeyedMessage<byte[], byte[]>(_kafkaTopic, Longs.toByteArray(HashUtil.hash64(bytes, bytes.length)),
-                bytes);
-
-        producer.send(data);
+        streamDataProducer.produce(_kafkaTopic, Longs.toByteArray(HashUtil.hash64(bytes, bytes.length)), bytes);
 
         // Sleep between messages
         if (sleepRequired) {
