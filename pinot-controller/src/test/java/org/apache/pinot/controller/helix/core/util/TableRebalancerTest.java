@@ -28,7 +28,6 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
-import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.TableRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
 import org.testng.Assert;
@@ -36,7 +35,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-public class TableRebalancerTest extends ControllerTest {
+public class TableRebalancerTest {
 
   private IdealState current;
   private final String segmentId = "segment1";
