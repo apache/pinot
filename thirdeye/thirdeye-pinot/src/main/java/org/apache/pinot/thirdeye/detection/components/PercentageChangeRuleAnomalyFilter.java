@@ -60,8 +60,6 @@ public class PercentageChangeRuleAnomalyFilter implements AnomalyFilter<Percenta
     MetricEntity me = MetricEntity.fromURN(anomaly.getMetricUrn());
     List<MetricSlice> slices = new ArrayList<>();
     MetricSlice currentSlice = MetricSlice.from(me.getId(), anomaly.getStartTime(), anomaly.getEndTime(), me.getFilters());
-    slices.add(currentSlice);
-
     // customize baseline offset
     if (baseline != null) {
       slices.addAll(this.baseline.scatter(currentSlice));
@@ -70,13 +68,7 @@ public class PercentageChangeRuleAnomalyFilter implements AnomalyFilter<Percenta
     Map<MetricSlice, DataFrame> aggregates =
         this.dataFetcher.fetchData(new InputDataSpec().withAggregateSlices(slices)).getAggregates();
 
-    double currentValue;
-    if (aggregates.get(currentSlice).isEmpty()) {
-      currentValue = anomaly.getAvgCurrentVal();
-    } else {
-      currentValue = aggregates.get(currentSlice).getDouble(COL_VALUE, 0);
-    }
-
+    double currentValue = anomaly.getAvgCurrentVal();
     double baselineValue;
     if (baseline == null) {
       baselineValue = anomaly.getAvgBaselineVal();
