@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.h2.command.dml.Merge;
 import org.joda.time.DateTimeZone;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -79,7 +80,7 @@ public class PercentageChangeRuleAnomalyFilterTest {
     AnomalyFilter filter = new PercentageChangeRuleAnomalyFilter();
     filter.init(spec, new DefaultInputDataFetcher(this.testDataProvider, 125L));
     List<Boolean> results =
-        Stream.of(makeAnomaly(1555570800000L, 1555693200000L), makeAnomaly(1554163200000L, 1554249600000L)).map(anomaly -> filter.isQualified(anomaly)).collect(
+        Stream.of(makeAnomaly(1555570800000L, 1555693200000L, 150), makeAnomaly(1554163200000L, 1554249600000L, 500)).map(anomaly -> filter.isQualified(anomaly)).collect(
             Collectors.toList());
     Assert.assertEquals(results, Arrays.asList(false, true));
   }
@@ -94,12 +95,16 @@ public class PercentageChangeRuleAnomalyFilterTest {
     AnomalyFilter filter = new PercentageChangeRuleAnomalyFilter();
     filter.init(spec, new DefaultInputDataFetcher(this.testDataProvider, 125L));
     List<Boolean> results =
-        Stream.of(makeAnomaly(1555570800000L, 1555693200000L), makeAnomaly(1554163200000L, 1554249600000L), makeAnomaly(1554076800000L, 1554163200000L)).map(anomaly -> filter.isQualified(anomaly)).collect(
+        Stream.of(makeAnomaly(1555570800000L, 1555693200000L, 150), makeAnomaly(1554163200000L, 1554249600000L, 500), makeAnomaly(1554076800000L, 1554163200000L, 200)).map(anomaly -> filter.isQualified(anomaly)).collect(
             Collectors.toList());
     Assert.assertEquals(results, Arrays.asList(false, true, true));
   }
 
-
+  private static MergedAnomalyResultDTO makeAnomaly(long start, long end, long currentVal) {
+    MergedAnomalyResultDTO anomaly = makeAnomaly(start, end);
+    anomaly.setAvgCurrentVal(currentVal);
+    return anomaly;
+  }
 
   private static MergedAnomalyResultDTO makeAnomaly(long start, long end) {
     Map<String, String> dimensions = new HashMap<>();
