@@ -64,8 +64,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
             alertId: alertId,
             detectionInfo,
             rawDetectionYaml: detection_json.yaml,
-            metricUrn: detection_json.properties.nested[0].nestedMetricUrns[0],
-            metricUrnList: detection_json.properties.nested[0].nestedMetricUrns,
+            metricUrn: detection_json.metricUrns[0],
+            metricUrnList: detection_json.metricUrns,
             granularity
           });
 
