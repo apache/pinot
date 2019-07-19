@@ -124,7 +124,6 @@ public class JsonUtils {
       if (jsonValue != null && !jsonValue.isNull()) {
         return extractSingleValue(jsonValue, fieldSpec.getDataType());
       } else {
-//        return fieldSpec.getDefaultNullValue();
         return null;
       }
     } else {
