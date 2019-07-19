@@ -12,6 +12,7 @@
           "className": "org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
           "nested": [{
             "bucketPeriod": "P1D",
+            "subEntityName": "metric alert on test_metric",
             "className": "org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper"
           }],
           "detector": "$maxThreshold_1:THRESHOLD"
