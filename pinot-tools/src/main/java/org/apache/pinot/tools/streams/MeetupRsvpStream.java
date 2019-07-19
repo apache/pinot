@@ -55,7 +55,7 @@ public class MeetupRsvpStream {
     properties.put("metadata.broker.list", DEFAULT_KAFKA_BROKER);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
-    producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_09_PRODUCER_CLASS_NAME, properties);
+    producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
   }
 
   public void stopPublishing() {

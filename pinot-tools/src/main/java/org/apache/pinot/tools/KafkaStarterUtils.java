@@ -37,9 +37,9 @@ public class KafkaStarterUtils {
   private static final String ZOOKEEPER_CONNECT = "zookeeper.connect";
   private static final String LOG_DIRS = "log.dirs";
 
-  public static final String KAFKA_09_SERVER_STARTABLE_CLASS_NAME =
+  public static final String KAFKA_SERVER_STARTABLE_CLASS_NAME =
       "org.apache.pinot.core.realtime.impl.kafka.server.KafkaDataServerStartable";
-  public static final String KAFKA_09_PRODUCER_CLASS_NAME =
+  public static final String KAFKA_PRODUCER_CLASS_NAME =
       "org.apache.pinot.core.realtime.impl.kafka.server.KafkaDataProducer";
   public static final String KAFKA_JSON_MESSAGE_DECODER_CLASS_NAME =
       "org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder";
@@ -93,9 +93,9 @@ public class KafkaStarterUtils {
       configuration.put(KafkaStarterUtils.BROKER_ID, brokerId);
       configuration.put(KafkaStarterUtils.ZOOKEEPER_CONNECT, zkStr);
       configuration.put(KafkaStarterUtils.LOG_DIRS, "/tmp/kafka-" + Double.toHexString(Math.random()));
-      kafkaStarter = StreamDataProvider.getServerDataStartable(KAFKA_09_SERVER_STARTABLE_CLASS_NAME, configuration);
+      kafkaStarter = StreamDataProvider.getServerDataStartable(KAFKA_SERVER_STARTABLE_CLASS_NAME, configuration);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to start " + KAFKA_09_SERVER_STARTABLE_CLASS_NAME, e);
+      throw new RuntimeException("Failed to start " + KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }
     kafkaStarter.start();
     return kafkaStarter;

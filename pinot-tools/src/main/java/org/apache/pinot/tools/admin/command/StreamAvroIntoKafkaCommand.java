@@ -104,9 +104,9 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
 
     StreamDataProducer streamDataProducer;
     try {
-      streamDataProducer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_09_PRODUCER_CLASS_NAME, properties);
+      streamDataProducer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to get StreamDataProducer - " + KafkaStarterUtils.KAFKA_09_PRODUCER_CLASS_NAME, e);
+      throw new RuntimeException("Failed to get StreamDataProducer - " + KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, e);
     }
     try {
       // Open the Avro file

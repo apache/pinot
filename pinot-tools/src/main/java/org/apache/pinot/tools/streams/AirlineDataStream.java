@@ -64,7 +64,7 @@ public class AirlineDataStream {
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
 
-    producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_09_PRODUCER_CLASS_NAME, properties);
+    producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
 
     service = Executors.newFixedThreadPool(1);
     Quickstart.printStatus(Quickstart.Color.YELLOW,
