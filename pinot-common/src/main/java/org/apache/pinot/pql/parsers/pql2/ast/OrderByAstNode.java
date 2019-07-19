@@ -40,12 +40,19 @@ public class OrderByAstNode extends BaseAstNode {
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof OrderByExpressionAstNode) {
         OrderByExpressionAstNode node = (OrderByExpressionAstNode) astNode;
-        SelectionSort elem = new SelectionSort();
         TransformExpressionTree transformExpressionTree =
             TransformExpressionTree.compileToExpressionTree(node.getColumn());
+
+        SelectionSort elem = new SelectionSort();
         elem.setColumn(transformExpressionTree.toString());
         elem.setIsAsc("asc".equalsIgnoreCase(node.getOrdering()));
-        selections.addToSelectionSortSequence(elem);
+        brokerRequest.addToOrderBy(elem);
+
+        // TODO: Change selection to directly use Order-by. Won't be required if move to PinotQuery happens before that.
+        if (selections != null) {
+          selections.addToSelectionSortSequence(elem);
+        }
+
       } else {
         throw new Pql2CompilationException("Child node of ORDER BY node is not an expression node");
       }
