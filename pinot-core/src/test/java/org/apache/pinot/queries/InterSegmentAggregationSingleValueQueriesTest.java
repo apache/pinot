@@ -191,19 +191,19 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
     BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
-        new String[]{"6643", "22594"});
+        new String[]{"5977", "23825"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
-        new String[]{"1855", "4571"});
+        new String[]{"1886", "4492"});
 
     brokerResponse = getBrokerResponseForQuery(query + GROUP_BY);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
-        new String[]{"3515", "11997"});
+        new String[]{"3592", "11889"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query + GROUP_BY);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
-        new String[]{"1278", "3285"});
+        new String[]{"1324", "3197"});
   }
 
   @Test
