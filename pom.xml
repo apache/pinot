@@ -141,8 +141,7 @@
     kafka dependency is still explicitly defined in pinot-integration-tests, pinot-tools and pinot-perf pom files.
     To change kafka connector dependency, we only need to update this version number config.
     TODO: figure out a way to inject kafka dependency instead of explicitly setting the kafka module dependency -->
-    <kafka.version>0.9</kafka.version>
-    <kafka.scala.version>2.10</kafka.scala.version>
+    <kafka.lib.version>0.9</kafka.lib.version>
   </properties>
 
   <profiles>
@@ -928,12 +927,6 @@
         <groupId>net.sf.jopt-simple</groupId>
         <artifactId>jopt-simple</artifactId>
         <version>4.6</version>
-      </dependency>
-      <!-- kafka_2.10 & larray use scala-library -->
-      <dependency>
-        <groupId>org.scala-lang</groupId>
-        <artifactId>scala-library</artifactId>
-        <version>2.10.5</version>
       </dependency>
       <dependency>
         <groupId>commons-lang</groupId>

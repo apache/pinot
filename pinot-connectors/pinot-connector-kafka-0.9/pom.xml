@@ -42,7 +42,7 @@
     <!-- Kafka  -->
     <dependency>
       <groupId>org.apache.kafka</groupId>
-      <artifactId>kafka_${kafka.scala.version}</artifactId>
+      <artifactId>kafka_2.10</artifactId>
       <version>${kafka.lib.version}</version>
       <exclusions>
         <exclusion>
@@ -62,6 +62,11 @@
           <artifactId>zookeeper</artifactId>
         </exclusion>
       </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.scala-lang</groupId>
+      <artifactId>scala-library</artifactId>
+      <version>2.10.5</version>
     </dependency>
   </dependencies>
 </project>
