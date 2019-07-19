@@ -20,6 +20,8 @@ package org.apache.pinot.controller.helix.core.util;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
@@ -41,6 +43,7 @@ import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.helix.model.builder.FullAutoModeISBuilder;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.core.PinotHelixBrokerResourceOnlineOfflineStateModelGenerator;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import org.slf4j.Logger;
@@ -176,6 +179,14 @@ public class HelixSetupUtils {
       idealState.enable(false);
 
       helixAdmin.addResource(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, idealState);
+    }
+
+    // Create resource config for lead controller resource if it doesn't exist
+    Map<String, String> resourceConfigMap =
+        HelixHelper.getResourceConfigsFor(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, helixAdmin);
+    if (resourceConfigMap == null) {
+      HelixHelper
+          .updateResourceConfigsFor(new HashMap<>(), LEAD_CONTROLLER_RESOURCE_NAME, helixClusterName, helixAdmin);
     }
   }
 }
