@@ -20,14 +20,12 @@ package org.apache.pinot.integration.tests;
 
 import org.apache.pinot.controller.ControllerConf;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.*;
-
 
 public class LLCRealtimeClusterWithEnabledLeadControllerResourceIntegrationTest extends LLCRealtimeClusterIntegrationTest {
   @Override
   public void startController() {
     ControllerConf controllerConfig = getDefaultControllerConfiguration();
     startController(controllerConfig);
-    _helixAdmin.enableResource(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, true);
+    _helixResourceManager.enableLeadControllerResource(true);
   }
 }

@@ -27,6 +27,7 @@ import org.apache.pinot.common.utils.StringUtil;
 
 
 public class LeadControllerUtils {
+  public static final String RESOURCE_ENABLED = "RESOURCE_ENABLED";
 
   /**
    * Gets hash code for table using murmur2 function, ignores the most significant bit.
@@ -36,7 +37,7 @@ public class LeadControllerUtils {
    * @return hash code ignoring the most significant bit.
    */
   private static int getHashCodeForTable(String rawTableName) {
-    return (HashUtil.murmur2(StringUtil.encodeUtf8(rawTableName)) & 0x7fffffff);
+    return (HashUtil.murmur2(StringUtil.encodeUtf8(rawTableName)) & Integer.MAX_VALUE);
   }
 
   /**
@@ -56,7 +57,8 @@ public class LeadControllerUtils {
    * @param rawTableName table name without type
    * @return controller participant id for partition leader, e.g. Controller_localhost_9000. Null if not found or resource is disabled.
    */
-  public static String getLeadControllerInstanceForTable(ExternalView leadControllerResourceExternalView, String rawTableName) {
+  public static String getLeadControllerInstanceForTable(ExternalView leadControllerResourceExternalView,
+      String rawTableName) {
     if (leadControllerResourceExternalView == null) {
       return null;
     }

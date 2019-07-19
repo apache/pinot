@@ -34,6 +34,7 @@ public class LeadControllerManager {
 
   private Set<Integer> _partitionIndexCache;
   private PinotHelixResourceManager _pinotHelixResourceManager;
+  private volatile boolean _isLeadControllerResourceEnabled = false;
   private volatile boolean _amIHelixLeader = false;
 
   public LeadControllerManager() {
@@ -48,24 +49,25 @@ public class LeadControllerManager {
   }
 
   /**
-   * Unregisters {@link PinotHelixResourceManager}.
+   * Marks the cached indices invalid and unregisters {@link PinotHelixResourceManager}.
    */
-  public void unregisterResourceManager() {
+  public void stop() {
+    _partitionIndexCache.clear();
     _pinotHelixResourceManager = null;
   }
 
   /**
    * Checks whether the current controller is the leader for the given table. Return true if current controller is the leader for this table.
-   * Otherwise check whether the current controller is helix leader.
+   * Otherwise check whether the current controller is helix leader if the resource is disabled.
    * @param tableName table name with/without table type.
    */
   public boolean isLeaderForTable(String tableName) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    int partitionIndex =
-        LeadControllerUtils.getPartitionIdForTable(rawTableName, NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
-    if (_partitionIndexCache.contains(partitionIndex)) {
-      return true;
+    if (isLeadControllerResourceEnabled()) {
+      String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+      int partitionIndex = LeadControllerUtils.getPartitionIdForTable(rawTableName, NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
+      return _partitionIndexCache.contains(partitionIndex);
     } else {
+      // Checks if it's Helix leader if lead controller resource is disabled.
       return isHelixLeader();
     }
   }
@@ -97,6 +99,10 @@ public class LeadControllerManager {
     return _amIHelixLeader;
   }
 
+  public boolean isLeadControllerResourceEnabled() {
+    return _isLeadControllerResourceEnabled;
+  }
+
   /**
    * Callback on changes in the controller. Should be registered to the controller callback. This callback is not needed when the resource is enabled.
    * However, the resource can be disabled sometime while the cluster is in operation, so we keep it here. Plus, it does not add much overhead.
@@ -117,6 +123,16 @@ public class LeadControllerManager {
       } else {
         LOGGER.info("Already not Helix leader. Duplicate notification");
       }
+    }
+  }
+
+  void onResourceConfigChange() {
+    if (_pinotHelixResourceManager.isLeadControllerResourceEnabled()) {
+      LOGGER.info("Lead controller resource is enabled.");
+      _isLeadControllerResourceEnabled = true;
+    } else {
+      LOGGER.info("Lead controller resource is disabled.");
+      _isLeadControllerResourceEnabled = false;
     }
   }
 }

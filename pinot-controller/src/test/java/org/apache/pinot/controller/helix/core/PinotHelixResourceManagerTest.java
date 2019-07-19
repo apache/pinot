@@ -96,7 +96,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
             .build();
     _helixResourceManager.createServerTenant(serverTenant);
 
-    _helixAdmin.enableResource(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, true);
+    // Enable lead controller resource
+    _helixResourceManager.enableLeadControllerResource(true);
   }
 
   @Test

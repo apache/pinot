@@ -62,6 +62,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.MasterSlaveSMD;
+import org.apache.helix.model.ResourceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.OfflineTagConfig;
@@ -116,6 +117,8 @@ import org.apache.pinot.core.util.ReplicationUtils;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
 
 
 public class PinotHelixResourceManager {
@@ -203,7 +206,7 @@ public class PinotHelixResourceManager {
    * Stop the Pinot controller instance.
    */
   public synchronized void stop() {
-    _leadControllerManager.unregisterResourceManager();
+    _leadControllerManager.stop();
     _segmentDeletionManager.stop();
     _helixZkManager.disconnect();
   }
@@ -2346,6 +2349,20 @@ public class PinotHelixResourceManager {
     LiveInstance liveInstance = _helixDataAccessor.getProperty(propertyKey);
     String helixLeaderInstanceId = liveInstance.getInstanceName();
     return _instanceId.equals(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + helixLeaderInstanceId);
+  }
+
+  public boolean isLeadControllerResourceEnabled() {
+    PropertyKey propertyKey = _keyBuilder.resourceConfig(LEAD_CONTROLLER_RESOURCE_NAME);
+    ResourceConfig resourceConfig = _helixDataAccessor.getProperty(propertyKey);
+    String enableResource = resourceConfig.getSimpleConfig(LeadControllerUtils.RESOURCE_ENABLED);
+    return Boolean.parseBoolean(enableResource);
+  }
+
+  public void enableLeadControllerResource(boolean enable) {
+    Map<String, String> resourceConfig = new HashMap<>();
+    resourceConfig.put(LeadControllerUtils.RESOURCE_ENABLED, Boolean.toString(enable));
+    HelixHelper.updateResourceConfigsFor(resourceConfig, LEAD_CONTROLLER_RESOURCE_NAME, getHelixClusterName(),
+        getHelixAdmin());
   }
 
   /*

@@ -24,9 +24,12 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -65,19 +68,40 @@ public class PinotControllerModeTest extends ControllerTest {
     ControllerConf firstDualModeControllerConfig = getDefaultControllerConfiguration();
     firstDualModeControllerConfig.setControllerMode(ControllerConf.ControllerMode.DUAL);
     startController(firstDualModeControllerConfig);
+//    HelixManager helixControllerManager = firstDualModeController.getHelixControllerManager();
+//    HelixAdmin helixAdmin = helixControllerManager.getClusterManagmentTool();
+//    PinotHelixResourceManager pinotHelixResourceManager = _helixManager.getHelixResourceManager();
+
+    // Disable delay rebalance feature
+    IdealState idealState = _helixResourceManager.getTableIdealState(LEAD_CONTROLLER_RESOURCE_NAME);
+    idealState.setDelayRebalanceEnabled(false);
+    idealState.setMinActiveReplicas(1);
+    _helixAdmin.updateIdealState(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, idealState);
+
     TestUtils.waitForCondition(aVoid -> _helixManager.isConnected(), TIMEOUT_IN_MS,
         "Failed to start the first dual-mode controller");
+    // The first controller should be the MASTER for all partitions
+    checkInstanceState(_helixAdmin);
 
-    // There should be no partition in the external view because the resource is disabled
-    TestUtils.waitForCondition(aVoid -> {
-      ExternalView leadControllerResourceExternalView =
-          _helixAdmin.getResourceExternalView(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME);
-      return leadControllerResourceExternalView.getPartitionSet().isEmpty();
-    }, TIMEOUT_IN_MS, "There should be no partition in the disabled resource's external view");
+    final LeadControllerManager firstLeadControllerManager =
+        _helixResourceManager.getLeadControllerManager();
+    String firstTableName = "firstTableName";
+    String secondTableName = "secondTableName";
 
-    // Enable the lead controller resource, and the first controller should be the MASTER for all partitions
-    _helixAdmin.enableResource(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, true);
-    checkInstanceState(_helixAdmin, "MASTER");
+    Assert.assertNotEquals(
+        LeadControllerUtils.getPartitionIdForTable(firstTableName, NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE),
+        LeadControllerUtils.getPartitionIdForTable(secondTableName, NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE));
+
+    // The first controller should be the leader for both tables, which is the Helix leader, before the resource is enabled.
+    Assert.assertTrue(firstLeadControllerManager.isLeaderForTable(firstTableName));
+    Assert.assertTrue(firstLeadControllerManager.isLeaderForTable(secondTableName));
+
+    _helixResourceManager.enableLeadControllerResource(true);
+    TestUtils.waitForCondition(aVoid -> firstLeadControllerManager.isLeadControllerResourceEnabled(), TIMEOUT_IN_MS,
+        "Failed to mark lead controller resource as enabled");
+    // The first controller should still be the leader for both tables, which is the partition leader, after the resource is enabled.
+    Assert.assertTrue(firstLeadControllerManager.isLeaderForTable(firstTableName));
+    Assert.assertTrue(firstLeadControllerManager.isLeaderForTable(secondTableName));
 
     // Start the second dual-mode controller
     ControllerConf secondDualModeControllerConfig = getDefaultControllerConfiguration();
@@ -88,24 +112,70 @@ public class PinotControllerModeTest extends ControllerTest {
     TestUtils
         .waitForCondition(aVoid -> secondDualModeController.getHelixResourceManager().getHelixZkManager().isConnected(),
             TIMEOUT_IN_MS, "Failed to start the second dual-mode controller");
-
     // There should still be only one MASTER instance for each partition
-    checkInstanceState(_helixAdmin, "MASTER");
+    checkInstanceState(_helixAdmin);
 
-    // Disable the lead controller resource, and there should be only one OFFLINE instance for each partition
-    _helixAdmin.enableResource(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, false);
-    checkInstanceState(_helixAdmin, "OFFLINE");
+    LeadControllerManager secondLeadControllerManager =
+        secondDualModeController.getHelixResourceManager().getLeadControllerManager();
+    Assert.assertTrue(secondLeadControllerManager.isLeadControllerResourceEnabled());
 
-    // Re-enable the lead controller resource, and there should be only one MASTER instance for each partition
-    _helixAdmin.enableResource(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, true);
-    checkInstanceState(_helixAdmin, "MASTER");
+    // Either one of the controllers is the only leader for a given table name.
+    Assert.assertTrue(firstLeadControllerManager.isLeaderForTable(firstTableName) ^ secondLeadControllerManager
+        .isLeaderForTable(firstTableName));
+    Assert.assertTrue(firstLeadControllerManager.isLeaderForTable(secondTableName) ^ secondLeadControllerManager
+        .isLeaderForTable(secondTableName));
 
     // Stop the second controller, and there should still be only one MASTER instance for each partition
     secondDualModeController.stop();
-    checkInstanceState(_helixAdmin, "MASTER");
+    checkInstanceState(_helixAdmin);
 
     // Stop the first controller
     stopController();
+
+    // Both controllers are stopped and no one should be the partition leader for tables.
+    Assert.assertTrue(firstLeadControllerManager.isLeadControllerResourceEnabled());
+    TestUtils.waitForCondition(aVoid -> {
+      boolean result;
+      result = !firstLeadControllerManager.isLeaderForTable(firstTableName);
+      result &= !firstLeadControllerManager.isLeaderForTable(secondTableName);
+      result &= !secondLeadControllerManager.isLeaderForTable(firstTableName);
+      result &= !secondLeadControllerManager.isLeaderForTable(secondTableName);
+      return result;
+    }, TIMEOUT_IN_MS, "No one should be the partition leader for tables");
+
+    ZkClient zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
+    TestUtils
+        .waitForCondition(aVoid -> !zkClient.exists("/" + getHelixClusterName() + "/CONTROLLER/LEADER"), TIMEOUT_IN_MS,
+            "No cluster leader should be shown in Helix cluster");
+    zkClient.close();
+
+    ControllerConf thirdDualModeControllerConfig = getDefaultControllerConfiguration();
+    thirdDualModeControllerConfig.setControllerMode(ControllerConf.ControllerMode.DUAL);
+    thirdDualModeControllerConfig.setControllerPort(Integer.toString(DEFAULT_CONTROLLER_PORT + 2));
+    ControllerStarter thirdDualModeController = getControllerStarter(thirdDualModeControllerConfig);
+    thirdDualModeController.start();
+    PinotHelixResourceManager pinotHelixResourceManager = thirdDualModeController.getHelixResourceManager();
+    _helixAdmin = thirdDualModeController.getHelixControllerManager().getClusterManagmentTool();
+    TestUtils
+        .waitForCondition(aVoid -> thirdDualModeController.getHelixResourceManager().getHelixZkManager().isConnected(),
+            TIMEOUT_IN_MS, "Failed to start the 3rd dual-mode controller");
+    // There should still be only one MASTER instance for each partition
+    checkInstanceState(_helixAdmin);
+
+    pinotHelixResourceManager.enableLeadControllerResource(false);
+    final LeadControllerManager thirdLeadControllerManager = pinotHelixResourceManager.getLeadControllerManager();
+
+    TestUtils.waitForCondition(aVoid -> !thirdLeadControllerManager.isLeadControllerResourceEnabled(), TIMEOUT_IN_MS,
+        "Lead controller resource should be disabled.");
+
+    // After disabling lead controller resource, helix leader should be the leader for both tables.
+    TestUtils.waitForCondition(
+        aVoid -> thirdLeadControllerManager.isLeaderForTable(firstTableName) && thirdLeadControllerManager
+            .isLeaderForTable(secondTableName), TIMEOUT_IN_MS,
+        "The 3rd controller should be the leader for both tables, which is the Helix leader.");
+
+    // Stop the 3rd controller
+    thirdDualModeController.stop();
   }
 
   @Test
@@ -135,7 +205,7 @@ public class PinotControllerModeTest extends ControllerTest {
 
     // Enabling the lead controller resource before setting up the Pinot cluster should fail
     try {
-      helixAdmin.enableResource(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, true);
+      _helixResourceManager.enableLeadControllerResource(true);
       Assert.fail("Enabling the lead controller resource before setting up the Pinot cluster should fail");
     } catch (Exception e) {
       // Expected
@@ -146,17 +216,8 @@ public class PinotControllerModeTest extends ControllerTest {
     PinotHelixResourceManager helixResourceManager = firstPinotOnlyController.getHelixResourceManager();
     TestUtils.waitForCondition(aVoid -> helixResourceManager.getHelixZkManager().isConnected(), TIMEOUT_IN_MS,
         "Failed to start the first Pinot-only controller");
-
-    // There should be no partition in the external view because the resource is disabled
-    TestUtils.waitForCondition(aVoid -> {
-      ExternalView leadControllerResourceExternalView =
-          helixAdmin.getResourceExternalView(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME);
-      return leadControllerResourceExternalView.getPartitionSet().isEmpty();
-    }, TIMEOUT_IN_MS, "There should be no partition in the disabled resource's external view");
-
-    // Enable the lead controller resource, and the first Pinot-only controller should be the MASTER for all partitions
-    helixAdmin.enableResource(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, true);
-    checkInstanceState(helixAdmin, "MASTER");
+    // The first Pinot-only controller should be the MASTER for all partitions
+    checkInstanceState(helixAdmin);
 
     // Start the second Pinot-only controller
     ControllerConf secondPinotOnlyControllerConfig = getDefaultControllerConfiguration();
@@ -167,21 +228,12 @@ public class PinotControllerModeTest extends ControllerTest {
     TestUtils.waitForCondition(
         aVoid -> secondPinotOnlyController.getHelixResourceManager().getHelixZkManager().isConnected(), TIMEOUT_IN_MS,
         "Failed to start the second Pinot-only controller");
-
     // There should still be only one MASTER instance for each partition
-    checkInstanceState(helixAdmin, "MASTER");
-
-    // Disable the lead controller resource, and there should be only one OFFLINE instance for each partition
-    helixAdmin.enableResource(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, false);
-    checkInstanceState(helixAdmin, "OFFLINE");
-
-    // Re-enable the lead controller resource, and there should be only one MASTER instance for each partition
-    helixAdmin.enableResource(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, true);
-    checkInstanceState(helixAdmin, "MASTER");
+    checkInstanceState(helixAdmin);
 
     // Stop the second Pinot-only controller, and there should still be only one MASTER instance for each partition
     secondPinotOnlyController.stop();
-    checkInstanceState(helixAdmin, "MASTER");
+    checkInstanceState(helixAdmin);
 
     // Stop the first Pinot-only controller, and there should be no partition in the external view
     firstPinotOnlyController.stop();
@@ -195,7 +247,8 @@ public class PinotControllerModeTest extends ControllerTest {
     helixOnlyController.stop();
   }
 
-  private void checkInstanceState(HelixAdmin helixAdmin, String expectedInstanceState) {
+  private void checkInstanceState(HelixAdmin helixAdmin) {
+    String expectedInstanceState = "MASTER";
     TestUtils.waitForCondition(aVoid -> {
       ExternalView leadControllerResourceExternalView =
           helixAdmin.getResourceExternalView(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME);
@@ -217,7 +270,7 @@ public class PinotControllerModeTest extends ControllerTest {
   public void cleanUpCluster() {
     ZkClient zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
     if (zkClient.exists("/" + getHelixClusterName())) {
-      zkClient.deleteRecursively("/" + getHelixClusterName());
+      zkClient.deleteRecursive("/" + getHelixClusterName());
     }
     zkClient.close();
   }

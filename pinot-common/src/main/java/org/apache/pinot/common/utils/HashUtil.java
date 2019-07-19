@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 
@@ -112,7 +111,6 @@ public class HashUtil {
    * @param data byte array to hash
    * @return 32 bit hash of the given array
    */
-  @VisibleForTesting
   public static int murmur2(final byte[] data) {
     int length = data.length;
     int seed = 0x9747b28c;
