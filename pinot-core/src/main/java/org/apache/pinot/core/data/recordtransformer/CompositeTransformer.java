@@ -27,9 +27,9 @@ import org.apache.pinot.core.data.GenericRow;
 
 
 /**
- * The {@code CompoundTransformer} class performs multiple transforms based on the inner {@link RecordTransformer}s.
+ * The {@code CompositeTransformer} class performs multiple transforms based on the inner {@link RecordTransformer}s.
  */
-public class CompoundTransformer implements RecordTransformer {
+public class CompositeTransformer implements RecordTransformer {
   private final List<RecordTransformer> _transformers;
 
   /**
@@ -41,25 +41,25 @@ public class CompoundTransformer implements RecordTransformer {
    *     column
    *   </li>
    *   <li>
-   *     We put {@link SanitationTransformer} after {@link DataTypeTransformer} so that before sanitation, all values
+   *     We put {@link SanitizationTransformer} after {@link DataTypeTransformer} so that before sanitation, all values
    *     follow the data types defined in the {@link Schema}.
    *   </li>
    * </ul>
    */
-  public static CompoundTransformer getDefaultTransformer(Schema schema) {
-    return new CompoundTransformer(Arrays
-        .asList(new TimeTransformer(schema), new ExpressionTransformer(schema), new DataTypeTransformer(schema),
-            new SanitationTransformer(schema)));
+  public static CompositeTransformer getDefaultTransformer(Schema schema) {
+    return new CompositeTransformer(Arrays
+        .asList(new NullValueTransformer(schema), new TimeTransformer(schema), new ExpressionTransformer(schema), new DataTypeTransformer(schema),
+            new SanitizationTransformer(schema)));
   }
 
   /**
    * Returns a pass through record transformer that does not transform the record.
    */
-  public static CompoundTransformer getPassThroughTransformer() {
-    return new CompoundTransformer(Collections.emptyList());
+  public static CompositeTransformer getPassThroughTransformer() {
+    return new CompositeTransformer(Collections.emptyList());
   }
 
-  public CompoundTransformer(List<RecordTransformer> transformers) {
+  public CompositeTransformer(List<RecordTransformer> transformers) {
     _transformers = transformers;
   }
 

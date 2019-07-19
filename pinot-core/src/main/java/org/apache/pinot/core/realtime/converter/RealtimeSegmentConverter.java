@@ -34,7 +34,7 @@ import org.apache.pinot.common.data.TimeFieldSpec;
 import org.apache.pinot.common.data.TimeGranularitySpec;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.core.data.recordtransformer.CompoundTransformer;
+import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
@@ -138,7 +138,7 @@ public class RealtimeSegmentConverter {
     final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     RealtimeSegmentSegmentCreationDataSource dataSource =
         new RealtimeSegmentSegmentCreationDataSource(realtimeSegmentImpl, reader, dataSchema);
-    driver.init(genConfig, dataSource, CompoundTransformer.getPassThroughTransformer());
+    driver.init(genConfig, dataSource, CompositeTransformer.getPassThroughTransformer());
     driver.build();
 
     if (segmentPartitionConfig != null && segmentPartitionConfig.getColumnPartitionMap() != null) {
