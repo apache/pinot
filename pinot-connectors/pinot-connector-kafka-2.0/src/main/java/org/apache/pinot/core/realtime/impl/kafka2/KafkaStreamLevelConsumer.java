@@ -20,6 +20,7 @@ package org.apache.pinot.core.realtime.impl.kafka2;
 
 import com.yammer.metrics.core.Meter;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -28,6 +29,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -55,9 +57,9 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   private StreamConfig _streamConfig;
   private KafkaHighLevelStreamConfig _kafkaHighLevelStreamConfig;
 
-  private KafkaConsumer<byte[], byte[]> consumer;
-  private ConsumerRecords<byte[], byte[]> consumerRecords;
-  private Iterator<ConsumerRecord<byte[], byte[]>> kafkaIterator;
+  private KafkaConsumer<Bytes, Bytes> consumer;
+  private ConsumerRecords<Bytes, Bytes> consumerRecords;
+  private Iterator<ConsumerRecord<Bytes, Bytes>> kafkaIterator;
   private Map<Integer, Long> consumerOffsets = new HashMap<>(); // tracking current consumed records offsets.
 
   private long lastLogTime = 0;
@@ -80,6 +82,7 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
     _tableAndStreamName = tableName + "-" + streamConfig.getTopicName();
     INSTANCE_LOGGER = LoggerFactory
         .getLogger(KafkaStreamLevelConsumer.class.getName() + "_" + tableName + "_" + streamConfig.getTopicName());
+    INSTANCE_LOGGER.info("KafkaStreamLevelConsumer: streamConfig : {}", _streamConfig);
   }
 
   @Override
@@ -93,16 +96,23 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
     kafkaIterator = consumerRecords.iterator();
   }
 
+  private void resetOffsets() {
+    for (int partition : consumerOffsets.keySet()) {
+      long offsetToSeek = consumerOffsets.get(partition);
+      consumer.seek(new TopicPartition(_streamConfig.getTopicName(), partition), offsetToSeek);
+    }
+  }
+
   @Override
   public GenericRow next(GenericRow destination) {
-    if (!kafkaIterator.hasNext()) {
+    if (kafkaIterator == null || !kafkaIterator.hasNext()) {
       updateKafkaIterator();
     }
     if (kafkaIterator.hasNext()) {
       try {
-        final ConsumerRecord<byte[], byte[]> record = kafkaIterator.next();
+        final ConsumerRecord<Bytes, Bytes> record = kafkaIterator.next();
         updateOffsets(record.partition(), record.offset());
-        destination = _messageDecoder.decode(record.value(), destination);
+        destination = _messageDecoder.decode(record.value().get(), destination);
         tableAndStreamRowsConsumed = _serverMetrics
             .addMeteredTableValue(_tableAndStreamName, ServerMeter.REALTIME_ROWS_CONSUMED, 1L,
                 tableAndStreamRowsConsumed);
@@ -135,12 +145,14 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   }
 
   private void updateOffsets(int partition, long offset) {
-    consumerOffsets.put(partition, offset);
+    consumerOffsets.put(partition, offset + 1);
   }
 
   @Override
   public void commit() {
     consumer.commitSync(getOffsetsMap());
+    // Since the lastest batch may not be consumed fully, so we need to reset kafka consumer's offset.
+    resetOffsets();
     consumerOffsets.clear();
     _serverMetrics.addMeteredTableValue(_tableAndStreamName, ServerMeter.REALTIME_OFFSET_COMMITS, 1L);
     _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_OFFSET_COMMITS, 1L);
@@ -159,8 +171,10 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   public void shutdown()
       throws Exception {
     if (consumer != null) {
-      consumer = null;
+      // If offsets commit is not succeed, then reset the offsets here.
+      resetOffsets();
       KafkaStreamLevelConsumerManager.releaseKafkaConsumer(consumer);
+      consumer = null;
     }
   }
 }

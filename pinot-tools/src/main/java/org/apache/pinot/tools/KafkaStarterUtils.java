@@ -38,9 +38,14 @@ public class KafkaStarterUtils {
   private static final String LOG_DIRS = "log.dirs";
 
   public static final String KAFKA_SERVER_STARTABLE_CLASS_NAME =
-      "org.apache.pinot.core.realtime.impl.kafka.server.KafkaDataServerStartable";
+      "org.apache.pinot.core.realtime.impl.kafka2.server.KafkaDataServerStartable";
   public static final String KAFKA_PRODUCER_CLASS_NAME =
-      "org.apache.pinot.core.realtime.impl.kafka.server.KafkaDataProducer";
+      "org.apache.pinot.core.realtime.impl.kafka2.server.KafkaDataProducer";
+  public static final String KAFKA_STREAM_CONSUMER_FACTORY_CLASS_NAME =
+      "org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory";
+  public static final String KAFKA_STREAM_LEVEL_CONSUMER_CLASS_NAME =
+      "org.apache.pinot.core.realtime.impl.kafka2.KafkaStreamLevelConsumer";
+
   public static final String KAFKA_JSON_MESSAGE_DECODER_CLASS_NAME =
       "org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder";
 
@@ -52,13 +57,17 @@ public class KafkaStarterUtils {
 
     // Set host name
     configureHostName(configuration, "localhost");
-
+    configureOffsetsTopicReplicationFactor(configuration, (short) 1);
     configuration.put(PORT, DEFAULT_KAFKA_PORT);
     configuration.put(BROKER_ID, DEFAULT_BROKER_ID);
     configuration.put(ZOOKEEPER_CONNECT, DEFAULT_ZK_STR);
     configuration.put(LOG_DIRS, "/tmp/kafka-" + Double.toHexString(Math.random()));
 
     return configuration;
+  }
+
+  public static void configureOffsetsTopicReplicationFactor(Properties configuration, short replicationFactor) {
+    configuration.put("offsets.topic.replication.factor", replicationFactor);
   }
 
   public static void configureTopicDeletion(Properties configuration, boolean topicDeletionEnabled) {
@@ -89,6 +98,7 @@ public class KafkaStarterUtils {
       final Properties configuration) {
     StreamDataServerStartable kafkaStarter;
     try {
+      configureOffsetsTopicReplicationFactor(configuration, (short) 1);
       configuration.put(KafkaStarterUtils.PORT, port);
       configuration.put(KafkaStarterUtils.BROKER_ID, brokerId);
       configuration.put(KafkaStarterUtils.ZOOKEEPER_CONNECT, zkStr);

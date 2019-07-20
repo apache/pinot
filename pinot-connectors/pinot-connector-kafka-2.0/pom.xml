@@ -35,7 +35,6 @@
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
     <kafka.lib.version>2.0.0</kafka.lib.version>
-    <kafka.scala.version>2.12</kafka.scala.version>
   </properties>
 
   <dependencies>
@@ -75,16 +74,12 @@
     </dependency>
     <dependency>
       <groupId>org.apache.kafka</groupId>
-      <artifactId>kafka_${kafka.scala.version}</artifactId>
+      <artifactId>kafka_2.12</artifactId>
       <version>${kafka.lib.version}</version>
       <exclusions>
         <exclusion>
           <groupId>org.slf4j</groupId>
           <artifactId>slf4j-log4j12</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>net.sf.jopt-simple</groupId>
-          <artifactId>jopt-simple</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.scala-lang</groupId>
@@ -99,7 +94,10 @@
           <artifactId>zookeeper</artifactId>
         </exclusion>
       </exclusions>
-      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>net.sf.jopt-simple</groupId>
+      <artifactId>jopt-simple</artifactId>
     </dependency>
   </dependencies>
 </project>

@@ -99,12 +99,10 @@ public class HybridQuickstart {
 
   private void startKafka() {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
-
-    String kafkaClazz = "org.apache.pinot.core.realtime.impl.kafka.server.KafkaDataServerStartable";
     try {
-      _kafkaStarter = StreamDataProvider.getServerDataStartable(kafkaClazz, KafkaStarterUtils.getDefaultKafkaConfiguration());
+      _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, KafkaStarterUtils.getDefaultKafkaConfiguration());
     } catch (Exception e) {
-      throw new RuntimeException("Failed to start " + kafkaClazz, e);
+      throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }
     _kafkaStarter.start();
     _kafkaStarter.createTopic("airlineStatsEvents", KafkaStarterUtils.getTopicCreationProps(10));

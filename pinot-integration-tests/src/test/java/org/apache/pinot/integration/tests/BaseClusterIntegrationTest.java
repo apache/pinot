@@ -38,7 +38,6 @@ import org.apache.pinot.common.config.TableTaskConfig;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
 import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
@@ -112,7 +111,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected String getStreamConsumerFactoryClassName() {
-    return KafkaConsumerFactory.class.getName();
+    return KafkaStarterUtils.KAFKA_STREAM_CONSUMER_FACTORY_CLASS_NAME;
   }
 
   protected int getRealtimeSegmentFlushSize() {

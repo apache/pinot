@@ -41,9 +41,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import kafka.javaapi.producer.Producer;
-import kafka.producer.KeyedMessage;
-import kafka.producer.ProducerConfig;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericData;
@@ -59,11 +56,14 @@ import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.realtime.stream.StreamDataProducer;
+import org.apache.pinot.core.realtime.stream.StreamDataProvider;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.core.util.AvroUtils;
 import org.apache.pinot.server.util.SegmentTestUtils;
+import org.apache.pinot.tools.KafkaStarterUtils;
 import org.testng.Assert;
 
 
@@ -324,16 +324,13 @@ public class ClusterIntegrationTestUtils {
     properties.put("request.required.acks", "1");
     properties.put("partitioner.class", "kafka.producer.ByteArrayPartitioner");
 
-    ProducerConfig producerConfig = new ProducerConfig(properties);
-    Producer<byte[], byte[]> producer = new Producer<>(producerConfig);
+    StreamDataProducer producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
 
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
       for (File avroFile : avroFiles) {
         try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
           BinaryEncoder binaryEncoder = new EncoderFactory().directBinaryEncoder(outputStream, null);
           GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(reader.getSchema());
-
-          List<KeyedMessage<byte[], byte[]>> messagesToWrite = new ArrayList<>(maxNumKafkaMessagesPerBatch);
           for (GenericRecord genericRecord : reader) {
             outputStream.reset();
             if (header != null && 0 < header.length) {
@@ -345,19 +342,8 @@ public class ClusterIntegrationTestUtils {
             byte[] keyBytes = (partitionColumn == null) ? Longs.toByteArray(System.currentTimeMillis())
                 : (genericRecord.get(partitionColumn)).toString().getBytes();
             byte[] bytes = outputStream.toByteArray();
-            KeyedMessage<byte[], byte[]> data = new KeyedMessage<>(kafkaTopic, keyBytes, bytes);
-
-            messagesToWrite.add(data);
-
-            // Send a batch of messages
-            if (messagesToWrite.size() == maxNumKafkaMessagesPerBatch) {
-              producer.send(messagesToWrite);
-              messagesToWrite.clear();
-            }
+            producer.produce(kafkaTopic,keyBytes,bytes);
           }
-
-          // Send last batch of messages
-          producer.send(messagesToWrite);
         }
       }
     }
@@ -386,16 +372,12 @@ public class ClusterIntegrationTestUtils {
     properties.put("request.required.acks", "1");
     properties.put("partitioner.class", "kafka.producer.ByteArrayPartitioner");
 
-    ProducerConfig producerConfig = new ProducerConfig(properties);
-    Producer<byte[], byte[]> producer = new Producer<>(producerConfig);
-
+    StreamDataProducer producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
         BinaryEncoder binaryEncoder = new EncoderFactory().directBinaryEncoder(outputStream, null);
         Schema avroSchema = reader.getSchema();
         GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(avroSchema);
-
-        List<KeyedMessage<byte[], byte[]>> messagesToWrite = new ArrayList<>(maxNumKafkaMessagesPerBatch);
         GenericRecord genericRecord = new GenericData.Record(avroSchema);
 
         while (numKafkaMessagesToPush > 0) {
@@ -411,21 +393,10 @@ public class ClusterIntegrationTestUtils {
           byte[] keyBytes = (partitionColumn == null) ? Longs.toByteArray(System.currentTimeMillis())
               : (genericRecord.get(partitionColumn)).toString().getBytes();
           byte[] bytes = outputStream.toByteArray();
-          KeyedMessage<byte[], byte[]> data = new KeyedMessage<>(kafkaTopic, keyBytes, bytes);
 
-          messagesToWrite.add(data);
-
-          // Send a batch of messages
-          if (messagesToWrite.size() == maxNumKafkaMessagesPerBatch) {
-            producer.send(messagesToWrite);
-            messagesToWrite.clear();
-          }
-
+          producer.produce(kafkaTopic,keyBytes,bytes);
           numKafkaMessagesToPush--;
         }
-
-        // Send last batch of messages
-        producer.send(messagesToWrite);
       }
     }
   }
