@@ -426,15 +426,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     completeTableConfiguration();
   }
 
-  protected void completeTableConfiguration() {
+  protected void completeTableConfiguration() throws IOException {
     if (isUsingNewConfigFormat()) {
       CombinedConfig combinedConfig = new CombinedConfig(_offlineTableConfig, _realtimeTableConfig, _schema);
-      try {
-        sendPostRequest(_controllerRequestURLBuilder.forNewTableCreate(), Serializer.serializeToString(combinedConfig));
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
+      sendPostRequest(_controllerRequestURLBuilder.forNewTableCreate(), Serializer.serializeToString(combinedConfig));
     }
   }
-
 }
