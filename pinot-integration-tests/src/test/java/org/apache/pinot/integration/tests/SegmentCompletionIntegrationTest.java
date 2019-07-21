@@ -52,7 +52,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegrationTest {
+public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_KAFKA_PARTITIONS = 1;
 
   private String _serverInstance;
@@ -77,7 +77,12 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
     startKafka();
 
     // Create Pinot table
-    setUpTable(null);
+    setUpRealtimeTable(null);
+  }
+
+  @Override
+  protected boolean useLlc() {
+    return true;
   }
 
   /**
@@ -185,66 +190,12 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
     }, 60_000L, "Failed to get a new segment reaching CONSUMING state");
   }
 
-  @Test(enabled = false)
-  @Override
-  public void testQueriesFromQueryFile()
-      throws Exception {
-    // Skipped
-  }
-
-  @Test(enabled = false)
-  @Override
-  public void testSqlQueriesFromQueryFile()
-      throws Exception {
-    // Skipped
-  }
-
-  @Test(enabled = false)
-  @Override
-  public void testGeneratedQueriesWithMultiValues()
-      throws Exception {
-    // Skipped
-  }
-
-  @Test(enabled = false)
-  @Override
-  public void testInstanceShutdown()
-      throws Exception {
-    // Skipped
-  }
-
-  @Test(enabled = false)
-  @Override
-  public void testSegmentFlushSize()
-      throws Exception {
-    // Skipped
-  }
-
-  @Test(enabled = false)
-  @Override
-  public void testDictionaryBasedQueries()
-      throws Exception {
-    // Skipped
-  }
-
-  @Test(enabled = false)
-  @Override
-  public void testQueryExceptions()
-      throws Exception {
-    // Skipped
-  }
-
-  @Test(enabled = false)
-  public void testConsumerDirectoryExists() {
-    // Skipped
-  }
-
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() {
     stopFakeServer();
     stopBroker();
     stopController();
+    stopKafka();
     stopZk();
   }
 

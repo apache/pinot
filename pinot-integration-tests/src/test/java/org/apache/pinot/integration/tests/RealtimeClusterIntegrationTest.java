@@ -71,32 +71,10 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
     // Create Pinot table
-    setUpTable(avroFiles.get(0));
+    setUpRealtimeTable(avroFiles.get(0));
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
-  }
-
-  protected void setUpTable(File avroFile)
-      throws Exception {
-    File schemaFile = getSchemaFile();
-    Schema schema = Schema.fromFile(schemaFile);
-    String schemaName = schema.getSchemaName();
-    addSchema(schemaFile, schemaName);
-
-    String timeColumnName = schema.getTimeColumnName();
-    Assert.assertNotNull(timeColumnName);
-    TimeUnit outgoingTimeUnit = schema.getOutgoingTimeUnit();
-    Assert.assertNotNull(outgoingTimeUnit);
-    String timeType = outgoingTimeUnit.toString();
-
-    addRealtimeTable(getTableName(), useLlc(), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
-        getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName,
-        getBrokerTenant(), getServerTenant(), getLoadMode(), getSortedColumn(),
-        getInvertedIndexColumns(), getBloomFilterIndexColumns(), getRawIndexColumns(), getTaskConfig(),
-        getStreamConsumerFactoryClassName());
-
-    completeTableConfiguration();
   }
 
   @Test
