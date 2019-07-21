@@ -82,8 +82,10 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     valueIterator.skipTo(docId);
     //_numEntriesScanned++;
     int length = valueIterator.nextIntVal(intArray);
-    _numEntriesScanned+=length/2;
-    return evaluator.applyMV(intArray, length);
+    int[] numEntriesScannedInEvaluator={0};
+    boolean ret=evaluator.applyMV(intArray, length,numEntriesScannedInEvaluator);
+    _numEntriesScanned+=numEntriesScannedInEvaluator[0];
+    return ret;
   }
 
   @Override
@@ -111,16 +113,18 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     if (currentDocId == Constants.EOF) {
       return currentDocId;
     }
+    int[] numEntriesScannedInEvaluator={0};
     while (valueIterator.hasNext() && currentDocId < endDocId) {
       currentDocId = currentDocId + 1;
       //_numEntriesScanned++;
       int length = valueIterator.nextIntVal(intArray);
-      _numEntriesScanned+=length/2;
-      if (evaluator.applyMV(intArray, length)) {
+      if (evaluator.applyMV(intArray, length, numEntriesScannedInEvaluator)) {
+        _numEntriesScanned+=numEntriesScannedInEvaluator[0];
         return currentDocId;
       }
     }
     currentDocId = Constants.EOF;
+    _numEntriesScanned+=numEntriesScannedInEvaluator[0];
     return Constants.EOF;
   }
 
@@ -143,18 +147,19 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
     IntIterator intIterator = answer.getIntIterator();
     int docId = -1, length;
+    int[] numEntriesScannedInEvaluator={0};
     while (intIterator.hasNext() && docId < endDocId) {
       docId = intIterator.next();
       if (docId >= startDocId) {
         valueIterator.skipTo(docId);
         //_numEntriesScanned++;
         length = valueIterator.nextIntVal(intArray);
-        _numEntriesScanned+=length/2;
-        if (evaluator.applyMV(intArray, length)) {
+        if (evaluator.applyMV(intArray, length, numEntriesScannedInEvaluator)) {
           result.add(docId);
         }
       }
     }
+    _numEntriesScanned+=numEntriesScannedInEvaluator[0];
     return result;
   }
 
