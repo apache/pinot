@@ -21,6 +21,12 @@ public abstract class StandaloneDriver extends TunerDriver {
   protected static final Logger LOGGER = LoggerFactory.getLogger(StandaloneDriver.class);
   public static final int NO_CONCURRENCY=0;
   private int _coreSize = 0;
+  private int _minNumQueries = 0;
+
+  public StandaloneDriver setMinNumQueries(int minNumQueries) {
+    _minNumQueries = minNumQueries;
+    return this;
+  }
 
   protected StandaloneDriver setThreadPoolSize(int coreSize) {
     _coreSize = coreSize;

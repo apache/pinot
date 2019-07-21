@@ -155,7 +155,7 @@ public class OLSAnalysisImpl implements BasicStrategy {
     regression.setNoIntercept(true);
 
     double[] time = new double[olsMergerObj.getMinBin().size()];
-    double[][] x_arr = new double[olsMergerObj.getMinBin().size()][3];
+    double[][] x_arr = new double[olsMergerObj.getMinBin().size()][2];
     int iter=0;
 
     for (Map.Entry<Tuple2<Long, Long>, Tuple2<Long, Long>> entry : olsMergerObj.getMinBin().entrySet()) {
@@ -164,8 +164,8 @@ public class OLSAnalysisImpl implements BasicStrategy {
       time[iter]=val._2();
       x_arr[iter][0]=key._1()*_len_bin+_len_bin/2;
       x_arr[iter][1]=key._2()*_len_bin+_len_bin/2;
-      x_arr[iter][2]=val._1();
-      //LOGGER.info("time:{} inFilter:{} postFilter:{} usedIndex:{}",time[iter], x_arr[iter][0], x_arr[iter][1], x_arr[iter][2]);
+      //x_arr[iter][2]=val._1();
+      //LOGGER.info("time:{} inFilter:{} postFilter:{} usedIndex:{}",time[iter], x_arr[iter][0], x_arr[iter][1]);//, x_arr[iter][2]);
       iter++;
     }
 

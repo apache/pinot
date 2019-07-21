@@ -17,23 +17,38 @@ import org.slf4j.LoggerFactory;
 public class LogFileSrcImpl implements QuerySrc {
   private static final Logger LOGGER = LoggerFactory.getLogger(LogFileSrcImpl.class);
 
+
   private FileInputStream _fileInputStream = null;
   private BufferedReader _bufferedReader = null;
   private String _stringBuffer = null;
   private String _stringBufferNext = null;
   private BasicQueryParser _parser;
   private String _path;
-  private static final String VALID_LINE_REGEX = "^(\\d{4})/(\\d{2})/(\\d{2}) [\\d:.].*$";
-  private static final Pattern valid_line_beginner = Pattern.compile(VALID_LINE_REGEX);
+  private boolean _standaloneLog;
+
+  private String VALID_LINE_REGEX;
+  private Pattern valid_line_beginner;
+
 
   private LogFileSrcImpl(Builder builder) {
+    _standaloneLog = builder._standaloneLog;
     _parser = builder._parser;
     _path = builder._path;
+
+    if(_standaloneLog){
+      VALID_LINE_REGEX = "^(Processed requestId|RequestId|\\w).*$";
+      valid_line_beginner = Pattern.compile(VALID_LINE_REGEX);
+    }
+    else{
+      VALID_LINE_REGEX = "^(\\d{4})/(\\d{2})/(\\d{2}) [\\d:.].*$";
+      valid_line_beginner = Pattern.compile(VALID_LINE_REGEX);
+    }
   }
 
   public static final class Builder {
     private BasicQueryParser _parser;
     private String _path;
+    private boolean _standaloneLog = false;
 
     public Builder() {
     }
@@ -53,6 +68,12 @@ public class LogFileSrcImpl implements QuerySrc {
     @Nonnull
     public LogFileSrcImpl build() {
       return new LogFileSrcImpl(this).openFile();
+    }
+
+    @Nonnull
+    public Builder _standaloneLog(boolean val) {
+      _standaloneLog = val;
+      return this;
     }
   }
 

@@ -6,6 +6,7 @@ import org.apache.pinot.tools.tuner.driver.StandaloneDriver;
 import org.apache.pinot.tools.tuner.meta.manager.JsonFileMetaManagerImpl;
 import org.apache.pinot.tools.tuner.query.src.BrokerLogParserImpl;
 import org.apache.pinot.tools.tuner.query.src.LogFileSrcImpl;
+import org.apache.pinot.tools.tuner.query.src.ServerLogParserImpl;
 import org.apache.pinot.tools.tuner.strategy.FrequencyImpl;
 import org.apache.pinot.tools.tuner.strategy.OLSAnalysisImpl;
 import org.apache.pinot.tools.tuner.strategy.ParserBasedImpl;
@@ -13,25 +14,25 @@ import org.apache.pinot.tools.tuner.strategy.ParserBasedImpl;
 
 public class StandaloneTest extends StandaloneDriver {
   public static void main(String[] args) {
-//    StandaloneDriver standaloneTest=new StandaloneTest()
+//    StandaloneDriver parserBased=new StandaloneTest()
 //        .setThreadPoolSize(3)
 //        .setStrategy(new ParserBasedImpl.Builder()._algorithmOrder(ParserBasedImpl.THIRD_ORDER)._numEntriesScannedThreshold(ParserBasedImpl.NO_IN_FILTER_THRESHOLD).build())
 //        .setQuerySrc(new LogFileSrcImpl.Builder()._parser(new BrokerLogParserImpl())._path("/Users/jiaguo/scin_v2_additive.broker.log").build())
 //        .setMetaManager(new JsonFileMetaManagerImpl.Builder()._path("/Users/jiaguo/Workspace/pinot-tuna-script/data/meta/scin_v2_additive/col_meta")._use_existing_index(JsonFileMetaManagerImpl.USE_EXISTING_INDEX).build());
-//    standaloneTest.excute();
+//    parserBased.excute();
 
-//    StandaloneDriver standaloneTest=new StandaloneTest()
+//    StandaloneDriver freqBased=new StandaloneTest()
 //        .setThreadPoolSize(3)
 //        .setStrategy(new FrequencyImpl.Builder()._numEntriesScannedThreshold(ParserBasedImpl.NO_IN_FILTER_THRESHOLD).build())
 //        .setQuerySrc(new LogFileSrcImpl.Builder()._parser(new BrokerLogParserImpl())._path("/Users/jiaguo/scin_v2_additive.broker.log").build())
 //        .setMetaManager(new JsonFileMetaManagerImpl.Builder()._path("/Users/jiaguo/Workspace/pinot-tuna-script/data/meta/scin_v2_additive/col_meta")._use_existing_index(JsonFileMetaManagerImpl.USE_EXISTING_INDEX).build());
-//    standaloneTest.excute();
+//    freqBased.excute();
 
-    StandaloneDriver standaloneTest=new StandaloneTest()
+    StandaloneDriver fitModel=new StandaloneTest()
         .setThreadPoolSize(3)
-        .setStrategy(new OLSAnalysisImpl.Builder()._len_bin(10000)._numEntriesScannedThreshold(ParserBasedImpl.NO_IN_FILTER_THRESHOLD).build())
-        .setQuerySrc(new LogFileSrcImpl.Builder()._parser(new BrokerLogParserImpl())._path("/Users/jiaguo/pinot-broker.log.2019-06-27").build())
+        .setStrategy(new OLSAnalysisImpl.Builder()._numEntriesScannedThreshold(ParserBasedImpl.NO_IN_FILTER_THRESHOLD).build())
+        .setQuerySrc(new LogFileSrcImpl.Builder()._standaloneLog(true)._parser(new ServerLogParserImpl())._path("/Users/jiaguo/Downloads/2factorfit/bidSuggestion_OFFLINE/server.bidSuggestion_noindex.log").build())
         .setMetaManager(new JsonFileMetaManagerImpl.Builder()._path("/Users/jiaguo/Workspace/pinot-tuna-script/data/meta/prodAll/col_meta.json")._use_existing_index(JsonFileMetaManagerImpl.USE_EXISTING_INDEX).build());
-    standaloneTest.excute();
+    fitModel.excute();
   }
 }
