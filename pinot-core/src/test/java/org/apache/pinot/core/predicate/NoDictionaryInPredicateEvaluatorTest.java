@@ -93,8 +93,8 @@ public class NoDictionaryInPredicateEvaluatorTest {
     PredicateEvaluatorTestUtils.fillRandom(multiValues);
     multiValues[_random.nextInt(NUM_MULTI_VALUES)] =
         Integer.parseInt(stringValues.get(_random.nextInt(NUM_PREDICATE_VALUES)));
-    Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
-    Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
+    Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES, new int[]{0}));
+    Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES, new int[]{0}));
   }
 
   @Test
