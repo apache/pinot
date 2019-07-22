@@ -80,7 +80,6 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
       return false;
     }
     valueIterator.skipTo(docId);
-    //_numEntriesScanned++;
     int length = valueIterator.nextIntVal(intArray);
     int[] numEntriesScannedInEvaluator={0};
     boolean ret=evaluator.applyMV(intArray, length,numEntriesScannedInEvaluator);
@@ -116,7 +115,6 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     int[] numEntriesScannedInEvaluator={0};
     while (valueIterator.hasNext() && currentDocId < endDocId) {
       currentDocId = currentDocId + 1;
-      //_numEntriesScanned++;
       int length = valueIterator.nextIntVal(intArray);
       if (evaluator.applyMV(intArray, length, numEntriesScannedInEvaluator)) {
         _numEntriesScanned+=numEntriesScannedInEvaluator[0];
@@ -152,7 +150,6 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
       docId = intIterator.next();
       if (docId >= startDocId) {
         valueIterator.skipTo(docId);
-        //_numEntriesScanned++;
         length = valueIterator.nextIntVal(intArray);
         if (evaluator.applyMV(intArray, length, numEntriesScannedInEvaluator)) {
           result.add(docId);
