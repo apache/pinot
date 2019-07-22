@@ -16,24 +16,22 @@
 
 package org.apache.pinot.thirdeye.detection.components;
 
-import org.apache.pinot.thirdeye.dataframe.DataFrame;
-import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
-import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import org.apache.pinot.thirdeye.detection.DataProvider;
-import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
-import org.apache.pinot.thirdeye.detection.DetectionTestUtils;
-import org.apache.pinot.thirdeye.detection.MockDataProvider;
-import org.apache.pinot.thirdeye.detection.spec.AbsoluteChangeRuleAnomalyFilterSpec;
-import org.apache.pinot.thirdeye.detection.spec.PercentageChangeRuleAnomalyFilterSpec;
-import org.apache.pinot.thirdeye.detection.spi.components.AnomalyFilter;
-import org.apache.pinot.thirdeye.rootcause.timeseries.Baseline;
-import org.apache.pinot.thirdeye.rootcause.timeseries.BaselineAggregate;
-import org.apache.pinot.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
+import org.apache.pinot.thirdeye.detection.DetectionTestUtils;
+import org.apache.pinot.thirdeye.detection.MockDataProvider;
+import org.apache.pinot.thirdeye.detection.spec.AbsoluteChangeRuleAnomalyFilterSpec;
+import org.apache.pinot.thirdeye.detection.spi.components.AnomalyFilter;
+import org.apache.pinot.thirdeye.rootcause.timeseries.Baseline;
+import org.apache.pinot.thirdeye.rootcause.timeseries.BaselineAggregate;
+import org.apache.pinot.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import org.joda.time.DateTimeZone;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -44,6 +42,7 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 public class AbsoluteChangeRuleAnomalyFilterTest {
   private static final String METRIC_URN = "thirdeye:metric:123";
+  private static final long CONFIG_ID = 125L;
 
   private DataProvider testDataProvider;
   private Baseline baseline;
@@ -73,18 +72,10 @@ public class AbsoluteChangeRuleAnomalyFilterTest {
     spec.setThreshold(100);
     spec.setPattern("up_or_down");
     AnomalyFilter filter = new AbsoluteChangeRuleAnomalyFilter();
-    filter.init(spec, new DefaultInputDataFetcher(this.testDataProvider, 125L));
+    filter.init(spec, new DefaultInputDataFetcher(this.testDataProvider, CONFIG_ID));
     List<Boolean> results =
-        Arrays.asList(makeAnomaly(0, 2), makeAnomaly(4, 6)).stream().map(anomaly -> filter.isQualified(anomaly)).collect(
+        Arrays.asList(DetectionTestUtils.makeAnomaly(0, 2, CONFIG_ID, METRIC_URN, 150), DetectionTestUtils.makeAnomaly(4, 6, CONFIG_ID, METRIC_URN, 500)).stream().map(anomaly -> filter.isQualified(anomaly)).collect(
             Collectors.toList());
     Assert.assertEquals(results, Arrays.asList(false, true));
-  }
-
-
-  private static MergedAnomalyResultDTO makeAnomaly(long start, long end) {
-    Map<String, String> dimensions = new HashMap<>();
-    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(125L, start, end, dimensions);
-    anomaly.setMetricUrn(METRIC_URN);
-    return anomaly;
   }
 }

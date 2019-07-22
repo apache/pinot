@@ -52,16 +52,9 @@ public class ThresholdRuleAnomalyFilter implements AnomalyFilter<ThresholdRuleFi
   private double maxValueDaily;
   private double maxValue;
   private double minValue;
-  private InputDataFetcher dataFetcher;
-
   @Override
   public boolean isQualified(MergedAnomalyResultDTO anomaly) {
-    MetricEntity me = MetricEntity.fromURN(anomaly.getMetricUrn());
-    MetricSlice currentSlice = MetricSlice.from(me.getId(), anomaly.getStartTime(), anomaly.getEndTime(), me.getFilters());
-    InputData data = dataFetcher.fetchData(new InputDataSpec().withAggregateSlices(Collections.singleton(currentSlice)));
-
-    Map<MetricSlice, DataFrame> aggregates = data.getAggregates();
-    double currentValue = getValueFromAggregates(currentSlice, aggregates);
+    double currentValue = anomaly.getAvgCurrentVal();
 
     Interval anomalyInterval = new Interval(anomaly.getStartTime(), anomaly.getEndTime());
     double hourlyMultiplier = TimeUnit.HOURS.toMillis(1) / (double) anomalyInterval.toDurationMillis();
@@ -93,10 +86,5 @@ public class ThresholdRuleAnomalyFilter implements AnomalyFilter<ThresholdRuleFi
     this.maxValueDaily = spec.getMaxValueDaily();
     this.maxValue = spec.getMaxValue();
     this.minValue = spec.getMinValue();
-    this.dataFetcher = dataFetcher;
-  }
-
-  double getValueFromAggregates(MetricSlice slice, Map<MetricSlice, DataFrame> aggregates) {
-    return aggregates.get(slice).getDouble(COL_VALUE, 0);
   }
 }

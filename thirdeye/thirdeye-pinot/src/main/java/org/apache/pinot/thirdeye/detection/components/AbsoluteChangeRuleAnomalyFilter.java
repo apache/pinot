@@ -56,7 +56,6 @@ public class AbsoluteChangeRuleAnomalyFilter implements AnomalyFilter<AbsoluteCh
     List<MetricSlice> slices = new ArrayList<>();
     MetricSlice currentSlice =
         MetricSlice.from(me.getId(), anomaly.getStartTime(), anomaly.getEndTime(), me.getFilters());
-    slices.add(currentSlice);
 
     // customize baseline offset
     if (baseline != null) {
@@ -66,7 +65,7 @@ public class AbsoluteChangeRuleAnomalyFilter implements AnomalyFilter<AbsoluteCh
     Map<MetricSlice, DataFrame> aggregates =
         this.dataFetcher.fetchData(new InputDataSpec().withAggregateSlices(slices)).getAggregates();
 
-    double currentValue = aggregates.get(currentSlice).getDouble(COL_VALUE, 0);
+    double currentValue = anomaly.getAvgCurrentVal();
     double baselineValue =
         baseline == null ? anomaly.getAvgBaselineVal() : this.baseline.gather(currentSlice, aggregates).getDouble(COL_VALUE, 0);
     // if inconsistent with up/down, filter the anomaly
