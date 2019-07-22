@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.kafka2;
+package org.apache.pinot.core.realtime.impl.kafka;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;

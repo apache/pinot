@@ -39,7 +39,7 @@ import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
-import org.apache.pinot.tools.KafkaStarterUtils;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 

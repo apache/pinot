@@ -63,7 +63,7 @@ import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl
 import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.core.util.AvroUtils;
 import org.apache.pinot.server.util.SegmentTestUtils;
-import org.apache.pinot.tools.KafkaStarterUtils;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.testng.Assert;
 
 

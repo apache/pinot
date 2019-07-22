@@ -23,11 +23,11 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.util.Properties;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.apache.pinot.core.realtime.stream.StreamDataProvider;
 import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.Quickstart.Color;
@@ -90,7 +90,8 @@ public class HybridQuickstart {
 
     File tableConfigFile = new File(_realtimeQuickStartDataDir, "airlineStats_realtime_table_config.json");
 
-    URL resource = Quickstart.class.getClassLoader().getResource("sample_data/airlineStats_realtime_table_config.json");
+    URL resource = Quickstart.class.getClassLoader().getResource(
+        "sample_data/airlineStats_realtime_table_config.json");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 

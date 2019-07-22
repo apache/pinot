@@ -20,10 +20,10 @@ package org.apache.pinot.tools.admin.command;
 
 import java.io.File;
 import java.io.IOException;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.apache.pinot.core.realtime.stream.StreamDataProvider;
 import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.Command;
-import org.apache.pinot.tools.KafkaStarterUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

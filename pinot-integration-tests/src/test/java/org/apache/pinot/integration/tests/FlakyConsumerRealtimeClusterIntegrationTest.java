@@ -29,7 +29,7 @@ import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamConsumerFactory;
 import org.apache.pinot.core.realtime.stream.StreamLevelConsumer;
 import org.apache.pinot.core.realtime.stream.StreamMetadataProvider;
-import org.apache.pinot.tools.KafkaStarterUtils;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.testng.annotations.BeforeClass;
 
 

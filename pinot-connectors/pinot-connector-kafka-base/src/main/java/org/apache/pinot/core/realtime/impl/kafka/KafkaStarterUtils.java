@@ -16,12 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.tools;
+package org.apache.pinot.core.realtime.impl.kafka;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.ServiceLoader;
 import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.core.realtime.stream.StreamConsumerFactory;
 import org.apache.pinot.core.realtime.stream.StreamDataProvider;
 import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
 
@@ -38,13 +40,16 @@ public class KafkaStarterUtils {
   private static final String LOG_DIRS = "log.dirs";
 
   public static final String KAFKA_SERVER_STARTABLE_CLASS_NAME =
-      "org.apache.pinot.core.realtime.impl.kafka2.server.KafkaDataServerStartable";
-  public static final String KAFKA_PRODUCER_CLASS_NAME =
-      "org.apache.pinot.core.realtime.impl.kafka2.server.KafkaDataProducer";
+      getKafkaConnectorPackageName() + ".server.KafkaDataServerStartable";
+  public static final String KAFKA_PRODUCER_CLASS_NAME = getKafkaConnectorPackageName() + ".server.KafkaDataProducer";
   public static final String KAFKA_STREAM_CONSUMER_FACTORY_CLASS_NAME =
-      "org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory";
+      getKafkaConnectorPackageName() + ".KafkaConsumerFactory";
   public static final String KAFKA_STREAM_LEVEL_CONSUMER_CLASS_NAME =
-      "org.apache.pinot.core.realtime.impl.kafka2.KafkaStreamLevelConsumer";
+      getKafkaConnectorPackageName() + ".KafkaStreamLevelConsumer";
+
+  private static String getKafkaConnectorPackageName() {
+    return ServiceLoader.load(StreamConsumerFactory.class).iterator().next().getClass().getPackage().getName();
+  }
 
   public static final String KAFKA_JSON_MESSAGE_DECODER_CLASS_NAME =
       "org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder";
