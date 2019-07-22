@@ -136,9 +136,10 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
   private Map<String,Map<String,Object>>  buildAlertSchemes(Map<String,Object> yamlAlertConfig) {
     List<Map<String, Object>> alertSchemes = ConfigUtils.getList(yamlAlertConfig.get(PROP_ALERT_SCHEMES));
     Map<String, Map<String, Object>> alertSchemesHolder = new HashMap<>();
-    Map<String, Object> alertSchemesParsed = new HashMap<>();
     if (!alertSchemes.isEmpty()) {
       for (Map<String, Object> alertScheme : alertSchemes) {
+        Map<String, Object> alertSchemesParsed = new HashMap<>();
+
         Preconditions.checkNotNull(alertScheme.get(PROP_TYPE));
         alertSchemesParsed.put(PROP_CLASS_NAME,
               DETECTION_ALERT_REGISTRY.lookupAlertSchemes(alertScheme.get(PROP_TYPE).toString()));
