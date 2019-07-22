@@ -49,11 +49,12 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.thirdeye.alert.content.EntityGroupByContentFormatter.*;
+import static org.apache.pinot.thirdeye.alert.content.EntityGroupKeyContentFormatter.*;
 import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.*;
+import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator.*;
 
 
-public class TestEntityGroupByEmailContentFormatter {
+public class TestEntityGroupKeyEmailContentFormatter {
   private static final String TEST = "test";
   private int id = 0;
   private String dashboardHost = "http://localhost:8080/dashboard";
@@ -121,7 +122,7 @@ public class TestEntityGroupByEmailContentFormatter {
         id);
     Map<String, String> properties = new HashMap<>();
     properties.put(PROP_GROUP_KEY, "group-1");
-    properties.put(PROP_ENTITY_NAME, "sub-entity-A");
+    properties.put(PROP_SUB_ENTITY_NAME, "sub-entity-A");
     properties.put(PROP_ANOMALY_SCORE, "10");
     subGroupedAnomaly1.setProperties(properties);
     subGroupedAnomaly1.setChildIds(Collections.singleton(1l));
@@ -134,7 +135,7 @@ public class TestEntityGroupByEmailContentFormatter {
         id);
     Map<String, String> properties2 = new HashMap<>();
     properties2.put(PROP_GROUP_KEY, "group-2");
-    properties2.put(PROP_ENTITY_NAME, "sub-entity-B");
+    properties2.put(PROP_SUB_ENTITY_NAME, "sub-entity-B");
     properties2.put(PROP_ANOMALY_SCORE, "20");
     subGroupedAnomaly2.setProperties(properties2);
     subGroupedAnomaly2.setChildIds(Collections.singleton(2l));
@@ -153,7 +154,7 @@ public class TestEntityGroupByEmailContentFormatter {
     List<AnomalyResult> anomalies = new ArrayList<>();
     anomalies.add(parentGroupedAnomaly);
 
-    EmailContentFormatter contentFormatter = new EntityGroupByContentFormatter();
+    EmailContentFormatter contentFormatter = new EntityGroupKeyContentFormatter();
     contentFormatter.init(new Properties(), EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(thirdeyeAnomalyConfig));
     EmailEntity emailEntity = contentFormatter.getEmailEntity(
         DaoTestUtils.getTestAlertConfiguration("Test Config"),

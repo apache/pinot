@@ -18,8 +18,6 @@ package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ListMultimap;
-import java.sql.Time;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
@@ -45,6 +43,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
+import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator.*;
 
 
 public class AnomalyDetectorWrapperTest {
@@ -62,6 +61,7 @@ public class AnomalyDetectorWrapperTest {
     this.properties = new HashMap<>();
     this.properties.put(PROP_METRIC_URN, "thirdeye:metric:1");
     this.properties.put(PROP_DETECTOR, "$testDetector");
+    this.properties.put(PROP_SUB_ENTITY_NAME, "test_detector");
     this.config = new DetectionConfigDTO();
     this.config.setComponents(ImmutableMap.of("testDetector", new ThresholdRuleDetector()));
     this.config.setProperties(properties);

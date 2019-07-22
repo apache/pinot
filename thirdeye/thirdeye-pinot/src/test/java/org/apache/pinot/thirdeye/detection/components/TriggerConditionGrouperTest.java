@@ -31,6 +31,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.thirdeye.detection.DetectionUtils.*;
 import static org.apache.pinot.thirdeye.detection.components.TriggerConditionGrouper.*;
+import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator.*;
 
 
 public class TriggerConditionGrouperTest {
@@ -40,7 +41,7 @@ public class TriggerConditionGrouperTest {
   public static MergedAnomalyResultDTO makeAnomaly(long start, long end, String entity) {
     MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(1000l, start, end, null, null, Collections.<String, String>emptyMap());
     Map<String, String> props = new HashMap<>();
-    props.put(PROP_ENTITY_NAME, entity);
+    props.put(PROP_SUB_ENTITY_NAME, entity);
     anomaly.setProperties(props);
     return anomaly;
   }

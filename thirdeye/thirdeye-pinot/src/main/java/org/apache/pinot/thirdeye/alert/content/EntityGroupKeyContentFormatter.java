@@ -39,17 +39,18 @@ import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator.*;
+
 
 /**
  * This email formatter generates a report/alert from the anomalies having a groupKey
  */
-public class EntityGroupByContentFormatter extends BaseEmailContentFormatter{
-  private static final Logger LOG = LoggerFactory.getLogger(EntityGroupByContentFormatter.class);
+public class EntityGroupKeyContentFormatter extends BaseEmailContentFormatter{
+  private static final Logger LOG = LoggerFactory.getLogger(EntityGroupKeyContentFormatter.class);
 
   private static final String EMAIL_TEMPLATE = "emailTemplate";
-  private static final String DEFAULT_EMAIL_TEMPLATE = "entity-groupby-anomaly-report.ftl";
+  private static final String DEFAULT_EMAIL_TEMPLATE = "entity-groupkey-anomaly-report.ftl";
 
-  static final String PROP_ENTITY_NAME = "entityName";
   static final String PROP_ANOMALY_SCORE = "groupScore";
   static final String PROP_GROUP_KEY = "groupKey";
 
@@ -59,7 +60,7 @@ public class EntityGroupByContentFormatter extends BaseEmailContentFormatter{
   private Map<AnomalyReportEntity, Double> anomalyToGroupScoreMap = new HashMap<>();
   private Map<String, String> anomalyToChildIdsMap = new HashMap<>();
 
-  public EntityGroupByContentFormatter() {}
+  public EntityGroupKeyContentFormatter() {}
 
   @Override
   public void init(Properties properties, EmailContentFormatterConfiguration configuration) {
@@ -124,7 +125,7 @@ public class EntityGroupByContentFormatter extends BaseEmailContentFormatter{
       }
       anomalyReport.setWeight(anomaly.getWeight());
       anomalyReport.setGroupKey(anomaly.getProperties().get(PROP_GROUP_KEY));
-      anomalyReport.setEntityName(anomaly.getProperties().getOrDefault(PROP_ENTITY_NAME, "UNKNOWN_ENTITY"));
+      anomalyReport.setEntityName(anomaly.getProperties().get(PROP_SUB_ENTITY_NAME));
 
       Set<Long> childIds = new HashSet<>();
       if (anomaly.getChildIds() != null) {
@@ -138,7 +139,7 @@ public class EntityGroupByContentFormatter extends BaseEmailContentFormatter{
         anomalyToChildIdsMap.put(anomalyReport.getGroupKey() + anomalyReport.getStartDateTime(), Joiner.on(",").join(childIds));
 
         anomalyToGroupScoreMap.put(anomalyReport, score);
-        entityToAnomaliesMap.put(anomaly.getProperties().get(PROP_ENTITY_NAME), anomalyReport);
+        entityToAnomaliesMap.put(anomaly.getProperties().get(PROP_SUB_ENTITY_NAME), anomalyReport);
       }
     } else {
       for (MergedAnomalyResultDTO childAnomaly : anomaly.getChildren()) {
