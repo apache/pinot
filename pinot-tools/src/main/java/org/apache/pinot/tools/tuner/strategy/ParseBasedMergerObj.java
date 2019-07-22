@@ -21,11 +21,13 @@ public class ParseBasedMergerObj extends BasicMergerObj {
   }
 
   public void merge(int _pureScore, BigInteger _weigtedScore) {
+    super.addCount();
     this._pureScore += _pureScore;
     this._weigtedScore = this._weigtedScore.add(_weigtedScore);
   }
 
   public void merge(ParseBasedMergerObj pb) {
+    super.mergeCount(pb);
     this._pureScore += pb._pureScore;
     this._weigtedScore = this._weigtedScore.add(pb._weigtedScore);
   }

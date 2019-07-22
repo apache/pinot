@@ -31,6 +31,7 @@ public class OLSMergerObj extends BasicMergerObj {
   }
 
   public void merge(long time, long inFilter, long postFilter, long indexUsed, long binLen){
+    super.addCount();
     _timeList.add(time);
     _inFilterList.add(inFilter);
     Tuple2<Long, Long> key = new Tuple2<>(inFilter / binLen, postFilter / binLen);
@@ -45,6 +46,7 @@ public class OLSMergerObj extends BasicMergerObj {
   }
 
   public void merge(OLSMergerObj o2){
+    super.mergeCount(o2);
     _timeList.addAll(o2._timeList);
     _inFilterList.addAll(o2._inFilterList);
     o2._minBin.forEach(
