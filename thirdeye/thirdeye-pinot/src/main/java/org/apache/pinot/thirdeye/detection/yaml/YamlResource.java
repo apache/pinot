@@ -175,7 +175,7 @@ public class YamlResource {
   /*
    * Helper method to build the detection config from a yaml.
    */
-  public DetectionConfigDTO buildDetectionConfigFromYaml(long tuningStartTime, long tuningEndTime, String yamlConfig,
+  private DetectionConfigDTO buildDetectionConfigFromYaml(long tuningStartTime, long tuningEndTime, String yamlConfig,
       DetectionConfigDTO existingConfig) {
 
     // Configure the tuning window
