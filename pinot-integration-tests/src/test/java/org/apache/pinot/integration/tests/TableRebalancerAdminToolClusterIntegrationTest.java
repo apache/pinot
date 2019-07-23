@@ -63,6 +63,7 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
   private static final int NUM_INITIAL_SERVERS = 3;
   private final List<HelixManager> _helixManagers = new ArrayList<>();
   private final Set<String> servers = new HashSet<>();
+  private StateTransitionStats _stateTransitionStats;
 
   @Override
   protected boolean isUsingNewConfigFormat() {
@@ -154,16 +155,34 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
   @Test
   public void testPinotTableRebalancerWithDirectTransitions()
       throws Exception {
+    _stateTransitionStats = new StateTransitionStats();
+
+    // write ideal state
     createIdealState(2, NUM_INITIAL_SERVERS);
+
     // add additional servers to trigger the rebalance strategy,
     // otherwise rebalance will be a NO-OP
     startFakeServers(2, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + NUM_INITIAL_SERVERS);
+
+    // rebalance
     final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, _clusterName, false, true, false, 2);
     tableRebalancer.rebalance(getTableName(), "OFFLINE");
-    TableRebalancer.RebalancerStats stats = tableRebalancer.getRebalancerStats();
+    final TableRebalancer.RebalancerStats stats = tableRebalancer.getRebalancerStats();
+
+    // check the algorithm stats on how we moved from current
+    // to target ideal state
     Assert.assertEquals(0, stats.getDryRun());
     Assert.assertEquals(2, stats.getDirectTransitions());
     Assert.assertEquals(0, stats.getIncrementalTransitions());
+
+    // as part of rebalancing, host2 lost segment1 and host3
+    // lost segment2 -- so 2 transitions from ON to OFF and
+    // OFF to DROP
+    Assert.assertEquals(2, _stateTransitionStats.offFromOn);
+    Assert.assertEquals(2, _stateTransitionStats.dropFromOff);
+
+    // clear for next test to avoid mixing state transition stats
+    clearIdealState(2);
   }
 
   /**
@@ -184,7 +203,7 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
    * segment3: {host1:online, host2:online, host3:online}
    * segment4: {host1:online, host2:online, host3:online}
    *
-   * We add 2 additional hosts: host5 and host6
+   * We add 3 additional hosts: host4, host5 and host6
    * The rebalancer will use the table config to get the
    * appropriate rebalance strategy (default strategy in this case)
    * and come up with the target ideal state
@@ -216,7 +235,8 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
    * We haven't so we go over each segment again.
    *
    * Now for each segment we can do direct update -- once for
-   * each of the 4 segments
+   * each of the 4 segments while still satisfying
+   * the min replica requirement
    *
    * So, direct transitions: 2+4 = 6, increment transitions = 2
    * @throws Exception
@@ -224,16 +244,50 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
   @Test
   public void testPinotTableRebalancerWithIncrementalTransitions()
       throws Exception {
+    _stateTransitionStats = new StateTransitionStats();
+
+    // write ideal state
     createIdealState(4, NUM_INITIAL_SERVERS);
+
     // add additional servers to trigger the rebalance strategy,
     // otherwise rebalance will be a NO-OP
     startFakeServers(3, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + NUM_INITIAL_SERVERS);
+
+    // rebalance
     final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, _clusterName, false, true, false, 2);
     tableRebalancer.rebalance(getTableName(), "OFFLINE");
     TableRebalancer.RebalancerStats stats = tableRebalancer.getRebalancerStats();
+
+    // verify the algorithm stats on how we moved from
+    // current to target ideal state
     Assert.assertEquals(0, stats.getDryRun());
     Assert.assertEquals(6, stats.getDirectTransitions());
     Assert.assertEquals(2, stats.getIncrementalTransitions());
+
+    // as part of rebalancing, host2 lost segment1 and segment3,
+    // host1 and host3 lost segment2 and segment4 -- so 6
+    // transitions from ON to OFF and OFF to DROP
+    Assert.assertEquals(6, _stateTransitionStats.offFromOn);
+    Assert.assertEquals(6, _stateTransitionStats.dropFromOff);
+  }
+
+  private void clearIdealState(final int numSegments) throws Exception {
+    final HelixDataAccessor dataAccessor = _helixManagers.get(0).getHelixDataAccessor();
+    final String tableNameWithType = getTableName() + "_OFFLINE";
+    final PropertyKey idealStateKey = dataAccessor.keyBuilder().idealStates(tableNameWithType);
+    final IdealState idealState = dataAccessor.getProperty(idealStateKey);
+    for (int i = 0; i < numSegments; i++) {
+      final String segmentID = "segment" + i;
+      if (idealState.getInstanceStateMap(segmentID) != null) {
+        idealState.getInstanceStateMap(segmentID).clear();
+      }
+    }
+    final ZkBaseDataAccessor zkBaseDataAccessor = (ZkBaseDataAccessor) dataAccessor.getBaseDataAccessor();
+    zkBaseDataAccessor.set(idealStateKey.getPath(), idealState.getRecord(), idealState.getRecord().getVersion(),
+        AccessOption.PERSISTENT);
+
+    // should be enough for the callbacks to come and go away
+    Thread.sleep(2000);
   }
 
   private void createIdealState(final int numSegments, final int numReplicas)
@@ -268,7 +322,7 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
     }
 
     @SuppressWarnings("unused")
-    @StateModelInfo(states = "{'OFFLINE', 'ONLINE'}", initialState = "OFFLINE")
+    @StateModelInfo(states = "{'OFFLINE', 'ONLINE', 'DROPPED'}", initialState = "OFFLINE")
     public class FakeSegmentStateModel extends StateModel {
 
       @Transition(from = "OFFLINE", to = "ONLINE")
@@ -277,7 +331,22 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
 
       @Transition(from = "ONLINE", to = "OFFLINE")
       public void onBecomeOfflineFromOnline(Message message, NotificationContext context) {
+        ++_stateTransitionStats.offFromOn;
+      }
+
+      @Transition(from = "OFFLINE", to = "DROPPED")
+      public void onBecomeDroppedFromOffline(Message message, NotificationContext context) {
+        ++_stateTransitionStats.dropFromOff;
+      }
+
+      @Transition(from = "ONLINE", to = "DROPPED")
+      public void onBecomeDroppedFromOnline(Message message, NotificationContext context) {
       }
     }
+  }
+
+  private static class StateTransitionStats {
+    private int offFromOn = 0;
+    private int dropFromOff = 0;
   }
 }
