@@ -41,6 +41,7 @@ import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableCustomConfig;
+import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
 import org.apache.pinot.hadoop.utils.PushLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -286,6 +287,12 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
           .format("Partition column: %s is not found from the schema of input files.", _partitionColumn));
       Preconditions.checkArgument(_numberOfPartitions > 0, String.format("Number of partitions should be positive. Current value: %s", _numberOfPartitions));
       Preconditions.checkArgument(_partitionFunction != null, "Partition function should not be null!");
+      try {
+        PartitionFunctionFactory.PartitionFunctionType.fromString(_partitionFunction);
+      } catch (IllegalArgumentException e) {
+        _logger.info("Partition function needs to be one of Modulo, Murmur, ByteArray, HashCode");
+        throw new IllegalArgumentException(e);
+      }
     }
     if (_enableSorting) {
       Preconditions.checkArgument(_sortedColumn != null, "Sorted column should not be null!");
