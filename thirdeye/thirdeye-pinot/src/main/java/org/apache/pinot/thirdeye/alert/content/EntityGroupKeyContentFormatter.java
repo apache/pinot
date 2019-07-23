@@ -23,6 +23,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import org.apache.pinot.thirdeye.anomaly.alert.util.EmailScreenshotHelper;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -48,25 +50,32 @@ import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfi
 public class EntityGroupKeyContentFormatter extends BaseEmailContentFormatter{
   private static final Logger LOG = LoggerFactory.getLogger(EntityGroupKeyContentFormatter.class);
 
-  private static final String EMAIL_TEMPLATE = "emailTemplate";
-  private static final String DEFAULT_EMAIL_TEMPLATE = "entity-groupkey-anomaly-report.ftl";
 
+  private static final String EMAIL_TEMPLATE = "entity-groupkey-anomaly-report.ftl";
+
+  static final String PROP_ENTITY_WHITELIST = "entityWhitelist";
   static final String PROP_ANOMALY_SCORE = "groupScore";
   static final String PROP_GROUP_KEY = "groupKey";
 
   private DetectionConfigManager configDAO = null;
   private Multimap<String, AnomalyReportEntity> entityToAnomaliesMap = ArrayListMultimap.create();
-  private Map<String, List<AnomalyReportEntity>> entityToSortedAnomaliesMap = new HashMap<>();
+  private Multimap<String, AnomalyReportEntity> entityToSortedAnomaliesMap = ArrayListMultimap.create();
+  private Multimap<String, AnomalyReportEntity> whitelistMetricToAnomaliesMap = ArrayListMultimap.create();
   private Map<AnomalyReportEntity, Double> anomalyToGroupScoreMap = new HashMap<>();
   private Map<String, String> anomalyToChildIdsMap = new HashMap<>();
+  private List<String> entityWhitelist = new ArrayList<>();
 
   public EntityGroupKeyContentFormatter() {}
 
   @Override
   public void init(Properties properties, EmailContentFormatterConfiguration configuration) {
     super.init(properties, configuration);
-    this.emailTemplate = properties.getProperty(EMAIL_TEMPLATE, DEFAULT_EMAIL_TEMPLATE);
+    this.emailTemplate = EMAIL_TEMPLATE;
     this.configDAO = DAORegistry.getInstance().getDetectionConfigManager();
+    if (properties.containsKey(PROP_ENTITY_WHITELIST)) {
+      // Support only one whitelist entity. This can be extended in the future.
+      entityWhitelist.add(properties.get(PROP_ENTITY_WHITELIST).toString());
+    }
   }
 
   @Override
@@ -74,6 +83,7 @@ public class EntityGroupKeyContentFormatter extends BaseEmailContentFormatter{
       Collection<AnomalyResult> anomalies, EmailContentFormatterContext context) {
     DetectionConfigDTO config = null;
     Preconditions.checkArgument(anomalies != null && !anomalies.isEmpty(), "Report has empty anomalies");
+
     for (AnomalyResult anomalyResult : anomalies) {
       if (!(anomalyResult instanceof MergedAnomalyResultDTO)) {
         LOG.warn("Anomaly result {} isn't an instance of MergedAnomalyResultDTO. Skip from alert.", anomalyResult);
@@ -93,29 +103,51 @@ public class EntityGroupKeyContentFormatter extends BaseEmailContentFormatter{
     for (String entityName : entityToAnomaliesMap.keySet()) {
       List<AnomalyReportEntity> groupedAnomalies = (List<AnomalyReportEntity>) entityToAnomaliesMap.get(entityName);
       groupedAnomalies.sort((u1, u2) -> anomalyToGroupScoreMap.get(u2).compareTo(anomalyToGroupScoreMap.get(u1)));
-      entityToSortedAnomaliesMap.put(entityName, groupedAnomalies);
+      entityToSortedAnomaliesMap.putAll(entityName, groupedAnomalies);
     }
 
+    // Insert anomaly snapshot image
+    if (whitelistMetricToAnomaliesMap.size() == 1 && whitelistMetricToAnomaliesMap.values().size() == 1) {
+      AnomalyReportEntity singleAnomaly = whitelistMetricToAnomaliesMap.values().iterator().next();
+      try {
+        imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(),
+            emailContentFormatterConfiguration);
+      } catch (Exception e) {
+        LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
+      }
+    }
+
+    templateData.put("whitelistMetricToAnomaliesMap", whitelistMetricToAnomaliesMap.asMap());
     templateData.put("emailHeading", config.getName());
     templateData.put("emailDescription", config.getDescription());
     templateData.put("anomalyToChildIdsMap", anomalyToChildIdsMap);
-    templateData.put("entityToSortedAnomaliesMap", entityToSortedAnomaliesMap);
+    templateData.put("entityToSortedAnomaliesMap", entityToSortedAnomaliesMap.asMap());
   }
 
   /**
    * Recursively find the anomalies having a groupKey and display them in the email
    */
   private void updateEntityToAnomalyDetailsMap(MergedAnomalyResultDTO anomaly, DetectionConfigDTO detectionConfig) {
-    if (anomaly.getProperties() != null && anomaly.getProperties().containsKey(PROP_GROUP_KEY)) {
-      AnomalyReportEntity anomalyReport = new AnomalyReportEntity(String.valueOf(anomaly.getId()),
-          getAnomalyURL(anomaly, emailContentFormatterConfiguration.getDashboardHost()),
-          anomaly.getAvgBaselineVal(),
-          anomaly.getAvgCurrentVal(), 0d, null,
-          getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()), getFeedbackValue(anomaly.getFeedback()),
-          detectionConfig.getName(), detectionConfig.getDescription(), anomaly.getMetric(),
-          getDateString(anomaly.getStartTime(), dateTimeZone), getDateString(anomaly.getEndTime(), dateTimeZone),
-          getTimezoneString(dateTimeZone), getIssueType(anomaly));
+    AnomalyReportEntity anomalyReport = new AnomalyReportEntity(String.valueOf(anomaly.getId()),
+        getAnomalyURL(anomaly, emailContentFormatterConfiguration.getDashboardHost()),
+        anomaly.getAvgBaselineVal(),
+        anomaly.getAvgCurrentVal(), 0d, getDimensionsList(anomaly.getDimensions()),
+        getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()), getFeedbackValue(anomaly.getFeedback()),
+        detectionConfig.getName(), detectionConfig.getDescription(), anomaly.getMetric(),
+        getDateString(anomaly.getStartTime(), dateTimeZone), getDateString(anomaly.getEndTime(), dateTimeZone),
+        getTimezoneString(dateTimeZone), getIssueType(anomaly));
 
+    // Extract out the whitelisted metrics
+    if (anomaly.getProperties() != null && anomaly.getProperties().containsKey(PROP_SUB_ENTITY_NAME)
+        && this.entityWhitelist.contains(anomaly.getProperties().get(PROP_SUB_ENTITY_NAME))) {
+      if (whitelistMetricToAnomaliesMap.get(anomalyReport.getMetric()) != null) {
+        whitelistMetricToAnomaliesMap.get(anomalyReport.getMetric()).add(anomalyReport);
+      } else {
+        whitelistMetricToAnomaliesMap.put(anomaly.getMetric(), anomalyReport);
+      }
+    }
+
+    if (anomaly.getProperties() != null && anomaly.getProperties().containsKey(PROP_GROUP_KEY)) {
       // Criticality score ranges from [0 to infinity)
       double score = -1;
       if (anomaly.getProperties().containsKey(PROP_ANOMALY_SCORE)) {
