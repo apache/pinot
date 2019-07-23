@@ -16,9 +16,6 @@ public class PinotTuneCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-strat", required = true, metaVar = "<String>", usage = "Select execution strategy (inverted/sorted)")
   private String _stat;
 
-  @Option(name = "-additional", required = false, metaVar = "<String>", usage = "Add additional column as index")
-  private String _additional;
-
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help;
 
