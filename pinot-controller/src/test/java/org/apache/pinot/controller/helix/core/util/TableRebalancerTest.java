@@ -160,7 +160,7 @@ public class TableRebalancerTest {
     // Essentially, host1 from current state got replaced with host4 from target state
     // Now, what we are checking is that between toUpdate and target ideal state,
     // there is exactly 1 host in common
-    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 1);
+    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 1, true);
     currentIdealState = toUpdateIdealState;
 
     // STEP 2
@@ -179,7 +179,7 @@ public class TableRebalancerTest {
     // Essentially, host2 from current state got replaced with host5
     // Now, what we are checking is that between toUpdate and target ideal state,
     // there are exactly 2 hosts in common and not 3
-    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 2);
+    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 2, true);
     currentIdealState = toUpdateIdealState;
 
     // STEP 3
@@ -188,7 +188,71 @@ public class TableRebalancerTest {
     // At this point, it would be perfectly fine to just directly set the ideal
     // state to target since the number of hosts in common >= min serving
     // replicas we need
-    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 3);
+    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 3, true);
+
+    // Verify the same behavior (as described in above steps) through stats
+    TableRebalancer.RebalancerStats rebalancerStats = rebalancer.getRebalancerStats();
+    // STEP 1 and STEP 2 -- incremental transitions
+    Assert.assertEquals(2, rebalancerStats.getIncrementalTransitions());
+    // STEP 3 -- final direct transition
+    Assert.assertEquals(1, rebalancerStats.getDirectTransitions());
+  }
+
+  /**
+   * Test for now downtime rebalance with no common hosts between
+   * current and target ideal state and a request to keep minimum
+   * 2 replicas up while rebalancing along with the increase
+   */
+  @Test
+  public void noDowntimeUpdateWithNoCommonHostsAndIncreasedReplicas() {
+    IdealState currentIdealState = new IdealState("rebalance");
+    currentIdealState.setPartitionState(segmentId, "host1", "ONLINE");
+    currentIdealState.setPartitionState(segmentId, "host2", "ONLINE");
+    currentIdealState.setPartitionState(segmentId, "host3", "ONLINE");
+
+    IdealState targetIdealState = new IdealState("rebalance");
+    targetIdealState.setPartitionState(segmentId, "host4", "ONLINE");
+    targetIdealState.setPartitionState(segmentId, "host5", "ONLINE");
+    targetIdealState.setPartitionState(segmentId, "host6", "ONLINE");
+    targetIdealState.setPartitionState(segmentId, "host7", "ONLINE");
+
+    IdealState toUpdateIdealState = HelixHelper.cloneIdealState(currentIdealState);
+
+    // test for no-downtime rebalance with minimum 2 replicas of each segment to be kept up
+    noDowntime.setProperty(RebalanceUserConfigConstants.MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME, 2);
+
+    final TableRebalancer rebalancer = new TableRebalancer(null, null, null);
+    final Map<String, String> targetSegmentInstancesMap = targetIdealState.getInstanceStateMap(segmentId);
+
+    // STEP 1
+    rebalancer.updateSegmentIfNeeded(segmentId, currentIdealState.getRecord().getMapField(segmentId),
+        targetSegmentInstancesMap, toUpdateIdealState, noDowntime);
+    // After step 1, let's assume that
+    // toUpdateIdealState : { SEGMENT1 : { host4 : online, host2 : online, host3 : online } }
+    // Essentially, host1 from current state got replaced with host4 from target state
+    // Now, what we are checking is that between toUpdate and target ideal state,
+    // there is exactly 1 host in common
+    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 1, false);
+    currentIdealState = toUpdateIdealState;
+
+    // STEP 2
+    rebalancer.updateSegmentIfNeeded(segmentId, currentIdealState.getRecord().getMapField(segmentId),
+        targetSegmentInstancesMap, toUpdateIdealState, noDowntime);
+    // another incremental transition to keep up with 2 serving replicas requirement
+    // toUpdateIdealState : { SEGMENT1 : { host4 : online, host5 : online, host3 : online } }
+    // Essentially, host2 from current state got replaced with host5
+    // Now, what we are checking is that between toUpdate and target ideal state,
+    // there are exactly 2 hosts in common and not 3
+    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 2, false);
+    currentIdealState = toUpdateIdealState;
+
+    // STEP 3
+    rebalancer.updateSegmentIfNeeded(segmentId, currentIdealState.getRecord().getMapField(segmentId),
+        targetSegmentInstancesMap, toUpdateIdealState, noDowntime);
+    // At this point, it would be perfectly fine to just directly set the ideal
+    // state to target since the number of hosts in common >= min serving
+    // replicas we need
+    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 4, true);
 
     // Verify the same behavior (as described in above steps) through stats
     TableRebalancer.RebalancerStats rebalancerStats = rebalancer.getRebalancerStats();
@@ -231,7 +295,7 @@ public class TableRebalancerTest {
     // Essentially, host1 from current state got replaced with host4
     // Now, what we are checking is that between toUpdate and target ideal state,
     // there is exactly 1 host in common
-    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 1);
+    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 1, true);
     currentIdealState = toUpdateIdealState;
 
     // STEP 2
@@ -247,7 +311,7 @@ public class TableRebalancerTest {
     // Essentially, host2, host3 from current state got replaced with host5 and host6
     // Now, what we are checking is that between toUpdate and target ideal state,
     // all hosts are in common
-    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 3);
+    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 3, true);
 
     TableRebalancer.RebalancerStats rebalancerStats = rebalancer.getRebalancerStats();
     // STEP 1 incremental transition
@@ -289,7 +353,7 @@ public class TableRebalancerTest {
     // Essentially, host1 from current state got replaced with host4
     // Now, what we are checking is that between toUpdate and target ideal state,
     // there is exactly 1 host in common
-    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 1);
+    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 1, true);
     currentIdealState = toUpdateIdealState;
 
     // STEP 2
@@ -304,7 +368,7 @@ public class TableRebalancerTest {
     // 1 replica (host4) is up for serving
     // Now, what we are checking is that between toUpdate and target ideal state,
     // all hosts are in common
-    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 3);
+    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 3, true);
 
     TableRebalancer.RebalancerStats rebalancerStats = rebalancer.getRebalancerStats();
     // STEP 1 incremental transition
@@ -346,7 +410,7 @@ public class TableRebalancerTest {
     // Essentially, host2 from current state got replaced with host5
     // Now, what we are checking is that between toUpdate and target ideal state,
     // there are exactly 2 common hosts since we already had 1 common host to begin with
-    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 2);
+    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 2, true);
     currentIdealState = toUpdateIdealState;
 
     // STEP 2
@@ -358,7 +422,7 @@ public class TableRebalancerTest {
     // 2 serving replicas, the ideal state can be set to target at one go.
     // Now, what we are checking is that between toUpdate and target ideal state,
     // all hosts are in common
-    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 3);
+    verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 3, true);
 
     TableRebalancer.RebalancerStats rebalancerStats = rebalancer.getRebalancerStats();
     // STEP 1 incremental transition
@@ -367,10 +431,14 @@ public class TableRebalancerTest {
     Assert.assertEquals(1, rebalancerStats.getDirectTransitions());
   }
 
-  private void verifyStateForMinReplicaConstraint(final IdealState updated, final IdealState target, final int same) {
+  private void verifyStateForMinReplicaConstraint(
+      final IdealState updated, final IdealState target,
+      final int same, final boolean sizeCheck) {
     Set<String> updatedSegmentInstances = updated.getInstanceStateMap(segmentId).keySet();
     Set<String> currentSegmentInstances = target.getInstanceStateMap(segmentId).keySet();
-    Assert.assertEquals(updatedSegmentInstances.size(), currentSegmentInstances.size());
+    if (sizeCheck) {
+      Assert.assertEquals(updatedSegmentInstances.size(), currentSegmentInstances.size());
+    }
     int count = 0;
     for (String updatedHost : updatedSegmentInstances) {
       if (currentSegmentInstances.contains(updatedHost)) {

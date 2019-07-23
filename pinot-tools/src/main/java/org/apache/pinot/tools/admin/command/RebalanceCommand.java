@@ -46,7 +46,7 @@ public class RebalanceCommand extends AbstractBaseAdminCommand implements Comman
   @Option(name = "-includeConsuming", required = false, metaVar = "<boolean>", usage = "Should include consuming segments? Applicable only for realtime tables")
   private boolean _includeConsuming;
 
-  @Option(name = "-nodowntime", required = false, metaVar = "<boolean>", usage = "Rebalance without downtime?")
+  @Option(name = "-noDowntime", required = false, metaVar = "<boolean>", usage = "Rebalance without downtime?")
   private boolean _noDowntime;
 
   @Option(name = "-minReplicasToKeepUpForNoDowntime", required = false, metaVar = "<int>", usage = "Minimum number of serving replicas that will be kept up for no downtime rebalancing")
@@ -91,21 +91,24 @@ public class RebalanceCommand extends AbstractBaseAdminCommand implements Comman
     super.printUsage();
     System.out.println("Usage examples:\n\n");
 
+    System.out.println("Help for RebalanceTable command");
+    System.out.println("sh pinot-admin.sh RebalanceTable -h");
+
     System.out.println("Running rebalancer in dry run mode");
     System.out
-        .println("sh pinot-admin.sh -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable -dryRun");
+        .println("sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable -tableType offline -dryRun");
 
     System.out.println("\nRunning rebalancer in downtime (default) mode");
-    System.out.println("sh pinot-admin.sh -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable");
+    System.out.println("sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable -tableType offline");
 
     System.out.println("\n\nExample usage for running rebalancer in no-downtime mode. "
         + "Rebalancer will try to keep at least one replica up for each segment while rebalancing");
     System.out.println(
-        "sh pinot-admin.sh -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable -noDowntime");
+        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable -tableType offline -noDowntime");
 
     System.out.println("\n\nExample usage for running rebalancer in no-downtime mode. "
         + "Rebalancer will keep the given number of min replicas up for each segment while rebalancing");
     System.out.println(
-        "sh pinot-admin.sh -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable -noDowntime -minReplicasToKeepUpForNoDowntime 2");
+        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName myTable -tableType offline -noDowntime -minReplicasToKeepUpForNoDowntime 2");
   }
 }

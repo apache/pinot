@@ -225,6 +225,8 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
   public void testPinotTableRebalancerWithIncrementalTransitions()
       throws Exception {
     createIdealState(4, NUM_INITIAL_SERVERS);
+    // add additional servers to trigger the rebalance strategy,
+    // otherwise rebalance will be a NO-OP
     startFakeServers(3, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + NUM_INITIAL_SERVERS);
     final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, _clusterName, false, true, false, 2);
     tableRebalancer.rebalance(getTableName(), "OFFLINE");
