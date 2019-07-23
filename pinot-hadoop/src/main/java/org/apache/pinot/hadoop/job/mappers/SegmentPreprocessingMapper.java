@@ -96,7 +96,8 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
       if (!normalizedTimeColumnValue.equals(_sampleNormalizedTimeColumnValue)) {
         // TODO: Create a custom exception and gracefully catch this exception outside, changing what the path to input
         // into segment creation should be
-        throw new IllegalArgumentException("");
+        throw new IllegalArgumentException("Your segment spans multiple time units. Preprocess is not currently allowed for"
+            + "these use cases");
       }
     }
 

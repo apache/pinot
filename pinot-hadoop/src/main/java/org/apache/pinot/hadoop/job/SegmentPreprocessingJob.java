@@ -98,13 +98,14 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
   private final Path _preprocessedOutputDir;
   protected final String _rawTableName;
   protected final List<PushLocation> _pushLocations;
+  private DataFileStream<GenericRecord> _dataStreamReader;
 
   // Optional.
   private final Path _pathToDependencyJar;
   private final String _defaultPermissionsMask;
 
   private TableConfig _tableConfig;
-  private org.apache.pinot.common.data.Schema _schema;
+  private org.apache.pinot.common.data.Schema _pinotTableSchema;
   protected FileSystem _fileSystem;
 
   public SegmentPreprocessingJob(final Properties properties) {
@@ -194,7 +195,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
 
     try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
       _tableConfig = controllerRestApi.getTableConfig();
-      _schema = controllerRestApi.getSchema();
+      _pinotTableSchema = controllerRestApi.getSchema();
     }
 
     if (_tableConfig == null) {
@@ -202,7 +203,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       return;
     }
 
-    if (_schema == null) {
+    if (_pinotTableSchema == null) {
       _logger.error("Schema cannot be null. Skipping pre-processing");
     }
 
@@ -217,14 +218,13 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     // and value
     if (validationConfig.getSegmentPushType().equalsIgnoreCase("APPEND")) {
       job.getConfiguration().set(IS_APPEND, "true");
-      String timeColumnName = _schema.getTimeFieldSpec().getName();
+      String timeColumnName = _pinotTableSchema.getTimeFieldSpec().getName();
       job.getConfiguration().set(TIME_COLUMN_CONFIG, timeColumnName);
       job.getConfiguration().set(SEGMENT_TIME_TYPE, validationConfig.getTimeType().toString());
-      job.getConfiguration().set(SEGMENT_TIME_FORMAT, _schema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeFormat());
+      job.getConfiguration().set(SEGMENT_TIME_FORMAT, _pinotTableSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeFormat());
       job.getConfiguration().set(SEGMENT_PUSH_FREQUENCY, validationConfig.getSegmentPushFrequency());
-      DataFileStream<GenericRecord> dataStreamReader = getAvroReader(inputDataPath.get(0));
-      job.getConfiguration().set(TIME_COLUMN_VALUE, (String) dataStreamReader.next().get(timeColumnName));
-      dataStreamReader.close();
+      _dataStreamReader = getAvroReader(inputDataPath.get(0));
+      job.getConfiguration().set(TIME_COLUMN_VALUE, (String) _dataStreamReader.next().get(timeColumnName));
     }
 
     if (_enablePartitioning) {
@@ -257,12 +257,12 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       job.getConfiguration().set(MAPREDUCE_JOB_CREDENTIALS_BINARY, hadoopTokenFileLocation);
     }
 
-    // Schema configs.
-    Schema schema = getSchema(inputDataPath.get(0));
-    _logger.info("Schema is: {}", schema.toString(true));
+    // Avro Schema configs.
+    Schema avroSchema = getSchema(inputDataPath.get(0));
+    _logger.info("Schema is: {}", avroSchema.toString(true));
 
     // Validates configs against schema.
-    validateConfigsAgainstSchema(schema);
+    validateConfigsAgainstSchema(avroSchema);
 
     // Mapper configs.
     job.setMapperClass(SegmentPreprocessingMapper.class);
@@ -275,7 +275,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     job.setOutputKeyClass(AvroKey.class);
     job.setOutputValueClass(NullWritable.class);
 
-    AvroMultipleOutputs.addNamedOutput(job, "avro", AvroKeyOutputFormat.class, schema);
+    AvroMultipleOutputs.addNamedOutput(job, "avro", AvroKeyOutputFormat.class, avroSchema);
     AvroMultipleOutputs.setCountersEnabled(job, true);
     // Use LazyOutputFormat to avoid creating empty files.
     LazyOutputFormat.setOutputFormatClass(job, AvroKeyOutputFormat.class);
@@ -317,7 +317,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       _logger.info("Adding sorted column: {} to job config", _sortedColumn);
       job.getConfiguration().set(SORTED_COLUMN_CONFIG, _sortedColumn);
 
-      addSortedColumnField(schema, fieldSet);
+      addSortedColumnField(avroSchema, fieldSet);
     } else {
       // If sorting is disabled, hashcode will be the only factor for sort/group comparator.
       addHashCodeField(fieldSet);
@@ -328,10 +328,10 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     mapperOutputKeySchema.setFields(new ArrayList<>(fieldSet));
     _logger.info("Mapper output schema: {}", mapperOutputKeySchema);
 
-    AvroJob.setInputKeySchema(job, schema);
+    AvroJob.setInputKeySchema(job, avroSchema);
     AvroJob.setMapOutputKeySchema(job, mapperOutputKeySchema);
-    AvroJob.setMapOutputValueSchema(job, schema);
-    AvroJob.setOutputKeySchema(job, schema);
+    AvroJob.setMapOutputValueSchema(job, avroSchema);
+    AvroJob.setOutputKeySchema(job, avroSchema);
 
     // Since we aren't extending AbstractHadoopJob, we need to add the jars for the job to
     // distributed cache ourselves. Take a look at how the addFilesToDistributedCache is
@@ -351,6 +351,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       throw new RuntimeException("Job failed : " + job);
     }
 
+    cleanup();
     _logger.info("Finished pre-processing job in {}ms", (System.currentTimeMillis() - startTime));
   }
 
@@ -431,31 +432,17 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
    * @return Input schema
    * @throws IOException exception when accessing to IO
    */
-  private static Schema getSchema(Path inputPathDir)
+  private Schema getSchema(Path inputPathDir)
       throws IOException {
     FileSystem fs = FileSystem.get(new Configuration());
     Schema avroSchema = null;
     for (FileStatus fileStatus : fs.listStatus(inputPathDir)) {
       if (fileStatus.isFile() && fileStatus.getPath().getName().endsWith(".avro")) {
         _logger.info("Extracting schema from " + fileStatus.getPath());
-        avroSchema = extractSchemaFromAvro(fileStatus.getPath());
+        avroSchema = _dataStreamReader.getSchema();
         break;
       }
     }
-    return avroSchema;
-  }
-
-  /**
-   * Extracts avro schema from avro file
-   * @param avroFile Input avro file
-   * @return Schema in avro file
-   * @throws IOException exception when accessing to IO
-   */
-  private static Schema extractSchemaFromAvro(Path avroFile)
-      throws IOException {
-    DataFileStream<GenericRecord> dataStreamReader = getAvroReader(avroFile);
-    Schema avroSchema = dataStreamReader.getSchema();
-    dataStreamReader.close();
     return avroSchema;
   }
 
@@ -467,7 +454,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
    * @return Avro reader for the file.
    * @throws IOException exception when accessing to IO
    */
-  private static DataFileStream<GenericRecord> getAvroReader(Path avroFile)
+  private DataFileStream<GenericRecord> getAvroReader(Path avroFile)
       throws IOException {
     FileSystem fs = FileSystem.get(new Configuration());
     if (avroFile.getName().endsWith("gz")) {
@@ -524,12 +511,14 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     return fileName.endsWith(".avro");
   }
 
-  void cleanup() {
-    _logger.info("Clean up pre-processing output path: {}", _preprocessedOutputDir);
-    try {
-      _fileSystem.delete(_preprocessedOutputDir, true);
-    } catch (IOException e) {
-      _logger.error("Failed to clean up pre-processing output path: {}", _preprocessedOutputDir);
-    }
+  void cleanup() throws IOException {
+    _dataStreamReader.close();
+    // TODO: Move this to post-segment creation
+//    _logger.info("Clean up pre-processing output path: {}", _preprocessedOutputDir);
+//    try {
+//      _fileSystem.delete(_preprocessedOutputDir, true);
+//    } catch (IOException e) {
+//      _logger.error("Failed to clean up pre-processing output path: {}", _preprocessedOutputDir);
+//    }
   }
 }
