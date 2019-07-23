@@ -71,11 +71,13 @@ public class TableRebalancer {
   private final HelixManager _helixManager;
   private final HelixAdmin _helixAdmin;
   private final String _helixClusterName;
+  private final RebalancerStats _rebalancerStats;
 
   public TableRebalancer(HelixManager mgr, HelixAdmin admin, String helixClusterName) {
     _helixManager = mgr;
     _helixAdmin = admin;
     _helixClusterName = helixClusterName;
+    _rebalancerStats = new RebalancerStats();
   }
 
   /**
@@ -110,6 +112,8 @@ public class TableRebalancer {
           strategy.getRebalancedIdealState(previousIdealState, tableConfig, rebalanceConfig, partitionAssignment);
       result.setIdealStateMapping(idealState.getRecord().getMapFields());
       result.setPartitionAssignment(partitionAssignment);
+      result.setStatus(RebalanceResult.RebalanceStatus.DONE);
+      _rebalancerStats.dryRun = 1;
       return result;
     }
 
@@ -119,14 +123,13 @@ public class TableRebalancer {
 
     long retryDelayMs = 60000; // 1 min
     int retries = 0;
+    LOGGER.info("Start rebalancing table :{}", tableNameWithType);
     while (true) {
       IdealState currentIdealState = dataAccessor.getProperty(idealStateKey);
 
       if (targetIdealState == null || !EqualityUtils.isEqual(previousIdealState, currentIdealState)) {
-        LOGGER.info("Computing new rebalanced state for table {}", tableNameWithType);
-
+        LOGGER.info("Computing target ideal state for table {}", tableNameWithType);
         // we need to recompute target state
-
         // Make a copy of the the idealState above to pass it to the rebalancer
         // NOTE: new IdealState(idealState.getRecord()) does not work because it's shallow copy for map fields and
         // list fields
@@ -139,12 +142,11 @@ public class TableRebalancer {
       }
 
       if (EqualityUtils.isEqual(targetIdealState, currentIdealState)) {
-        LOGGER.info("Table {} is rebalanced.", tableNameWithType);
-
         LOGGER.info("Finished rebalancing table {} in {} ms.", tableNameWithType,
             TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime));
         result.setIdealStateMapping(targetIdealState.getRecord().getMapFields());
         result.setPartitionAssignment(targetPartitionAssignment);
+        result.setStatus(RebalanceResult.RebalanceStatus.DONE);
         return result;
       }
 
@@ -162,10 +164,12 @@ public class TableRebalancer {
         if (zkBaseDataAccessor
             .set(idealStateKey.getPath(), nextIdealState.getRecord(), currentIdealState.getRecord().getVersion(),
                 AccessOption.PERSISTENT)) {
+          LOGGER.debug("Successfully persisted the ideal state in ZK. Will wait for External view to converge");
           // if we succeeded, wait for the change to stabilize
           waitForStable(tableNameWithType);
           // clear retries as it tracks failures with each idealstate update attempt
           retries = 0;
+          LOGGER.debug("External view converged for the change in ideal state. Will start the next iteration now");
           continue;
         }
         // in case of any error, we retry a bounded number of types
@@ -178,6 +182,7 @@ public class TableRebalancer {
       previousIdealState = currentIdealState;
       if (retries++ > MAX_RETRIES) {
         LOGGER.error("Unable to rebalance table {} in {} attempts. Giving up", tableNameWithType, MAX_RETRIES);
+        result.setStatus(RebalanceResult.RebalanceStatus.FAILED);
         return result;
       }
       // wait before retrying
@@ -185,6 +190,7 @@ public class TableRebalancer {
         Thread.sleep(retryDelayMs);
       } catch (InterruptedException e) {
         LOGGER.error("Got interrupted while rebalancing table {}", tableNameWithType);
+        result.setStatus(RebalanceResult.RebalanceStatus.FAILED);
         Thread.currentThread().interrupt();
         return result;
       }
@@ -235,6 +241,24 @@ public class TableRebalancer {
       Map<String, String> targetIdealStateSegmentHosts, IdealState idealStateToUpdate,
       Configuration rebalanceUserConfig) {
 
+    LOGGER.info("Will update instance map of segment: {}", segmentId);
+
+    // dump additional detailed info for debugging
+    if (LOGGER.isDebugEnabled()) {
+      // check the debug level beforehand and write everything at once
+      // else we will have to check repeatedly in a loop=
+      StringBuilder sb = new StringBuilder("Current segment hosts and states:\n");
+      for (Map.Entry<String, String> entry : currentIdealStateSegmentHosts.entrySet()) {
+        sb.append("HOST: ").append(entry.getKey()).append("STATE: ").append(entry.getValue()).append("\n");
+      }
+      LOGGER.debug(sb.toString());
+      sb = new StringBuilder("Target segment hosts and states:\n");
+      for (Map.Entry<String, String> entry : targetIdealStateSegmentHosts.entrySet()) {
+        sb.append("HOST: ").append(entry.getKey()).append("STATE: ").append(entry.getValue()).append("\n");
+      }
+      LOGGER.debug(sb.toString());
+    }
+
     if (currentIdealStateSegmentHosts == null) {
       //segment can be missing if retention manager has deleted it
       LOGGER.info("Segment " + segmentId + " missing from current idealState. Skipping it.");
@@ -244,13 +268,19 @@ public class TableRebalancer {
     if (rebalanceUserConfig
         // in downtime mode, set the current ideal state to target at one go
         .getBoolean(RebalanceUserConfigConstants.DOWNTIME, RebalanceUserConfigConstants.DEFAULT_DOWNTIME)) {
+      LOGGER.debug("Downtime mode is enabled. Will set to target state at one go");
       setTargetState(idealStateToUpdate, segmentId, targetIdealStateSegmentHosts);
+      ++_rebalancerStats.directTransitions;
       return;
     }
 
     // we are in no-downtime mode
-    int minReplicasToKeepUp = rebalanceUserConfig.getInt(RebalanceUserConfigConstants.MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME,
-        RebalanceUserConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME);
+    int minReplicasToKeepUp = rebalanceUserConfig
+        .getInt(RebalanceUserConfigConstants.MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME,
+            RebalanceUserConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME);
+    LOGGER.debug("No downtime mode is enabled. Need to keep {} serving replicas up while rebalancing",
+        minReplicasToKeepUp);
+
     if (minReplicasToKeepUp >= currentIdealStateSegmentHosts.size()) {
       // if the minimum number of serving replicas in rebalance config is
       // greater than or equal to number of replicas of a segment, then it
@@ -264,8 +294,9 @@ public class TableRebalancer {
       // if there are enough hosts in common between current and target ideal states
       // to satisfy the min replicas condition, then there won't be any downtime
       // and we can directly set the current ideal state to target ideal state
-      LOGGER.debug("Segment " + segmentId + " has common entries between current and expected ideal state");
+      LOGGER.debug("Current and target ideal states have common hosts. Will set to target state at one go");
       setTargetState(idealStateToUpdate, segmentId, targetIdealStateSegmentHosts);
+      ++_rebalancerStats.directTransitions;
     } else {
       // remove one entry
       String hostToRemove = "";
@@ -277,7 +308,12 @@ public class TableRebalancer {
           break;
         }
       }
-      idealStateToUpdate.getInstanceStateMap(segmentId).remove(hostToRemove);
+
+      if (!hostToRemove.equals("")) {
+        idealStateToUpdate.getInstanceStateMap(segmentId).remove(hostToRemove);
+        LOGGER.info("Removing host: {} for segment: {}", hostToRemove, segmentId);
+      }
+
       // add an entry from the target state to ensure there is no downtime
       final Map<String, String> updatedSegmentInstancesMap = idealStateToUpdate.getInstanceStateMap(segmentId);
       String hostToAdd = "";
@@ -289,9 +325,24 @@ public class TableRebalancer {
           break;
         }
       }
+
       if (!hostToAdd.equals("")) {
         idealStateToUpdate.setPartitionState(segmentId, hostToAdd, targetIdealStateSegmentHosts.get(hostToAdd));
-        LOGGER.debug("Adding " + hostToAdd + " to serve segment " + segmentId);
+        LOGGER.info("Adding " + hostToAdd + " to serve segment " + segmentId);
+      }
+
+      ++_rebalancerStats.incrementalTransitions;
+
+      // dump additional detailed info for debugging
+      if (LOGGER.isDebugEnabled()) {
+        // check the debug level beforehand and write everything at once
+        // else we will have to check repeatedly in a loop
+        StringBuilder sb = new StringBuilder("Updated segment hosts and states:\n");
+        final Map<String, String> updatedSegmentHosts = idealStateToUpdate.getInstanceStateMap(segmentId);
+        for (Map.Entry<String, String> entry : updatedSegmentHosts.entrySet()) {
+          sb.append("HOST: ").append(entry.getKey()).append("STATE: ").append(entry.getValue()).append("\n");
+        }
+        LOGGER.debug(sb.toString());
       }
     }
   }
@@ -347,5 +398,56 @@ public class TableRebalancer {
         Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
       }
     } while (diff > 0);
+  }
+
+  /**
+   * Helper class that maintains stats that
+   * are later checked in tests to verify
+   * the behavior of the algorithm here
+   * that takes from current ideal state
+   * to a target ideal state
+   */
+  public static class RebalancerStats {
+    private int dryRun;
+    private int directTransitions;
+    private int incrementalTransitions;
+
+    RebalancerStats() {
+    }
+
+    /**
+     * Number of dry runs. Can only be 1
+     * @return
+     */
+    public int getDryRun() {
+      return dryRun;
+    }
+
+    /**
+     * Get the number of times we updated the ideal
+     * state at one go. This happens in downtime
+     * rebalancing and can also happen in no-downtime
+     * rebalancing if there are sufficient common
+     * hosts between current and target ideal states
+     * @return direct transitions
+     */
+    public int getDirectTransitions() {
+      return directTransitions;
+    }
+
+    /**
+     * Get the number of times we updated the ideal
+     * states incrementally to keep the requirement
+     * of having some number of serving replicas up
+     * for each segment
+     * @return incremental transitions
+     */
+    public int getIncrementalTransitions() {
+      return incrementalTransitions;
+    }
+  }
+
+  public RebalancerStats getRebalancerStats() {
+    return _rebalancerStats;
   }
 }

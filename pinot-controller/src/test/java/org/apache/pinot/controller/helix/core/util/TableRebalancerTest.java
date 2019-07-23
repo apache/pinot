@@ -189,6 +189,13 @@ public class TableRebalancerTest {
     // state to target since the number of hosts in common >= min serving
     // replicas we need
     verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 3);
+
+    // Verify the same behavior (as described in above steps) through stats
+    TableRebalancer.RebalancerStats rebalancerStats = rebalancer.getRebalancerStats();
+    // STEP 1 and STEP 2 -- incremental transitions
+    Assert.assertEquals(2, rebalancerStats.getIncrementalTransitions());
+    // STEP 3 -- final direct transition
+    Assert.assertEquals(1, rebalancerStats.getDirectTransitions());
   }
 
   /**
@@ -241,6 +248,12 @@ public class TableRebalancerTest {
     // Now, what we are checking is that between toUpdate and target ideal state,
     // all hosts are in common
     verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 3);
+
+    TableRebalancer.RebalancerStats rebalancerStats = rebalancer.getRebalancerStats();
+    // STEP 1 incremental transition
+    Assert.assertEquals(1, rebalancerStats.getIncrementalTransitions());
+    // STEP 2 -- final direct transition
+    Assert.assertEquals(1, rebalancerStats.getDirectTransitions());
   }
 
   /**
@@ -292,6 +305,12 @@ public class TableRebalancerTest {
     // Now, what we are checking is that between toUpdate and target ideal state,
     // all hosts are in common
     verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 3);
+
+    TableRebalancer.RebalancerStats rebalancerStats = rebalancer.getRebalancerStats();
+    // STEP 1 incremental transition
+    Assert.assertEquals(1, rebalancerStats.getIncrementalTransitions());
+    // STEP 2 -- final direct transition
+    Assert.assertEquals(1, rebalancerStats.getDirectTransitions());
   }
 
   /**
@@ -340,10 +359,15 @@ public class TableRebalancerTest {
     // Now, what we are checking is that between toUpdate and target ideal state,
     // all hosts are in common
     verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 3);
+
+    TableRebalancer.RebalancerStats rebalancerStats = rebalancer.getRebalancerStats();
+    // STEP 1 incremental transition
+    Assert.assertEquals(1, rebalancerStats.getIncrementalTransitions());
+    // STEP 2 -- final direct transition
+    Assert.assertEquals(1, rebalancerStats.getDirectTransitions());
   }
 
-  private void verifyStateForMinReplicaConstraint(final IdealState updated, final IdealState target,
-      final int same) {
+  private void verifyStateForMinReplicaConstraint(final IdealState updated, final IdealState target, final int same) {
     Set<String> updatedSegmentInstances = updated.getInstanceStateMap(segmentId).keySet();
     Set<String> currentSegmentInstances = target.getInstanceStateMap(segmentId).keySet();
     Assert.assertEquals(updatedSegmentInstances.size(), currentSegmentInstances.size());

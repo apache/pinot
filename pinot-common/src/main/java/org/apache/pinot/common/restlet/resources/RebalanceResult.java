@@ -28,17 +28,19 @@ import org.apache.pinot.common.partition.PartitionAssignment;
 public class RebalanceResult {
   private Map<String, Map<String, String>> idealStateMapping;
   private PartitionAssignment partitionAssignment;
-  private String status;
+  private RebalanceStatus status;
+  private String statusMessage;
 
   public RebalanceResult() {
-
   }
 
   public RebalanceResult(@JsonProperty("idealState") Map<String, Map<String, String>> idealStateMapping,
-      @JsonProperty("partitionAssignment") PartitionAssignment partitionAssignment, String status) {
+      @JsonProperty("partitionAssignment") PartitionAssignment partitionAssignment,
+      @JsonProperty("rebalanceStatus") RebalanceStatus status, @JsonProperty("statusMessage") String statusMessage) {
     this.idealStateMapping = idealStateMapping;
     this.partitionAssignment = partitionAssignment;
     this.status = status;
+    this.statusMessage = statusMessage;
   }
 
   public Map<String, Map<String, String>> getIdealStateMapping() {
@@ -57,11 +59,23 @@ public class RebalanceResult {
     this.partitionAssignment = partitionAssignment;
   }
 
-  public String getStatus() {
+  public RebalanceStatus getStatus() {
     return status;
   }
 
-  public void setStatus(String status) {
+  public void setStatus(RebalanceStatus status) {
     this.status = status;
+  }
+
+  public void setStatusMessage(String message) {
+    statusMessage = message;
+  }
+
+  public String getStatusMessage() {
+    return statusMessage;
+  }
+
+  public enum RebalanceStatus {
+    DONE, FAILED
   }
 }
