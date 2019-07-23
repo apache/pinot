@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class StandaloneDriver extends TunerDriver {
   protected static final Logger LOGGER = LoggerFactory.getLogger(StandaloneDriver.class);
-  public static final int NO_CONCURRENCY=0;
+  public static final int NO_CONCURRENCY = 0;
   private int _coreSize = 0;
   private int _minNumQueries = 0;
 
@@ -62,8 +62,8 @@ public abstract class StandaloneDriver extends TunerDriver {
     _threadAccumulator = new HashMap<>();
     LOGGER.info("Setting up executor for accumulation: {} threads", this._coreSize);
     ThreadPoolExecutor accumulateExecutor = null;
-    if(_coreSize!=NO_CONCURRENCY){
-      accumulateExecutor=new ThreadPoolExecutor(this._coreSize, this._coreSize, 365, TimeUnit.DAYS,
+    if (_coreSize != NO_CONCURRENCY) {
+      accumulateExecutor = new ThreadPoolExecutor(this._coreSize, this._coreSize, 365, TimeUnit.DAYS,
           new LinkedBlockingQueue<>(Integer.MAX_VALUE), new ThreadPoolExecutor.CallerRunsPolicy());
     }
 
@@ -71,15 +71,14 @@ public abstract class StandaloneDriver extends TunerDriver {
       BasicQueryStats basicQueryStats = _querySrc.next();
       if (basicQueryStats != null && _strategy.filter(basicQueryStats)) {
         LOGGER.debug("Master thread {} submitting: {}", Thread.currentThread().getId(), basicQueryStats.toString());
-        if(_coreSize!=NO_CONCURRENCY){
+        if (_coreSize != NO_CONCURRENCY) {
           accumulateExecutor.execute(() -> {
             long threadID = Thread.currentThread().getId();
             LOGGER.debug("Thread {} accumulating: {}", threadID, basicQueryStats.toString());
             _threadAccumulator.putIfAbsent(threadID, new HashMap<>());
             _strategy.accumulator(basicQueryStats, _metaManager, _threadAccumulator.get(threadID));
           });
-        }
-        else{
+        } else {
           long threadID = Thread.currentThread().getId();
           LOGGER.debug("Thread {} accumulating: {}", threadID, basicQueryStats.toString());
           _threadAccumulator.putIfAbsent(threadID, new HashMap<>());
@@ -87,7 +86,7 @@ public abstract class StandaloneDriver extends TunerDriver {
         }
       }
     }
-    if(_coreSize!=NO_CONCURRENCY) {
+    if (_coreSize != NO_CONCURRENCY) {
       accumulateExecutor.shutdown();
       LOGGER.info("All queries waiting for accumulation");
       try {
@@ -112,12 +111,12 @@ public abstract class StandaloneDriver extends TunerDriver {
 
     LOGGER.info("Setting up executor for merging: {} threads", this._coreSize);
     ThreadPoolExecutor mergeExecutor = null;
-    if(_coreSize!=NO_CONCURRENCY) {
+    if (_coreSize != NO_CONCURRENCY) {
       mergeExecutor = new ThreadPoolExecutor(this._coreSize, this._coreSize, 365, TimeUnit.DAYS,
           new LinkedBlockingQueue<>(Integer.MAX_VALUE), new ThreadPoolExecutor.CallerRunsPolicy());
     }
     for (String tableNameWithoutType : _mergedResults.keySet()) {
-      if (_coreSize!=NO_CONCURRENCY){
+      if (_coreSize != NO_CONCURRENCY) {
         mergeExecutor.execute(() -> {
           LOGGER.debug("Thread {} working on table {}", Thread.currentThread().getId(), tableNameWithoutType);
           _threadAccumulator.forEach(
@@ -130,26 +129,23 @@ public abstract class StandaloneDriver extends TunerDriver {
                       LOGGER.error(e.toString());
                     }
                     _strategy.merger(_mergedResults.get(tableNameWithoutType).get(colName), mergerObj);
-                  })
-          );
+                  }));
         });
-      }
-      else {
+      } else {
         _threadAccumulator.forEach(
             (threadID, threadAccumulator) -> threadAccumulator.getOrDefault(tableNameWithoutType, new HashMap<>())
                 .forEach((colName, mergerObj) -> {
-              try {
-                _mergedResults.get(tableNameWithoutType).putIfAbsent(colName, mergerObj.getClass().newInstance());
-              } catch (Exception e) {
-                LOGGER.error("Instantiation Exception in Merger!");
-                LOGGER.error(e.toString());
-              }
-              _strategy.merger(_mergedResults.get(tableNameWithoutType).get(colName), mergerObj);
-            })
-        );
+                  try {
+                    _mergedResults.get(tableNameWithoutType).putIfAbsent(colName, mergerObj.getClass().newInstance());
+                  } catch (Exception e) {
+                    LOGGER.error("Instantiation Exception in Merger!");
+                    LOGGER.error(e.toString());
+                  }
+                  _strategy.merger(_mergedResults.get(tableNameWithoutType).get(colName), mergerObj);
+                }));
       }
     }
-    if(_coreSize!=NO_CONCURRENCY) {
+    if (_coreSize != NO_CONCURRENCY) {
       LOGGER.info("All tables waiting for merge");
       mergeExecutor.shutdown();
       try {

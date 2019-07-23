@@ -1,4 +1,5 @@
 package org.apache.pinot.tools.tuner;
+
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
@@ -22,7 +23,7 @@ public class PinotTuneCommand extends AbstractBaseCommand implements Command {
   private boolean _help;
 
   @Override
-  public boolean execute(){
+  public boolean execute() {
     return true;
   }
 
@@ -35,5 +36,4 @@ public class PinotTuneCommand extends AbstractBaseCommand implements Command {
   public boolean getHelp() {
     return _help;
   }
-
 }

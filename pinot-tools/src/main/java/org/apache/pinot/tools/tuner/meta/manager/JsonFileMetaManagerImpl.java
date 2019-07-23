@@ -31,7 +31,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
   private static final String TYPE_REALTIME = "_REALTIME";
   private static final String TYPE_OFFLINE = "_OFFLINE";
   private static final String TYPE_HYBRID = "_HYBRID";
-  private static final String TYPE_REGEX="(_REALTIME|_OFFLINE|_HYBRID)";
+  private static final String TYPE_REGEX = "(_REALTIME|_OFFLINE|_HYBRID)";
   private String _path;
   private Boolean _use_existing_index;
   private HashMap<String, HashSet<String>> _additional_masking_cols;
@@ -97,15 +97,13 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     return this;
   }
 
-  public boolean hasInvertedIndex(String tableNameWithoutType, String columnName){
+  public boolean hasInvertedIndex(String tableNameWithoutType, String columnName) {
     if (_additional_masking_cols.getOrDefault(tableNameWithoutType, new HashSet<>()).contains(columnName)) {
       return true;
     }
     if (_use_existing_index) {
       String _numHasInv = getColField(tableNameWithoutType, columnName, NUM_SEGMENTS_HAS_INVERTED_INDEX);
-      if (_numHasInv != null && Integer.parseInt(_numHasInv) > 0) {
-        return true;
-      }
+      return _numHasInv != null && Integer.parseInt(_numHasInv) > 0;
     }
     return false;
   }
@@ -128,9 +126,8 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     String cardNumerator = getColField(tableNameWithoutType, columnName, WEIGHTED_SUM_CARDINALITY);
     String cardDenominator = getColField(tableNameWithoutType, columnName, SUM_DOCS);
 
-    LOGGER
-        .debug("Cardinality table:{} column:{} card: {}/{}, sort: {}/{}", tableNameWithoutType, columnName, cardNumerator,
-            cardDenominator, nSortedNuemrator, nSortedDenominator);
+    LOGGER.debug("Cardinality table:{} column:{} card: {}/{}, sort: {}/{}", tableNameWithoutType, columnName,
+        cardNumerator, cardDenominator, nSortedNuemrator, nSortedDenominator);
 
     if (cardNumerator == null || cardDenominator == null) {
       LOGGER.error("{} {}'s cardinality does not exist!", tableNameWithoutType, columnName);
@@ -160,18 +157,18 @@ public class JsonFileMetaManagerImpl implements MetaManager {
   }
 
   public String getSegmentField(String tableNameWithoutType, String columnName, String segmentName, String fieldName) {
-    tableNameWithoutType=Pattern.compile(TYPE_REGEX).matcher(tableNameWithoutType).replaceFirst("");
+    tableNameWithoutType = Pattern.compile(TYPE_REGEX).matcher(tableNameWithoutType).replaceFirst("");
     JsonNode ret = _aggregatedMap.get(tableNameWithoutType).get(columnName).get(segmentName).get(fieldName);
     if (ret == null) {
-      LOGGER.error("tableNameWithoutType:{} columnName:{} segmentName:{} fieldName:{} Does not exist!", tableNameWithoutType,
-          columnName, segmentName, fieldName);
+      LOGGER.error("tableNameWithoutType:{} columnName:{} segmentName:{} fieldName:{} Does not exist!",
+          tableNameWithoutType, columnName, segmentName, fieldName);
       return null;
     }
     return ret.asText();
   }
 
   public String getColField(String tableNameWithoutType, String columnName, String fieldName) {
-    tableNameWithoutType=Pattern.compile(TYPE_REGEX).matcher(tableNameWithoutType).replaceFirst("");
+    tableNameWithoutType = Pattern.compile(TYPE_REGEX).matcher(tableNameWithoutType).replaceFirst("");
     JsonNode ret = null;
     try {
       ret = _aggregatedMap.get(tableNameWithoutType).get(columnName).get(fieldName);
@@ -180,8 +177,9 @@ public class JsonFileMetaManagerImpl implements MetaManager {
       return null;
     }
     if (ret == null) {
-      LOGGER.debug("tableNameWithoutType:{} columnName:{} fieldName:{} Does not exist!", tableNameWithoutType, columnName,
-          fieldName);
+      LOGGER
+          .debug("tableNameWithoutType:{} columnName:{} fieldName:{} Does not exist!", tableNameWithoutType, columnName,
+              fieldName);
       return null;
     }
     return ret.asText();

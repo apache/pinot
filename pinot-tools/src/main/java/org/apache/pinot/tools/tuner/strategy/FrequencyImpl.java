@@ -20,11 +20,11 @@ import org.slf4j.LoggerFactory;
 public class FrequencyImpl implements BasicStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(FrequencyImpl.class);
 
-  public final static String DIMENSION_REGEX="(?:(\\w+) ((?:NOT )?IN) (\\(.+?\\)))|(?:(\\w+) (=|<>|!=) (.+?)[ |$)])";
+  public final static String DIMENSION_REGEX = "(?:(\\w+) ((?:NOT )?IN) (\\(.+?\\)))|(?:(\\w+) (=|<>|!=) (.+?)[ |$)])";
   public final static long NO_IN_FILTER_THRESHOLD = 0;
   public final static long CARD_THRESHOLD_ONE = 1;
 
-  public final static Pattern _dimensionPattern=Pattern.compile(DIMENSION_REGEX);
+  public final static Pattern _dimensionPattern = Pattern.compile(DIMENSION_REGEX);
   private HashSet<String> _tableNamesWorkonWithoutType;
   private long _numEntriesScannedThreshold;
   private long _cardinalityThreshold;
@@ -91,27 +91,28 @@ public class FrequencyImpl implements BasicStrategy {
     String numEntriesScannedInFilter = indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter();
     String query = indexSuggestQueryStatsImpl.getQuery();
     LOGGER.debug("Accumulator: scoring query {}", query);
-    HashSet<String> counted=new HashSet<>();
+    HashSet<String> counted = new HashSet<>();
 
-    if (Long.parseLong(numEntriesScannedInFilter) == 0) return; //Early return if the query is not scanning in filter
-
-    Matcher matcher=_dimensionPattern.matcher(query);
-    while(matcher.find()){
-      if (matcher.group(1)!=null){
-        counted.add(matcher.group(1));
-      }
-      else if (matcher.group(4)!=null){
-        counted.add(matcher.group(4));
-      }
-      else{}
+    if (Long.parseLong(numEntriesScannedInFilter) == 0) {
+      return; //Early return if the query is not scanning in filter
     }
 
-    counted.stream().filter(colName->metaDataProperties.getAverageCardinality(tableNameWithoutType,colName).compareTo(new BigFraction(_cardinalityThreshold))>0)
-        .forEach(colName->{
-          AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-          AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new FrequencyMergerObj());
-          ((FrequencyMergerObj)AccumulatorOut.get(tableNameWithoutType).get(colName)).merge(1);
-        });
+    Matcher matcher = _dimensionPattern.matcher(query);
+    while (matcher.find()) {
+      if (matcher.group(1) != null) {
+        counted.add(matcher.group(1));
+      } else if (matcher.group(4) != null) {
+        counted.add(matcher.group(4));
+      } else {
+      }
+    }
+
+    counted.stream().filter(colName -> metaDataProperties.getAverageCardinality(tableNameWithoutType, colName)
+        .compareTo(new BigFraction(_cardinalityThreshold)) > 0).forEach(colName -> {
+      AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
+      AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new FrequencyMergerObj());
+      ((FrequencyMergerObj) AccumulatorOut.get(tableNameWithoutType).get(colName)).merge(1);
+    });
   }
 
   @Override
@@ -124,11 +125,11 @@ public class FrequencyImpl implements BasicStrategy {
     String tableName = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
     String mergerOut = "";
     List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
-    mergedOut
-        .forEach((colName, score) -> sortedPure.add(new Tuple2<>(colName, ((FrequencyMergerObj) score).getPureScore())));
-    sortedPure.sort((p1,p2)->(p2._2().compareTo(p1._2())));
+    mergedOut.forEach(
+        (colName, score) -> sortedPure.add(new Tuple2<>(colName, ((FrequencyMergerObj) score).getPureScore())));
+    sortedPure.sort((p1, p2) -> (p2._2().compareTo(p1._2())));
     for (Tuple2<String, Long> tuple2 : sortedPure) {
-      mergerOut += "Dimension: " + tuple2._1()+ "  " + tuple2._2().toString() + "\n";
+      mergerOut += "Dimension: " + tuple2._1() + "  " + tuple2._2().toString() + "\n";
     }
     LOGGER.info(tableName + mergerOut);
   }

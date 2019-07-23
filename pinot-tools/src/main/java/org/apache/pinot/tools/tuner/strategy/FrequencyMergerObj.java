@@ -9,7 +9,7 @@ public class FrequencyMergerObj extends BasicMergerObj {
   private long _pureScore;
 
   public long getPureScore() {
-      return _pureScore;
+    return _pureScore;
   }
 
   public void merge(int _pureScore) {

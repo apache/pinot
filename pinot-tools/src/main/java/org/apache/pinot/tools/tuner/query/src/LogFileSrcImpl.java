@@ -17,7 +17,6 @@ import org.slf4j.LoggerFactory;
 public class LogFileSrcImpl implements QuerySrc {
   private static final Logger LOGGER = LoggerFactory.getLogger(LogFileSrcImpl.class);
 
-
   private FileInputStream _fileInputStream = null;
   private BufferedReader _bufferedReader = null;
   private String _stringBuffer = null;
@@ -29,17 +28,15 @@ public class LogFileSrcImpl implements QuerySrc {
   private String VALID_LINE_REGEX;
   private Pattern valid_line_beginner;
 
-
   private LogFileSrcImpl(Builder builder) {
     _standaloneLog = builder._standaloneLog;
     _parser = builder._parser;
     _path = builder._path;
 
-    if(_standaloneLog){
+    if (_standaloneLog) {
       VALID_LINE_REGEX = "^(Processed requestId|RequestId|\\w).*$";
       valid_line_beginner = Pattern.compile(VALID_LINE_REGEX);
-    }
-    else{
+    } else {
       VALID_LINE_REGEX = "^(\\d{4})/(\\d{2})/(\\d{2}) [\\d:.].*$";
       valid_line_beginner = Pattern.compile(VALID_LINE_REGEX);
     }

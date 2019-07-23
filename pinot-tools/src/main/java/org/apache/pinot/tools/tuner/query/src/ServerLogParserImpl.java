@@ -16,12 +16,7 @@ public class ServerLogParserImpl implements BasicQueryParser {
   private static final Pattern _compiledPattern = Pattern.compile(SERVER_LOG_REGEX);
 
   private enum GROUP_NAMES {
-    ALL,
-    TABLE_NAME_WITHOUT_TYPE,
-    TOTAL_TIME,
-    NUM_ENTRIES_SCANNED_IN_FILTER,
-    NUM_ENTRIES_SCANNED_POST_FILTER,
-    QUERY
+    ALL, TABLE_NAME_WITHOUT_TYPE, TOTAL_TIME, NUM_ENTRIES_SCANNED_IN_FILTER, NUM_ENTRIES_SCANNED_POST_FILTER, QUERY
   }
 
   @Nullable
@@ -30,12 +25,11 @@ public class ServerLogParserImpl implements BasicQueryParser {
     Matcher match = _compiledPattern.matcher(line);
     LOGGER.debug("Original line: " + line);
     if (match.find()) {
-      IndexSuggestQueryStatsImpl ret = new IndexSuggestQueryStatsImpl.Builder()
-          ._time(match.group(GROUP_NAMES.TOTAL_TIME.ordinal()))
-          ._tableNameWithoutType(match.group(GROUP_NAMES.TABLE_NAME_WITHOUT_TYPE.ordinal()))
-          ._numEntriesScannedInFilter(match.group(GROUP_NAMES.NUM_ENTRIES_SCANNED_IN_FILTER.ordinal()))
-          ._numEntriesScannedPostFilter(match.group(GROUP_NAMES.NUM_ENTRIES_SCANNED_POST_FILTER.ordinal())
-          ).build();
+      IndexSuggestQueryStatsImpl ret =
+          new IndexSuggestQueryStatsImpl.Builder()._time(match.group(GROUP_NAMES.TOTAL_TIME.ordinal()))
+              ._tableNameWithoutType(match.group(GROUP_NAMES.TABLE_NAME_WITHOUT_TYPE.ordinal()))
+              ._numEntriesScannedInFilter(match.group(GROUP_NAMES.NUM_ENTRIES_SCANNED_IN_FILTER.ordinal()))
+              ._numEntriesScannedPostFilter(match.group(GROUP_NAMES.NUM_ENTRIES_SCANNED_POST_FILTER.ordinal())).build();
       LOGGER.debug("Parsed line: " + ret.toString());
       return ret;
     }
