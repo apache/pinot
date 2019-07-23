@@ -20,8 +20,7 @@ public interface MetaDataProperties {
    * @param fieldName one of {WEIGHTED_SUM_CARDINALITY, SUM_DOCS, NUM_SEGMENTS_HAS_INVERTED_INDEX, NUM_SEGMENTS_SORTED, NUM_SEGMENTS_COUNT}
    * @return
    */
-  String getColField(String tableNameWithoutType, String columnName,
-      String fieldName);
+  String getColField(String tableNameWithoutType, String columnName, String fieldName);
 
   String getSegmentField(String tableNameWithoutType, String columnName, String segmentName,
       String fieldName); //get metadata of individual segment

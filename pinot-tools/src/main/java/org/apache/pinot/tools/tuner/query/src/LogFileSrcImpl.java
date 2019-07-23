@@ -29,8 +29,6 @@ public class LogFileSrcImpl implements QuerySrc {
   private String _path;
   private String _valid_line_beginner_regex;
 
-
-
   private LogFileSrcImpl(Builder builder) {
     _parser = builder._parser;
     _path = builder._path;
@@ -41,7 +39,7 @@ public class LogFileSrcImpl implements QuerySrc {
   public static final class Builder {
     private BasicQueryParser _parser;
     private String _path;
-    private String _valid_line_beginner_regex=REGEX_VALID_LINE_TIME;
+    private String _valid_line_beginner_regex = REGEX_VALID_LINE_TIME;
 
     public Builder() {
     }
@@ -121,8 +119,8 @@ public class LogFileSrcImpl implements QuerySrc {
     }
     String stringBuffer = _stringBufferNext;
     try {
-      while ((_stringBufferNext = _bufferedReader.readLine()) != null && !_valid_line_beginner_pattern.matcher(_stringBufferNext)
-          .find()) {
+      while ((_stringBufferNext = _bufferedReader.readLine()) != null && !_valid_line_beginner_pattern
+          .matcher(_stringBufferNext).find()) {
         stringBuffer = stringBuffer + _stringBufferNext;
         _stringBufferNext = null;
       }
