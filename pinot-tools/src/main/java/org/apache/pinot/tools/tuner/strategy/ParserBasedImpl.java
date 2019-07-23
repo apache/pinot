@@ -333,7 +333,7 @@ public class ParserBasedImpl implements BasicStrategy {
       }
     }
 
-    /*
+    /**
      * Parse leaf predicates
      * The score is calculated as:
      *  IN clause:
@@ -348,7 +348,8 @@ public class ParserBasedImpl implements BasicStrategy {
      *  Range ( <d<, BETWEEN AND) clause:
      *    average_values_hit/cardinality
      *  Moreover, if average_values_hit is made available, prediction for In clause can be optimized
-     *
+     * @param predicateContext the leaf predicate context where the score are generated from cardinality
+     * @return
      */
     List<Tuple2<List<String>, BigFraction>> parsePredicate(PQL2Parser.PredicateContext predicateContext) {
       LOGGER.debug("Parsing predicate: {}", predicateContext.getText());

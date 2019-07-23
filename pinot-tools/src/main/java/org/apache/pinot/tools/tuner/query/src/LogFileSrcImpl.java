@@ -11,7 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/*
+/**
  * Generic class to iterate over lines in file
  */
 public class LogFileSrcImpl implements QuerySrc {

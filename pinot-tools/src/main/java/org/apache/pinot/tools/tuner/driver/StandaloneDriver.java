@@ -20,29 +20,43 @@ import org.slf4j.LoggerFactory;
 public abstract class StandaloneDriver extends TunerDriver {
   protected static final Logger LOGGER = LoggerFactory.getLogger(StandaloneDriver.class);
   public static final int NO_CONCURRENCY = 0;
-  private int _coreSize = 0;
-  private int _minNumQueries = 0;
+  private int _threadPoolSize = 0;
 
-  public StandaloneDriver setMinNumQueries(int minNumQueries) {
-    _minNumQueries = minNumQueries;
+  /**
+   * set the number of threads used in action
+   * @param threadPoolSize
+   * @return
+   */
+  protected StandaloneDriver setThreadPoolSize(int threadPoolSize) {
+    _threadPoolSize = threadPoolSize;
     return this;
   }
 
-  protected StandaloneDriver setThreadPoolSize(int coreSize) {
-    _coreSize = coreSize;
-    return this;
-  }
-
+  /**
+   * Set the query source, e.g. LogFileSrcImpl
+   * @param querySrc e.g. LogFileSrcImpl
+   * @return
+   */
   public StandaloneDriver setQuerySrc(QuerySrc querySrc) {
     _querySrc = querySrc;
     return this;
   }
 
+  /**
+   * set the metaManager for caching and query cardinality e.g. MetaManager
+   * @param metaManager e.g. MetaManager
+   * @return
+   */
   public StandaloneDriver setMetaManager(MetaManager metaManager) {
     _metaManager = metaManager;
     return this;
   }
 
+  /**
+   * set the strategy for the recommendation, e.g. FrequencyImpl, OLSAnalysisImpl, ParserBasedImpl
+   * @param strategy
+   * @return
+   */
   public StandaloneDriver setStrategy(BasicStrategy strategy) {
     _strategy = strategy;
     return this;
@@ -58,18 +72,18 @@ public abstract class StandaloneDriver extends TunerDriver {
   public void excute() {
     // Accumulate all the query results to _threadAccumulator:/threadID/table/column/BasicMergerObj
     _threadAccumulator = new HashMap<>();
-    LOGGER.info("Setting up executor for accumulation: {} threads", this._coreSize);
+    LOGGER.info("Setting up executor for accumulation: {} threads", this._threadPoolSize);
     ThreadPoolExecutor accumulateExecutor = null;
     // setup threadpool, NO_CONCURRENCY for debugging
-    if (_coreSize != NO_CONCURRENCY) {
-      accumulateExecutor = new ThreadPoolExecutor(this._coreSize, this._coreSize, 365, TimeUnit.DAYS,
+    if (_threadPoolSize != NO_CONCURRENCY) {
+      accumulateExecutor = new ThreadPoolExecutor(this._threadPoolSize, this._threadPoolSize, 365, TimeUnit.DAYS,
           new LinkedBlockingQueue<>(Integer.MAX_VALUE), new ThreadPoolExecutor.CallerRunsPolicy());
     }
     while (_querySrc.hasNext()) {
       BasicQueryStats basicQueryStats = _querySrc.next();
       if (basicQueryStats != null && _strategy.filter(basicQueryStats)) {
         LOGGER.debug("Master thread {} submitting: {}", Thread.currentThread().getId(), basicQueryStats.toString());
-        if (_coreSize != NO_CONCURRENCY) {
+        if (_threadPoolSize != NO_CONCURRENCY) {
           accumulateExecutor.execute(() -> {
             long threadID = Thread.currentThread().getId();
             LOGGER.debug("Thread {} accumulating: {}", threadID, basicQueryStats.toString());
@@ -84,7 +98,7 @@ public abstract class StandaloneDriver extends TunerDriver {
         }
       }
     }
-    if (_coreSize != NO_CONCURRENCY) {
+    if (_threadPoolSize != NO_CONCURRENCY) {
       accumulateExecutor.shutdown();
       LOGGER.info("All queries waiting for accumulation");
       try {
@@ -105,14 +119,14 @@ public abstract class StandaloneDriver extends TunerDriver {
     }
     LOGGER.info("tableNames: {}", _mergedResults.keySet().toString());
 
-    LOGGER.info("Setting up executor for merging: {} threads", this._coreSize);
+    LOGGER.info("Setting up executor for merging: {} threads", this._threadPoolSize);
     ThreadPoolExecutor mergeExecutor = null;
-    if (_coreSize != NO_CONCURRENCY) {
-      mergeExecutor = new ThreadPoolExecutor(this._coreSize, this._coreSize, 365, TimeUnit.DAYS,
+    if (_threadPoolSize != NO_CONCURRENCY) {
+      mergeExecutor = new ThreadPoolExecutor(this._threadPoolSize, this._threadPoolSize, 365, TimeUnit.DAYS,
           new LinkedBlockingQueue<>(Integer.MAX_VALUE), new ThreadPoolExecutor.CallerRunsPolicy());
     }
     for (String tableNameWithoutType : _mergedResults.keySet()) {
-      if (_coreSize != NO_CONCURRENCY) {
+      if (_threadPoolSize != NO_CONCURRENCY) {
         mergeExecutor.execute(() -> {
           LOGGER.debug("Thread {} working on table {}", Thread.currentThread().getId(), tableNameWithoutType);
           _threadAccumulator.forEach(
@@ -141,7 +155,7 @@ public abstract class StandaloneDriver extends TunerDriver {
                 }));
       }
     }
-    if (_coreSize != NO_CONCURRENCY) {
+    if (_threadPoolSize != NO_CONCURRENCY) {
       LOGGER.info("All tables waiting for merge");
       mergeExecutor.shutdown();
       try {
