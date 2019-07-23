@@ -290,7 +290,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       try {
         PartitionFunctionFactory.PartitionFunctionType.fromString(_partitionFunction);
       } catch (IllegalArgumentException e) {
-        _logger.info("Partition function needs to be one of Modulo, Murmur, ByteArray, HashCode");
+        _logger.error("Partition function needs to be one of Modulo, Murmur, ByteArray, HashCode, it is currently {}", _partitionColumn);
         throw new IllegalArgumentException(e);
       }
     }
