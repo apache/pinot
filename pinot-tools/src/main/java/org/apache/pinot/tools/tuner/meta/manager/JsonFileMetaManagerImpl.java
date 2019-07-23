@@ -24,6 +24,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
    */
   public static final Boolean IGNORE_EXISTING_INDEX = false;
   public static final Boolean USE_EXISTING_INDEX = true;
+  public static final Boolean DONT_USE_EXISTING_INDEX = false;
 
   private static final String COL_META = "col_meta";
   private static final String SEGMENT_META = "segment_meta";

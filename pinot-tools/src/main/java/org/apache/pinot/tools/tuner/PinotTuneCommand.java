@@ -12,7 +12,7 @@ public class PinotTuneCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-brokerLog", required = true, metaVar = "<String>", usage = "Path to broker log file")
   private String _brokerLog;
 
-  @Option(name = "-strat", required = true, metaVar = "<String>", usage = "Select execution strategy (//)")
+  @Option(name = "-strat", required = true, metaVar = "<String>", usage = "Select execution strategy (inverted/sorted)")
   private String _stat;
 
   @Option(name = "-additional", required = false, metaVar = "<String>", usage = "Add additional column as index")

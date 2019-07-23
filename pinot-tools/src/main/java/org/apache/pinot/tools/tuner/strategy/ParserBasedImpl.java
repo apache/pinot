@@ -33,23 +33,25 @@ public class ParserBasedImpl implements BasicStrategy {
 
   public final static long NO_IN_FILTER_THRESHOLD = 0;
 
-  public final static int NO_WEIGHT_FOR_VOTE = 0;
-  public final static int IN_FILTER_WEIGHT_FOR_VOTE = 1;
+  public final static long NO_PROCESSED_THRESH = 0;
 
   private int _algorithmOrder;
   private HashSet<String> _tableNamesWorkonWithoutType;
   private long _numEntriesScannedThreshold;
+  private long _numProcessedThreshold;
 
   private ParserBasedImpl(Builder builder) {
     _algorithmOrder = builder._algorithmOrder;
     _tableNamesWorkonWithoutType = builder._tableNamesWorkonWithoutType;
     _numEntriesScannedThreshold = builder._numEntriesScannedThreshold;
+    _numProcessedThreshold = builder._numProcessedThreshold;
   }
 
   public static final class Builder {
     private int _algorithmOrder = FIRST_ORDER;
     private HashSet<String> _tableNamesWorkonWithoutType = new HashSet<>();
     private long _numEntriesScannedThreshold = NO_IN_FILTER_THRESHOLD;
+    private long _numProcessedThreshold = NO_PROCESSED_THRESH;
 
     public Builder() {
     }
@@ -74,6 +76,12 @@ public class ParserBasedImpl implements BasicStrategy {
     @Nonnull
     public Builder _numEntriesScannedThreshold(long val) {
       _numEntriesScannedThreshold = val;
+      return this;
+    }
+
+    @Nonnull
+    public Builder _numProcessedThreshold(long val) {
+      _numProcessedThreshold = val;
       return this;
     }
 
@@ -103,13 +111,15 @@ public class ParserBasedImpl implements BasicStrategy {
     String query = indexSuggestQueryStatsImpl.getQuery();
     LOGGER.debug("Accumulator: scoring query {}", query);
 
-    if (Long.parseLong(numEntriesScannedInFilter) == 0) return; //Early return if the query is not scanning in filter
+    if (Long.parseLong(numEntriesScannedInFilter) == 0) {
+      return; //Early return if the query is not scanning in filter
+    }
 
     DimensionScoring dimensionScoring = new DimensionScoring(tableNameWithoutType, metaDataProperties, query);
     List<Tuple2<List<String>, BigFraction>> columnScores = dimensionScoring.parseQuery();
     LOGGER.debug("Accumulator: query score: {}", columnScores.toString());
 
-    HashSet<String> counted=new HashSet<>();
+    HashSet<String> counted = new HashSet<>();
     //Discard if the effective cardinality is less than one.
     columnScores.stream().filter(tupleNamesScore -> tupleNamesScore._2().compareTo(BigFraction.ONE) > 0)
         .forEach(tupleNamesScore -> {
@@ -141,14 +151,14 @@ public class ParserBasedImpl implements BasicStrategy {
       sortedPure.add(new Tuple2<>(colName, ((ParseBasedMergerObj) score).getPureScore()));
       sortedWeighted.add(new Tuple2<>(colName, ((ParseBasedMergerObj) score).getWeigtedScore()));
     });
-    sortedPure.sort((p1,p2)->(p2._2().compareTo(p1._2())));
-    sortedWeighted.sort((p1,p2)->(p2._2().compareTo(p1._2())));
-    for(Tuple2<String, Long> tuple2 : sortedPure) {
+    sortedPure.sort((p1, p2) -> (p2._2().compareTo(p1._2())));
+    sortedWeighted.sort((p1, p2) -> (p2._2().compareTo(p1._2())));
+    for (Tuple2<String, Long> tuple2 : sortedPure) {
       mergerOut += "Dimension: " + tuple2._1() + "  " + tuple2._2().toString() + "\n";
     }
     mergerOut += "***********************************************************************************\n";
     for (Tuple2<String, BigInteger> tuple2 : sortedWeighted) {
-      mergerOut += "Dimension: " + tuple2._1()+ "  " + tuple2._2().toString() + "\n";
+      mergerOut += "Dimension: " + tuple2._1() + "  " + tuple2._2().toString() + "\n";
     }
     LOGGER.info(tableName + mergerOut);
   }
@@ -184,8 +194,7 @@ public class ParserBasedImpl implements BasicStrategy {
     /*
      * Navigate from root to predicateListContext of whereClauseContext, where all the filtering happens
      */
-    @NotNull
-    List<Tuple2<List<String>, BigFraction>> parseQuery() {
+    @NotNull List<Tuple2<List<String>, BigFraction>> parseQuery() {
       LOGGER.debug("Parsing query: {}", _queryString);
       PQL2Parser.OptionalClauseContext optionalClauseContext = null;
       PQL2Parser.WhereClauseContext whereClauseContext = null;
@@ -321,8 +330,7 @@ public class ParserBasedImpl implements BasicStrategy {
             return ret;
           }
           ret.add(new Tuple2<>(colNameList, cardinality.divide(cardinality.subtract(lenFilter))));
-        }
-        else {
+        } else {
           ret.add(new Tuple2<>(colNameList, cardinality.divide(lenFilter)));
         }
         LOGGER.debug("IN clause ret {}", ret.toString());
@@ -349,8 +357,7 @@ public class ParserBasedImpl implements BasicStrategy {
           ret.add(new Tuple2<>(colNameList, cardinality));
           LOGGER.debug("COMP clause ret {}", ret.toString());
           return ret;
-        }
-        else if (comparisonOp.equals("!=") || comparisonOp.equals("<>")) {
+        } else if (comparisonOp.equals("!=") || comparisonOp.equals("<>")) {
           if (cardinality.subtract(BigInteger.ONE).compareTo(BigFraction.ZERO) <= 0) {
             ret.add(new Tuple2<>(colNameList, BigFraction.ONE));
             return ret;
@@ -358,8 +365,7 @@ public class ParserBasedImpl implements BasicStrategy {
           ret.add(new Tuple2<>(colNameList, cardinality.divide(cardinality.subtract(BigFraction.ONE))));
           LOGGER.debug("COMP clause ret {}", ret.toString());
           return ret;
-        }
-        else {
+        } else {
           return ret;
         }
       } else {
