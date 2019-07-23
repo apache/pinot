@@ -53,18 +53,33 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     public Builder() {
     }
 
+    /**
+     *
+     * @param val the path to the json file storing the segment metadata
+     * @return
+     */
     @Nonnull
     public Builder _path(@Nonnull String val) {
       _path = val;
       return this;
     }
 
+    /**
+     *
+     * @param val if this is set the already applied index will not be considered again
+     * @return
+     */
     @Nonnull
     public Builder _use_existing_index(@Nonnull Boolean val) {
       _use_existing_index = val;
       return this;
     }
 
+    /**
+     *
+     * @param val for research and debug purpose only, the cardinality of /tableName/colName passed in will be considered as 1
+     * @return
+     */
     @Nonnull
     public Builder _additional_masking_cols(@Nonnull HashMap<String, HashSet<String>> val) {
       _additional_masking_cols = val;
@@ -169,7 +184,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
 
   public String getColField(String tableNameWithoutType, String columnName, String fieldName) {
     tableNameWithoutType = Pattern.compile(TYPE_REGEX).matcher(tableNameWithoutType).replaceFirst("");
-    JsonNode ret = null;
+    JsonNode ret;
     try {
       ret = _aggregatedMap.get(tableNameWithoutType).get(columnName).get(fieldName);
     } catch (NullPointerException e) {

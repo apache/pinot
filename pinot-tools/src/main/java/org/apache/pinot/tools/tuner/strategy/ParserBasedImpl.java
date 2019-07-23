@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
 import javax.validation.constraints.NotNull;
@@ -35,16 +36,20 @@ public class ParserBasedImpl implements BasicStrategy {
 
   public final static long NO_PROCESSED_THRESH = 0;
 
+  public final static int NO_CARD_THRESH = 1;
+
   private int _algorithmOrder;
   private HashSet<String> _tableNamesWorkonWithoutType;
   private long _numEntriesScannedThreshold;
   private long _numProcessedThreshold;
+  private int _cardinalityThreshold;
 
   private ParserBasedImpl(Builder builder) {
     _algorithmOrder = builder._algorithmOrder;
     _tableNamesWorkonWithoutType = builder._tableNamesWorkonWithoutType;
     _numEntriesScannedThreshold = builder._numEntriesScannedThreshold;
     _numProcessedThreshold = builder._numProcessedThreshold;
+    _cardinalityThreshold = builder._cardinalityThreshold;
   }
 
   public static final class Builder {
@@ -52,6 +57,7 @@ public class ParserBasedImpl implements BasicStrategy {
     private HashSet<String> _tableNamesWorkonWithoutType = new HashSet<>();
     private long _numEntriesScannedThreshold = NO_IN_FILTER_THRESHOLD;
     private long _numProcessedThreshold = NO_PROCESSED_THRESH;
+    private int _cardinalityThreshold = NO_CARD_THRESH;
 
     public Builder() {
     }
@@ -61,27 +67,59 @@ public class ParserBasedImpl implements BasicStrategy {
       return new ParserBasedImpl(this);
     }
 
+    /**
+     * lower order(FIRST_ORDER) for inverted index, higher order(THIRD_ORDER) for sorted (broad coverage), default to FIRST_ORDER
+     * @param val
+     * @return
+     */
     @Nonnull
     public Builder _algorithmOrder(int val) {
       _algorithmOrder = val;
       return this;
     }
 
+    /**
+     * set the tables to work on, other tables will be filtered out
+     * @param val set of table names without type
+     * @return
+     */
     @Nonnull
     public Builder _tableNamesWorkonWithoutType(@Nonnull HashSet<String> val) {
       _tableNamesWorkonWithoutType = val;
       return this;
     }
 
+    /**
+     * set the threshold for _numEntriesScannedInFilter, the queries with _numEntriesScannedInFilter below this will be filtered out
+     * @param val
+     * @return
+     */
     @Nonnull
     public Builder _numEntriesScannedThreshold(long val) {
       _numEntriesScannedThreshold = val;
       return this;
     }
 
+    /**
+     * set the minimum number of records scanned to give a recommendation
+     * @param val minimum number of records scanned to give a recommendation, default to 0
+     * @return
+     */
     @Nonnull
     public Builder _numProcessedThreshold(long val) {
       _numProcessedThreshold = val;
+      return this;
+    }
+
+    /**
+     * set the cardinality threshold, column with cardinality below this will be ignored,
+     * setting a high value will force the system to ignore low card columns
+     * @param val cardinality threshold, default to 1
+     * @return
+     */
+    @Nonnull
+    public Builder _cardinalityThreshold(int val) {
+      _cardinalityThreshold = val;
       return this;
     }
 
@@ -120,8 +158,9 @@ public class ParserBasedImpl implements BasicStrategy {
     LOGGER.debug("Accumulator: query score: {}", columnScores.toString());
 
     HashSet<String> counted = new HashSet<>();
-    //Discard if the effective cardinality is less than one.
-    columnScores.stream().filter(tupleNamesScore -> tupleNamesScore._2().compareTo(BigFraction.ONE) > 0)
+    //Discard if the effective cardinality is less than _cardinalityThreshold
+    BigFraction cardinalityThresholdFraction = new BigFraction(_cardinalityThreshold);
+    columnScores.stream().filter(tupleNamesScore -> tupleNamesScore._2().compareTo(cardinalityThresholdFraction) > 0)
         .forEach(tupleNamesScore -> {
           //Do not count if already counted
           tupleNamesScore._1().stream().filter(colName -> !counted.contains(colName)).forEach(colName -> {
@@ -143,8 +182,15 @@ public class ParserBasedImpl implements BasicStrategy {
 
   @Override
   public void reporter(String tableNameWithoutType, Map<String, BasicMergerObj> mergedOut) {
-    String tableName = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
-    String mergerOut = "";
+    AtomicLong totalCount = new AtomicLong(0);
+    mergedOut.forEach((k, v) -> {
+      totalCount.addAndGet(v.getCount());
+    });
+    if (totalCount.longValue() < _numProcessedThreshold) {
+      return;
+    }
+
+    String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
     List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
     List<Tuple2<String, BigInteger>> sortedWeighted = new ArrayList<>();
     mergedOut.forEach((colName, score) -> {
@@ -154,13 +200,13 @@ public class ParserBasedImpl implements BasicStrategy {
     sortedPure.sort((p1, p2) -> (p2._2().compareTo(p1._2())));
     sortedWeighted.sort((p1, p2) -> (p2._2().compareTo(p1._2())));
     for (Tuple2<String, Long> tuple2 : sortedPure) {
-      mergerOut += "Dimension: " + tuple2._1() + "  " + tuple2._2().toString() + "\n";
+      reportOut += "Dimension: " + tuple2._1() + "  " + tuple2._2().toString() + "\n";
     }
-    mergerOut += "***********************************************************************************\n";
+    reportOut += "***********************************************************************************\n";
     for (Tuple2<String, BigInteger> tuple2 : sortedWeighted) {
-      mergerOut += "Dimension: " + tuple2._1() + "  " + tuple2._2().toString() + "\n";
+      reportOut += "Dimension: " + tuple2._1() + "  " + tuple2._2().toString() + "\n";
     }
-    LOGGER.info(tableName + mergerOut);
+    LOGGER.info(reportOut);
   }
 
   /*
@@ -196,7 +242,7 @@ public class ParserBasedImpl implements BasicStrategy {
      */
     @NotNull List<Tuple2<List<String>, BigFraction>> parseQuery() {
       LOGGER.debug("Parsing query: {}", _queryString);
-      PQL2Parser.OptionalClauseContext optionalClauseContext = null;
+      PQL2Parser.OptionalClauseContext optionalClauseContext;
       PQL2Parser.WhereClauseContext whereClauseContext = null;
 
       try {

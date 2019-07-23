@@ -21,6 +21,11 @@ public class IndexSuggestQueryStatsImpl extends BasicQueryStats {
     public Builder() {
     }
 
+    /**
+     *
+     * @param val query text
+     * @return
+     */
     @Nonnull
     Builder _query(@Nonnull String val) {
       _query = val;

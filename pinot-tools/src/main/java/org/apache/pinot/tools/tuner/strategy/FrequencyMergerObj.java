@@ -13,7 +13,7 @@ public class FrequencyMergerObj extends BasicMergerObj {
   }
 
   public void merge(int _pureScore) {
-    super.addCount();
+    super.increaseCount();
     this._pureScore += _pureScore;
   }
 

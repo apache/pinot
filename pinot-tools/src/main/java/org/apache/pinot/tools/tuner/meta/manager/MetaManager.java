@@ -1,5 +1,9 @@
 package org.apache.pinot.tools.tuner.meta.manager;
 
 public interface MetaManager extends MetaDataProperties {
-  MetaManager cache(); //extract from some source and cache metadata in JsonNode
+  /**
+   * extract from some source(file/API) and cache metadata in JsonNode
+   * @return
+   */
+  MetaManager cache();
 }

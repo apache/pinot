@@ -14,8 +14,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/*
- * Local concurrent driver
+/**
+ * Local concurrent executor.
  */
 public abstract class StandaloneDriver extends TunerDriver {
   protected static final Logger LOGGER = LoggerFactory.getLogger(StandaloneDriver.class);
@@ -51,22 +51,20 @@ public abstract class StandaloneDriver extends TunerDriver {
   private Map<Long, Map<String, Map<String, BasicMergerObj>>> _threadAccumulator = null;
   private Map<String, Map<String, BasicMergerObj>> _mergedResults;
 
-  /*
+  /**
    * Execute strategy
    */
   @Override
   public void excute() {
-    /*
-     * Accumulate all the queries to threadAccumulator:/threadID/table/column
-     */
+    // Accumulate all the query results to _threadAccumulator:/threadID/table/column/BasicMergerObj
     _threadAccumulator = new HashMap<>();
     LOGGER.info("Setting up executor for accumulation: {} threads", this._coreSize);
     ThreadPoolExecutor accumulateExecutor = null;
+    // setup threadpool, NO_CONCURRENCY for debugging
     if (_coreSize != NO_CONCURRENCY) {
       accumulateExecutor = new ThreadPoolExecutor(this._coreSize, this._coreSize, 365, TimeUnit.DAYS,
           new LinkedBlockingQueue<>(Integer.MAX_VALUE), new ThreadPoolExecutor.CallerRunsPolicy());
     }
-
     while (_querySrc.hasNext()) {
       BasicQueryStats basicQueryStats = _querySrc.next();
       if (basicQueryStats != null && _strategy.filter(basicQueryStats)) {
@@ -97,9 +95,7 @@ public abstract class StandaloneDriver extends TunerDriver {
       LOGGER.info("All accumulation done");
     }
 
-    /*
-     * Merge corresponding entries
-     */
+    // Merge corresponding entries
     LOGGER.info("Setting up _mergedResults for merging");
     _mergedResults = new HashMap<>();
     for (Map.Entry<Long, Map<String, Map<String, BasicMergerObj>>> threadEntry : _threadAccumulator.entrySet()) {
@@ -155,9 +151,7 @@ public abstract class StandaloneDriver extends TunerDriver {
       }
       LOGGER.info("All merge done");
     }
-    /*
-     * Report
-     */
+    //Report
     for (Map.Entry<String, Map<String, BasicMergerObj>> tableStat : _mergedResults.entrySet()) {
       _strategy.reporter(tableStat.getKey(), tableStat.getValue());
     }

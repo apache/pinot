@@ -17,60 +17,71 @@ import org.slf4j.LoggerFactory;
 public class LogFileSrcImpl implements QuerySrc {
   private static final Logger LOGGER = LoggerFactory.getLogger(LogFileSrcImpl.class);
 
+  public static final String REGEX_VALID_LINE_STANDALONE = "^(Processed requestId|RequestId|\\w).*$";
+  public static final String REGEX_VALID_LINE_TIME = "^(\\d{4})/(\\d{2})/(\\d{2}) [\\d:.].*$";
+
   private FileInputStream _fileInputStream = null;
   private BufferedReader _bufferedReader = null;
-  private String _stringBuffer = null;
   private String _stringBufferNext = null;
+  private Pattern _valid_line_beginner_pattern;
+
   private BasicQueryParser _parser;
   private String _path;
-  private boolean _standaloneLog;
+  private String _valid_line_beginner_regex;
 
-  private String VALID_LINE_REGEX;
-  private Pattern valid_line_beginner;
+
 
   private LogFileSrcImpl(Builder builder) {
-    _standaloneLog = builder._standaloneLog;
     _parser = builder._parser;
     _path = builder._path;
-
-    if (_standaloneLog) {
-      VALID_LINE_REGEX = "^(Processed requestId|RequestId|\\w).*$";
-      valid_line_beginner = Pattern.compile(VALID_LINE_REGEX);
-    } else {
-      VALID_LINE_REGEX = "^(\\d{4})/(\\d{2})/(\\d{2}) [\\d:.].*$";
-      valid_line_beginner = Pattern.compile(VALID_LINE_REGEX);
-    }
+    _valid_line_beginner_regex = builder._valid_line_beginner_regex;
+    _valid_line_beginner_pattern = Pattern.compile(_valid_line_beginner_regex);
   }
 
   public static final class Builder {
     private BasicQueryParser _parser;
     private String _path;
-    private boolean _standaloneLog = false;
+    private String _valid_line_beginner_regex=REGEX_VALID_LINE_TIME;
 
     public Builder() {
     }
 
+    /**
+     * choose a parser
+     * @param val a parser, e.g. BrokerLogParserImpl, ServerLogParserImpl
+     * @return
+     */
     @Nonnull
     public Builder _parser(@Nonnull BasicQueryParser val) {
       _parser = val;
       return this;
     }
 
+    /**
+     *
+     * @param val path to the log file
+     * @return
+     */
     @Nonnull
     public Builder _path(@Nonnull String val) {
       _path = val;
       return this;
     }
 
+    /**
+     *
+     * @param val starting pattern of a log line, default to REGEX_VALID_LINE_TIME = "^(\\d{4})/(\\d{2})/(\\d{2}) [\\d:.].*$"
+     * @return
+     */
     @Nonnull
-    public LogFileSrcImpl build() {
-      return new LogFileSrcImpl(this).openFile();
+    public Builder _valid_line_beginner_regex(@Nonnull String val) {
+      _valid_line_beginner_regex = val;
+      return this;
     }
 
     @Nonnull
-    public Builder _standaloneLog(boolean val) {
-      _standaloneLog = val;
-      return this;
+    public LogFileSrcImpl build() {
+      return new LogFileSrcImpl(this).openFile();
     }
   }
 
@@ -108,19 +119,19 @@ public class LogFileSrcImpl implements QuerySrc {
     if (_stringBufferNext == null) {
       throw new NoSuchElementException();
     }
-    _stringBuffer = _stringBufferNext;
+    String stringBuffer = _stringBufferNext;
     try {
-      while ((_stringBufferNext = _bufferedReader.readLine()) != null && !valid_line_beginner.matcher(_stringBufferNext)
+      while ((_stringBufferNext = _bufferedReader.readLine()) != null && !_valid_line_beginner_pattern.matcher(_stringBufferNext)
           .find()) {
-        _stringBuffer = _stringBuffer + _stringBufferNext;
+        stringBuffer = stringBuffer + _stringBufferNext;
         _stringBufferNext = null;
       }
     } catch (IOException e) {
       LOGGER.error(e.getMessage());
       _stringBufferNext = null;
     } finally {
-      LOGGER.trace("FileReader returning: {}", _stringBuffer);
-      return _parser.parse(_stringBuffer);
+      LOGGER.trace("FileReader returning: {}", stringBuffer);
+      return _parser.parse(stringBuffer);
     }
   }
 }

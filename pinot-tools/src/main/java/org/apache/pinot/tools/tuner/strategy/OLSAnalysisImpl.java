@@ -118,8 +118,8 @@ public class OLSAnalysisImpl implements BasicStrategy {
 
   @Override
   public void reporter(String tableNameWithoutType, Map<String, BasicMergerObj> mergedOut) {
-    String tableName = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
-    LOGGER.info(tableName);
+    String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
+    LOGGER.info(reportOut);
 
     if (!mergedOut.containsKey("*")) {
       return;
@@ -174,7 +174,7 @@ public class OLSAnalysisImpl implements BasicStrategy {
     }
   }
 
-  /*
+  /**
    * Parse and score the dimensions in a query
    */
   class DimensionScoring {

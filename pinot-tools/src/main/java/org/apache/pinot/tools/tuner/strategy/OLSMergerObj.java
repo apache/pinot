@@ -7,9 +7,9 @@ import java.util.HashMap;
 
 public class OLSMergerObj extends BasicMergerObj {
 
-  ArrayList<Long> _timeList = null;
-  ArrayList<Long> _inFilterList = null;
-  HashMap<Tuple2<Long, Long>, Tuple2<Long, Long>> _minBin = null;
+  ArrayList<Long> _timeList;
+  ArrayList<Long> _inFilterList;
+  HashMap<Tuple2<Long, Long>, Tuple2<Long, Long>> _minBin;
 
   public ArrayList<Long> getTimeList() {
     return _timeList;
@@ -30,7 +30,7 @@ public class OLSMergerObj extends BasicMergerObj {
   }
 
   public void merge(long time, long inFilter, long postFilter, long indexUsed, long binLen) {
-    super.addCount();
+    super.increaseCount();
     _timeList.add(time);
     _inFilterList.add(inFilter);
     Tuple2<Long, Long> key = new Tuple2<>(inFilter / binLen, postFilter / binLen);

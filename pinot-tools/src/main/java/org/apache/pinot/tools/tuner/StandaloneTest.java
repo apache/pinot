@@ -12,7 +12,8 @@ public class StandaloneTest extends StandaloneDriver {
     StandaloneDriver parserBased = new StandaloneTest().setThreadPoolSize(3).setStrategy(
         new ParserBasedImpl.Builder()._algorithmOrder(ParserBasedImpl.FIRST_ORDER)
             ._numEntriesScannedThreshold(ParserBasedImpl.NO_IN_FILTER_THRESHOLD).build()).setQuerySrc(
-        new LogFileSrcImpl.Builder()._standaloneLog(true)._parser(new BrokerLogParserImpl())
+        new LogFileSrcImpl.Builder()._valid_line_beginner_regex(LogFileSrcImpl.REGEX_VALID_LINE_STANDALONE)
+            ._parser(new BrokerLogParserImpl())
             ._path("/Users/jiaguo/Downloads/2factorfit_f/bidSuggestion_OFFLINE/bidSuggestion_noindex.log").build())
         .setMetaManager(new JsonFileMetaManagerImpl.Builder()
             ._path("/Users/jiaguo/Workspace/pinot-tuna-script/data/meta/prodAll/col_meta")

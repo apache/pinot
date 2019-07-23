@@ -13,8 +13,15 @@ public interface MetaDataProperties {
   String NUM_SEGMENTS_SORTED = "n_isSorted";
   String NUM_SEGMENTS_COUNT = "n_segments_count";
 
+  /**
+   * get aggregated (sum and weighted sum) of metadata
+   * @param tableNameWithoutType
+   * @param columnName
+   * @param fieldName one of {WEIGHTED_SUM_CARDINALITY, SUM_DOCS, NUM_SEGMENTS_HAS_INVERTED_INDEX, NUM_SEGMENTS_SORTED, NUM_SEGMENTS_COUNT}
+   * @return
+   */
   String getColField(String tableNameWithoutType, String columnName,
-      String fieldName); //get aggregated (sum and weighted sum) of metadata
+      String fieldName);
 
   String getSegmentField(String tableNameWithoutType, String columnName, String segmentName,
       String fieldName); //get metadata of individual segment
