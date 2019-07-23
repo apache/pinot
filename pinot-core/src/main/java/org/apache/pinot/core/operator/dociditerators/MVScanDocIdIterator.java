@@ -81,9 +81,9 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
     valueIterator.skipTo(docId);
     int length = valueIterator.nextIntVal(intArray);
-    int[] numEntriesScannedInEvaluator={0};
-    boolean ret=evaluator.applyMV(intArray, length,numEntriesScannedInEvaluator);
-    _numEntriesScanned+=numEntriesScannedInEvaluator[0];
+    int[] numEntriesScannedInEvaluator = {0};
+    boolean ret = evaluator.applyMV(intArray, length, numEntriesScannedInEvaluator);
+    _numEntriesScanned += numEntriesScannedInEvaluator[0];
     return ret;
   }
 
@@ -112,17 +112,17 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     if (currentDocId == Constants.EOF) {
       return currentDocId;
     }
-    int[] numEntriesScannedInEvaluator={0};
+    int[] numEntriesScannedInEvaluator = {0};
     while (valueIterator.hasNext() && currentDocId < endDocId) {
       currentDocId = currentDocId + 1;
       int length = valueIterator.nextIntVal(intArray);
       if (evaluator.applyMV(intArray, length, numEntriesScannedInEvaluator)) {
-        _numEntriesScanned+=numEntriesScannedInEvaluator[0];
+        _numEntriesScanned += numEntriesScannedInEvaluator[0];
         return currentDocId;
       }
     }
     currentDocId = Constants.EOF;
-    _numEntriesScanned+=numEntriesScannedInEvaluator[0];
+    _numEntriesScanned += numEntriesScannedInEvaluator[0];
     return Constants.EOF;
   }
 
@@ -145,7 +145,7 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
     IntIterator intIterator = answer.getIntIterator();
     int docId = -1, length;
-    int[] numEntriesScannedInEvaluator={0};
+    int[] numEntriesScannedInEvaluator = {0};
     while (intIterator.hasNext() && docId < endDocId) {
       docId = intIterator.next();
       if (docId >= startDocId) {
@@ -156,7 +156,7 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
         }
       }
     }
-    _numEntriesScanned+=numEntriesScannedInEvaluator[0];
+    _numEntriesScanned += numEntriesScannedInEvaluator[0];
     return result;
   }
 

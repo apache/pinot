@@ -69,20 +69,20 @@ public abstract class BaseRawValueBasedPredicateEvaluator extends BasePredicateE
     if (isExclusive()) {
       for (int i = 0; i < length; i++) {
         if (!applySV(values[i])) {
-          numEntriesScanned[0]+=i+1;
+          numEntriesScanned[0] += i + 1;
           return false;
         }
       }
-      numEntriesScanned[0]+=length;
+      numEntriesScanned[0] += length;
       return true;
     } else {
       for (int i = 0; i < length; i++) {
         if (applySV(values[i])) {
-          numEntriesScanned[0]+=i+1;
+          numEntriesScanned[0] += i + 1;
           return true;
         }
       }
-      numEntriesScanned[0]+=length;
+      numEntriesScanned[0] += length;
       return false;
     }
   }
