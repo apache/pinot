@@ -49,6 +49,8 @@ import org.slf4j.LoggerFactory;
 
 public class AvroUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(AvroUtils.class);
+  public static final String MAP_KEY_COLUMN_SUFFIX = "__KEYS";
+  public static final String MAP_VALUE_COLUMN_SUFFIX = "__VALUES";
 
   private AvroUtils() {
   }
@@ -302,32 +304,31 @@ public class AvroUtils {
     }
   }
 
-  public static void extractField(FieldSpec incomingFieldSpec, GenericRecord from, GenericRow to) {
-    String fieldName = incomingFieldSpec.getName();
+  public static void extractField(FieldSpec fieldSpec, GenericRecord from, GenericRow to) {
+    String fieldName = fieldSpec.getName();
     //Handle MAP types
-    if (fieldName.toUpperCase().endsWith("__KEYS")) {
-      String avroFieldName = fieldName.replaceAll("__KEYS", "");
+    if (fieldName.toUpperCase().endsWith(MAP_KEY_COLUMN_SUFFIX)) {
+      String avroFieldName = fieldName.replaceAll(MAP_KEY_COLUMN_SUFFIX, "");
       Object o = from.get(avroFieldName);
       if (o instanceof Map) {
         Map map = (Map) o;
         TreeSet sortedKeySet = new TreeSet(map.keySet());
-        to.putField(fieldName, RecordReaderUtils.convert(incomingFieldSpec, sortedKeySet));
+        to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, sortedKeySet));
       }
-    } else if (fieldName.toUpperCase().endsWith("__VALUES")) {
-      String avroFieldName = fieldName.replaceAll("__VALUES", "");
+    } else if (fieldName.toUpperCase().endsWith(MAP_VALUE_COLUMN_SUFFIX)) {
+      String avroFieldName = fieldName.replaceAll(MAP_VALUE_COLUMN_SUFFIX, "");
       Object o = from.get(avroFieldName);
       if (o instanceof Map) {
         Map map = (Map) o;
         TreeSet sortedKeySet = new TreeSet(map.keySet());
         List values = new ArrayList(map.size());
-        int i = 0;
         for (Object key : sortedKeySet) {
           values.add(map.get(key));
         }
-        to.putField(fieldName, RecordReaderUtils.convert(incomingFieldSpec, values));
+        to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, values));
       }
     } else {
-      to.putField(fieldName, RecordReaderUtils.convert(incomingFieldSpec, from.get(fieldName)));
+      to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, from.get(fieldName)));
     }
   }
 }

@@ -51,6 +51,10 @@ public class MapValueTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(@Nonnull List<TransformFunction> arguments, @Nonnull Map<String, DataSource> dataSourceMap) {
+    int numArguments = arguments.size();
+    if (numArguments != 3) {
+      throw new IllegalArgumentException("3 arguments are required for MAP_VALUE transform function map_value(keyColName, 'keyName', valColName)");
+    }
     _keyColumnFunction = arguments.get(0);
     _keyName = ((LiteralTransformFunction) arguments.get(1)).getLiteral();
     _valueColumnFunction = arguments.get(2);

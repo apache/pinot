@@ -82,7 +82,6 @@ public class AvroRecordReader implements RecordReader {
       String fieldName = fieldSpec.getName();
       Object value = _reusableAvroRecord.get(fieldName);
       // Allow default value for non-time columns
-      //Why special treatment for Time Column?
       if (value != null || fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
         AvroUtils.extractField(fieldSpec, _reusableAvroRecord, reuse);
       }
