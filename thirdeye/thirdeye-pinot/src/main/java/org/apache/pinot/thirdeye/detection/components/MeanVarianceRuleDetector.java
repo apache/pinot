@@ -208,11 +208,6 @@ public class MeanVarianceRuleDetector implements AnomalyDetector<MeanVarianceRul
       std[k]= trainingDF.getDoubles(COL_CHANGE).std().value();
       mean[k] = trainingDF.getDoubles(COL_CHANGE).mean().value();
 
-      // We need at least 4 weeks of data
-      if (trainingDF.size() < 4) {
-        continue;
-      }
-
       //calculate baseline, error , upper and lower bound for prediction window.
       resultTimeArray[k] = forecastDF.getLong(COL_TIME, k);
       baselineArray[k] = trainingDF.getDouble(COL_VALUE,trainingDF.size()-1) * (1 + mean[k]);
