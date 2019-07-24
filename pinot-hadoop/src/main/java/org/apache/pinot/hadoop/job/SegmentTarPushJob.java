@@ -56,29 +56,31 @@ public class SegmentTarPushJob extends BaseSegmentJob {
   public void run()
       throws Exception {
     FileSystem fileSystem = FileSystem.get(_conf);
+    List<Path> segmentsToPush = getDataFilePaths(_segmentPattern);
     try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
       // TODO: Deal with invalid prefixes in the future
+
+      List<String> allSegments = controllerRestApi.getAllSegments("OFFLINE");
+
+      controllerRestApi.pushSegments(fileSystem, segmentsToPush);
+
       if (_deleteExtraSegments) {
-        deleteExtraSegments(controllerRestApi, fileSystem);
-      } else {
-        controllerRestApi.pushSegments(fileSystem, getDataFilePaths(_segmentPattern));
+        controllerRestApi.deleteSegmentUris(getSegmentsToDelete(allSegments, segmentsToPush));
       }
     }
   }
 
   /**
    * Deletes extra segments after pushing to the controller
-   * @param controllerRestApi
-   * @param fileSystem
+   * @param allSegments all segments on the controller for the table
+   * @param segmentsToPush segments that will be pushed to the controller
    * @throws IOException
    */
-  public void deleteExtraSegments(ControllerRestApi controllerRestApi, FileSystem fileSystem) throws IOException {
-    List<String> allSegments = controllerRestApi.getAllSegments("OFFLINE");
+  public List<String> getSegmentsToDelete(List<String> allSegments, List<Path> segmentsToPush) {
     Set<String> uniqueSegmentPrefixes = new HashSet<>();
 
     // Get all relevant segment prefixes that we are planning on pushing
-    List<Path> segmentsToPushPaths = getDataFilePaths(_segmentPattern);
-    List<String> segmentsToPushNames = segmentsToPushPaths.stream().map(s -> s.getName()).collect(Collectors.toList());
+    List<String> segmentsToPushNames = segmentsToPush.stream().map(s -> s.getName()).collect(Collectors.toList());
     for (String segmentName : segmentsToPushNames) {
       String segmentNamePrefix = removeSequenceId(segmentName);
       uniqueSegmentPrefixes.add(segmentNamePrefix);
@@ -93,8 +95,7 @@ public class SegmentTarPushJob extends BaseSegmentJob {
     }
 
     relevantSegments.removeAll(segmentsToPushNames);
-    controllerRestApi.pushSegments(fileSystem, getDataFilePaths(_segmentPattern));
-    controllerRestApi.deleteSegmentUris(relevantSegments);
+    return relevantSegments;
   }
 
   /**
