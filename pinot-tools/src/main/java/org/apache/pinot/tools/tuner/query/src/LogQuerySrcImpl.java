@@ -33,8 +33,8 @@ public class LogQuerySrcImpl implements QuerySrc {
   private LogQuerySrcImpl(Builder builder) {
     _parser = builder._parser;
     _path = builder._path;
-    String valid_line_beginner_regex = builder._validLineBeginnerRegex;
-    _validLineBeginnerPattern = Pattern.compile(valid_line_beginner_regex);
+    String _validLineBeginnerRegex = builder._validLineBeginnerRegex;
+    _validLineBeginnerPattern = Pattern.compile(_validLineBeginnerRegex);
   }
 
   public static final class Builder {

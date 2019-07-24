@@ -19,15 +19,15 @@ import org.slf4j.LoggerFactory;
  *   MetaData Manager: a manger for MetaManager, which is an interface to access segment metadata.
  *   QuerySrc: an iterator interface over input source, has a pluggable AbstractQueryParser, who parses each item in input source, and returns AbstractQueryStats, a wrapper of relevant fields in nput.
  *   Strategy, which has four user defined functions operating on a map of Map<Long, Map<String, Map<String, AbstractMergerObj>>>:
- *                                                                               |		       |				    |				  |
- *                                                                           ThreadID	TableName	    ColumnName		Abstract object of stats for a column
+ *                                                                             |		       |				    |				     |
+ *                                                                        ThreadID	   TableName	  ColumnName		  Abstract object of stats for a column
  *       Filter: A function to filter AbstractQueryStats, by table name, number of entries scanned in filters, number of entries scanned post filter, etc. The relevant AbstractQueryStats will be feed to Accumulator.
  *       Accumulator: A function to process AbstractQueryStats and MetaManager; then accumulate stats to corresponding AbstractMergerObj entry.
  *       Merger: A function to merge two AbstractMergerObj entries having the same TableName/ColumnName from different threads.
  *       Reporter: A function to postprocess and print(email) out the final results of a table.
  */
 public abstract class TunerDriver {
-  protected static final Logger LOGGER = LoggerFactory.getLogger(TunerDriver.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(TunerDriver.class);
   public static final int NO_CONCURRENCY = 0;
 
   private QuerySrc _querySrc = null;
@@ -177,6 +177,7 @@ public abstract class TunerDriver {
       }
       LOGGER.info("All merge done");
     }
+
     //Report
     for (Map.Entry<String, Map<String, AbstractAccumulator>> tableStat : _mergedResults.entrySet()) {
       _strategy.reporter(tableStat.getKey(), tableStat.getValue());
