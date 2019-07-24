@@ -14,11 +14,11 @@ public class IndexSuggestQueryStatsImpl extends AbstractQueryStats {
   private String _numEntriesScannedPostFilter;
 
   public static final class Builder {
-    private String _tableNameWithoutType;
-    private String _numEntriesScannedInFilter;
-    private String _numEntriesScannedPostFilter;
-    private String _query;
-    private String _time;
+    private String _tableNameWithoutType = null;
+    private String _numEntriesScannedInFilter = null;
+    private String _numEntriesScannedPostFilter = null;
+    private String _query = null;
+    private String _time = null;
 
     public Builder() {
     }
