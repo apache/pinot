@@ -71,7 +71,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
      * @return
      */
     @Nonnull
-    public Builder useExistingIndex(@Nonnull Boolean val) {
+    public Builder setUseExistingIndex(@Nonnull Boolean val) {
       _useExistingIndex = val;
       return this;
     }
@@ -82,7 +82,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
      * @return
      */
     @Nonnull
-    public Builder additionalMaskingCols(@Nonnull HashMap<String, HashSet<String>> val) {
+    public Builder setAdditionalMaskingCols(@Nonnull HashMap<String, HashSet<String>> val) {
       _additionalMaskingCols = val;
       return this;
     }

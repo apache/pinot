@@ -60,7 +60,7 @@ public class FrequencyImpl implements Strategy {
      * @return
      */
     @Nonnull
-    public Builder _tableNamesWorkonWithoutType(@Nonnull HashSet<String> val) {
+    public Builder setTableNamesWorkonWithoutType(@Nonnull HashSet<String> val) {
       _tableNamesWorkonWithoutType = val;
       return this;
     }
@@ -71,7 +71,7 @@ public class FrequencyImpl implements Strategy {
      * @return
      */
     @Nonnull
-    public Builder _numEntriesScannedThreshold(long val) {
+    public Builder setNumEntriesScannedThreshold(long val) {
       _numEntriesScannedThreshold = val;
       return this;
     }
@@ -83,7 +83,7 @@ public class FrequencyImpl implements Strategy {
      * @return
      */
     @Nonnull
-    public Builder _cardinalityThreshold(long val) {
+    public Builder setCardinalityThreshold(long val) {
       _cardinalityThreshold = val;
       return this;
     }
@@ -94,7 +94,7 @@ public class FrequencyImpl implements Strategy {
      * @return
      */
     @Nonnull
-    public Builder _numProcessedThreshold(long val) {
+    public Builder setNumProcessedThreshold(long val) {
       _numProcessedThreshold = val;
       return this;
     }
@@ -105,7 +105,7 @@ public class FrequencyImpl implements Strategy {
      * @return
      */
     @Nonnull
-    public Builder _tableNamesWorkonWithoutType(@Nonnull List<String> val) {
+    public Builder setTableNamesWorkonWithoutType(@Nonnull List<String> val) {
       _tableNamesWorkonWithoutType.addAll(val);
       return this;
     }

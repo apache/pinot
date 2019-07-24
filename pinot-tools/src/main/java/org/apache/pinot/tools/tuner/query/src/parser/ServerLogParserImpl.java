@@ -9,7 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class ServerLogParserImpl implements AbstractQueryParser {
+public class ServerLogParserImpl implements QueryParser {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerLogParserImpl.class);
   /*Regex to parse Server Log*/
   private static final String SERVER_LOG_REGEX =

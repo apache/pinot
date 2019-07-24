@@ -16,7 +16,7 @@ public interface QuerySrc {
 
   /**
    *
-   * @return The nex obj parsed from input
+   * @return The next obj parsed from input
    * @throws NoSuchElementException
    */
   AbstractQueryStats next()

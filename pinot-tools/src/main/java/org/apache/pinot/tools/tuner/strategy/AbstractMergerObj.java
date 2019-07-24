@@ -7,7 +7,7 @@ public abstract class AbstractMergerObj {
   public abstract String toString();
 
   /**
-   * get the default counter for BasicMergerObjs merged to this AbstractMergerObj
+   * Get the default counter for BasicMergerObjs merged to this AbstractMergerObj
    * @return
    */
   public long getCount() {
@@ -17,14 +17,14 @@ public abstract class AbstractMergerObj {
   private long _count = 0;
 
   /**
-   * increase default counter by one
+   * Increase default counter by one
    */
   public void increaseCount() {
     this._count += 1;
   }
 
   /**
-   * merge the default counter of two BasicMergerObjs
+   * Merge the default counter of two BasicMergerObjs
    * @param abstractMergerObj AbstractMergerObj to merge to this AbstractMergerObj
    */
   public void mergeCount(AbstractMergerObj abstractMergerObj) {

@@ -9,7 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class BrokerLogParserImpl implements AbstractQueryParser {
+public class BrokerLogParserImpl implements QueryParser {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerLogParserImpl.class);
 
   //Regex to parse Broker Log

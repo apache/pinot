@@ -7,7 +7,7 @@ import java.io.InputStreamReader;
 import java.util.NoSuchElementException;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
-import org.apache.pinot.tools.tuner.query.src.parser.AbstractQueryParser;
+import org.apache.pinot.tools.tuner.query.src.parser.QueryParser;
 import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,8 +16,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Generic class to iterate over lines in file
  */
-public class LogFileSrcImpl implements QuerySrc {
-  private static final Logger LOGGER = LoggerFactory.getLogger(LogFileSrcImpl.class);
+public class LogQuerySrcImpl implements QuerySrc {
+  private static final Logger LOGGER = LoggerFactory.getLogger(LogQuerySrcImpl.class);
 
   public static final String REGEX_VALID_LINE_STANDALONE = "^(Processed requestId|RequestId|\\w).*$";
   public static final String REGEX_VALID_LINE_TIME = "^(\\d{4})/(\\d{2})/(\\d{2}) [\\d:.].*$";
@@ -27,10 +27,10 @@ public class LogFileSrcImpl implements QuerySrc {
   private String _stringBufferNext = null;
   private Pattern _validLineBeginnerPattern;
 
-  private AbstractQueryParser _parser;
+  private QueryParser _parser;
   private String _path;
 
-  private LogFileSrcImpl(Builder builder) {
+  private LogQuerySrcImpl(Builder builder) {
     _parser = builder._parser;
     _path = builder._path;
     String valid_line_beginner_regex = builder._validLineBeginnerRegex;
@@ -38,7 +38,7 @@ public class LogFileSrcImpl implements QuerySrc {
   }
 
   public static final class Builder {
-    private AbstractQueryParser _parser;
+    private QueryParser _parser;
     private String _path;
     private String _validLineBeginnerRegex = REGEX_VALID_LINE_TIME;
 
@@ -51,7 +51,7 @@ public class LogFileSrcImpl implements QuerySrc {
      * @return
      */
     @Nonnull
-    public Builder setParser(@Nonnull AbstractQueryParser val) {
+    public Builder setParser(@Nonnull QueryParser val) {
       _parser = val;
       return this;
     }
@@ -79,12 +79,12 @@ public class LogFileSrcImpl implements QuerySrc {
     }
 
     @Nonnull
-    public LogFileSrcImpl build() {
-      return new LogFileSrcImpl(this).openFile();
+    public LogQuerySrcImpl build() {
+      return new LogQuerySrcImpl(this).openFile();
     }
   }
 
-  private LogFileSrcImpl openFile() {
+  private LogQuerySrcImpl openFile() {
     try {
       _fileInputStream = new FileInputStream(this._path);
       _bufferedReader = new BufferedReader(new InputStreamReader(_fileInputStream));
