@@ -28,7 +28,6 @@ import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,14 +49,6 @@ public class LeadControllerManager {
     _instanceId = instanceId;
     _helixManager = helixManager;
     _partitionIndexCache = ConcurrentHashMap.newKeySet();
-  }
-
-  /**
-   * Marks the cached indices invalid and unregisters {@link PinotHelixResourceManager}.
-   */
-  public synchronized void stop() {
-    _partitionIndexCache.clear();
-    _isShuttingDown = true;
   }
 
   /**
@@ -120,6 +111,16 @@ public class LeadControllerManager {
   }
 
   /**
+   * Marks the cached indices invalid and isShuttingDown to be true.
+   * Adding the synchronized block here and in the following callback methods
+   * to make sure that {@link HelixManager} won't be closed when the callback changes happened.
+   */
+  public synchronized void stop() {
+    _partitionIndexCache.clear();
+    _isShuttingDown = true;
+  }
+
+  /**
    * Callback on changes in the controller. Should be registered to the controller callback. This callback is not needed when the resource is enabled.
    * However, the resource can be disabled sometime while the cluster is in operation, so we keep it here. Plus, it does not add much overhead.
    * At some point in future when we stop supporting the disabled resource, we will remove this line altogether and the logic that goes with it.
@@ -145,6 +146,9 @@ public class LeadControllerManager {
     }
   }
 
+  /**
+   * Callback on changes in resource config.
+   */
   synchronized void onResourceConfigChange() {
     if (_isShuttingDown) {
       return;

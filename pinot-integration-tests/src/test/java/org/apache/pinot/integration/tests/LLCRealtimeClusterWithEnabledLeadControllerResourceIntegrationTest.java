@@ -26,6 +26,6 @@ public class LLCRealtimeClusterWithEnabledLeadControllerResourceIntegrationTest 
   public void startController() {
     ControllerConf controllerConfig = getDefaultControllerConfiguration();
     startController(controllerConfig);
-    _helixResourceManager.enableLeadControllerResource(true);
+    enableResourceConfigForLeadControllerResource(true);
   }
 }

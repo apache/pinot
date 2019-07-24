@@ -2344,13 +2344,6 @@ public class PinotHelixResourceManager {
     return endpointToInstance;
   }
 
-  public void enableLeadControllerResource(boolean enable) {
-    Map<String, String> resourceConfig = new HashMap<>();
-    resourceConfig.put(LeadControllerUtils.RESOURCE_ENABLED, Boolean.toString(enable));
-    HelixHelper.updateResourceConfigsFor(resourceConfig, LEAD_CONTROLLER_RESOURCE_NAME, getHelixClusterName(),
-        getHelixAdmin());
-  }
-
   /*
    * Uncomment and use for testing on a real cluster
   public static void main(String[] args) throws Exception {
