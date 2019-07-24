@@ -59,7 +59,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     /**
      *
      * @param val The path to the json file storing the segment metadata
-     * @return
+     * @return this
      */
     @Nonnull
     public Builder setPath(@Nonnull String val) {
@@ -70,7 +70,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     /**
      *
      * @param val If this is set the already applied index will not be considered again
-     * @return
+     * @return this
      */
     @Nonnull
     public Builder setUseExistingIndex(@Nonnull Boolean val) {
@@ -81,7 +81,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     /**
      *
      * @param val For research and debug purpose only, the cardinality of /tableName/colName passed in will be considered as 1
-     * @return
+     * @return this
      */
     @Nonnull
     public Builder setAdditionalMaskingCols(@Nonnull HashMap<String, HashSet<String>> val) {
@@ -95,6 +95,10 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     }
   }
 
+  /**
+   * fetch the metadata from file
+   * @return this
+   */
   public JsonFileMetaManagerImpl fetch() {
     File file = new File(this._path);
     String metaBytes = "";
@@ -115,6 +119,12 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     return this;
   }
 
+  /**
+   * If there is already inverted index on a column
+   * @param tableNameWithoutType
+   * @param columnName
+   * @return
+   */
   public boolean hasInvertedIndex(String tableNameWithoutType, String columnName) {
     if (_additionalMaskingCols.getOrDefault(tableNameWithoutType, new HashSet<>()).contains(columnName)) {
       return true;

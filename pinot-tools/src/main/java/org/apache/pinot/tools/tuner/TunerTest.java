@@ -13,8 +13,9 @@ public class TunerTest extends TunerDriver {
         new ParserBasedImpl.Builder().setAlgorithmOrder(1)
             .setNumEntriesScannedThreshold(ParserBasedImpl.NO_IN_FILTER_THRESHOLD).build()).setQuerySrc(
         new LogQuerySrcImpl.Builder().setValidLineBeginnerRegex(LogQuerySrcImpl.REGEX_VALID_LINE_STANDALONE)
-            .setParser(new BrokerLogParserImpl())
-            .setPath("/Users/jiaguo/Downloads/2factorfit_f/bidSuggestion_OFFLINE/bidSuggestion_noindex.log").build())
+            .setParser(new BrokerLogParserImpl()).setPath(
+            "/Users/jiaguo/Workspace/pinot-tuna-script/data/logs/logs_2019-06-28/lor1-app11412.prod.linkedin.com/logs/pinot-broker.log.2019-06-26")
+            .build())
         .setMetaManager(new JsonFileMetaManagerImpl.Builder()
             .setPath("/Users/jiaguo/Workspace/pinot-tuna-script/data/meta/prodAll/col_meta")
             .setUseExistingIndex(JsonFileMetaManagerImpl.DONT_USE_EXISTING_INDEX).build());
