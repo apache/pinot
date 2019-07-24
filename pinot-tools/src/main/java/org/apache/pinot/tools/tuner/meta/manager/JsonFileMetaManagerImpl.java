@@ -136,7 +136,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     return false;
   }
 
-  public BigFraction getAverageCardinality(String tableNameWithoutType, String columnName) {
+  public BigFraction getColumnSelectivity(String tableNameWithoutType, String columnName) {
     LOGGER.debug("Getting card from: {} {}", tableNameWithoutType, columnName);
 
     if (_additionalMaskingCols.getOrDefault(tableNameWithoutType, new HashSet<>()).contains(columnName)) {

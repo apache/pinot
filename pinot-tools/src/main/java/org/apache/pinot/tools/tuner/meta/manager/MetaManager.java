@@ -14,7 +14,7 @@ public interface MetaManager {
   String NUM_SEGMENTS_COUNT = "n_segments_count";
 
   /**
-   * get aggregated (sum and weighted sum) of metadata
+   * Get aggregated (sum and weighted sum) of metadata
    * @param tableNameWithoutType
    * @param columnName
    * @param fieldName one of {WEIGHTED_SUM_CARDINALITY, SUM_DOCS, NUM_SEGMENTS_HAS_INVERTED_INDEX, NUM_SEGMENTS_SORTED, NUM_SEGMENTS_COUNT}
@@ -22,10 +22,23 @@ public interface MetaManager {
    */
   String getColField(String tableNameWithoutType, String columnName, String fieldName);
 
-  String getSegmentField(String tableNameWithoutType, String columnName, String segmentName,
-      String fieldName); //get metadata of individual segment
+  /**
+   * Getter to certain fields for a specific column, for forward compatibility precise inverted index prediction.
+   * @param tableNameWithoutType
+   * @param columnName
+   * @param segmentName
+   * @param fieldName
+   * @return
+   */
+  String getSegmentField(String tableNameWithoutType, String columnName, String segmentName, String fieldName); //get metadata of individual segment
 
-  BigFraction getAverageCardinality(String tableNameWithoutType, String columnName);
+  /**
+   * Get the selectivity calculated by weighted average of cardinality.
+   * @param tableNameWithoutType
+   * @param columnName
+   * @return Selectivity, a BigFraction.
+   */
+  BigFraction getColumnSelectivity(String tableNameWithoutType, String columnName);
 
   boolean hasInvertedIndex(String tableNameWithoutType, String columnName);
 }

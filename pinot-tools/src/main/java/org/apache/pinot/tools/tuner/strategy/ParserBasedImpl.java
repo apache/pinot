@@ -36,20 +36,20 @@ public class ParserBasedImpl implements Strategy {
 
   public final static long NO_PROCESSED_THRESH = 0;
 
-  public final static int NO_CARD_THRESH = 1;
+  public final static int NO_SEL_THRESH = 1;
 
   private int _algorithmOrder;
   private HashSet<String> _tableNamesWorkonWithoutType;
   private long _numEntriesScannedThreshold;
   private long _numProcessedThreshold;
-  private int _cardinalityThreshold;
+  private int _selectivityThreshold;
 
   private ParserBasedImpl(Builder builder) {
     _algorithmOrder = builder._algorithmOrder;
     _tableNamesWorkonWithoutType = builder._tableNamesWorkonWithoutType;
     _numEntriesScannedThreshold = builder._numEntriesScannedThreshold;
     _numProcessedThreshold = builder._numProcessedThreshold;
-    _cardinalityThreshold = builder._cardinalityThreshold;
+    _selectivityThreshold = builder._selectivityThreshold;
   }
 
   public static final class Builder {
@@ -57,7 +57,7 @@ public class ParserBasedImpl implements Strategy {
     private HashSet<String> _tableNamesWorkonWithoutType = new HashSet<>();
     private long _numEntriesScannedThreshold = NO_IN_FILTER_THRESHOLD;
     private long _numProcessedThreshold = NO_PROCESSED_THRESH;
-    private int _cardinalityThreshold = NO_CARD_THRESH;
+    private int _selectivityThreshold = NO_SEL_THRESH;
 
     public Builder() {
     }
@@ -112,14 +112,14 @@ public class ParserBasedImpl implements Strategy {
     }
 
     /**
-     * Set the cardinality threshold, column with cardinality below this will be ignored;
-     * setting a high value will force the system to ignore low card columns
-     * @param val cardinality threshold, default to 1
+     * Set the selectivity threshold, column with selectivity below this will be ignored;
+     * setting a high value will force the system to ignore low selectivity columns
+     * @param val selectivity threshold, default to 1
      * @return
      */
     @Nonnull
-    public Builder setCardinalityThreshold(int val) {
-      _cardinalityThreshold = val;
+    public Builder setSelectivityThreshold(int val) {
+      _selectivityThreshold = val;
       return this;
     }
 
@@ -163,9 +163,9 @@ public class ParserBasedImpl implements Strategy {
     LOGGER.debug("Accumulator: query score: {}", columnScores.toString());
 
     HashSet<String> counted = new HashSet<>();
-    //Discard if the effective cardinality is less than _cardinalityThreshold
-    BigFraction cardinalityThresholdFraction = new BigFraction(_cardinalityThreshold);
-    columnScores.stream().filter(tupleNamesScore -> tupleNamesScore._2().compareTo(cardinalityThresholdFraction) > 0)
+    //Discard if the effective selectivity is less than _selectivityThreshold
+    BigFraction selectivityThresholdFraction = new BigFraction(_selectivityThreshold);
+    columnScores.stream().filter(tupleNamesScore -> tupleNamesScore._2().compareTo(selectivityThresholdFraction) > 0)
         .forEach(tupleNamesScore -> {
           //Do not count if already counted
           tupleNamesScore._1().stream().filter(colName -> !counted.contains(colName)).forEach(colName -> {
@@ -287,7 +287,7 @@ public class ParserBasedImpl implements Strategy {
      * The score is calculated as:
      *  AND connected: pick the top _algorithmOrder of sorted([([colName],Score(predicate)) for predicate in predicateList])
      *  OR connected: ([colName1]+[colName2]+[colName3], 1/(1/Score(predicate1)+1/Score(predicate2)+1/Score(predicate3))) i.e. Harmonic mean of scores
-     * @param predicateListContext the leaf predicate context where the score are generated from cardinality
+     * @param predicateListContext the leaf predicate context where the score are generated from selectivity
      * @return a list of sorted tuples List<Tuple2<List<colName>, Score>>
      */
     List<Tuple2<List<String>, BigFraction>> parsePredicateList(PQL2Parser.PredicateListContext predicateListContext) {
@@ -348,18 +348,18 @@ public class ParserBasedImpl implements Strategy {
      * Parse leaf predicates
      * The score is calculated as:
      *  IN clause:
-     *    IN: cardinality/len(literals to match)
-     *    NOT IN: cardinality/(cardinality-len(literals to match))
+     *    IN: selectivity/len(literals to match)
+     *    NOT IN: selectivity/(selectivity-len(literals to match))
      *  Comparison clause:
-     *    '=': cardinality
-     *    '!=' '<>' cardinality/(cardinality-1)
+     *    '=': selectivity
+     *    '!=' '<>' selectivity/(selectivity-1)
      *
      *  Other Predicates have no scoring for now
      *  TODO:
      *  Range ( <d<, BETWEEN AND) clause:
-     *    average_values_hit/cardinality
+     *    average_values_hit/selectivity
      *  Moreover, if average_values_hit is made available, prediction for In clause can be optimized
-     * @param predicateContext the leaf predicate context where the score are generated from cardinality
+     * @param predicateContext the leaf predicate context where the score are generated from selectivity
      * @return a list of tuples List<Tuple2<List<colName>, Score>>
      */
     List<Tuple2<List<String>, BigFraction>> parsePredicate(PQL2Parser.PredicateContext predicateContext) {
@@ -375,21 +375,21 @@ public class ParserBasedImpl implements Strategy {
         colNameList.add(colName);
         ArrayList<Tuple2<List<String>, BigFraction>> ret = new ArrayList<>();
 
-        BigFraction cardinality = _metaManager.getAverageCardinality(_tableNameWithoutType, colName);
-        LOGGER.debug("Final Cardinality: {} {} {}", cardinality, _tableNameWithoutType, colName);
-        if (cardinality.compareTo(BigFraction.ONE) <= 0) {
+        BigFraction selectivity = _metaManager.getColumnSelectivity(_tableNameWithoutType, colName);
+        LOGGER.debug("Final Cardinality: {} {} {}", selectivity, _tableNameWithoutType, colName);
+        if (selectivity.compareTo(BigFraction.ONE) <= 0) {
           return ret;
         }
 
         int lenFilter = ((PQL2Parser.InPredicateContext) predicateContext).inClause().literal().size();
         if (((PQL2Parser.InPredicateContext) predicateContext).inClause().NOT() != null) {
-          if (cardinality.subtract(lenFilter).compareTo(BigFraction.ZERO) <= 0) {
-            ret.add(new Tuple2<>(colNameList, cardinality));
+          if (selectivity.subtract(lenFilter).compareTo(BigFraction.ZERO) <= 0) {
+            ret.add(new Tuple2<>(colNameList, selectivity));
             return ret;
           }
-          ret.add(new Tuple2<>(colNameList, cardinality.divide(cardinality.subtract(lenFilter))));
+          ret.add(new Tuple2<>(colNameList, selectivity.divide(selectivity.subtract(lenFilter))));
         } else {
-          ret.add(new Tuple2<>(colNameList, cardinality.divide(lenFilter)));
+          ret.add(new Tuple2<>(colNameList, selectivity.divide(lenFilter)));
         }
         LOGGER.debug("IN clause ret {}", ret.toString());
         return ret;
@@ -401,9 +401,9 @@ public class ParserBasedImpl implements Strategy {
         colNameList.add(colName);
         ArrayList<Tuple2<List<String>, BigFraction>> ret = new ArrayList<>();
 
-        BigFraction cardinality = _metaManager.getAverageCardinality(_tableNameWithoutType, colName);
-        LOGGER.debug("Final Cardinality: {} {} {}", cardinality, _tableNameWithoutType, colName);
-        if (cardinality.compareTo(BigFraction.ONE) <= 0) {
+        BigFraction selectivity = _metaManager.getColumnSelectivity(_tableNameWithoutType, colName);
+        LOGGER.debug("Final Cardinality: {} {} {}", selectivity, _tableNameWithoutType, colName);
+        if (selectivity.compareTo(BigFraction.ONE) <= 0) {
           return ret;
         }
 
@@ -412,15 +412,15 @@ public class ParserBasedImpl implements Strategy {
                 .getText();
         LOGGER.debug("COMP operator {}", comparisonOp);
         if (comparisonOp.equals("=")) {
-          ret.add(new Tuple2<>(colNameList, cardinality));
+          ret.add(new Tuple2<>(colNameList, selectivity));
           LOGGER.debug("COMP clause ret {}", ret.toString());
           return ret;
         } else if (comparisonOp.equals("!=") || comparisonOp.equals("<>")) {
-          if (cardinality.subtract(BigInteger.ONE).compareTo(BigFraction.ZERO) <= 0) {
+          if (selectivity.subtract(BigInteger.ONE).compareTo(BigFraction.ZERO) <= 0) {
             ret.add(new Tuple2<>(colNameList, BigFraction.ONE));
             return ret;
           }
-          ret.add(new Tuple2<>(colNameList, cardinality.divide(cardinality.subtract(BigFraction.ONE))));
+          ret.add(new Tuple2<>(colNameList, selectivity.divide(selectivity.subtract(BigFraction.ONE))));
           LOGGER.debug("COMP clause ret {}", ret.toString());
           return ret;
         } else {

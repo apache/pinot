@@ -145,7 +145,7 @@ public class FrequencyImpl implements Strategy {
       }
     }
 
-    counted.stream().filter(colName -> metaManager.getAverageCardinality(tableNameWithoutType, colName)
+    counted.stream().filter(colName -> metaManager.getColumnSelectivity(tableNameWithoutType, colName)
         .compareTo(new BigFraction(_cardinalityThreshold)) > 0).forEach(colName -> {
       AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
       AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new FrequencyAccumulator());
