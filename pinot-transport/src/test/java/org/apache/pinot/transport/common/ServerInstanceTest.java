@@ -20,8 +20,10 @@ package org.apache.pinot.transport.common;
 
 import java.net.InetAddress;
 import org.apache.pinot.common.response.ServerInstance;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 
 
 public class ServerInstanceTest {
@@ -29,50 +31,26 @@ public class ServerInstanceTest {
   @Test
   public void testServerInstance()
       throws Exception {
-    // Same local hostname and port
-    {
-      ServerInstance instance1 = new ServerInstance("localhost", 8080);
-      ServerInstance instance2 = new ServerInstance("localhost", 8080);
-//      System.out.println("Instance 1 :" + instance1);
-//      System.out.println("Instance 2 :" + instance2);
-      Assert.assertEquals(instance2, instance1, "Localhost server-instances with same port");
-    }
+    // Same local host name and port
+    assertEquals(new ServerInstance("localhost", 8080), new ServerInstance("localhost", 8080));
 
-    // Same  hostname and port
-    {
-      ServerInstance instance1 = new ServerInstance("test-host", 8080);
-      ServerInstance instance2 = new ServerInstance("test-host", 8080);
-//      System.out.println("Instance 1 :" + instance1);
-//      System.out.println("Instance 2 :" + instance2);
-      Assert.assertEquals(instance2, instance1, "Localhost server-instances with same port");
-    }
-    // same hostname but different port
-    {
-      ServerInstance instance1 = new ServerInstance("localhost", 8081);
-      ServerInstance instance2 = new ServerInstance("localhost", 8082);
-//      System.out.println("Instance 1 :" + instance1);
-//      System.out.println("Instance 2 :" + instance2);
-      Assert.assertFalse(instance1.equals(instance2), "Localhost server-instances with same port");
-    }
+    // Same local host IP address and port
+    assertEquals(new ServerInstance("127.0.0.1", 8080), new ServerInstance("127.0.0.1", 8080));
 
-    // same port but different host
-    {
-      ServerInstance instance1 = new ServerInstance("abcd", 8080);
-      ServerInstance instance2 = new ServerInstance("abce", 8080);
-//      System.out.println("Instance 1 :" + instance1);
-//      System.out.println("Instance 2 :" + instance2);
-      Assert.assertFalse(instance1.equals(instance2), "Localhost server-instances with same port");
-    }
+    // Same other host name and port
+    assertEquals(new ServerInstance("test-host", 8080), new ServerInstance("test-host", 8080));
 
-    // Test getIpAddress
-    {
-      InetAddress ipAddr = InetAddress.getByName("127.0.0.1");
+    // Same other host IP address and port
+    assertEquals(new ServerInstance("192.168.0.1", 8080), new ServerInstance("192.168.0.1", 8080));
 
-      ServerInstance instance1 = new ServerInstance("127.0.0.1", 8080);
-      Assert.assertEquals(instance1.getPort(), 8080, "Port check");
-      Assert.assertEquals(instance1.getPort(), 8080, "Hostname check");
-      Assert.assertEquals(instance1.getHostname(), ipAddr.getHostName(), "Host check");
-      Assert.assertEquals(instance1.getIpAddress(), ipAddr, "IP check");
-    }
+    // Same local host and port, one with IP address and one with host name
+    assertEquals(new ServerInstance("127.0.0.1", 8080),
+        new ServerInstance(InetAddress.getByName("127.0.0.1").getHostName(), 8080));
+
+    // Same host but different port
+    assertNotEquals(new ServerInstance("localhost", 8081), new ServerInstance("localhost", 8082));
+
+    // Same port but different host
+    assertNotEquals(new ServerInstance("foo", 8080), new ServerInstance("bar", 8080));
   }
 }

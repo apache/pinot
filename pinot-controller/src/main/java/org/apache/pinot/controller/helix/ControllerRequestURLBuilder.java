@@ -18,11 +18,10 @@
  */
 package org.apache.pinot.controller.helix;
 
-import java.io.IOException;
-import java.net.URLEncoder;
 import org.apache.avro.reflect.Nullable;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.URIUtils;
 
 
 /**
@@ -206,20 +205,17 @@ public class ControllerRequestURLBuilder {
     System.out.println(ControllerRequestURLBuilder.baseUrl("localhost:8089").forInstanceCreate());
   }
 
-  public String forSegmentDownload(String tableName, String segmentName)
-      throws IOException {
-    return StringUtil
-        .join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName, URLEncoder.encode(segmentName, "UTF-8"));
+  public String forSegmentDownload(String tableName, String segmentName) {
+    return URIUtils.constructDownloadUrl(StringUtils.chomp(_baseUrl, "/"), tableName, segmentName);
   }
 
   public String forSegmentDelete(String resourceName, String segmentName) {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "datafiles", resourceName, segmentName);
   }
 
-  public String forSegmentDeleteAPI(String tableName, String segmentName, String tableType)
-      throws Exception {
-    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName,
-        URLEncoder.encode(segmentName, "UTF-8") + "?type=" + tableType);
+  public String forSegmentDeleteAPI(String tableName, String segmentName, String tableType) {
+    return URIUtils.getPath(StringUtils.chomp(_baseUrl, "/"), "segments", tableName, URIUtils.encode(segmentName))
+        + "?type=" + tableType;
   }
 
   public String forSegmentDeleteAllAPI(String tableName, String tableType)
@@ -244,8 +240,9 @@ public class ControllerRequestURLBuilder {
 
   public String forDeleteSegmentWithGetAPI(String tableName, String segmentName, String tableType)
       throws Exception {
-    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "segments",
-        URLEncoder.encode(segmentName, "UTF-8") + "?state=drop&" + "type=" + tableType);
+    return URIUtils
+        .getPath(StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "segments", URIUtils.encode(segmentName))
+        + "?state=drop&type=" + tableType;
   }
 
   public String forDeleteAllSegmentsWithTypeWithGetAPI(String tableName, String tableType) {

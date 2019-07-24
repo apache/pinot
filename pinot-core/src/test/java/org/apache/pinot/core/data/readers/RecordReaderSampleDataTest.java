@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -68,6 +69,7 @@ public class RecordReaderSampleDataTest {
   @Test
   public void testRecordReaders()
       throws Exception {
+    CompositeTransformer defaultTransformer = CompositeTransformer.getDefaultTransformer(SCHEMA);
     try (AvroRecordReader avroRecordReader = new AvroRecordReader(AVRO_SAMPLE_DATA_FILE, SCHEMA);
         CSVRecordReader csvRecordReader = new CSVRecordReader(CSV_SAMPLE_DATA_FILE, SCHEMA, null);
         JSONRecordReader jsonRecordReader = new JSONRecordReader(JSON_SAMPLE_DATA_FILE, SCHEMA)) {
@@ -77,9 +79,9 @@ public class RecordReaderSampleDataTest {
         assertTrue(jsonRecordReader.hasNext());
         numRecords++;
 
-        GenericRow avroRecord = avroRecordReader.next();
-        GenericRow csvRecord = csvRecordReader.next();
-        GenericRow jsonRecord = jsonRecordReader.next();
+        GenericRow avroRecord = defaultTransformer.transform(avroRecordReader.next());
+        GenericRow csvRecord = defaultTransformer.transform(csvRecordReader.next());
+        GenericRow jsonRecord = defaultTransformer.transform(jsonRecordReader.next());
         assertEquals(avroRecord, csvRecord);
         assertEquals(avroRecord, jsonRecord);
 

@@ -61,26 +61,46 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
 
   @Override
   public Future<BrokerResponse> executeQueryAsync(String brokerAddress, final String query) {
+    return executeQueryAsync(brokerAddress, new Request("pql", query));
+  }
+
+  public Future<BrokerResponse> executePinotQueryAsync(String brokerAddress, final Request request) {
     try {
       ObjectNode json = JsonNodeFactory.instance.objectNode();
-      json.put("pql", query);
+      json.put(request.getQueryFormat(), request.getQuery());
 
       final String url = "http://" + brokerAddress + "/query";
 
-      AsyncHttpClient.BoundRequestBuilder request = _httpClient.preparePost(url);
+      AsyncHttpClient.BoundRequestBuilder requestBuilder = _httpClient.preparePost(url);
 
       if(_headers != null) {
-        _headers.forEach((k, v) -> request.addHeader(k, v));
+        _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
       }
 
-      final Future<Response> response = request
+      final Future<Response> response = requestBuilder
           .addHeader("Content-Type", "application/json; charset=utf-8")
           .setBody(json.toString()).execute();
 
-      return new BrokerResponseFuture(response, query, url);
+      return new BrokerResponseFuture(response, request.getQuery(), url);
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
+  }
+
+  @Override
+  public BrokerResponse executeQuery(String brokerAddress, Request request)
+      throws PinotClientException {
+    try {
+      return executeQueryAsync(brokerAddress, request).get();
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
+  @Override
+  public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
+      throws PinotClientException {
+    return executePinotQueryAsync(brokerAddress, request);
   }
 
   private static class BrokerResponseFuture implements Future<BrokerResponse> {

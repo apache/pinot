@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
+import org.apache.calcite.sql.SqlLiteral;
+import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.commons.lang.mutable.MutableInt;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
@@ -91,27 +93,52 @@ public class RequestUtils {
   public static Expression createLiteralExpression(LiteralAstNode value) {
     Expression expression = new Expression(ExpressionType.LITERAL);
     Literal literal = new Literal();
-    if(value instanceof StringLiteralAstNode) {
-      literal.setStringValue(((StringLiteralAstNode)value).getText());
+    if (value instanceof StringLiteralAstNode) {
+      literal.setStringValue(((StringLiteralAstNode) value).getText());
     }
-    if(value instanceof IntegerLiteralAstNode) {
-      literal.setLongValue(((IntegerLiteralAstNode)value).getValue());
+    if (value instanceof IntegerLiteralAstNode) {
+      literal.setLongValue(((IntegerLiteralAstNode) value).getValue());
     }
-    if(value instanceof FloatingPointLiteralAstNode) {
-      literal.setDoubleValue(((FloatingPointLiteralAstNode)value).getValue());
+    if (value instanceof FloatingPointLiteralAstNode) {
+      literal.setDoubleValue(((FloatingPointLiteralAstNode) value).getValue());
     }
     expression.setLiteral(literal);
     return expression;
   }
 
-  /**
-   * Create Function Expression given a functionName
-   * @param functionName
-   * @return
-   */
-  public static Expression createFunctionExpression(String functionName) {
+  public static Expression getIdentifierExpression(String identifier) {
+    Expression expression = new Expression(ExpressionType.IDENTIFIER);
+    expression.setIdentifier(new Identifier(identifier));
+    return expression;
+  }
+
+  public static Expression getLiteralExpression(SqlLiteral node) {
+    Expression expression = new Expression(ExpressionType.LITERAL);
+    Literal literal = new Literal();
+    if (node instanceof SqlNumericLiteral) {
+      if (((SqlNumericLiteral) node).isInteger()) {
+        literal.setLongValue(node.bigDecimalValue().longValue());
+      } else {
+        literal.setDoubleValue(node.bigDecimalValue().doubleValue());
+      }
+    } else {
+      literal.setStringValue(node.toString().replaceAll("^\'|\'$", ""));
+    }
+    expression.setLiteral(literal);
+    return expression;
+  }
+
+  public static Expression getLiteralExpression(String value) {
+    Expression expression = new Expression(ExpressionType.LITERAL);
+    Literal literal = new Literal();
+    literal.setStringValue(value);
+    expression.setLiteral(literal);
+    return expression;
+  }
+
+  public static Expression getFunctionExpression(String operator) {
     Expression expression = new Expression(ExpressionType.FUNCTION);
-    Function function = new Function(functionName);
+    Function function = new Function(operator);
     expression.setFunctionCall(function);
     return expression;
   }
@@ -279,7 +306,7 @@ public class RequestUtils {
       return createIdentifierExpression(((IdentifierAstNode) astNode).getName());
     } else if (astNode instanceof FunctionCallAstNode) {
       // Function expression
-      Expression expression = createFunctionExpression(((FunctionCallAstNode) astNode).getName());
+      Expression expression = getFunctionExpression(((FunctionCallAstNode) astNode).getName());
       Function func = expression.getFunctionCall();
       final List<? extends AstNode> operandsAstNodes = astNode.getChildren();
       if (operandsAstNodes != null) {

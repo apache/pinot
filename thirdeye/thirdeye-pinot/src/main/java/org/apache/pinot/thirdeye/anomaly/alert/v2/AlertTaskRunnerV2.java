@@ -110,7 +110,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
   private static final Logger LOG = LoggerFactory.getLogger(AlertTaskRunnerV2.class);
 
   public static final TimeZone DEFAULT_TIME_ZONE = TimeZone.getTimeZone("America/Los_Angeles");
-  public static final String DEFAULT_EMAIL_FORMATTER_TYPE = "MultipleAnomaliesEmailContentFormatter";
+  public static final String DEFAULT_EMAIL_FORMATTER_TYPE = "MetricAnomaliesEmailContentFormatter";
   public static final String CHARSET = "UTF-8";
   public static final String EMAIL_WHITELIST_KEY = "emailWhitelist";
 

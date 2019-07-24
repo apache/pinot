@@ -46,9 +46,8 @@ public class CommonConstants {
     // https://cwiki.apache.org/confluence/display/PINOT/Controller+Separation+between+Helix+and+Pinot
     public static final int NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE = 24;
     public static final int LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT = 1;
-    public static final boolean ENABLE_DELAY_REBALANCE = true;
     public static final int MIN_ACTIVE_REPLICAS = 0;
-    public static final long REBALANCE_DELAY_MS = 300_000L; // 5 minutes.
+    public static final int REBALANCE_DELAY_MS = 300_000; // 5 minutes.
 
     public static final String UNTAGGED_SERVER_INSTANCE = "server_untagged";
     public static final String UNTAGGED_BROKER_INSTANCE = "broker_untagged";
@@ -159,6 +158,7 @@ public class CommonConstants {
 
     public static class Request {
       public static final String PQL = "pql";
+      public static final String SQL = "sql";
       public static final String TRACE = "trace";
       public static final String DEBUG_OPTIONS = "debugOptions";
 
@@ -318,6 +318,14 @@ public class CommonConstants {
     public static class Realtime {
       public enum Status {
         IN_PROGRESS, DONE
+      }
+
+      /**
+       * During realtime segment completion, the value of this enum decides how  non-winner servers should replace  the completed segment.
+       */
+      public enum CompletionMode {
+        DEFAULT, // default behavior - if the in memory segment in the non-winner server is equivalent to the committed segment, then build and replace, else download
+        DOWNLOAD // non-winner servers always download the segment, never build it
       }
 
       public static final String STATUS = "segment.realtime.status";

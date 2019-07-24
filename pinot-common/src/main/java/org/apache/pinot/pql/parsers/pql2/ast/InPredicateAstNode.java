@@ -124,7 +124,7 @@ public class InPredicateAstNode extends PredicateAstNode {
     } else {
       filterOperator = FilterKind.IN;
     }
-    Expression expr = RequestUtils.createFunctionExpression(filterOperator.name());
+    Expression expr = RequestUtils.getFunctionExpression(filterOperator.name());
     expr.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression(_identifier));
 
     Set<String> values = new LinkedHashSet<>();

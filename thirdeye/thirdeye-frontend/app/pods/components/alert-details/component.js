@@ -93,6 +93,7 @@ export default Component.extend({
   granularity: null,
   alertYaml: null,
   dimensionExploration: null,
+  detectionHealth: null, // result of call to detection/health/{id}, passed in by parent
 
 
 
@@ -615,6 +616,7 @@ export default Component.extend({
     }
   ),
 
+
   /**
    * Date types to display in the pills
    * @type {Object[]} - array of objects, each of which represents each date pill
@@ -1086,7 +1088,10 @@ export default Component.extend({
       //Update the time range option selected
       set(this, 'analysisRange', [startDate, endDate]);
       set(this, 'duration', duration);
-      this._fetchAnomalies();
+      // This makes sure we don't fetch if the preview is collapsed
+      if(get(this, 'showDetails') && get(this, 'dataIsCurrent')){
+        this._fetchAnomalies();
+      }
     },
 
     /**

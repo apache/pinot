@@ -21,6 +21,7 @@ package org.apache.pinot.pql.parsers;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.AggregationInfo;
@@ -29,6 +30,7 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.GroupBy;
+import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.pql.parsers.pql2.ast.TopAstNode;
@@ -239,9 +241,9 @@ public class Pql2CompilerTest {
     Assert.assertEquals(brokerRequest.getHavingFilterSubQueryMap().getFilterQueryMap().size(), 1);
     Assert.assertEquals(brokerRequest.getHavingFilterQuery().getOperator(), FilterOperator.IN);
     Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().size(), 1);
-    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().get(0).contains("375"), true);
-    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().get(0).contains("5005"), true);
-    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().get(0).contains("1099"), true);
+    Assert.assertTrue(brokerRequest.getHavingFilterQuery().getValue().get(0).contains("375"));
+    Assert.assertTrue(brokerRequest.getHavingFilterQuery().getValue().get(0).contains("5005"));
+    Assert.assertTrue(brokerRequest.getHavingFilterQuery().getValue().get(0).contains("1099"));
     brokerRequest = COMPILER.compileToBrokerRequest(
         "SELECT count(*) FROM mytable WHERE DaysSinceEpoch >= 16312 group by Carrier having count(*) not in (375,5005,1099)");
     Assert.assertEquals(brokerRequest.getHavingFilterSubQueryMap().getFilterQueryMap().size(), 1);
@@ -419,5 +421,51 @@ public class Pql2CompilerTest {
     Pql2Compiler.ENABLE_PINOT_QUERY = true;
     Pql2Compiler.VALIDATE_CONVERTER = true;
     Pql2Compiler.FAIL_ON_CONVERSION_ERROR = true;
+  }
+
+  /**
+   * Unit test for order-by clause in PQL.
+   */
+  @Test
+  public void testOrderBy() {
+
+    testOrderBy("select d1, d2, d3 from table order by d2 asc, d3 desc", Arrays.asList("d2", "d3"),
+        Arrays.asList(true, false));
+
+    testOrderBy("select sum(m1), d2, d3 from table order by d2 desc, d3 asc", Arrays.asList("d2", "d3"),
+        Arrays.asList(false, true));
+
+    testOrderBy("select sum(m1), d2, d3 from table order by sum(m1) asc, d3 desc", Arrays.asList("sum(m1)", "d3"),
+        Arrays.asList(true, false));
+
+    testOrderBy("select sum(m1), sum(m2), d3 from table order by sum(m1) desc, sum(m2) asc", Arrays.asList("sum(m1)", "sum(m2)"),
+        Arrays.asList(false, true));
+
+    testOrderBy("select sum(m1), sum(m2), foo(bar(x, y), z) from table order by sum(m1) desc, foo(bar(x, y), z) asc",
+        Arrays.asList("sum(m1)", "foo(bar(x,y),z)"), Arrays.asList(false, true));
+
+    testOrderBy("select sum(m1), sum(m2), x, y, z from table order by sum(m1) desc, foo(bar(x, y), z) asc",
+        Arrays.asList("sum(m1)", "foo(bar(x,y),z)"), Arrays.asList(false, true));
+
+  }
+
+  /**
+   * Utility method to compile a PQL and test expected values for order-by
+   *
+   * @param pql PQL to compile
+   * @param orderBys Expected order-by's
+   * @param isAscs Expected isAsc boolean values
+   */
+  private void testOrderBy(String pql, List<String> orderBys, List<Boolean> isAscs) {
+    BrokerRequest brokerRequest =
+        COMPILER.compileToBrokerRequest(pql);
+    List<SelectionSort> orderByList = brokerRequest.getOrderBy();
+
+    for (int i = 0; i < orderByList.size(); i++) {
+      SelectionSort orderBy = orderByList.get(i);
+
+      Assert.assertEquals(orderBy.getColumn(), orderBys.get(i));
+      Assert.assertEquals(orderBy.isIsAsc(), isAscs.get(i).booleanValue());
+    }
   }
 }

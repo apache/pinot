@@ -111,9 +111,7 @@ public class RecordReaderUtils {
    */
   public static Object convertSingleValue(FieldSpec fieldSpec, @Nullable Object value) {
     if (value == null) {
-      // Do not allow default value for time column
-      assert fieldSpec.getFieldType() != FieldSpec.FieldType.TIME;
-      return fieldSpec.getDefaultNullValue();
+      return null;
     }
     if (value instanceof GenericData.Record) {
       return convertSingleValue(fieldSpec, ((GenericData.Record) value).get(0));
@@ -160,14 +158,12 @@ public class RecordReaderUtils {
    */
   public static Object convertSingleValue(FieldSpec fieldSpec, @Nullable String stringValue) {
     if (stringValue == null) {
-      // Do not allow default value for time column
-      assert fieldSpec.getFieldType() != FieldSpec.FieldType.TIME;
-      return fieldSpec.getDefaultNullValue();
+      return null;
     }
     DataType dataType = fieldSpec.getDataType();
     // Treat empty string as null for data types other than STRING
     if (stringValue.isEmpty() && dataType != DataType.STRING) {
-      return fieldSpec.getDefaultNullValue();
+      return null;
     }
     switch (dataType) {
       case INT:
@@ -190,7 +186,7 @@ public class RecordReaderUtils {
    */
   public static Object convertMultiValue(FieldSpec fieldSpec, @Nullable Collection values) {
     if (values == null || values.isEmpty()) {
-      return new Object[]{fieldSpec.getDefaultNullValue()};
+      return null;
     } else {
       int numValues = values.size();
       Object[] array = new Object[numValues];
@@ -207,7 +203,7 @@ public class RecordReaderUtils {
    */
   public static Object convertMultiValue(FieldSpec fieldSpec, @Nullable String[] stringValues) {
     if (stringValues == null || stringValues.length == 0) {
-      return new Object[]{fieldSpec.getDefaultNullValue()};
+      return null;
     } else {
       int numValues = stringValues.length;
       Object[] array = new Object[numValues];

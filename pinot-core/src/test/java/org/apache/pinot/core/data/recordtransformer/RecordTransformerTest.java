@@ -110,7 +110,7 @@ public class RecordTransformerTest {
 
   @Test
   public void testSanitationTransformer() {
-    RecordTransformer transformer = new SanitationTransformer(SCHEMA);
+    RecordTransformer transformer = new SanitizationTransformer(SCHEMA);
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
       record = transformer.transform(record);
@@ -122,7 +122,7 @@ public class RecordTransformerTest {
 
   @Test
   public void testDefaultTransformer() {
-    RecordTransformer transformer = CompoundTransformer.getDefaultTransformer(SCHEMA);
+    RecordTransformer transformer = CompositeTransformer.getDefaultTransformer(SCHEMA);
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
       record = transformer.transform(record);
@@ -143,7 +143,7 @@ public class RecordTransformerTest {
 
   @Test
   public void testPassThroughTransformer() {
-    RecordTransformer transformer = CompoundTransformer.getPassThroughTransformer();
+    RecordTransformer transformer = CompositeTransformer.getPassThroughTransformer();
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
       record = transformer.transform(record);

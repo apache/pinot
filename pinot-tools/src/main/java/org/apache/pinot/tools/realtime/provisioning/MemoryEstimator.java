@@ -59,6 +59,7 @@ public class MemoryEstimator {
   private long _sampleCompletedSegmentSizeBytes;
   private Set<String> _invertedIndexColumns = new HashSet<>();
   private Set<String> _noDictionaryColumns = new HashSet<>();
+  private Set<String> _varLengthDictionaryColumns = new HashSet<>();
   int _avgMultiValues;
   private File _tableDataDir;
 
@@ -82,6 +83,9 @@ public class MemoryEstimator {
 
     if (CollectionUtils.isNotEmpty(_tableConfig.getIndexingConfig().getNoDictionaryColumns())) {
       _noDictionaryColumns.addAll(_tableConfig.getIndexingConfig().getNoDictionaryColumns());
+    }
+    if (CollectionUtils.isNotEmpty(_tableConfig.getIndexingConfig().getVarLengthDictionaryColumns())) {
+      _varLengthDictionaryColumns.addAll(_tableConfig.getIndexingConfig().getVarLengthDictionaryColumns());
     }
     if (CollectionUtils.isNotEmpty(_tableConfig.getIndexingConfig().getInvertedIndexColumns())) {
       _invertedIndexColumns.addAll(_tableConfig.getIndexingConfig().getInvertedIndexColumns());
@@ -123,8 +127,11 @@ public class MemoryEstimator {
         new RealtimeSegmentConfig.Builder().setSegmentName(_segmentMetadata.getName())
             .setStreamName(_tableNameWithType).setSchema(_segmentMetadata.getSchema())
             .setCapacity(_segmentMetadata.getTotalDocs()).setAvgNumMultiValues(_avgMultiValues)
-            .setNoDictionaryColumns(_noDictionaryColumns).setInvertedIndexColumns(_invertedIndexColumns)
-            .setRealtimeSegmentZKMetadata(segmentZKMetadata).setOffHeap(true).setMemoryManager(memoryManager)
+            .setNoDictionaryColumns(_noDictionaryColumns)
+            .setVarLengthDictionaryColumns(_varLengthDictionaryColumns)
+            .setInvertedIndexColumns(_invertedIndexColumns)
+            .setRealtimeSegmentZKMetadata(segmentZKMetadata).setOffHeap(true)
+            .setMemoryManager(memoryManager)
             .setStatsHistory(sampleStatsHistory);
 
     // create mutable segment impl
@@ -220,8 +227,11 @@ public class MemoryEstimator {
       RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
           new RealtimeSegmentConfig.Builder().setSegmentName(_segmentMetadata.getName())
               .setStreamName(_tableNameWithType).setSchema(_segmentMetadata.getSchema())
-              .setCapacity(totalDocs).setAvgNumMultiValues(_avgMultiValues).setNoDictionaryColumns(_noDictionaryColumns)
-              .setInvertedIndexColumns(_invertedIndexColumns).setRealtimeSegmentZKMetadata(segmentZKMetadata)
+              .setCapacity(totalDocs).setAvgNumMultiValues(_avgMultiValues)
+              .setNoDictionaryColumns(_noDictionaryColumns)
+              .setVarLengthDictionaryColumns(_varLengthDictionaryColumns)
+              .setInvertedIndexColumns(_invertedIndexColumns)
+              .setRealtimeSegmentZKMetadata(segmentZKMetadata)
               .setOffHeap(true).setMemoryManager(memoryManager).setStatsHistory(statsHistory);
 
       // create mutable segment impl

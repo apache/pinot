@@ -126,7 +126,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
       try {
         return FileUtils.sizeOfDirectory(segmentDirectory.toPath().toFile());
       } catch (IllegalArgumentException e) {
-        LOGGER.error("Failed to read disk size for direcotry: ", segmentDirectory.getAbsolutePath());
+        LOGGER.error("Failed to read disk size for directory: ", segmentDirectory.getAbsolutePath());
         return -1;
       }
     } else {

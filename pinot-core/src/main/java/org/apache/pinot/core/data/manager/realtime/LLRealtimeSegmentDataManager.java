@@ -35,6 +35,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.CompletionConfig;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.config.TableConfig;
@@ -48,11 +49,12 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.data.recordtransformer.CompoundTransformer;
+import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegment;
@@ -237,6 +239,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final String _timeColumnName;
   private final List<String> _invertedIndexColumns;
   private final List<String> _noDictionaryColumns;
+  private final List<String> _varLengthDictionaryColumns;
   private final StarTreeIndexSpec _starTreeIndexSpec;
   private final String _sortedColumn;
   private Logger segmentLogger;
@@ -548,12 +551,20 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               break;
             case KEEP:
               _state = State.RETAINING;
-              success = buildSegmentAndReplace();
-              if (success) {
-                _state = State.RETAINED;
-              } else {
-                // Could not build segment for some reason. We can only download it.
-                _state = State.ERROR;
+              CompletionMode segmentCompletionMode = getSegmentCompletionMode();
+              switch (segmentCompletionMode) {
+                case DOWNLOAD:
+                  _state = State.DISCARDED;
+                  break;
+                case DEFAULT:
+                  success = buildSegmentAndReplace();
+                  if (success) {
+                    _state = State.RETAINED;
+                  } else {
+                    // Could not build segment for some reason. We can only download it.
+                    _state = State.ERROR;
+                  }
+                  break;
               }
               break;
             case COMMIT:
@@ -599,6 +610,19 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       }
       _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
     }
+  }
+
+  /**
+   * Fetches the completion mode for the segment completion for the given realtime table
+   */
+  private CompletionMode getSegmentCompletionMode() {
+    CompletionConfig completionConfig = _tableConfig.getValidationConfig().getCompletionConfig();
+    if (completionConfig != null) {
+      if (CompletionMode.DOWNLOAD.toString().equalsIgnoreCase(completionConfig.getCompletionMode())) {
+        return CompletionMode.DOWNLOAD;
+      }
+    }
+    return CompletionMode.DEFAULT;
   }
 
   private File makeSegmentDirPath() {
@@ -662,7 +686,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), _schema,
               _tableNameWithType, _timeColumnName, _segmentZKMetadata.getSegmentName(), _sortedColumn,
-              _invertedIndexColumns, _noDictionaryColumns, _starTreeIndexSpec);
+              _invertedIndexColumns, _noDictionaryColumns, _varLengthDictionaryColumns, _starTreeIndexSpec);
       segmentLogger.info("Trying to build segment");
       try {
         converter.build(_segmentVersion, _serverMetrics);
@@ -911,27 +935,37 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         case CATCHING_UP:
         case HOLDING:
         case INITIAL_CONSUMING:
-          // Allow to catch up upto final offset, and then replace.
-          if (_currentOffset > endOffset) {
-            // We moved ahead of the offset that is committed in ZK.
-            segmentLogger.warn("Current offset {} ahead of the offset in zk {}. Downloading to replace", _currentOffset,
-                endOffset);
-            downloadSegmentAndReplace(llcMetadata);
-          } else if (_currentOffset == endOffset) {
-            segmentLogger
-                .info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset, endOffset);
-            buildSegmentAndReplace();
-          } else {
-            segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
-            boolean success = catchupToFinalOffset(endOffset,
-                TimeUnit.MILLISECONDS.convert(MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS, TimeUnit.SECONDS));
-            if (success) {
-              segmentLogger.info("Caught up to offset {}", _currentOffset);
-              buildSegmentAndReplace();
-            } else {
-              segmentLogger.info("Could not catch up to offset (current = {}). Downloading to replace", _currentOffset);
+          CompletionMode segmentCompletionMode = getSegmentCompletionMode();
+          switch (segmentCompletionMode) {
+            case DOWNLOAD:
+              segmentLogger.info("State {}. CompletionMode {}. Downloading to replace", _state.toString(),
+                  segmentCompletionMode);
               downloadSegmentAndReplace(llcMetadata);
-            }
+              break;
+            case DEFAULT:
+              // Allow to catch up upto final offset, and then replace.
+              if (_currentOffset > endOffset) {
+                // We moved ahead of the offset that is committed in ZK.
+                segmentLogger.warn("Current offset {} ahead of the offset in zk {}. Downloading to replace", _currentOffset,
+                    endOffset);
+                downloadSegmentAndReplace(llcMetadata);
+              } else if (_currentOffset == endOffset) {
+                segmentLogger.info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset,
+                    endOffset);
+                buildSegmentAndReplace();
+              } else {
+                segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
+                boolean success = catchupToFinalOffset(endOffset,
+                    TimeUnit.MILLISECONDS.convert(MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS, TimeUnit.SECONDS));
+                if (success) {
+                  segmentLogger.info("Caught up to offset {}", _currentOffset);
+                  buildSegmentAndReplace();
+                } else {
+                  segmentLogger.info("Could not catch up to offset (current = {}). Downloading to replace", _currentOffset);
+                  downloadSegmentAndReplace(llcMetadata);
+                }
+              }
+              break;
           }
           break;
         default:
@@ -1088,6 +1122,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // No dictionary Columns
     _noDictionaryColumns = new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns());
 
+    _varLengthDictionaryColumns = new ArrayList<>(indexLoadingConfig.getVarLengthDictionaryColumns());
+
     // Read the star tree config
     _starTreeIndexSpec = indexingConfig.getStarTreeIndexSpec();
 
@@ -1106,6 +1142,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setSchema(schema).setCapacity(_segmentMaxRowCount)
             .setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
+            .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
             .setInvertedIndexColumns(invertedIndexColumns).setRealtimeSegmentZKMetadata(segmentZKMetadata)
             .setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
@@ -1116,7 +1153,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _clientId = _streamPartitionId + "-" + NetUtil.getHostnameOrAddress();
 
     // Create record transformer
-    _recordTransformer = CompoundTransformer.getDefaultTransformer(schema);
+    _recordTransformer = CompositeTransformer.getDefaultTransformer(schema);
     makeStreamConsumer("Starting");
     makeStreamMetadataProvider("Starting");
 

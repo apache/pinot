@@ -152,9 +152,8 @@ public class ScatterGatherPerfClient implements Runnable {
 
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
     PooledNettyClientResourceManager rm = new PooledNettyClientResourceManager(_eventLoopGroup, _timer, clientMetrics);
-    _pool =
-        new KeyedPoolImpl<PooledNettyClientResourceManager.PooledClientConnection>(1, _maxActiveConnections, 300000, 10,
-            rm, _timedExecutor, MoreExecutors.sameThreadExecutor(), registry);
+    _pool = new KeyedPoolImpl<>(1, _maxActiveConnections, 300000, 10, rm, _timedExecutor,
+        MoreExecutors.newDirectExecutorService(), registry);
     rm.setPool(_pool);
     _scatterGather = new ScatterGatherImpl(_pool, _service);
     for (AsyncReader r : _readerThreads) {

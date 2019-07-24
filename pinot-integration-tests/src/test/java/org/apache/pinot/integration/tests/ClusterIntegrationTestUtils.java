@@ -52,6 +52,8 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
+import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
+import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.StringUtil;
@@ -496,20 +498,23 @@ public class ClusterIntegrationTestUtils {
    *   <li>Do not examine the order of result records.</li>
    * </ul>
    *
-   * @param pqlQuery Pinot PQL query
+   * @param pinotQuery Pinot query
+   * @param queryFormat Pinot query format
    * @param brokerUrl Pinot broker URL
    * @param pinotConnection Pinot connection
    * @param sqlQueries H2 SQL queries
    * @param h2Connection H2 connection
    * @throws Exception
    */
-  public static void testQuery(@Nonnull String pqlQuery, @Nonnull String brokerUrl,
+  public static void testQuery(@Nonnull String pinotQuery, @Nonnull String queryFormat, @Nonnull String brokerUrl,
       @Nonnull org.apache.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
       @Nullable Connection h2Connection)
       throws Exception {
     // Use broker response for metadata check, connection response for value check
-    JsonNode pinotResponse = ClusterTest.postQuery(pqlQuery, brokerUrl);
-    ResultSetGroup pinotResultSetGroup = pinotConnection.execute(pqlQuery);
+    PinotQueryRequest pinotBrokerQueryRequest = new PinotQueryRequest(queryFormat, pinotQuery);
+    JsonNode pinotResponse = ClusterTest.postQuery(pinotBrokerQueryRequest, brokerUrl);
+    Request pinotClientRequest = new Request(queryFormat, pinotQuery);
+    ResultSetGroup pinotResultSetGroup = pinotConnection.execute(pinotClientRequest);
 
     // Skip comparison if SQL queries are not specified
     if (sqlQueries == null) {
@@ -530,7 +535,7 @@ public class ClusterIntegrationTestUtils {
         String failureMessage =
             "Number of aggregation results: " + numAggregationResults + " does not match number of SQL queries: "
                 + numSqlQueries;
-        failure(pqlQuery, sqlQueries, failureMessage);
+        failure(pinotQuery, sqlQueries, failureMessage);
       }
 
       // Get aggregation type
@@ -551,7 +556,7 @@ public class ClusterIntegrationTestUtils {
             if (pinotNumRecordsSelected != 0) {
               String failureMessage =
                   "No record selected in H2 but " + pinotNumRecordsSelected + " records selected in Pinot";
-              failure(pqlQuery, sqlQueries, failureMessage);
+              failure(pinotQuery, sqlQueries, failureMessage);
             }
 
             // Skip further comparison
@@ -565,7 +570,7 @@ public class ClusterIntegrationTestUtils {
           if (!DoubleMath.fuzzyEquals(actualValue, expectedValue, 1.0)) {
             String failureMessage =
                 "Value: " + aggregationIndex + " does not match, expected: " + h2Value + ", got: " + pinotValue;
-            failure(pqlQuery, sqlQueries, failureMessage);
+            failure(pinotQuery, sqlQueries, failureMessage);
           }
         }
 
@@ -609,18 +614,18 @@ public class ClusterIntegrationTestUtils {
           if (h2NumGroups == 0) {
             if (pinotNumGroups != 0) {
               String failureMessage = "No group returned in H2 but " + pinotNumGroups + " groups returned in Pinot";
-              failure(pqlQuery, sqlQueries, failureMessage);
+              failure(pinotQuery, sqlQueries, failureMessage);
             }
 
             // If the query has a HAVING clause and both H2 and Pinot have no groups, that is expected, so we don't need
             // to compare the number of docs scanned
-            if (pqlQuery.contains("HAVING")) {
+            if (pinotQuery.contains("HAVING")) {
               return;
             }
 
             if (pinotNumRecordsSelected != 0) {
               String failureMessage = "No group returned in Pinot but " + pinotNumRecordsSelected + " records selected";
-              failure(pqlQuery, sqlQueries, failureMessage);
+              failure(pinotQuery, sqlQueries, failureMessage);
             }
 
             // Skip further comparison
@@ -644,7 +649,7 @@ public class ClusterIntegrationTestUtils {
               String h2Value = expectedValues.get(groupKey);
               if (h2Value == null) {
                 String failureMessage = "Group returned in Pinot but not in H2: " + groupKey;
-                failure(pqlQuery, sqlQueries, failureMessage);
+                failure(pinotQuery, sqlQueries, failureMessage);
                 return;
               }
               double expectedValue = Double.parseDouble(h2Value);
@@ -654,7 +659,7 @@ public class ClusterIntegrationTestUtils {
                 String failureMessage =
                     "Value: " + aggregationIndex + " does not match, expected: " + h2Value + ", got: " + pinotValue
                         + ", for group: " + groupKey;
-                failure(pqlQuery, sqlQueries, failureMessage);
+                failure(pinotQuery, sqlQueries, failureMessage);
               }
             }
           }
@@ -665,7 +670,7 @@ public class ClusterIntegrationTestUtils {
 
       // Neither aggregation-only or group-by results
       String failureMessage = "Inside aggregation results, no aggregation-only or group-by results found";
-      failure(pqlQuery, sqlQueries, failureMessage);
+      failure(pinotQuery, sqlQueries, failureMessage);
     }
 
     // Selection results
@@ -740,14 +745,14 @@ public class ClusterIntegrationTestUtils {
       if (h2NumRows == 0) {
         if (pinotNumRows != 0) {
           String failureMessage = "No record selected in H2 but number of records selected in Pinot: " + pinotNumRows;
-          failure(pqlQuery, sqlQueries, failureMessage);
+          failure(pinotQuery, sqlQueries, failureMessage);
           return;
         }
 
         if (pinotNumRecordsSelected != 0) {
           String failureMessage =
               "No selection result returned in Pinot but number of records selected: " + pinotNumRecordsSelected;
-          failure(pqlQuery, sqlQueries, failureMessage);
+          failure(pinotQuery, sqlQueries, failureMessage);
           return;
         }
 
@@ -793,15 +798,15 @@ public class ClusterIntegrationTestUtils {
           // Check actual value in expected values set
           if (!expectedValues.contains(actualValue)) {
             String failureMessage = "Selection result returned in Pinot but not in H2: " + actualValue;
-            failure(pqlQuery, sqlQueries, failureMessage);
+            failure(pinotQuery, sqlQueries, failureMessage);
             return;
           }
         }
       }
     } else {
       // Neither aggregation or selection results
-      String failureMessage = "No aggregation or selection results found for query: " + pqlQuery;
-      failure(pqlQuery, sqlQueries, failureMessage);
+      String failureMessage = "No aggregation or selection results found for query: " + pinotQuery;
+      failure(pinotQuery, sqlQueries, failureMessage);
     }
   }
 

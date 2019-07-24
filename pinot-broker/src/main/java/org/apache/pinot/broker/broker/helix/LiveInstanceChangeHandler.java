@@ -99,8 +99,7 @@ public class LiveInstanceChangeHandler implements ClusterChangeHandler {
           try {
             LOGGER.info("Instance {} has changed session id {} -> {}, validating connection pool for this instance.",
                 instanceId, sessionId, _liveInstanceToSessionIdMap.get(instanceId));
-            ServerInstance ins = ServerInstance.forHostPort(hostName, port);
-            _connectionPool.validatePool(ins, DO_NOT_RECREATE);
+            _connectionPool.validatePool(new ServerInstance(hostName, port), DO_NOT_RECREATE);
             _liveInstanceToSessionIdMap.put(instanceId, sessionId);
           } catch (Exception e) {
             LOGGER.error("Error trying to validate & destroy dead connections for {}", instanceId, e);
@@ -111,8 +110,7 @@ public class LiveInstanceChangeHandler implements ClusterChangeHandler {
         // we don't have this instanceId
         // lets first check if the connection is valid or not
         try {
-          ServerInstance ins = ServerInstance.forHostPort(hostName, port);
-          _connectionPool.validatePool(ins, DO_NOT_RECREATE);
+          _connectionPool.validatePool(new ServerInstance(hostName, port), DO_NOT_RECREATE);
           _liveInstanceToSessionIdMap.put(instanceId, sessionId);
         } catch (Exception e) {
           LOGGER.error("Error trying to destroy dead connections for {}", instanceId, e);

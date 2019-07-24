@@ -11,10 +11,18 @@
  * @exports stats-cards
  */
 import Component from '@ember/component';
-import { set, get } from '@ember/object';
+import { set, get, computed } from '@ember/object';
 
 export default Component.extend({
   classNames: ['te-horizontal-cards__container'],
+  statsTransformed: [],
+
+  oneCardOnly: computed(
+    'statsTransformed',
+    function() {
+      return (this.get('statsTransformed').length < 2);
+    }
+  ),
 
   /**
    * Transform the stats array passed to the component
@@ -31,22 +39,22 @@ export default Component.extend({
    * @param {Array.Array<String>} - entries of each stats card (i.e. [['entry1', ...], ['entry2', ...], ['entry3], ...])
    * @return {Object[]} - array of objects, each of which represents a stats card
    * @example
-   * [{
-   *    title: 'title',
-   *    description: 'description',
-   *    value: 7,
-   *    unit: 'digit'
-   *  }, {
-   *    title: 'title',
-   *    description: 'description',
-   *    value: 87.1,
-   *    unit: 'percent'
-   *  }, {
-   *    title: 'title',
-   *    description: 'description',
-   *    value: 87.1,
-   *    unit: 'percent'
-   * }];
+   * [[
+   *    'title',
+   *    'description',
+   *    7,
+   *    'digit'
+   *  ], [
+   *    'title',
+   *    'description',
+   *    87.1,
+   *    'percent'
+   *  ], [
+   *    'title',
+   *    'description',
+   *    87.1,
+   *    'percent'
+   * ]];
    */
   statsBuilder(statsArray) {
     const props = ['title', 'description', 'value', 'unit'];

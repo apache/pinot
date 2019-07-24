@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection;
 
+import java.util.HashMap;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.Collections;
@@ -92,5 +93,13 @@ public class DetectionTestUtils {
     result.setAvgCurrentVal(currentValue);
     result.setAvgBaselineVal(baselineValue);
     return result;
+  }
+
+  public static MergedAnomalyResultDTO makeAnomaly(long start, long end, long configId, String metricUrn,
+      double currentVal) {
+    MergedAnomalyResultDTO anomaly = makeAnomaly(configId, start, end, new HashMap<>());
+    anomaly.setMetricUrn(metricUrn);
+    anomaly.setAvgCurrentVal(currentVal);
+    return anomaly;
   }
 }

@@ -189,11 +189,11 @@
       <version>${project.version}</version>
       <type>test-jar</type>
     </dependency>
-    <!-- TODO: figure out a way to avoid explicitly setting the kafka module dependency, and instead inject it, such that any kafka stream implementation can use this -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-connector-kafka-0.9</artifactId>
+      <artifactId>pinot-connector-kafka-${kafka.lib.version}</artifactId>
       <version>${project.version}</version>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.testng</groupId>

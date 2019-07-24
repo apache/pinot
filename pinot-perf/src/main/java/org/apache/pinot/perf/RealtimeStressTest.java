@@ -25,10 +25,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import kafka.server.KafkaServerStartable;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
+import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
+import org.apache.pinot.tools.KafkaStarterUtils;
 import org.apache.pinot.integration.tests.OfflineClusterIntegrationTest;
 import org.apache.pinot.integration.tests.RealtimeClusterIntegrationTest;
 import org.apache.pinot.util.TestUtils;
@@ -59,12 +59,12 @@ public class RealtimeStressTest extends RealtimeClusterIntegrationTest {
       throws Exception {
     // Start ZK and Kafka
     startZk();
-    KafkaServerStartable kafkaStarter = KafkaStarterUtils
+    StreamDataServerStartable kafkaStarter = KafkaStarterUtils
         .startServer(KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_BROKER_ID,
             KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
 
     // Create Kafka topic
-    KafkaStarterUtils.createTopic(getKafkaTopic(), KafkaStarterUtils.DEFAULT_ZK_STR, 10);
+    kafkaStarter.createTopic(getKafkaTopic(), KafkaStarterUtils.getTopicCreationProps(10));
 
     // Unpack data (needed to get the Avro schema)
     TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(
@@ -86,7 +86,7 @@ public class RealtimeStressTest extends RealtimeClusterIntegrationTest {
     startServer();
 
     // Create realtime table
-    setUpTable(avroFiles.get(0));
+    setUpRealtimeTable(avroFiles.get(0));
 
     // Wait a couple of seconds for all Helix state transitions to happen
     Uninterruptibles.sleepUninterruptibly(5, TimeUnit.SECONDS);

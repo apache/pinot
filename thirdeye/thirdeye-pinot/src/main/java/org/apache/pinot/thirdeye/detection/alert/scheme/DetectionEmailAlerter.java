@@ -25,12 +25,15 @@ import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
 import org.apache.pinot.thirdeye.alert.content.EmailContentFormatter;
 import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterConfiguration;
 import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterContext;
+import org.apache.pinot.thirdeye.alert.content.EntityGroupKeyContentFormatter;
+import org.apache.pinot.thirdeye.alert.content.MetricAnomaliesEmailContentFormatter;
 import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.alert.AlertUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
@@ -38,7 +41,6 @@ import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.apache.pinot.thirdeye.detection.annotation.AlertScheme;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -60,8 +62,10 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
 
   private static final Comparator<AnomalyResult> COMPARATOR_DESC =
       (o1, o2) -> -1 * Long.compare(o1.getStartTime(), o2.getStartTime());
-  private static final String DEFAULT_EMAIL_FORMATTER_TYPE = "MultipleAnomaliesEmailContentFormatter";
   private static final String EMAIL_WHITELIST_KEY = "emailWhitelist";
+  private static final String PROP_EMAIL_SCHEME = "emailScheme";
+  private static final String PROP_EMAIL_TEMPLATE = "template";
+  private static final String PROP_EMAIL_SUBJECT_STYLE = "subject";
 
   private ThirdEyeAnomalyConfiguration teConfig;
 
@@ -117,6 +121,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     if (config.getSmtpUser() != null && config.getSmtpPassword() != null) {
       email.setAuthenticator(new DefaultAuthenticator(config.getSmtpUser(), config.getSmtpPassword()));
       email.setSSLOnConnect(true);
+      email.setSslSmtpPort(Integer.toString(config.getSmtpPort()));
     }
     email.send();
 
@@ -124,24 +129,68 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     LOG.info("Email sent with subject '{}' to {} recipients", email.getSubject(), recipientCount);
   }
 
+  public enum EmailTemplate {
+    DEFAULT_EMAIL,
+    ENTITY_GROUPBY_REPORT
+  }
+
+  /**
+   * Plug the appropriate template based on configuration.
+   */
+  private static EmailContentFormatter makeTemplate(Map<String, Object> emailParams) throws Exception {
+    EmailTemplate template = EmailTemplate.DEFAULT_EMAIL;
+    if (emailParams != null && emailParams.containsKey(PROP_EMAIL_TEMPLATE)) {
+      template = EmailTemplate.valueOf(emailParams.get(PROP_EMAIL_TEMPLATE).toString());
+    }
+
+    String className;
+    switch (template) {
+      case DEFAULT_EMAIL:
+        className = MetricAnomaliesEmailContentFormatter.class.getSimpleName();
+        LOG.info("Using " + className + " to render the template.");
+        return EmailContentFormatterFactory.fromClassName(className);
+
+      case ENTITY_GROUPBY_REPORT:
+        className = EntityGroupKeyContentFormatter.class.getSimpleName();
+        LOG.info("Using " + className + " to render the template.");
+        return EmailContentFormatterFactory.fromClassName(className);
+
+      default:
+        throw new IllegalArgumentException(String.format("Unknown email template '%s'", template));
+    }
+  }
+
+  /**
+   * Plug the appropriate email subject style based on configuration
+   */
+  private AlertConfigBean.SubjectType makeSubject(Map<String, Object> emailParams) {
+    AlertConfigBean.SubjectType subjectType;
+    if (emailParams != null && emailParams.containsKey(PROP_EMAIL_SUBJECT_STYLE)) {
+      subjectType = AlertConfigBean.SubjectType.valueOf(emailParams.get(PROP_EMAIL_SUBJECT_STYLE).toString());
+    } else {
+      // To support the legacy email subject configuration
+      subjectType = this.config.getSubjectType();
+    }
+
+    return subjectType;
+  }
+
   private void sendEmail(DetectionAlertFilterRecipients recipients, Set<MergedAnomalyResultDTO> anomalies) throws Exception {
     whitelistRecipients(recipients);
     validateAlert(recipients, anomalies);
 
-    EmailContentFormatter emailContentFormatter =
-        EmailContentFormatterFactory.fromClassName(DEFAULT_EMAIL_FORMATTER_TYPE);
-
+    Map<String, Object> emailParams = ConfigUtils.getMap(this.config.getAlertSchemes().get(PROP_EMAIL_SCHEME));
+    EmailContentFormatter emailContentFormatter = makeTemplate(emailParams);
     emailContentFormatter.init(new Properties(),
         EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(this.teConfig));
 
-    List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>();
-    anomalyResultListOfGroup.addAll(anomalies);
-    Collections.sort(anomalyResultListOfGroup, COMPARATOR_DESC);
+    List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>(anomalies);
+    anomalyResultListOfGroup.sort(COMPARATOR_DESC);
 
     AlertConfigDTO alertConfig = new AlertConfigDTO();
     alertConfig.setName(this.config.getName());
     alertConfig.setFromAddress(this.config.getFrom());
-    alertConfig.setSubjectType(this.config.getSubjectType());
+    alertConfig.setSubjectType(makeSubject(emailParams));
     alertConfig.setReferenceLinks(this.config.getReferenceLinks());
 
     EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, null,
@@ -163,7 +212,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   }
 
   private void generateAndSendEmails(DetectionAlertFilterResult detectionResult) throws Exception {
-    LOG.info("Sending Email alert for {}", config.getId());
+    LOG.info("Preparing an email alert for subscription group id {}", config.getId());
     Preconditions.checkNotNull(detectionResult.getResult());
     for (Map.Entry<DetectionAlertFilterRecipients, Set<MergedAnomalyResultDTO>> entry : detectionResult.getResult().entrySet()) {
       DetectionAlertFilterRecipients recipients = entry.getKey();

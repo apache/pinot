@@ -25,6 +25,7 @@ import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.core.io.util.ValueReader;
+import org.apache.pinot.core.io.util.VarLengthBytesValueReaderWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
@@ -36,11 +37,18 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
   private final byte _paddingByte;
 
   protected ImmutableDictionaryReader(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
-    Preconditions.checkState(dataBuffer.size() == length * numBytesPerValue);
-    _valueReader = new FixedByteValueReaderWriter(dataBuffer);
+    if (VarLengthBytesValueReaderWriter.isVarLengthBytesDictBuffer(dataBuffer)) {
+      _valueReader = new VarLengthBytesValueReaderWriter(dataBuffer);
+      _numBytesPerValue = -1;
+      _paddingByte = 0;
+    }
+    else {
+      Preconditions.checkState(dataBuffer.size() == length * numBytesPerValue);
+      _valueReader = new FixedByteValueReaderWriter(dataBuffer);
+      _numBytesPerValue = numBytesPerValue;
+      _paddingByte = paddingByte;
+    }
     _length = length;
-    _numBytesPerValue = numBytesPerValue;
-    _paddingByte = paddingByte;
   }
 
   protected ImmutableDictionaryReader(ValueReader valueReader, int length) {
@@ -244,6 +252,6 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
   }
 
   protected byte[] getBuffer() {
-    return new byte[_numBytesPerValue];
+    return _numBytesPerValue == -1 ? null : new byte[_numBytesPerValue];
   }
 }

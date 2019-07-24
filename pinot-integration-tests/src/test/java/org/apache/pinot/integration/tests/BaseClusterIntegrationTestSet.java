@@ -141,6 +141,53 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
             + "HAVING SUM(ArrDelay) <> 6325.973 AND AVG(CAST(CRSDepTime AS DOUBLE)) <= 1569.8755 OR SUM(TaxiIn) = 1003.87274"));
   }
 
+
+  /**
+   * Test hardcoded queries.
+   * <p>NOTE:
+   * <p>For queries with <code>LIMIT</code> or <code>TOP</code>, need to remove limit or add <code>LIMIT 10000</code> to
+   * the H2 SQL query because the comparison only works on exhausted result with at most 10000 rows.
+   * <ul>
+   *   <li>
+   *     Eg. <code>SELECT a FROM table LIMIT 15 -> [SELECT a FROM table LIMIT 10000]</code>
+   *   </li>
+   * </ul>
+   * <p>For queries with multiple aggregation functions, need to split each of them into a separate H2 SQL query.
+   * <ul>
+   *   <li>
+   *     Eg. <code>SELECT SUM(a), MAX(b) FROM table -> [SELECT SUM(a) FROM table, SELECT MAX(b) FROM table]</code>
+   *   </li>
+   * </ul>
+   * <p>For group-by queries, need to add group-by columns to the select clause for H2 SQL query.
+   * <ul>
+   *   <li>
+   *     Eg. <code>SELECT SUM(a) FROM table GROUP BY b -> [SELECT b, SUM(a) FROM table GROUP BY b]</code>
+   *   </li>
+   * </ul>
+   *
+   * @throws Exception
+   */
+  public void testHardcodedSqlQueries()
+      throws Exception {
+    // Here are some sample queries.
+    String query;
+    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16312 AND Carrier = 'DL'";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL'";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch > 16312 AND Carrier = 'DL'";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch >= 16312 AND Carrier = 'DL'";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch < 16312 AND Carrier = 'DL'";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT MAX(ArrTime), MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 16312";
+    testSqlQuery(query, Arrays.asList("SELECT MAX(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 15312",
+        "SELECT MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 15312"));
+  }
+
   /**
    * Test to ensure that broker response contains expected stats
    *
@@ -215,6 +262,44 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
           sqlQueries.add(hsqls.get(i).asText());
         }
         testQuery(pqlQuery, sqlQueries);
+      }
+    }
+  }
+
+  /**
+   * Test random SQL queries from the query file.
+   *
+   * @throws Exception
+   */
+  public void testSqlQueriesFromQueryFile()
+      throws Exception {
+    URL resourceUrl = BaseClusterIntegrationTestSet.class.getClassLoader().getResource(getQueryFileName());
+    Assert.assertNotNull(resourceUrl);
+    File queryFile = new File(resourceUrl.getFile());
+
+    int maxNumQueriesToSkipInQueryFile = getMaxNumQueriesToSkipInQueryFile();
+    try (BufferedReader reader = new BufferedReader(new FileReader(queryFile))) {
+      while (true) {
+        int numQueriesSkipped = RANDOM.nextInt(maxNumQueriesToSkipInQueryFile);
+        for (int i = 0; i < numQueriesSkipped; i++) {
+          reader.readLine();
+        }
+
+        String queryString = reader.readLine();
+        // Reach end of file.
+        if (queryString == null) {
+          return;
+        }
+
+        JsonNode query = JsonUtils.stringToJsonNode(queryString);
+        String sqlQuery = query.get("pql").asText();
+        JsonNode hsqls = query.get("hsqls");
+        List<String> sqlQueries = new ArrayList<>();
+        int length = hsqls.size();
+        for (int i = 0; i < length; i++) {
+          sqlQueries.add(hsqls.get(i).asText());
+        }
+        testSqlQuery(sqlQuery, sqlQueries);
       }
     }
   }
@@ -405,17 +490,6 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         }
       }
     }, 60_000L, errorMessage);
-  }
-
-  protected void completeTableConfiguration() {
-    if (isUsingNewConfigFormat()) {
-      CombinedConfig combinedConfig = new CombinedConfig(_offlineTableConfig, _realtimeTableConfig, _schema);
-      try {
-        sendPostRequest(_controllerRequestURLBuilder.forNewTableCreate(), Serializer.serializeToString(combinedConfig));
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }
   }
 
   protected void updateTableConfiguration() {

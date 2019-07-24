@@ -197,8 +197,6 @@ public class SearchFilters {
         String issueType = properties.get(ClassificationTaskRunner.ISSUE_TYPE_KEY);
         passed = passed && checkFilter(issueTypeFilterMap, issueType);
       }
-      // check isChild
-      passed = passed && !mergedAnomalyResultDTO.isChild(); // TODO configurable filter
 
       if (passed) {
         filteredAnomalies.add(mergedAnomalyResultDTO);

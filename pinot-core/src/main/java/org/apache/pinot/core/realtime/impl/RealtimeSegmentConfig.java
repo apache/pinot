@@ -32,6 +32,7 @@ public class RealtimeSegmentConfig {
   private final int _capacity;
   private final int _avgNumMultiValues;
   private final Set<String> _noDictionaryColumns;
+  private final Set<String> _varLengthDictionaryColumns;
   private final Set<String> _invertedIndexColumns;
   private final RealtimeSegmentZKMetadata _realtimeSegmentZKMetadata;
   private final boolean _offHeap;
@@ -41,8 +42,9 @@ public class RealtimeSegmentConfig {
   private final boolean _aggregateMetrics;
 
   private RealtimeSegmentConfig(String segmentName, String streamName, Schema schema, int capacity,
-      int avgNumMultiValues, Set<String> noDictionaryColumns, Set<String> invertedIndexColumns,
-      RealtimeSegmentZKMetadata realtimeSegmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
+      int avgNumMultiValues, Set<String> noDictionaryColumns, Set<String> varLengthDictionaryColumns,
+      Set<String> invertedIndexColumns, RealtimeSegmentZKMetadata realtimeSegmentZKMetadata,
+      boolean offHeap, PinotDataBufferMemoryManager memoryManager,
       RealtimeSegmentStatsHistory statsHistory, SegmentPartitionConfig segmentPartitionConfig,
       boolean aggregateMetrics) {
     _segmentName = segmentName;
@@ -51,6 +53,7 @@ public class RealtimeSegmentConfig {
     _capacity = capacity;
     _avgNumMultiValues = avgNumMultiValues;
     _noDictionaryColumns = noDictionaryColumns;
+    _varLengthDictionaryColumns = varLengthDictionaryColumns;
     _invertedIndexColumns = invertedIndexColumns;
     _realtimeSegmentZKMetadata = realtimeSegmentZKMetadata;
     _offHeap = offHeap;
@@ -82,6 +85,10 @@ public class RealtimeSegmentConfig {
 
   public Set<String> getNoDictionaryColumns() {
     return _noDictionaryColumns;
+  }
+
+  public Set<String> getVarLengthDictionaryColumns() {
+    return _varLengthDictionaryColumns;
   }
 
   public Set<String> getInvertedIndexColumns() {
@@ -119,6 +126,7 @@ public class RealtimeSegmentConfig {
     private int _capacity;
     private int _avgNumMultiValues;
     private Set<String> _noDictionaryColumns;
+    private Set<String> _varLengthDictionaryColumns;
     private Set<String> _invertedIndexColumns;
     private RealtimeSegmentZKMetadata _realtimeSegmentZKMetadata;
     private boolean _offHeap;
@@ -160,6 +168,11 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setVarLengthDictionaryColumns(Set<String> varLengthDictionaryColumns) {
+      _varLengthDictionaryColumns = varLengthDictionaryColumns;
+      return this;
+    }
+
     public Builder setInvertedIndexColumns(Set<String> invertedIndexColumns) {
       _invertedIndexColumns = invertedIndexColumns;
       return this;
@@ -197,7 +210,8 @@ public class RealtimeSegmentConfig {
 
     public RealtimeSegmentConfig build() {
       return new RealtimeSegmentConfig(_segmentName, _streamName, _schema, _capacity, _avgNumMultiValues,
-          _noDictionaryColumns, _invertedIndexColumns, _realtimeSegmentZKMetadata, _offHeap, _memoryManager,
+          _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
+          _realtimeSegmentZKMetadata, _offHeap, _memoryManager,
           _statsHistory, _segmentPartitionConfig, _aggregateMetrics);
     }
   }

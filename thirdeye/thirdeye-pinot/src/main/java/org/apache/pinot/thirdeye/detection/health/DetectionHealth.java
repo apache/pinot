@@ -201,7 +201,7 @@ public class DetectionHealth {
       List<Interval> intervals = new ArrayList<>();
       if (!anomalies.isEmpty()) {
         anomalies.sort(Comparator.comparingLong(MergedAnomalyResultBean::getStartTime));
-        long start = anomalies.stream().findFirst().get().getStartTime();
+        long start = Math.max(anomalies.stream().findFirst().get().getStartTime(), this.startTime);
         long end = anomalies.stream().findFirst().get().getEndTime();
         for (MergedAnomalyResultDTO anomaly : anomalies) {
           if (anomaly.getStartTime() <= end) {
@@ -212,7 +212,7 @@ public class DetectionHealth {
             end = anomaly.getEndTime();
           }
         }
-        intervals.add(new Interval(start, end));
+        intervals.add(new Interval(start, Math.min(end, this.endTime)));
       }
 
       // compute coverage

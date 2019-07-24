@@ -20,8 +20,6 @@ package org.apache.pinot.transport.perf;
 
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
 import java.util.concurrent.CountDownLatch;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -152,9 +150,7 @@ public class ScatterGatherPerfServer {
     }
 
     @Override
-    public ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request) {
-      byte[] b = new byte[request.readableBytes()];
-      request.readBytes(b);
+    public ListenableFuture<byte[]> processRequest(byte[] request) {
       if (null != _responseHandlingLatch) {
         try {
           _responseHandlingLatch.await();
@@ -162,7 +158,7 @@ public class ScatterGatherPerfServer {
           e.printStackTrace();
         }
       }
-      _request = new String(b);
+      _request = new String(request);
 
       if (_responseLatencyMs > 0) {
         try {

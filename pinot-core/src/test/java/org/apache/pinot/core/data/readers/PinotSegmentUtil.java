@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.readers;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,9 +28,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -47,16 +52,16 @@ public class PinotSegmentUtil {
 
   public static List<GenericRow> createTestData(Schema schema, int numRows) {
     List<GenericRow> rows = new ArrayList<>();
-    final Random random = new Random();
+    final ThreadLocalRandom random = ThreadLocalRandom.current();
     Map<String, Object> fields;
     for (int i = 0; i < numRows; i++) {
       fields = new HashMap<>();
       for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
         Object value;
         if (fieldSpec.isSingleValueField()) {
-          value = generateSingleValue(random, fieldSpec.getDataType());
+          value = generateSingleValue(random, fieldSpec);
         } else {
-          value = generateMultiValue(random, fieldSpec.getDataType());
+          value = generateMultiValue(random, fieldSpec);
         }
         fields.put(fieldSpec.getName(), value);
       }
@@ -94,27 +99,58 @@ public class PinotSegmentUtil {
     return segmentIndexDir;
   }
 
-  private static Object generateSingleValue(Random random, FieldSpec.DataType dataType) {
-    switch (dataType) {
-      case INT:
-        return Math.abs(random.nextInt());
-      case LONG:
-        return Math.abs(random.nextLong());
-      case FLOAT:
-        return Math.abs(random.nextFloat());
-      case DOUBLE:
-        return Math.abs(random.nextDouble());
-      case STRING:
-        return RandomStringUtils.randomAlphabetic(DEFAULT_STRING_VALUE_LENGTH);
-      default:
-        throw new IllegalStateException("Illegal data type");
+  private static Object generateSingleValue(ThreadLocalRandom random, FieldSpec fieldSpec) {
+    if (fieldSpec instanceof TimeFieldSpec) {
+      // explicitly generate the time column values within allowed range so that
+      // segment generation code doesn't throw exception
+      TimeFieldSpec timeFieldSpec = (TimeFieldSpec)fieldSpec;
+      TimeUnit unit = timeFieldSpec.getIncomingGranularitySpec().getTimeType();
+      final long milliMin = TimeUtils.getValidMinTimeMillis();
+      final long milliMax = TimeUtils.getValidMaxTimeMillis();
+      final long daysMin = TimeUnit.DAYS.convert(milliMin, TimeUnit.MILLISECONDS);
+      final long daysMax = TimeUnit.DAYS.convert(milliMax, TimeUnit.MILLISECONDS);
+      final long hoursMin = TimeUnit.HOURS.convert(milliMin, TimeUnit.MILLISECONDS);
+      final long hoursMax = TimeUnit.HOURS.convert(milliMax, TimeUnit.MILLISECONDS);
+      final long minutesMin = TimeUnit.MINUTES.convert(milliMin, TimeUnit.MILLISECONDS);
+      final long minutesMax = TimeUnit.MINUTES.convert(milliMax, TimeUnit.MILLISECONDS);
+      switch (unit) {
+        case MILLISECONDS:
+          return random.nextLong(milliMin, milliMax);
+        case SECONDS:
+          return random.nextLong(milliMin/1000, milliMax/1000);
+        case MICROSECONDS:
+          return random.nextLong(milliMin*1000, milliMax*1000);
+        case NANOSECONDS:
+          return random.nextLong(milliMin*1000*1000, milliMax*1000*1000);
+        case DAYS:
+          return random.nextLong(daysMin, daysMax);
+        case HOURS:
+          return random.nextLong(hoursMin, hoursMax);
+        case MINUTES:
+          return random.nextLong(minutesMin, minutesMax);
+      }
+    } else {
+      switch (fieldSpec.getDataType()) {
+        case INT:
+          return Math.abs(random.nextInt());
+        case LONG:
+          return Math.abs(random.nextLong());
+        case FLOAT:
+          return Math.abs(random.nextFloat());
+        case DOUBLE:
+          return Math.abs(random.nextDouble());
+        case STRING:
+          return RandomStringUtils.randomAlphabetic(DEFAULT_STRING_VALUE_LENGTH);
+      }
     }
+
+    throw new IllegalStateException("Illegal data type");
   }
 
-  private static Object[] generateMultiValue(Random random, FieldSpec.DataType dataType) {
+  private static Object[] generateMultiValue(ThreadLocalRandom random, FieldSpec fieldSpec) {
     Object[] value = new Object[DEFAULT_NUM_MULTIVALUE];
     for (int i = 0; i < DEFAULT_NUM_MULTIVALUE; i++) {
-      value[i] = generateSingleValue(random, dataType);
+      value[i] = generateSingleValue(random, fieldSpec);
     }
     return value;
   }
