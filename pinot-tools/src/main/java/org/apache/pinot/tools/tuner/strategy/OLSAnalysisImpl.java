@@ -227,7 +227,7 @@ public class OLSAnalysisImpl implements Strategy {
 
     /*
      * Parse predicate list connected by AND and OR (recursively)
-     * Sum the results of childs
+     * Sum the results of children
      */
     int parsePredicateList(PQL2Parser.PredicateListContext predicateListContext) {
       LOGGER.debug("Parsing predicate list: {}", predicateListContext.getText());
