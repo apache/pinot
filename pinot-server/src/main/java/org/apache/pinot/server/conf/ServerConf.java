@@ -21,6 +21,7 @@ package org.apache.pinot.server.conf;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.CommonConstants;
 
 
 /**
@@ -104,6 +105,6 @@ public class ServerConf {
   }
 
   public String getMetricsPrefix() {
-    return _serverConf.getString(PINOT_SERVER_METRICS_PREFIX, ServerMetrics.METRICS_PREFIX);
+    return _serverConf.getString(PINOT_SERVER_METRICS_PREFIX, CommonConstants.Server.DEFAULT_METRICS_PREFIX);
   }
 }

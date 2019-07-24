@@ -20,6 +20,8 @@ package org.apache.pinot.common.metrics;
 
 import com.yammer.metrics.core.MetricsRegistry;
 
+import static org.apache.pinot.common.utils.CommonConstants.Server.DEFAULT_METRICS_PREFIX;
+
 
 /**
  * Utility class to centralize all metrics reporting for the Pinot server.
@@ -28,7 +30,6 @@ import com.yammer.metrics.core.MetricsRegistry;
 public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter, ServerGauge, ServerTimer> {
 
   public static final boolean GLOBAL_METRICS_DEFAULT = false;
-  public static final String METRICS_PREFIX = "pinot.server.";
 
   @Override
   protected ServerQueryPhase[] getQueryPhases() {
@@ -46,11 +47,11 @@ public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter
   }
 
   public ServerMetrics(MetricsRegistry metricsRegistry) {
-    this(METRICS_PREFIX, metricsRegistry, GLOBAL_METRICS_DEFAULT);
+    this(DEFAULT_METRICS_PREFIX, metricsRegistry, GLOBAL_METRICS_DEFAULT);
   }
 
   public ServerMetrics(MetricsRegistry metricsRegistry, boolean global) {
-    this(METRICS_PREFIX, metricsRegistry, global);
+    this(DEFAULT_METRICS_PREFIX, metricsRegistry, global);
   }
 
   public ServerMetrics(String prefix, MetricsRegistry metricsRegistry, boolean global) {

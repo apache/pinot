@@ -70,7 +70,7 @@ public class BrokerServerBuilder {
     MetricsHelper.initializeMetrics(config.subset(Broker.METRICS_CONFIG_PREFIX));
     MetricsHelper.registerMetricsRegistry(_metricsRegistry);
     _brokerMetrics =
-        new BrokerMetrics(config.getString(Broker.METRICS_NAME_PREFIX, BrokerMetrics.METRICS_PREFIX_DEFAULT), _metricsRegistry,
+        new BrokerMetrics(config.getString(Broker.CONFIG_OF_METRICS_NAME_PREFIX, Broker.DEFAULT_METRICS_NAME_PREFIX), _metricsRegistry,
             !_config.getBoolean(Broker.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS, true));
     _brokerMetrics.initializeGlobalMeters();
     _brokerRequestHandler = buildRequestHandler();

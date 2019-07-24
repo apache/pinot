@@ -29,13 +29,15 @@ import java.util.Random;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.filesystem.LocalPinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.common.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
+import static org.apache.pinot.common.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
 
 
 public class ControllerConf extends PropertiesConfiguration {
@@ -58,7 +60,6 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String CONSOLE_WEBAPP_USE_HTTPS = "controller.query.console.useHttps";
   private static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
   private static final String CONTROLLER_MODE = "controller.mode";
-  private static final String CONTROLLER_METRICS_PREFIX = "controller.metrics.prefix";
 
   public enum ControllerMode {
     DUAL,
@@ -646,6 +647,6 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public String getMetricsPrefix() {
-    return getString(CONTROLLER_METRICS_PREFIX, ControllerMetrics.METRICS_PREFIX_DEFAULT);
+    return getString(CONFIG_OF_CONTROLLER_METRICS_PREFIX, DEFAULT_METRICS_PREFIX);
   }
 }
