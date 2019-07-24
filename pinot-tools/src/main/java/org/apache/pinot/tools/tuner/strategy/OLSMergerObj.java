@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 
-public class OLSMergerObj extends BasicMergerObj {
+public class OLSMergerObj extends AbstractMergerObj {
 
   ArrayList<Long> _timeList;
   ArrayList<Long> _inFilterList;

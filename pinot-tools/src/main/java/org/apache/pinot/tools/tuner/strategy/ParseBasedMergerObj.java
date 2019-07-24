@@ -3,7 +3,7 @@ package org.apache.pinot.tools.tuner.strategy;
 import java.math.BigInteger;
 
 
-public class ParseBasedMergerObj extends BasicMergerObj {
+public class ParseBasedMergerObj extends AbstractMergerObj {
   private long _pureScore;
   private BigInteger _weigtedScore;
 

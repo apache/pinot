@@ -15,14 +15,14 @@ import org.apache.commons.math3.stat.descriptive.rank.Percentile;
 import org.apache.commons.math3.stat.regression.OLSMultipleLinearRegression;
 import org.apache.pinot.pql.parsers.PQL2Lexer;
 import org.apache.pinot.pql.parsers.PQL2Parser;
-import org.apache.pinot.tools.tuner.meta.manager.MetaDataProperties;
-import org.apache.pinot.tools.tuner.query.src.BasicQueryStats;
-import org.apache.pinot.tools.tuner.query.src.IndexSuggestQueryStatsImpl;
+import org.apache.pinot.tools.tuner.meta.manager.MetaManager;
+import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
+import org.apache.pinot.tools.tuner.query.src.stats.wrapper.IndexSuggestQueryStatsImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class OLSAnalysisImpl implements BasicStrategy {
+public class OLSAnalysisImpl implements Strategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(OLSAnalysisImpl.class);
 
   public final static long NO_IN_FILTER_THRESHOLD = 0;
@@ -32,19 +32,19 @@ public class OLSAnalysisImpl implements BasicStrategy {
 
   private HashSet<String> _tableNamesWorkonWithoutType;
   private long _numEntriesScannedThreshold;
-  private long _len_bin;
+  private long _lenBin;
 
   private OLSAnalysisImpl(Builder builder) {
     _tableNamesWorkonWithoutType = builder._tableNamesWorkonWithoutType;
     _numEntriesScannedThreshold = builder._numEntriesScannedThreshold;
-    _len_bin = builder._len_bin;
+    _lenBin = builder._lenBin;
   }
 
   public static final class Builder {
 
     private HashSet<String> _tableNamesWorkonWithoutType = new HashSet<>();
     private long _numEntriesScannedThreshold = NO_IN_FILTER_THRESHOLD;
-    private long _len_bin = 100;
+    private long _lenBin = 100;
 
     public Builder() {
     }
@@ -55,32 +55,32 @@ public class OLSAnalysisImpl implements BasicStrategy {
     }
 
     @Nonnull
-    public Builder _tableNamesWorkonWithoutType(@Nonnull HashSet<String> val) {
+    public Builder setTableNamesWorkonWithoutType(@Nonnull HashSet<String> val) {
       _tableNamesWorkonWithoutType = val;
       return this;
     }
 
     @Nonnull
-    public Builder _numEntriesScannedThreshold(long val) {
+    public Builder setNumEntriesScannedThreshold(long val) {
       _numEntriesScannedThreshold = val;
       return this;
     }
 
     @Nonnull
-    public Builder _len_bin(long val) {
-      _len_bin = val;
+    public Builder setLenBin(long val) {
+      _lenBin = val;
       return this;
     }
 
     @Nonnull
-    public Builder _tableNamesWorkonWithoutType(@Nonnull List<String> val) {
+    public Builder setTableNamesWorkonWithoutType(@Nonnull List<String> val) {
       _tableNamesWorkonWithoutType.addAll(val);
       return this;
     }
   }
 
   @Override
-  public boolean filter(BasicQueryStats queryStats) {
+  public boolean filter(AbstractQueryStats queryStats) {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     long numEntriesScannedInFilter = Long.parseLong(indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter());
     return (_tableNamesWorkonWithoutType.isEmpty() || _tableNamesWorkonWithoutType
@@ -89,8 +89,8 @@ public class OLSAnalysisImpl implements BasicStrategy {
   }
 
   @Override
-  public void accumulator(BasicQueryStats queryStats, MetaDataProperties metaDataProperties,
-      Map<String, Map<String, BasicMergerObj>> AccumulatorOut) {
+  public void accumulator(AbstractQueryStats queryStats, MetaManager metaManager,
+      Map<String, Map<String, AbstractMergerObj>> AccumulatorOut) {
 
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     String tableNameWithoutType = indexSuggestQueryStatsImpl.getTableNameWithoutType();
@@ -100,7 +100,7 @@ public class OLSAnalysisImpl implements BasicStrategy {
     String query = indexSuggestQueryStatsImpl.getQuery();
     LOGGER.debug("Accumulator: scoring query {}", query);
 
-    DimensionScoring dimensionScoring = new DimensionScoring(tableNameWithoutType, metaDataProperties, query);
+    DimensionScoring dimensionScoring = new DimensionScoring(tableNameWithoutType, metaManager, query);
     int usedIndexs = dimensionScoring.parseQuery();
     LOGGER.debug("Accumulator: query score: {}", usedIndexs);
 
@@ -108,16 +108,16 @@ public class OLSAnalysisImpl implements BasicStrategy {
     AccumulatorOut.get(tableNameWithoutType).putIfAbsent("*", new OLSMergerObj());
     ((OLSMergerObj) AccumulatorOut.get(tableNameWithoutType).get("*"))
         .merge(Long.parseLong(time), Long.parseLong(numEntriesScannedInFilter),
-            Long.parseLong(numEntriesScannedPostFilter), usedIndexs, _len_bin);
+            Long.parseLong(numEntriesScannedPostFilter), usedIndexs, _lenBin);
   }
 
   @Override
-  public void merger(BasicMergerObj p1, BasicMergerObj p2) {
+  public void merger(AbstractMergerObj p1, AbstractMergerObj p2) {
     ((OLSMergerObj) p1).merge((OLSMergerObj) p2);
   }
 
   @Override
-  public void reporter(String tableNameWithoutType, Map<String, BasicMergerObj> mergedOut) {
+  public void reporter(String tableNameWithoutType, Map<String, AbstractMergerObj> mergedOut) {
     String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
     LOGGER.info(reportOut);
 
@@ -155,8 +155,8 @@ public class OLSAnalysisImpl implements BasicStrategy {
       Tuple2<Long, Long> key = entry.getKey();
       Tuple2<Long, Long> val = entry.getValue();
       time[iter] = val._2();
-      x_arr[iter][0] = key._1() * _len_bin + _len_bin / 2;
-      x_arr[iter][1] = key._2() * _len_bin + _len_bin / 2;
+      x_arr[iter][0] = key._1() * _lenBin + _lenBin / 2;
+      x_arr[iter][1] = key._2() * _lenBin + _lenBin / 2;
       //x_arr[iter][2]=val._1();
       //LOGGER.info("time:{} inFilter:{} postFilter:{} usedIndex:{}",time[iter], x_arr[iter][0], x_arr[iter][1]);//, x_arr[iter][2]);
       iter++;
@@ -181,13 +181,13 @@ public class OLSAnalysisImpl implements BasicStrategy {
     static final String AND = "AND";
     static final String OR = "OR";
     private String _tableNameWithoutType;
-    private MetaDataProperties _metaDataProperties;
+    private MetaManager _metaManager;
     private String _queryString;
     private final Logger LOGGER = LoggerFactory.getLogger(DimensionScoring.class);
 
-    DimensionScoring(String tableNameWithoutType, MetaDataProperties metaDataProperties, String queryString) {
+    DimensionScoring(String tableNameWithoutType, MetaManager metaManager, String queryString) {
       _tableNameWithoutType = tableNameWithoutType;
-      _metaDataProperties = metaDataProperties;
+      _metaManager = metaManager;
       _queryString = queryString;
     }
 
@@ -263,7 +263,7 @@ public class OLSAnalysisImpl implements BasicStrategy {
       } else if (predicateContext instanceof PQL2Parser.InPredicateContext) {
         LOGGER.debug("Entering IN clause!");
         String colName = ((PQL2Parser.InPredicateContext) predicateContext).inClause().expression().getText();
-        if (_metaDataProperties.hasInvertedIndex(_tableNameWithoutType, colName)) {
+        if (_metaManager.hasInvertedIndex(_tableNameWithoutType, colName)) {
           return ((PQL2Parser.InPredicateContext) predicateContext).inClause().literal().size();
         }
         return 0;
@@ -276,7 +276,7 @@ public class OLSAnalysisImpl implements BasicStrategy {
                 .getText();
         LOGGER.debug("COMP operator {}", comparisonOp);
         if (comparisonOp.equals("=") || comparisonOp.equals("!=") || comparisonOp.equals("<>")) {
-          if (_metaDataProperties.hasInvertedIndex(_tableNameWithoutType, colName)) {
+          if (_metaManager.hasInvertedIndex(_tableNameWithoutType, colName)) {
             return 1;
           }
         }

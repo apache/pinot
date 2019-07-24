@@ -22,8 +22,8 @@ public class JsonFileMetaManagerImpl implements MetaManager {
   public static final Boolean USE_EXISTING_INDEX = true;
   public static final Boolean DONT_USE_EXISTING_INDEX = false;
 
-  /*
-   *Meta data type:
+
+   /*Meta data type:
    *COL_META: Aggregated (sum and weighted sum of metadata)
    *SEGMENT_META: Individually stored metadata of each segment
    */
@@ -34,66 +34,66 @@ public class JsonFileMetaManagerImpl implements MetaManager {
   private static final String TYPE_HYBRID = "_HYBRID";
   private static final String TYPE_REGEX = "(_REALTIME|_OFFLINE|_HYBRID)";
   private String _path;
-  private Boolean _use_existing_index;
-  private HashMap<String, HashSet<String>> _additional_masking_cols;
+  private Boolean _useExistingIndex;
+  private HashMap<String, HashSet<String>> _additionalMaskingCols;
 
   private JsonNode _aggregatedMap = null;
   private JsonNode _segmentMap = null;
 
   private JsonFileMetaManagerImpl(Builder builder) {
     _path = builder._path;
-    _use_existing_index = builder._use_existing_index;
-    _additional_masking_cols = builder._additional_masking_cols;
+    _useExistingIndex = builder._useExistingIndex;
+    _additionalMaskingCols = builder._additionalMaskingCols;
   }
 
   public static final class Builder {
     private String _path;
-    private Boolean _use_existing_index = USE_EXISTING_INDEX;
-    private HashMap<String, HashSet<String>> _additional_masking_cols = new HashMap<>();
+    private Boolean _useExistingIndex = USE_EXISTING_INDEX;
+    private HashMap<String, HashSet<String>> _additionalMaskingCols = new HashMap<>();
 
     public Builder() {
     }
 
     /**
      *
-     * @param val the path to the json file storing the segment metadata
+     * @param val The path to the json file storing the segment metadata
      * @return
      */
     @Nonnull
-    public Builder _path(@Nonnull String val) {
+    public Builder setPath(@Nonnull String val) {
       _path = val;
       return this;
     }
 
     /**
      *
-     * @param val if this is set the already applied index will not be considered again
+     * @param val If this is set the already applied index will not be considered again
      * @return
      */
     @Nonnull
-    public Builder _use_existing_index(@Nonnull Boolean val) {
-      _use_existing_index = val;
+    public Builder useExistingIndex(@Nonnull Boolean val) {
+      _useExistingIndex = val;
       return this;
     }
 
     /**
      *
-     * @param val for research and debug purpose only, the cardinality of /tableName/colName passed in will be considered as 1
+     * @param val For research and debug purpose only, the cardinality of /tableName/colName passed in will be considered as 1
      * @return
      */
     @Nonnull
-    public Builder _additional_masking_cols(@Nonnull HashMap<String, HashSet<String>> val) {
-      _additional_masking_cols = val;
+    public Builder additionalMaskingCols(@Nonnull HashMap<String, HashSet<String>> val) {
+      _additionalMaskingCols = val;
       return this;
     }
 
     @Nonnull
     public JsonFileMetaManagerImpl build() {
-      return new JsonFileMetaManagerImpl(this).cache();
+      return new JsonFileMetaManagerImpl(this).fetch();
     }
   }
 
-  public JsonFileMetaManagerImpl cache() {
+  public JsonFileMetaManagerImpl fetch() {
     File file = new File(this._path);
     String metaBytes = "";
     try {
@@ -114,10 +114,10 @@ public class JsonFileMetaManagerImpl implements MetaManager {
   }
 
   public boolean hasInvertedIndex(String tableNameWithoutType, String columnName) {
-    if (_additional_masking_cols.getOrDefault(tableNameWithoutType, new HashSet<>()).contains(columnName)) {
+    if (_additionalMaskingCols.getOrDefault(tableNameWithoutType, new HashSet<>()).contains(columnName)) {
       return true;
     }
-    if (_use_existing_index) {
+    if (_useExistingIndex) {
       String _numHasInv = getColField(tableNameWithoutType, columnName, NUM_SEGMENTS_HAS_INVERTED_INDEX);
       return _numHasInv != null && Integer.parseInt(_numHasInv) > 0;
     }
@@ -127,10 +127,10 @@ public class JsonFileMetaManagerImpl implements MetaManager {
   public BigFraction getAverageCardinality(String tableNameWithoutType, String columnName) {
     LOGGER.debug("Getting card from: {} {}", tableNameWithoutType, columnName);
 
-    if (_additional_masking_cols.getOrDefault(tableNameWithoutType, new HashSet<>()).contains(columnName)) {
+    if (_additionalMaskingCols.getOrDefault(tableNameWithoutType, new HashSet<>()).contains(columnName)) {
       return BigFraction.ONE;
     }
-    if (_use_existing_index) {
+    if (_useExistingIndex) {
       String _numHasInv = getColField(tableNameWithoutType, columnName, NUM_SEGMENTS_HAS_INVERTED_INDEX);
       if (_numHasInv == null || Integer.parseInt(_numHasInv) > 0) {
         return BigFraction.ONE;

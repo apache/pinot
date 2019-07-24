@@ -19,14 +19,14 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import org.apache.commons.math.fraction.BigFraction;
 import org.apache.pinot.pql.parsers.PQL2Lexer;
 import org.apache.pinot.pql.parsers.PQL2Parser;
-import org.apache.pinot.tools.tuner.meta.manager.MetaDataProperties;
-import org.apache.pinot.tools.tuner.query.src.BasicQueryStats;
-import org.apache.pinot.tools.tuner.query.src.IndexSuggestQueryStatsImpl;
+import org.apache.pinot.tools.tuner.meta.manager.MetaManager;
+import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
+import org.apache.pinot.tools.tuner.query.src.stats.wrapper.IndexSuggestQueryStatsImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class ParserBasedImpl implements BasicStrategy {
+public class ParserBasedImpl implements Strategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(ParserBasedImpl.class);
 
   public final static int FIRST_ORDER = 1;
@@ -68,75 +68,75 @@ public class ParserBasedImpl implements BasicStrategy {
     }
 
     /**
-     * lower order(FIRST_ORDER) for inverted index, higher order(THIRD_ORDER) for sorted (broad coverage), default to FIRST_ORDER
+     * Lower order(FIRST_ORDER) for inverted index, higher order(THIRD_ORDER) for sorted (broad coverage), default to FIRST_ORDER
      * @param val
      * @return
      */
     @Nonnull
-    public Builder _algorithmOrder(int val) {
+    public Builder setAlgorithmOrder(int val) {
       _algorithmOrder = val;
       return this;
     }
 
     /**
-     * set the tables to work on, other tables will be filtered out
+     * Set the tables to work on, other tables will be filtered out
      * @param val set of table names without type
      * @return
      */
     @Nonnull
-    public Builder _tableNamesWorkonWithoutType(@Nonnull HashSet<String> val) {
+    public Builder setTableNamesWorkonWithoutType(@Nonnull HashSet<String> val) {
       _tableNamesWorkonWithoutType = val;
       return this;
     }
 
     /**
-     * set the threshold for _numEntriesScannedInFilter, the queries with _numEntriesScannedInFilter below this will be filtered out
+     * Set the threshold for _numEntriesScannedInFilter, the queries with _numEntriesScannedInFilter below this will be filtered out
      * @param val
      * @return
      */
     @Nonnull
-    public Builder _numEntriesScannedThreshold(long val) {
+    public Builder setNumEntriesScannedThreshold(long val) {
       _numEntriesScannedThreshold = val;
       return this;
     }
 
     /**
-     * set the minimum number of records scanned to give a recommendation
+     * Set the minimum number of records scanned to give a recommendation
      * @param val minimum number of records scanned to give a recommendation, default to 0
      * @return
      */
     @Nonnull
-    public Builder _numProcessedThreshold(long val) {
+    public Builder setNumProcessedThreshold(long val) {
       _numProcessedThreshold = val;
       return this;
     }
 
     /**
-     * set the cardinality threshold, column with cardinality below this will be ignored,
+     * Set the cardinality threshold, column with cardinality below this will be ignored;
      * setting a high value will force the system to ignore low card columns
      * @param val cardinality threshold, default to 1
      * @return
      */
     @Nonnull
-    public Builder _cardinalityThreshold(int val) {
+    public Builder setCardinalityThreshold(int val) {
       _cardinalityThreshold = val;
       return this;
     }
 
     /**
-     * set the tables to work on, other tables will be filtered out
+     * Set the tables to work on, other tables will be filtered out
      * @param val list of table names without type
      * @return
      */
     @Nonnull
-    public Builder _tableNamesWorkonWithoutType(@Nonnull List<String> val) {
+    public Builder setTableNamesWorkonWithoutType(@Nonnull List<String> val) {
       _tableNamesWorkonWithoutType.addAll(val);
       return this;
     }
   }
 
   @Override
-  public boolean filter(BasicQueryStats queryStats) {
+  public boolean filter(AbstractQueryStats queryStats) {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     long numEntriesScannedInFilter = Long.parseLong(indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter());
     return (_tableNamesWorkonWithoutType.isEmpty() || _tableNamesWorkonWithoutType
@@ -145,8 +145,8 @@ public class ParserBasedImpl implements BasicStrategy {
   }
 
   @Override
-  public void accumulator(BasicQueryStats queryStats, MetaDataProperties metaDataProperties,
-      Map<String, Map<String, BasicMergerObj>> AccumulatorOut) {
+  public void accumulator(AbstractQueryStats queryStats, MetaManager metaManager,
+      Map<String, Map<String, AbstractMergerObj>> AccumulatorOut) {
 
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     String tableNameWithoutType = indexSuggestQueryStatsImpl.getTableNameWithoutType();
@@ -158,7 +158,7 @@ public class ParserBasedImpl implements BasicStrategy {
       return; //Early return if the query is not scanning in filter
     }
 
-    DimensionScoring dimensionScoring = new DimensionScoring(tableNameWithoutType, metaDataProperties, query);
+    DimensionScoring dimensionScoring = new DimensionScoring(tableNameWithoutType, metaManager, query);
     List<Tuple2<List<String>, BigFraction>> columnScores = dimensionScoring.parseQuery();
     LOGGER.debug("Accumulator: query score: {}", columnScores.toString());
 
@@ -181,12 +181,12 @@ public class ParserBasedImpl implements BasicStrategy {
   }
 
   @Override
-  public void merger(BasicMergerObj p1, BasicMergerObj p2) {
+  public void merger(AbstractMergerObj p1, AbstractMergerObj p2) {
     ((ParseBasedMergerObj) p1).merge((ParseBasedMergerObj) p2);
   }
 
   @Override
-  public void reporter(String tableNameWithoutType, Map<String, BasicMergerObj> mergedOut) {
+  public void reporter(String tableNameWithoutType, Map<String, AbstractMergerObj> mergedOut) {
     AtomicLong totalCount = new AtomicLong(0);
     mergedOut.forEach((k, v) -> {
       totalCount.addAndGet(v.getCount());
@@ -221,7 +221,7 @@ public class ParserBasedImpl implements BasicStrategy {
     static final String AND = "AND";
     static final String OR = "OR";
     private String _tableNameWithoutType;
-    private MetaDataProperties _metaDataProperties;
+    private MetaManager _metaManager;
     private String _queryString;
     private final Logger LOGGER = LoggerFactory.getLogger(DimensionScoring.class);
 
@@ -236,9 +236,9 @@ public class ParserBasedImpl implements BasicStrategy {
       }
     }
 
-    DimensionScoring(String tableNameWithoutType, MetaDataProperties metaDataProperties, String queryString) {
+    DimensionScoring(String tableNameWithoutType, MetaManager metaManager, String queryString) {
       _tableNameWithoutType = tableNameWithoutType;
-      _metaDataProperties = metaDataProperties;
+      _metaManager = metaManager;
       _queryString = queryString;
     }
 
@@ -375,7 +375,7 @@ public class ParserBasedImpl implements BasicStrategy {
         colNameList.add(colName);
         ArrayList<Tuple2<List<String>, BigFraction>> ret = new ArrayList<>();
 
-        BigFraction cardinality = _metaDataProperties.getAverageCardinality(_tableNameWithoutType, colName);
+        BigFraction cardinality = _metaManager.getAverageCardinality(_tableNameWithoutType, colName);
         LOGGER.debug("Final Cardinality: {} {} {}", cardinality, _tableNameWithoutType, colName);
         if (cardinality.compareTo(BigFraction.ONE) <= 0) {
           return ret;
@@ -401,7 +401,7 @@ public class ParserBasedImpl implements BasicStrategy {
         colNameList.add(colName);
         ArrayList<Tuple2<List<String>, BigFraction>> ret = new ArrayList<>();
 
-        BigFraction cardinality = _metaDataProperties.getAverageCardinality(_tableNameWithoutType, colName);
+        BigFraction cardinality = _metaManager.getAverageCardinality(_tableNameWithoutType, colName);
         LOGGER.debug("Final Cardinality: {} {} {}", cardinality, _tableNameWithoutType, colName);
         if (cardinality.compareTo(BigFraction.ONE) <= 0) {
           return ret;

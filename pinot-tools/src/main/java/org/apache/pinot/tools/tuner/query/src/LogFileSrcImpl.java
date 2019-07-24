@@ -7,6 +7,8 @@ import java.io.InputStreamReader;
 import java.util.NoSuchElementException;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
+import org.apache.pinot.tools.tuner.query.src.parser.AbstractQueryParser;
+import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,57 +25,56 @@ public class LogFileSrcImpl implements QuerySrc {
   private FileInputStream _fileInputStream = null;
   private BufferedReader _bufferedReader = null;
   private String _stringBufferNext = null;
-  private Pattern _valid_line_beginner_pattern;
+  private Pattern _validLineBeginnerPattern;
 
-  private BasicQueryParser _parser;
+  private AbstractQueryParser _parser;
   private String _path;
-  private String _valid_line_beginner_regex;
 
   private LogFileSrcImpl(Builder builder) {
     _parser = builder._parser;
     _path = builder._path;
-    _valid_line_beginner_regex = builder._valid_line_beginner_regex;
-    _valid_line_beginner_pattern = Pattern.compile(_valid_line_beginner_regex);
+    String valid_line_beginner_regex = builder._validLineBeginnerRegex;
+    _validLineBeginnerPattern = Pattern.compile(valid_line_beginner_regex);
   }
 
   public static final class Builder {
-    private BasicQueryParser _parser;
+    private AbstractQueryParser _parser;
     private String _path;
-    private String _valid_line_beginner_regex = REGEX_VALID_LINE_TIME;
+    private String _validLineBeginnerRegex = REGEX_VALID_LINE_TIME;
 
     public Builder() {
     }
 
     /**
-     * choose a parser
-     * @param val a parser, e.g. BrokerLogParserImpl, ServerLogParserImpl
+     * Choose a parser
+     * @param val A parser, e.g. BrokerLogParserImpl, ServerLogParserImpl
      * @return
      */
     @Nonnull
-    public Builder _parser(@Nonnull BasicQueryParser val) {
+    public Builder setParser(@Nonnull AbstractQueryParser val) {
       _parser = val;
       return this;
     }
 
     /**
      *
-     * @param val path to the log file
+     * @param val Path to the log file
      * @return
      */
     @Nonnull
-    public Builder _path(@Nonnull String val) {
+    public Builder setPath(@Nonnull String val) {
       _path = val;
       return this;
     }
 
     /**
      *
-     * @param val starting pattern of a log line, default to REGEX_VALID_LINE_TIME = "^(\\d{4})/(\\d{2})/(\\d{2}) [\\d:.].*$"
+     * @param val Starting pattern of a log line, default to REGEX_VALID_LINE_TIME = "^(\\d{4})/(\\d{2})/(\\d{2}) [\\d:.].*$"
      * @return
      */
     @Nonnull
-    public Builder _valid_line_beginner_regex(@Nonnull String val) {
-      _valid_line_beginner_regex = val;
+    public Builder setValidLineBeginnerRegex(@Nonnull String val) {
+      _validLineBeginnerRegex = val;
       return this;
     }
 
@@ -112,14 +113,14 @@ public class LogFileSrcImpl implements QuerySrc {
   }
 
   @Override
-  public BasicQueryStats next()
+  public AbstractQueryStats next()
       throws NoSuchElementException {
     if (_stringBufferNext == null) {
       throw new NoSuchElementException();
     }
     String stringBuffer = _stringBufferNext;
     try {
-      while ((_stringBufferNext = _bufferedReader.readLine()) != null && !_valid_line_beginner_pattern
+      while ((_stringBufferNext = _bufferedReader.readLine()) != null && !_validLineBeginnerPattern
           .matcher(_stringBufferNext).find()) {
         stringBuffer = stringBuffer + _stringBufferNext;
         _stringBufferNext = null;

@@ -1,15 +1,17 @@
-package org.apache.pinot.tools.tuner.query.src;
+package org.apache.pinot.tools.tuner.query.src.stats.wrapper;
 
 import javax.annotation.Nonnull;
 
 
-public class IndexSuggestQueryStatsImpl extends BasicQueryStats {
+/**
+ * The query stats used for inverted index study and recommendation
+ */
+public class IndexSuggestQueryStatsImpl extends AbstractQueryStats {
 
   private String _time;
   private String _tableNameWithoutType;
   private String _numEntriesScannedInFilter;
   private String _numEntriesScannedPostFilter;
-  private String _query;
 
   public static final class Builder {
     private String _tableNameWithoutType;
@@ -23,29 +25,29 @@ public class IndexSuggestQueryStatsImpl extends BasicQueryStats {
 
     /**
      *
-     * @param val query text
+     * @param val Query text
      * @return
      */
     @Nonnull
-    Builder _query(@Nonnull String val) {
+    public Builder setQuery(@Nonnull String val) {
       _query = val;
       return this;
     }
 
     @Nonnull
-    Builder _tableNameWithoutType(@Nonnull String val) {
+    public Builder setTableNameWithoutType(@Nonnull String val) {
       _tableNameWithoutType = val;
       return this;
     }
 
     @Nonnull
-    Builder _numEntriesScannedInFilter(String val) {
+    public Builder setNumEntriesScannedInFilter(String val) {
       _numEntriesScannedInFilter = val;
       return this;
     }
 
     @Nonnull
-    Builder _numEntriesScannedPostFilter(String val) {
+    public Builder setNumEntriesScannedPostFilter(String val) {
       _numEntriesScannedPostFilter = val;
       return this;
     }
@@ -56,7 +58,7 @@ public class IndexSuggestQueryStatsImpl extends BasicQueryStats {
     }
 
     @Nonnull
-    public Builder _time(@Nonnull String val) {
+    public Builder setTime(@Nonnull String val) {
       _time = val;
       return this;
     }

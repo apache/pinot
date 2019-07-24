@@ -11,14 +11,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
 import org.apache.commons.math.fraction.BigFraction;
-import org.apache.pinot.tools.tuner.meta.manager.MetaDataProperties;
-import org.apache.pinot.tools.tuner.query.src.BasicQueryStats;
-import org.apache.pinot.tools.tuner.query.src.IndexSuggestQueryStatsImpl;
+import org.apache.pinot.tools.tuner.meta.manager.MetaManager;
+import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
+import org.apache.pinot.tools.tuner.query.src.stats.wrapper.IndexSuggestQueryStatsImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class FrequencyImpl implements BasicStrategy {
+public class FrequencyImpl implements Strategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(FrequencyImpl.class);
 
   public final static String DIMENSION_REGEX = "(?:(\\w+) ((?:NOT )?IN) (\\(.+?\\)))|(?:(\\w+) (=|<>|!=) (.+?)[ |$)])";
@@ -112,7 +112,7 @@ public class FrequencyImpl implements BasicStrategy {
   }
 
   @Override
-  public boolean filter(BasicQueryStats queryStats) {
+  public boolean filter(AbstractQueryStats queryStats) {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     long numEntriesScannedInFilter = Long.parseLong(indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter());
     return (_tableNamesWorkonWithoutType.isEmpty() || _tableNamesWorkonWithoutType
@@ -121,8 +121,8 @@ public class FrequencyImpl implements BasicStrategy {
   }
 
   @Override
-  public void accumulator(BasicQueryStats queryStats, MetaDataProperties metaDataProperties,
-      Map<String, Map<String, BasicMergerObj>> AccumulatorOut) {
+  public void accumulator(AbstractQueryStats queryStats, MetaManager metaManager,
+      Map<String, Map<String, AbstractMergerObj>> AccumulatorOut) {
 
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     String tableNameWithoutType = indexSuggestQueryStatsImpl.getTableNameWithoutType();
@@ -145,7 +145,7 @@ public class FrequencyImpl implements BasicStrategy {
       }
     }
 
-    counted.stream().filter(colName -> metaDataProperties.getAverageCardinality(tableNameWithoutType, colName)
+    counted.stream().filter(colName -> metaManager.getAverageCardinality(tableNameWithoutType, colName)
         .compareTo(new BigFraction(_cardinalityThreshold)) > 0).forEach(colName -> {
       AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
       AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new FrequencyMergerObj());
@@ -154,12 +154,12 @@ public class FrequencyImpl implements BasicStrategy {
   }
 
   @Override
-  public void merger(BasicMergerObj p1, BasicMergerObj p2) {
+  public void merger(AbstractMergerObj p1, AbstractMergerObj p2) {
     ((FrequencyMergerObj) p1).merge((FrequencyMergerObj) p2);
   }
 
   @Override
-  public void reporter(String tableNameWithoutType, Map<String, BasicMergerObj> mergedOut) {
+  public void reporter(String tableNameWithoutType, Map<String, AbstractMergerObj> mergedOut) {
     AtomicLong totalCount = new AtomicLong(0);
     mergedOut.forEach((k, v) -> {
       totalCount.addAndGet(v.getCount());

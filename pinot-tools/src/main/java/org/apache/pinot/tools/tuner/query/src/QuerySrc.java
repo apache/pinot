@@ -1,6 +1,7 @@
 package org.apache.pinot.tools.tuner.query.src;
 
 import java.util.NoSuchElementException;
+import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 
 
 /**
@@ -9,15 +10,15 @@ import java.util.NoSuchElementException;
 public interface QuerySrc {
   /**
    *
-   * @return if the input has next stats obj
+   * @return If the input has next stats obj
    */
   boolean hasNext();
 
   /**
    *
-   * @return the nex obj parsed from input
+   * @return The nex obj parsed from input
    * @throws NoSuchElementException
    */
-  BasicQueryStats next()
+  AbstractQueryStats next()
       throws NoSuchElementException;
 }
