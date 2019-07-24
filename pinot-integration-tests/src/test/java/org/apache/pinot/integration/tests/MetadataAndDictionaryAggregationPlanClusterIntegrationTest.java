@@ -138,7 +138,7 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
-    uploadSegments(_tarDir);
+    uploadSegments(getTableName(), _tarDir);
   }
 
   @Test

@@ -121,7 +121,7 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     executor.shutdown();
     executor.awaitTermination(1L, TimeUnit.MINUTES);
 
-    uploadSegments(segmentTarDir);
+    uploadSegments(getTableName(), segmentTarDir);
 
     FileUtils.forceDelete(avroFile);
     FileUtils.forceDelete(segmentTarDir);

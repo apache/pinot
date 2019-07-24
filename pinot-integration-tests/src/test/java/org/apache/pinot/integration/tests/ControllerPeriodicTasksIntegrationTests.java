@@ -192,7 +192,7 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
         null, null, null, executor);
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
-    uploadSegments(_tarDir);
+    uploadSegments(getTableName(), _tarDir);
     waitForAllDocsLoaded(600_000L);
   }
 

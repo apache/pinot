@@ -64,8 +64,6 @@ public class PerfBenchmarkDriverConf {
   String rawDataDirectory;
 
   boolean regenerateIndex = false;
-  //if the regenerateIndex is true, the indexes under this directory will be deleted and recreated from rawData.
-  String indexDirectory;
 
   //by default all files under indexDirectory will be uploaded to the controller if its not already present.
   //If the indexes are already uploaded, nothing
@@ -178,10 +176,6 @@ public class PerfBenchmarkDriverConf {
     return regenerateIndex;
   }
 
-  public String getIndexDirectory() {
-    return indexDirectory;
-  }
-
   public boolean isForceReloadIndex() {
     return forceReloadIndex;
   }
@@ -270,10 +264,6 @@ public class PerfBenchmarkDriverConf {
     this.regenerateIndex = regenerateIndex;
   }
 
-  public void setIndexDirectory(String indexDirectory) {
-    this.indexDirectory = indexDirectory;
-  }
-
   public void setForceReloadIndex(boolean forceReloadIndex) {
     this.forceReloadIndex = forceReloadIndex;
   }
@@ -316,14 +306,5 @@ public class PerfBenchmarkDriverConf {
 
   public void setSchemaFileNamePath(String schemaFileNamePath) {
     this.schemaFileNamePath = schemaFileNamePath;
-  }
-
-  public static void main(String[] args) {
-    DumperOptions options = new DumperOptions();
-    options.setIndent(4);
-    options.setDefaultFlowStyle(FlowStyle.BLOCK);
-    Yaml yaml = new Yaml(options);
-    String dump = yaml.dump(new PerfBenchmarkDriverConf());
-    System.out.println(dump);
   }
 }

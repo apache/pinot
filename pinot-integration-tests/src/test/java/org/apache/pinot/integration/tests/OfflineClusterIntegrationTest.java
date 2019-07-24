@@ -124,7 +124,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     completeTableConfiguration();
 
     // Upload all segments
-    uploadSegments(_tarDir);
+    uploadSegments(getTableName(), _tarDir);
 
     // Set up service status callbacks
     // NOTE: put this step after creating the table and uploading all segments so that brokers and servers can find the
@@ -199,7 +199,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Refresh time is when the segment gets refreshed (existing segment)
     long refreshTime = segmentZKMetadata.getRefreshTime();
 
-    uploadSegments(_tarDir);
+    uploadSegments(getTableName(), _tarDir);
     for (OfflineSegmentZKMetadata segmentZKMetadataAfterUpload : _helixResourceManager
         .getOfflineSegmentMetadata(getTableName())) {
       // Only check one segment

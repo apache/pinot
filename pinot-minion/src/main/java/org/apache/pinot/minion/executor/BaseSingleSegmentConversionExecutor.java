@@ -21,7 +21,6 @@ package org.apache.pinot.minion.executor;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
@@ -137,17 +136,15 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
           new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
               segmentZKMetadataCustomMapModifier.toJsonString());
 
-      // Add table name and segment name to headers
-      Header tableNameHeader = new BasicHeader(CommonConstants.Controller.TABLE_NAME_HTTP_HEADER,
-          TableNameBuilder.extractRawTableName(tableNameWithType));
-      Header segmentNameHeader = new BasicHeader(CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER, segmentName);
-
       List<Header> httpHeaders =
-          Arrays.asList(ifMatchHeader, segmentZKMetadataCustomMapModifierHeader, tableNameHeader, segmentNameHeader);
+          Arrays.asList(ifMatchHeader, segmentZKMetadataCustomMapModifierHeader);
 
       // Set parameters for upload request.
-      List<NameValuePair> parameters = Collections.singletonList(
-          new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION, "true"));
+      NameValuePair enableParallelPushProtectionParameter =
+          new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION, "true");
+      NameValuePair tableNameParameter = new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME,
+          TableNameBuilder.extractRawTableName(tableNameWithType));
+      List<NameValuePair> parameters = Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter);
 
       // Upload the tarred segment
       SegmentConversionUtils

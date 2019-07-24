@@ -56,7 +56,7 @@ import org.apache.http.entity.mime.content.FileBody;
 import org.apache.http.entity.mime.content.InputStreamBody;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.message.BasicHeader;
+import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.slf4j.Logger;
@@ -80,6 +80,7 @@ public class FileUploadDownloadClient implements Closeable {
 
   public static class QueryParameters {
     public static final String ENABLE_PARALLEL_PUSH_PROTECTION = "enableParallelPushProtection";
+    public static final String TABLE_NAME = "tableName";
   }
 
   public enum FileUploadType {
@@ -458,6 +459,10 @@ public class FileUploadDownloadClient implements Closeable {
   /**
    * Upload segment with segment file.
    *
+   * Note: in case of using this API directly, tableName has to be set in the parameter when uploading segments from
+   * Minion or offline push job. Realtime segment upload does not need to add table name parameter. Table name is
+   * derived from the segment name in case of realtime segment commit.
+   *
    * @param uri URI
    * @param segmentName Segment name
    * @param segmentFile Segment file
@@ -475,22 +480,31 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
-   * Upload segment with segment file using default settings.
+   * Upload segment with segment file using default settings. Include table name as a request parameter.
    *
    * @param uri URI
    * @param segmentName Segment name
    * @param segmentFile Segment file
+   * @param rawTableName Raw table name
    * @return Response
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile)
+  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, String rawTableName)
       throws IOException, HttpErrorStatusException {
-    return uploadSegment(uri, segmentName, segmentFile, null, null, DEFAULT_SOCKET_TIMEOUT_MS);
+    // Add table name as a request parameter
+    NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, rawTableName);
+    List<NameValuePair> parameters = Arrays.asList(tableNameValuePair);
+    return uploadSegment(uri, segmentName, segmentFile, null, parameters, DEFAULT_SOCKET_TIMEOUT_MS);
   }
+
 
   /**
    * Upload segment with segment file input stream.
+   *
+   * Note: in case of using this API directly, tableName has to be set in the parameter when uploading segments from
+   * Minion or offline push job. Realtime segment upload does not need to add table name parameter. Table name is
+   * derived from the segment name in case of realtime segment commit.
    *
    * @param uri URI
    * @param segmentName Segment name
@@ -509,22 +523,7 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
-   * Upload segment with segment file input stream using default settings.
-   *
-   * @param uri URI
-   * @param segmentName Segment name
-   * @param inputStream Segment file input stream
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
-  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, InputStream inputStream)
-      throws IOException, HttpErrorStatusException {
-    return uploadSegment(uri, segmentName, inputStream, null, null, DEFAULT_SOCKET_TIMEOUT_MS);
-  }
-
-  /**
-   * Upload segment with segment file. Include table name and segment name headers.
+   * Upload segment with segment file input stream using default settings. Include table name as a request parameter.
    *
    * @param uri URI
    * @param segmentName Segment name
@@ -534,19 +533,20 @@ public class FileUploadDownloadClient implements Closeable {
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public SimpleHttpResponse uploadSegmentWithTableAndSegmentNameHeader(URI uri, String segmentName,
-      InputStream inputStream, String rawTableName)
+  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, InputStream inputStream, String rawTableName)
       throws IOException, HttpErrorStatusException {
-    // Add table and segment name to headers
-    Header tableNameHeader = new BasicHeader(CommonConstants.Controller.TABLE_NAME_HTTP_HEADER, rawTableName);
-    Header segmentNameHeader = new BasicHeader(CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER, segmentName);
-    List<Header> headers = Arrays.asList(tableNameHeader, segmentNameHeader);
-    return sendRequest(
-        getUploadSegmentRequest(uri, segmentName, inputStream, headers, null, DEFAULT_SOCKET_TIMEOUT_MS));
+    // Add table name as a request parameter
+    NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, rawTableName);
+    List<NameValuePair> parameters = Arrays.asList(tableNameValuePair);
+    return uploadSegment(uri, segmentName, inputStream, null, parameters, DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
   /**
-   * Send segment uri.
+   * Send segment uri. Include table name as a request parameter.
+   *
+   * Note: in case of using this API directly, tableName has to be set in the parameter when uploading segments from
+   * Minion or offline push job. Realtime segment upload does not need to add table name parameter. Table name is
+   * derived from the segment name in case of realtime segment commit.
    *
    * @param uri URI
    * @param downloadUri Segment download uri
@@ -564,21 +564,7 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
-   * Send segment uri using default settings.
-   *
-   * @param uri URI
-   * @param downloadUri Segment download uri
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
-  public SimpleHttpResponse sendSegmentUri(URI uri, String downloadUri)
-      throws IOException, HttpErrorStatusException {
-    return sendSegmentUri(uri, downloadUri, null, null, DEFAULT_SOCKET_TIMEOUT_MS);
-  }
-
-  /**
-   * Send segment uri with table name header. Include table name and segment name headers.
+   * Send segment uri using default settings. Include table name as a request parameter.
    *
    * @param uri URI
    * @param downloadUri Segment download uri
@@ -587,15 +573,12 @@ public class FileUploadDownloadClient implements Closeable {
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public SimpleHttpResponse sendSegmentUriWithTableAndSegmentNameHeader(URI uri, String downloadUri,
-      String rawTableName)
+  public SimpleHttpResponse sendSegmentUri(URI uri, String downloadUri, String rawTableName)
       throws IOException, HttpErrorStatusException {
-    // Add table name to headers
-    Header tableNameHeader = new BasicHeader(CommonConstants.Controller.TABLE_NAME_HTTP_HEADER, rawTableName);
-
-    // TODO: add segment name to headers
-    List<Header> headers = Arrays.asList(tableNameHeader);
-    return sendRequest(getSendSegmentUriRequest(uri, downloadUri, headers, null, DEFAULT_SOCKET_TIMEOUT_MS));
+    // Add table name as a request parameter
+    NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, rawTableName);
+    List<NameValuePair> parameters = Arrays.asList(tableNameValuePair);
+    return sendSegmentUri(uri, downloadUri, null, parameters, DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
   /**

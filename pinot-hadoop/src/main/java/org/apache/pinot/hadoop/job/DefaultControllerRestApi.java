@@ -105,7 +105,7 @@ public class DefaultControllerRestApi implements ControllerRestApi {
       for (PushLocation pushLocation : _pushLocations) {
         LOGGER.info("Pushing segment: {} to location: {}", segmentName, pushLocation);
         try (InputStream inputStream = fileSystem.open(tarFilePath)) {
-          SimpleHttpResponse response = _fileUploadDownloadClient.uploadSegmentWithTableAndSegmentNameHeader(
+          SimpleHttpResponse response = _fileUploadDownloadClient.uploadSegment(
               FileUploadDownloadClient.getUploadSegmentHttpURI(pushLocation.getHost(), pushLocation.getPort()),
               segmentName, inputStream, _rawTableName);
           LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
@@ -124,7 +124,7 @@ public class DefaultControllerRestApi implements ControllerRestApi {
       for (PushLocation pushLocation : _pushLocations) {
         LOGGER.info("Sending segment URI: {} to location: {}", segmentUri, pushLocation);
         try {
-          SimpleHttpResponse response = _fileUploadDownloadClient.sendSegmentUriWithTableAndSegmentNameHeader(
+          SimpleHttpResponse response = _fileUploadDownloadClient.sendSegmentUri(
               FileUploadDownloadClient.getUploadSegmentHttpURI(pushLocation.getHost(), pushLocation.getPort()),
               segmentUri, _rawTableName);
           LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
