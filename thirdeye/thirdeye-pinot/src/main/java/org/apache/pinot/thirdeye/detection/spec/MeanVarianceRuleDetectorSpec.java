@@ -26,7 +26,7 @@ import org.apache.pinot.thirdeye.detection.Pattern;
 public class MeanVarianceRuleDetectorSpec extends AbstractSpec {
   private String monitoringGranularity = MetricSlice.NATIVE_GRANULARITY.toAggregationGranularityString(); // use native granularity by default
   private int lookback = 52; //default look back of 52 units
-  private double sensitivity = 1.5; //default sensitivity of +/- 1.5 sigma
+  private double sigma = 1.5; //default sensitivity of +/- 1.5 sigma
   private Pattern pattern = Pattern.UP_OR_DOWN;
 
   public String getMonitoringGranularity() {
@@ -49,12 +49,12 @@ public class MeanVarianceRuleDetectorSpec extends AbstractSpec {
 
   public void setLookback(int lookback) {this.lookback = lookback;}
 
-  public double getSensitivity() {
-    return sensitivity;
+  public double getSigma() {
+    return sigma;
   }
 
-  public void setSensitivity(double sensitivity) {
-    this.sensitivity = sensitivity;
+  public void setSigma(double sigma) {
+    this.sigma = sigma;
   }
 
 }

@@ -22,11 +22,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.lang.Math;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -86,7 +88,7 @@ public class MeanVarianceRuleDetectorTest {
     MeanVarianceRuleDetectorSpec spec = new MeanVarianceRuleDetectorSpec();
     spec.setMonitoringGranularity("7_DAYS");
     spec.setLookback(52);
-    spec.setSensitivity(1.0);
+    spec.setSigma(1.0);
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
     Interval window = new Interval(1530576000000L, 1562630400000L);
     String metricUrn = "thirdeye:metric:1";
@@ -95,6 +97,10 @@ public class MeanVarianceRuleDetectorTest {
         .fromString(spec.getMonitoringGranularity()));
     TimeSeries timeSeries = detector.computePredictedTimeSeries(slice);
     Assert.assertEquals(timeSeries.getPredictedBaseline().size(), 53);
+    // prediction assertion. Expected value calculated offline using Python.
+    Assert.assertEquals(Math.round(timeSeries.getPredictedBaseline().getDouble(0) * 1000.0) / 1000.0,174431.234);
+    Assert.assertEquals(Math.round(timeSeries.getPredictedBaseline().getDouble(1) * 1000.0) / 1000.0,147184.878);
+    Assert.assertEquals(Math.round(timeSeries.getPredictedBaseline().getDouble(2) * 1000.0) / 1000.0,153660.665);
   }
 
   @Test
@@ -103,7 +109,7 @@ public class MeanVarianceRuleDetectorTest {
     MeanVarianceRuleDetectorSpec spec = new MeanVarianceRuleDetectorSpec();
     spec.setMonitoringGranularity("7_DAYS");
     spec.setLookback(52);
-    spec.setSensitivity(1.0);
+    spec.setSigma(1.0);
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
     DetectionResult detectionResult = detector.runDetection(new Interval(1530576000000L, 1562630400000L), "thirdeye:metric:1");
     List<MergedAnomalyResultDTO> anomalies = detectionResult.getAnomalies();
@@ -128,7 +134,7 @@ public class MeanVarianceRuleDetectorTest {
     MeanVarianceRuleDetectorSpec spec = new MeanVarianceRuleDetectorSpec();
     spec.setMonitoringGranularity("7_DAYS");
     spec.setLookback(52);
-    spec.setSensitivity(1.0);
+    spec.setSigma(1.0);
     spec.setPattern(Pattern.DOWN);
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
     DetectionResult result = detector.runDetection(new Interval(1530576000000L, 1562630400000L), "thirdeye:metric:1");
@@ -150,7 +156,7 @@ public class MeanVarianceRuleDetectorTest {
     MeanVarianceRuleDetectorSpec spec = new MeanVarianceRuleDetectorSpec();
     spec.setMonitoringGranularity("7_DAYS");
     spec.setLookback(52);
-    spec.setSensitivity(1.0);
+    spec.setSigma(1.0);
     spec.setPattern(Pattern.UP);
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
     DetectionResult result = detector.runDetection(new Interval(1530576000000L, 1562630400000L), "thirdeye:metric:1");

@@ -68,7 +68,7 @@ public class MeanVarianceRuleDetector implements AnomalyDetector<MeanVarianceRul
   private Pattern pattern;
   private String monitoringGranularity;
   private TimeGranularity timeGranularity;
-  private double sensitivity;
+  private double sigma;
   private int lookback;
 
   private static final String COL_CURR = "current";
@@ -84,13 +84,25 @@ public class MeanVarianceRuleDetector implements AnomalyDetector<MeanVarianceRul
     this.dataFetcher = dataFetcher;
     this.pattern = spec.getPattern();
     this.lookback = spec.getLookback();
-    this.sensitivity = spec.getSensitivity();
+    this.sigma = spec.getSigma();
     this.monitoringGranularity = spec.getMonitoringGranularity();
 
     if (this.monitoringGranularity.equals("1_MONTHS")) {
       this.timeGranularity = MetricSlice.NATIVE_GRANULARITY;
     } else {
       this.timeGranularity = TimeGranularity.fromString(spec.getMonitoringGranularity());
+    }
+
+    //Lookback spec validation
+    //Minimum lookback set to 9. That's 8 change data points.
+    if (this.lookback < 9) {
+      throw new IllegalArgumentException(String.format("Lookback of %d is too small. Please increase to greater than 9.", this.lookback));
+    }
+
+    //Sigma spec validation
+    //Sigma should be between 0 to 1.5
+    if (this.sigma < 0 || this.sigma > 1.5) {
+      throw new IllegalArgumentException(String.format("sigma of %.1f is not supported. Sigma should between 0 and 1.5.", this.sigma));
     }
   }
 
@@ -204,7 +216,7 @@ public class MeanVarianceRuleDetector implements AnomalyDetector<MeanVarianceRul
       //calculate baseline, error , upper and lower bound for prediction window.
       resultTimeArray[k] = forecastDF.getLong(COL_TIME, k);
       baselineArray[k] = trainingDF.getDouble(COL_VALUE,trainingDF.size()-1) * (1 + mean[k]);
-      errorArray[k] = trainingDF.getDouble(COL_VALUE,trainingDF.size()-1) * sensitivity * std[k];
+      errorArray[k] = trainingDF.getDouble(COL_VALUE,trainingDF.size()-1) * sigma * std[k];
       upperBoundArray[k] = baselineArray[k] + errorArray[k];
       lowerBoundArray[k] = baselineArray[k] - errorArray[k];
     }
@@ -231,8 +243,7 @@ public class MeanVarianceRuleDetector implements AnomalyDetector<MeanVarianceRul
         metricEntity.getFilters(), timeGranularity);
     slices.add(sliceData);
     LOG.info("Getting data for" + sliceData.toString());
-    InputData data = this.dataFetcher.fetchData(new InputDataSpec().withTimeseriesSlices(slices)
-        .withMetricIdsForDataset(Collections.singletonList(metricEntity.getId())));
+    InputData data = this.dataFetcher.fetchData(new InputDataSpec().withTimeseriesSlices(slices));
     return data.getTimeseries().get(sliceData);
   }
 
