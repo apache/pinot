@@ -3,6 +3,7 @@ package org.apache.pinot.tools.tuner.meta.manager;
 import java.io.IOException;
 
 
+/*TODO: Test code, this will be deleted, test code*/
 public class UncompressAndGetMeta {
   String _directory = null;
 
