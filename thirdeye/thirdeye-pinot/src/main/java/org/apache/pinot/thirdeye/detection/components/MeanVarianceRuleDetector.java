@@ -28,7 +28,6 @@ import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
-import org.apache.pinot.thirdeye.dataframe.Series;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -38,7 +37,7 @@ import org.apache.pinot.thirdeye.detection.Pattern;
 import org.apache.pinot.thirdeye.detection.annotation.Components;
 import org.apache.pinot.thirdeye.detection.annotation.DetectionTag;
 import org.apache.pinot.thirdeye.detection.annotation.Param;
-import org.apache.pinot.thirdeye.detection.spec.WoWStdRuleDetectorSpec;
+import org.apache.pinot.thirdeye.detection.spec.MeanVarianceRuleDetectorSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
 import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
 import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
@@ -53,18 +52,18 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.thirdeye.dataframe.DoubleSeries.*;
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
-@Components(title = "WoW mean and std-dev forecasting and detection",
+@Components(title = "History mean and standard deviation based forecasting and detection.",
     type = "WOW_STD_RULE",
     tags = {DetectionTag.RULE_DETECTION},
-    description = "Forecast using history WoW mean and std-dev",
+    description = "Forecast using history mean and standard deviation.",
     params = {
         @Param(name = "offset", defaultValue = "wo1w"),
         @Param(name = "pattern", allowableValues = {"up", "down"}),
         @Param(name = "lookback"),
         @Param(name = "sensitivity")})
-public class WoWStdRuleDetector implements AnomalyDetector<WoWStdRuleDetectorSpec>,
-                                           BaselineProvider<WoWStdRuleDetectorSpec> {
-  private static final Logger LOG = LoggerFactory.getLogger(WoWStdRuleDetector.class);
+public class MeanVarianceRuleDetector implements AnomalyDetector<MeanVarianceRuleDetectorSpec>,
+                                                 BaselineProvider<MeanVarianceRuleDetectorSpec> {
+  private static final Logger LOG = LoggerFactory.getLogger(MeanVarianceRuleDetector.class);
   private InputDataFetcher dataFetcher;
   private Pattern pattern;
   private String monitoringGranularity;
@@ -81,7 +80,7 @@ public class WoWStdRuleDetector implements AnomalyDetector<WoWStdRuleDetectorSpe
   private static final String COL_CHANGE = "change";
 
   @Override
-  public void init(WoWStdRuleDetectorSpec spec, InputDataFetcher dataFetcher) {
+  public void init(MeanVarianceRuleDetectorSpec spec, InputDataFetcher dataFetcher) {
     this.dataFetcher = dataFetcher;
     this.pattern = spec.getPattern();
     this.lookback = spec.getLookback();
@@ -158,8 +157,6 @@ public class WoWStdRuleDetector implements AnomalyDetector<WoWStdRuleDetectorSpe
           df.getDoubles(COL_DIFF).lt(0));
     }
     df.addSeries(COL_DIFF_VIOLATION, df.getDoubles(COL_DIFF).abs().gte(df.getDoubles(COL_ERROR)));
-//    df.addSeries(COL_DIFF_VIOLATION, map((Series.BooleanFunction) values -> values[0] || values[1],
-//        df.getDoubles(COL_DIFF).gte(df.getDoubles(COL_UP_ERROR)),df.getDoubles(COL_DIFF).lte(df.getDoubles(COL_DOWN_ERROR))));
     df.mapInPlace(BooleanSeries.ALL_TRUE, COL_ANOMALY, COL_PATTERN, COL_DIFF_VIOLATION);
 
     // Anomalies
@@ -168,7 +165,6 @@ public class WoWStdRuleDetector implements AnomalyDetector<WoWStdRuleDetectorSpe
         DetectionUtils.getMonitoringGranularityPeriod(timeGranularity.toAggregationGranularityString(),
             datasetConfig), datasetConfig);
     dfBase = dfBase.joinRight(df.retainSeries(COL_TIME, COL_CURR), COL_TIME);
-    DetectionResult dr1 = DetectionResult.from(anomalyResults, TimeSeries.fromDataFrame(dfBase));
     return DetectionResult.from(anomalyResults, TimeSeries.fromDataFrame(dfBase));
   }
 
@@ -176,7 +172,7 @@ public class WoWStdRuleDetector implements AnomalyDetector<WoWStdRuleDetectorSpe
 
     DataFrame resultDF = new DataFrame();
     //filter the data inside window for current values.
-    DataFrame forecastDF = inputDF.filter(new Series.LongConditional() {
+    DataFrame forecastDF = inputDF.filter(new LongConditional() {
       @Override
       public boolean apply(long... values) {
         return values[0] >= windowStartTime;
@@ -246,21 +242,21 @@ public class WoWStdRuleDetector implements AnomalyDetector<WoWStdRuleDetectorSpe
    * @param time the prediction time, in unix timestamp
    * @return DataFrame containing lookback number of data
    */
-
   private DataFrame getLookbackDF(DataFrame originalDF, Long time) {
     LongSeries longSeries = (LongSeries) originalDF.get(COL_TIME);
-    int indexFinish = longSeries.find(time);
+    int indexEnd = longSeries.find(time);
     DataFrame df = DataFrame.builder(COL_TIME, COL_VALUE).build();
 
-    if (indexFinish != -1) {
-      int indexStart = Math.max(0, indexFinish - lookback);
-      df = df.append(originalDF.slice(indexStart, indexFinish));
+    if (indexEnd != -1) {
+      int indexStart = Math.max(0, indexEnd - lookback);
+      df = df.append(originalDF.slice(indexStart, indexEnd));
     }
     // calculate percentage change
     df.addSeries(COL_CURR,df.getDoubles(COL_VALUE).shift(-1));
-    df.addSeries(COL_CHANGE, map((Series.DoubleFunction) values -> {
+    df.addSeries(COL_CHANGE, map((DoubleFunction) values -> {
       if (Double.compare(values[1], 0.0) == 0) {
-        return Double.compare(values[0], 0.0) == 0 ? 0.0 : (values[0] > 0 ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY);
+        // divide by zero handling
+        return 0.0;
       }
       return (values[0] - values[1]) / values[1];
     }, df.getDoubles(COL_CURR), df.get(COL_VALUE)));

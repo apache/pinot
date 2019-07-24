@@ -36,7 +36,7 @@ import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.Pattern;
 import org.apache.pinot.thirdeye.detection.algorithm.AlgorithmUtils;
-import org.apache.pinot.thirdeye.detection.spec.WoWStdRuleDetectorSpec;
+import org.apache.pinot.thirdeye.detection.spec.MeanVarianceRuleDetectorSpec;
 import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.joda.time.Interval;
@@ -48,7 +48,7 @@ import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
-public class WoWStdRuleDetectorTest {
+public class MeanVarianceRuleDetectorTest {
 
   private DataProvider provider;
   private DataFrame data;
@@ -56,7 +56,7 @@ public class WoWStdRuleDetectorTest {
 
   @BeforeMethod
   public void setUp() throws Exception {
-    try (Reader dataReader = new InputStreamReader(AlgorithmUtils.class.getResourceAsStream("timeseries-1y.csv"))) {
+    try (Reader dataReader = new InputStreamReader(AlgorithmUtils.class.getResourceAsStream("timeseries-2y.csv"))) {
       this.data = DataFrame.fromCsv(dataReader);
       this.data.setIndex(COL_TIME);
     }
@@ -82,8 +82,8 @@ public class WoWStdRuleDetectorTest {
 
   @Test
   public void testComputePredictedTimeSeriesDaily() {
-    WoWStdRuleDetector detector = new WoWStdRuleDetector();
-    WoWStdRuleDetectorSpec spec = new WoWStdRuleDetectorSpec();
+    MeanVarianceRuleDetector detector = new MeanVarianceRuleDetector();
+    MeanVarianceRuleDetectorSpec spec = new MeanVarianceRuleDetectorSpec();
     spec.setMonitoringGranularity("7_DAYS");
     spec.setLookback(52);
     spec.setSensitivity(1.0);
@@ -99,8 +99,8 @@ public class WoWStdRuleDetectorTest {
 
   @Test
   public void testWeekOverWeekLookbackChange() {
-    WoWStdRuleDetector detector = new WoWStdRuleDetector();
-    WoWStdRuleDetectorSpec spec = new WoWStdRuleDetectorSpec();
+    MeanVarianceRuleDetector detector = new MeanVarianceRuleDetector();
+    MeanVarianceRuleDetectorSpec spec = new MeanVarianceRuleDetectorSpec();
     spec.setMonitoringGranularity("7_DAYS");
     spec.setLookback(52);
     spec.setSensitivity(1.0);
@@ -124,8 +124,8 @@ public class WoWStdRuleDetectorTest {
 
   @Test
   public void testWeekOverWeekLookbackChangeDown() {
-    WoWStdRuleDetector detector = new WoWStdRuleDetector();
-    WoWStdRuleDetectorSpec spec = new WoWStdRuleDetectorSpec();
+    MeanVarianceRuleDetector detector = new MeanVarianceRuleDetector();
+    MeanVarianceRuleDetectorSpec spec = new MeanVarianceRuleDetectorSpec();
     spec.setMonitoringGranularity("7_DAYS");
     spec.setLookback(52);
     spec.setSensitivity(1.0);
@@ -146,8 +146,8 @@ public class WoWStdRuleDetectorTest {
 
   @Test
   public void testWeekOverWeekLookbackChangeUp() {
-    WoWStdRuleDetector detector = new WoWStdRuleDetector();
-    WoWStdRuleDetectorSpec spec = new WoWStdRuleDetectorSpec();
+    MeanVarianceRuleDetector detector = new MeanVarianceRuleDetector();
+    MeanVarianceRuleDetectorSpec spec = new MeanVarianceRuleDetectorSpec();
     spec.setMonitoringGranularity("7_DAYS");
     spec.setLookback(52);
     spec.setSensitivity(1.0);

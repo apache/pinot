@@ -23,10 +23,10 @@ import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.detection.Pattern;
 
 
-public class WoWStdRuleDetectorSpec extends AbstractSpec {
+public class MeanVarianceRuleDetectorSpec extends AbstractSpec {
   private String monitoringGranularity = MetricSlice.NATIVE_GRANULARITY.toAggregationGranularityString(); // use native granularity by default
-  private int lookback = 52;
-  private double sensitivity = 1.5;
+  private int lookback = 52; //default look back of 52 units
+  private double sensitivity = 1.5; //default sensitivity of +/- 1.5 sigma
   private Pattern pattern = Pattern.UP_OR_DOWN;
 
   public String getMonitoringGranularity() {
