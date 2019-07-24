@@ -161,9 +161,7 @@ public class FrequencyImpl implements Strategy {
   @Override
   public void report(String tableNameWithoutType, Map<String, AbstractAccumulator> mergedOut) {
     AtomicLong totalCount = new AtomicLong(0);
-    mergedOut.forEach((k, v) -> {
-      totalCount.addAndGet(v.getCount());
-    });
+    mergedOut.forEach((k, v) -> totalCount.addAndGet(v.getCount()));
     if (totalCount.longValue() < _numProcessedThreshold) {
       return;
     }

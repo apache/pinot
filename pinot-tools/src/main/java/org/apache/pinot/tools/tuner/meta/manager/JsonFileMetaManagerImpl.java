@@ -149,13 +149,13 @@ public class JsonFileMetaManagerImpl implements MetaManager {
       }
     }
 
-    String nSortedNuemrator = getColField(tableNameWithoutType, columnName, NUM_SEGMENTS_SORTED);
+    String nSortedNumerator = getColField(tableNameWithoutType, columnName, NUM_SEGMENTS_SORTED);
     String nSortedDenominator = getColField(tableNameWithoutType, columnName, NUM_SEGMENTS_COUNT);
     String cardNumerator = getColField(tableNameWithoutType, columnName, WEIGHTED_SUM_CARDINALITY);
     String cardDenominator = getColField(tableNameWithoutType, columnName, SUM_DOCS);
 
     LOGGER.debug("Cardinality table:{} column:{} card: {}/{}, sort: {}/{}", tableNameWithoutType, columnName,
-        cardNumerator, cardDenominator, nSortedNuemrator, nSortedDenominator);
+        cardNumerator, cardDenominator, nSortedNumerator, nSortedDenominator);
 
     if (cardNumerator == null || cardDenominator == null) {
       LOGGER.error("{} {}'s cardinality does not exist!", tableNameWithoutType, columnName);
@@ -163,13 +163,13 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     }
 
     BigFraction sorted_ratio;
-    if (nSortedNuemrator == null || nSortedDenominator == null) {
+    if (nSortedNumerator == null || nSortedDenominator == null) {
       //LOGGER.error("{} {}'s sort info does not exist!", tableNameWithoutType, columnName);
       sorted_ratio = BigFraction.ZERO;
-    } else if (nSortedNuemrator.equals(nSortedDenominator)) {
+    } else if (nSortedNumerator.equals(nSortedDenominator)) {
       return BigFraction.ONE;
     } else {
-      sorted_ratio = new BigFraction(new BigInteger(nSortedNuemrator), new BigInteger(nSortedDenominator));
+      sorted_ratio = new BigFraction(new BigInteger(nSortedNumerator), new BigInteger(nSortedDenominator));
     }
 
     sorted_ratio = BigFraction.ONE.subtract(sorted_ratio);
@@ -178,7 +178,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
 
 //    LOGGER.debug("Cardinality: table:{} column:{} card: {}/{}, sort: {}/{}, final {}",
 //        tableNameWithoutType, columnName, cardNumerator,
-//        cardDenominator, nSortedNuemrator, nSortedDenominator, ret
+//        cardDenominator, nSortedNumerator, nSortedDenominator, ret
 //        );
 
     return ret;

@@ -17,7 +17,7 @@ import org.slf4j.LoggerFactory;
 /**
  *TunerDriver is an executable interface, has three pluggable modules:
  *   MetaData Manager: a manger for MetaManager, which is an interface to access segment metadata.
- *   QuerySrc: an iterator interface over input source, has a pluggable AbstractQueryParser, who parses each item in input source, and returns AbstractQueryStats, a wrapper of relevant fields in nput.
+ *   QuerySrc: an iterator interface over input source, has a pluggable AbstractQueryParser, who parses each item in input source, and returns AbstractQueryStats, a wrapper of relevant fields input.
  *   Strategy, which has four user defined functions operating on a map of Map<Long, Map<String, Map<String, AbstractMergerObj>>>:
  *                                                                             |		       |				    |				     |
  *                                                                        ThreadID	   TableName	  ColumnName		  Abstract object of stats for a column

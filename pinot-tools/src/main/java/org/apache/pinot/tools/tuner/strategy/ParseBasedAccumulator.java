@@ -5,35 +5,35 @@ import java.math.BigInteger;
 
 public class ParseBasedAccumulator extends AbstractAccumulator {
   private long _pureScore;
-  private BigInteger _weigtedScore;
+  private BigInteger _weightedScore;
 
   public long getPureScore() {
     return _pureScore;
   }
 
-  public BigInteger getWeigtedScore() {
-    return _weigtedScore;
+  public BigInteger getWeightedScore() {
+    return _weightedScore;
   }
 
   public ParseBasedAccumulator() {
     _pureScore = 0;
-    _weigtedScore = BigInteger.ZERO;
+    _weightedScore = BigInteger.ZERO;
   }
 
-  public void merge(int _pureScore, BigInteger _weigtedScore) {
+  public void merge(int _pureScore, BigInteger _weightedScore) {
     super.increaseCount();
     this._pureScore += _pureScore;
-    this._weigtedScore = this._weigtedScore.add(_weigtedScore);
+    this._weightedScore = this._weightedScore.add(_weightedScore);
   }
 
   public void merge(ParseBasedAccumulator pb) {
     super.mergeCount(pb);
     this._pureScore += pb._pureScore;
-    this._weigtedScore = this._weigtedScore.add(pb._weigtedScore);
+    this._weightedScore = this._weightedScore.add(pb._weightedScore);
   }
 
   @Override
   public String toString() {
-    return "ParseBasedMergerObj{" + "_pureScore=" + _pureScore + ", _weigtedScore=" + _weigtedScore + '}';
+    return "ParseBasedMergerObj{" + "_pureScore=" + _pureScore + ", _weightedScore=" + _weightedScore + '}';
   }
 }

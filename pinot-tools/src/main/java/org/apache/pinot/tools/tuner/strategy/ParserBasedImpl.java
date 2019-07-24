@@ -172,10 +172,10 @@ public class ParserBasedImpl implements Strategy {
             counted.add(colName);
             AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
             AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new ParseBasedAccumulator());
-            BigFraction weigthedScore = BigFraction.ONE.subtract(tupleNamesScore._2().reciprocal())
+            BigFraction weightedScore = BigFraction.ONE.subtract(tupleNamesScore._2().reciprocal())
                 .multiply(new BigInteger(numEntriesScannedInFilter));
             ((ParseBasedAccumulator) AccumulatorOut.get(tableNameWithoutType).get(colName))
-                .merge(1, weigthedScore.bigDecimalValue(RoundingMode.DOWN.ordinal()).toBigInteger());
+                .merge(1, weightedScore.bigDecimalValue(RoundingMode.DOWN.ordinal()).toBigInteger());
           });
         });
   }
@@ -188,9 +188,7 @@ public class ParserBasedImpl implements Strategy {
   @Override
   public void report(String tableNameWithoutType, Map<String, AbstractAccumulator> mergedOut) {
     AtomicLong totalCount = new AtomicLong(0);
-    mergedOut.forEach((k, v) -> {
-      totalCount.addAndGet(v.getCount());
-    });
+    mergedOut.forEach((k, v) -> totalCount.addAndGet(v.getCount()));
     if (totalCount.longValue() < _numProcessedThreshold) {
       return;
     }
@@ -200,7 +198,7 @@ public class ParserBasedImpl implements Strategy {
     List<Tuple2<String, BigInteger>> sortedWeighted = new ArrayList<>();
     mergedOut.forEach((colName, score) -> {
       sortedPure.add(new Tuple2<>(colName, ((ParseBasedAccumulator) score).getPureScore()));
-      sortedWeighted.add(new Tuple2<>(colName, ((ParseBasedAccumulator) score).getWeigtedScore()));
+      sortedWeighted.add(new Tuple2<>(colName, ((ParseBasedAccumulator) score).getWeightedScore()));
     });
     sortedPure.sort((p1, p2) -> (p2._2().compareTo(p1._2())));
     sortedWeighted.sort((p1, p2) -> (p2._2().compareTo(p1._2())));

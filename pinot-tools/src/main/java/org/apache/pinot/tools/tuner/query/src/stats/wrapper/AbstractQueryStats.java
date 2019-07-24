@@ -6,4 +6,5 @@ package org.apache.pinot.tools.tuner.query.src.stats.wrapper;
 public abstract class AbstractQueryStats {
   public abstract String toString();
   protected String _query;
+  protected String _tableNameWithoutType;
 }

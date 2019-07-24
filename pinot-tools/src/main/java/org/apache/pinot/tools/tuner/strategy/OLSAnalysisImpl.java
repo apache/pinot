@@ -101,14 +101,14 @@ public class OLSAnalysisImpl implements Strategy {
     LOGGER.debug("Accumulator: scoring query {}", query);
 
     DimensionScoring dimensionScoring = new DimensionScoring(tableNameWithoutType, metaManager, query);
-    int usedIndexs = dimensionScoring.parseQuery();
-    LOGGER.debug("Accumulator: query score: {}", usedIndexs);
+    int usedIndices = dimensionScoring.parseQuery();
+    LOGGER.debug("Accumulator: query score: {}", usedIndices);
 
     AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
     AccumulatorOut.get(tableNameWithoutType).putIfAbsent("*", new OLSAccumulator());
     ((OLSAccumulator) AccumulatorOut.get(tableNameWithoutType).get("*"))
         .merge(Long.parseLong(time), Long.parseLong(numEntriesScannedInFilter),
-            Long.parseLong(numEntriesScannedPostFilter), usedIndexs, _lenBin);
+            Long.parseLong(numEntriesScannedPostFilter), usedIndices, _lenBin);
   }
 
   @Override
@@ -170,7 +170,6 @@ public class OLSAnalysisImpl implements Strategy {
       LOGGER.info("params: {}", para);
     } catch (Exception e) {
       LOGGER.info("unable to predict this table!");
-      return;
     }
   }
 

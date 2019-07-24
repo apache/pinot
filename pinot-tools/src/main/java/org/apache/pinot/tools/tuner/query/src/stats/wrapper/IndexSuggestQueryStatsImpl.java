@@ -9,7 +9,6 @@ import javax.annotation.Nonnull;
 public class IndexSuggestQueryStatsImpl extends AbstractQueryStats {
 
   private String _time;
-  private String _tableNameWithoutType;
   private String _numEntriesScannedInFilter;
   private String _numEntriesScannedPostFilter;
 
