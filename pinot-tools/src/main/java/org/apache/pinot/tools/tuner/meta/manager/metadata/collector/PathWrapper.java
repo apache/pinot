@@ -1,6 +1,7 @@
-package org.apache.pinot.tools.tuner.query.src.stats.wrapper;
+package org.apache.pinot.tools.tuner.meta.manager.metadata.collector;
 
 import javax.annotation.Nonnull;
+import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 
 
 public class PathWrapper extends AbstractQueryStats {

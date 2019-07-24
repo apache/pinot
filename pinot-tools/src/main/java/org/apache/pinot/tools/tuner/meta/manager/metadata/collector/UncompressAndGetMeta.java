@@ -1,4 +1,4 @@
-package org.apache.pinot.tools.tuner.meta.manager;
+package org.apache.pinot.tools.tuner.meta.manager.metadata.collector;
 
 import java.io.IOException;
 

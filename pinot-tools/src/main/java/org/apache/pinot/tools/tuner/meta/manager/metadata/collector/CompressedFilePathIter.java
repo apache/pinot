@@ -1,12 +1,11 @@
-package org.apache.pinot.tools.tuner.query.src;
+package org.apache.pinot.tools.tuner.meta.manager.metadata.collector;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.NoSuchElementException;
 import javax.annotation.Nonnull;
+import org.apache.pinot.tools.tuner.query.src.QuerySrc;
 import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
-import org.apache.pinot.tools.tuner.query.src.stats.wrapper.IndexSuggestQueryStatsImpl;
-import org.apache.pinot.tools.tuner.query.src.stats.wrapper.PathWrapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
