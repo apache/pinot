@@ -20,6 +20,7 @@ package org.apache.pinot.common.metrics;
 
 import com.yammer.metrics.core.MetricsRegistry;
 
+import static org.apache.pinot.common.utils.CommonConstants.Broker.DEFAULT_METRICS_GLOBAL_ENABLED;
 import static org.apache.pinot.common.utils.CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX;
 
 
@@ -29,15 +30,13 @@ import static org.apache.pinot.common.utils.CommonConstants.Broker.DEFAULT_METRI
  */
 public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter, BrokerGauge, BrokerTimer> {
 
-  public static final boolean GLOBAL_DEFAULT = false;
-
   /**
    * Constructs the broker metrics.
    *
    * @param metricsRegistry The metric registry used to register timers and meters.
    */
   public BrokerMetrics(MetricsRegistry metricsRegistry) {
-    this(metricsRegistry, GLOBAL_DEFAULT);
+    this(metricsRegistry, DEFAULT_METRICS_GLOBAL_ENABLED);
   }
 
   public BrokerMetrics(MetricsRegistry metricsRegistry, boolean global) {

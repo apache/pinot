@@ -126,6 +126,7 @@ public class CommonConstants {
     public static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
     public static final String CONFIG_OF_METRICS_NAME_PREFIX = "pinot.broker.metrics.prefix";
     public static final String DEFAULT_METRICS_NAME_PREFIX = "pinot.broker.";
+    public static final boolean DEFAULT_METRICS_GLOBAL_ENABLED = false;
 
     public static final String CONFIG_OF_DELAY_SHUTDOWN_TIME_MS = "pinot.broker.delayShutdownTimeMs";
     public static final long DEFAULT_DELAY_SHUTDOWN_TIME_MS = 10_000L;
@@ -277,6 +278,7 @@ public class CommonConstants {
     }
 
     public static final String DEFAULT_METRICS_PREFIX = "pinot.server.";
+    public static final boolean DEFAULT_METRICS_GLOBAL_ENABLED = false;
   }
 
   public static class Controller {
