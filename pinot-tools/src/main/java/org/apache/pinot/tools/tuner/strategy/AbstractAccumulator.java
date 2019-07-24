@@ -3,7 +3,7 @@ package org.apache.pinot.tools.tuner.strategy;
 /**
  * Accumulator for column stats
  */
-public abstract class AbstractMergerObj {
+public abstract class AbstractAccumulator {
   public abstract String toString();
 
   /**
@@ -25,9 +25,9 @@ public abstract class AbstractMergerObj {
 
   /**
    * Merge the default counter of two BasicMergerObjs
-   * @param abstractMergerObj AbstractMergerObj to merge to this AbstractMergerObj
+   * @param abstractAccumulator AbstractMergerObj to merge to this AbstractMergerObj
    */
-  public void mergeCount(AbstractMergerObj abstractMergerObj) {
-    this._count += abstractMergerObj._count;
+  public void mergeCount(AbstractAccumulator abstractAccumulator) {
+    this._count += abstractAccumulator._count;
   }
 }

@@ -23,14 +23,14 @@ public interface Strategy {
    * @param AccumulatorOut output, map of /tableMame: String/columnName: String/AbstractMergerObj
    */
   void accumulator(AbstractQueryStats queryStats, MetaManager metaManager,
-      Map<String, Map<String, AbstractMergerObj>> AccumulatorOut);
+      Map<String, Map<String, AbstractAccumulator>> AccumulatorOut);
 
   /**
    * merge two AbstractMergerObj with same /tableName/colName
-   * @param abstractMergerObj input
-   * @param abstractMergerObjToMerge input
+   * @param abstractAccumulator input
+   * @param abstractAccumulatorToMerge input
    */
-  void merger(AbstractMergerObj abstractMergerObj, AbstractMergerObj abstractMergerObjToMerge);
+  void merger(AbstractAccumulator abstractAccumulator, AbstractAccumulator abstractAccumulatorToMerge);
   //Merge two AbstractMergerObj from same /table/column
 
   /**
@@ -38,6 +38,6 @@ public interface Strategy {
    * @param tableNameWithoutType input
    * @param mergedOut input
    */
-  void reporter(String tableNameWithoutType, Map<String, AbstractMergerObj> mergedOut);
+  void reporter(String tableNameWithoutType, Map<String, AbstractAccumulator> mergedOut);
   //print/email results
 }

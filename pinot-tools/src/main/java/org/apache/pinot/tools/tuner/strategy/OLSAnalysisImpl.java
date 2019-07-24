@@ -90,7 +90,7 @@ public class OLSAnalysisImpl implements Strategy {
 
   @Override
   public void accumulator(AbstractQueryStats queryStats, MetaManager metaManager,
-      Map<String, Map<String, AbstractMergerObj>> AccumulatorOut) {
+      Map<String, Map<String, AbstractAccumulator>> AccumulatorOut) {
 
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     String tableNameWithoutType = indexSuggestQueryStatsImpl.getTableNameWithoutType();
@@ -105,19 +105,19 @@ public class OLSAnalysisImpl implements Strategy {
     LOGGER.debug("Accumulator: query score: {}", usedIndexs);
 
     AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-    AccumulatorOut.get(tableNameWithoutType).putIfAbsent("*", new OLSMergerObj());
-    ((OLSMergerObj) AccumulatorOut.get(tableNameWithoutType).get("*"))
+    AccumulatorOut.get(tableNameWithoutType).putIfAbsent("*", new OLSAccumulator());
+    ((OLSAccumulator) AccumulatorOut.get(tableNameWithoutType).get("*"))
         .merge(Long.parseLong(time), Long.parseLong(numEntriesScannedInFilter),
             Long.parseLong(numEntriesScannedPostFilter), usedIndexs, _lenBin);
   }
 
   @Override
-  public void merger(AbstractMergerObj p1, AbstractMergerObj p2) {
-    ((OLSMergerObj) p1).merge((OLSMergerObj) p2);
+  public void merger(AbstractAccumulator p1, AbstractAccumulator p2) {
+    ((OLSAccumulator) p1).merge((OLSAccumulator) p2);
   }
 
   @Override
-  public void reporter(String tableNameWithoutType, Map<String, AbstractMergerObj> mergedOut) {
+  public void reporter(String tableNameWithoutType, Map<String, AbstractAccumulator> mergedOut) {
     String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
     LOGGER.info(reportOut);
 
@@ -125,7 +125,7 @@ public class OLSAnalysisImpl implements Strategy {
       return;
     }
 
-    OLSMergerObj olsMergerObj = (OLSMergerObj) mergedOut.get("*");
+    OLSAccumulator olsMergerObj = (OLSAccumulator) mergedOut.get("*");
     LOGGER.debug(olsMergerObj.getMinBin().toString());
 
     double[] timeAll = new double[olsMergerObj.getTimeList().size()];

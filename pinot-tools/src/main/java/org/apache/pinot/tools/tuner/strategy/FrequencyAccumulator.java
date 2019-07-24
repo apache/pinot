@@ -3,9 +3,9 @@ package org.apache.pinot.tools.tuner.strategy;
 /**
  *
  */
-public class FrequencyMergerObj extends AbstractMergerObj {
+public class FrequencyAccumulator extends AbstractAccumulator {
 
-  public FrequencyMergerObj() {
+  public FrequencyAccumulator() {
     _pureScore = 0;
   }
 
@@ -20,7 +20,7 @@ public class FrequencyMergerObj extends AbstractMergerObj {
     this._pureScore += pureScore;
   }
 
-  public void merge(FrequencyMergerObj fobj) {
+  public void merge(FrequencyAccumulator fobj) {
     super.mergeCount(fobj);
     this._pureScore += fobj._pureScore;
   }

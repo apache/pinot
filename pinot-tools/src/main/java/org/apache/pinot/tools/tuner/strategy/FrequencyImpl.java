@@ -122,7 +122,7 @@ public class FrequencyImpl implements Strategy {
 
   @Override
   public void accumulator(AbstractQueryStats queryStats, MetaManager metaManager,
-      Map<String, Map<String, AbstractMergerObj>> AccumulatorOut) {
+      Map<String, Map<String, AbstractAccumulator>> AccumulatorOut) {
 
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     String tableNameWithoutType = indexSuggestQueryStatsImpl.getTableNameWithoutType();
@@ -148,18 +148,18 @@ public class FrequencyImpl implements Strategy {
     counted.stream().filter(colName -> metaManager.getAverageCardinality(tableNameWithoutType, colName)
         .compareTo(new BigFraction(_cardinalityThreshold)) > 0).forEach(colName -> {
       AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-      AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new FrequencyMergerObj());
-      ((FrequencyMergerObj) AccumulatorOut.get(tableNameWithoutType).get(colName)).merge(1);
+      AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new FrequencyAccumulator());
+      ((FrequencyAccumulator) AccumulatorOut.get(tableNameWithoutType).get(colName)).merge(1);
     });
   }
 
   @Override
-  public void merger(AbstractMergerObj p1, AbstractMergerObj p2) {
-    ((FrequencyMergerObj) p1).merge((FrequencyMergerObj) p2);
+  public void merger(AbstractAccumulator p1, AbstractAccumulator p2) {
+    ((FrequencyAccumulator) p1).merge((FrequencyAccumulator) p2);
   }
 
   @Override
-  public void reporter(String tableNameWithoutType, Map<String, AbstractMergerObj> mergedOut) {
+  public void reporter(String tableNameWithoutType, Map<String, AbstractAccumulator> mergedOut) {
     AtomicLong totalCount = new AtomicLong(0);
     mergedOut.forEach((k, v) -> {
       totalCount.addAndGet(v.getCount());
@@ -171,7 +171,7 @@ public class FrequencyImpl implements Strategy {
     String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
     List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
     mergedOut.forEach(
-        (colName, score) -> sortedPure.add(new Tuple2<>(colName, ((FrequencyMergerObj) score).getPureScore())));
+        (colName, score) -> sortedPure.add(new Tuple2<>(colName, ((FrequencyAccumulator) score).getPureScore())));
     sortedPure.sort((p1, p2) -> (p2._2().compareTo(p1._2())));
     for (Tuple2<String, Long> tuple2 : sortedPure) {
       reportOut += "Dimension: " + tuple2._1() + "  " + tuple2._2().toString() + "\n";

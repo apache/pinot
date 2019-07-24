@@ -146,7 +146,7 @@ public class ParserBasedImpl implements Strategy {
 
   @Override
   public void accumulator(AbstractQueryStats queryStats, MetaManager metaManager,
-      Map<String, Map<String, AbstractMergerObj>> AccumulatorOut) {
+      Map<String, Map<String, AbstractAccumulator>> AccumulatorOut) {
 
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     String tableNameWithoutType = indexSuggestQueryStatsImpl.getTableNameWithoutType();
@@ -171,22 +171,22 @@ public class ParserBasedImpl implements Strategy {
           tupleNamesScore._1().stream().filter(colName -> !counted.contains(colName)).forEach(colName -> {
             counted.add(colName);
             AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-            AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new ParseBasedMergerObj());
+            AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new ParseBasedAccumulator());
             BigFraction weigthedScore = BigFraction.ONE.subtract(tupleNamesScore._2().reciprocal())
                 .multiply(new BigInteger(numEntriesScannedInFilter));
-            ((ParseBasedMergerObj) AccumulatorOut.get(tableNameWithoutType).get(colName))
+            ((ParseBasedAccumulator) AccumulatorOut.get(tableNameWithoutType).get(colName))
                 .merge(1, weigthedScore.bigDecimalValue(RoundingMode.DOWN.ordinal()).toBigInteger());
           });
         });
   }
 
   @Override
-  public void merger(AbstractMergerObj p1, AbstractMergerObj p2) {
-    ((ParseBasedMergerObj) p1).merge((ParseBasedMergerObj) p2);
+  public void merger(AbstractAccumulator p1, AbstractAccumulator p2) {
+    ((ParseBasedAccumulator) p1).merge((ParseBasedAccumulator) p2);
   }
 
   @Override
-  public void reporter(String tableNameWithoutType, Map<String, AbstractMergerObj> mergedOut) {
+  public void reporter(String tableNameWithoutType, Map<String, AbstractAccumulator> mergedOut) {
     AtomicLong totalCount = new AtomicLong(0);
     mergedOut.forEach((k, v) -> {
       totalCount.addAndGet(v.getCount());
@@ -199,8 +199,8 @@ public class ParserBasedImpl implements Strategy {
     List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
     List<Tuple2<String, BigInteger>> sortedWeighted = new ArrayList<>();
     mergedOut.forEach((colName, score) -> {
-      sortedPure.add(new Tuple2<>(colName, ((ParseBasedMergerObj) score).getPureScore()));
-      sortedWeighted.add(new Tuple2<>(colName, ((ParseBasedMergerObj) score).getWeigtedScore()));
+      sortedPure.add(new Tuple2<>(colName, ((ParseBasedAccumulator) score).getPureScore()));
+      sortedWeighted.add(new Tuple2<>(colName, ((ParseBasedAccumulator) score).getWeigtedScore()));
     });
     sortedPure.sort((p1, p2) -> (p2._2().compareTo(p1._2())));
     sortedWeighted.sort((p1, p2) -> (p2._2().compareTo(p1._2())));

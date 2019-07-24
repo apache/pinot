@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 
-public class OLSMergerObj extends AbstractMergerObj {
+public class OLSAccumulator extends AbstractAccumulator {
 
   ArrayList<Long> _timeList;
   ArrayList<Long> _inFilterList;
@@ -23,7 +23,7 @@ public class OLSMergerObj extends AbstractMergerObj {
     return _minBin;
   }
 
-  public OLSMergerObj() {
+  public OLSAccumulator() {
     _timeList = new ArrayList<>();
     _inFilterList = new ArrayList<>();
     _minBin = new HashMap<>();
@@ -43,7 +43,7 @@ public class OLSMergerObj extends AbstractMergerObj {
     }
   }
 
-  public void merge(OLSMergerObj o2) {
+  public void merge(OLSAccumulator o2) {
     super.mergeCount(o2);
     _timeList.addAll(o2._timeList);
     _inFilterList.addAll(o2._inFilterList);

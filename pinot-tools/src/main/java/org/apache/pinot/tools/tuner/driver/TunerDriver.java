@@ -8,7 +8,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.tools.tuner.meta.manager.MetaManager;
 import org.apache.pinot.tools.tuner.query.src.QuerySrc;
 import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
-import org.apache.pinot.tools.tuner.strategy.AbstractMergerObj;
+import org.apache.pinot.tools.tuner.strategy.AbstractAccumulator;
 import org.apache.pinot.tools.tuner.strategy.Strategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +37,7 @@ public abstract class TunerDriver {
 
   /**
    * Set the number of threads used in action
-   * @param threadPoolSize
+   * @param threadPoolSize The number of threads used in action
    * @return
    */
   protected TunerDriver setThreadPoolSize(int threadPoolSize) {
@@ -75,8 +75,8 @@ public abstract class TunerDriver {
     return this;
   }
 
-  private Map<Long, Map<String, Map<String, AbstractMergerObj>>> _threadAccumulator = null;
-  private Map<String, Map<String, AbstractMergerObj>> _mergedResults;
+  private Map<Long, Map<String, Map<String, AbstractAccumulator>>> _threadAccumulator = null;
+  private Map<String, Map<String, AbstractAccumulator>> _mergedResults;
 
   /**
    * Execute strategy
@@ -124,7 +124,7 @@ public abstract class TunerDriver {
     // Merge corresponding entries
     LOGGER.info("Setting up _mergedResults for merging");
     _mergedResults = new HashMap<>();
-    for (Map.Entry<Long, Map<String, Map<String, AbstractMergerObj>>> threadEntry : _threadAccumulator.entrySet()) {
+    for (Map.Entry<Long, Map<String, Map<String, AbstractAccumulator>>> threadEntry : _threadAccumulator.entrySet()) {
       for (String tableNameWithoutType : threadEntry.getValue().keySet()) {
         _mergedResults.putIfAbsent(tableNameWithoutType, new HashMap<>());
       }
@@ -178,7 +178,7 @@ public abstract class TunerDriver {
       LOGGER.info("All merge done");
     }
     //Report
-    for (Map.Entry<String, Map<String, AbstractMergerObj>> tableStat : _mergedResults.entrySet()) {
+    for (Map.Entry<String, Map<String, AbstractAccumulator>> tableStat : _mergedResults.entrySet()) {
       _strategy.reporter(tableStat.getKey(), tableStat.getValue());
     }
   }
