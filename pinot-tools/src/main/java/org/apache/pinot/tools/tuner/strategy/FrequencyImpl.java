@@ -121,7 +121,7 @@ public class FrequencyImpl implements Strategy {
   }
 
   @Override
-  public void accumulator(AbstractQueryStats queryStats, MetaManager metaManager,
+  public void accumulate(AbstractQueryStats queryStats, MetaManager metaManager,
       Map<String, Map<String, AbstractAccumulator>> AccumulatorOut) {
 
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
@@ -154,12 +154,12 @@ public class FrequencyImpl implements Strategy {
   }
 
   @Override
-  public void merger(AbstractAccumulator p1, AbstractAccumulator p2) {
+  public void merge(AbstractAccumulator p1, AbstractAccumulator p2) {
     ((FrequencyAccumulator) p1).merge((FrequencyAccumulator) p2);
   }
 
   @Override
-  public void reporter(String tableNameWithoutType, Map<String, AbstractAccumulator> mergedOut) {
+  public void report(String tableNameWithoutType, Map<String, AbstractAccumulator> mergedOut) {
     AtomicLong totalCount = new AtomicLong(0);
     mergedOut.forEach((k, v) -> {
       totalCount.addAndGet(v.getCount());

@@ -100,13 +100,13 @@ public abstract class TunerDriver {
             long threadID = Thread.currentThread().getId();
             LOGGER.debug("Thread {} accumulating: {}", threadID, abstractQueryStats.toString());
             _threadAccumulator.putIfAbsent(threadID, new HashMap<>());
-            _strategy.accumulator(abstractQueryStats, _metaManager, _threadAccumulator.get(threadID));
+            _strategy.accumulate(abstractQueryStats, _metaManager, _threadAccumulator.get(threadID));
           });
         } else {
           long threadID = Thread.currentThread().getId();
           LOGGER.debug("Thread {} accumulating: {}", threadID, abstractQueryStats.toString());
           _threadAccumulator.putIfAbsent(threadID, new HashMap<>());
-          _strategy.accumulator(abstractQueryStats, _metaManager, _threadAccumulator.get(threadID));
+          _strategy.accumulate(abstractQueryStats, _metaManager, _threadAccumulator.get(threadID));
         }
       }
     }
@@ -150,7 +150,7 @@ public abstract class TunerDriver {
                       LOGGER.error("Instantiation Exception in Merger!");
                       LOGGER.error(e.toString());
                     }
-                    _strategy.merger(_mergedResults.get(tableNameWithoutType).get(colName), mergerObj);
+                    _strategy.merge(_mergedResults.get(tableNameWithoutType).get(colName), mergerObj);
                   }));
         });
       } else {
@@ -163,7 +163,7 @@ public abstract class TunerDriver {
                     LOGGER.error("Instantiation Exception in Merger!");
                     LOGGER.error(e.toString());
                   }
-                  _strategy.merger(_mergedResults.get(tableNameWithoutType).get(colName), mergerObj);
+                  _strategy.merge(_mergedResults.get(tableNameWithoutType).get(colName), mergerObj);
                 }));
       }
     }
@@ -180,7 +180,7 @@ public abstract class TunerDriver {
 
     //Report
     for (Map.Entry<String, Map<String, AbstractAccumulator>> tableStat : _mergedResults.entrySet()) {
-      _strategy.reporter(tableStat.getKey(), tableStat.getValue());
+      _strategy.report(tableStat.getKey(), tableStat.getValue());
     }
   }
 }

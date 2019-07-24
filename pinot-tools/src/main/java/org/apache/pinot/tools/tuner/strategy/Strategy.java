@@ -9,6 +9,7 @@ import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
  * Recommendation strategy
  */
 public interface Strategy {
+
   /**
    * Filter out irrelevant query stats to target a specific table or specific range of nESI
    * @param queryStats the stats extracted and parsed from QuerySrc
@@ -22,7 +23,7 @@ public interface Strategy {
    * @param metaManager input, the metaManager where cardinality info can be get from
    * @param AccumulatorOut output, map of /tableMame: String/columnName: String/AbstractMergerObj
    */
-  void accumulator(AbstractQueryStats queryStats, MetaManager metaManager,
+  void accumulate(AbstractQueryStats queryStats, MetaManager metaManager,
       Map<String, Map<String, AbstractAccumulator>> AccumulatorOut);
 
   /**
@@ -30,7 +31,7 @@ public interface Strategy {
    * @param abstractAccumulator input
    * @param abstractAccumulatorToMerge input
    */
-  void merger(AbstractAccumulator abstractAccumulator, AbstractAccumulator abstractAccumulatorToMerge);
+  void merge(AbstractAccumulator abstractAccumulator, AbstractAccumulator abstractAccumulatorToMerge);
   //Merge two AbstractMergerObj from same /table/column
 
   /**
@@ -38,6 +39,6 @@ public interface Strategy {
    * @param tableNameWithoutType input
    * @param mergedOut input
    */
-  void reporter(String tableNameWithoutType, Map<String, AbstractAccumulator> mergedOut);
+  void report(String tableNameWithoutType, Map<String, AbstractAccumulator> mergedOut);
   //print/email results
 }
