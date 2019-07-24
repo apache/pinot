@@ -66,8 +66,8 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
     PredicateEvaluatorTestUtils.fillRandom(randomInts);
     randomInts[_random.nextInt(NUM_MULTI_VALUES)] = intValue;
 
-    Assert.assertTrue(eqPredicateEvaluator.applyMV(randomInts, NUM_MULTI_VALUES, new int[]{0}));
-    Assert.assertFalse(neqPredicateEvaluator.applyMV(randomInts, NUM_MULTI_VALUES, new int[]{0}));
+    Assert.assertTrue(eqPredicateEvaluator.applyMV(randomInts, NUM_MULTI_VALUES));
+    Assert.assertFalse(neqPredicateEvaluator.applyMV(randomInts, NUM_MULTI_VALUES));
 
     for (int i = 0; i < 100; i++) {
       int random = _random.nextInt();
@@ -75,9 +75,9 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
       Assert.assertEquals(neqPredicateEvaluator.applySV(random), (random != intValue));
 
       PredicateEvaluatorTestUtils.fillRandom(randomInts);
-      Assert.assertEquals(eqPredicateEvaluator.applyMV(randomInts, NUM_MULTI_VALUES, new int[]{0}),
+      Assert.assertEquals(eqPredicateEvaluator.applyMV(randomInts, NUM_MULTI_VALUES),
           ArrayUtils.contains(randomInts, intValue));
-      Assert.assertEquals(neqPredicateEvaluator.applyMV(randomInts, NUM_MULTI_VALUES, new int[]{0}),
+      Assert.assertEquals(neqPredicateEvaluator.applyMV(randomInts, NUM_MULTI_VALUES),
           !ArrayUtils.contains(randomInts, intValue));
     }
   }

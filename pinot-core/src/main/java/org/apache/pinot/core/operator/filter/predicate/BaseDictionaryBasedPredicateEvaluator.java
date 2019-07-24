@@ -101,24 +101,20 @@ public abstract class BaseDictionaryBasedPredicateEvaluator extends BasePredicat
    */
   @SuppressWarnings("Duplicates")
   @Override
-  public boolean applyMV(int[] dictIds, int length, int[] numEntriesScanned) {
+  public boolean applyMV(int[] dictIds, int length) {
     if (isExclusive()) {
       for (int i = 0; i < length; i++) {
         if (!applySV(dictIds[i])) {
-          numEntriesScanned[0]+=i+1;
           return false;
         }
       }
-      numEntriesScanned[0]+=length;
       return true;
     } else {
       for (int i = 0; i < length; i++) {
         if (applySV(dictIds[i])) {
-          numEntriesScanned[0]+=i+1;
           return true;
         }
       }
-      numEntriesScanned[0]+=length;
       return false;
     }
   }
