@@ -1322,7 +1322,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     protected FakePinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager,
         List<String> existingLLCSegments, ControllerMetrics controllerMetrics) {
       super(pinotHelixResourceManager, CONTROLLER_CONF, controllerMetrics,
-          new LeadControllerManager());
+          new LeadControllerManager(DUMMY_HOST, pinotHelixResourceManager.getHelixZkManager()));
 
       try {
         TableConfigCache mockCache = mock(TableConfigCache.class);

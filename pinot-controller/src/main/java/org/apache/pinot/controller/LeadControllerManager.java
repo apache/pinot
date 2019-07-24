@@ -20,12 +20,19 @@ package org.apache.pinot.controller;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.model.LiveInstance;
+import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
 import static org.apache.pinot.common.utils.CommonConstants.Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE;
 
 
@@ -33,20 +40,16 @@ public class LeadControllerManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerManager.class);
 
   private Set<Integer> _partitionIndexCache;
-  private PinotHelixResourceManager _pinotHelixResourceManager;
+  private String _instanceId;
+  private HelixManager _helixManager;
   private volatile boolean _isLeadControllerResourceEnabled = false;
   private volatile boolean _amIHelixLeader = false;
   private volatile boolean _isShuttingDown = false;
 
-  public LeadControllerManager() {
+  public LeadControllerManager(String instanceId, HelixManager helixManager) {
+    _instanceId = instanceId;
+    _helixManager = helixManager;
     _partitionIndexCache = ConcurrentHashMap.newKeySet();
-  }
-
-  /**
-   * Registers {@link PinotHelixResourceManager} in LeadControllerManager, which is needed to get the external view of lead controller resource.
-   */
-  public synchronized void registerResourceManager(PinotHelixResourceManager pinotHelixResourceManager) {
-    _pinotHelixResourceManager = pinotHelixResourceManager;
   }
 
   /**
@@ -55,7 +58,6 @@ public class LeadControllerManager {
   public synchronized void stop() {
     _partitionIndexCache.clear();
     _isShuttingDown = true;
-    _pinotHelixResourceManager = null;
   }
 
   /**
@@ -64,13 +66,14 @@ public class LeadControllerManager {
    * @param tableName table name with/without table type.
    */
   public boolean isLeaderForTable(String tableName) {
-    if (isLeadControllerResourceEnabled()) {
+    if (_isLeadControllerResourceEnabled) {
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-      int partitionIndex = LeadControllerUtils.getPartitionIdForTable(rawTableName, NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
+      int partitionIndex =
+          LeadControllerUtils.getPartitionIdForTable(rawTableName, NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
       return _partitionIndexCache.contains(partitionIndex);
     } else {
       // Checks if it's Helix leader if lead controller resource is disabled.
-      return isHelixLeader();
+      return _amIHelixLeader;
     }
   }
 
@@ -95,14 +98,25 @@ public class LeadControllerManager {
   }
 
   /**
-   * Checks if the current controller host is Helix cluster leader.
+   * Checks from ZK if the current controller host is Helix cluster leader.
    */
   private boolean isHelixLeader() {
-    return _amIHelixLeader;
+    HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
+    PropertyKey propertyKey = helixDataAccessor.keyBuilder().controllerLeader();
+    LiveInstance liveInstance = helixDataAccessor.getProperty(propertyKey);
+    String helixLeaderInstanceId = liveInstance.getInstanceName();
+    return _instanceId.equals(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + helixLeaderInstanceId);
   }
 
+  /**
+   * Checks from ZK if resource config of leadControllerResource is enabled.
+   */
   public boolean isLeadControllerResourceEnabled() {
-    return _isLeadControllerResourceEnabled;
+    HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
+    PropertyKey propertyKey = helixDataAccessor.keyBuilder().resourceConfig(LEAD_CONTROLLER_RESOURCE_NAME);
+    ResourceConfig resourceConfig = helixDataAccessor.getProperty(propertyKey);
+    String enableResource = resourceConfig.getSimpleConfig(LeadControllerUtils.RESOURCE_ENABLED);
+    return Boolean.parseBoolean(enableResource);
   }
 
   /**
@@ -114,7 +128,7 @@ public class LeadControllerManager {
     if (_isShuttingDown) {
       return;
     }
-    if (_pinotHelixResourceManager.isHelixLeader()) {
+    if (isHelixLeader()) {
       if (!_amIHelixLeader) {
         _amIHelixLeader = true;
         LOGGER.info("Became Helix leader");
@@ -135,7 +149,7 @@ public class LeadControllerManager {
     if (_isShuttingDown) {
       return;
     }
-    if (_pinotHelixResourceManager.isLeadControllerResourceEnabled()) {
+    if (isLeadControllerResourceEnabled()) {
       LOGGER.info("Lead controller resource is enabled.");
       _isLeadControllerResourceEnabled = true;
     } else {
