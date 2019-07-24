@@ -10,7 +10,7 @@ import org.apache.pinot.tools.tuner.strategy.ParserBasedImpl;
 public class StandaloneTest extends StandaloneDriver {
   public static void main(String[] args) {
     StandaloneDriver parserBased = new StandaloneTest().setThreadPoolSize(3).setStrategy(
-        new ParserBasedImpl.Builder()._algorithmOrder(ParserBasedImpl.FIRST_ORDER)
+        new ParserBasedImpl.Builder()._algorithmOrder(1)
             ._numEntriesScannedThreshold(ParserBasedImpl.NO_IN_FILTER_THRESHOLD).build()).setQuerySrc(
         new LogFileSrcImpl.Builder()._valid_line_beginner_regex(LogFileSrcImpl.REGEX_VALID_LINE_STANDALONE)
             ._parser(new BrokerLogParserImpl())

@@ -123,6 +123,11 @@ public class ParserBasedImpl implements BasicStrategy {
       return this;
     }
 
+    /**
+     * set the tables to work on, other tables will be filtered out
+     * @param val list of table names without type
+     * @return
+     */
     @Nonnull
     public Builder _tableNamesWorkonWithoutType(@Nonnull List<String> val) {
       _tableNamesWorkonWithoutType.addAll(val);
@@ -209,7 +214,7 @@ public class ParserBasedImpl implements BasicStrategy {
     LOGGER.info(reportOut);
   }
 
-  /*
+  /**
    * Parse and score the dimensions in a query
    */
   class DimensionScoring {
@@ -237,8 +242,10 @@ public class ParserBasedImpl implements BasicStrategy {
       _queryString = queryString;
     }
 
-    /*
+
+    /**
      * Navigate from root to predicateListContext of whereClauseContext, where all the filtering happens
+     * @return a list of sorted tuples List<Tuple2<List<colName>, Score>>
      */
     @NotNull List<Tuple2<List<String>, BigFraction>> parseQuery() {
       LOGGER.debug("Parsing query: {}", _queryString);
@@ -274,11 +281,14 @@ public class ParserBasedImpl implements BasicStrategy {
       return results;
     }
 
-    /*
+
+    /**
      * Parse predicate list connected by AND and OR (recursively)
      * The score is calculated as:
      *  AND connected: pick the top _algorithmOrder of sorted([([colName],Score(predicate)) for predicate in predicateList])
      *  OR connected: ([colName1]+[colName2]+[colName3], 1/(1/Score(predicate1)+1/Score(predicate2)+1/Score(predicate3))) i.e. Harmonic mean of scores
+     * @param predicateListContext the leaf predicate context where the score are generated from cardinality
+     * @return a list of sorted tuples List<Tuple2<List<colName>, Score>>
      */
     List<Tuple2<List<String>, BigFraction>> parsePredicateList(PQL2Parser.PredicateListContext predicateListContext) {
       LOGGER.debug("Parsing predicate list: {}", predicateListContext.getText());
@@ -333,6 +343,7 @@ public class ParserBasedImpl implements BasicStrategy {
       }
     }
 
+
     /**
      * Parse leaf predicates
      * The score is calculated as:
@@ -349,7 +360,7 @@ public class ParserBasedImpl implements BasicStrategy {
      *    average_values_hit/cardinality
      *  Moreover, if average_values_hit is made available, prediction for In clause can be optimized
      * @param predicateContext the leaf predicate context where the score are generated from cardinality
-     * @return
+     * @return a list of tuples List<Tuple2<List<colName>, Score>>
      */
     List<Tuple2<List<String>, BigFraction>> parsePredicate(PQL2Parser.PredicateContext predicateContext) {
       LOGGER.debug("Parsing predicate: {}", predicateContext.getText());
