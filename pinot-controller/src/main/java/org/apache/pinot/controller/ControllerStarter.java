@@ -81,6 +81,8 @@ import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
+
 
 public class ControllerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerStarter.class);
@@ -465,7 +467,7 @@ public class ControllerStarter {
   }
 
   private void registerListeners(HelixManager helixParticipantManager) {
-    // This registration is not needed when the resource is enabled.
+    // This registration is not needed when the leadControllerResource is enabled.
     // However, the resource can be disabled sometime while the cluster is in operation, so we keep it here. Plus, it does not add much overhead.
     // At some point in future when we stop supporting the disabled resource, we will remove this line altogether and the logic that goes with it.
     LOGGER.info("Registering helix controller listener");
@@ -477,7 +479,7 @@ public class ControllerStarter {
       helixParticipantManager.addResourceConfigChangeListener(
           (resourceConfigList, changeContext) -> _leadControllerManager.onResourceConfigChange());
     } catch (Exception e) {
-      throw new RuntimeException("Error registering resource config listener", e);
+      throw new RuntimeException("Error registering resource config listener for " + LEAD_CONTROLLER_RESOURCE_NAME, e);
     }
   }
 

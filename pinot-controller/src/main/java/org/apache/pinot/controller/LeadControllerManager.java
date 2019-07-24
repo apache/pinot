@@ -36,6 +36,7 @@ public class LeadControllerManager {
   private PinotHelixResourceManager _pinotHelixResourceManager;
   private volatile boolean _isLeadControllerResourceEnabled = false;
   private volatile boolean _amIHelixLeader = false;
+  private volatile boolean _isShuttingDown = false;
 
   public LeadControllerManager() {
     _partitionIndexCache = ConcurrentHashMap.newKeySet();
@@ -44,15 +45,16 @@ public class LeadControllerManager {
   /**
    * Registers {@link PinotHelixResourceManager} in LeadControllerManager, which is needed to get the external view of lead controller resource.
    */
-  public void registerResourceManager(PinotHelixResourceManager pinotHelixResourceManager) {
+  public synchronized void registerResourceManager(PinotHelixResourceManager pinotHelixResourceManager) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
   }
 
   /**
    * Marks the cached indices invalid and unregisters {@link PinotHelixResourceManager}.
    */
-  public void stop() {
+  public synchronized void stop() {
     _partitionIndexCache.clear();
+    _isShuttingDown = true;
     _pinotHelixResourceManager = null;
   }
 
@@ -108,7 +110,10 @@ public class LeadControllerManager {
    * However, the resource can be disabled sometime while the cluster is in operation, so we keep it here. Plus, it does not add much overhead.
    * At some point in future when we stop supporting the disabled resource, we will remove this line altogether and the logic that goes with it.
    */
-  void onHelixControllerChange() {
+  synchronized void onHelixControllerChange() {
+    if (_isShuttingDown) {
+      return;
+    }
     if (_pinotHelixResourceManager.isHelixLeader()) {
       if (!_amIHelixLeader) {
         _amIHelixLeader = true;
@@ -126,7 +131,10 @@ public class LeadControllerManager {
     }
   }
 
-  void onResourceConfigChange() {
+  synchronized void onResourceConfigChange() {
+    if (_isShuttingDown) {
+      return;
+    }
     if (_pinotHelixResourceManager.isLeadControllerResourceEnabled()) {
       LOGGER.info("Lead controller resource is enabled.");
       _isLeadControllerResourceEnabled = true;

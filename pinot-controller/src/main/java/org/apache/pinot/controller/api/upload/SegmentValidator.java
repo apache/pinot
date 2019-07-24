@@ -34,7 +34,6 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.resources.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
@@ -55,17 +54,17 @@ public class SegmentValidator {
   private final Executor _executor;
   private final HttpConnectionManager _connectionManager;
   private final ControllerMetrics _controllerMetrics;
-  private final LeadControllerManager _leadControllerManager;
+  private final boolean _isLeaderForTable;
 
   public SegmentValidator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf controllerConf,
       Executor executor, HttpConnectionManager connectionManager, ControllerMetrics controllerMetrics,
-      LeadControllerManager leadControllerManager) {
+      boolean isLeaderForTable) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _controllerConf = controllerConf;
     _executor = executor;
     _connectionManager = connectionManager;
     _controllerMetrics = controllerMetrics;
-    _leadControllerManager = leadControllerManager;
+    _isLeaderForTable = isLeaderForTable;
   }
 
   public SegmentValidatorResponse validateSegment(String rawTableName, SegmentMetadata segmentMetadata,
@@ -134,8 +133,7 @@ public class SegmentValidator {
     TableSizeReader tableSizeReader =
         new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _pinotHelixResourceManager);
     StorageQuotaChecker quotaChecker =
-        new StorageQuotaChecker(offlineTableConfig, tableSizeReader, _controllerMetrics, _pinotHelixResourceManager,
-            _leadControllerManager);
+        new StorageQuotaChecker(offlineTableConfig, tableSizeReader, _controllerMetrics, _isLeaderForTable);
     return quotaChecker.isSegmentStorageWithinQuota(segmentFile, metadata.getName(),
         _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }
