@@ -287,15 +287,19 @@ public class PinotSegmentUploadRestletResource {
           throw new UnsupportedOperationException("Unsupported upload type: " + uploadType);
       }
 
+      // Fetch segment name
+      String segmentName = segmentMetadata.getName();
+
       // Fetch raw table name. Try to derive the table name from the parameter and then from segment metadata
-      String rawTableName = null;
+      String rawTableName;
       if (tableName != null && !tableName.isEmpty()) {
         rawTableName = TableNameBuilder.extractRawTableName(tableName);
+        LOGGER.info("Uploading segment {} to table: {}, (Derived from API parameter)", segmentName, tableName);
       } else {
         // TODO: remove this when we completely deprecate the segment name from segment metadata
         rawTableName = segmentMetadata.getTableName();
+        LOGGER.info("Uploading a segment {} to table: {}, (Derived from segment metadata)", segmentName, tableName);
       }
-      String segmentName = segmentMetadata.getName();
 
       String zkDownloadUri;
       // This boolean is here for V1 segment upload, where we keep the segment in the downloadURI sent in the header.

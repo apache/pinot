@@ -57,18 +57,6 @@ public class PerfBenchmarkDriverConf {
   String brokerHost = "localhost";
   boolean startBroker = true;
 
-  //data configuration
-  //where is the raw data, mandatory if regenerateIndex = true
-  boolean uploadIndexes = false;
-
-  String rawDataDirectory;
-
-  boolean regenerateIndex = false;
-
-  //by default all files under indexDirectory will be uploaded to the controller if its not already present.
-  //If the indexes are already uploaded, nothing
-  boolean forceReloadIndex = false;
-
   //resource configuration
 
   boolean configureResources = false;
@@ -160,26 +148,6 @@ public class PerfBenchmarkDriverConf {
     return startBroker;
   }
 
-  public boolean isUploadIndexes() {
-    return uploadIndexes;
-  }
-
-  public void setUploadIndexes(boolean uploadIndexes) {
-    this.uploadIndexes = uploadIndexes;
-  }
-
-  public String getRawDataDirectory() {
-    return rawDataDirectory;
-  }
-
-  public boolean isRegenerateIndex() {
-    return regenerateIndex;
-  }
-
-  public boolean isForceReloadIndex() {
-    return forceReloadIndex;
-  }
-
   public String getQueriesDirectory() {
     return queriesDirectory;
   }
@@ -254,18 +222,6 @@ public class PerfBenchmarkDriverConf {
 
   public void setStartBroker(boolean startBroker) {
     this.startBroker = startBroker;
-  }
-
-  public void setRawDataDirectory(String rawDataDirectory) {
-    this.rawDataDirectory = rawDataDirectory;
-  }
-
-  public void setRegenerateIndex(boolean regenerateIndex) {
-    this.regenerateIndex = regenerateIndex;
-  }
-
-  public void setForceReloadIndex(boolean forceReloadIndex) {
-    this.forceReloadIndex = forceReloadIndex;
   }
 
   public boolean isRunQueries() {
