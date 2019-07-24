@@ -38,7 +38,7 @@ public abstract class TunerDriver {
   /**
    * Set the number of threads used in action
    * @param threadPoolSize The number of threads used in action
-   * @return
+   * @return this
    */
   protected TunerDriver setThreadPoolSize(int threadPoolSize) {
     _threadPoolSize = threadPoolSize;
@@ -48,7 +48,7 @@ public abstract class TunerDriver {
   /**
    * Set the query source, e.g. LogFileSrcImpl
    * @param querySrc E.g. LogFileSrcImpl
-   * @return
+   * @return this
    */
   public TunerDriver setQuerySrc(QuerySrc querySrc) {
     _querySrc = querySrc;
@@ -58,7 +58,7 @@ public abstract class TunerDriver {
   /**
    * Set the metaManager for caching and query cardinality e.g. MetaManager
    * @param metaManager E.g. MetaManager
-   * @return
+   * @return this
    */
   public TunerDriver setMetaManager(MetaManager metaManager) {
     _metaManager = metaManager;
@@ -68,7 +68,7 @@ public abstract class TunerDriver {
   /**
    * Set the strategy for the recommendation, e.g. FrequencyImpl, OLSAnalysisImpl, ParserBasedImpl
    * @param strategy E.g. ParserBasedImpl
-   * @return
+   * @return this
    */
   public TunerDriver setStrategy(Strategy strategy) {
     _strategy = strategy;
