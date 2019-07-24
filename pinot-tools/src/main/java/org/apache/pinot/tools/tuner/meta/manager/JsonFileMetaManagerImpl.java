@@ -15,13 +15,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * The implementation of MetaManager to read formatted data from Json file
+ */
 public class JsonFileMetaManagerImpl implements MetaManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonFileMetaManagerImpl.class);
 
   public static final Boolean IGNORE_EXISTING_INDEX = false;
   public static final Boolean USE_EXISTING_INDEX = true;
   public static final Boolean DONT_USE_EXISTING_INDEX = false;
-
 
    /*Meta data type:
    *COL_META: Aggregated (sum and weighted sum of metadata)

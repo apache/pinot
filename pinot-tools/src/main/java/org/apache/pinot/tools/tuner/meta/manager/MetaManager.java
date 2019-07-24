@@ -3,8 +3,8 @@ package org.apache.pinot.tools.tuner.meta.manager;
 import org.apache.commons.math.fraction.BigFraction;
 
 
-/*
- * Access fields of metadata.properties
+/**
+ * Load and access fields of metadata.properties
  */
 public interface MetaManager {
   String WEIGHTED_SUM_CARDINALITY = "w_cardinality";

@@ -6,8 +6,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.tools.tuner.meta.manager.MetaManager;
-import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 import org.apache.pinot.tools.tuner.query.src.QuerySrc;
+import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 import org.apache.pinot.tools.tuner.strategy.AbstractMergerObj;
 import org.apache.pinot.tools.tuner.strategy.Strategy;
 import org.slf4j.Logger;
@@ -34,7 +34,6 @@ public abstract class TunerDriver {
   private MetaManager _metaManager = null;
   private Strategy _strategy = null;
   private int _threadPoolSize = 0;
-
 
   /**
    * Set the number of threads used in action
@@ -68,7 +67,7 @@ public abstract class TunerDriver {
 
   /**
    * Set the strategy for the recommendation, e.g. FrequencyImpl, OLSAnalysisImpl, ParserBasedImpl
-   * @param strategy
+   * @param strategy E.g. ParserBasedImpl
    * @return
    */
   public TunerDriver setStrategy(Strategy strategy) {

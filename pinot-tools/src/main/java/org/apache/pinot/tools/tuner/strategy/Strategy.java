@@ -20,10 +20,10 @@ public interface Strategy {
    * Accumulate the parsed queryStats to corresponding entry in MapperOut, see FrequencyImpl for ex
    * @param queryStats input, the stats extracted and parsed from QuerySrc
    * @param metaManager input, the metaManager where cardinality info can be get from
-   * @param MapperOut output, map of /tableMame: String/columnName: String/AbstractMergerObj
+   * @param AccumulatorOut output, map of /tableMame: String/columnName: String/AbstractMergerObj
    */
   void accumulator(AbstractQueryStats queryStats, MetaManager metaManager,
-      Map<String, Map<String, AbstractMergerObj>> MapperOut);
+      Map<String, Map<String, AbstractMergerObj>> AccumulatorOut);
 
   /**
    * merge two AbstractMergerObj with same /tableName/colName
