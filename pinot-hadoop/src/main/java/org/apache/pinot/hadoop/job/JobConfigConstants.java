@@ -58,5 +58,5 @@ public class JobConfigConstants {
   public static final String ENABLE_SORTING = "enable.sorting";
   public static final String ENABLE_RESIZING = "enable.resizing";
 
-  public static final String DELETE_EXTRA_REFRESHED_SEGMENTS = "delete.extra.refreshed.segments";
+  public static final String IS_DELETE_EXTRA_SEGMENTS = "is.delete.extra.segments";
 }

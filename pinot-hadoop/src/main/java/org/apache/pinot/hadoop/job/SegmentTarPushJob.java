@@ -19,6 +19,7 @@
 package org.apache.pinot.hadoop.job;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -44,7 +45,7 @@ public class SegmentTarPushJob extends BaseSegmentJob {
     int port = Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_TO_PORT));
     _pushLocations = PushLocation.getPushLocations(hosts, port);
     _rawTableName = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME));
-    _deleteExtraSegments = Boolean.parseBoolean(properties.getProperty(JobConfigConstants.DELETE_EXTRA_REFRESHED_SEGMENTS, "false"));
+    _deleteExtraSegments = Boolean.parseBoolean(properties.getProperty(JobConfigConstants.IS_DELETE_EXTRA_SEGMENTS, "false"));
   }
 
   @Override
@@ -58,28 +59,7 @@ public class SegmentTarPushJob extends BaseSegmentJob {
     try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
       // TODO: Deal with invalid prefixes in the future
       if (_deleteExtraSegments) {
-        List<String> allSegments = controllerRestApi.getAllSegments("OFFLINE");
-        Set<String> uniqueSegmentPrefixes = new HashSet<>();
-
-        // Get all relevant segment prefixes that we are planning on pushing
-        List<Path> segmentsToPushPaths = getDataFilePaths(_segmentPattern);
-        List<String> segmentsToPushNames = segmentsToPushPaths.stream().map(s -> s.getName()).collect(Collectors.toList());
-        for (String segmentName : segmentsToPushNames) {
-          String segmentNamePrefix = removeSequenceId(segmentName);
-          uniqueSegmentPrefixes.add(segmentNamePrefix);
-        }
-
-        List<String> relevantSegments = new ArrayList<>();
-        // Get relevant segments already pushed that we are planning on refreshing
-        for (String segmentName : allSegments) {
-          if (uniqueSegmentPrefixes.contains(removeSequenceId(segmentName))) {
-            relevantSegments.add(segmentName);
-          }
-        }
-
-        relevantSegments.removeAll(segmentsToPushNames);
-        controllerRestApi.pushSegments(fileSystem, getDataFilePaths(_segmentPattern));
-        controllerRestApi.deleteSegmentUris(relevantSegments);
+        deleteExtraSegments(controllerRestApi, fileSystem);
       } else {
         controllerRestApi.pushSegments(fileSystem, getDataFilePaths(_segmentPattern));
       }
@@ -87,7 +67,40 @@ public class SegmentTarPushJob extends BaseSegmentJob {
   }
 
   /**
+   * Deletes extra segments after pushing to the controller
+   * @param controllerRestApi
+   * @param fileSystem
+   * @throws IOException
+   */
+  public void deleteExtraSegments(ControllerRestApi controllerRestApi, FileSystem fileSystem) throws IOException {
+    List<String> allSegments = controllerRestApi.getAllSegments("OFFLINE");
+    Set<String> uniqueSegmentPrefixes = new HashSet<>();
+
+    // Get all relevant segment prefixes that we are planning on pushing
+    List<Path> segmentsToPushPaths = getDataFilePaths(_segmentPattern);
+    List<String> segmentsToPushNames = segmentsToPushPaths.stream().map(s -> s.getName()).collect(Collectors.toList());
+    for (String segmentName : segmentsToPushNames) {
+      String segmentNamePrefix = removeSequenceId(segmentName);
+      uniqueSegmentPrefixes.add(segmentNamePrefix);
+    }
+
+    List<String> relevantSegments = new ArrayList<>();
+    // Get relevant segments already pushed that we are planning on refreshing
+    for (String segmentName : allSegments) {
+      if (uniqueSegmentPrefixes.contains(removeSequenceId(segmentName))) {
+        relevantSegments.add(segmentName);
+      }
+    }
+
+    relevantSegments.removeAll(segmentsToPushNames);
+    controllerRestApi.pushSegments(fileSystem, getDataFilePaths(_segmentPattern));
+    controllerRestApi.deleteSegmentUris(relevantSegments);
+  }
+
+  /**
    * Remove trailing sequence id
+   * eg: If segment name is mytable_12, it will return mytable_
+   * If segment name is mytable_20190809_20190809_12, it will return mytable_20190809_20190809_
    * @param segmentName
    * @return
    */
