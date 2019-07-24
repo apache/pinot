@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.server.request;
 
-import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.IOException;
 import java.util.Arrays;
@@ -115,8 +115,7 @@ public class ScheduledRequestHandlerTest {
             // Specifying it for less ambiguity.
             ListenableFuture<DataTable> dataTable = resourceManager.getQueryRunners().submit(new Callable<DataTable>() {
               @Override
-              public DataTable call()
-                  throws Exception {
+              public DataTable call() {
                 throw new RuntimeException("query processing error");
               }
             });
@@ -124,7 +123,7 @@ public class ScheduledRequestHandlerTest {
               DataTable result = new DataTableImplV2();
               result.addException(QueryException.INTERNAL_ERROR);
               return result;
-            });
+            }, MoreExecutors.directExecutor());
             return serializeData(queryResponse);
           }
 
@@ -199,13 +198,13 @@ public class ScheduledRequestHandlerTest {
   }
 
   private ListenableFuture<byte[]> serializeData(ListenableFuture<DataTable> dataTable) {
-    return Futures.transform(dataTable, (Function<DataTable, byte[]>) input -> {
+    return Futures.transform(dataTable, input -> {
       try {
         Preconditions.checkNotNull(input);
         return input.toBytes();
       } catch (IOException e) {
         return new byte[0];
       }
-    });
+    }, MoreExecutors.directExecutor());
   }
 }

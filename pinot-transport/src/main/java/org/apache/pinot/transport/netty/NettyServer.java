@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -290,7 +291,7 @@ public abstract class NettyServer implements Runnable {
           LOGGER.error("Request processing returned unhandled exception, error: ", t);
           sendResponse(new byte[0]);
         }
-      });
+      }, MoreExecutors.directExecutor());
     }
 
     @Override
