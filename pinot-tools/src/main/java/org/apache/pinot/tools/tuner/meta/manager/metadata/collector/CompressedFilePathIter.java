@@ -1,8 +1,12 @@
 package org.apache.pinot.tools.tuner.meta.manager.metadata.collector;
 
+import io.vavr.Tuple2;
 import java.io.File;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import javax.annotation.Nonnull;
 import org.apache.pinot.tools.tuner.query.src.QuerySrc;
 import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
@@ -12,7 +16,7 @@ import org.slf4j.LoggerFactory;
 
 public class CompressedFilePathIter implements QuerySrc {
   private static final Logger LOGGER = LoggerFactory.getLogger(CompressedFilePathIter.class);
-  Iterable<File> _iterable;
+  Iterable<Tuple2<String, File>> _iterable;
 
   private String _directory;
 
@@ -20,20 +24,21 @@ public class CompressedFilePathIter implements QuerySrc {
     _directory = builder._directory;
   }
 
-  public CompressedFilePathIter openDirectory() {
+  private CompressedFilePathIter openDirectory() {
     File dir = new File(_directory);
     if (!dir.exists() || dir.isFile()) {
       LOGGER.error("Wrong input directory!");
       System.exit(1);
     }
-    File[] files = dir.listFiles();
-    ArrayList<File> validFileArrayList = new ArrayList<>();
-    for (File file : files) {
-      if (!file.getName().startsWith(".") && file.isFile()) {
-        validFileArrayList.add(file);
-      }
-    }
-    _iterable = validFileArrayList;
+
+    ArrayList<Tuple2<String, File>> validTableNameWithoutTypeSegmentFile = new ArrayList<>();
+
+    Arrays.stream(Objects.requireNonNull(dir.listFiles()))
+        .filter(tableDir -> (!tableDir.getName().startsWith(".") && tableDir.isDirectory())).forEach(
+        tableDir -> Arrays.asList(Objects.requireNonNull(tableDir.listFiles()))
+            .forEach(file -> validTableNameWithoutTypeSegmentFile.add(new Tuple2<>(tableDir.getName(), file))));
+
+    _iterable = validTableNameWithoutTypeSegmentFile;
     return this;
   }
 
@@ -54,7 +59,9 @@ public class CompressedFilePathIter implements QuerySrc {
   @Override
   public AbstractQueryStats next()
       throws NoSuchElementException {
-    return new PathWrapper.Builder().setPath(_iterable.iterator().next().getAbsolutePath()).build();
+    Tuple2<String, File> nextTuple = _iterable.iterator().next();
+    return new PathWrapper.Builder().setTableNameWithoutType(nextTuple._1()).setPath(nextTuple._2().getAbsolutePath())
+        .build();
   }
 
   public static final class Builder {
