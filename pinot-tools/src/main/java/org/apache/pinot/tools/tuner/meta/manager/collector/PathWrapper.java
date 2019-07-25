@@ -1,4 +1,4 @@
-package org.apache.pinot.tools.tuner.meta.manager.metadata.collector;
+package org.apache.pinot.tools.tuner.meta.manager.collector;
 
 import java.io.File;
 import javax.annotation.Nonnull;

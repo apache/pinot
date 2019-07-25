@@ -1,4 +1,4 @@
-package org.apache.pinot.tools.tuner.meta.manager.metadata.collector;
+package org.apache.pinot.tools.tuner.meta.manager.collector;
 
 import io.vavr.Tuple2;
 import java.io.File;

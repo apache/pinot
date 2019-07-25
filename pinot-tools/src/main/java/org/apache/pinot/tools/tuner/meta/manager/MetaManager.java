@@ -7,11 +7,12 @@ import org.apache.commons.math.fraction.BigFraction;
  * Load and access fields of metadata.properties
  */
 public interface MetaManager {
-  String WEIGHTED_SUM_CARDINALITY = "w_cardinality";
-  String SUM_DOCS = "n_totalDocs";
-  String NUM_SEGMENTS_HAS_INVERTED_INDEX = "n_has_inverted_index";
-  String NUM_SEGMENTS_SORTED = "n_isSorted";
-  String NUM_SEGMENTS_COUNT = "n_segments_count";
+  static final String WEIGHTED_SUM_CARDINALITY = "w_cardinality";
+  static final String SUM_DOCS = "n_totalDocs";
+  static final String SUM_SEGMENTS_HAS_INVERTED_INDEX = "n_hasInvertedIndex";
+  static final String SUM_SEGMENTS_SORTED = "n_isSorted";
+  static final String SUM_SEGMENTS_COUNT = "n_segmentCount";
+  static final String SUM_TOTAL_ENTRIES = "n_totalNumberOfEntries";
 
   /**
    * Get aggregated (sum and weighted sum) of metadata

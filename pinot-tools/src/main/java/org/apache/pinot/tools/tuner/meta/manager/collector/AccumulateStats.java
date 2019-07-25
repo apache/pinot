@@ -1,11 +1,15 @@
-package org.apache.pinot.tools.tuner.meta.manager.metadata.collector;
+package org.apache.pinot.tools.tuner.meta.manager.collector;
 
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.tools.tuner.meta.manager.MetaManager;
 import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 import org.apache.pinot.tools.tuner.strategy.AbstractAccumulator;
@@ -19,6 +23,15 @@ public class AccumulateStats implements Strategy {
   private static final String UNTAR = "tar -xvf ";
   private static final String EXCLUDE_DATA = " --exclude \"columns.psf\" ";
   private static final String OUT_PUT_PATH = " -C ";
+  private static final String RM_RF = "rm -rf ";
+  private static final String REGEX_COL_EXTRACT = "column\\.(.*)\\.columnType = (DIMENSION|TIME)";
+  private static final String REGEX_COLUMN = "column\\.";
+  private static final String REGEX_CARDINALITY = "\\.cardinality = (.*)";
+  private static final String REGEX_TOTAL_DOCS = "\\.totalDocs = (.*)";
+  private static final String REGEX_IS_SORTED = "\\.isSorted = (.*)";
+  private static final String REGEX_TOTAL_NUMBER_OF_ENTRIES = "\\.totalNumberOfEntries = (.*)";
+  private static final String REGEX_INVERTED_INDEX_SIZE = "\\.inverted_index\\.size = (.*)";
+
 
   private HashSet<String> _tableNamesWithoutType;
   private File _outputDir;
@@ -65,17 +78,25 @@ public class AccumulateStats implements Strategy {
       return;
     }
 
+    File tmpFolder;
     File versionFolder;
     File metaDataProperties;
     File indexMap;
 
     try {
-      versionFolder = _outputDir.listFiles(new FilenameFilter() {
+      tmpFolder = _outputDir.listFiles(new FilenameFilter() {
         @Override
         public boolean accept(File dir, String name) {
           return name.equals(pathWrapper.getFile().getName());
         }
-      })[0].listFiles()[0];
+      })[0];
+    } catch (NullPointerException e) {
+      LOGGER.error(e.getMessage());
+      return;
+    }
+
+    try {
+      versionFolder = tmpFolder.listFiles()[0];
     } catch (NullPointerException e) {
       LOGGER.error(e.getMessage());
       return;
@@ -88,6 +109,9 @@ public class AccumulateStats implements Strategy {
           return name.equals("metadata.properties");
         }
       })[0];
+      if (!metaDataProperties.exists()) {
+        throw new NullPointerException();
+      }
     } catch (NullPointerException e) {
       LOGGER.error(e.getMessage());
       return;
@@ -100,12 +124,64 @@ public class AccumulateStats implements Strategy {
           return name.equals("index_map");
         }
       })[0];
+      if (!indexMap.exists()) {
+        throw new NullPointerException();
+      }
     } catch (NullPointerException e) {
       LOGGER.error(e.getMessage());
       indexMap = null;
     }
 
+    String metadataString = "";
+    try {
+      metadataString = FileUtils.readFileToString(metaDataProperties);
+    } catch (IOException e) {
+      LOGGER.error(e.toString());
+      return;
+    }
 
+    String indexMapString;
+    try {
+      indexMapString = FileUtils.readFileToString(indexMap);
+    } catch (IOException e) {
+      LOGGER.error(e.toString());
+      indexMapString = "";
+    }
+
+    Matcher colMatcher = Pattern.compile(REGEX_COL_EXTRACT).matcher(metadataString);
+    while (colMatcher.find()) {
+      String colName = colMatcher.group(0);
+      AccumulatorOut.putIfAbsent(pathWrapper.getTableNameWithoutType(), new HashMap<>());
+      AccumulatorOut.get(pathWrapper.getTableNameWithoutType()).putIfAbsent(colName, new ColStatsAccumulatorObj());
+
+      Matcher cardinalityMatcher = Pattern.compile(REGEX_COLUMN + colName + REGEX_CARDINALITY).matcher(metadataString);
+      String cardinality = cardinalityMatcher.find() ? cardinalityMatcher.group(0) : "1";
+
+      Matcher totalDocsMatcher = Pattern.compile(REGEX_COLUMN + colName + REGEX_TOTAL_DOCS).matcher(metadataString);
+      String totalDocs = totalDocsMatcher.find() ? totalDocsMatcher.group(0) : "0";
+
+      Matcher isSortedMatcher = Pattern.compile(REGEX_COLUMN + colName + REGEX_IS_SORTED).matcher(metadataString);
+      String isSorted = isSortedMatcher.find() ? isSortedMatcher.group(0) : "false";
+
+      Matcher totalNumberOfEntriesMatcher =
+          Pattern.compile(REGEX_COLUMN + colName + REGEX_TOTAL_NUMBER_OF_ENTRIES).matcher(metadataString);
+      String totalNumberOfEntries = totalNumberOfEntriesMatcher.find() ? totalNumberOfEntriesMatcher.group(0) : "0";
+
+      Matcher invertedIndexSizeMatcher = Pattern.compile(colName + REGEX_INVERTED_INDEX_SIZE).matcher(indexMapString);
+      String invertedIndexSize = invertedIndexSizeMatcher.find() ? invertedIndexSizeMatcher.group(0) : "0";
+
+      ((ColStatsAccumulatorObj) AccumulatorOut.get(pathWrapper.getTableNameWithoutType()).get(colName))
+          .addCardinality(cardinality).addInvertedIndexSize(invertedIndexSize).addIsSorted(isSorted)
+          .addSegmentName(pathWrapper.getFile().getName()).addTotalDocs(totalDocs)
+          .addTotalNumberOfEntries(totalNumberOfEntries).merge();
+    }
+
+    try {
+      Runtime.getRuntime().exec(RM_RF + tmpFolder.getAbsolutePath());
+    } catch (IOException e) {
+      LOGGER.error(e.getMessage());
+      return;
+    }
   }
 
   /**

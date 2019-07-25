@@ -130,7 +130,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
       return true;
     }
     if (_useExistingIndex) {
-      String _numHasInv = getColField(tableNameWithoutType, columnName, NUM_SEGMENTS_HAS_INVERTED_INDEX);
+      String _numHasInv = getColField(tableNameWithoutType, columnName, SUM_SEGMENTS_HAS_INVERTED_INDEX);
       return _numHasInv != null && Integer.parseInt(_numHasInv) > 0;
     }
     return false;
@@ -143,14 +143,14 @@ public class JsonFileMetaManagerImpl implements MetaManager {
       return BigFraction.ONE;
     }
     if (_useExistingIndex) {
-      String _numHasInv = getColField(tableNameWithoutType, columnName, NUM_SEGMENTS_HAS_INVERTED_INDEX);
+      String _numHasInv = getColField(tableNameWithoutType, columnName, SUM_SEGMENTS_HAS_INVERTED_INDEX);
       if (_numHasInv == null || Integer.parseInt(_numHasInv) > 0) {
         return BigFraction.ONE;
       }
     }
 
-    String nSortedNumerator = getColField(tableNameWithoutType, columnName, NUM_SEGMENTS_SORTED);
-    String nSortedDenominator = getColField(tableNameWithoutType, columnName, NUM_SEGMENTS_COUNT);
+    String nSortedNumerator = getColField(tableNameWithoutType, columnName, SUM_SEGMENTS_SORTED);
+    String nSortedDenominator = getColField(tableNameWithoutType, columnName, SUM_SEGMENTS_COUNT);
     String cardNumerator = getColField(tableNameWithoutType, columnName, WEIGHTED_SUM_CARDINALITY);
     String cardDenominator = getColField(tableNameWithoutType, columnName, SUM_DOCS);
 
