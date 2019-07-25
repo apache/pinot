@@ -2,7 +2,6 @@ package org.apache.pinot.tools.tuner.meta.manager.metadata.collector;
 
 import io.vavr.Tuple2;
 import java.io.File;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
@@ -60,7 +59,7 @@ public class CompressedFilePathIter implements QuerySrc {
   public AbstractQueryStats next()
       throws NoSuchElementException {
     Tuple2<String, File> nextTuple = _iterable.iterator().next();
-    return new PathWrapper.Builder().setTableNameWithoutType(nextTuple._1()).setPath(nextTuple._2().getAbsolutePath())
+    return new PathWrapper.Builder().setTableNameWithoutType(nextTuple._1()).setFile(nextTuple._2())
         .build();
   }
 

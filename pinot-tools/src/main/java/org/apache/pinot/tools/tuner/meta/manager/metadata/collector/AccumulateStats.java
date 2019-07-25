@@ -1,37 +1,110 @@
 package org.apache.pinot.tools.tuner.meta.manager.metadata.collector;
 
+import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
+import javax.annotation.Nonnull;
 import org.apache.pinot.tools.tuner.meta.manager.MetaManager;
 import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 import org.apache.pinot.tools.tuner.strategy.AbstractAccumulator;
 import org.apache.pinot.tools.tuner.strategy.Strategy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class AccumulateStats implements Strategy {
-  private HashSet<String> _tableNamesWithoutType;
-  private String _outputType;
+  private static final Logger LOGGER = LoggerFactory.getLogger(AccumulateStats.class);
+  private static final String UNTAR = "tar -xvf ";
+  private static final String EXCLUDE_DATA = " --exclude \"columns.psf\" ";
+  private static final String OUT_PUT_PATH = " -C ";
 
-  /**
-   * Filter out irrelevant query stats to target a specific table or specific range of nESI
-   * @param queryStats the stats extracted and parsed from QuerySrc
-   * @return
-   */
-  @Override
-  public boolean filter(AbstractQueryStats queryStats) {
-    return true;
+  private HashSet<String> _tableNamesWithoutType;
+  private File _outputDir;
+
+  public AccumulateStats(Builder builder) {
+    _tableNamesWithoutType = builder._tableNamesWithoutType;
+
+    if (builder._outputDir == null) {
+      LOGGER.error("No output path specified!");
+      return;
+    }
+    _outputDir = new File(builder._outputDir);
+    if (!_outputDir.exists() || _outputDir.isFile() || !_outputDir.canRead() || !_outputDir.canWrite()) {
+      LOGGER.error("Error in output path specified!");
+      return;
+    }
   }
 
   /**
-   * Accumulate the parsed queryStats to corresponding entry in MapperOut, see FrequencyImpl for ex
-   * @param queryStats input, the stats extracted and parsed from QuerySrc
-   * @param metaManager input, the metaManager where cardinality info can be get from
+   * Filter out irrelevant segments
+   * @param filePaths the (tableNamesWithoutType,segmentPaths) extracted and parsed from directory
+   * @return
+   */
+  @Override
+  public boolean filter(AbstractQueryStats filePaths) {
+    return _tableNamesWithoutType.contains(((PathWrapper) filePaths).getTableNameWithoutType());
+  }
+
+  /**
+   * Accumulate the parsed metadata.properties and index_map to corresponding entry
+   * @param filePaths input, PathWrapper
+   * @param metaManager null,
    * @param AccumulatorOut output, map of /tableMame: String/columnName: String/AbstractMergerObj
    */
   @Override
-  public void accumulate(AbstractQueryStats queryStats, MetaManager metaManager,
+  public void accumulate(AbstractQueryStats filePaths, MetaManager metaManager,
       Map<String, Map<String, AbstractAccumulator>> AccumulatorOut) {
+    PathWrapper pathWrapper = ((PathWrapper) filePaths);
+    try {
+      Runtime.getRuntime().exec(
+          UNTAR + pathWrapper.getFile().getAbsolutePath() + EXCLUDE_DATA + OUT_PUT_PATH + _outputDir.getAbsolutePath());
+    } catch (IOException e) {
+      LOGGER.error(e.getMessage());
+      return;
+    }
+
+    File versionFolder;
+    File metaDataProperties;
+    File indexMap;
+
+    try {
+      versionFolder = _outputDir.listFiles(new FilenameFilter() {
+        @Override
+        public boolean accept(File dir, String name) {
+          return name.equals(pathWrapper.getFile().getName());
+        }
+      })[0].listFiles()[0];
+    } catch (NullPointerException e) {
+      LOGGER.error(e.getMessage());
+      return;
+    }
+
+    try {
+      metaDataProperties = versionFolder.listFiles(new FilenameFilter() {
+        @Override
+        public boolean accept(File dir, String name) {
+          return name.equals("metadata.properties");
+        }
+      })[0];
+    } catch (NullPointerException e) {
+      LOGGER.error(e.getMessage());
+      return;
+    }
+
+    try {
+      indexMap = versionFolder.listFiles(new FilenameFilter() {
+        @Override
+        public boolean accept(File dir, String name) {
+          return name.equals("index_map");
+        }
+      })[0];
+    } catch (NullPointerException e) {
+      LOGGER.error(e.getMessage());
+      indexMap = null;
+    }
+
 
   }
 
@@ -47,32 +120,35 @@ public class AccumulateStats implements Strategy {
 
   /**
    * Generate a report for recommendation using mergedOut:/colName/AbstractMergerObj
-   * @param tableNameWithoutType input
    * @param mergedOut input
    */
   @Override
-  public void report(String tableNameWithoutType, Map<String, AbstractAccumulator> mergedOut) {
+  public void report(Map<String, Map<String, AbstractAccumulator>> mergedOut) {
 
   }
-}
 
-/*TODO: Test code, this will be deleted*/
-class UncompressAndGetMeta {
-  String _directory = null;
+  public static final class Builder {
+    private HashSet<String> _tableNamesWithoutType = new HashSet<>();
+    private String _outputDir = null;
 
-  public void uncompressFile(String path) {
-    try {
-      Runtime.getRuntime().exec("tar -xvf " + path + " --exclude \"columns.psf\"");
-    } catch (IOException e) {
-      e.printStackTrace();
+    public Builder() {
     }
-  }
 
-  public void remove(String path) {
-    try {
-      Runtime.getRuntime().exec("rm -rf " + path);
-    } catch (IOException e) {
-      e.printStackTrace();
+    @Nonnull
+    public Builder setTableNamesWithoutType(@Nonnull HashSet<String> val) {
+      _tableNamesWithoutType = val;
+      return this;
+    }
+
+    @Nonnull
+    public Builder setOutputDir(@Nonnull String val) {
+      _outputDir = val;
+      return this;
+    }
+
+    @Nonnull
+    public AccumulateStats build() {
+      return new AccumulateStats(this);
     }
   }
 }

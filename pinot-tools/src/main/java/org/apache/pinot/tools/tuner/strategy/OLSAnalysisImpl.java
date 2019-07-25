@@ -116,16 +116,26 @@ public class OLSAnalysisImpl implements Strategy {
     ((OLSAccumulator) p1).merge((OLSAccumulator) p2);
   }
 
+  /**
+   * Generate a report for recommendation using tableResults:TableName/colName/AbstractMergerObj
+   * @param tableResults input
+   */
   @Override
-  public void report(String tableNameWithoutType, Map<String, AbstractAccumulator> mergedOut) {
+  public void report(Map<String, Map<String, AbstractAccumulator>> tableResults) {
+    tableResults.forEach((table, map) -> {
+      reportTable(table, map);
+    });
+  }
+
+  public void reportTable(String tableNameWithoutType, Map<String, AbstractAccumulator> columnStats) {
     String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
     LOGGER.info(reportOut);
 
-    if (!mergedOut.containsKey("*")) {
+    if (!columnStats.containsKey("*")) {
       return;
     }
 
-    OLSAccumulator olsMergerObj = (OLSAccumulator) mergedOut.get("*");
+    OLSAccumulator olsMergerObj = (OLSAccumulator) columnStats.get("*");
     LOGGER.debug(olsMergerObj.getMinBin().toString());
 
     double[] timeAll = new double[olsMergerObj.getTimeList().size()];

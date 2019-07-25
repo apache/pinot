@@ -185,10 +185,19 @@ public class ParserBasedImpl implements Strategy {
     ((ParseBasedAccumulator) p1).merge((ParseBasedAccumulator) p2);
   }
 
-  @Override
-  public void report(String tableNameWithoutType, Map<String, AbstractAccumulator> mergedOut) {
+  /**
+   * Generate a report for recommendation using tableResults:TableName/colName/AbstractMergerObj
+   * @param tableResults input
+   */
+  public void report(Map<String, Map<String, AbstractAccumulator>> tableResults) {
+    tableResults.forEach((table, map) -> {
+      reportTable(table, map);
+    });
+  }
+
+  public void reportTable(String tableNameWithoutType, Map<String, AbstractAccumulator> columnStats) {
     AtomicLong totalCount = new AtomicLong(0);
-    mergedOut.forEach((k, v) -> totalCount.addAndGet(v.getCount()));
+    columnStats.forEach((k, v) -> totalCount.addAndGet(v.getCount()));
     if (totalCount.longValue() < _numProcessedThreshold) {
       return;
     }
@@ -196,7 +205,7 @@ public class ParserBasedImpl implements Strategy {
     String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
     List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
     List<Tuple2<String, BigInteger>> sortedWeighted = new ArrayList<>();
-    mergedOut.forEach((colName, score) -> {
+    columnStats.forEach((colName, score) -> {
       sortedPure.add(new Tuple2<>(colName, ((ParseBasedAccumulator) score).getPureScore()));
       sortedWeighted.add(new Tuple2<>(colName, ((ParseBasedAccumulator) score).getWeightedScore()));
     });

@@ -158,17 +158,26 @@ public class FrequencyImpl implements Strategy {
     ((FrequencyAccumulator) p1).merge((FrequencyAccumulator) p2);
   }
 
-  @Override
-  public void report(String tableNameWithoutType, Map<String, AbstractAccumulator> mergedOut) {
+  /**
+   * Generate a report for recommendation using tableResults:TableName/colName/AbstractMergerObj
+   * @param tableResults input
+   */
+  public void report(Map<String, Map<String, AbstractAccumulator>> tableResults) {
+    tableResults.forEach((table, map) -> {
+      reportTable(table, map);
+    });
+  }
+
+  public void reportTable(String tableNameWithoutType, Map<String, AbstractAccumulator> columnStats) {
     AtomicLong totalCount = new AtomicLong(0);
-    mergedOut.forEach((k, v) -> totalCount.addAndGet(v.getCount()));
+    columnStats.forEach((k, v) -> totalCount.addAndGet(v.getCount()));
     if (totalCount.longValue() < _numProcessedThreshold) {
       return;
     }
 
     String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
     List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
-    mergedOut.forEach(
+    columnStats.forEach(
         (colName, score) -> sortedPure.add(new Tuple2<>(colName, ((FrequencyAccumulator) score).getPureScore())));
     sortedPure.sort((p1, p2) -> (p2._2().compareTo(p1._2())));
     for (Tuple2<String, Long> tuple2 : sortedPure) {

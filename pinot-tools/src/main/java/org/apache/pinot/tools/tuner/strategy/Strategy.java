@@ -35,10 +35,9 @@ public interface Strategy {
   //Merge two AbstractMergerObj from same /table/column
 
   /**
-   * Generate a report for recommendation using mergedOut:/colName/AbstractMergerObj
-   * @param tableNameWithoutType input
-   * @param mergedOut input
+   * Generate a report for recommendation using tableResults:TableName/colName/AbstractMergerObj
+   * @param tableResults input
    */
-  void report(String tableNameWithoutType, Map<String, AbstractAccumulator> mergedOut);
+  void report(Map<String, Map<String, AbstractAccumulator>> tableResults);
   //print/email results
 }

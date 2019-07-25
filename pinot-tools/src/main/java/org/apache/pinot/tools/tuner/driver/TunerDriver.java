@@ -179,8 +179,6 @@ public abstract class TunerDriver {
     }
 
     //Report
-    for (Map.Entry<String, Map<String, AbstractAccumulator>> tableStat : _mergedResults.entrySet()) {
-      _strategy.report(tableStat.getKey(), tableStat.getValue());
-    }
+    _strategy.report(_mergedResults);
   }
 }

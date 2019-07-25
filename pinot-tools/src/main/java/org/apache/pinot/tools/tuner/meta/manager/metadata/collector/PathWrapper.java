@@ -1,19 +1,20 @@
 package org.apache.pinot.tools.tuner.meta.manager.metadata.collector;
 
+import java.io.File;
 import javax.annotation.Nonnull;
 import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 
 
 public class PathWrapper extends AbstractQueryStats {
-  private String _path;
+  private File _file;
 
   @Override
   public String toString() {
-    return "PathWrapper{" + "_path='" + _path + '\'' + ", _tableNameWithoutType='" + _tableNameWithoutType + '\'' + '}';
+    return "PathWrapper{" + "_path='" + _file + '\'' + ", _tableNameWithoutType='" + _tableNameWithoutType + '\'' + '}';
   }
 
-  public String getPath() {
-    return _path;
+  public File getFile() {
+    return _file;
   }
 
   public String getTableNameWithoutType() {
@@ -22,12 +23,12 @@ public class PathWrapper extends AbstractQueryStats {
 
   private PathWrapper(Builder builder) {
     _tableNameWithoutType = builder._tableNameWithoutType;
-    _path = builder._path;
+    _file = builder._file;
   }
 
   public static final class Builder {
     private String _tableNameWithoutType;
-    private String _path;
+    private File _file;
 
     public Builder() {
     }
@@ -39,8 +40,8 @@ public class PathWrapper extends AbstractQueryStats {
     }
 
     @Nonnull
-    public Builder setPath(@Nonnull String val) {
-      _path = val;
+    public Builder setFile(@Nonnull File val) {
+      _file = val;
       return this;
     }
 
