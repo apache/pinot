@@ -459,9 +459,10 @@ public class FileUploadDownloadClient implements Closeable {
   /**
    * Upload segment with segment file.
    *
-   * Note: in case of using this API directly, tableName has to be set in the parameter when uploading segments from
-   * Minion or offline push job. Realtime segment upload does not need to add table name parameter. Table name is
-   * derived from the segment name in case of realtime segment commit.
+   * Note: table name needs to be added as a parameter except for the case where this gets called during realtime
+   * segment commit protocol.
+   *
+   * TODO: fix the realtime segment commit protocol to add table name as a parameter.
    *
    * @param uri URI
    * @param segmentName Segment name
@@ -502,9 +503,7 @@ public class FileUploadDownloadClient implements Closeable {
   /**
    * Upload segment with segment file input stream.
    *
-   * Note: in case of using this API directly, tableName has to be set in the parameter when uploading segments from
-   * Minion or offline push job. Realtime segment upload does not need to add table name parameter. Table name is
-   * derived from the segment name in case of realtime segment commit.
+   * Note: table name has to be set as a parameter.
    *
    * @param uri URI
    * @param segmentName Segment name
@@ -542,11 +541,9 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
-   * Send segment uri. Include table name as a request parameter.
+   * Send segment uri.
    *
-   * Note: in case of using this API directly, tableName has to be set in the parameter when uploading segments from
-   * Minion or offline push job. Realtime segment upload does not need to add table name parameter. Table name is
-   * derived from the segment name in case of realtime segment commit.
+   * Note: table name has to be set as a parameter.
    *
    * @param uri URI
    * @param downloadUri Segment download uri
