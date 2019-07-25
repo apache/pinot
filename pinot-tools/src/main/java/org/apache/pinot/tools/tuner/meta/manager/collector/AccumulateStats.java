@@ -22,8 +22,8 @@ import org.slf4j.LoggerFactory;
 
 public class AccumulateStats implements Strategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(AccumulateStats.class);
-  private static final String UNTAR = "tar -xvf ";
-  private static final String EXCLUDE_DATA = " --exclude \"columns.psf\" ";
+  private static final String UNTAR = "tar -xf ";
+  private static final String EXCLUDE_DATA = " --exclude columns.psf ";
   private static final String OUT_PUT_PATH = " -C ";
   private static final String RM_RF = "rm -rf ";
 
@@ -186,12 +186,12 @@ public class AccumulateStats implements Strategy {
           .addTotalNumberOfEntries(totalNumberOfEntries).merge();
     }
 
-//    try {
-//      Runtime.getRuntime().exec(RM_RF + tmpFolder.getAbsolutePath());
-//    } catch (IOException e) {
-//      LOGGER.error(e.getMessage());
-//      return;
-//    }
+    try {
+      Runtime.getRuntime().exec(RM_RF + tmpFolder.getAbsolutePath());
+    } catch (IOException e) {
+      LOGGER.error(e.getMessage());
+      return;
+    }
   }
 
   /**
