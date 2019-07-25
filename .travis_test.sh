@@ -59,6 +59,11 @@ passed=0
 
 KAFKA_BUILD_OPTS=""
 if [ "$KAFKA_VERSION" != '0.9' ]; then
+  git diff --name-only $TRAVIS_COMMIT_RANGE | egrep '^(pinot-connectors)'
+  if [ $? -ne 0 ]; then
+    echo "No Pinot Connector Changes, Skip tests for Kafka Connector: ${KAFKA_VERSION}."
+    exit 0
+  fi
   KAFKA_BUILD_OPTS="-Dkafka.version=${KAFKA_VERSION}"
 fi
 
