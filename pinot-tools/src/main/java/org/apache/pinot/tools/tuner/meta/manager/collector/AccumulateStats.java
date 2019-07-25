@@ -26,6 +26,8 @@ public class AccumulateStats implements Strategy {
   private static final String EXCLUDE_DATA = " --exclude \"columns.psf\" ";
   private static final String OUT_PUT_PATH = " -C ";
   private static final String RM_RF = "rm -rf ";
+
+  private static final int REGEX_FIRST_GROUP = 1;
   private static final String REGEX_COL_EXTRACT = "column\\.(.*)\\.columnType = (DIMENSION|TIME)";
   private static final String REGEX_COLUMN = "column\\.";
   private static final String REGEX_CARDINALITY = "\\.cardinality = (.*)";
@@ -156,25 +158,27 @@ public class AccumulateStats implements Strategy {
 
     Matcher colMatcher = Pattern.compile(REGEX_COL_EXTRACT).matcher(metadataString);
     while (colMatcher.find()) {
-      String colName = colMatcher.group(1);
+      String colName = colMatcher.group(REGEX_FIRST_GROUP);
       AccumulatorOut.putIfAbsent(pathWrapper.getTableNameWithoutType(), new HashMap<>());
       AccumulatorOut.get(pathWrapper.getTableNameWithoutType()).putIfAbsent(colName, new ColStatsAccumulatorObj());
 
       Matcher cardinalityMatcher = Pattern.compile(REGEX_COLUMN + colName + REGEX_CARDINALITY).matcher(metadataString);
-      String cardinality = cardinalityMatcher.find() ? cardinalityMatcher.group(1) : "1";
+      String cardinality = cardinalityMatcher.find() ? cardinalityMatcher.group(REGEX_FIRST_GROUP) : "1";
 
       Matcher totalDocsMatcher = Pattern.compile(REGEX_COLUMN + colName + REGEX_TOTAL_DOCS).matcher(metadataString);
-      String totalDocs = totalDocsMatcher.find() ? totalDocsMatcher.group(1) : "0";
+      String totalDocs = totalDocsMatcher.find() ? totalDocsMatcher.group(REGEX_FIRST_GROUP) : "0";
 
       Matcher isSortedMatcher = Pattern.compile(REGEX_COLUMN + colName + REGEX_IS_SORTED).matcher(metadataString);
-      String isSorted = isSortedMatcher.find() ? isSortedMatcher.group(1) : "false";
+      String isSorted = isSortedMatcher.find() ? isSortedMatcher.group(REGEX_FIRST_GROUP) : "false";
 
       Matcher totalNumberOfEntriesMatcher =
           Pattern.compile(REGEX_COLUMN + colName + REGEX_TOTAL_NUMBER_OF_ENTRIES).matcher(metadataString);
-      String totalNumberOfEntries = totalNumberOfEntriesMatcher.find() ? totalNumberOfEntriesMatcher.group(1) : "0";
+      String totalNumberOfEntries =
+          totalNumberOfEntriesMatcher.find() ? totalNumberOfEntriesMatcher.group(REGEX_FIRST_GROUP) : "0";
 
       Matcher invertedIndexSizeMatcher = Pattern.compile(colName + REGEX_INVERTED_INDEX_SIZE).matcher(indexMapString);
-      String invertedIndexSize = invertedIndexSizeMatcher.find() ? invertedIndexSizeMatcher.group(1) : "0";
+      String invertedIndexSize =
+          invertedIndexSizeMatcher.find() ? invertedIndexSizeMatcher.group(REGEX_FIRST_GROUP) : "0";
 
       ((ColStatsAccumulatorObj) AccumulatorOut.get(pathWrapper.getTableNameWithoutType()).get(colName))
           .addCardinality(cardinality).addInvertedIndexSize(invertedIndexSize).addIsSorted(isSorted)
