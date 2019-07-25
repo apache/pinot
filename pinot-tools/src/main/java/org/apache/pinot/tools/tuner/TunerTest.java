@@ -14,7 +14,7 @@ import org.apache.pinot.tools.tuner.strategy.ParserBasedImpl;
 
 public class TunerTest extends TunerDriver {
   public static void main(String[] args) {
-    TunerDriver metaFetch = new TunerTest().setThreadPoolSize(3)
+    TunerDriver metaFetch = new TunerTest().setThreadPoolSize(0)
         .setStrategy(new AccumulateStats.Builder().setOutputDir("/Users/jiaguo/tmp2").build()).setQuerySrc(
             new CompressedFilePathIter.Builder()
                 .set_directory("/Users/jiaguo/Workspace/pinot-tuna-script/data/segments").build()).setMetaManager(null);

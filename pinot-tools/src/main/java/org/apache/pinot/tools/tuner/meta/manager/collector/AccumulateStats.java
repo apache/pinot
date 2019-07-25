@@ -1,5 +1,6 @@
 package org.apache.pinot.tools.tuner.meta.manager.collector;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.gson.Gson;
 import java.io.File;
 import java.io.FilenameFilter;
@@ -12,6 +13,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.tools.tuner.meta.manager.MetaManager;
 import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 import org.apache.pinot.tools.tuner.strategy.AbstractAccumulator;
@@ -224,8 +226,13 @@ public class AccumulateStats implements Strategy {
 
     packedFile.put("col_meta", colMeta);
     packedFile.put("segment_meta", segmentMeta);
-    Gson gson = new Gson();
-    String json = gson.toJson(packedFile);
+
+    String json = null;
+    try {
+      json = JsonUtils.objectToString(packedFile);
+    } catch (JsonProcessingException e) {
+      LOGGER.error("Cannot convert to json!");
+    }
 
     File file = new File(_outputDir.getAbsolutePath() + "/metadata.json");
     try {
