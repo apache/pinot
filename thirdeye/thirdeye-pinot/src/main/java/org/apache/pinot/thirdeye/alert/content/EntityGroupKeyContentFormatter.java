@@ -97,6 +97,7 @@ public class EntityGroupKeyContentFormatter extends BaseEmailContentFormatter{
     }
 
     templateData.put("emailHeading", config.getName());
+    templateData.put("emailDescription", config.getDescription());
     templateData.put("anomalyToChildIdsMap", anomalyToChildIdsMap);
     templateData.put("entityToSortedAnomaliesMap", entityToSortedAnomaliesMap);
   }

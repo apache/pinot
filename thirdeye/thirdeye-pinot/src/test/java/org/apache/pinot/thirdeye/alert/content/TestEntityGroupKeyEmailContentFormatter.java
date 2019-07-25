@@ -111,6 +111,7 @@ public class TestEntityGroupKeyEmailContentFormatter {
 
     DetectionConfigDTO detection = new DetectionConfigDTO();
     detection.setName("test_report");
+    detection.setDescription("test_description");
     long id = detectionDAO.save(detection);
 
     DateTimeZone dateTimeZone = DateTimeZone.forID("America/Los_Angeles");

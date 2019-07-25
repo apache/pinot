@@ -18,6 +18,7 @@
   <tr>
     <td style="font-size: 16px; padding: 12px; background-color: #0073B1; color: #FFF; text-align: center;">
       <span style="font-size: 18px; font-weight: bold; letter-spacing: 2px; vertical-align: middle;">Report: ${emailHeading}</span>
+      <p>${emailDescription}</p>
     </td>
   </tr>
 
