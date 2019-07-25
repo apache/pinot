@@ -130,7 +130,7 @@ public class ControllerStarter {
     _enableBatchMessageMode = _config.getEnableBatchMessageMode();
 
     _metricsRegistry = new MetricsRegistry();
-    _controllerMetrics = new ControllerMetrics(_metricsRegistry);
+    _controllerMetrics = new ControllerMetrics(conf.getMetricsPrefix(), _metricsRegistry);
     _serviceStatusCallbackList = new ArrayList<>();
     if (_controllerMode == ControllerConf.ControllerMode.HELIX_ONLY) {
       _adminApp = null;

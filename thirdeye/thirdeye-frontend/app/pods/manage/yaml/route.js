@@ -54,7 +54,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
           this.setProperties({
             alertId: alertId,
             detectionInfo,
-            rawDetectionYaml: detection_json.yaml
+            rawDetectionYaml: detection_json.yaml,
+            timeWindowSize: detection_json.alertDetailsDefaultWindowSize
           });
         }
       }
@@ -116,7 +117,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
       detectionHealth: get (this, 'detectionHealth'),
       subscriptionGroups: get(this, 'subscriptionGroups'),
       subscribedGroups,
-      subscriptionGroupNames // all subscription groups as Ember data
+      subscriptionGroupNames, // all subscription groups as Ember data
+      timeWindowSize: get(this, 'timeWindowSize')
     });
   },
 

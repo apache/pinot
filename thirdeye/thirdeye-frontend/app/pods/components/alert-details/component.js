@@ -94,7 +94,7 @@ export default Component.extend({
   alertYaml: null,
   dimensionExploration: null,
   detectionHealth: null, // result of call to detection/health/{id}, passed in by parent
-
+  timeWindowSize: null, // passed in by parent, which retrieves from endpoint.  Do not set
 
 
   /**
@@ -747,10 +747,12 @@ export default Component.extend({
       isPreviewMode,
       dimensionExploration
     } = this.getProperties('granularity', 'isPreviewMode', 'dimensionExploration');
+    let timeWindowSize = get(this, 'timeWindowSize');
+    timeWindowSize = timeWindowSize ? timeWindowSize : 172800000; // 48 hours in milliseconds
     if (!isPreviewMode) {
       this.setProperties({
-        analysisRange: [moment().add(1, 'day').subtract(1, 'month').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
-        duration: '1m',
+        analysisRange: [moment().subtract(timeWindowSize, 'milliseconds').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
+        duration: (timeWindowSize === 172800000) ? '48h' : 'custom',
         selectedDimension: 'Choose a dimension',
         // For now, we will only show predicted and bounds on daily metrics with no dimensions, for the Alert Overview page
         selectedBaseline: (granularity === 'DAYS' && !dimensionExploration) ? 'predicted' : 'wo1w'
@@ -758,7 +760,8 @@ export default Component.extend({
       this._fetchAnomalies();
     } else {
       this.setProperties({
-        duration: '48h',
+        analysisRange: [moment().subtract(timeWindowSize, 'milliseconds').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
+        duration: 'custom',
         selectedBaseline: 'predicted'
       });
     }

@@ -57,20 +57,6 @@ public class PerfBenchmarkDriverConf {
   String brokerHost = "localhost";
   boolean startBroker = true;
 
-  //data configuration
-  //where is the raw data, mandatory if regenerateIndex = true
-  boolean uploadIndexes = false;
-
-  String rawDataDirectory;
-
-  boolean regenerateIndex = false;
-  //if the regenerateIndex is true, the indexes under this directory will be deleted and recreated from rawData.
-  String indexDirectory;
-
-  //by default all files under indexDirectory will be uploaded to the controller if its not already present.
-  //If the indexes are already uploaded, nothing
-  boolean forceReloadIndex = false;
-
   //resource configuration
 
   boolean configureResources = false;
@@ -162,30 +148,6 @@ public class PerfBenchmarkDriverConf {
     return startBroker;
   }
 
-  public boolean isUploadIndexes() {
-    return uploadIndexes;
-  }
-
-  public void setUploadIndexes(boolean uploadIndexes) {
-    this.uploadIndexes = uploadIndexes;
-  }
-
-  public String getRawDataDirectory() {
-    return rawDataDirectory;
-  }
-
-  public boolean isRegenerateIndex() {
-    return regenerateIndex;
-  }
-
-  public String getIndexDirectory() {
-    return indexDirectory;
-  }
-
-  public boolean isForceReloadIndex() {
-    return forceReloadIndex;
-  }
-
   public String getQueriesDirectory() {
     return queriesDirectory;
   }
@@ -262,22 +224,6 @@ public class PerfBenchmarkDriverConf {
     this.startBroker = startBroker;
   }
 
-  public void setRawDataDirectory(String rawDataDirectory) {
-    this.rawDataDirectory = rawDataDirectory;
-  }
-
-  public void setRegenerateIndex(boolean regenerateIndex) {
-    this.regenerateIndex = regenerateIndex;
-  }
-
-  public void setIndexDirectory(String indexDirectory) {
-    this.indexDirectory = indexDirectory;
-  }
-
-  public void setForceReloadIndex(boolean forceReloadIndex) {
-    this.forceReloadIndex = forceReloadIndex;
-  }
-
   public boolean isRunQueries() {
     return runQueries;
   }
@@ -316,14 +262,5 @@ public class PerfBenchmarkDriverConf {
 
   public void setSchemaFileNamePath(String schemaFileNamePath) {
     this.schemaFileNamePath = schemaFileNamePath;
-  }
-
-  public static void main(String[] args) {
-    DumperOptions options = new DumperOptions();
-    options.setIndent(4);
-    options.setDefaultFlowStyle(FlowStyle.BLOCK);
-    Yaml yaml = new Yaml(options);
-    String dump = yaml.dump(new PerfBenchmarkDriverConf());
-    System.out.println(dump);
   }
 }

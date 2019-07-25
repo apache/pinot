@@ -66,7 +66,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
             rawDetectionYaml: detection_json.yaml,
             metricUrn: detection_json.metricUrns[0],
             metricUrnList: detection_json.metricUrns,
-            granularity
+            granularity,
+            timeWindowSize: detection_json.alertDetailsDefaultWindowSize
           });
 
         }
@@ -128,7 +129,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
       subscribedGroups,
       metricUrn: get(this, 'metricUrn'),
       metricUrnList: get(this, 'metricUrnList') ? get(this, 'metricUrnList') : [],
-      granularity
+      granularity,
+      timeWindowSize: get(this, 'timeWindowSize')
     });
   },
 

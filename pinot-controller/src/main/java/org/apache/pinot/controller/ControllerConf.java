@@ -31,6 +31,9 @@ import org.apache.pinot.filesystem.LocalPinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.common.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
+import static org.apache.pinot.common.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
+
 
 public class ControllerConf extends PropertiesConfiguration {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerConf.class);
@@ -597,5 +600,9 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public void setHLCTablesAllowed(boolean allowHLCTables) {
     setProperty(ALLOW_HLC_TABLES, allowHLCTables);
+  }
+
+  public String getMetricsPrefix() {
+    return getString(CONFIG_OF_CONTROLLER_METRICS_PREFIX, DEFAULT_METRICS_PREFIX);
   }
 }

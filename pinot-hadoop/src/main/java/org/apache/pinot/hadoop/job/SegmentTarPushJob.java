@@ -30,6 +30,7 @@ import org.apache.pinot.hadoop.utils.PushLocation;
 public class SegmentTarPushJob extends BaseSegmentJob {
   private final Path _segmentPattern;
   private final List<PushLocation> _pushLocations;
+  private final String _rawTableName;
 
   public SegmentTarPushJob(Properties properties) {
     super(properties);
@@ -37,6 +38,7 @@ public class SegmentTarPushJob extends BaseSegmentJob {
     String[] hosts = StringUtils.split(properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS), ',');
     int port = Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_TO_PORT));
     _pushLocations = PushLocation.getPushLocations(hosts, port);
+    _rawTableName = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME));
   }
 
   @Override
@@ -53,6 +55,6 @@ public class SegmentTarPushJob extends BaseSegmentJob {
   }
 
   protected ControllerRestApi getControllerRestApi() {
-    return new DefaultControllerRestApi(_pushLocations, null);
+    return new DefaultControllerRestApi(_pushLocations, _rawTableName);
   }
 }

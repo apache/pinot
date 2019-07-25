@@ -123,6 +123,9 @@ public class CommonConstants {
     public static final String ROUTING_TABLE_CONFIG_PREFIX = "pinot.broker.routing.table";
     public static final String ACCESS_CONTROL_CONFIG_PREFIX = "pinot.broker.access.control";
     public static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
+    public static final String CONFIG_OF_METRICS_NAME_PREFIX = "pinot.broker.metrics.prefix";
+    public static final String DEFAULT_METRICS_NAME_PREFIX = "pinot.broker.";
+    public static final boolean DEFAULT_METRICS_GLOBAL_ENABLED = false;
 
     public static final String CONFIG_OF_DELAY_SHUTDOWN_TIME_MS = "pinot.broker.delayShutdownTimeMs";
     public static final long DEFAULT_DELAY_SHUTDOWN_TIME_MS = 10_000L;
@@ -273,6 +276,9 @@ public class CommonConstants {
       public static final int DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = 300_000;
       public static final int DEFAULT_OTHER_REQUESTS_TIMEOUT = 10_000;
     }
+
+    public static final String DEFAULT_METRICS_PREFIX = "pinot.server.";
+    public static final boolean DEFAULT_METRICS_GLOBAL_ENABLED = false;
   }
 
   public static class Controller {
@@ -283,16 +289,23 @@ public class CommonConstants {
     public static final String SEGMENT_NAME_HTTP_HEADER = "Pinot-Segment-Name";
     public static final String TABLE_NAME_HTTP_HEADER = "Pinot-Table-Name";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.controller.crypter";
+
+    public static final String CONFIG_OF_CONTROLLER_METRICS_PREFIX = "controller.metrics.prefix";
+    // FYI this is incorrect as it generate metrics named without a dot after pinot.controller part,
+    // but we keep this default for backward compatibility in case someone relies on this format
+    // see Server or Broker class for correct prefix format you should use
+    public static final String DEFAULT_METRICS_PREFIX = "pinot.controller";
   }
 
   public static class Minion {
     public static final String INSTANCE_PREFIX = "Minion_";
     public static final String INSTANCE_TYPE = "minion";
     public static final String UNTAGGED_INSTANCE = "minion_untagged";
-    public static final String METRICS_PREFIX = "pinot.minion.";
+    public static final String CONFIG_OF_METRICS_PREFIX = "pinot.minion.";
     public static final String METADATA_EVENT_OBSERVER_PREFIX = "metadata.event.notifier";
 
     // Config keys
+    public static final String CONFIG_OF_METRICS_PREFIX_KEY = "metricsPrefix";
     public static final String METRICS_REGISTRY_REGISTRATION_LISTENERS_KEY = "metricsRegistryRegistrationListeners";
 
     // Default settings

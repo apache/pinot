@@ -28,6 +28,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Collections;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
@@ -39,6 +40,9 @@ import org.apache.commons.io.IOUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.model.ClusterConfig;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
@@ -124,6 +128,13 @@ public abstract class ControllerTest {
       case PINOT_ONLY:
         _helixAdmin = _helixResourceManager.getHelixAdmin();
         _propertyStore = _helixResourceManager.getPropertyStore();
+
+        // TODO: Enable periodic rebalance per 10 seconds as a temporary work-around for the Helix issue:
+        //       https://github.com/apache/helix/issues/331. Remove this after Helix fixing the issue.
+        _helixAdmin.setConfig(
+            new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+                .build(),
+            Collections.singletonMap(ClusterConfig.ClusterConfigProperty.REBALANCE_TIMER_PERIOD.name(), "10000"));
         break;
       case HELIX_ONLY:
         _helixAdmin = _helixManager.getClusterManagmentTool();
