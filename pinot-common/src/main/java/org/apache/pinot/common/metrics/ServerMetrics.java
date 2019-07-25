@@ -30,6 +30,18 @@ import static org.apache.pinot.common.utils.CommonConstants.Server.DEFAULT_METRI
  */
 public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter, ServerGauge, ServerTimer> {
 
+  public ServerMetrics(MetricsRegistry metricsRegistry) {
+    this(DEFAULT_METRICS_PREFIX, metricsRegistry, DEFAULT_METRICS_GLOBAL_ENABLED);
+  }
+
+  public ServerMetrics(MetricsRegistry metricsRegistry, boolean global) {
+    this(DEFAULT_METRICS_PREFIX, metricsRegistry, global);
+  }
+
+  public ServerMetrics(String prefix, MetricsRegistry metricsRegistry, boolean global) {
+    super(prefix, metricsRegistry, ServerMetrics.class, global);
+  }
+
   @Override
   protected ServerQueryPhase[] getQueryPhases() {
     return ServerQueryPhase.values();
@@ -44,17 +56,4 @@ public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter
   protected ServerGauge[] getGauges() {
     return ServerGauge.values();
   }
-
-  public ServerMetrics(MetricsRegistry metricsRegistry) {
-    this(DEFAULT_METRICS_PREFIX, metricsRegistry, DEFAULT_METRICS_GLOBAL_ENABLED);
-  }
-
-  public ServerMetrics(MetricsRegistry metricsRegistry, boolean global) {
-    this(DEFAULT_METRICS_PREFIX, metricsRegistry, global);
-  }
-
-  public ServerMetrics(String prefix, MetricsRegistry metricsRegistry, boolean global) {
-    super(prefix, metricsRegistry, ServerMetrics.class, global);
-  }
-
 }
