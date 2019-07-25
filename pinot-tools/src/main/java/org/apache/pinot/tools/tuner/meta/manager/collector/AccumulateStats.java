@@ -195,7 +195,7 @@ public class AccumulateStats implements Strategy {
   }
 
   /**
-   * merge two AbstractMergerObj with same /tableName/colName
+   * merge two ColStatsAccumulatorObj with same /tableName/colName
    * @param abstractAccumulator input
    * @param abstractAccumulatorToMerge input
    */
@@ -205,7 +205,7 @@ public class AccumulateStats implements Strategy {
   }
 
   /**
-   * Generate a report for recommendation using mergedOut:tableName/colName/AbstractMergerObj
+   * Generate a json packing all metadata properties.
    * @param tableResults input
    */
   @Override
