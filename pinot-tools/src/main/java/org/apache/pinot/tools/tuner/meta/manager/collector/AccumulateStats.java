@@ -1,8 +1,10 @@
 package org.apache.pinot.tools.tuner.meta.manager.collector;
 
+import com.google.gson.Gson;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -57,7 +59,8 @@ public class AccumulateStats implements Strategy {
    */
   @Override
   public boolean filter(AbstractQueryStats filePaths) {
-    return _tableNamesWithoutType.contains(((PathWrapper) filePaths).getTableNameWithoutType());
+    return _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType
+        .contains(((PathWrapper) filePaths).getTableNameWithoutType());
   }
 
   /**
@@ -70,10 +73,13 @@ public class AccumulateStats implements Strategy {
   public void accumulate(AbstractQueryStats filePaths, MetaManager metaManager,
       Map<String, Map<String, AbstractAccumulator>> AccumulatorOut) {
     PathWrapper pathWrapper = ((PathWrapper) filePaths);
+    LOGGER.info("Extracting: " + pathWrapper.getFile().getAbsolutePath() + " to " + _outputDir.getAbsolutePath());
     try {
-      Runtime.getRuntime().exec(
-          UNTAR + pathWrapper.getFile().getAbsolutePath() + EXCLUDE_DATA + OUT_PUT_PATH + _outputDir.getAbsolutePath());
-    } catch (IOException e) {
+      Process p = Runtime.getRuntime().exec(
+          (UNTAR + pathWrapper.getFile().getAbsolutePath() + EXCLUDE_DATA + OUT_PUT_PATH + _outputDir
+              .getAbsolutePath()));
+      p.waitFor();
+    } catch (IOException | InterruptedException e) {
       LOGGER.error(e.getMessage());
       return;
     }
@@ -91,14 +97,14 @@ public class AccumulateStats implements Strategy {
         }
       })[0];
     } catch (NullPointerException e) {
-      LOGGER.error(e.getMessage());
+      LOGGER.error("no tmp folder!");
       return;
     }
 
     try {
       versionFolder = tmpFolder.listFiles()[0];
     } catch (NullPointerException e) {
-      LOGGER.error(e.getMessage());
+      LOGGER.error("no version folder!");
       return;
     }
 
@@ -150,25 +156,25 @@ public class AccumulateStats implements Strategy {
 
     Matcher colMatcher = Pattern.compile(REGEX_COL_EXTRACT).matcher(metadataString);
     while (colMatcher.find()) {
-      String colName = colMatcher.group(0);
+      String colName = colMatcher.group(1);
       AccumulatorOut.putIfAbsent(pathWrapper.getTableNameWithoutType(), new HashMap<>());
       AccumulatorOut.get(pathWrapper.getTableNameWithoutType()).putIfAbsent(colName, new ColStatsAccumulatorObj());
 
       Matcher cardinalityMatcher = Pattern.compile(REGEX_COLUMN + colName + REGEX_CARDINALITY).matcher(metadataString);
-      String cardinality = cardinalityMatcher.find() ? cardinalityMatcher.group(0) : "1";
+      String cardinality = cardinalityMatcher.find() ? cardinalityMatcher.group(1) : "1";
 
       Matcher totalDocsMatcher = Pattern.compile(REGEX_COLUMN + colName + REGEX_TOTAL_DOCS).matcher(metadataString);
-      String totalDocs = totalDocsMatcher.find() ? totalDocsMatcher.group(0) : "0";
+      String totalDocs = totalDocsMatcher.find() ? totalDocsMatcher.group(1) : "0";
 
       Matcher isSortedMatcher = Pattern.compile(REGEX_COLUMN + colName + REGEX_IS_SORTED).matcher(metadataString);
-      String isSorted = isSortedMatcher.find() ? isSortedMatcher.group(0) : "false";
+      String isSorted = isSortedMatcher.find() ? isSortedMatcher.group(1) : "false";
 
       Matcher totalNumberOfEntriesMatcher =
           Pattern.compile(REGEX_COLUMN + colName + REGEX_TOTAL_NUMBER_OF_ENTRIES).matcher(metadataString);
-      String totalNumberOfEntries = totalNumberOfEntriesMatcher.find() ? totalNumberOfEntriesMatcher.group(0) : "0";
+      String totalNumberOfEntries = totalNumberOfEntriesMatcher.find() ? totalNumberOfEntriesMatcher.group(1) : "0";
 
       Matcher invertedIndexSizeMatcher = Pattern.compile(colName + REGEX_INVERTED_INDEX_SIZE).matcher(indexMapString);
-      String invertedIndexSize = invertedIndexSizeMatcher.find() ? invertedIndexSizeMatcher.group(0) : "0";
+      String invertedIndexSize = invertedIndexSizeMatcher.find() ? invertedIndexSizeMatcher.group(1) : "0";
 
       ((ColStatsAccumulatorObj) AccumulatorOut.get(pathWrapper.getTableNameWithoutType()).get(colName))
           .addCardinality(cardinality).addInvertedIndexSize(invertedIndexSize).addIsSorted(isSorted)
@@ -200,7 +206,30 @@ public class AccumulateStats implements Strategy {
    */
   @Override
   public void report(Map<String, Map<String, AbstractAccumulator>> tableResults) {
+    Map<String, Map> packedFile = new HashMap<>();
+    Map<String, Map<String, Map<String, BigInteger>>> colMeta = new HashMap<>();
+    Map<String, Map<String, Map<String, Map<String, String>>>> segmentMeta = new HashMap<>();
 
+    tableResults.forEach((tableNameNoType, colMap) -> colMap.forEach((colName, obj) -> {
+      colMeta.putIfAbsent(tableNameNoType, new HashMap<>());
+      colMeta.get(tableNameNoType).put(colName, ((ColStatsAccumulatorObj) obj).getAccumulatedStats());
+
+      segmentMeta.putIfAbsent(tableNameNoType, new HashMap<>());
+      segmentMeta.get(tableNameNoType).put(colName, ((ColStatsAccumulatorObj) obj).getSegmentStats());
+    }));
+
+    packedFile.put("col_meta", colMeta);
+    packedFile.put("segment_meta", segmentMeta);
+    Gson gson = new Gson();
+    String json = gson.toJson(packedFile);
+
+    File file = new File(_outputDir.getAbsolutePath() + "/metadata.json");
+    try {
+      file.createNewFile();
+      FileUtils.writeStringToFile(file, json);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
   }
 
   public static final class Builder {

@@ -4,6 +4,7 @@ import io.vavr.Tuple2;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import javax.annotation.Nonnull;
@@ -15,7 +16,8 @@ import org.slf4j.LoggerFactory;
 
 public class CompressedFilePathIter implements QuerySrc {
   private static final Logger LOGGER = LoggerFactory.getLogger(CompressedFilePathIter.class);
-  Iterable<Tuple2<String, File>> _iterable;
+  Iterator<Tuple2<String, File>> _iterator;
+
 
   private String _directory;
 
@@ -34,10 +36,11 @@ public class CompressedFilePathIter implements QuerySrc {
 
     Arrays.stream(Objects.requireNonNull(dir.listFiles()))
         .filter(tableDir -> (!tableDir.getName().startsWith(".") && tableDir.isDirectory())).forEach(
-        tableDir -> Arrays.asList(Objects.requireNonNull(tableDir.listFiles()))
+        tableDir -> Arrays.stream(Objects.requireNonNull(tableDir.listFiles()))
+            .filter(file -> (!file.getName().startsWith(".")))
             .forEach(file -> validTableNameWithoutTypeSegmentFile.add(new Tuple2<>(tableDir.getName(), file))));
 
-    _iterable = validTableNameWithoutTypeSegmentFile;
+    _iterator = validTableNameWithoutTypeSegmentFile.iterator();
     return this;
   }
 
@@ -47,7 +50,7 @@ public class CompressedFilePathIter implements QuerySrc {
    */
   @Override
   public boolean hasNext() {
-    return _iterable.iterator().hasNext();
+    return _iterator.hasNext();
   }
 
   /**
@@ -58,7 +61,7 @@ public class CompressedFilePathIter implements QuerySrc {
   @Override
   public AbstractQueryStats next()
       throws NoSuchElementException {
-    Tuple2<String, File> nextTuple = _iterable.iterator().next();
+    Tuple2<String, File> nextTuple = _iterator.next();
     return new PathWrapper.Builder().setTableNameWithoutType(nextTuple._1()).setFile(nextTuple._2())
         .build();
   }

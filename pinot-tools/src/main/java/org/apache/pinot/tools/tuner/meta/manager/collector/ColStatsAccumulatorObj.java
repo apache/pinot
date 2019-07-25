@@ -30,6 +30,14 @@ public class ColStatsAccumulatorObj extends AbstractAccumulator {
   private String _isSorted;
   private String _invertedIndexSize;
 
+  public Map<String, BigInteger> getAccumulatedStats() {
+    return accumulatedStats;
+  }
+
+  public Map<String, Map<String, String>> getSegmentStats() {
+    return segmentStats;
+  }
+
   public ColStatsAccumulatorObj addInvertedIndexSize(String invertedIndexSize) {
     _invertedIndexSize = invertedIndexSize;
     return this;
