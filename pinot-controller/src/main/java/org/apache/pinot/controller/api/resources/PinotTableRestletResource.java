@@ -473,7 +473,8 @@ public class PinotTableRestletResource {
       @ApiParam(value = "true|false") @Nonnull @DefaultValue("true") @QueryParam("dryrun") Boolean dryRun,
       @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("includeConsuming") Boolean includeConsuming,
       @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("downtime") Boolean downtime,
-      @ApiParam(value = "1|2|3|4") @DefaultValue("1") @QueryParam("minReplicasToKeepUpForNoDowntime") Integer minReplicasToKeepUp) {
+      @ApiParam(value = "number of serving replicas to keep alive per segment while rebalancing in no downtime mode")
+      @DefaultValue("1") @QueryParam("minReplicasToKeepUpForNoDowntime") Integer minReplicasToKeepUp) {
 
     if (tableType != null && !EnumUtils.isValidEnum(CommonConstants.Helix.TableType.class, tableType.toUpperCase())) {
       throw new ControllerApplicationException(LOGGER, "Illegal table type " + tableType, Response.Status.BAD_REQUEST);

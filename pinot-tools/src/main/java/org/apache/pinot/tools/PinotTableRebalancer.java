@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.commons.configuration.Configuration;
@@ -30,6 +31,8 @@ import org.apache.pinot.controller.helix.core.TableRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategyFactory;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -38,6 +41,8 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceUserConfigConst
  * code which does the rebalancing.
  */
 public class PinotTableRebalancer extends PinotZKChanger {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableRebalancer.class);
+
   private final boolean _noDowntime;
   private final boolean _includeConsuming;
   private final boolean _dryRun;
@@ -63,6 +68,13 @@ public class PinotTableRebalancer extends PinotZKChanger {
     _minReplicasToKeepUpForNoDowntime = minReplicasToKeepUpForNoDowntime;
   }
 
+  /**
+   * Rebalances segments of a table
+   * @param tableName name of table
+   * @param tableType type of table
+   * @return true if operation succeeded, false otherwise
+   * @throws Exception
+   */
   public boolean rebalance(final String tableName, final String tableType)
       throws Exception {
     Preconditions.checkArgument(tableName != null && tableName.length() > 0, "Expecting a valid table name");
@@ -91,18 +103,17 @@ public class PinotTableRebalancer extends PinotZKChanger {
         tableRebalancer.rebalance(tableConfig, rebalanceSegmentsStrategy, rebalanceUserConfig);
 
     if (rebalanceResult.getStatus() == RebalanceResult.RebalanceStatus.FAILED) {
-      System.out.println("Failed to rebalance table: " + tableName);
+      LOGGER.error("Failed to rebalance table: " + tableName);
       return false;
     } else {
-      System.out.println("Successfully rebalanced table: " + tableName);
-      System.out.println("Ideal state");
+      LOGGER.debug("Successfully rebalanced table: " + tableName);
+      LOGGER.debug("Resulting Ideal state");
       Map<String, Map<String, String>> idealState = rebalanceResult.getIdealStateMapping();
-      for (Map.Entry<String, Map<String, String>> segments : idealState.entrySet()) {
-        System.out.println("Segment: " + segments.getKey());
-        final Map<String, String> segmentHostsMap = segments.getValue();
-        for (Map.Entry<String, String> host : segmentHostsMap.entrySet()) {
-          System.out.println(host.getKey() + ":" + host.getValue());
-        }
+      for (String segment : idealState.keySet()) {
+        LOGGER.debug("Segment: {}", segment);
+        final Map<String, String> segmentHostsMap = idealState.get(segment);
+        final Joiner.MapJoiner mapJoiner = Joiner.on(",").withKeyValueSeparator(":");
+        LOGGER.debug(mapJoiner.join(segmentHostsMap));
       }
       _rebalancerStats = tableRebalancer.getRebalancerStats();
       return true;

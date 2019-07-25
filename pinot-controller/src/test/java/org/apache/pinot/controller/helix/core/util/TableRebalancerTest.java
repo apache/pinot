@@ -186,22 +186,23 @@ public class TableRebalancerTest {
     rebalancer.updateSegmentIfNeeded(segmentId, currentIdealState.getRecord().getMapField(segmentId),
         targetSegmentInstancesMap, toUpdateIdealState, noDowntime);
     // At this point, it would be perfectly fine to just directly set the ideal
-    // state to target since the number of hosts in common >= min serving
-    // replicas we need
+    // state to target by updating the segment's partition map since the number
+    // of hosts in common >= min serving replicas we need
     verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 3, true);
 
     // Verify the same behavior (as described in above steps) through stats
     TableRebalancer.RebalancerStats rebalancerStats = rebalancer.getRebalancerStats();
-    // STEP 1 and STEP 2 -- incremental transitions
-    Assert.assertEquals(2, rebalancerStats.getIncrementalTransitions());
-    // STEP 3 -- final direct transition
-    Assert.assertEquals(1, rebalancerStats.getDirectTransitions());
+    // STEP 1 and STEP 2 -- incremental updates to segment's partition map
+    Assert.assertEquals(rebalancerStats.getIncrementalUpdatesToSegmentInstanceMap(), 2);
+    // STEP 3 -- final direct update to segment's partition map
+    Assert.assertEquals(rebalancerStats.getDirectUpdatesToSegmentInstanceMap(), 1);
   }
 
   /**
    * Test for now downtime rebalance with no common hosts between
    * current and target ideal state and a request to keep minimum
-   * 2 replicas up while rebalancing along with the increase
+   * 2 replicas up while rebalancing along with the increase in
+   * replicas in the target ideal state
    */
   @Test
   public void noDowntimeUpdateWithNoCommonHostsAndIncreasedReplicas() {
@@ -249,17 +250,17 @@ public class TableRebalancerTest {
     // STEP 3
     rebalancer.updateSegmentIfNeeded(segmentId, currentIdealState.getRecord().getMapField(segmentId),
         targetSegmentInstancesMap, toUpdateIdealState, noDowntime);
-    // At this point, it would be perfectly fine to just directly set the ideal
-    // state to target since the number of hosts in common >= min serving
+    // At this point, it would be perfectly fine to just directly set the partition
+    // map in ideal state to target since the number of hosts in common >= min serving
     // replicas we need
     verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 4, true);
 
     // Verify the same behavior (as described in above steps) through stats
     TableRebalancer.RebalancerStats rebalancerStats = rebalancer.getRebalancerStats();
-    // STEP 1 and STEP 2 -- incremental transitions
-    Assert.assertEquals(2, rebalancerStats.getIncrementalTransitions());
-    // STEP 3 -- final direct transition
-    Assert.assertEquals(1, rebalancerStats.getDirectTransitions());
+    // STEP 1 and STEP 2 -- incremental updates to segment's partition map
+    Assert.assertEquals(rebalancerStats.getIncrementalUpdatesToSegmentInstanceMap(), 2);
+    // STEP 3 -- final direct update to segment's partition map
+    Assert.assertEquals(rebalancerStats.getDirectUpdatesToSegmentInstanceMap(), 1);
   }
 
   /**
@@ -302,10 +303,9 @@ public class TableRebalancerTest {
     rebalancer.updateSegmentIfNeeded(segmentId, currentIdealState.getRecord().getMapField(segmentId),
         targetSegmentInstancesMap, toUpdateIdealState, noDowntime);
     // Now since the minimum number of serving replicas we need is 1, it is fine
-    // to directly (in one step) set the ideal state to target by replacing
+    // to directly (in one step) set the partition mapping to target by replacing
     // host2 and host3 from current state with host5 and host6 from target state
-    // Doing this direct update on current ideal state still ensures that
-    // 1 replica (host4) is up for serving
+    // Doing this direct update still ensures that 1 replica (host4) is up for serving
     //
     // toUpdateIdealState : { SEGMENT1 : { host4 : online, host5 : online, host6 : online } }
     // Essentially, host2, host3 from current state got replaced with host5 and host6
@@ -314,10 +314,10 @@ public class TableRebalancerTest {
     verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 3, true);
 
     TableRebalancer.RebalancerStats rebalancerStats = rebalancer.getRebalancerStats();
-    // STEP 1 incremental transition
-    Assert.assertEquals(1, rebalancerStats.getIncrementalTransitions());
-    // STEP 2 -- final direct transition
-    Assert.assertEquals(1, rebalancerStats.getDirectTransitions());
+    // STEP 1 -- incremental update to segment's partition map
+    Assert.assertEquals(rebalancerStats.getIncrementalUpdatesToSegmentInstanceMap(), 1);
+    // STEP 2 -- final direct update to segment's partition map
+    Assert.assertEquals(rebalancerStats.getDirectUpdatesToSegmentInstanceMap(), 1);
   }
 
   /**
@@ -362,19 +362,19 @@ public class TableRebalancerTest {
     // Now since the minimum number of serving replicas we asked for are 4,
     // the rebalancer will detect that is impossible to keep up 4 replicas
     // since a segment only has 3 replicas in the current configuration. So
-    // it is fine to directly set the ideal state to target in this step by replacing
-    // host2 and host3 from current state with host5 and host6 from target state
-    // Doing this direct update on current ideal state still ensures that
+    // it is fine to directly set the segment's partition map to target in this
+    // step by replacing host2 and host3 from current state with host5 and host6
+    // from target state Doing this direct update still ensures that
     // 1 replica (host4) is up for serving
     // Now, what we are checking is that between toUpdate and target ideal state,
     // all hosts are in common
     verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 3, true);
 
     TableRebalancer.RebalancerStats rebalancerStats = rebalancer.getRebalancerStats();
-    // STEP 1 incremental transition
-    Assert.assertEquals(1, rebalancerStats.getIncrementalTransitions());
-    // STEP 2 -- final direct transition
-    Assert.assertEquals(1, rebalancerStats.getDirectTransitions());
+    // STEP 1 -- incremental update to segment's partition map
+    Assert.assertEquals(rebalancerStats.getIncrementalUpdatesToSegmentInstanceMap(), 1);
+    // STEP 2 -- final direct update to segment's partition map
+    Assert.assertEquals(rebalancerStats.getDirectUpdatesToSegmentInstanceMap(), 1);
   }
 
   /**
@@ -417,18 +417,18 @@ public class TableRebalancerTest {
     rebalancer.updateSegmentIfNeeded(segmentId, currentIdealState.getRecord().getMapField(segmentId),
         targetSegmentInstancesMap, toUpdateIdealState, noDowntime);
     // Now since the minimum number of serving replicas we asked for are 2,
-    // we don't need to update the current ideal state incrementally. Since
+    // we don't need to update the segment's partition map incrementally. Since
     // the common hosts (host1 and host5) satisfy the requirement of minimum
-    // 2 serving replicas, the ideal state can be set to target at one go.
+    // 2 serving replicas, the partition map can be set to target at one go.
     // Now, what we are checking is that between toUpdate and target ideal state,
     // all hosts are in common
     verifyStateForMinReplicaConstraint(toUpdateIdealState, targetIdealState, 3, true);
 
     TableRebalancer.RebalancerStats rebalancerStats = rebalancer.getRebalancerStats();
-    // STEP 1 incremental transition
-    Assert.assertEquals(1, rebalancerStats.getIncrementalTransitions());
-    // STEP 2 -- final direct transition
-    Assert.assertEquals(1, rebalancerStats.getDirectTransitions());
+    // STEP 1 -- incremental update to segment's partition map
+    Assert.assertEquals(rebalancerStats.getIncrementalUpdatesToSegmentInstanceMap(), 1);
+    // STEP 2 -- final direct update to segment's partition map
+    Assert.assertEquals(rebalancerStats.getDirectUpdatesToSegmentInstanceMap(), 1);
   }
 
   private void verifyStateForMinReplicaConstraint(
