@@ -182,12 +182,12 @@ public class AccumulateStats implements Strategy {
           .addTotalNumberOfEntries(totalNumberOfEntries).merge();
     }
 
-    try {
-      Runtime.getRuntime().exec(RM_RF + tmpFolder.getAbsolutePath());
-    } catch (IOException e) {
-      LOGGER.error(e.getMessage());
-      return;
-    }
+//    try {
+//      Runtime.getRuntime().exec(RM_RF + tmpFolder.getAbsolutePath());
+//    } catch (IOException e) {
+//      LOGGER.error(e.getMessage());
+//      return;
+//    }
   }
 
   /**

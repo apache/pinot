@@ -112,7 +112,7 @@ public abstract class TunerDriver {
     }
     if (_threadPoolSize != NO_CONCURRENCY) {
       accumulateExecutor.shutdown();
-      LOGGER.info("All queries waiting for accumulation");
+      LOGGER.info("All queries queued for accumulation");
       try {
         accumulateExecutor.awaitTermination(365, TimeUnit.DAYS);
       } catch (InterruptedException e) {
