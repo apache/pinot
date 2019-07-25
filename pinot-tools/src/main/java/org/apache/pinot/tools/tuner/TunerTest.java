@@ -1,15 +1,8 @@
 package org.apache.pinot.tools.tuner;
 
-import com.google.gson.Gson;
-import java.math.BigInteger;
-import java.util.HashMap;
 import org.apache.pinot.tools.tuner.driver.TunerDriver;
-import org.apache.pinot.tools.tuner.meta.manager.JsonFileMetaManagerImpl;
 import org.apache.pinot.tools.tuner.meta.manager.collector.AccumulateStats;
 import org.apache.pinot.tools.tuner.meta.manager.collector.CompressedFilePathIter;
-import org.apache.pinot.tools.tuner.query.src.parser.BrokerLogParserImpl;
-import org.apache.pinot.tools.tuner.query.src.LogQuerySrcImpl;
-import org.apache.pinot.tools.tuner.strategy.ParserBasedImpl;
 
 
 public class TunerTest extends TunerDriver {
