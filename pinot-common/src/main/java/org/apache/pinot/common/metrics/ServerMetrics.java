@@ -20,12 +20,28 @@ package org.apache.pinot.common.metrics;
 
 import com.yammer.metrics.core.MetricsRegistry;
 
+import static org.apache.pinot.common.utils.CommonConstants.Server.DEFAULT_METRICS_GLOBAL_ENABLED;
+import static org.apache.pinot.common.utils.CommonConstants.Server.DEFAULT_METRICS_PREFIX;
+
 
 /**
  * Utility class to centralize all metrics reporting for the Pinot server.
  *
  */
 public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter, ServerGauge, ServerTimer> {
+
+  public ServerMetrics(MetricsRegistry metricsRegistry) {
+    this(DEFAULT_METRICS_PREFIX, metricsRegistry, DEFAULT_METRICS_GLOBAL_ENABLED);
+  }
+
+  public ServerMetrics(MetricsRegistry metricsRegistry, boolean global) {
+    this(DEFAULT_METRICS_PREFIX, metricsRegistry, global);
+  }
+
+  public ServerMetrics(String prefix, MetricsRegistry metricsRegistry, boolean global) {
+    super(prefix, metricsRegistry, ServerMetrics.class, global);
+  }
+
   @Override
   protected ServerQueryPhase[] getQueryPhases() {
     return ServerQueryPhase.values();
@@ -39,13 +55,5 @@ public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter
   @Override
   protected ServerGauge[] getGauges() {
     return ServerGauge.values();
-  }
-
-  public ServerMetrics(MetricsRegistry metricsRegistry) {
-    super("pinot.server.", metricsRegistry, ServerMetrics.class);
-  }
-
-  public ServerMetrics(MetricsRegistry metricsRegistry, boolean global) {
-    super("pinot.server.", metricsRegistry, ServerMetrics.class, global);
   }
 }
