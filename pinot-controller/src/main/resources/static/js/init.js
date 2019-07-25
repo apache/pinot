@@ -31,7 +31,8 @@ $(document).ready(function() {
     lineWrapping: true,
     lineNumbers: true,
     mode: "sql",
-    theme: "elegant"
+    theme: "elegant",
+    extraKeys: {'Ctrl': 'autocomplete'}
   });
 
   RESULTS = CodeMirror.fromTextArea(document.getElementById('results-maker'), {
