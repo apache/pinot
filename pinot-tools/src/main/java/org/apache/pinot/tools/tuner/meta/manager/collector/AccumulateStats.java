@@ -1,7 +1,6 @@
 package org.apache.pinot.tools.tuner.meta.manager.collector;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.gson.Gson;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
