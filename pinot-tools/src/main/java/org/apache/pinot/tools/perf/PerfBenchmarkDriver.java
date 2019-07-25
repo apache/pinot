@@ -170,7 +170,6 @@ public class PerfBenchmarkDriver {
     startServer();
     startHelixResourceManager();
     configureResources();
-    uploadIndexSegments();
     waitForExternalViewUpdate(_zkAddress, _clusterName, 60 * 1000L);
     postQueries();
   }
@@ -294,24 +293,6 @@ public class PerfBenchmarkDriver {
         .setSegmentVersion(_segmentFormatVersion).setInvertedIndexColumns(invertedIndexColumns)
         .setBloomFilterColumns(bloomFilterColumns).build();
     _helixResourceManager.addTable(tableConfig);
-  }
-
-  private void uploadIndexSegments()
-      throws Exception {
-    if (!_conf.isUploadIndexes()) {
-      LOGGER.info("Skipping upload index segments step.");
-      return;
-    }
-    String indexDirectory = _conf.getIndexDirectory();
-    File[] indexFiles = new File(indexDirectory).listFiles();
-    Preconditions.checkNotNull(indexFiles);
-    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(_controllerHost, _controllerPort);
-      for (File indexFile : indexFiles) {
-        LOGGER.info("Uploading index segment: {}", indexFile.getAbsolutePath());
-        fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, indexFile.getName(), indexFile);
-      }
-    }
   }
 
   /**

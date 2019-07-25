@@ -97,7 +97,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     setUpTable(avroFiles.get(0));
 
     // Upload all segments
-    uploadSegments(_tarDir);
+    uploadSegments(getTableName(), _tarDir);
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);

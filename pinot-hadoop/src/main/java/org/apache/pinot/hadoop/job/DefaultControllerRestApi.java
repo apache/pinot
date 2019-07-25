@@ -107,7 +107,7 @@ public class DefaultControllerRestApi implements ControllerRestApi {
         try (InputStream inputStream = fileSystem.open(tarFilePath)) {
           SimpleHttpResponse response = _fileUploadDownloadClient.uploadSegment(
               FileUploadDownloadClient.getUploadSegmentHttpURI(pushLocation.getHost(), pushLocation.getPort()),
-              segmentName, inputStream);
+              segmentName, inputStream, _rawTableName);
           LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
         } catch (Exception e) {
           LOGGER.error("Caught exception while pushing segment: {} to location: {}", segmentName, pushLocation, e);
@@ -126,7 +126,7 @@ public class DefaultControllerRestApi implements ControllerRestApi {
         try {
           SimpleHttpResponse response = _fileUploadDownloadClient.sendSegmentUri(
               FileUploadDownloadClient.getUploadSegmentHttpURI(pushLocation.getHost(), pushLocation.getPort()),
-              segmentUri);
+              segmentUri, _rawTableName);
           LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
         } catch (Exception e) {
           LOGGER.error("Caught exception while sending segment URI: {} to location: {}", segmentUri, pushLocation, e);

@@ -273,7 +273,7 @@ public abstract class ClusterTest extends ControllerTest {
    *
    * @param segmentDir Segment directory
    */
-  protected void uploadSegments(@Nonnull File segmentDir)
+  protected void uploadSegments(@Nonnull String tableName, @Nonnull File segmentDir)
       throws Exception {
     String[] segmentNames = segmentDir.list();
     Assert.assertNotNull(segmentNames);
@@ -290,7 +290,7 @@ public abstract class ClusterTest extends ControllerTest {
           @Override
           public Integer call()
               throws Exception {
-            return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentName, segmentFile)
+            return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentName, segmentFile, tableName)
                 .getStatusCode();
           }
         }));
