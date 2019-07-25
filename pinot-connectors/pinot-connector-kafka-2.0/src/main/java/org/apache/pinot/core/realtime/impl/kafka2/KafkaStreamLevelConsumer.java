@@ -20,7 +20,6 @@ package org.apache.pinot.core.realtime.impl.kafka2;
 
 import com.yammer.metrics.core.Meter;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -55,7 +54,7 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   private String _tableAndStreamName;
 
   private StreamConfig _streamConfig;
-  private KafkaHighLevelStreamConfig _kafkaHighLevelStreamConfig;
+  private KafkaStreamLevelStreamConfig _kafkaStreamLevelStreamConfig;
 
   private KafkaConsumer<Bytes, Bytes> consumer;
   private ConsumerRecords<Bytes, Bytes> consumerRecords;
@@ -74,7 +73,7 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
       InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
     _clientId = clientId;
     _streamConfig = streamConfig;
-    _kafkaHighLevelStreamConfig = new KafkaHighLevelStreamConfig(streamConfig, tableName, instanceZKMetadata);
+    _kafkaStreamLevelStreamConfig = new KafkaStreamLevelStreamConfig(streamConfig, tableName, instanceZKMetadata);
     _serverMetrics = serverMetrics;
 
     _messageDecoder = StreamDecoderProvider.create(streamConfig, schema);
@@ -88,7 +87,7 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   @Override
   public void start()
       throws Exception {
-    consumer = KafkaStreamLevelConsumerManager.acquireKafkaConsumerForConfig(_kafkaHighLevelStreamConfig);
+    consumer = KafkaStreamLevelConsumerManager.acquireKafkaConsumerForConfig(_kafkaStreamLevelStreamConfig);
   }
 
   private void updateKafkaIterator() {

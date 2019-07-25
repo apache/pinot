@@ -33,7 +33,7 @@ import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
 /**
  * Wrapper around {@link StreamConfig} for use in the {@link KafkaStreamLevelConsumer}
  */
-public class KafkaHighLevelStreamConfig {
+public class KafkaStreamLevelStreamConfig {
   private static final String DEFAULT_AUTO_COMMIT_ENABLE = "false";
 
   private static final Map<String, String> defaultProps;
@@ -48,7 +48,7 @@ public class KafkaHighLevelStreamConfig {
    * @param tableName
    * @param instanceZKMetadata
    */
-  public KafkaHighLevelStreamConfig(StreamConfig streamConfig, String tableName,
+  public KafkaStreamLevelStreamConfig(StreamConfig streamConfig, String tableName,
       InstanceZKMetadata instanceZKMetadata) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
 
@@ -94,7 +94,7 @@ public class KafkaHighLevelStreamConfig {
 
   @Override
   public String toString() {
-    return "KafkaHighLevelStreamConfig{" + "_kafkaTopicName='" + _kafkaTopicName + '\'' + ", _groupId='" + _groupId
+    return "KafkaStreamLevelStreamConfig{" + "_kafkaTopicName='" + _kafkaTopicName + '\'' + ", _groupId='" + _groupId
         + '\'' + ", _bootstrapServers='" + _bootstrapServers + '\'' + ", _kafkaConsumerProperties="
         + _kafkaConsumerProperties + '}';
   }
@@ -109,7 +109,7 @@ public class KafkaHighLevelStreamConfig {
       return false;
     }
 
-    KafkaHighLevelStreamConfig that = (KafkaHighLevelStreamConfig) o;
+    KafkaStreamLevelStreamConfig that = (KafkaStreamLevelStreamConfig) o;
 
     return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName) && EqualityUtils
         .isEqual(_groupId, that._groupId) && EqualityUtils.isEqual(_bootstrapServers, that._bootstrapServers)

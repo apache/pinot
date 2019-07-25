@@ -32,6 +32,11 @@ import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 
 
+/**
+ * KafkaPartitionLevelConnectionHandler provides low level APIs to access Kafka partition level information.
+ * E.g. partition counts, offsets per partition.
+ *
+ */
 public abstract class KafkaPartitionLevelConnectionHandler {
 
   protected final KafkaPartitionLevelStreamConfig _config;
