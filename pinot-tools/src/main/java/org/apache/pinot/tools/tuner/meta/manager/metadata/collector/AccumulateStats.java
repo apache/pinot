@@ -115,15 +115,15 @@ public class AccumulateStats implements Strategy {
    */
   @Override
   public void merge(AbstractAccumulator abstractAccumulator, AbstractAccumulator abstractAccumulatorToMerge) {
-
+    ((ColStatsAccumulatorObj) abstractAccumulator).merge((ColStatsAccumulatorObj) abstractAccumulatorToMerge);
   }
 
   /**
-   * Generate a report for recommendation using mergedOut:/colName/AbstractMergerObj
-   * @param mergedOut input
+   * Generate a report for recommendation using mergedOut:tableName/colName/AbstractMergerObj
+   * @param tableResults input
    */
   @Override
-  public void report(Map<String, Map<String, AbstractAccumulator>> mergedOut) {
+  public void report(Map<String, Map<String, AbstractAccumulator>> tableResults) {
 
   }
 

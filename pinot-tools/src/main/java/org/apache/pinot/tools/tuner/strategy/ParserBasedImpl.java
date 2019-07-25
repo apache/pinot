@@ -186,7 +186,7 @@ public class ParserBasedImpl implements Strategy {
   }
 
   /**
-   * Generate a report for recommendation using tableResults:TableName/colName/AbstractMergerObj
+   * Generate a report for recommendation using tableResults:tableName/colName/AbstractMergerObj
    * @param tableResults input
    */
   public void report(Map<String, Map<String, AbstractAccumulator>> tableResults) {

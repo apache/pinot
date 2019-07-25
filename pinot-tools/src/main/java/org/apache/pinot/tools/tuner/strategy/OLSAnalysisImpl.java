@@ -117,7 +117,7 @@ public class OLSAnalysisImpl implements Strategy {
   }
 
   /**
-   * Generate a report for recommendation using tableResults:TableName/colName/AbstractMergerObj
+   * Generate a report for recommendation using tableResults:tableName/colName/AbstractMergerObj
    * @param tableResults input
    */
   @Override
