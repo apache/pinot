@@ -259,6 +259,9 @@ public class ParserBasedImpl implements Strategy {
       LOGGER.debug("Parsing query: {}", _queryString);
       PQL2Parser.OptionalClauseContext optionalClauseContext;
       PQL2Parser.WhereClauseContext whereClauseContext = null;
+      if (_queryString == null) {
+        return new ArrayList<>();
+      }
 
       try {
         PQL2Lexer lexer = new PQL2Lexer(new ANTLRInputStream(_queryString));

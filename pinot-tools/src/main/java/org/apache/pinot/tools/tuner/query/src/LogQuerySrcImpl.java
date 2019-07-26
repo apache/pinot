@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory;
 public class LogQuerySrcImpl implements QuerySrc {
   private static final Logger LOGGER = LoggerFactory.getLogger(LogQuerySrcImpl.class);
 
-  public static final String REGEX_VALID_LINE_STANDALONE = "^(Processed requestId|RequestId|\\w).*$";
+  public static final String REGEX_VALID_LINE_STANDALONE = "^(Processed requestId|RequestId).*$";
   public static final String REGEX_VALID_LINE_TIME = "^(\\d{4})/(\\d{2})/(\\d{2}) [\\d:.].*$";
 
   private FileInputStream _fileInputStream = null;
@@ -80,6 +80,7 @@ public class LogQuerySrcImpl implements QuerySrc {
 
     @Nonnull
     public LogQuerySrcImpl build() {
+      LOGGER.info("Line beginner is set to:{}", this._validLineBeginnerRegex);
       return new LogQuerySrcImpl(this).openFile();
     }
   }
@@ -91,7 +92,6 @@ public class LogQuerySrcImpl implements QuerySrc {
       _stringBufferNext = _bufferedReader.readLine();
     } catch (IOException e) {
       LOGGER.error(e.toString());
-      _stringBufferNext = null;
       System.exit(1);
     }
     return this;
@@ -118,19 +118,19 @@ public class LogQuerySrcImpl implements QuerySrc {
     if (_stringBufferNext == null) {
       throw new NoSuchElementException();
     }
-    String stringBuffer = _stringBufferNext;
+    StringBuilder stringBuffer = new StringBuilder(_stringBufferNext);
     try {
       while ((_stringBufferNext = _bufferedReader.readLine()) != null && !_validLineBeginnerPattern
           .matcher(_stringBufferNext).find()) {
-        stringBuffer = stringBuffer + _stringBufferNext;
+        stringBuffer.append(_stringBufferNext);
         _stringBufferNext = null;
       }
     } catch (IOException e) {
       LOGGER.error(e.getMessage());
       _stringBufferNext = null;
     } finally {
-      LOGGER.trace("FileReader returning: {}", stringBuffer);
-      return _parser.parse(stringBuffer);
+      LOGGER.trace("FileReader returning: {}", stringBuffer.toString());
+      return _parser.parse(stringBuffer.toString());
     }
   }
 }

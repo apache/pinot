@@ -33,7 +33,7 @@ public class BrokerLogParserImpl implements QueryParser {
   @Override
   public AbstractQueryStats parse(String line) {
     Matcher match = _compiledPattern.matcher(line);
-    LOGGER.debug("Original line: " + line);
+    LOGGER.trace("Original line: " + line);
     if (match.find()) {
       IndexSuggestQueryStatsImpl ret =
           new IndexSuggestQueryStatsImpl.Builder().setTime(match.group(GROUP_NAMES.TOTAL_TIME.ordinal()))

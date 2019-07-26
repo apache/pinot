@@ -31,19 +31,16 @@ public class OLSAnalysisImpl implements Strategy {
   public final static int IN_FILTER_WEIGHT_FOR_VOTE = 1;
 
   private HashSet<String> _tableNamesWorkonWithoutType;
-  private long _numEntriesScannedThreshold;
   private long _lenBin;
 
   private OLSAnalysisImpl(Builder builder) {
     _tableNamesWorkonWithoutType = builder._tableNamesWorkonWithoutType;
-    _numEntriesScannedThreshold = builder._numEntriesScannedThreshold;
     _lenBin = builder._lenBin;
   }
 
   public static final class Builder {
 
     private HashSet<String> _tableNamesWorkonWithoutType = new HashSet<>();
-    private long _numEntriesScannedThreshold = NO_IN_FILTER_THRESHOLD;
     private long _lenBin = 100;
 
     public Builder() {
@@ -57,12 +54,6 @@ public class OLSAnalysisImpl implements Strategy {
     @Nonnull
     public Builder setTableNamesWorkonWithoutType(@Nonnull HashSet<String> val) {
       _tableNamesWorkonWithoutType = val;
-      return this;
-    }
-
-    @Nonnull
-    public Builder setNumEntriesScannedThreshold(long val) {
-      _numEntriesScannedThreshold = val;
       return this;
     }
 
@@ -82,10 +73,8 @@ public class OLSAnalysisImpl implements Strategy {
   @Override
   public boolean filter(AbstractQueryStats queryStats) {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
-    long numEntriesScannedInFilter = Long.parseLong(indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter());
     return (_tableNamesWorkonWithoutType.isEmpty() || _tableNamesWorkonWithoutType
-        .contains(indexSuggestQueryStatsImpl.getTableNameWithoutType())) && (numEntriesScannedInFilter
-        >= _numEntriesScannedThreshold);
+        .contains(indexSuggestQueryStatsImpl.getTableNameWithoutType()));
   }
 
   @Override
@@ -167,8 +156,9 @@ public class OLSAnalysisImpl implements Strategy {
       time[iter] = val._2();
       x_arr[iter][0] = key._1() * _lenBin + _lenBin / 2;
       x_arr[iter][1] = key._2() * _lenBin + _lenBin / 2;
-      //x_arr[iter][2]=val._1();
-      //LOGGER.info("time:{} inFilter:{} postFilter:{} usedIndex:{}",time[iter], x_arr[iter][0], x_arr[iter][1]);//, x_arr[iter][2]);
+      //x_arr[iter][2] = val._1();
+      LOGGER.info("time:{} inFilter:{} postFilter:{} usedIndex:{}", time[iter], x_arr[iter][0],
+          x_arr[iter][1]);//, x_arr[iter][2]);
       iter++;
     }
 
@@ -207,7 +197,9 @@ public class OLSAnalysisImpl implements Strategy {
       LOGGER.debug("Parsing query: {}", _queryString);
       PQL2Parser.OptionalClauseContext optionalClauseContext = null;
       PQL2Parser.WhereClauseContext whereClauseContext = null;
-
+      if (_queryString == null) {
+        return 0;
+      }
       try {
         PQL2Lexer lexer = new PQL2Lexer(new ANTLRInputStream(_queryString));
         PQL2Parser parser = new PQL2Parser(new CommonTokenStream(lexer));
