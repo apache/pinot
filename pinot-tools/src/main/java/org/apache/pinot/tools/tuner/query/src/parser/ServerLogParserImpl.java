@@ -13,7 +13,7 @@ public class ServerLogParserImpl implements QueryParser {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerLogParserImpl.class);
   /*Regex to parse Server Log*/
   private static final String SERVER_LOG_REGEX =
-      "^.*?table=(.+?)(?:_OFFLINE|_REALTIME|_HYBRID|),.*?totalExecMs=(\\d*).*?scanInFilter=(\\d*),scanPostFilter=(\\d*).*?$";
+      "^.*?table=(.+?)(?:_OFFLINE|_REALTIME|_HYBRID|)?,.*?totalExecMs=(\\d*).*?scanInFilter=(\\d*),scanPostFilter=(\\d*).*?$";
 
   private static final Pattern _compiledPattern = Pattern.compile(SERVER_LOG_REGEX);
 
