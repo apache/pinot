@@ -1,6 +1,5 @@
 package org.apache.pinot.tools.tuner;
 
-import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.HashSet;
 import org.apache.pinot.tools.AbstractBaseCommand;
@@ -19,7 +18,6 @@ public class TunerCommand extends AbstractBaseCommand implements Command {
 
   public static final String INVERTED_INDEX = "inverted";
   public static final String SORTED_INDEX = "sorted";
-  public static final String OPTIMIZATION = "optimization";
 
   @Option(name = "-metaDataDir", required = true, metaVar = "<String>", usage = "Path to packed metadata file (json), which contains the weighted sum of cardinality, number of documents, number of entries, etc.")
   private String _metaData;
