@@ -30,6 +30,7 @@ public class ParserBasedImpl implements Strategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(ParserBasedImpl.class);
 
   public final static int FIRST_ORDER = 1;
+  public final static int SECOND_ORDER = 2;
   public final static int THIRD_ORDER = 3;
 
   public final static long NO_IN_FILTER_THRESHOLD = 0;
