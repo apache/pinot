@@ -159,6 +159,9 @@ public class CommonConstants {
         "pinot.broker.startup.minResourcePercent";
     public static final double DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
 
+    public static final String CONFIG_OF_BROKER_EMIT_PEAK_QPS_METRICS = "pinot.broker.emit.peak.qps.metrics";
+    public static final boolean DEFAULT_BROKER_EMIT_PEAK_QPS_METRICS = false;
+
     public static class Request {
       public static final String PQL = "pql";
       public static final String SQL = "sql";

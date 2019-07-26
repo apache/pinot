@@ -87,6 +87,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final RateLimiter _numDroppedLogRateLimiter;
   private final AtomicInteger _numDroppedLog;
 
+  protected final BrokerPeakQPSMetricsHandler _brokerPeakQPSMetricsHandler;
+
   public BaseBrokerRequestHandler(Configuration config, RoutingTable routingTable,
       TimeBoundaryService timeBoundaryService, AccessControlFactory accessControlFactory,
       QueryQuotaManager queryQuotaManager, BrokerMetrics brokerMetrics) {
@@ -106,6 +108,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     _numDroppedLog = new AtomicInteger(0);
     _numDroppedLogRateLimiter = RateLimiter.create(1.0);
+
+    _brokerPeakQPSMetricsHandler = new BrokerPeakQPSMetricsHandler(_brokerMetrics);
 
     LOGGER
         .info("Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log max rate: {}qps",
@@ -154,6 +158,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
         compilationEndTimeNs - compilationStartTimeNs);
     _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERIES, 1);
+    _brokerPeakQPSMetricsHandler.incrementQueryCount();
 
     // Check table access
     boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity, brokerRequest);

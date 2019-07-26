@@ -49,6 +49,7 @@ import static org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHandler, QueryQuotaManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedQueryQuotaManager.class);
   private static final int TIME_RANGE_IN_SECOND = 1;
+  private static final int HIT_COUNTER_BUCKETS = 100;
 
   private final AtomicInteger _lastKnownBrokerResourceVersion = new AtomicInteger(-1);
   private final Map<String, QueryQuotaConfig> _rateLimiterMap = new ConcurrentHashMap<>();
@@ -182,7 +183,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
 
     double perBrokerRate = overallRate / onlineCount;
     QueryQuotaConfig queryQuotaConfig =
-        new QueryQuotaConfig(RateLimiter.create(perBrokerRate), new HitCounter(TIME_RANGE_IN_SECOND));
+        new QueryQuotaConfig(RateLimiter.create(perBrokerRate), new HitCounter(TIME_RANGE_IN_SECOND, HIT_COUNTER_BUCKETS));
     _rateLimiterMap.put(tableNameWithType, queryQuotaConfig);
     LOGGER.info(
         "Rate limiter for table: {} has been initialized. Overall rate: {}. Per-broker rate: {}. Number of online broker instances: {}",
