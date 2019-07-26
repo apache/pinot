@@ -50,10 +50,8 @@ public class TunerTest extends TunerDriver {
 
     TunerDriver fitModel = new TunerTest().setThreadPoolSize(3).setStrategy(new OLSAnalysisImpl.Builder().build())
         .setQuerySrc(new LogQuerySrcImpl.Builder().setValidLineBeginnerRegex(LogQuerySrcImpl.REGEX_VALID_LINE_TIME)
-                .setParser(new BrokerLogParserImpl()).setPath("/Users/jiaguo/finalTestData/broker.scin_v2_additive.log")
-                .build()).setMetaManager(
-            new JsonFileMetaManagerImpl.Builder().setPath("/Users/jiaguo/tmp3/metadata.json")
-                .setUseExistingIndex(JsonFileMetaManagerImpl.USE_EXISTING_INDEX).build());
+            .setParser(new BrokerLogParserImpl()).setPath("/Users/jiaguo/finalTestData/broker.scin_v2_additive.log")
+            .build());
     fitModel.execute();
   }
 }

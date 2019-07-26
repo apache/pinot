@@ -64,8 +64,6 @@ public class TunerCommand extends AbstractBaseCommand implements Command {
               .setNumEntriesScannedThreshold(_numEntriesScannedThreshold).build())
           .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
           .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metaData).build());
-    } else if (_strategy.equals(OPTIMIZATION)) {
-
     } else {
       return false;
     }
