@@ -1,7 +1,13 @@
 package org.apache.pinot.tools.tuner;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
+import org.apache.pinot.tools.tuner.driver.TunerDriver;
+import org.apache.pinot.tools.tuner.query.src.LogQuerySrcImpl;
+import org.apache.pinot.tools.tuner.query.src.parser.BrokerLogParserImpl;
+import org.apache.pinot.tools.tuner.strategy.OLSAnalysisImpl;
 import org.kohsuke.args4j.Option;
 
 
@@ -19,16 +25,26 @@ public class PercentileReportCommand extends AbstractBaseCommand implements Comm
   @Override
   public boolean execute()
       throws Exception {
-    return false;
+    HashSet<String> tableNamesWithoutType = new HashSet<>();
+    if (_tableNamesWithoutType != null && !_tableNamesWithoutType.trim().equals("")) {
+      tableNamesWithoutType.addAll(Arrays.asList(_tableNamesWithoutType.split(",")));
+    }
+
+    TunerDriver fitModel = new TunerTest().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
+        .setStrategy(new OLSAnalysisImpl.Builder().setTableNamesWorkonWithoutType(tableNamesWithoutType).build())
+        .setQuerySrc(new LogQuerySrcImpl.Builder().setValidLineBeginnerRegex(LogQuerySrcImpl.REGEX_VALID_LINE_TIME)
+            .setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build());
+    fitModel.execute();
+    return true;
   }
 
   @Override
   public String description() {
-    return null;
+    return "Scan through broker log and give percentile of numEntriesScannedInFilter";
   }
 
   @Override
   public boolean getHelp() {
-    return false;
+    return _help;
   }
 }
