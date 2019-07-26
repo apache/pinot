@@ -88,7 +88,7 @@ public class MeanVarianceRuleDetectorTest {
     MeanVarianceRuleDetectorSpec spec = new MeanVarianceRuleDetectorSpec();
     spec.setMonitoringGranularity("7_DAYS");
     spec.setLookback(52);
-    spec.setSigma(1.0);
+    spec.setSensitivity(5);
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
     Interval window = new Interval(1530576000000L, 1562630400000L);
     String metricUrn = "thirdeye:metric:1";
@@ -109,7 +109,7 @@ public class MeanVarianceRuleDetectorTest {
     MeanVarianceRuleDetectorSpec spec = new MeanVarianceRuleDetectorSpec();
     spec.setMonitoringGranularity("7_DAYS");
     spec.setLookback(52);
-    spec.setSigma(1.0);
+    spec.setSensitivity(5);
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
     DetectionResult detectionResult = detector.runDetection(new Interval(1530576000000L, 1562630400000L), "thirdeye:metric:1");
     List<MergedAnomalyResultDTO> anomalies = detectionResult.getAnomalies();
@@ -134,7 +134,7 @@ public class MeanVarianceRuleDetectorTest {
     MeanVarianceRuleDetectorSpec spec = new MeanVarianceRuleDetectorSpec();
     spec.setMonitoringGranularity("7_DAYS");
     spec.setLookback(52);
-    spec.setSigma(1.0);
+    spec.setSensitivity(5);
     spec.setPattern(Pattern.DOWN);
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
     DetectionResult result = detector.runDetection(new Interval(1530576000000L, 1562630400000L), "thirdeye:metric:1");
@@ -156,7 +156,7 @@ public class MeanVarianceRuleDetectorTest {
     MeanVarianceRuleDetectorSpec spec = new MeanVarianceRuleDetectorSpec();
     spec.setMonitoringGranularity("7_DAYS");
     spec.setLookback(52);
-    spec.setSigma(1.0);
+    spec.setSensitivity(5);
     spec.setPattern(Pattern.UP);
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
     DetectionResult result = detector.runDetection(new Interval(1530576000000L, 1562630400000L), "thirdeye:metric:1");
