@@ -14,7 +14,7 @@ public class CollectMetaCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-workDir", required = true, metaVar = "<String>", usage = "The directory to work on, for temporary files and output metadata.json file，must have r/w access")
   private String _workDir;
 
-  @Option(name = "-segmentsDir", required = true, metaVar = "<String>", usage = "The directory, which contains tableNames/{tarred segments}")
+  @Option(name = "-segmentsDir", required = true, metaVar = "<String>", usage = "The directory, which contains tableNamesWithoutType/{tarred segments}")
   private String _segmentsDir;
 
   @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (leave this blank to run on all tables)")
@@ -42,7 +42,7 @@ public class CollectMetaCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String description() {
-    return "";
+    return "A tool to extract and pack metadata and index info to a json file, from tarred segments.";
   }
 
   @Override

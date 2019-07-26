@@ -13,11 +13,11 @@ import org.kohsuke.args4j.Option;
 
 
 public class TunerCommand extends AbstractBaseCommand implements Command {
-  public static final long DEFAULT_NUM_ENTRIES_SCANNED_THRESHOLD = 0;
-  public static final long DEFAULT_NUM_QUERIES_TO_GIVE_RECOMMENDATION = 0;
+  private static final long DEFAULT_NUM_ENTRIES_SCANNED_THRESHOLD = 0;
+  private static final long DEFAULT_NUM_QUERIES_TO_GIVE_RECOMMENDATION = 0;
 
-  public static final String INVERTED_INDEX = "inverted";
-  public static final String SORTED_INDEX = "sorted";
+  private static final String INVERTED_INDEX = "inverted";
+  private static final String SORTED_INDEX = "sorted";
 
   @Option(name = "-metaDataDir", required = true, metaVar = "<String>", usage = "Path to packed metadata file (json), which contains the weighted sum of cardinality, number of documents, number of entries, etc.")
   private String _metaData;
@@ -42,6 +42,7 @@ public class TunerCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public boolean execute() {
+
     HashSet<String> tableNamesWithoutType = new HashSet<>();
     if (_tableNamesWithoutType != null && !_tableNamesWithoutType.trim().equals("")) {
       tableNamesWithoutType.addAll(Arrays.asList(_tableNamesWithoutType.split(",")));
