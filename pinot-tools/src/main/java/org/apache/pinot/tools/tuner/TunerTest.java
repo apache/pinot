@@ -1,5 +1,6 @@
 package org.apache.pinot.tools.tuner;
 
+import java.util.HashSet;
 import org.apache.pinot.tools.tuner.driver.TunerDriver;
 import org.apache.pinot.tools.tuner.meta.manager.collector.AccumulateStats;
 import org.apache.pinot.tools.tuner.meta.manager.collector.CompressedFilePathIter;
@@ -7,8 +8,11 @@ import org.apache.pinot.tools.tuner.meta.manager.collector.CompressedFilePathIte
 
 public class TunerTest extends TunerDriver {
   public static void main(String[] args) {
-    TunerDriver metaFetch = new TunerTest().setThreadPoolSize(0)
-        .setStrategy(new AccumulateStats.Builder().setOutputDir("/Users/jiaguo/tmp2").build()).setQuerySrc(
+    HashSet<String> filter = new HashSet<>();
+    filter.add("adStatisticsEvents");
+    TunerDriver metaFetch = new TunerTest().setThreadPoolSize(3).setStrategy(
+        new AccumulateStats.Builder().setTableNamesWithoutType(filter).setOutputDir("/Users/jiaguo/tmp3").build())
+        .setQuerySrc(
             new CompressedFilePathIter.Builder()
                 .set_directory("/Users/jiaguo/Workspace/pinot-tuna-script/data/segments").build()).setMetaManager(null);
     metaFetch.execute();

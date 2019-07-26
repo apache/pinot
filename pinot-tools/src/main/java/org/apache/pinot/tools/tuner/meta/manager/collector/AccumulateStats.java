@@ -99,15 +99,15 @@ public class AccumulateStats implements Strategy {
           return name.equals(pathWrapper.getFile().getName());
         }
       })[0];
-    } catch (NullPointerException e) {
-      LOGGER.error("no tmp folder!");
+    } catch (NullPointerException | ArrayIndexOutOfBoundsException e) {
+      LOGGER.error("No tmp folder for {}!", pathWrapper.getFile().getName());
       return;
     }
 
     try {
       versionFolder = tmpFolder.listFiles()[0];
-    } catch (NullPointerException e) {
-      LOGGER.error("no version folder!");
+    } catch (NullPointerException | ArrayIndexOutOfBoundsException e) {
+      LOGGER.error("No version folder fpr {}!", pathWrapper.getFile().getName());
       return;
     }
 
@@ -121,8 +121,8 @@ public class AccumulateStats implements Strategy {
       if (!metaDataProperties.exists()) {
         throw new NullPointerException();
       }
-    } catch (NullPointerException e) {
-      LOGGER.error(e.getMessage());
+    } catch (NullPointerException | ArrayIndexOutOfBoundsException e) {
+      LOGGER.error("No metadata.properties for {}!", pathWrapper.getFile().getName());
       return;
     }
 
@@ -136,8 +136,8 @@ public class AccumulateStats implements Strategy {
       if (!indexMap.exists()) {
         throw new NullPointerException();
       }
-    } catch (NullPointerException e) {
-      LOGGER.error(e.getMessage());
+    } catch (NullPointerException | ArrayIndexOutOfBoundsException e) {
+      LOGGER.error("No inde_map for {}!", pathWrapper.getFile().getName());
       indexMap = null;
     }
 
@@ -145,7 +145,7 @@ public class AccumulateStats implements Strategy {
     try {
       metadataString = FileUtils.readFileToString(metaDataProperties);
     } catch (IOException e) {
-      LOGGER.error(e.toString());
+      LOGGER.error("No metadata file read err for {}!", pathWrapper.getFile().getName());
       return;
     }
 
@@ -153,7 +153,7 @@ public class AccumulateStats implements Strategy {
     try {
       indexMapString = FileUtils.readFileToString(indexMap);
     } catch (IOException e) {
-      LOGGER.error(e.toString());
+      LOGGER.error("No indexMap file read err for {}!", pathWrapper.getFile().getName());
       indexMapString = "";
     }
 
