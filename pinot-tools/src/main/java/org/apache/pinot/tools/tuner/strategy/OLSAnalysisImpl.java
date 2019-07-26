@@ -90,15 +90,11 @@ public class OLSAnalysisImpl implements Strategy {
     String query = indexSuggestQueryStatsImpl.getQuery();
     LOGGER.debug("Accumulator: scoring query {}", query);
 
-    DimensionScoring dimensionScoring = new DimensionScoring(tableNameWithoutType, metaManager, query);
-    int usedIndices = dimensionScoring.parseQuery();
-    LOGGER.debug("Accumulator: query score: {}", usedIndices);
-
     AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
     AccumulatorOut.get(tableNameWithoutType).putIfAbsent("*", new OLSAccumulator());
     ((OLSAccumulator) AccumulatorOut.get(tableNameWithoutType).get("*"))
         .merge(Long.parseLong(time), Long.parseLong(numEntriesScannedInFilter),
-            Long.parseLong(numEntriesScannedPostFilter), usedIndices, _lenBin);
+            Long.parseLong(numEntriesScannedPostFilter), 0, _lenBin);
   }
 
   @Override

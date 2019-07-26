@@ -7,9 +7,9 @@ import java.util.HashMap;
 
 public class OLSAccumulator extends AbstractAccumulator {
 
-  ArrayList<Long> _timeList;
-  ArrayList<Long> _inFilterList;
-  HashMap<Tuple2<Long, Long>, Tuple2<Long, Long>> _minBin;
+  private ArrayList<Long> _timeList;
+  private ArrayList<Long> _inFilterList;
+  private HashMap<Tuple2<Long, Long>, Tuple2<Long, Long>> _minBin;
 
   public ArrayList<Long> getTimeList() {
     return _timeList;
