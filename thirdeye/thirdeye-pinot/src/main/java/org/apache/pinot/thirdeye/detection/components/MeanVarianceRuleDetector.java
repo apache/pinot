@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection.components;
 
+import com.google.common.collect.Multimap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -40,6 +41,7 @@ import org.apache.pinot.thirdeye.detection.annotation.Param;
 import org.apache.pinot.thirdeye.detection.spec.MeanVarianceRuleDetectorSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
 import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
+import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
 import org.apache.pinot.thirdeye.detection.spi.model.InputData;
 import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
@@ -68,7 +70,7 @@ public class MeanVarianceRuleDetector implements AnomalyDetector<MeanVarianceRul
   private Pattern pattern;
   private String monitoringGranularity;
   private TimeGranularity timeGranularity;
-  private double sigma;
+  private double sensitivity;
   private int lookback;
 
   private static final String COL_CURR = "current";
@@ -84,7 +86,7 @@ public class MeanVarianceRuleDetector implements AnomalyDetector<MeanVarianceRul
     this.dataFetcher = dataFetcher;
     this.pattern = spec.getPattern();
     this.lookback = spec.getLookback();
-    this.sigma = spec.getSigma();
+    this.sensitivity = spec.getSensitivity();
     this.monitoringGranularity = spec.getMonitoringGranularity();
 
     if (this.monitoringGranularity.equals("1_MONTHS")) {
@@ -99,11 +101,6 @@ public class MeanVarianceRuleDetector implements AnomalyDetector<MeanVarianceRul
       throw new IllegalArgumentException(String.format("Lookback of %d is too small. Please increase to greater than 9.", this.lookback));
     }
 
-    //Sigma spec validation
-    //Sigma should be between 0 to 1.5
-    if (this.sigma < 0 || this.sigma > 1.5) {
-      throw new IllegalArgumentException(String.format("sigma of %.1f is not supported. Sigma should between 0 and 1.5.", this.sigma));
-    }
   }
 
   @Override
@@ -211,7 +208,7 @@ public class MeanVarianceRuleDetector implements AnomalyDetector<MeanVarianceRul
       //calculate baseline, error , upper and lower bound for prediction window.
       resultTimeArray[k] = forecastDF.getLong(COL_TIME, k);
       baselineArray[k] = trainingDF.getDouble(COL_VALUE,trainingDF.size()-1) * (1 + mean[k]);
-      errorArray[k] = trainingDF.getDouble(COL_VALUE,trainingDF.size()-1) * sigma * std[k];
+      errorArray[k] = trainingDF.getDouble(COL_VALUE,trainingDF.size()-1) * sensitivityToSigma(this.sensitivity) * std[k];
       upperBoundArray[k] = baselineArray[k] + errorArray[k];
       lowerBoundArray[k] = baselineArray[k] - errorArray[k];
     }
@@ -272,6 +269,22 @@ public class MeanVarianceRuleDetector implements AnomalyDetector<MeanVarianceRul
   // Check whether monitoring timeGranularity is multiple days
   private boolean isMultiDayGranularity() {
     return !timeGranularity.equals(MetricSlice.NATIVE_GRANULARITY) && timeGranularity.getUnit() == TimeUnit.DAYS;
+  }
+
+  /**
+   * Mapping of sensitivity to sigma on range of 0.5 - 1.5
+   * @param sensitivity double from 0 to 10
+   * @return sigma
+   */
+  private static double sensitivityToSigma(double sensitivity) {
+    // If out of bound, use boundary sensitivity
+    if (sensitivity < 0) {
+      sensitivity = 0;
+    } else if (sensitivity > 10) {
+      sensitivity = 10;
+    }
+    double sigma = 0.5 + 0.1 * (10 - sensitivity);
+    return sigma;
   }
 
 }
