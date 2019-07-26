@@ -1,7 +1,10 @@
 package org.apache.pinot.tools.tuner;
 
+import java.lang.reflect.Array;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.tuner.driver.TunerDriver;
@@ -20,28 +23,33 @@ public class CollectMetaCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (leave this blank to run on all tables)")
   private String _tableNamesWithoutType = null;
 
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  private boolean _help;
+
   @Override
   public boolean execute()
       throws Exception {
-    HashSet<String> tableNamesWithoutType = null;
-    if (_tableNamesWithoutType != null) {
+    HashSet<String> tableNamesWithoutType = new HashSet<>();
+    if (_tableNamesWithoutType != null && !_tableNamesWithoutType.trim().equals("")) {
       tableNamesWithoutType.addAll(Arrays.asList(_tableNamesWithoutType.split(",")));
     }
 
-    TunerDriver metaFetch = new TunerTest().setThreadPoolSize(3).setStrategy(
-        new AccumulateStats.Builder().setTableNamesWithoutType(tableNamesWithoutType).setOutputDir(_workDir).build())
-        .setQuerySrc(new CompressedFilePathIter.Builder().set_directory(_segmentsDir).build()).setMetaManager(null);
+    TunerDriver metaFetch = new TunerTest().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
+        .setStrategy(
+            new AccumulateStats.Builder().setTableNamesWithoutType(tableNamesWithoutType).setOutputDir(_workDir)
+                .build()).setQuerySrc(new CompressedFilePathIter.Builder().set_directory(_segmentsDir).build())
+        .setMetaManager(null);
     metaFetch.execute();
     return true;
   }
 
   @Override
   public String description() {
-    return null;
+    return "";
   }
 
   @Override
   public boolean getHelp() {
-    return false;
+    return _help;
   }
 }

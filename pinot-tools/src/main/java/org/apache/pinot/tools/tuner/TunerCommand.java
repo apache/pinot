@@ -42,8 +42,8 @@ public class TunerCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public boolean execute() {
-    HashSet<String> tableNamesWithoutType = null;
-    if (_tableNamesWithoutType != null) {
+    HashSet<String> tableNamesWithoutType = new HashSet<>();
+    if (_tableNamesWithoutType != null && !_tableNamesWithoutType.trim().equals("")) {
       tableNamesWithoutType.addAll(Arrays.asList(_tableNamesWithoutType.split(",")));
     }
 
