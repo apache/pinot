@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nonnull;
 import javax.validation.constraints.NotNull;
 import org.antlr.v4.runtime.ANTLRInputStream;
@@ -148,19 +149,15 @@ public class OLSAnalysisImpl implements Strategy {
 
     double[] time = new double[olsMergerObj.getMinBin().size()];
     double[][] x_arr = new double[olsMergerObj.getMinBin().size()][2];
-    int iter = 0;
+    AtomicInteger iter = new AtomicInteger(0);
 
-    for (Map.Entry<Tuple2<Long, Long>, Tuple2<Long, Long>> entry : olsMergerObj.getMinBin().entrySet()) {
-      Tuple2<Long, Long> key = entry.getKey();
-      Tuple2<Long, Long> val = entry.getValue();
-      time[iter] = val._2();
-      x_arr[iter][0] = key._1() * _lenBin + _lenBin / 2;
-      x_arr[iter][1] = key._2() * _lenBin + _lenBin / 2;
-      //x_arr[iter][2] = val._1();
-      LOGGER.info("time:{} inFilter:{} postFilter:{} usedIndex:{}", time[iter], x_arr[iter][0],
-          x_arr[iter][1]);//, x_arr[iter][2]);
-      iter++;
-    }
+    olsMergerObj.getMinBin().forEach((key, val) -> {
+      time[iter.get()] = val._2();
+      x_arr[iter.get()][0] = key._1() * _lenBin + _lenBin / 2;
+      x_arr[iter.get()][1] = key._2() * _lenBin + _lenBin / 2;
+      LOGGER.info("time:{} inFilter:{} postFilter:{}", time[iter.get()], x_arr[iter.get()][0], x_arr[iter.get()][1]);
+      iter.incrementAndGet();
+    });
 
     try {
       regression.newSampleData(time, x_arr);
