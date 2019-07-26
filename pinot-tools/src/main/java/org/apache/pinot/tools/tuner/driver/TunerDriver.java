@@ -40,7 +40,7 @@ public abstract class TunerDriver {
    * @param threadPoolSize The number of threads used in action
    * @return this
    */
-  protected TunerDriver setThreadPoolSize(int threadPoolSize) {
+  public TunerDriver setThreadPoolSize(int threadPoolSize) {
     _threadPoolSize = threadPoolSize;
     return this;
   }
