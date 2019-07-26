@@ -69,7 +69,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 500L, 10_000L, "Expected three instances after creation of tagged instances");
+    }, 10_000L, "Expected three instances after creation of tagged instances");
 
     // Create tagged broker and server instances
     brokerInstance.put("tag", "someTag");
@@ -90,7 +90,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 500L, 10_000L, "Expected five instances after creation of tagged instances");
+    }, 10_000L, "Expected five instances after creation of tagged instances");
 
     // Create duplicate broker and server instances (both calls should fail)
     try {
