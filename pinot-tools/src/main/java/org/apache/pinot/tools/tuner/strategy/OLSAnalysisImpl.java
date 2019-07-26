@@ -63,12 +63,6 @@ public class OLSAnalysisImpl implements Strategy {
       _lenBin = val;
       return this;
     }
-
-    @Nonnull
-    public Builder setTableNamesWorkonWithoutType(@Nonnull List<String> val) {
-      _tableNamesWorkonWithoutType.addAll(val);
-      return this;
-    }
   }
 
   @Override

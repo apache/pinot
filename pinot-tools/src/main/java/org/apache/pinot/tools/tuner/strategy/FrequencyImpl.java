@@ -98,17 +98,6 @@ public class FrequencyImpl implements Strategy {
       _numProcessedThreshold = val;
       return this;
     }
-
-    /**
-     * set the tables to work on, other tables will be filtered out
-     * @param val list of table names without type
-     * @return
-     */
-    @Nonnull
-    public Builder setTableNamesWorkonWithoutType(@Nonnull List<String> val) {
-      _tableNamesWorkonWithoutType.addAll(val);
-      return this;
-    }
   }
 
   @Override

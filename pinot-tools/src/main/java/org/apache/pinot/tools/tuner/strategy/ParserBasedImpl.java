@@ -123,17 +123,6 @@ public class ParserBasedImpl implements Strategy {
       _selectivityThreshold = val;
       return this;
     }
-
-    /**
-     * Set the tables to work on, other tables will be filtered out
-     * @param val list of table names without type
-     * @return
-     */
-    @Nonnull
-    public Builder setTableNamesWorkonWithoutType(@Nonnull List<String> val) {
-      _tableNamesWorkonWithoutType.addAll(val);
-      return this;
-    }
   }
 
   @Override

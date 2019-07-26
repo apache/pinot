@@ -12,6 +12,9 @@ import org.apache.pinot.tools.tuner.strategy.OLSAnalysisImpl;
 import org.apache.pinot.tools.tuner.strategy.ParserBasedImpl;
 
 
+/**
+ * TODO: This is test and will be deleted
+ */
 public class TunerTest extends TunerDriver {
   public static void main(String[] args) {
 //    HashSet<String> filter = new HashSet<>();
@@ -49,8 +52,7 @@ public class TunerTest extends TunerDriver {
 //    freqBased.execute();
 
     TunerDriver fitModel = new TunerTest().setThreadPoolSize(3).setStrategy(new OLSAnalysisImpl.Builder().build())
-        .setQuerySrc(new LogQuerySrcImpl.Builder().setValidLineBeginnerRegex(LogQuerySrcImpl.REGEX_VALID_LINE_TIME)
-            .setParser(new BrokerLogParserImpl()).setPath("/Users/jiaguo/finalTestData/broker.scin_v2_additive.log")
+        .setQuerySrc(new LogQuerySrcImpl.Builder().setValidLineBeginnerRegex(LogQuerySrcImpl.REGEX_VALID_LINE_TIME).setParser(new BrokerLogParserImpl()).setPath("/Users/jiaguo/finalTestData/broker.scin_v2_additive.log")
             .build());
     fitModel.execute();
   }
