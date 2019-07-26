@@ -1,7 +1,12 @@
 package org.apache.pinot.tools.tuner;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
+import org.apache.pinot.tools.tuner.driver.TunerDriver;
+import org.apache.pinot.tools.tuner.meta.manager.collector.AccumulateStats;
+import org.apache.pinot.tools.tuner.meta.manager.collector.CompressedFilePathIter;
 import org.kohsuke.args4j.Option;
 
 
@@ -12,10 +17,22 @@ public class CollectMetaCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-segmentsDir", required = true, metaVar = "<String>", usage = "The directory, which contains tableNames/{tarred segments}")
   private String _segmentsDir;
 
+  @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (leave this blank to run on all tables)")
+  private String _tableNamesWithoutType = null;
+
   @Override
   public boolean execute()
       throws Exception {
-    return false;
+    HashSet<String> tableNamesWithoutType = null;
+    if (_tableNamesWithoutType != null) {
+      tableNamesWithoutType.addAll(Arrays.asList(_tableNamesWithoutType.split(",")));
+    }
+
+    TunerDriver metaFetch = new TunerTest().setThreadPoolSize(3).setStrategy(
+        new AccumulateStats.Builder().setTableNamesWithoutType(tableNamesWithoutType).setOutputDir(_workDir).build())
+        .setQuerySrc(new CompressedFilePathIter.Builder().set_directory(_segmentsDir).build()).setMetaManager(null);
+    metaFetch.execute();
+    return true;
   }
 
   @Override
