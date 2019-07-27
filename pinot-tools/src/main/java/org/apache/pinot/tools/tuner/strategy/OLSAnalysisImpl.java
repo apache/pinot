@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nonnull;
 import javax.validation.constraints.NotNull;
 import org.antlr.v4.runtime.ANTLRInputStream;
@@ -111,6 +112,11 @@ public class OLSAnalysisImpl implements Strategy {
 
   public void reportTable(String tableNameWithoutType, Map<String, AbstractAccumulator> columnStats) {
     String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
+
+    AtomicLong totalCount = new AtomicLong(0);
+    columnStats.forEach((k, v) -> totalCount.addAndGet(v.getCount()));
+
+    reportOut += MessageFormat.format("\nTotal lines accumulated: {0}\n\n", totalCount);
 
     if (!columnStats.containsKey("*")) {
       return;

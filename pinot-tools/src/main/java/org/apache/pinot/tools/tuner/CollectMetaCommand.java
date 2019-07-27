@@ -11,13 +11,13 @@ import org.kohsuke.args4j.Option;
 
 
 public class CollectMetaCommand extends AbstractBaseCommand implements Command {
-  @Option(name = "-workDir", required = true, metaVar = "<String>", usage = "The directory to work on, for temporary files and output metadata.json file，must have r/w access")
+  @Option(name = "-workDir", required = true, metaVar = "<String>", usage = "The directory to work on, for tmp files and output metadata.json file，must have r/w access")
   private String _workDir;
 
   @Option(name = "-segmentsDir", required = true, metaVar = "<String>", usage = "The directory, which contains tableNamesWithoutType/{tarred segments}")
   private String _segmentsDir;
 
-  @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (leave this blank to run on all tables)")
+  @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (unset to run on all tables)")
   private String _tableNamesWithoutType = null;
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")

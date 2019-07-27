@@ -53,7 +53,7 @@ public class TunerTest extends TunerDriver {
 
     TunerDriver fitModel = new TunerTest().setThreadPoolSize(3).setStrategy(new OLSAnalysisImpl.Builder().build())
         .setQuerySrc(new LogQuerySrcImpl.Builder().setValidLineBeginnerRegex(LogQuerySrcImpl.REGEX_VALID_LINE_TIME)
-            .setParser(new ServerLogParserImpl()).setPath("/Users/jiaguo/i001/pinot-server.log.2019-07-23")
+            .setParser(new BrokerLogParserImpl()).setPath("/Users/jiaguo/broker/pinot-broker.log.2019-07-25")
             .build());
     fitModel.execute();
   }

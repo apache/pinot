@@ -19,22 +19,22 @@ public class TunerCommand extends AbstractBaseCommand implements Command {
   private static final String INVERTED_INDEX = "inverted";
   private static final String SORTED_INDEX = "sorted";
 
-  @Option(name = "-metaDataDir", required = true, metaVar = "<String>", usage = "Path to packed metadata file (json), which contains the weighted sum of cardinality, number of documents, number of entries, etc.")
+  @Option(name = "-metaData", required = true, metaVar = "<String>", usage = "Path to packed metadata file (json).")
   private String _metaData;
 
-  @Option(name = "-brokerLog", required = true, metaVar = "<String>", usage = "Path to broker log file containing time of execution, numEntriesScannedInFilter, numEntriesScannedPostFilter, query text.")
+  @Option(name = "-brokerLog", required = true, metaVar = "<String>", usage = "Path to broker log file.")
   private String _brokerLog;
 
-  @Option(name = "-strategy", required = true, metaVar = "<String>", usage = "Select execution strategy (percentile/inverted/sorted)")
+  @Option(name = "-strategy", required = true, metaVar = "<inverted/sorted>", usage = "Select execution strategy.")
   private String _strategy;
 
-  @Option(name = "-numEntriesScannedThreshold", required = false, metaVar = "<long>", usage = "The threshold for numEntriesScannedInFilter, log lines with numEntriesScannedInFilter below this threshold will be excluded.")
+  @Option(name = "-entriesScannedThreshold", required = false, metaVar = "<long>", usage = "Log lines with numEntriesScannedInFilter below this threshold will be excluded.")
   private long _numEntriesScannedThreshold = DEFAULT_NUM_ENTRIES_SCANNED_THRESHOLD;
 
-  @Option(name = "-numQueriesToGiveRecommendation", required = false, metaVar = "<long>", usage = "The threshold for numEntriesScannedInFilter, log lines with numEntriesScannedInFilter below this threshold will be excluded.")
+  @Option(name = "-queriesToReport", required = false, metaVar = "<long>", usage = "Log lines with numEntriesScannedInFilter below this threshold will be excluded.")
   private long _numQueriesToGiveRecommendation = DEFAULT_NUM_QUERIES_TO_GIVE_RECOMMENDATION;
 
-  @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (leave this blank to run on all tables)")
+  @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (unset run on all tables)")
   private String _tableNamesWithoutType = null;
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
@@ -62,6 +62,7 @@ public class TunerCommand extends AbstractBaseCommand implements Command {
               .setNumEntriesScannedThreshold(_numEntriesScannedThreshold).build())
           .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
           .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metaData).build());
+      parserBased.execute();
     } else {
       return false;
     }
@@ -70,7 +71,7 @@ public class TunerCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String description() {
-    return "Give optimization boundary analysis and indexing recommendation to specific tables, based on packed segment metadata() and broker logs.";
+    return "Give optimization boundary analysis and indexing recommendation to specific tables, based on packed segment metadata (containing the weighted sum of cardinality, number of documents, number of entries, etc.) and broker logs (containing time of execution, numEntriesScannedInFilter, numEntriesScannedPostFilter, query text).";
   }
 
   @Override

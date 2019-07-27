@@ -13,10 +13,10 @@ import org.kohsuke.args4j.Option;
 
 public class QuantileReportCommand extends AbstractBaseCommand implements Command {
 
-  @Option(name = "-brokerLog", required = true, metaVar = "<String>", usage = "Path to broker log file containing time of execution, numEntriesScannedInFilter, numEntriesScannedPostFilter, query text.")
+  @Option(name = "-brokerLog", required = true, metaVar = "<String>", usage = "Path to broker log file.")
   private String _brokerLog;
 
-  @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (leave this blank to run on all tables)")
+  @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (unset run on all tables)")
   private String _tableNamesWithoutType = null;
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
@@ -40,7 +40,7 @@ public class QuantileReportCommand extends AbstractBaseCommand implements Comman
 
   @Override
   public String description() {
-    return "Scan through broker log and give percentile of numEntriesScannedInFilter";
+    return "Scan through broker log (containing time of execution, numEntriesScannedInFilter, numEntriesScannedPostFilter) and give percentile of numEntriesScannedInFilter";
   }
 
   @Override
