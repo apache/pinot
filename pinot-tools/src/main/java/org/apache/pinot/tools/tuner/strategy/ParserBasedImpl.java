@@ -146,7 +146,7 @@ public class ParserBasedImpl implements Strategy {
     LOGGER.debug("Accumulator: scoring query {}", query);
 
     if (Long.parseLong(numEntriesScannedInFilter) == 0) {
-      return; //Early return if the query is not scanning in filter
+      return;
     }
 
     DimensionScoring dimensionScoring = new DimensionScoring(tableNameWithoutType, metaManager, query);

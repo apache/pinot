@@ -143,8 +143,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
       return BigFraction.ONE;
     }
     if (_useExistingIndex) {
-      String _numHasInv = getColField(tableNameWithoutType, columnName, SUM_SEGMENTS_HAS_INVERTED_INDEX);
-      if (_numHasInv == null || Integer.parseInt(_numHasInv) > 0) {
+      if (hasInvertedIndex(tableNameWithoutType, columnName)) {
         return BigFraction.ONE;
       }
     }

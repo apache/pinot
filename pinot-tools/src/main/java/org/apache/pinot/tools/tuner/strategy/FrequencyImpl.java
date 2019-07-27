@@ -122,7 +122,7 @@ public class FrequencyImpl implements Strategy {
     HashSet<String> counted = new HashSet<>();
 
     if (Long.parseLong(numEntriesScannedInFilter) == 0) {
-      return; //Early return if the query is not scanning in filter
+      return;
     }
 
     Matcher matcher = _dimensionPattern.matcher(query);
