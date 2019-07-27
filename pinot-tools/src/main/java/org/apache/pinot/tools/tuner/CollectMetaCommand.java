@@ -46,6 +46,11 @@ public class CollectMetaCommand extends AbstractBaseCommand implements Command {
   }
 
   @Override
+  public String getName() {
+    return "CollectMeta";
+  }
+
+  @Override
   public boolean getHelp() {
     return _help;
   }

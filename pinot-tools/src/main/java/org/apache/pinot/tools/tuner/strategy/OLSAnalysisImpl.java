@@ -106,9 +106,7 @@ public class OLSAnalysisImpl implements Strategy {
    */
   @Override
   public void report(Map<String, Map<String, AbstractAccumulator>> tableResults) {
-    tableResults.forEach((table, map) -> {
-      reportTable(table, map);
-    });
+    tableResults.forEach((table, map) -> reportTable(table, map));
   }
 
   public void reportTable(String tableNameWithoutType, Map<String, AbstractAccumulator> columnStats) {

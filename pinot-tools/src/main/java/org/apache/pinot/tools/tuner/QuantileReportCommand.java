@@ -11,7 +11,7 @@ import org.apache.pinot.tools.tuner.strategy.OLSAnalysisImpl;
 import org.kohsuke.args4j.Option;
 
 
-public class PercentileReportCommand extends AbstractBaseCommand implements Command {
+public class QuantileReportCommand extends AbstractBaseCommand implements Command {
 
   @Option(name = "-brokerLog", required = true, metaVar = "<String>", usage = "Path to broker log file containing time of execution, numEntriesScannedInFilter, numEntriesScannedPostFilter, query text.")
   private String _brokerLog;
@@ -41,6 +41,11 @@ public class PercentileReportCommand extends AbstractBaseCommand implements Comm
   @Override
   public String description() {
     return "Scan through broker log and give percentile of numEntriesScannedInFilter";
+  }
+
+  @Override
+  public String getName() {
+    return "PercentileReport";
   }
 
   @Override

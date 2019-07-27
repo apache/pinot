@@ -42,7 +42,6 @@ public class TunerCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public boolean execute() {
-
     HashSet<String> tableNamesWithoutType = new HashSet<>();
     if (_tableNamesWithoutType != null && !_tableNamesWithoutType.trim().equals("")) {
       tableNamesWithoutType.addAll(Arrays.asList(_tableNamesWithoutType.split(",")));
@@ -72,6 +71,11 @@ public class TunerCommand extends AbstractBaseCommand implements Command {
   @Override
   public String description() {
     return "Give optimization boundary analysis and indexing recommendation to specific tables, based on packed segment metadata() and broker logs.";
+  }
+
+  @Override
+  public String getName() {
+    return "Tuner";
   }
 
   @Override
