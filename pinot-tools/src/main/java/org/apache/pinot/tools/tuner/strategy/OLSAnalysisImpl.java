@@ -218,10 +218,10 @@ public class OLSAnalysisImpl implements Strategy {
         reportOut += String.format("Params: %s %s\n", Double.toString(params[0]), Double.toString(params[1]));
 
       } else {
-        reportOut += "\nunable to predict this table!";
+        reportOut += "\nunable to predict the optimization boundary of this table!";
       }
     } catch (MathIllegalArgumentException | MathArithmeticException e) {
-      reportOut += "\nunable to predict this table!";
+      reportOut += "\nunable to predict the optimization boundary of this table!";
     }
     LOGGER.info(reportOut);
   }
