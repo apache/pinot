@@ -112,7 +112,6 @@ public class OLSAnalysisImpl implements Strategy {
 
     AtomicLong totalCount = new AtomicLong(0);
     columnStats.forEach((k, v) -> totalCount.addAndGet(v.getCount()));
-
     reportOut += MessageFormat.format("\nTotal lines accumulated: {0}\n\n", totalCount);
 
     if (!columnStats.containsKey("*")) {

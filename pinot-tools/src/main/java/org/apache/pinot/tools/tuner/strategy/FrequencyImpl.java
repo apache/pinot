@@ -1,6 +1,7 @@
 package org.apache.pinot.tools.tuner.strategy;
 
 import io.vavr.Tuple2;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -165,6 +166,7 @@ public class FrequencyImpl implements Strategy {
     }
 
     String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
+    reportOut += MessageFormat.format("\nTotal lines accumulated: {0}\n\n", totalCount);
     List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
     columnStats.forEach(
         (colName, score) -> sortedPure.add(new Tuple2<>(colName, ((FrequencyAccumulator) score).getPureScore())));

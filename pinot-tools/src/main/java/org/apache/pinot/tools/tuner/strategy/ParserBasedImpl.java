@@ -3,6 +3,7 @@ package org.apache.pinot.tools.tuner.strategy;
 import io.vavr.Tuple2;
 import java.math.BigInteger;
 import java.math.RoundingMode;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -193,6 +194,7 @@ public class ParserBasedImpl implements Strategy {
     }
 
     String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
+    reportOut += MessageFormat.format("\nTotal lines accumulated: {0}\n\n", totalCount);
     List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
     List<Tuple2<String, BigInteger>> sortedWeighted = new ArrayList<>();
     columnStats.forEach((colName, score) -> {
