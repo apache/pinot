@@ -31,9 +31,14 @@ public class QuantileReportCommand extends AbstractBaseCommand implements Comman
     }
 
     TunerDriver fitModel = new TunerTest().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
-        .setStrategy(new OLSAnalysisImpl.Builder().setTableNamesWithoutType(tableNamesWithoutType).build())
-        .setQuerySrc(new LogQuerySrcImpl.Builder().setValidLinePrefixRegex(LogQuerySrcImpl.REGEX_VALID_LINE_TIME)
-            .setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build());
+        .setStrategy(new OLSAnalysisImpl.Builder()
+            .setTableNamesWithoutType(tableNamesWithoutType)
+            .build())
+        .setQuerySrc(new LogQuerySrcImpl.Builder()
+            .setValidLinePrefixRegex(LogQuerySrcImpl.REGEX_VALID_LINE_TIME)
+            .setParser(new BrokerLogParserImpl())
+            .setPath(_brokerLog)
+            .build());
     fitModel.execute();
     return true;
   }

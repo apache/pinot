@@ -32,9 +32,13 @@ public class CollectMetaCommand extends AbstractBaseCommand implements Command {
     }
 
     TunerDriver metaFetch = new TunerTest().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
-        .setStrategy(
-            new AccumulateStats.Builder().setTableNamesWithoutType(tableNamesWithoutType).setOutputDir(_workDir)
-                .build()).setQuerySrc(new CompressedFilePathIter.Builder().set_directory(_segmentsDir).build())
+        .setStrategy(new AccumulateStats.Builder()
+            .setTableNamesWithoutType(tableNamesWithoutType)
+            .setOutputDir(_workDir)
+            .build())
+        .setQuerySrc(new CompressedFilePathIter.Builder()
+            .set_directory(_segmentsDir)
+            .build())
         .setMetaManager(null);
     metaFetch.execute();
     return true;

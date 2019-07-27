@@ -49,19 +49,35 @@ public class TunerCommand extends AbstractBaseCommand implements Command {
 
     if (_strategy.equals(INVERTED_INDEX)) {
       TunerDriver parserBased = new TunerTest().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
-          .setStrategy(new ParserBasedImpl.Builder().setTableNamesWithoutType(tableNamesWithoutType)
-              .setNumProcessedThreshold(_numQueriesToGiveRecommendation).setAlgorithmOrder(ParserBasedImpl.FIRST_ORDER)
-              .setNumEntriesScannedThreshold(_numEntriesScannedThreshold).build())
-          .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
-          .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metaData).build());
+          .setStrategy(new ParserBasedImpl.Builder()
+              .setTableNamesWithoutType(tableNamesWithoutType)
+              .setNumProcessedThreshold(_numQueriesToGiveRecommendation)
+              .setAlgorithmOrder(ParserBasedImpl.FIRST_ORDER)
+              .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
+              .build())
+          .setQuerySrc(new LogQuerySrcImpl.Builder()
+              .setParser(new BrokerLogParserImpl())
+              .setPath(_brokerLog)
+              .build())
+          .setMetaManager(new JsonFileMetaManagerImpl.Builder()
+              .setPath(_metaData)
+              .build());
       parserBased.execute();
     } else if (_strategy.equals(SORTED_INDEX)) {
       TunerDriver parserBased = new TunerTest().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
-          .setStrategy(new ParserBasedImpl.Builder().setTableNamesWithoutType(tableNamesWithoutType)
-              .setNumProcessedThreshold(_numQueriesToGiveRecommendation).setAlgorithmOrder(ParserBasedImpl.SECOND_ORDER)
-              .setNumEntriesScannedThreshold(_numEntriesScannedThreshold).build())
-          .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
-          .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metaData).build());
+          .setStrategy(new ParserBasedImpl.Builder()
+              .setTableNamesWithoutType(tableNamesWithoutType)
+              .setNumProcessedThreshold(_numQueriesToGiveRecommendation)
+              .setAlgorithmOrder(ParserBasedImpl.SECOND_ORDER)
+              .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
+              .build())
+          .setQuerySrc(new LogQuerySrcImpl.Builder()
+              .setParser(new BrokerLogParserImpl())
+              .setPath(_brokerLog)
+              .build())
+          .setMetaManager(new JsonFileMetaManagerImpl.Builder()
+              .setPath(_metaData)
+              .build());
       parserBased.execute();
     } else {
       return false;
