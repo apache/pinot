@@ -50,7 +50,7 @@ public class QuantileReportCommand extends AbstractBaseCommand implements Comman
 
   @Override
   public String getName() {
-    return "PercentileReport";
+    return "QuantileReport";
   }
 
   @Override
