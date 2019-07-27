@@ -122,7 +122,7 @@ public abstract class TunerDriver {
     }
 
     // Merge corresponding entries
-    LOGGER.info("Setting up _mergedResults for merging");
+    LOGGER.info("Setting up mergedResults for merging");
     _mergedResults = new HashMap<>();
     for (Map.Entry<Long, Map<String, Map<String, AbstractAccumulator>>> threadEntry : _threadAccumulator.entrySet()) {
       for (String tableNameWithoutType : threadEntry.getValue().keySet()) {

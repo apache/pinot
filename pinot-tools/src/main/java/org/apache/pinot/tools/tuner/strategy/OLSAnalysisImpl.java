@@ -203,8 +203,6 @@ public class OLSAnalysisImpl implements Strategy {
       double[] params = regression.estimateRegressionParameters();
       double rSquared = regression.calculateRSquared();
       if (rSquared > 0.7) {
-        reportOut += MessageFormat.format("\nR-square: {0}\n", rSquared);
-        reportOut += String.format("Params: %s %s\n", Double.toString(params[0]), Double.toString(params[1]));
         reportOut += "\nMaximum Optimization(ms):\n";
         reportOut += MessageFormat.format(
             "10%:{0} | 20%:{1} | 30%:{2} | 40%:{3} | 50%:{4} | 60%:{5} | 70%:{6} | 80%:{7} | 90%:{8} | 95%:{9}\n",
@@ -218,6 +216,9 @@ public class OLSAnalysisImpl implements Strategy {
             String.format("%.0f", numEntriesScannedInFilterPercentile[7] * params[0]),
             String.format("%.0f", numEntriesScannedInFilterPercentile[8] * params[0]),
             String.format("%.0f", numEntriesScannedInFilterPercentile[9] * params[0]));
+        reportOut += MessageFormat.format("\nR-square: {0}\n", rSquared);
+        reportOut += String.format("Params: %s %s\n", Double.toString(params[0]), Double.toString(params[1]));
+
       } else {
         reportOut += "\nunable to predict this table!";
       }
