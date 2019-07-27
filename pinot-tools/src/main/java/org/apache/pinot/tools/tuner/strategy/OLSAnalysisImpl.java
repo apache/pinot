@@ -226,8 +226,9 @@ public class OLSAnalysisImpl implements Strategy {
     LOGGER.info(reportOut);
   }
 
+
   /**
-   * Parse and score the dimensions in a query
+   * Parse and count the total bitmaps used in a query
    */
   class DimensionScoring {
     static final String AND = "AND";

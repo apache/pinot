@@ -52,10 +52,8 @@ public class TunerTest extends TunerDriver {
 //    freqBased.execute();
 
     TunerDriver fitModel = new TunerTest().setThreadPoolSize(3).setStrategy(new OLSAnalysisImpl.Builder().build())
-        .setQuerySrc(
-            new LogQuerySrcImpl.Builder().setValidLineBeginnerRegex(LogQuerySrcImpl.REGEX_VALID_LINE_STANDALONE)
-                .setParser(new BrokerLogParserImpl())
-                .setPath("/Users/jiaguo/Downloads/broker_scin_v2_additive_noindex.log")
+        .setQuerySrc(new LogQuerySrcImpl.Builder().setValidLineBeginnerRegex(LogQuerySrcImpl.REGEX_VALID_LINE_TIME)
+            .setParser(new ServerLogParserImpl()).setPath("/Users/jiaguo/i001/pinot-server.log.2019-07-23")
             .build());
     fitModel.execute();
   }
