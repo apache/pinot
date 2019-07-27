@@ -419,7 +419,6 @@ public class ParserBasedImpl implements Strategy {
           return ret;
         } else if (comparisonOp.equals("!=") || comparisonOp.equals("<>")) {
           if (selectivity.subtract(BigInteger.ONE).compareTo(BigFraction.ZERO) <= 0) {
-            ret.add(new Tuple2<>(colNameList, BigFraction.ONE));
             return ret;
           }
           ret.add(new Tuple2<>(colNameList, selectivity.divide(selectivity.subtract(BigFraction.ONE))));
