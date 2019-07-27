@@ -132,7 +132,7 @@ public class ParserBasedImpl implements Strategy {
     long numEntriesScannedInFilter = Long.parseLong(indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter());
     return (_tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType
         .contains(indexSuggestQueryStatsImpl.getTableNameWithoutType())) && (numEntriesScannedInFilter
-        >= _numEntriesScannedThreshold);
+        > _numEntriesScannedThreshold);
   }
 
   @Override
@@ -143,11 +143,8 @@ public class ParserBasedImpl implements Strategy {
     String tableNameWithoutType = indexSuggestQueryStatsImpl.getTableNameWithoutType();
     String numEntriesScannedInFilter = indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter();
     String query = indexSuggestQueryStatsImpl.getQuery();
-    LOGGER.debug("Accumulator: scoring query {}", query);
 
-    if (Long.parseLong(numEntriesScannedInFilter) == 0) {
-      return;
-    }
+    LOGGER.debug("Accumulator: scoring query {}", query);
 
     DimensionScoring dimensionScoring = new DimensionScoring(tableNameWithoutType, metaManager, query);
     List<Tuple2<List<String>, BigFraction>> columnScores = dimensionScoring.parseQuery();

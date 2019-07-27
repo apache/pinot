@@ -107,7 +107,7 @@ public class FrequencyImpl implements Strategy {
     long numEntriesScannedInFilter = Long.parseLong(indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter());
     return (_tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType
         .contains(indexSuggestQueryStatsImpl.getTableNameWithoutType())) && (numEntriesScannedInFilter
-        >= _numEntriesScannedThreshold);
+        > _numEntriesScannedThreshold);
   }
 
   @Override
@@ -120,10 +120,6 @@ public class FrequencyImpl implements Strategy {
     String query = indexSuggestQueryStatsImpl.getQuery();
     LOGGER.debug("Accumulator: scoring query {}", query);
     HashSet<String> counted = new HashSet<>();
-
-    if (Long.parseLong(numEntriesScannedInFilter) == 0) {
-      return;
-    }
 
     Matcher matcher = _dimensionPattern.matcher(query);
     while (matcher.find()) {
