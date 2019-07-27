@@ -30,7 +30,7 @@ public class QuantileReportCommand extends AbstractBaseCommand implements Comman
       tableNamesWithoutType.addAll(Arrays.asList(_tableNamesWithoutType.split(",")));
     }
 
-    TunerDriver fitModel = new TunerTest().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
+    TunerDriver fitModel = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
         .setStrategy(new OLSAnalysisImpl.Builder()
             .setTableNamesWithoutType(tableNamesWithoutType)
             .build())

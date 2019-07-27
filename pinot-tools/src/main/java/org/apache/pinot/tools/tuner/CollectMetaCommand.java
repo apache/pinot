@@ -31,7 +31,7 @@ public class CollectMetaCommand extends AbstractBaseCommand implements Command {
       tableNamesWithoutType.addAll(Arrays.asList(_tableNamesWithoutType.split(",")));
     }
 
-    TunerDriver metaFetch = new TunerTest().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
+    TunerDriver metaFetch = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
         .setStrategy(new AccumulateStats.Builder()
             .setTableNamesWithoutType(tableNamesWithoutType)
             .setOutputDir(_workDir)

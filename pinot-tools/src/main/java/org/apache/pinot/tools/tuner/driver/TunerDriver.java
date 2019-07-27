@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
  *       Merger: A function to merge two AbstractMergerObj entries having the same TableName/ColumnName from different threads.
  *       Reporter: A function to postprocess and print(email) out the final results of a table.
  */
-public abstract class TunerDriver {
+public class TunerDriver {
   private static final Logger LOGGER = LoggerFactory.getLogger(TunerDriver.class);
   public static final int NO_CONCURRENCY = 0;
 
