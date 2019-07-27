@@ -114,7 +114,7 @@ public class AccumulateStats implements Strategy {
         throw new NullPointerException();
       }
     } catch (NullPointerException | ArrayIndexOutOfBoundsException e) {
-      LOGGER.error("No inde_map for {}!", pathWrapper.getFile().getName());
+      LOGGER.error("No index_map for {}!", pathWrapper.getFile().getName());
       indexMap = null;
     }
 
