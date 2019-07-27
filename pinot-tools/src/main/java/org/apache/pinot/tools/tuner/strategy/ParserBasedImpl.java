@@ -379,7 +379,7 @@ public class ParserBasedImpl implements Strategy {
 
         BigFraction selectivity = _metaManager.getColumnSelectivity(_tableNameWithoutType, colName);
         LOGGER.debug("Final Cardinality: {} {} {}", selectivity, _tableNameWithoutType, colName);
-        if (selectivity.compareTo(BigFraction.ONE) <= 0) {
+        if (selectivity.compareTo(new BigFraction(_selectivityThreshold)) <= 0) {
           return ret;
         }
 
@@ -405,7 +405,7 @@ public class ParserBasedImpl implements Strategy {
 
         BigFraction selectivity = _metaManager.getColumnSelectivity(_tableNameWithoutType, colName);
         LOGGER.debug("Final Cardinality: {} {} {}", selectivity, _tableNameWithoutType, colName);
-        if (selectivity.compareTo(BigFraction.ONE) <= 0) {
+        if (selectivity.compareTo(new BigFraction(_selectivityThreshold)) <= 0) {
           return ret;
         }
 
