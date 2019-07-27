@@ -4,10 +4,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.math.BigInteger;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
@@ -24,7 +27,9 @@ import org.slf4j.LoggerFactory;
 public class AccumulateStats implements Strategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(AccumulateStats.class);
   private static final String UNTAR = "tar -xf ";
+  private static final String TMP_THREAD_FILE_PREFIX = "/tmpThreadFile";
   private static final String EXCLUDE_DATA = " --exclude columns.psf ";
+  private static final String STRIP_2COMPONENTS = " --strip-components=2 ";
   private static final String OUT_PUT_PATH = " -C ";
   private static final String RM_RF = "rm -rf ";
 
@@ -62,7 +67,7 @@ public class AccumulateStats implements Strategy {
    */
   @Override
   public boolean filter(AbstractQueryStats filePaths) {
-    return _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType
+    return _tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType
         .contains(((PathWrapper) filePaths).getTableNameWithoutType());
   }
 
@@ -76,10 +81,14 @@ public class AccumulateStats implements Strategy {
   public void accumulate(AbstractQueryStats filePaths, MetaManager metaManager,
       Map<String, Map<String, AbstractAccumulator>> AccumulatorOut) {
     PathWrapper pathWrapper = ((PathWrapper) filePaths);
-    LOGGER.info("Extracting: " + pathWrapper.getFile().getAbsolutePath() + " to " + _outputDir.getAbsolutePath());
+
+    File tmpFolder = new File(_outputDir.getAbsolutePath() + TMP_THREAD_FILE_PREFIX + Thread.currentThread()
+        .getId()); //+"_"+(int)(Math.random()*100)
+    LOGGER.info("Extracting: " + pathWrapper.getFile().getAbsolutePath() + " to " + tmpFolder.getAbsolutePath());
     try {
+      tmpFolder.mkdirs();
       Process p = Runtime.getRuntime().exec(
-          (UNTAR + pathWrapper.getFile().getAbsolutePath() + EXCLUDE_DATA + OUT_PUT_PATH + _outputDir
+          (UNTAR + pathWrapper.getFile().getAbsolutePath() + EXCLUDE_DATA + STRIP_2COMPONENTS + OUT_PUT_PATH + tmpFolder
               .getAbsolutePath()));
       p.waitFor();
     } catch (IOException | InterruptedException e) {
@@ -87,37 +96,10 @@ public class AccumulateStats implements Strategy {
       return;
     }
 
-    File tmpFolder;
-    File versionFolder;
     File metaDataProperties;
     File indexMap;
-
     try {
-      tmpFolder = _outputDir.listFiles(new FilenameFilter() {
-        @Override
-        public boolean accept(File dir, String name) {
-          return name.equals(pathWrapper.getFile().getName());
-        }
-      })[0];
-    } catch (NullPointerException | ArrayIndexOutOfBoundsException e) {
-      LOGGER.error("No tmp folder for {}!", pathWrapper.getFile().getName());
-      return;
-    }
-
-    try {
-      versionFolder = tmpFolder.listFiles()[0];
-    } catch (NullPointerException | ArrayIndexOutOfBoundsException e) {
-      LOGGER.error("No version folder fpr {}!", pathWrapper.getFile().getName());
-      return;
-    }
-
-    try {
-      metaDataProperties = versionFolder.listFiles(new FilenameFilter() {
-        @Override
-        public boolean accept(File dir, String name) {
-          return name.equals("metadata.properties");
-        }
-      })[0];
+      metaDataProperties = tmpFolder.listFiles((dir, name) -> name.equals("metadata.properties"))[0];
       if (!metaDataProperties.exists()) {
         throw new NullPointerException();
       }
@@ -127,12 +109,7 @@ public class AccumulateStats implements Strategy {
     }
 
     try {
-      indexMap = versionFolder.listFiles(new FilenameFilter() {
-        @Override
-        public boolean accept(File dir, String name) {
-          return name.equals("index_map");
-        }
-      })[0];
+      indexMap = tmpFolder.listFiles((dir, name) -> name.equals("index_map"))[0];
       if (!indexMap.exists()) {
         throw new NullPointerException();
       }
@@ -149,7 +126,7 @@ public class AccumulateStats implements Strategy {
       return;
     }
 
-    String indexMapString;
+    String indexMapString = "";
     try {
       indexMapString = FileUtils.readFileToString(indexMap);
     } catch (IOException e) {
@@ -188,8 +165,9 @@ public class AccumulateStats implements Strategy {
     }
 
     try {
-      Runtime.getRuntime().exec(RM_RF + tmpFolder.getAbsolutePath());
-    } catch (IOException e) {
+      Process p = Runtime.getRuntime().exec(RM_RF + tmpFolder.getAbsolutePath());
+      p.waitFor();
+    } catch (IOException | InterruptedException e) {
       LOGGER.error(e.getMessage());
       return;
     }

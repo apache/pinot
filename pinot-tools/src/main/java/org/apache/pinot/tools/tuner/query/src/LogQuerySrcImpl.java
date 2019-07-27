@@ -25,7 +25,7 @@ public class LogQuerySrcImpl implements QuerySrc {
   private FileInputStream _fileInputStream = null;
   private BufferedReader _bufferedReader = null;
   private String _stringBufferNext = null;
-  private Pattern _validLineBeginnerPattern;
+  private Pattern _validLinePrefixPattern;
 
   private QueryParser _parser;
   private String _path;
@@ -33,14 +33,14 @@ public class LogQuerySrcImpl implements QuerySrc {
   private LogQuerySrcImpl(Builder builder) {
     _parser = builder._parser;
     _path = builder._path;
-    String _validLineBeginnerRegex = builder._validLineBeginnerRegex;
-    _validLineBeginnerPattern = Pattern.compile(_validLineBeginnerRegex);
+    String _validLinePrefixRegex = builder._validLinePrefixRegex;
+    _validLinePrefixPattern = Pattern.compile(_validLinePrefixRegex);
   }
 
   public static final class Builder {
     private QueryParser _parser;
     private String _path;
-    private String _validLineBeginnerRegex = REGEX_VALID_LINE_TIME;
+    private String _validLinePrefixRegex = REGEX_VALID_LINE_TIME;
 
     public Builder() {
     }
@@ -73,14 +73,14 @@ public class LogQuerySrcImpl implements QuerySrc {
      * @return
      */
     @Nonnull
-    public Builder setValidLineBeginnerRegex(@Nonnull String val) {
-      _validLineBeginnerRegex = val;
+    public Builder setValidLinePrefixRegex(@Nonnull String val) {
+      _validLinePrefixRegex = val;
       return this;
     }
 
     @Nonnull
     public LogQuerySrcImpl build() {
-      LOGGER.info("Line beginner is set to:{}", this._validLineBeginnerRegex);
+      LOGGER.info("Line beginner is set to:{}", this._validLinePrefixRegex);
       return new LogQuerySrcImpl(this).openFile();
     }
   }
@@ -120,7 +120,7 @@ public class LogQuerySrcImpl implements QuerySrc {
     }
     StringBuilder stringBuffer = new StringBuilder(_stringBufferNext);
     try {
-      while ((_stringBufferNext = _bufferedReader.readLine()) != null && !_validLineBeginnerPattern
+      while ((_stringBufferNext = _bufferedReader.readLine()) != null && !_validLinePrefixPattern
           .matcher(_stringBufferNext).find()) {
         stringBuffer.append(_stringBufferNext);
         _stringBufferNext = null;

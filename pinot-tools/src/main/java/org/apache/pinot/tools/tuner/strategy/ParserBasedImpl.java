@@ -40,14 +40,14 @@ public class ParserBasedImpl implements Strategy {
   public final static int NO_SEL_THRESH = 1;
 
   private int _algorithmOrder;
-  private HashSet<String> _tableNamesWorkonWithoutType;
+  private HashSet<String> _tableNamesWithoutType;
   private long _numEntriesScannedThreshold;
   private long _numProcessedThreshold;
   private int _selectivityThreshold;
 
   private ParserBasedImpl(Builder builder) {
     _algorithmOrder = builder._algorithmOrder;
-    _tableNamesWorkonWithoutType = builder._tableNamesWorkonWithoutType;
+    _tableNamesWithoutType = builder._tableNamesWithoutType;
     _numEntriesScannedThreshold = builder._numEntriesScannedThreshold;
     _numProcessedThreshold = builder._numProcessedThreshold;
     _selectivityThreshold = builder._selectivityThreshold;
@@ -55,7 +55,7 @@ public class ParserBasedImpl implements Strategy {
 
   public static final class Builder {
     private int _algorithmOrder = FIRST_ORDER;
-    private HashSet<String> _tableNamesWorkonWithoutType = new HashSet<>();
+    private HashSet<String> _tableNamesWithoutType = new HashSet<>();
     private long _numEntriesScannedThreshold = NO_IN_FILTER_THRESHOLD;
     private long _numProcessedThreshold = NO_PROCESSED_THRESH;
     private int _selectivityThreshold = NO_SEL_THRESH;
@@ -85,8 +85,8 @@ public class ParserBasedImpl implements Strategy {
      * @return
      */
     @Nonnull
-    public Builder setTableNamesWorkonWithoutType(@Nonnull HashSet<String> val) {
-      _tableNamesWorkonWithoutType = val;
+    public Builder setTableNamesWithoutType(@Nonnull HashSet<String> val) {
+      _tableNamesWithoutType = val;
       return this;
     }
 
@@ -129,7 +129,7 @@ public class ParserBasedImpl implements Strategy {
   public boolean filter(AbstractQueryStats queryStats) {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     long numEntriesScannedInFilter = Long.parseLong(indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter());
-    return (_tableNamesWorkonWithoutType.isEmpty() || _tableNamesWorkonWithoutType
+    return (_tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType
         .contains(indexSuggestQueryStatsImpl.getTableNameWithoutType())) && (numEntriesScannedInFilter
         >= _numEntriesScannedThreshold);
   }

@@ -1,12 +1,9 @@
 package org.apache.pinot.tools.tuner.strategy;
 
-import io.vavr.Tuple2;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -36,17 +33,17 @@ public class OLSAnalysisImpl implements Strategy {
   public final static int NO_WEIGHT_FOR_VOTE = 0;
   public final static int IN_FILTER_WEIGHT_FOR_VOTE = 1;
 
-  private HashSet<String> _tableNamesWorkonWithoutType;
+  private HashSet<String> _tableNamesWithoutType;
   private long _lenBin;
 
   private OLSAnalysisImpl(Builder builder) {
-    _tableNamesWorkonWithoutType = builder._tableNamesWorkonWithoutType;
+    _tableNamesWithoutType = builder._tableNamesWithoutType;
     _lenBin = builder._lenBin;
   }
 
   public static final class Builder {
 
-    private HashSet<String> _tableNamesWorkonWithoutType = new HashSet<>();
+    private HashSet<String> _tableNamesWithoutType = new HashSet<>();
     private long _lenBin = 100;
 
     public Builder() {
@@ -58,8 +55,8 @@ public class OLSAnalysisImpl implements Strategy {
     }
 
     @Nonnull
-    public Builder setTableNamesWorkonWithoutType(@Nonnull HashSet<String> val) {
-      _tableNamesWorkonWithoutType = val;
+    public Builder setTableNamesWithoutType(@Nonnull HashSet<String> val) {
+      _tableNamesWithoutType = val;
       return this;
     }
 
@@ -73,7 +70,7 @@ public class OLSAnalysisImpl implements Strategy {
   @Override
   public boolean filter(AbstractQueryStats queryStats) {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
-    return (_tableNamesWorkonWithoutType.isEmpty() || _tableNamesWorkonWithoutType
+    return (_tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType
         .contains(indexSuggestQueryStatsImpl.getTableNameWithoutType()));
   }
 

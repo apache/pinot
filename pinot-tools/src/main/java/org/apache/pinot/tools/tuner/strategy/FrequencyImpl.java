@@ -28,20 +28,20 @@ public class FrequencyImpl implements Strategy {
   public final static long NO_PROCESSED_THRESH = 0;
 
   public final static Pattern _dimensionPattern = Pattern.compile(DIMENSION_REGEX);
-  private HashSet<String> _tableNamesWorkonWithoutType;
+  private HashSet<String> _tableNamesWithoutType;
   private long _numEntriesScannedThreshold;
   private long _cardinalityThreshold;
   private long _numProcessedThreshold;
 
   private FrequencyImpl(Builder builder) {
-    _tableNamesWorkonWithoutType = builder._tableNamesWorkonWithoutType;
+    _tableNamesWithoutType = builder._tableNamesWithoutType;
     _numEntriesScannedThreshold = builder._numEntriesScannedThreshold;
     _cardinalityThreshold = builder._cardinalityThreshold;
     _numProcessedThreshold = builder._numProcessedThreshold;
   }
 
   public static final class Builder {
-    private HashSet<String> _tableNamesWorkonWithoutType = new HashSet<>();
+    private HashSet<String> _tableNamesWithoutType = new HashSet<>();
     private long _numEntriesScannedThreshold = NO_IN_FILTER_THRESHOLD;
     private long _cardinalityThreshold = CARD_THRESHOLD_ONE;
     private long _numProcessedThreshold = NO_PROCESSED_THRESH;
@@ -60,8 +60,8 @@ public class FrequencyImpl implements Strategy {
      * @return
      */
     @Nonnull
-    public Builder setTableNamesWorkonWithoutType(@Nonnull HashSet<String> val) {
-      _tableNamesWorkonWithoutType = val;
+    public Builder setTableNamesWithoutType(@Nonnull HashSet<String> val) {
+      _tableNamesWithoutType = val;
       return this;
     }
 
@@ -104,7 +104,7 @@ public class FrequencyImpl implements Strategy {
   public boolean filter(AbstractQueryStats queryStats) {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     long numEntriesScannedInFilter = Long.parseLong(indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter());
-    return (_tableNamesWorkonWithoutType.isEmpty() || _tableNamesWorkonWithoutType
+    return (_tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType
         .contains(indexSuggestQueryStatsImpl.getTableNameWithoutType())) && (numEntriesScannedInFilter
         >= _numEntriesScannedThreshold);
   }
