@@ -1,7 +1,9 @@
 package org.apache.pinot.tools.tuner.strategy;
 
 import io.vavr.Tuple2;
+import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -12,6 +14,8 @@ import javax.validation.constraints.NotNull;
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
+import org.apache.commons.math3.exception.MathArithmeticException;
+import org.apache.commons.math3.exception.MathIllegalArgumentException;
 import org.apache.commons.math3.stat.descriptive.rank.Percentile;
 import org.apache.commons.math3.stat.regression.OLSMultipleLinearRegression;
 import org.apache.pinot.pql.parsers.PQL2Lexer;
@@ -109,7 +113,6 @@ public class OLSAnalysisImpl implements Strategy {
 
   public void reportTable(String tableNameWithoutType, Map<String, AbstractAccumulator> columnStats) {
     String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
-    LOGGER.info(reportOut);
 
     if (!columnStats.containsKey("*")) {
       return;
@@ -128,11 +131,58 @@ public class OLSAnalysisImpl implements Strategy {
       inFilterAll[i] = inFilterList.get(i);
     }
 
+    double[] timePercentile = new double[10];
     Percentile percentile = new Percentile();
     percentile.setData(timeAll);
-    percentile.evaluate(10);
 
-    //TODO:PRINT PERCERNTILES
+    timePercentile[0] = percentile.evaluate(10);
+    timePercentile[1] = percentile.evaluate(20);
+    timePercentile[2] = percentile.evaluate(30);
+    timePercentile[3] = percentile.evaluate(40);
+    timePercentile[4] = percentile.evaluate(50);
+    timePercentile[5] = percentile.evaluate(60);
+    timePercentile[6] = percentile.evaluate(70);
+    timePercentile[7] = percentile.evaluate(80);
+    timePercentile[8] = percentile.evaluate(90);
+    timePercentile[9] = percentile.evaluate(95);
+
+    double[] numEntriesScannedInFilterPercentile = new double[10];
+    percentile = new Percentile();
+    percentile.setData(inFilterAll);
+
+    numEntriesScannedInFilterPercentile[0] = percentile.evaluate(10);
+    numEntriesScannedInFilterPercentile[1] = percentile.evaluate(20);
+    numEntriesScannedInFilterPercentile[2] = percentile.evaluate(30);
+    numEntriesScannedInFilterPercentile[3] = percentile.evaluate(40);
+    numEntriesScannedInFilterPercentile[4] = percentile.evaluate(50);
+    numEntriesScannedInFilterPercentile[5] = percentile.evaluate(60);
+    numEntriesScannedInFilterPercentile[6] = percentile.evaluate(70);
+    numEntriesScannedInFilterPercentile[7] = percentile.evaluate(80);
+    numEntriesScannedInFilterPercentile[8] = percentile.evaluate(90);
+    numEntriesScannedInFilterPercentile[9] = percentile.evaluate(95);
+
+    reportOut += "numEntriesScannedInFilter:\n";
+    reportOut += MessageFormat
+        .format("10%:{0} | 20%:{1} | 30%:{2} | 40%:{3} | 50%:{4} | 60%:{5} | 70%:{6} | 80%:{7} | 90%:{8} | 95%:{9}\n",
+            String.format("%.0f", numEntriesScannedInFilterPercentile[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[1]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[2]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[3]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[4]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[5]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[6]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[7]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[8]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[9]));
+
+    reportOut += "\nLatency (ms):\n";
+    reportOut += MessageFormat
+        .format("10%:{0} | 20%:{1} | 30%:{2} | 40%:{3} | 50%:{4} | 60%:{5} | 70%:{6} | 80%:{7} | 90%:{8} | 95%:{9}\n",
+            String.format("%.0f", timePercentile[0]), String.format("%.0f", timePercentile[1]),
+            String.format("%.0f", timePercentile[2]), String.format("%.0f", timePercentile[3]),
+            String.format("%.0f", timePercentile[4]), String.format("%.0f", timePercentile[5]),
+            String.format("%.0f", timePercentile[6]), String.format("%.0f", timePercentile[7]),
+            String.format("%.0f", timePercentile[8]), String.format("%.0f", timePercentile[9]));
 
     OLSMultipleLinearRegression regression = new OLSMultipleLinearRegression();
     regression.setNoIntercept(true);
@@ -145,19 +195,36 @@ public class OLSAnalysisImpl implements Strategy {
       time[iter.get()] = val._2();
       x_arr[iter.get()][0] = key._1() * _lenBin + _lenBin / 2;
       x_arr[iter.get()][1] = key._2() * _lenBin + _lenBin / 2;
-      LOGGER.info("time:{} inFilter:{} postFilter:{}", time[iter.get()], x_arr[iter.get()][0], x_arr[iter.get()][1]);
       iter.incrementAndGet();
     });
 
     try {
       regression.newSampleData(time, x_arr);
-      double[] para = regression.estimateRegressionParameters();
+      double[] params = regression.estimateRegressionParameters();
       double rSquared = regression.calculateRSquared();
-      LOGGER.info("r-square: {}", rSquared);
-      LOGGER.info("params: {}", para);
-    } catch (Exception e) {
-      LOGGER.info("unable to predict this table!");
+      if (rSquared > 0.7) {
+        reportOut += MessageFormat.format("\nR-square: {0}\n", rSquared);
+        reportOut += String.format("Params: %s %s\n", Double.toString(params[0]), Double.toString(params[1]));
+        reportOut += "\nMaximum Optimization(ms):\n";
+        reportOut += MessageFormat.format(
+            "10%:{0} | 20%:{1} | 30%:{2} | 40%:{3} | 50%:{4} | 60%:{5} | 70%:{6} | 80%:{7} | 90%:{8} | 95%:{9}\n",
+            String.format("%.0f", numEntriesScannedInFilterPercentile[0] * params[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[1] * params[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[2] * params[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[3] * params[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[4] * params[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[5] * params[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[6] * params[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[7] * params[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[8] * params[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[9] * params[0]));
+      } else {
+        reportOut += "\nunable to predict this table!";
+      }
+    } catch (MathIllegalArgumentException | MathArithmeticException e) {
+      reportOut += "\nunable to predict this table!";
     }
+    LOGGER.info(reportOut);
   }
 
   /**
