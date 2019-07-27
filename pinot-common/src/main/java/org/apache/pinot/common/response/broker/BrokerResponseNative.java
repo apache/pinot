@@ -64,6 +64,7 @@ public class BrokerResponseNative implements BrokerResponse {
 
   private SelectionResults _selectionResults;
   private List<AggregationResult> _aggregationResults;
+  private GroupByOrderByResults _groupByOrderByResults;
 
   private Map<String, String> _traceInfo = new HashMap<>();
   private List<QueryProcessingException> _processingExceptions = new ArrayList<>();
@@ -109,6 +110,17 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("aggregationResults")
   public void setAggregationResults(List<AggregationResult> aggregationResults) {
     _aggregationResults = aggregationResults;
+  }
+
+  @JsonProperty("groupByOrderByResults")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public GroupByOrderByResults getGroupByOrderByResults() {
+    return _groupByOrderByResults;
+  }
+
+  @JsonProperty("groupByOrderByResults")
+  public void setGroupByOrderByResults(GroupByOrderByResults groupByOrderByResults) {
+    _groupByOrderByResults = groupByOrderByResults;
   }
 
   @JsonProperty("exceptions")

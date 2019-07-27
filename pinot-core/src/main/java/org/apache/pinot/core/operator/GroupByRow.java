@@ -11,7 +11,7 @@ public class GroupByRow {
 
   public GroupByRow(String stringKey, Object[] aggregationResults) {
     _stringKey = stringKey;
-    _arrayKey = stringKey.split(",");
+    _arrayKey = stringKey.split("\t");
     _aggregationResults = aggregationResults;
   }
 

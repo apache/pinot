@@ -44,12 +44,16 @@ import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.GroupByOrderByResults;
 import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.operator.GroupByRow;
+import org.apache.pinot.core.operator.OrderByDefn;
+import org.apache.pinot.core.operator.OrderByExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
@@ -252,16 +256,20 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
               preserveType);
         } else {
           // Aggregation group-by query.
-          boolean[] aggregationFunctionSelectStatus =
-              AggregationFunctionUtils.getAggregationFunctionsSelectStatus(brokerRequest.getAggregationsInfo());
-          setGroupByHavingResults(brokerResponseNative, aggregationFunctions, aggregationFunctionSelectStatus,
-              brokerRequest.getGroupBy(), dataTableMap, brokerRequest.getHavingFilterQuery(),
-              brokerRequest.getHavingFilterSubQueryMap(), preserveType);
-          if (brokerMetrics != null && (!brokerResponseNative.getAggregationResults().isEmpty())) {
-            // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the same.
-            // Thus, we can just emit the one from the 1st result.
-            brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.GROUP_BY_SIZE,
-                brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size());
+          boolean orderBy = true;
+          if (orderBy) {
+            setOrderByGroupByResults(brokerResponseNative, aggregationFunctions, dataTableMap, OrderByDefn.getDummyOrderByDefn(),
+                brokerRequest.getGroupBy().getTopN(), true);
+          } else {
+            boolean[] aggregationFunctionSelectStatus = AggregationFunctionUtils.getAggregationFunctionsSelectStatus(brokerRequest.getAggregationsInfo());
+            setGroupByHavingResults(brokerResponseNative, aggregationFunctions, aggregationFunctionSelectStatus,
+                brokerRequest.getGroupBy(), dataTableMap, brokerRequest.getHavingFilterQuery(), brokerRequest.getHavingFilterSubQueryMap(), preserveType);
+            if (brokerMetrics != null && (!brokerResponseNative.getAggregationResults().isEmpty())) {
+              // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the same.
+              // Thus, we can just emit the one from the 1st result.
+              brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.GROUP_BY_SIZE,
+                  brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size());
+            }
           }
         }
       }
@@ -390,6 +398,55 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       reducedAggregationResults.add(new AggregationResult(dataSchema.getColumnName(i), resultValue));
     }
     brokerResponseNative.setAggregationResults(reducedAggregationResults);
+  }
+
+  private void setOrderByGroupByResults(@Nonnull BrokerResponseNative brokerResponseNative,
+      @Nonnull AggregationFunction[] aggregationFunctions, @Nonnull Map<ServerInstance, DataTable> dataTableMap,
+      List<OrderByDefn> orderByDefns, long topN, boolean preserveType) {
+    OrderByExecutor orderByExecutor = new OrderByExecutor();
+    Map<String, GroupByRow> groupByRowsMap = new HashMap<>();
+    for (DataTable dataTable : dataTableMap.values()) {
+      for (int rowId = 0; rowId < dataTable.getNumberOfRows(); rowId ++) {
+        String stringKey = dataTable.getString(rowId, 0);
+        Object[] results = new Object[aggregationFunctions.length];
+        for (int i = 0; i < aggregationFunctions.length; i ++) {
+          results[i] = dataTable.getObject(rowId, i + 1);
+        }
+        GroupByRow groupByRow = new GroupByRow(stringKey, results);
+
+        groupByRowsMap.compute(stringKey, (key, value) -> {
+          if (value == null) {
+            return groupByRow;
+          } else {
+            value.merge(groupByRow, aggregationFunctions, aggregationFunctions.length);
+            return value;
+          }
+        });
+      }
+    }
+    List<GroupByRow> groupByRows = new ArrayList<>(groupByRowsMap.values());
+    orderByExecutor.sort(groupByRows, orderByDefns);
+
+    int numRows = Math.min((int) topN, groupByRows.size());
+    List<String> columns = new ArrayList<>();
+
+    List<String[]> groupByKeys = new ArrayList<>();
+    List<Serializable[]> results = new ArrayList<>();
+    for (int i = 0; i < numRows; i ++) {
+      GroupByRow groupByRow = groupByRows.get(i);
+      groupByKeys.add(groupByRow.getArrayKey());
+      Object[] aggregationResults = groupByRow.getAggregationResults();
+      Serializable[] result = new Serializable[aggregationResults.length];
+      for (int j = 0; j < aggregationResults.length; j++) {
+        Object aggregationResult = aggregationResults[j];
+        Number aggregationResult1 = (Number) aggregationResult;
+        double v = aggregationResult1.doubleValue();
+        result[j] = v;
+      }
+      results.add(result);
+    }
+    GroupByOrderByResults groupByOrderByResults = new GroupByOrderByResults(columns, groupByKeys, results);
+    brokerResponseNative.setGroupByOrderByResults(groupByOrderByResults);
   }
 
   /**

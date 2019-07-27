@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.CombineGroupByOperator;
+import org.apache.pinot.core.operator.CombineGroupByOrderByOperator;
 import org.apache.pinot.core.operator.CombineOperator;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.util.trace.TraceCallable;
@@ -139,13 +140,17 @@ public class CombinePlanNode implements PlanNode {
     }
 
     // TODO: use the same combine operator for both aggregation and selection query.
-    if (_brokerRequest.isSetAggregationsInfo() && _brokerRequest.getGroupBy() != null) {
-      // Aggregation group-by query
-      return new CombineGroupByOperator(operators, _brokerRequest, _executorService, _timeOutMs, _numGroupsLimit);
-    } else {
-      // Selection or aggregation only query
-      return new CombineOperator(operators, _executorService, _timeOutMs, _brokerRequest);
-    }
+    if (_brokerRequest.isSetAggregationsInfo()) {
+      //if (_brokerRequest.getGroupBy() != null) {
+        // Aggregation group-by query
+       // return new CombineGroupByOperator(operators, _brokerRequest, _executorService, _timeOutMs, _numGroupsLimit);
+      //}
+      //if (_brokerRequest.getPinotQuery().isSetOrderByList()) {
+        return new CombineGroupByOrderByOperator(operators, _brokerRequest, _executorService, _timeOutMs,
+            _numGroupsLimit);
+      //}
+    } // Selection or aggregation only query
+    return new CombineOperator(operators, _executorService, _timeOutMs, _brokerRequest);
   }
 
   @Override

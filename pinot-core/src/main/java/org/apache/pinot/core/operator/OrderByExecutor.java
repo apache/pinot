@@ -13,13 +13,20 @@ public class OrderByExecutor {
 
     Comparator<GroupByRow> comparator = null;
     if (orderType.equals(OrderType.AGGREGATION_VALUE)) {
-      comparator = Comparator.comparing(GroupByRow::getAggregationResults,
-          Comparator.comparingDouble(s -> ((Number) s[index]).doubleValue()));
+      if (orderByDefn.isAscending()) {
+        comparator = Comparator.comparing(GroupByRow::getAggregationResults,
+            Comparator.comparingDouble(s -> ((Number) s[index]).doubleValue())); // TODO: other data types?
+      } else {
+        comparator = Comparator.comparing(GroupByRow::getAggregationResults,
+            (s1, s2) -> Double.compare(((Number) s2[index]).doubleValue(),
+                ((Number) s1[index]).doubleValue())); // TODO: other data types?
+      }
     } else if (orderType.equals(OrderType.GROUP_BY_KEY)) {
-      comparator = Comparator.comparing(GroupByRow::getArrayKey, Comparator.comparing(s -> s[index]));
-    }
-    if (!orderByDefn.isAscending()) {
-      comparator.reversed();
+      if (orderByDefn.isAscending()) {
+        comparator = Comparator.comparing(GroupByRow::getArrayKey, Comparator.comparing(s -> s[index]));
+      } else {
+        comparator = Comparator.comparing(GroupByRow::getArrayKey, (s1, s2) -> s2[index].compareTo(s1[index]));
+      }
     }
     return comparator;
   }

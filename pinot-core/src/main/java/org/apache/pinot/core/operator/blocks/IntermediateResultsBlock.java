@@ -36,6 +36,7 @@ import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableImplV2;
+import org.apache.pinot.core.operator.GroupByRow;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -51,6 +52,7 @@ public class IntermediateResultsBlock implements Block {
   private List<Object> _aggregationResult;
   private AggregationGroupByResult _aggregationGroupByResult;
   private List<Map<String, Object>> _combinedAggregationGroupByResult;
+  private List<GroupByRow> _groupByOrderByResult;
   private List<ProcessingException> _processingExceptions;
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
@@ -83,6 +85,16 @@ public class IntermediateResultsBlock implements Block {
     } else {
       _aggregationResult = aggregationResult;
     }
+  }
+
+  /**
+   * Constructor for aggregation group by order by result.
+   */
+  @SuppressWarnings("unchecked")
+  public IntermediateResultsBlock(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
+      @Nonnull List aggregationResult) {
+    _aggregationFunctionContexts = aggregationFunctionContexts;
+    _groupByOrderByResult = aggregationResult;
   }
 
   /**
@@ -217,6 +229,10 @@ public class IntermediateResultsBlock implements Block {
       return getAggregationGroupByResultDataTable();
     }
 
+    if (_groupByOrderByResult != null) {
+      return getAggregationGroupByOrderByResultDataTable();
+    }
+
     if (_processingExceptions != null && _processingExceptions.size() > 0) {
       return getProcessingExceptionsDataTable();
     }
@@ -264,6 +280,36 @@ public class IntermediateResultsBlock implements Block {
       }
     }
     dataTableBuilder.finishRow();
+    DataTable dataTable = dataTableBuilder.build();
+
+    return attachMetadataToDataTable(dataTable);
+  }
+
+  @Nonnull
+  private DataTable getAggregationGroupByOrderByResultDataTable() throws Exception {
+    int numAggregationFunctions = _aggregationFunctionContexts.length;
+    String[] columnNames = new String[numAggregationFunctions + 1];
+    columnNames[0] = "groupByKeyString";
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numAggregationFunctions + 1];
+    columnDataTypes[0] = DataSchema.ColumnDataType.STRING;
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      AggregationFunctionContext aggregationFunctionContext = _aggregationFunctionContexts[i];
+      columnNames[i + 1] = aggregationFunctionContext.getAggregationColumnName();
+      columnDataTypes[i + 1] = aggregationFunctionContext.getAggregationFunction().getIntermediateResultColumnType();
+    }
+
+    // Build the data table.
+    DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnDataTypes));
+
+    for (GroupByRow groupByRow : _groupByOrderByResult) {
+      dataTableBuilder.startRow();
+      dataTableBuilder.setColumn(0, groupByRow.getStringKey());
+      Object[] aggregationResults = groupByRow.getAggregationResults();
+      for (int i = 0; i < aggregationResults.length; i++) {
+        dataTableBuilder.setColumn(i + 1, aggregationResults[i]); // TODO: handle dta types separately instead of having object?
+      }
+      dataTableBuilder.finishRow();
+    }
     DataTable dataTable = dataTableBuilder.build();
 
     return attachMetadataToDataTable(dataTable);

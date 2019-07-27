@@ -1,12 +1,14 @@
 package org.apache.pinot.core.operator;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.common.utils.EqualityUtils;
 
 
 public class OrderByDefn {
 
-  private OrderType _orderType;
-  private int _index;
+  private OrderType _orderType; // from group by key, or from aggregation results
+  private int _index; // the index, among all the group by keys or aggregation results
   private boolean _ascending;
 
   public OrderByDefn(OrderType orderType, int index, boolean ascending) {
@@ -61,5 +63,13 @@ public class OrderByDefn {
     result = EqualityUtils.hashCodeOf(result, _index);
     result = EqualityUtils.hashCodeOf(result, _ascending);
     return result;
+  }
+
+  public static List<OrderByDefn> getDummyOrderByDefn() {
+    List<OrderByDefn> orderByDefns = new ArrayList<>();
+    //orderByDefns.add(new OrderByDefn(OrderType.GROUP_BY_KEY, 0, true));
+    //orderByDefns.add(new OrderByDefn(OrderType.GROUP_BY_KEY, 1, false));
+    orderByDefns.add(new OrderByDefn(OrderType.AGGREGATION_VALUE, 0, true));
+    return orderByDefns;
   }
 }

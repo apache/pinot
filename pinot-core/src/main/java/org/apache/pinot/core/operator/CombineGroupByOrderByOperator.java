@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator;
 
 import com.google.common.base.Preconditions;
+import io.netty.util.internal.ConcurrentSet;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -28,6 +29,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -67,10 +69,8 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
   // Limit on number of groups stored, beyond which no new group will be created
   private final int _innerSegmentNumGroupsLimit;
   private final int _interSegmentNumGroupsLimit;
-  private final boolean _trimAtMerge;
-  private final boolean _trimAfterMerge;
-  private boolean orderBy = true;
-  private boolean firstOrderByIsAggregation = true;
+  private final boolean _aggregtionsInOrderBy;
+  private final List<OrderByDefn> _orderByDefns;
 
   public CombineGroupByOrderByOperator(List<Operator> operators, BrokerRequest brokerRequest, ExecutorService executorService,
       long timeOutMs, int innerSegmentNumGroupsLimit) {
@@ -84,20 +84,15 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
     _interSegmentNumGroupsLimit =
         (int) Math.min((long) innerSegmentNumGroupsLimit * INTER_SEGMENT_NUM_GROUPS_LIMIT_FACTOR, Integer.MAX_VALUE);
 
-    // 1. If no order by, can trim during merge
     // 2. If order by, don't trim results at merge
     // 2.a if order by is on group keys, can compare while merging
     // 2.b if order by is on aggregation, trimming anything is wrong
-    boolean trimAtMerge = true;
-    boolean trimAfterMerge = true;
-    if (orderBy) {
-      trimAtMerge = false;
-      if (firstOrderByIsAggregation) {
-        trimAfterMerge = false;
-      }
-    }
-    _trimAtMerge = trimAtMerge;
-    _trimAfterMerge = trimAfterMerge;
+
+    _orderByDefns = OrderByDefn.getDummyOrderByDefn(); // get from broker request
+    _aggregtionsInOrderBy = true; // if order by has aggregations, set this to true
+
+
+
   }
 
   /**
@@ -123,8 +118,13 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
   protected IntermediateResultsBlock getNextBlock() {
     int numOperators = _operators.size();
     CountDownLatch operatorLatch = new CountDownLatch(numOperators);
-    ConcurrentHashMap<String, Object[]> resultsMap = new ConcurrentHashMap<>();
-    AtomicInteger numGroups = new AtomicInteger();
+    ConcurrentHashMap<String, GroupByRow> resultsMap = new ConcurrentHashMap<>();
+    // for the case with no aggregations in order by
+    ConcurrentSet<String> keysAlreadyRemoved = new ConcurrentSet<>();
+    OrderByExecutor orderByExecutor = new OrderByExecutor();
+    PriorityBlockingQueue<GroupByRow> priorityQueue =
+        new PriorityBlockingQueue<>(10, orderByExecutor.getComparator(_orderByDefns));
+
     ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
 
     AggregationFunctionContext[] aggregationFunctionContexts =
@@ -157,28 +157,65 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
             // Merge aggregation group-by result.
             aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
             if (aggregationGroupByResult != null) {
-              // Iterate over the group-by keys, for each key, update the group-by result in the resultsMap.
               Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
-              while (groupKeyIterator.hasNext()) {
-                GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-                resultsMap.compute(groupKey._stringKey, (key, value) -> {
-                  if (value == null) {
-                    if (numGroups.getAndIncrement() >= _interSegmentNumGroupsLimit && _trimAtMerge) {
-                      // skip
-                    } else {
-                      value = new Object[numAggregationFunctions];
+
+              // aggregtions in order by clause, do not trim anything
+              if (_aggregtionsInOrderBy) {
+                while (groupKeyIterator.hasNext()) {
+                  GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+                  resultsMap.compute(groupKey._stringKey, (key, value) -> {
+                    if (value == null) {
+                      Object[] resultToInsert = new Object[numAggregationFunctions];
                       for (int i = 0; i < numAggregationFunctions; i++) {
-                        value[i] = aggregationGroupByResult.getResultForKey(groupKey, i);
+                        resultToInsert[i] = aggregationGroupByResult.getResultForKey(groupKey, i);
                       }
+                      GroupByRow rowToAdd = new GroupByRow(groupKey._stringKey, resultToInsert);
+                      return rowToAdd;
+                    } else {
+                      Object[] resultToMerge = new Object[numAggregationFunctions];
+                      for (int i = 0; i < numAggregationFunctions; i++) {
+                        resultToMerge[i] = aggregationGroupByResult.getResultForKey(groupKey, i);
+                      }
+                      GroupByRow rowToMerge = new GroupByRow(groupKey._stringKey, resultToMerge);
+                      value.merge(rowToMerge, aggregationFunctions, numAggregationFunctions);
+                      return value;
                     }
-                  } else {
-                    for (int i = 0; i < numAggregationFunctions; i++) {
-                      value[i] = aggregationFunctions[i]
-                          .merge(value[i], aggregationGroupByResult.getResultForKey(groupKey, i));
-                    }
+                  });
+                }
+              } else { // can trim while merging, but based on sort order
+                // Iterate over the group-by keys, for each key, update the group-by result in the resultsMap. No trimming
+                while (groupKeyIterator.hasNext()) {
+                  GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+                  if (keysAlreadyRemoved.contains(groupKey._stringKey)) {
+                    continue;
                   }
-                  return value;
-                });
+                  resultsMap.compute(groupKey._stringKey, (key, value) -> {
+                    if (value == null) {
+                      Object[] resultToInsert = new Object[numAggregationFunctions];
+                      for (int i = 0; i < numAggregationFunctions; i++) {
+                        resultToInsert[i] = aggregationGroupByResult.getResultForKey(groupKey, i);
+                      }
+                      GroupByRow rowToAdd = new GroupByRow(groupKey._stringKey, resultToInsert);
+                      priorityQueue.offer(rowToAdd);
+                      return rowToAdd;
+                    } else {
+                      priorityQueue.remove(value);
+                      Object[] resultToMerge = new Object[numAggregationFunctions];
+                      for (int i = 0; i < numAggregationFunctions; i++) {
+                        resultToMerge[i] = aggregationGroupByResult.getResultForKey(groupKey, i);
+                      }
+                      GroupByRow rowToMerge = new GroupByRow(groupKey._stringKey, resultToMerge);
+                      value.merge(rowToMerge, aggregationFunctions, numAggregationFunctions);
+                      priorityQueue.offer(value);
+                      return value;
+                    }
+                  });
+                  if (priorityQueue.size() > _interSegmentNumGroupsLimit) { // this block is not thread safe
+                    GroupByRow poll = priorityQueue.poll(); // poll in while?
+                    resultsMap.remove(poll.getStringKey());
+                    keysAlreadyRemoved.add(poll.getStringKey()); // others could be adding to results before the key reaches here. think about this more
+                  }
+                }
               }
             }
           } catch (Exception e) {
@@ -201,22 +238,18 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
         return new IntermediateResultsBlock(new TimeoutException(errorMessage));
       }
 
-      List<GroupByRow> groupByRows = new ArrayList<>();
-      for (Map.Entry<String, Object[]> entry : resultsMap.entrySet()) {
-        GroupByRow groupByRow = new GroupByRow(entry.getKey(), entry.getValue());
-        groupByRows.add(groupByRow);
-      }
+      List<GroupByRow> groupByRows = new ArrayList<>(resultsMap.values());
 
       List<GroupByRow> trimmedRows;
-      if (_trimAfterMerge) {
-        TrimmingService trimmingService =
-            new TrimmingService(_interSegmentNumGroupsLimit, _brokerRequest.getGroupBy().getTopN(), getOrderByDefns());
-        trimmedRows = trimmingService.trim(groupByRows);
-      } else {
+      // aggregations in order by, do not trim anything
+      if (_aggregtionsInOrderBy) {
         trimmedRows = groupByRows;
+      } else { // else, order, and then trim
+        TrimmingService trimmingService =
+            new TrimmingService(_interSegmentNumGroupsLimit, _brokerRequest.getGroupBy().getTopN(), _orderByDefns);
+        trimmedRows = trimmingService.trim(groupByRows);
       }
-      IntermediateResultsBlock mergedBlock =
-          new IntermediateResultsBlock(aggregationFunctionContexts, trimmedRows, true);
+      IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(aggregationFunctionContexts, trimmedRows);
 
       // Set the processing exceptions.
       if (!mergedProcessingExceptions.isEmpty()) {
@@ -255,28 +288,6 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
         }
       }
     }
-  }
-
-  private List<GroupByRow> getGroupByRows(AggregationGroupByResult aggregationGroupByResult,
-      int numAggregationFunctions) {
-    List<GroupByRow> groupByRows = new ArrayList<>();
-    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
-    while (groupKeyIterator.hasNext()) {
-      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-      Object[] aggregationResults = new Object[numAggregationFunctions];
-      for (int i = 0; i < numAggregationFunctions; i++) {
-        aggregationResults[i] = aggregationGroupByResult.getResultForKey(groupKey, i);
-      }
-      GroupByRow groupByRow = new GroupByRow(groupKey._stringKey, aggregationResults);
-      groupByRows.add(groupByRow);
-    }
-    return groupByRows;
-  }
-
-  private List<OrderByDefn> getOrderByDefns() {
-    List<OrderByDefn> orderByDefns = new ArrayList<>();
-    orderByDefns.add(new OrderByDefn(OrderType.GROUP_BY_KEY, 0, true));
-    return orderByDefns;
   }
 
   @Override
