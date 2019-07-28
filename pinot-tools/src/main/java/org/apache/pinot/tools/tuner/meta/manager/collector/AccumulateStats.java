@@ -25,7 +25,7 @@ public class AccumulateStats implements Strategy {
   private static final String UNTAR = "tar -xf ";
   private static final String TMP_THREAD_FILE_PREFIX = "/tmpThreadFile";
   private static final String EXCLUDE_DATA = " --exclude columns.psf ";
-  private static final String STRIP_PATHS = " --xform=\'s#^\\.+/##x\' ";
+  private static final String STRIP_PATHS = " --xform=\'s#^.+/##x\' ";
   private static final String OUT_PUT_PATH = " -C ";
   private static final String RM_RF = "rm -rf ";
 
