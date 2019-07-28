@@ -82,9 +82,8 @@ public class AccumulateStats implements Strategy {
       Map<String, Map<String, AbstractAccumulator>> AccumulatorOut) {
     PathWrapper pathWrapper = ((PathWrapper) filePaths);
 
-    File tmpFolder = new File(
-        _outputDir.getAbsolutePath() + TMP_THREAD_FILE_PREFIX + Thread.currentThread().getId() + "_" + (int) (
-            Math.random() * 100));
+    File tmpFolder = new File(_outputDir.getAbsolutePath() + TMP_THREAD_FILE_PREFIX
+        + Thread.currentThread().getId() + "_" + (System.currentTimeMillis() / 1000) % 100);
     LOGGER.info("Extracting: " + pathWrapper.getFile().getAbsolutePath() + " to " + tmpFolder.getAbsolutePath());
     try {
       tmpFolder.mkdirs();
