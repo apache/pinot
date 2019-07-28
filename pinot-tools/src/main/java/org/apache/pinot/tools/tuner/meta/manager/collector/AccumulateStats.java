@@ -120,7 +120,7 @@ public class AccumulateStats implements Strategy {
     try {
       metadataString = FileUtils.readFileToString(metaDataProperties);
     } catch (IOException | NullPointerException e) {
-      LOGGER.error("No metadata for {}!", pathWrapper.getFile().getName());
+      LOGGER.error("No metadata.properties for {}!", pathWrapper.getFile().getName());
       deleteTmp(tmpFolder);
       return;
     }
@@ -129,7 +129,7 @@ public class AccumulateStats implements Strategy {
     try {
       indexMapString = FileUtils.readFileToString(indexMap);
     } catch (IOException | NullPointerException e) {
-      LOGGER.error("No indexMap for {}!", pathWrapper.getFile().getName());
+      LOGGER.error("No index_map for {}!", pathWrapper.getFile().getName());
       indexMapString = "";
     }
 
