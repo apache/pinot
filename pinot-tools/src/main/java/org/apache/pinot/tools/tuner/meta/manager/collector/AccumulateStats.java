@@ -88,7 +88,7 @@ public class AccumulateStats implements Strategy {
               + STRIP_PATHS + OUT_PUT_PATH + tmpFolder.getAbsolutePath()));
       p.waitFor();
     } catch (IOException | InterruptedException e) {
-      LOGGER.error("Error while extracting {}", pathWrapper.getFile().getName());
+      LOGGER.error("Error while extracting {}", pathWrapper.getFile().getAbsolutePath());
       deleteTmp(tmpFolder);
       return;
     }
