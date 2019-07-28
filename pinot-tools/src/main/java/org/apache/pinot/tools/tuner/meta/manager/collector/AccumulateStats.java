@@ -97,7 +97,7 @@ public class AccumulateStats implements Strategy {
     File indexMap;
     try {
       metaDataProperties = tmpFolder.listFiles((dir, name) -> name.equals("metadata.properties"))[0];
-      if (!metaDataProperties.exists()) {
+      if (metaDataProperties == null && !metaDataProperties.exists()) {
         throw new NullPointerException();
       }
     } catch (NullPointerException | ArrayIndexOutOfBoundsException e) {
@@ -119,8 +119,8 @@ public class AccumulateStats implements Strategy {
     String metadataString = "";
     try {
       metadataString = FileUtils.readFileToString(metaDataProperties);
-    } catch (IOException e) {
-      LOGGER.error("No metadata file read err for {}!", pathWrapper.getFile().getName());
+    } catch (Exception e) {
+      LOGGER.error("No metadata for {}!", pathWrapper.getFile().getName());
       deleteTmp(tmpFolder);
       return;
     }
@@ -128,8 +128,8 @@ public class AccumulateStats implements Strategy {
     String indexMapString = "";
     try {
       indexMapString = FileUtils.readFileToString(indexMap);
-    } catch (IOException e) {
-      LOGGER.error("No indexMap file read err for {}!", pathWrapper.getFile().getName());
+    } catch (Exception e) {
+      LOGGER.error("No indexMap for {}!", pathWrapper.getFile().getName());
       indexMapString = "";
     }
 
