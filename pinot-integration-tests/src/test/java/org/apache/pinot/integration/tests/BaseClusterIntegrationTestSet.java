@@ -186,6 +186,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query = "SELECT MAX(ArrTime), MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 16312";
     testSqlQuery(query, Arrays.asList("SELECT MAX(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 15312",
         "SELECT MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 15312"));
+    query = "SELECT ((FlightNum+5)*3-1)/2 FROM mytable WHERE DaysSinceEpoch >= 16312 limit 10";
+    testSqlQuery(query,
+        Arrays.asList("SELECT ((FlightNum+5)*3-1)/2 FROM mytable WHERE DaysSinceEpoch >= 16312 limit 10000"));
   }
 
   /**

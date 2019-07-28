@@ -49,6 +49,17 @@ public class CalciteSqlParser {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
 
+  private static final Map<String, String> FUNC_NAME_MAP;
+
+  // Calcite Sqlkind name to pinot operator name map
+  static {
+    FUNC_NAME_MAP = new HashMap<String, String>();
+    FUNC_NAME_MAP.put("PLUS", "ADD");
+    FUNC_NAME_MAP.put("MINUS", "SUB");
+    FUNC_NAME_MAP.put("TIMES", "MULT");
+    FUNC_NAME_MAP.put("DIVIDE", "DIV");
+  }
+
   /** Lexical policy similar to MySQL with ANSI_QUOTES option enabled. (To be
    * precise: MySQL on Windows; MySQL on Linux uses case-sensitive matching,
    * like the Linux file system.) The case of identifiers is preserved whether
@@ -248,11 +259,17 @@ public class CalciteSqlParser {
       case IN:
       case NOT_IN:
       case LIKE:
+        // Arith
+      case PLUS:
+      case MINUS:
+      case TIMES:
+      case DIVIDE:
         SqlBasicCall funcSqlNode = (SqlBasicCall) node;
         String funcName = funcSqlNode.getOperator().getKind().name();
         if (funcSqlNode.getOperator().getKind() == SqlKind.OTHER_FUNCTION) {
           funcName = funcSqlNode.getOperator().getName();
         }
+        funcName = FUNC_NAME_MAP.getOrDefault(funcName, funcName);
         final Expression funcExpr = RequestUtils.getFunctionExpression(funcName);
         for (SqlNode child : funcSqlNode.getOperands()) {
           if (child instanceof SqlNodeList) {
