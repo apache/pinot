@@ -89,8 +89,8 @@ public class AccumulateStats implements Strategy {
     try {
       tmpFolder.mkdirs();
       Process p = Runtime.getRuntime().exec(
-          (UNTAR + pathWrapper.getFile().getAbsolutePath() + EXCLUDE_DATA + STRIP_2COMPONENTS + OUT_PUT_PATH + tmpFolder
-              .getAbsolutePath()));
+          (UNTAR + pathWrapper.getFile().getAbsolutePath() + EXCLUDE_DATA
+              + STRIP_2COMPONENTS + OUT_PUT_PATH + tmpFolder.getAbsolutePath()));
       p.waitFor();
     } catch (IOException | InterruptedException e) {
       LOGGER.error("Error while extracting {}", pathWrapper.getFile().getName());
