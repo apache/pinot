@@ -101,7 +101,7 @@ public class AccumulateStats implements Strategy {
         throw new NullPointerException();
       }
     } catch (NullPointerException | ArrayIndexOutOfBoundsException e) {
-      LOGGER.error("No metadata.properties file for {}!", pathWrapper.getFile().getName());
+      LOGGER.error("No metadata.properties file for {}!", pathWrapper.getFile().getAbsolutePath());
       deleteTmp(tmpFolder);
       return;
     }
@@ -120,7 +120,7 @@ public class AccumulateStats implements Strategy {
     try {
       metadataString = FileUtils.readFileToString(metaDataProperties);
     } catch (IOException | NullPointerException e) {
-      LOGGER.error("No metadata.properties for {}!", pathWrapper.getFile().getName());
+      LOGGER.error("No metadata.properties for {}!", pathWrapper.getFile().getAbsolutePath());
       deleteTmp(tmpFolder);
       return;
     }
