@@ -57,7 +57,7 @@ public class AccumulateStats implements Strategy {
   }
 
   /**
-   * Filter out irrelevant segments
+   * Filter out irrelevant tables' segments.
    * @param filePaths the (tableNamesWithoutType,segmentPaths) extracted and parsed from directory
    * @return
    */
