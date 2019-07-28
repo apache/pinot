@@ -88,10 +88,9 @@ public class AccumulateStats implements Strategy {
     LOGGER.info("Extracting: " + pathWrapper.getFile().getAbsolutePath() + " to " + tmpFolder.getAbsolutePath());
     try {
       tmpFolder.mkdirs();
-      ProcessBuilder pb = new ProcessBuilder(
+      Process p = Runtime.getRuntime().exec(
           (UNTAR + pathWrapper.getFile().getAbsolutePath() + EXCLUDE_DATA + STRIP_2COMPONENTS + OUT_PUT_PATH + tmpFolder
               .getAbsolutePath()));
-      Process p = pb.start();
       p.waitFor();
     } catch (IOException | InterruptedException e) {
       LOGGER.error("Error while extracting {}", pathWrapper.getFile().getName());
@@ -174,10 +173,8 @@ public class AccumulateStats implements Strategy {
 
   private void deleteTmp(File tmpFolder) {
     try {
-      ProcessBuilder pb = new ProcessBuilder(RM_RF + tmpFolder.getAbsolutePath());
-      Process p = pb.start();
-      p.waitFor();
-    } catch (IOException | InterruptedException e) {
+      FileUtils.deleteDirectory(tmpFolder);
+    } catch (IOException e) {
       LOGGER.error(e.getMessage());
     }
   }
