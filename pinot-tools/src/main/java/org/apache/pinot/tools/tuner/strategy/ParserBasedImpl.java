@@ -203,7 +203,7 @@ public class ParserBasedImpl implements Strategy {
     for (Tuple2<String, Long> tuple2 : sortedPure) {
       reportOut += "Dimension: " + tuple2._1() + "  " + tuple2._2().toString() + "\n";
     }
-    reportOut += "***********************************************************************************\n";
+    reportOut += "\n***********************************************************************************\n";
     for (Tuple2<String, BigInteger> tuple2 : sortedWeighted) {
       reportOut += "Dimension: " + tuple2._1() + "  " + tuple2._2().toString() + "\n";
     }
