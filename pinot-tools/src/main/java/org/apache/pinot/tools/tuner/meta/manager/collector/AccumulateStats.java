@@ -82,17 +82,20 @@ public class AccumulateStats implements Strategy {
       Map<String, Map<String, AbstractAccumulator>> AccumulatorOut) {
     PathWrapper pathWrapper = ((PathWrapper) filePaths);
 
-    File tmpFolder = new File(_outputDir.getAbsolutePath() + TMP_THREAD_FILE_PREFIX + Thread.currentThread()
-        .getId()); //+"_"+(int)(Math.random()*100)
+    File tmpFolder = new File(
+        _outputDir.getAbsolutePath() + TMP_THREAD_FILE_PREFIX + Thread.currentThread().getId() + "_" + (int) (
+            Math.random() * 100));
     LOGGER.info("Extracting: " + pathWrapper.getFile().getAbsolutePath() + " to " + tmpFolder.getAbsolutePath());
     try {
       tmpFolder.mkdirs();
-      Process p = Runtime.getRuntime().exec(
+      ProcessBuilder pb = new ProcessBuilder(
           (UNTAR + pathWrapper.getFile().getAbsolutePath() + EXCLUDE_DATA + STRIP_2COMPONENTS + OUT_PUT_PATH + tmpFolder
               .getAbsolutePath()));
+      Process p = pb.start();
       p.waitFor();
     } catch (IOException | InterruptedException e) {
-      LOGGER.error(e.getMessage());
+      LOGGER.error("Error while extracting {}", pathWrapper.getFile().getName());
+      deleteTmp(tmpFolder);
       return;
     }
 
@@ -104,7 +107,8 @@ public class AccumulateStats implements Strategy {
         throw new NullPointerException();
       }
     } catch (NullPointerException | ArrayIndexOutOfBoundsException e) {
-      LOGGER.error("No metadata.properties for {}!", pathWrapper.getFile().getName());
+      LOGGER.error("No metadata.properties file for {}!", pathWrapper.getFile().getName());
+      deleteTmp(tmpFolder);
       return;
     }
 
@@ -114,7 +118,7 @@ public class AccumulateStats implements Strategy {
         throw new NullPointerException();
       }
     } catch (NullPointerException | ArrayIndexOutOfBoundsException e) {
-      LOGGER.error("No index_map for {}!", pathWrapper.getFile().getName());
+      LOGGER.error("No index_map file for {}!", pathWrapper.getFile().getName());
       indexMap = null;
     }
 
@@ -123,6 +127,7 @@ public class AccumulateStats implements Strategy {
       metadataString = FileUtils.readFileToString(metaDataProperties);
     } catch (IOException e) {
       LOGGER.error("No metadata file read err for {}!", pathWrapper.getFile().getName());
+      deleteTmp(tmpFolder);
       return;
     }
 
@@ -164,12 +169,16 @@ public class AccumulateStats implements Strategy {
           .addTotalNumberOfEntries(totalNumberOfEntries).merge();
     }
 
+    deleteTmp(tmpFolder);
+  }
+
+  private void deleteTmp(File tmpFolder) {
     try {
-      Process p = Runtime.getRuntime().exec(RM_RF + tmpFolder.getAbsolutePath());
+      ProcessBuilder pb = new ProcessBuilder(RM_RF + tmpFolder.getAbsolutePath());
+      Process p = pb.start();
       p.waitFor();
     } catch (IOException | InterruptedException e) {
       LOGGER.error(e.getMessage());
-      return;
     }
   }
 
