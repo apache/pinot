@@ -35,10 +35,10 @@ public class CompressedFilePathIter implements QuerySrc {
     ArrayList<Tuple2<String, File>> validTableNameWithoutTypeSegmentFile = new ArrayList<>();
 
     Arrays.stream(Objects.requireNonNull(dir.listFiles()))
-        .filter(tableDir -> (!tableDir.getName().startsWith(".") && !tableDir.getName().equals("Deleted_Segments")
-            && tableDir.isDirectory())).forEach(
-        tableDir -> Arrays.stream(Objects.requireNonNull(tableDir.listFiles()))
-            .filter(file -> (!file.getName().startsWith(".")))
+        .filter(tableDir -> (tableDir.isDirectory() && !tableDir.getName().startsWith(".") && !tableDir.getName()
+            .equals("Deleted_Segments")))
+        .forEach(tableDir -> Arrays.stream(Objects.requireNonNull(tableDir.listFiles()))
+            .filter(file -> (file.isFile() && !file.getName().startsWith(".")))
             .forEach(file -> validTableNameWithoutTypeSegmentFile.add(new Tuple2<>(tableDir.getName(), file))));
 
     _iterator = validTableNameWithoutTypeSegmentFile.iterator();

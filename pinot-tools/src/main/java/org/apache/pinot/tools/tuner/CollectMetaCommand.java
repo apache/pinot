@@ -11,7 +11,7 @@ import org.kohsuke.args4j.Option;
 
 
 public class CollectMetaCommand extends AbstractBaseCommand implements Command {
-  @Option(name = "-workDir", required = true, metaVar = "<String>", usage = "The directory to work on, for tmp files and output metadata.json file，must have r/w access")
+  @Option(name = "-workDir", required = true, metaVar = "<String>", usage = "An empty directory to work on, for tmp files and output metadata.json file，must have r/w access")
   private String _workDir;
 
   @Option(name = "-segmentsDir", required = true, metaVar = "<String>", usage = "The directory, which contains tableNamesWithoutType/{tarred segments}")

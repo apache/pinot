@@ -112,7 +112,7 @@ public class AccumulateStats implements Strategy {
         throw new NullPointerException();
       }
     } catch (NullPointerException | ArrayIndexOutOfBoundsException e) {
-      LOGGER.error("No index_map file for {}!", pathWrapper.getFile().getName());
+      LOGGER.error("No index_map file for {}!", pathWrapper.getFile().getAbsolutePath());
       indexMap = null;
     }
 
@@ -129,7 +129,7 @@ public class AccumulateStats implements Strategy {
     try {
       indexMapString = FileUtils.readFileToString(indexMap);
     } catch (IOException | NullPointerException e) {
-      LOGGER.error("No index_map for {}!", pathWrapper.getFile().getName());
+      LOGGER.error("No index_map for {}!", pathWrapper.getFile().getAbsolutePath());
       indexMapString = "";
     }
 
