@@ -43,8 +43,8 @@ import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
+import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 
@@ -83,7 +83,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   private org.apache.pinot.client.Connection _pinotConnection;
   private Connection _h2Connection;
   private QueryGenerator _queryGenerator;
-
 
   /**
    * The following getters can be overridden to change default settings.
@@ -324,9 +323,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       @Override
       public void run() {
         try {
-          ClusterIntegrationTestUtils
-              .pushAvroIntoKafka(avroFiles, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, kafkaTopic,
-                  getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
+          ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, kafkaTopic,
+              getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
         } catch (Exception e) {
           // Ignored
         }
@@ -336,8 +334,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected void startKafka() {
 
-    _kafkaStarters =
-        KafkaStarterUtils.startServers(getNumKafkaBrokers(), KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_ZK_STR,
+    _kafkaStarters = KafkaStarterUtils
+        .startServers(getNumKafkaBrokers(), KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_ZK_STR,
             KafkaStarterUtils.getDefaultKafkaConfiguration());
     _kafkaStarters.get(0)
         .createTopic(getKafkaTopic(), KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
@@ -423,14 +421,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
     addRealtimeTable(getTableName(), useLlc(), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
         getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName,
-        getBrokerTenant(), getServerTenant(), getLoadMode(), getSortedColumn(),
-        getInvertedIndexColumns(), getBloomFilterIndexColumns(), getRawIndexColumns(), getTaskConfig(),
-        getStreamConsumerFactoryClassName());
+        getBrokerTenant(), getServerTenant(), getLoadMode(), getSortedColumn(), getInvertedIndexColumns(),
+        getBloomFilterIndexColumns(), getRawIndexColumns(), getTaskConfig(), getStreamConsumerFactoryClassName());
 
     completeTableConfiguration();
   }
 
-  protected void completeTableConfiguration() throws IOException {
+  protected void completeTableConfiguration()
+      throws IOException {
     if (isUsingNewConfigFormat()) {
       CombinedConfig combinedConfig = new CombinedConfig(_offlineTableConfig, _realtimeTableConfig, _schema);
       sendPostRequest(_controllerRequestURLBuilder.forNewTableCreate(), Serializer.serializeToString(combinedConfig));

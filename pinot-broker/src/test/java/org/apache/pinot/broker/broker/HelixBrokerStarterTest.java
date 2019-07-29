@@ -41,7 +41,6 @@ import org.apache.pinot.common.utils.CommonConstants.Broker;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.util.TestUtils;
@@ -77,11 +76,8 @@ public class HelixBrokerStarterTest extends ControllerTest {
     _brokerStarter = new HelixBrokerStarter(brokerConf, getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR);
     _brokerStarter.start();
 
-    ControllerRequestBuilderUtil
-        .addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, NUM_BROKERS - 1,
-            true);
-    ControllerRequestBuilderUtil
-        .addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, NUM_SERVERS, true);
+    addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKERS - 1, true);
+    addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVERS, true);
 
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
         .addTime(TIME_COLUMN_NAME, TimeUnit.DAYS, FieldSpec.DataType.INT).build();
@@ -207,6 +203,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
 
   @AfterClass
   public void tearDown() {
+    stopFakeInstances();
     _brokerStarter.shutdown();
     stopController();
     stopZk();
