@@ -498,7 +498,6 @@ public class PinotTableRestletResource {
     try {
       if (dryRun) {
         result = _pinotHelixResourceManager.rebalanceTable(tableName, type, rebalanceUserConfig);
-        result.setStatusMessage("Rebalance attempted in dry-run mode.");
       } else {
         // run rebalance asynchronously
         _executorService.submit(new Runnable() {
@@ -514,7 +513,7 @@ public class PinotTableRestletResource {
         });
         result = new RebalanceResult();
         result
-            .setStatusMessage("Rebalance for table " + tableName + " in progress. Check controller logs for updates.");
+            .setStatus("Rebalance for table " + tableName + " in progress. Check controller logs for updates.");
       }
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);

@@ -102,18 +102,20 @@ public class PinotTableRebalancer extends PinotZKChanger {
     final RebalanceResult rebalanceResult =
         tableRebalancer.rebalance(tableConfig, rebalanceSegmentsStrategy, rebalanceUserConfig);
 
-    if (rebalanceResult.getStatus() == RebalanceResult.RebalanceStatus.FAILED) {
+    if (rebalanceResult.getStatusCode() == RebalanceResult.RebalanceStatus.FAILED) {
       LOGGER.error("Failed to rebalance table: " + tableName);
+      LOGGER.error(rebalanceResult.getStatus());
       return false;
     } else {
-      LOGGER.debug("Successfully rebalanced table: " + tableName);
-      LOGGER.debug("Resulting Ideal state");
+      LOGGER.info("Successfully rebalanced table: " + tableName);
+      LOGGER.info(rebalanceResult.getStatus());
+      LOGGER.info("Resulting Ideal state");
       Map<String, Map<String, String>> idealState = rebalanceResult.getIdealStateMapping();
       for (String segment : idealState.keySet()) {
-        LOGGER.debug("Segment: {}", segment);
+        LOGGER.info("Segment: {}", segment);
         final Map<String, String> segmentHostsMap = idealState.get(segment);
         final Joiner.MapJoiner mapJoiner = Joiner.on(",").withKeyValueSeparator(":");
-        LOGGER.debug(mapJoiner.join(segmentHostsMap));
+        LOGGER.info(mapJoiner.join(segmentHostsMap));
       }
       _rebalancerStats = tableRebalancer.getRebalancerStats();
       return true;

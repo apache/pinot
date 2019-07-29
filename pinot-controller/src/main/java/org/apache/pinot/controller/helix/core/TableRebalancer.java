@@ -33,9 +33,11 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
+import org.apache.helix.api.config.RebalanceConfig;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.logging.log4j.Level;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.partition.PartitionAssignment;
@@ -70,6 +72,7 @@ public class TableRebalancer {
 
   private static final int MAX_RETRIES = 10;
   private static final int EXTERNAL_VIEW_CHECK_INTERVAL_MS = 30000;
+  private static final int EXTERNVAL_VIEW_STABILIZATON_MAX_WAIT_MS = 300000;
 
   private final HelixManager _helixManager;
   private final HelixAdmin _helixAdmin;
@@ -115,7 +118,8 @@ public class TableRebalancer {
           strategy.getRebalancedIdealState(previousIdealState, tableConfig, rebalanceConfig, partitionAssignment);
       result.setIdealStateMapping(idealState.getRecord().getMapFields());
       result.setPartitionAssignment(partitionAssignment);
-      result.setStatus(RebalanceResult.RebalanceStatus.DONE);
+      result.setStatus("Successfully ran rebalancer in dry run mode");
+      result.setStatusCode(RebalanceResult.RebalanceStatus.DONE);
       _rebalancerStats.dryRun = 1;
       return result;
     }
@@ -123,6 +127,10 @@ public class TableRebalancer {
     long startTime = System.nanoTime();
     IdealState targetIdealState = null;
     PartitionAssignment targetPartitionAssignment = null;
+
+    // validate the number of min replicas to keep alive
+    // if using no-downtime mode
+    validateMinReplicas(tableNameWithType, rebalanceConfig, previousIdealState);
 
     long retryDelayMs = 60000; // 1 min
     int retries = 0;
@@ -149,14 +157,15 @@ public class TableRebalancer {
             TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime));
         result.setIdealStateMapping(targetIdealState.getRecord().getMapFields());
         result.setPartitionAssignment(targetPartitionAssignment);
-        result.setStatus(RebalanceResult.RebalanceStatus.DONE);
+        result.setStatus("Successfully finished rebalancing");
+        result.setStatusCode(RebalanceResult.RebalanceStatus.DONE);
         return result;
       }
 
       // if ideal state needs to change, get the next 'safe' state (based on whether downtime is OK or not)
       IdealState nextIdealState = getNextState(currentIdealState, targetIdealState, rebalanceConfig);
-      LOGGER.debug("Ideal state after making changes to partition map of all segments");
-      prettyPrintIdealState(nextIdealState);
+      LOGGER.info("Got new ideal state after making changes to partition map of all segments. Will attempt to persist this in ZK. Logging the difference between new and target ideal state");
+      printIdealStateDifference(targetIdealState, nextIdealState);
 
       // If the ideal state is large enough, enable compression
       if (HelixHelper.MAX_PARTITION_COUNT_IN_UNCOMPRESSED_IDEAL_STATE < nextIdealState.getPartitionSet().size()) {
@@ -170,35 +179,44 @@ public class TableRebalancer {
         if (zkBaseDataAccessor
             .set(idealStateKey.getPath(), nextIdealState.getRecord(), currentIdealState.getRecord().getVersion(),
                 AccessOption.PERSISTENT)) {
-          LOGGER.debug("Successfully persisted the ideal state for table {} in ZK. Will wait for External view to converge",
+          LOGGER.info("Successfully persisted the ideal state for table {} in ZK. Will wait for External view to converge",
               tableNameWithType);
           ++_rebalancerStats.updatestoIdealStateInZK;
           // if we succeeded, wait for the change to stabilize
           waitForStable(tableNameWithType);
           // clear retries as it tracks failures with each idealstate update attempt
           retries = 0;
-          LOGGER.debug("External view converged for the change in ideal state for table {}. Will start the next iteration now",
+          LOGGER.info("External view converged for the change in ideal state for table {}. Will start the next iteration (if any)",
               tableNameWithType);
           continue;
         }
         // in case of any error, we retry a bounded number of times
       } catch (ZkBadVersionException e) {
         // we will go back in the loop and reattempt by recomputing the target ideal state
-        LOGGER.warn("Version changed while updating ideal state for resource: {}", tableNameWithType);
+        LOGGER.info("Version changed while updating ideal state for resource: {}, was expecting version {}",
+            tableNameWithType, currentIdealState.getRecord().getVersion());
       } catch (Exception e) {
         if (e instanceof IllegalStateException && e.getCause() instanceof ExternalViewErrored) {
-          LOGGER.error("External view reported error for table {} after updating ideal state", tableNameWithType);
+          if (e.getCause() instanceof ExternalViewErrored) {
+            LOGGER.error("External view reported error for table {} after updating ideal state", tableNameWithType);
+          } else if (e.getCause() instanceof ExternalViewConvergeTimeout) {
+            LOGGER.error("Timedout while waiting for external view to converge for table {}", tableNameWithType);
+          }
           // remove the cause as it is private and is only used to detect exact error within this class
           throw new IllegalStateException(e.getMessage());
         } else {
-          LOGGER.warn("Caught exception while or after updating ideal state for resource: {}", tableNameWithType, e);
+          LOGGER.error("Caught exception while or after updating ideal state for resource: {}", tableNameWithType, e);
+          throw e;
         }
       }
 
+      // if we are here, we failed to persist the updated ideal state in ZK
+      // due to version mismatch, will attempt again
       previousIdealState = currentIdealState;
       if (retries++ > MAX_RETRIES) {
         LOGGER.error("Unable to rebalance table {} in {} attempts. Giving up", tableNameWithType, MAX_RETRIES);
-        result.setStatus(RebalanceResult.RebalanceStatus.FAILED);
+        result.setStatus("Cancelling the rebalance operation as we have exhausted the max number of retries after ZK version mismatch");
+        result.setStatusCode(RebalanceResult.RebalanceStatus.FAILED);
         return result;
       }
       // wait before retrying
@@ -206,23 +224,59 @@ public class TableRebalancer {
         Thread.sleep(retryDelayMs);
       } catch (InterruptedException e) {
         LOGGER.error("Got interrupted while rebalancing table {}", tableNameWithType);
-        result.setStatus(RebalanceResult.RebalanceStatus.FAILED);
+        result.setStatus("Rebalancer got interrupted");
+        result.setStatusCode(RebalanceResult.RebalanceStatus.FAILED);
         Thread.currentThread().interrupt();
         return result;
       }
     }
   }
 
+  private void validateMinReplicas(final String tableNameWithType,
+      final Configuration rebalanceConfig, final IdealState idealState) {
+    if (rebalanceConfig.getBoolean(RebalanceUserConfigConstants.DOWNTIME,
+        RebalanceUserConfigConstants.DEFAULT_DOWNTIME)) {
+      final int minReplicasToKeepUp = rebalanceConfig
+          .getInt(RebalanceUserConfigConstants.MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME,
+              RebalanceUserConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME);
+      Map<String, Map<String, String>> currentMapFields = idealState.getRecord().getMapFields();
+      for (String segment : currentMapFields.keySet()) {
+        final Map<String, String> segmentHostsMap = currentMapFields.get(segment);
+        if (minReplicasToKeepUp >= segmentHostsMap.size()) {
+          final StringBuilder sb = new StringBuilder();
+          sb.append("User specified invalid number of min replicas: ").append(minReplicasToKeepUp)
+              .append(" to keep alive in no-downtime mode").append("for table ").append(tableNameWithType)
+              .append(" current replicas for segment ").append(segment)
+              .append(segmentHostsMap.size());
+          LOGGER.error(sb.toString());
+          throw new IllegalArgumentException(sb.toString());
+        }
+      }
+    }
+  }
+
   /**
-   * Helper method to dump ideal state
-   * @param idealState ideal state to dump
+   * Print the difference between target and updated ideal state
+   * @param target target ideal state
+   * @param updated updated ideal state
    */
-  private static void prettyPrintIdealState(final IdealState idealState) {
-    if (LOGGER.isDebugEnabled()) {
-      Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
-      for (String segment : mapFields.keySet()) {
-        LOGGER.debug("Segment: {}", segment);
-        prettyPrintMapDebug(mapFields.get(segment));
+  private void printIdealStateDifference(final IdealState target, final IdealState updated) {
+    final Map<String, Map<String, String>> targetSegments = target.getRecord().getMapFields();
+    final Map<String, Map<String, String>> updatedSegments = updated.getRecord().getMapFields();
+    for (String segment : targetSegments.keySet()) {
+      final Map<String, String> targetInstanceMap = targetSegments.get(segment);
+      final Map<String, String> updatedInstanceMap = updatedSegments.get(segment);
+      if (updatedInstanceMap == null) {
+        LOGGER.info("Segment {} missing from current ideal state", segment);
+      } else {
+        LOGGER.info("Printing the common and differing hosts between updated and target ideal states for segment {}", segment);
+        MapDifference diff = Maps.difference(targetInstanceMap, updatedInstanceMap);
+        LOGGER.debug("Common hosts");
+        prettyPrintMap(diff.entriesInCommon(), Level.DEBUG);
+        LOGGER.info("Hosts from target state not yet added");
+        prettyPrintMap(diff.entriesOnlyOnLeft(), Level.INFO);
+        LOGGER.debug("Hosts from updated state not yet removed");
+        prettyPrintMap(diff.entriesOnlyOnRight(), Level.DEBUG);
       }
     }
   }
@@ -232,19 +286,26 @@ public class TableRebalancer {
    * is set such that there is always atleast one common replica for each segment between current and next state.
    */
   private IdealState getNextState(IdealState currentState, IdealState targetState, Configuration rebalanceUserConfig) {
-
     // make a copy of the ideal state so it can be updated
-    IdealState idealStateCopy = HelixHelper.cloneIdealState(currentState);
+    IdealState idealStateToUpdate = HelixHelper.cloneIdealState(currentState);
 
     Map<String, Map<String, String>> currentMapFields = currentState.getRecord().getMapFields();
     Map<String, Map<String, String>> targetMapFields = targetState.getRecord().getMapFields();
 
+    final int directUpdates = _rebalancerStats.directUpdatesToSegmentInstanceMap;
+    final int incrementalUpdates = _rebalancerStats.incrementalUpdatesToSegmentInstanceMap;
+
     for (String segmentId : targetMapFields.keySet()) {
-      updateSegmentIfNeeded(segmentId, currentMapFields.get(segmentId), targetMapFields.get(segmentId), idealStateCopy,
-          rebalanceUserConfig);
+      updateSegmentIfNeeded(segmentId, currentMapFields.get(segmentId), targetMapFields.get(segmentId),
+          idealStateToUpdate, rebalanceUserConfig);
     }
 
-    return idealStateCopy;
+    LOGGER.info("Updated instance state map of {} segments by directly setting to target ideal state mapping",
+        _rebalancerStats.directUpdatesToSegmentInstanceMap - directUpdates);
+    LOGGER.info("Updated instance state map of {} segments incrementally by adding a host from target ideal state mapping",
+        _rebalancerStats.incrementalUpdatesToSegmentInstanceMap - incrementalUpdates);
+
+    return idealStateToUpdate;
   }
 
   /**
@@ -287,20 +348,20 @@ public class TableRebalancer {
       Map<String, String> targetIdealStateSegmentHosts, IdealState idealStateToUpdate,
       Configuration rebalanceUserConfig) {
 
-    LOGGER.info("Will update instance map of segment: {}", segmentId);
+    LOGGER.debug("Will update instance map of segment: {}", segmentId);
 
     if (currentIdealStateSegmentHosts == null) {
       //segment can be missing if retention manager has deleted it
-      LOGGER.info("Segment " + segmentId + " missing from current idealState. Skipping it.");
+      LOGGER.debug("Segment " + segmentId + " missing from current idealState. Skipping it.");
       return;
     }
 
     // dump additional detailed info for debugging
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Current hosts and states for segment {}", segmentId);
-      prettyPrintMapDebug(currentIdealStateSegmentHosts);
+      prettyPrintMap(currentIdealStateSegmentHosts, Level.DEBUG);
       LOGGER.debug("Target hosts and states for segment {}", segmentId);
-      prettyPrintMapDebug(targetIdealStateSegmentHosts);
+      prettyPrintMap(targetIdealStateSegmentHosts, Level.DEBUG);
     }
 
     if (rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DOWNTIME,
@@ -329,12 +390,13 @@ public class TableRebalancer {
           minReplicasToKeepUp, segmentId, currentIdealStateSegmentHosts.size());
       minReplicasToKeepUp = RebalanceUserConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME;
     }
+
     MapDifference difference = Maps.difference(targetIdealStateSegmentHosts, currentIdealStateSegmentHosts);
     if (difference.entriesInCommon().size() >= minReplicasToKeepUp) {
       // if there are enough hosts in common between current and target ideal states
       // to satisfy the min replicas condition, then there won't be any downtime
       // and we can directly set the current ideal state to target ideal state
-      LOGGER.debug("Current and target ideal states have common hosts. Will set to target state at one go");
+      LOGGER.debug("Current and target ideal states have sufficient common hosts. Will set to target state at one go");
       setTargetState(idealStateToUpdate, segmentId, targetIdealStateSegmentHosts);
       ++_rebalancerStats.directUpdatesToSegmentInstanceMap;
     } else {
@@ -351,7 +413,7 @@ public class TableRebalancer {
 
       if (!hostToRemove.equals("")) {
         idealStateToUpdate.getInstanceStateMap(segmentId).remove(hostToRemove);
-        LOGGER.info("Removing host: {} for segment: {}", hostToRemove, segmentId);
+        LOGGER.debug("Removing host: {} for segment: {}", hostToRemove, segmentId);
       }
 
       // add an entry from the target state to ensure there is no downtime
@@ -369,14 +431,14 @@ public class TableRebalancer {
       Preconditions.checkArgument(!hostToAdd.equals(""),
           "expecting a valid hostname to add from target segment mapping");
       idealStateToUpdate.setPartitionState(segmentId, hostToAdd, targetIdealStateSegmentHosts.get(hostToAdd));
-      LOGGER.info("Adding " + hostToAdd + " to serve segment " + segmentId);
+      LOGGER.debug("Adding " + hostToAdd + " to serve segment " + segmentId);
       ++_rebalancerStats.incrementalUpdatesToSegmentInstanceMap;
 
       // dump additional detailed info for debugging
       if (LOGGER.isDebugEnabled()) {
         final Map<String, String> updatedSegmentHosts = idealStateToUpdate.getInstanceStateMap(segmentId);
         LOGGER.debug("Updated hosts and states for segment {}", segmentId);
-        prettyPrintMapDebug(updatedSegmentHosts);
+        prettyPrintMap(updatedSegmentHosts, Level.DEBUG);
       }
     }
   }
@@ -401,64 +463,79 @@ public class TableRebalancer {
     Map<String, Map<String, String>> mapFieldsEV = externalView.getRecord().getMapFields();
 
     LOGGER.info("Checking if ideal state and external view are same for table {}", tableName);
+    int segmentsNotConverged = 0;
 
     boolean stable = true;
     for (String segment : mapFieldsIS.keySet()) {
       Map<String, String> mapIS = mapFieldsIS.get(segment);
       Map<String, String> mapEV = mapFieldsEV.get(segment);
+      boolean converged = true;
 
       if (mapEV == null) {
-        LOGGER.debug("Host-state mapping of segment {} not yet available in external view", segment);
+        LOGGER.info("Host-state mapping of segment {} not yet available in external view", segment);
         // we have found that external view hasn't yet converged to ideal state.
         // still go on to check for other segments just so that we can dump debug
         // messages or we can detect error. that's why we don't return
         // false immediately
         stable = false;
+        ++segmentsNotConverged;
         continue;
       }
 
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Hosts and states for segment {} in ideal state", segment);
-        prettyPrintMapDebug(mapIS);
+        prettyPrintMap(mapIS, Level.DEBUG);
         LOGGER.debug("Hosts and states for segment {} in external view", segment);
-        prettyPrintMapDebug(mapEV);
+        prettyPrintMap(mapEV, Level.DEBUG);
       }
 
       for (String server : mapIS.keySet()) {
         if (!mapEV.containsKey(server)) {
-          LOGGER.debug("Host-state mapping of segment {} doesn't yet have server {} in external view",
+          LOGGER.info("Host-state mapping of segment {} doesn't yet have server {} in external view",
               segment, server);
           // external view not yet converged
           stable = false;
+          converged = false;
         } else if (mapEV.get(server).equalsIgnoreCase("error")) {
           LOGGER.error("Detected error state for segment {} for server {}", segment, server);
-          prettyPrintMapError(mapIS);
-          prettyPrintMapError(mapEV);
+          prettyPrintMap(mapIS, Level.ERROR);
+          prettyPrintMap(mapEV, Level.ERROR);
           throw new IllegalStateException("External view reports error state for segment " + segment + " for host " + server,
               new ExternalViewErrored());
         } else {
           final String stateInIdealState = mapIS.get(server);
           final String stateInExternalView = mapEV.get(server);
           if (!stateInIdealState.equalsIgnoreCase(stateInExternalView)) {
-            LOGGER.debug("Host-state mapping of segment {} has state {} in external view and state {} in ideal state",
+            LOGGER.info("Host-state mapping of segment {} has state {} in external view and state {} in ideal state",
                 segment, stateInExternalView, stateInIdealState);
             // external view not yet converged
             stable = false;
+            converged = false;
           }
         }
       }
+
+      if (!converged) {
+        segmentsNotConverged++;
+      }
     }
+
+    LOGGER.info("{} of total {} segments from ideal state don't yet have external view converged",
+        segmentsNotConverged, mapFieldsIS.size());
     return stable;
   }
 
-  private static void prettyPrintMapDebug(final Map<String, String> map) {
-    final Joiner.MapJoiner mapJoiner = Joiner.on(",").withKeyValueSeparator(":");
-    LOGGER.debug(mapJoiner.join(map));
-  }
-
-  private static void prettyPrintMapError(final Map<String, String> map) {
-    final Joiner.MapJoiner mapJoiner = Joiner.on(",").withKeyValueSeparator(":");
-    LOGGER.error(mapJoiner.join(map));
+  private static void prettyPrintMap(final Map<String, String> map, final Level level) {
+    if (map.size() > 0) {
+      final Joiner.MapJoiner mapJoiner = Joiner.on(",").withKeyValueSeparator(":");
+      if (level == Level.DEBUG) {
+        LOGGER.debug(mapJoiner.join(map));
+      } else if (level == Level.ERROR) {
+        LOGGER.error(mapJoiner.join(map));
+      } else if (level == Level.INFO) {
+        LOGGER.info(mapJoiner.join(map));
+      }
+    }
   }
 
   /**
@@ -466,19 +543,36 @@ public class TableRebalancer {
    */
   private void waitForStable(final String resourceName) {
     int INITIAL_WAIT_MS = 3000;
+    int wait = 0;
+    boolean done = false;
     try {
       Thread.sleep(INITIAL_WAIT_MS);
-      while (true) {
+      // the isStable method will bail out on detecting ERROR state
+      // in external view. However, if the external view never converges
+      // (for some reason) and we don't see ERROR state as well, then we
+      // don't want to wait indefinitely for the external view to converge
+      // thus, we use a fix max wait period  and bail out if external
+      // view hasn't converged within that time period
+      while (wait < EXTERNVAL_VIEW_STABILIZATON_MAX_WAIT_MS) {
         if (isStable(resourceName)) {
+          done = true;
           break;
         } else {
           LOGGER.info("Waiting for externalView to match idealstate for table:" + resourceName);
           Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
+          wait += EXTERNAL_VIEW_CHECK_INTERVAL_MS;
           }
         }
       } catch (InterruptedException e) {
       LOGGER.error("Rebalancer got interrupted while waiting for external view to converge");
       Thread.currentThread().interrupt();
+    }
+
+    if (!done) {
+      LOGGER.error("External view didn't converge for table {} within max wait time of 5mins. Bailing out",
+          resourceName);
+      throw new IllegalStateException("External view didn't converge for table " + resourceName + " within max wait period of 5mins",
+          new ExternalViewConvergeTimeout());
     }
   }
 
@@ -546,6 +640,10 @@ public class TableRebalancer {
   }
 
   private static class ExternalViewErrored extends Throwable {
+
+  }
+
+  private static class ExternalViewConvergeTimeout extends Throwable {
 
   }
 }

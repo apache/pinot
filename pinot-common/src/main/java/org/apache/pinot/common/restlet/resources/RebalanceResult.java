@@ -28,19 +28,17 @@ import org.apache.pinot.common.partition.PartitionAssignment;
 public class RebalanceResult {
   private Map<String, Map<String, String>> idealStateMapping;
   private PartitionAssignment partitionAssignment;
-  private RebalanceStatus status;
-  private String statusMessage;
+  private String status;
+  private RebalanceStatus statusCode;
 
   public RebalanceResult() {
   }
 
   public RebalanceResult(@JsonProperty("idealState") Map<String, Map<String, String>> idealStateMapping,
-      @JsonProperty("partitionAssignment") PartitionAssignment partitionAssignment,
-      @JsonProperty("rebalanceStatus") RebalanceStatus status, @JsonProperty("statusMessage") String statusMessage) {
+      @JsonProperty("partitionAssignment") PartitionAssignment partitionAssignment, String status) {
     this.idealStateMapping = idealStateMapping;
     this.partitionAssignment = partitionAssignment;
     this.status = status;
-    this.statusMessage = statusMessage;
   }
 
   public Map<String, Map<String, String>> getIdealStateMapping() {
@@ -59,23 +57,23 @@ public class RebalanceResult {
     this.partitionAssignment = partitionAssignment;
   }
 
-  public RebalanceStatus getStatus() {
-    return status;
-  }
-
-  public void setStatus(RebalanceStatus status) {
+  public void setStatus(String status) {
     this.status = status;
   }
 
-  public void setStatusMessage(String message) {
-    statusMessage = message;
-  }
-
-  public String getStatusMessage() {
-    return statusMessage;
+  public String getStatus() {
+    return status;
   }
 
   public enum RebalanceStatus {
     DONE, FAILED
+  }
+
+  public RebalanceStatus getStatusCode() {
+    return statusCode;
+  }
+
+  public void setStatusCode(RebalanceStatus status) {
+    this.statusCode = status;
   }
 }
