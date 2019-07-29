@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The implementation of MetaManager to read formatted data from Json file
+ * The implementation of {@link MetaManager} to read formatted data from Json file
  */
 public class JsonFileMetaManagerImpl implements MetaManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonFileMetaManagerImpl.class);
@@ -155,17 +155,9 @@ public class JsonFileMetaManagerImpl implements MetaManager {
   }
 
   public BigFraction getAverageNumEntries(String tableNameWithoutType, String columnName) {
-    String entriesNumeratorString = getColField(tableNameWithoutType, columnName, SUM_TOTAL_ENTRIES);
-    String entriesDenominatorString = getColField(tableNameWithoutType, columnName, SUM_DOCS);
-
-    if (entriesNumeratorString == null || entriesDenominatorString == null) {
-      LOGGER.error("{} {}'s average value info does not exist!", tableNameWithoutType, columnName);
-      return BigFraction.ONE;
-    }
-
     try {
-      BigInteger entriesNumerator = new BigInteger(entriesNumeratorString);
-      BigInteger entriesDenominator = new BigInteger(entriesDenominatorString);
+      BigInteger entriesNumerator = new BigInteger(getColField(tableNameWithoutType, columnName, SUM_TOTAL_ENTRIES));
+      BigInteger entriesDenominator = new BigInteger(getColField(tableNameWithoutType, columnName, SUM_DOCS));
       if (entriesNumerator.compareTo(entriesDenominator) < 0 || entriesDenominator.equals(BigInteger.ZERO)) {
         throw new Exception();
       }
@@ -177,7 +169,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
   }
 
   public BigFraction getColumnSelectivity(String tableNameWithoutType, String columnName) {
-    LOGGER.debug("Getting card from: {} {}", tableNameWithoutType, columnName);
+    LOGGER.debug("Getting cardinality from: {} {}", tableNameWithoutType, columnName);
 
     if (_additionalMaskingCols.getOrDefault(tableNameWithoutType, new HashSet<>()).contains(columnName)) {
       return BigFraction.ONE;
@@ -203,7 +195,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
 
     BigFraction sorted_ratio;
     if (nSortedNumerator == null || nSortedDenominator == null) {
-      //LOGGER.error("{} {}'s sort info does not exist!", tableNameWithoutType, columnName);
+      LOGGER.error("{} {}'s sort info does not exist!", tableNameWithoutType, columnName);
       sorted_ratio = BigFraction.ZERO;
     } else if (nSortedNumerator.equals(nSortedDenominator)) {
       return BigFraction.ONE;
