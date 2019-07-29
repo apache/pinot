@@ -29,7 +29,7 @@ import org.apache.pinot.tools.tuner.strategy.OLSAnalysisImpl;
 import org.kohsuke.args4j.Option;
 
 
-public class QuantileReportCommand extends AbstractBaseCommand implements Command {
+public class QueryLatencyQuantileReport extends AbstractBaseCommand implements Command {
 
   @Option(name = "-brokerLog", required = true, metaVar = "<String>", usage = "Path to broker log file.")
   private String _brokerLog;

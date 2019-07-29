@@ -30,7 +30,7 @@ import org.apache.pinot.tools.tuner.strategy.ParserBasedImpl;
 import org.kohsuke.args4j.Option;
 
 
-public class TunerCommand extends AbstractBaseCommand implements Command {
+public class IndexTunerCommand extends AbstractBaseCommand implements Command {
   private static final long DEFAULT_NUM_ENTRIES_SCANNED_THRESHOLD = 0;
   private static final long DEFAULT_NUM_QUERIES_TO_GIVE_RECOMMENDATION = 0;
 

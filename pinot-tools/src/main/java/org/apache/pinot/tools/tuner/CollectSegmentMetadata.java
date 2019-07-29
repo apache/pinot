@@ -28,7 +28,7 @@ import org.apache.pinot.tools.tuner.meta.manager.collector.CompressedFilePathIte
 import org.kohsuke.args4j.Option;
 
 
-public class CollectMetaCommand extends AbstractBaseCommand implements Command {
+public class CollectSegmentMetadata extends AbstractBaseCommand implements Command {
   @Option(name = "-workDir", required = true, metaVar = "<String>", usage = "An empty directory to work on, for tmp files and output metadata.json file，must have r/w access")
   private String _workDir;
 
