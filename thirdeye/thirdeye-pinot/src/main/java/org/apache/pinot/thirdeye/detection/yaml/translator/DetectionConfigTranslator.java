@@ -165,13 +165,6 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
 
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
-  static {
-    // do not tune for alerts migrated from legacy anomaly function.
-    DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibAlertFilter",
-        "MIGRATED_ALGORITHM_FILTER");
-    DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibAnomalyDetector",
-        "MIGRATED_ALGORITHM");
-  }
   private static final Set<String> MOVING_WINDOW_DETECTOR_TYPES = ImmutableSet.of("ALGORITHM", "MIGRATED_ALGORITHM");
 
   private final Map<String, Object> components = new HashMap<>();
