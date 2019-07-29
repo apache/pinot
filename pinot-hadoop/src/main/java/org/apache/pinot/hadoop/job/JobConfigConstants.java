@@ -58,5 +58,7 @@ public class JobConfigConstants {
   public static final String ENABLE_SORTING = "enable.sorting";
   public static final String ENABLE_RESIZING = "enable.resizing";
 
+  // This setting should be used if you will generate less # of segments after
+  // push. In preprocessing, this is likely because we resize segments. 
   public static final String IS_DELETE_EXTRA_SEGMENTS = "is.delete.extra.segments";
 }

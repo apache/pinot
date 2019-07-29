@@ -25,7 +25,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.pinot.hadoop.job.JobConfigConstants;
 import org.apache.pinot.hadoop.job.SegmentTarPushJob;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -45,51 +44,46 @@ public class DeleteExtraPushedSegmentsTest {
 
   @Test
   public void checkDelete() {
-    List<String> allSegments = new ArrayList<>();
-    allSegments.add("mytable_2018-09-10_2018-09-10_0");
-    allSegments.add("mytable_2018-09-10_2018-09-10_1");
-    allSegments.add("mytable_2018-09-10_2018-09-10_2");
+    List<String> allSegmentsInCluster = new ArrayList<>();
+    allSegmentsInCluster.add("mytable_2018-09-10_2018-09-10_0");
+    allSegmentsInCluster.add("mytable_2018-09-10_2018-09-10_1");
+    allSegmentsInCluster.add("mytable_2018-09-10_2018-09-10_2");
 
     List<Path> currentSegments = new ArrayList<>();
     currentSegments.add(new Path("mytable_2018-09-10_2018-09-10_0"));
     SegmentTarPushJob segmentTarPushJob = new SegmentTarPushJob(_defaultProperties);
-    List<String> segmentsToDelete = segmentTarPushJob.getSegmentsToDelete(allSegments, currentSegments);
+    List<String> segmentsToDelete = segmentTarPushJob.getSegmentsToDelete(allSegmentsInCluster, currentSegments);
     Assert.assertEquals(segmentsToDelete.size(), 2);
-    Assert.assertEquals(segmentsToDelete.contains("mytable_2018-09-10_2018-09-10_0"), false);
+    Assert.assertFalse(segmentsToDelete.contains("mytable_2018-09-10_2018-09-10_0"));
   }
 
   @Test
   public void checkDeleteWithRefresh() {
-    List<String> allSegments = new ArrayList<>();
-    allSegments.add("mytable_0");
-    allSegments.add("mytable_1");
-    allSegments.add("mytable_2");
+    List<String> allSegmentsInCluster = new ArrayList<>();
+    allSegmentsInCluster.add("mytable_0");
+    allSegmentsInCluster.add("mytable_1");
+    allSegmentsInCluster.add("mytable_2");
 
     List<Path> currentSegments = new ArrayList<>();
     currentSegments.add(new Path("mytable_0"));
     SegmentTarPushJob segmentTarPushJob = new SegmentTarPushJob(_defaultProperties);
-    List<String> segmentsToDelete = segmentTarPushJob.getSegmentsToDelete(allSegments, currentSegments);
+    List<String> segmentsToDelete = segmentTarPushJob.getSegmentsToDelete(allSegmentsInCluster, currentSegments);
     Assert.assertEquals(segmentsToDelete.size(), 2);
-    Assert.assertEquals(segmentsToDelete.contains("mytable_0"), false);
+    Assert.assertFalse(segmentsToDelete.contains("mytable_0"));
   }
 
   @Test
   public void checkDeleteWithDoubleDigitSequenceIds() {
-    List<String> allSegments = new ArrayList<>();
-    allSegments.add("mytable_02");
-    allSegments.add("mytable_12");
-    allSegments.add("mytable_23");
+    List<String> allSegmentsInCluster = new ArrayList<>();
+    allSegmentsInCluster.add("mytable_02");
+    allSegmentsInCluster.add("mytable_12");
+    allSegmentsInCluster.add("mytable_23");
 
     List<Path> currentSegments = new ArrayList<>();
     currentSegments.add(new Path("mytable_02"));
     SegmentTarPushJob segmentTarPushJob = new SegmentTarPushJob(_defaultProperties);
-    List<String> segmentsToDelete = segmentTarPushJob.getSegmentsToDelete(allSegments, currentSegments);
+    List<String> segmentsToDelete = segmentTarPushJob.getSegmentsToDelete(allSegmentsInCluster, currentSegments);
     Assert.assertEquals(segmentsToDelete.size(), 2);
-    Assert.assertEquals(segmentsToDelete.contains("mytable_02"), false);
-  }
-
-  @AfterClass
-  private void shutdown() {
-
+    Assert.assertFalse(segmentsToDelete.contains("mytable_02"));
   }
 }

@@ -60,12 +60,12 @@ public class SegmentTarPushJob extends BaseSegmentJob {
     try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
       // TODO: Deal with invalid prefixes in the future
 
-      List<String> allSegments = controllerRestApi.getAllSegments("OFFLINE");
+      List<String> currentSegments = controllerRestApi.getAllSegments("OFFLINE");
 
       controllerRestApi.pushSegments(fileSystem, segmentsToPush);
 
       if (_deleteExtraSegments) {
-        controllerRestApi.deleteSegmentUris(getSegmentsToDelete(allSegments, segmentsToPush));
+        controllerRestApi.deleteSegmentUris(getSegmentsToDelete(currentSegments, segmentsToPush));
       }
     }
   }
@@ -80,8 +80,8 @@ public class SegmentTarPushJob extends BaseSegmentJob {
     Set<String> uniqueSegmentPrefixes = new HashSet<>();
 
     // Get all relevant segment prefixes that we are planning on pushing
-    List<String> segmentsToPushNames = segmentsToPush.stream().map(s -> s.getName()).collect(Collectors.toList());
-    for (String segmentName : segmentsToPushNames) {
+    List<String> segmentNamesToPush = segmentsToPush.stream().map(s -> s.getName()).collect(Collectors.toList());
+    for (String segmentName : segmentNamesToPush) {
       String segmentNamePrefix = removeSequenceId(segmentName);
       uniqueSegmentPrefixes.add(segmentNamePrefix);
     }
@@ -94,7 +94,7 @@ public class SegmentTarPushJob extends BaseSegmentJob {
       }
     }
 
-    relevantSegments.removeAll(segmentsToPushNames);
+    relevantSegments.removeAll(segmentNamesToPush);
     return relevantSegments;
   }
 
