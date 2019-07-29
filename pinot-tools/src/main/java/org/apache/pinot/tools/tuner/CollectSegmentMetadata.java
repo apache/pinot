@@ -69,7 +69,7 @@ public class CollectSegmentMetadata extends AbstractBaseCommand implements Comma
 
   @Override
   public String getName() {
-    return "CollectMeta";
+    return "CollectSegmentMetadata";
   }
 
   @Override

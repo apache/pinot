@@ -110,7 +110,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
 
   @Override
   public String getName() {
-    return "Tuner";
+    return "IndexTunerCommand";
   }
 
   @Override
