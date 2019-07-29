@@ -24,8 +24,7 @@ import java.util.concurrent.atomic.AtomicLongArray;
 
 /**
  * This hit counter is for counting the number of hits within a range of time.
- * Right now the granularity we use is configured the users. Currently two users
- * are there
+ * Currently two callers are there
  *
  * (1) QueryQuota Manager {@link HelixExternalViewBasedQueryQuotaManager} which
  * uses the hit counter for 1sec range of time and 100 time buckets thus
@@ -100,7 +99,7 @@ public class HitCounter {
 
   /*
    * Explanation of algorithm to keep track of
-   * max QPS per minute:
+   * max QPS within a minute window
    *
    * Hit counter is configured with fixed number buckets
    * and each bucket covers a fixed time window to
