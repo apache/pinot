@@ -154,6 +154,28 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     return false;
   }
 
+  public BigFraction getAverageNumEntries(String tableNameWithoutType, String columnName) {
+    String entriesNumeratorString = getColField(tableNameWithoutType, columnName, SUM_TOTAL_ENTRIES);
+    String entriesDenominatorString = getColField(tableNameWithoutType, columnName, SUM_DOCS);
+
+    if (entriesNumeratorString == null || entriesDenominatorString == null) {
+      LOGGER.error("{} {}'s average value info does not exist!", tableNameWithoutType, columnName);
+      return BigFraction.ONE;
+    }
+
+    try {
+      BigInteger entriesNumerator = new BigInteger(entriesNumeratorString);
+      BigInteger entriesDenominator = new BigInteger(entriesDenominatorString);
+      if (entriesNumerator.compareTo(entriesDenominator) < 0 || entriesDenominator.equals(BigInteger.ZERO)) {
+        throw new Exception();
+      }
+      return new BigFraction(entriesNumerator, entriesDenominator);
+    } catch (Exception e) {
+      LOGGER.error("Invalid AverageNumEntries info for {} {}", tableNameWithoutType, columnName);
+      return BigFraction.ONE;
+    }
+  }
+
   public BigFraction getColumnSelectivity(String tableNameWithoutType, String columnName) {
     LOGGER.debug("Getting card from: {} {}", tableNameWithoutType, columnName);
 
@@ -193,19 +215,19 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     BigFraction averageCard = new BigFraction(new BigInteger(cardNumerator), new BigInteger(cardDenominator));
     BigFraction ret = averageCard.multiply(sorted_ratio);
 
-//    LOGGER.debug("Cardinality: table:{} column:{} card: {}/{}, sort: {}/{}, final {}",
-//        tableNameWithoutType, columnName, cardNumerator,
-//        cardDenominator, nSortedNumerator, nSortedDenominator, ret
-//        );
-
     return ret;
   }
 
   public String getSegmentField(String tableNameWithoutType, String columnName, String segmentName, String fieldName) {
     tableNameWithoutType = Pattern.compile(TYPE_REGEX).matcher(tableNameWithoutType).replaceFirst("");
-    JsonNode ret = _aggregatedMap.get(tableNameWithoutType).get(columnName).get(segmentName).get(fieldName);
-    if (ret == null) {
-      LOGGER.error("tableNameWithoutType:{} columnName:{} segmentName:{} fieldName:{} Does not exist!",
+    JsonNode ret;
+    try {
+      ret = _segmentMap.get(tableNameWithoutType).get(columnName).get(segmentName).get(fieldName);
+      if (ret == null) {
+        throw new NullPointerException();
+      }
+    } catch (NullPointerException e) {
+      LOGGER.debug("tableNameWithoutType:{} columnName:{} segmentName:{} field:{} Does not exist!",
           tableNameWithoutType, columnName, segmentName, fieldName);
       return null;
     }
@@ -217,14 +239,12 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     JsonNode ret;
     try {
       ret = _aggregatedMap.get(tableNameWithoutType).get(columnName).get(fieldName);
+      if (ret == null) {
+        throw new NullPointerException();
+      }
     } catch (NullPointerException e) {
-      LOGGER.debug("tableNameWithoutType:{} columnName:{} Does not exist!", tableNameWithoutType, columnName);
-      return null;
-    }
-    if (ret == null) {
-      LOGGER
-          .debug("tableNameWithoutType:{} columnName:{} fieldName:{} Does not exist!", tableNameWithoutType, columnName,
-              fieldName);
+      LOGGER.debug("tableNameWithoutType:{} columnName:{} fieldName:{} Does not exist!",
+          tableNameWithoutType, columnName, fieldName);
       return null;
     }
     return ret.asText();
