@@ -16,12 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.tools;
+package org.apache.pinot.core.realtime.impl.kafka;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.ServiceLoader;
 import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.core.realtime.stream.StreamConsumerFactory;
 import org.apache.pinot.core.realtime.stream.StreamDataProvider;
 import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
 
@@ -38,9 +40,17 @@ public class KafkaStarterUtils {
   private static final String LOG_DIRS = "log.dirs";
 
   public static final String KAFKA_SERVER_STARTABLE_CLASS_NAME =
-      "org.apache.pinot.core.realtime.impl.kafka.server.KafkaDataServerStartable";
-  public static final String KAFKA_PRODUCER_CLASS_NAME =
-      "org.apache.pinot.core.realtime.impl.kafka.server.KafkaDataProducer";
+      getKafkaConnectorPackageName() + ".server.KafkaDataServerStartable";
+  public static final String KAFKA_PRODUCER_CLASS_NAME = getKafkaConnectorPackageName() + ".server.KafkaDataProducer";
+  public static final String KAFKA_STREAM_CONSUMER_FACTORY_CLASS_NAME =
+      getKafkaConnectorPackageName() + ".KafkaConsumerFactory";
+  public static final String KAFKA_STREAM_LEVEL_CONSUMER_CLASS_NAME =
+      getKafkaConnectorPackageName() + ".KafkaStreamLevelConsumer";
+
+  private static String getKafkaConnectorPackageName() {
+    return ServiceLoader.load(StreamConsumerFactory.class).iterator().next().getClass().getPackage().getName();
+  }
+
   public static final String KAFKA_JSON_MESSAGE_DECODER_CLASS_NAME =
       "org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder";
 
@@ -52,13 +62,17 @@ public class KafkaStarterUtils {
 
     // Set host name
     configureHostName(configuration, "localhost");
-
+    configureOffsetsTopicReplicationFactor(configuration, (short) 1);
     configuration.put(PORT, DEFAULT_KAFKA_PORT);
     configuration.put(BROKER_ID, DEFAULT_BROKER_ID);
     configuration.put(ZOOKEEPER_CONNECT, DEFAULT_ZK_STR);
     configuration.put(LOG_DIRS, "/tmp/kafka-" + Double.toHexString(Math.random()));
 
     return configuration;
+  }
+
+  public static void configureOffsetsTopicReplicationFactor(Properties configuration, short replicationFactor) {
+    configuration.put("offsets.topic.replication.factor", replicationFactor);
   }
 
   public static void configureTopicDeletion(Properties configuration, boolean topicDeletionEnabled) {
@@ -89,6 +103,7 @@ public class KafkaStarterUtils {
       final Properties configuration) {
     StreamDataServerStartable kafkaStarter;
     try {
+      configureOffsetsTopicReplicationFactor(configuration, (short) 1);
       configuration.put(KafkaStarterUtils.PORT, port);
       configuration.put(KafkaStarterUtils.BROKER_ID, brokerId);
       configuration.put(KafkaStarterUtils.ZOOKEEPER_CONNECT, zkStr);

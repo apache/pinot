@@ -141,10 +141,22 @@
     kafka dependency is still explicitly defined in pinot-integration-tests, pinot-tools and pinot-perf pom files.
     To change kafka connector dependency, we only need to update this version number config.
     TODO: figure out a way to inject kafka dependency instead of explicitly setting the kafka module dependency -->
-    <kafka.lib.version>0.9</kafka.lib.version>
+    <kafka.version>0.9</kafka.version>
   </properties>
 
   <profiles>
+    <profile>
+      <id>kafka-2.0</id>
+      <activation>
+        <property>
+          <name>kafka.version</name>
+          <value>2.0</value>
+        </property>
+      </activation>
+      <properties>
+        <kafka.version>2.0</kafka.version>
+      </properties>
+    </profile>
     <profile>
       <id>travis</id>
       <activation>

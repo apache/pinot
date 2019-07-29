@@ -144,3 +144,51 @@ The properties for the thresholds are as follows:
 
 
 An example of this implementation can be found in the `KafkaConsumerFactory <https://github.com/apache/incubator-pinot/blob/master/pinot-core/src/main/java/org/apache/pinot/core/realtime/impl/kafka/KafkaConsumerFactory.java>`_, which is an implementation for the kafka stream.
+
+
+Kafka 2.x Plugin
+^^^^^^^^^^^^^^^^
+
+Pinot provides stream plugin support for Kafka 2.x version.
+Although the version used in this implementation is kafka 2.0.0, it's possible to compile it with higher kafka lib version, e.g. 2.1.1.
+
+How to build and release Pinot package with Kafka 2.x connector
+---------------------------------------------------------------
+
+.. code-block:: none
+
+  mvn clean package -DskipTests -Pbin-dist -Dkafka.version=2.0
+
+How to use Kafka 2.x connector
+------------------------------
+
+Below is a sample `streamConfigs` used to create a realtime table with Kafka Stream(High) level consumer:
+
+.. code-block:: none
+
+  "streamConfigs": {
+    "streamType": "kafka",
+    "stream.kafka.consumer.type": "highLevel",
+    "stream.kafka.topic.name": "meetupRSVPEvents",
+    "stream.kafka.decoder.class.name": "org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder",
+    "stream.kafka.hlc.zk.connect.string": "localhost:2191/kafka",
+    "stream.kafka.consumer.factory.class.name": "org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory",
+    "stream.kafka.zk.broker.url": "localhost:2191/kafka",
+    "stream.kafka.hlc.bootstrap.server": "localhost:19092"
+  }
+
+Upgrade from Kafka 0.9 connector to Kafka 2.x connector
+-------------------------------------------------------
+
+* Update  table config:
+Update config: ``stream.kafka.consumer.factory.class.name`` from ``org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory`` to ``org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory``.
+
+* If using Stream(High) level consumer:
+Please also add config ``stream.kafka.hlc.bootstrap.server`` into ``tableIndexConfig.streamConfigs``.
+This config should be the URI of Kafka broker lists, e.g. ``localhost:9092``.
+
+How to use this plugin with higher Kafka version?
+-----------------------------------------
+
+This connector is also suitable for Kafka lib version higher than ``2.0.0``.
+In ``pinot-connector-kafka-2.0/pom.xml`` change the ``kafka.lib.version`` from ``2.0.0`` to ``2.1.1`` will make this Connector working with Kafka ``2.1.1``.

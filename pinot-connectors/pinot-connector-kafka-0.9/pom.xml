@@ -35,10 +35,15 @@
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
     <kafka.lib.version>0.9.0.1</kafka.lib.version>
+    <kafka.scala.version>2.10</kafka.scala.version>
   </properties>
 
   <dependencies>
-
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-connector-kafka-base</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- Kafka  -->
     <dependency>
       <groupId>org.apache.kafka</groupId>

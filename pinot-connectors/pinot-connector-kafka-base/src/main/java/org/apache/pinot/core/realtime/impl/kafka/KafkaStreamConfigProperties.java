@@ -29,7 +29,17 @@ public class KafkaStreamConfigProperties {
   public static final String DOT_SEPARATOR = ".";
   public static final String STREAM_TYPE = "kafka";
 
+  /**
+   * Helper method to create a property string for kafka stream
+   * @param property
+   * @return
+   */
+  public static String constructStreamProperty(String property) {
+    return Joiner.on(DOT_SEPARATOR).join(StreamConfigProperties.STREAM_PREFIX, property);
+  }
+
   public static class HighLevelConsumer {
+    public static final String KAFKA_HLC_BOOTSTRAP_SERVER = "kafka.hlc.bootstrap.server";
     public static final String KAFKA_HLC_ZK_CONNECTION_STRING = "kafka.hlc.zk.connect.string";
     public static final String ZK_SESSION_TIMEOUT_MS = "zookeeper.session.timeout.ms";
     public static final String ZK_CONNECTION_TIMEOUT_MS = "zookeeper.connection.timeout.ms";
@@ -52,14 +62,5 @@ public class KafkaStreamConfigProperties {
   }
 
   public static final String KAFKA_CONSUMER_PROP_PREFIX = "kafka.consumer.prop";
-
-  /**
-   * Helper method to create a property string for kafka stream
-   * @param property
-   * @return
-   */
-  public static String constructStreamProperty(String property) {
-    return Joiner.on(DOT_SEPARATOR).join(StreamConfigProperties.STREAM_PREFIX, property);
-  }
 }
 
