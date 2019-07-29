@@ -55,7 +55,7 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
 
     _isAppend = configuration.get(IS_APPEND).equalsIgnoreCase("true");
 
-      if (_isAppend) {
+    if (_isAppend) {
       // Get time column name
       _timeColumn = configuration.get(TIME_COLUMN_CONFIG);
 
@@ -65,8 +65,7 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
       String pushFrequency = configuration.get(SEGMENT_PUSH_FREQUENCY);
       String timeType = configuration.get(SEGMENT_TIME_TYPE);
       String timeFormat = configuration.get(SEGMENT_TIME_FORMAT);
-      TimeUnit timeUnit = TimeUnit.valueOf(timeType
-      );
+      TimeUnit timeUnit = TimeUnit.valueOf(timeType);
       // Normalize time column value
       _normalizedDateSegmentNameGenerator = new NormalizedDateSegmentNameGenerator(pushFrequency, timeUnit, timeFormat);
       _sampleNormalizedTimeColumnValue = _normalizedDateSegmentNameGenerator.getNormalizedDate(timeColumnValue);
@@ -97,7 +96,7 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
         // TODO: Create a custom exception and gracefully catch this exception outside, changing what the path to input
         // into segment creation should be
         throw new IllegalArgumentException("Your segment spans multiple time units. Preprocess is not currently allowed for"
-            + "these use cases");
+            + " these use cases");
       }
     }
 
