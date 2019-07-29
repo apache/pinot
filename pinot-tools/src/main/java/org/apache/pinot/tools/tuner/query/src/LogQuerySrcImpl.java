@@ -25,6 +25,7 @@ import java.io.InputStreamReader;
 import java.util.NoSuchElementException;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
+import org.apache.pinot.tools.tuner.query.src.parser.BrokerLogParserImpl;
 import org.apache.pinot.tools.tuner.query.src.parser.QueryParser;
 import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 import org.slf4j.Logger;
@@ -65,7 +66,7 @@ public class LogQuerySrcImpl implements QuerySrc {
 
     /**
      * Choose a parser
-     * @param val A parser, e.g. BrokerLogParserImpl, ServerLogParserImpl
+     * @param val A parser, e.g. {@link BrokerLogParserImpl}
      * @return
      */
     @Nonnull

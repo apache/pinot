@@ -57,5 +57,5 @@ public interface Strategy {
    * @param tableResults input
    */
   void report(Map<String, Map<String, AbstractAccumulator>> tableResults);
-  //print/email results
+  //print results
 }

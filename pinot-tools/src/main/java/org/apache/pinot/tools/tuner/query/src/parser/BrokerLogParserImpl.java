@@ -27,6 +27,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Implementation of {@link QueryParser}, to parse complete lines of broker log text
+ */
 public class BrokerLogParserImpl implements QueryParser {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerLogParserImpl.class);
 
