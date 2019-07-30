@@ -27,6 +27,8 @@
         isEditMode=false
         detectionYaml=detectionYaml
         setDetectionYaml=(action "updateDetectionYaml")
+        changeGeneralFieldsEnabled=(action "changeGeneralFieldsEnabled")
+        generalFieldsEnabled=generalFieldsEnabled
       }}
 
       <div class="col-xs-12">
@@ -55,8 +57,13 @@
     <fieldset class="te-form__section row">
 
       {{subscription-form
+        subscriptionYaml=subscriptionYaml
+        isEditMode=false
         allApplicationNames=applicationNames
-        allAlertsConfigGroups=allAlertsConfigGroups
+        allSubscriptionGroups=allSubscriptionGroups
+        generalFieldsEnabled=generalFieldsEnabled
+        selectSubscriptionGroup=(action "changeSubscriptionGroup")
+        setSubscriptionYaml=(action "updateSubscriptionYaml")
       }}
 
     </fieldset>
@@ -99,7 +106,7 @@
         setSubscriptionYaml=(action "updateSubscriptionYaml")
         selectSubscriptionGroup=(action "changeSubscriptionGroup")
         subscriptionGroupNamesDisplay=subscriptionGroupNamesDisplay
-        groupName=groupName
+        selectedGroup=selectedGroup
       }}
 
     </fieldset>

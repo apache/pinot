@@ -6,6 +6,8 @@
  * @property {Array} subscriptionGroupNames - the list of subscription groups
  * @property {String} subscriptionYaml - the subscription group yaml
  * @property {function} updateSubscriptionYaml - bubble up the subscription group yaml to parent
+ * @property {function} selectSubscriptionGroup - bubble up the selected subscription group to parent
+ * @property {Object} selectedGroup - the currently selected subscription group - shared with form
  * @example
    {{subscription-yaml
      isEditMode=true
@@ -13,8 +15,7 @@
      setSubscriptionYaml=(action "updateSubscriptionYaml")
      selectSubscriptionGroup=(action "changeSubscriptionGroup")
      subscriptionGroupNamesDisplay=subscriptionGroupNamesDisplay
-     groupName=groupName
-     createGroup=createGroup // default group for reset
+     selectedGroup=selectedGroup
    }}
  * @authors lohuynh and hjackson
  */
@@ -43,6 +44,7 @@ export default Component.extend({
   showNotificationModal: false,
   setSubscriptionYaml: null, // function passed in from parent
   createGroup: null,
+  selectedGroup: {}, // controlled by parent, do not set
 
 
 

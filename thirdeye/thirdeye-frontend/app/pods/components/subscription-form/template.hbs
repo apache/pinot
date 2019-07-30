@@ -11,11 +11,11 @@
   <label for="anomaly-form-app-name" class="control-label te-label te-label--taller required">Alert belongs to</label>
   <span>
     <i class="glyphicon glyphicon-question-sign"></i>
-    {{#tooltip-on-element}}Changing the application team will load the team's notification/subscription groups below{{/tooltip-on-element}}
+    {{#tooltip-on-element}}Changing the application team will load the team's subscription groups below{{/tooltip-on-element}}
   </span>
    {{#power-select
       options=allApplicationNames
-      selected=selectedAppName
+      selected=selectedApplication
       searchField="application"
       onchange=(action "onSelectAppName")
       loadingMessage="Waiting for the server...."
@@ -37,18 +37,18 @@
 
 {{!-- Field: Select Existing Subscription Group --}}
 <div class="col-sm-6">
-  <label for="config-group" class="control-label te-label te-label--taller">Add this alert to an existing <span class="stronger">{{selectedAppName.application}}</span> subscription group</label>
+  <label for="Sub-group" class="control-label te-label te-label--taller">Add this alert to an existing <span class="stronger">{{selectedApplication.application}}</span> subscription group</label>
   {{#power-select
-    options=filteredConfigGroups
-    selected=selectedConfigGroup
+    options=filteredSubGroups
+    selected=selectedSubGroup
     searchField="name"
-    onchange=(action "onSelectConfigGroup")
+    onchange=(action "onSelectSubGroup")
     disabled=(not generalFieldsEnabled)
     searchField="name"
     loadingMessage="Waiting for the server...."
     placeholder="Select an existing alert subscription group"
     searchPlaceholder="Type to filter..."
-    triggerId="config-group"
+    triggerId="Sub-group"
     triggerClass="te-form__select"
     as |group|
   }}
@@ -57,20 +57,20 @@
 </div>
 {{!--  Fields for new alert group creation --}}
 <div class="col-sm-6">
-  <label for="config-group-new-name" class="control-label te-label te-label--taller"><strong>Or</strong> create new subscription group</label>
+  <label for="Sub-group-new-name" class="control-label te-label te-label--taller"><strong>Or</strong> create new subscription group</label>
   <span>
     <i class="glyphicon glyphicon-question-sign"></i>
     {{#tooltip-on-element}}Before creating a new group, please check if you can simply add recipients to an existing one.{{/tooltip-on-element}}
   </span>
   {{#if isGroupNameDuplicate}}
-    <div class="te-form__alert--warning alert-warning">Warning: <strong>{{newConfigGroupName}}</strong> already exists. Please try another name.</div>
+    <div class="te-form__alert--warning alert-warning">Warning: <strong>{{newSubGroupName}}</strong> already exists. Please try another name.</div>
   {{/if}}
   {{input
     type="text"
-    id="config-group-new-name"
+    id="Sub-group-new-name"
     class="form-control te-input"
     placeholder="New Group Name"
-    value=newConfigGroupName
+    value=newSubGroupName
     key-up="validateNewGroupName"
     focus-out="validateNewGroupName"
     disabled=(not generalFieldsEnabled)
@@ -78,17 +78,17 @@
 </div>
 
 {{!-- Alert Group Metadata --}}
-{{#if selectedConfigGroup}}
+{{#if selectedSubGroup}}
   {{self-serve-config-group-table
-    title=selectedConfigGroupSubtitle
+    title=selectedSubGroupSubtitle
     data=selectedGroupFunctions
   }}
 {{/if}}
 
 {{!-- Field: new alert group recipient emails --}}
-<div class="col-xs-12 te-form__section-config">
-  <label for="config-group" class="control-label te-label te-label--taller">
-    Recipients in subscription group <span class="stronger">{{selectedConfigGroup.name}}</span>:
+<div class="col-xs-12 te-form__section-Sub">
+  <label for="Sub-group" class="control-label te-label te-label--taller">
+    Recipients in subscription group <span class="stronger">{{selectedSubGroup.name}}</span>:
     <div class="te-form__sub-label"><span class="te-form__sub-label--strong">To: {{if selectedGroupToRecipients selectedGroupToRecipients "No recipients yet"}}</span></div>
     {{#if selectedGroupCcRecipients}}
       <div class="te-form__sub-label"><span class="te-form__sub-label--strong">Cc: {{selectedGroupCcRecipients}}</span></div>
@@ -105,13 +105,13 @@
   {{/if}}
   {{input
     type="email"
-    id="config-group-add-recipients"
+    id="Sub-group-add-recipients"
     class="form-control te-input"
     focus-out="validateAlertEmail"
     key-up="validateAlertEmail"
     placeholder="Add the email addresses separated by commas. You can edit this or add cc and bcc fields later from the edit notification settings."
     autocomplete=false
-    value=alertGroupNewRecipient
+    value=subscriptionGroupNewRecipient
     disabled=(not generalFieldsEnabled)
     required=true
   }}

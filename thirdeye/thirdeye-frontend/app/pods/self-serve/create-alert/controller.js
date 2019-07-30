@@ -4,10 +4,10 @@
  * @exports create
  */
 import { reads } from '@ember/object/computed';
+import { computed, set, get } from '@ember/object';
 import { inject as service } from '@ember/service';
 import fetch from 'fetch';
 import Controller from '@ember/controller';
-import { set, get } from '@ember/object';
 import { toastOptions } from 'thirdeye-frontend/utils/constants';
 import config from 'thirdeye-frontend/config/environment';
 
@@ -27,6 +27,9 @@ export default Controller.extend({
   subscriptionYaml:  null,            // The YAML for the subscription group
   alertDataIsCurrent: true,
   disableYamlSave: true,
+  isMetricSelected: false, // set by child component through action
+  isMetricDataInvalid: false, // set by child component through action
+
 
   /**
    * Application name field options loaded from our model.
@@ -39,11 +42,30 @@ export default Controller.extend({
   debug: reads('model.debug'),
 
   /**
+   * Determines whether input fields in general are enabled. When metric data is 'invalid',
+   * we will still enable alert creation.
+   * @method generalFieldsEnabled
+   * @return {Boolean}
+   */
+  generalFieldsEnabled: computed.or('isMetricSelected', 'isMetricDataInvalid'),
+
+  /**
    * Actions for create alert form view
    */
   actions: {
     changeAccordion() {
       set(this, 'toggleCollapsed', !get(this, 'toggleCollapsed'));
+    },
+
+    /**
+     * update dependencies for computed variable generalFieldsEnabled
+     * @method changeGeneralFieldsEnabled
+     * @param {String} flag - which flag to toggle
+     * @param {Boolean} value - what to set the flag to
+     * @return {undefined}
+     */
+    changeGeneralFieldsEnabled(flag, value) {
+      set(this, flag, value);
     },
 
     /**
@@ -76,7 +98,7 @@ export default Controller.extend({
     changeSubscriptionGroup(group) {
       this.setProperties({
         subscriptionYaml: group.yaml,
-        groupName: group
+        selectedGroup: group
       });
     },
 

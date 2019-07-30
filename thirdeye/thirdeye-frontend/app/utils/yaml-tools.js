@@ -1,6 +1,9 @@
 import yamljs from 'yamljs';
 import jsyaml from 'js-yaml';
 
+import yamljs from 'yamljs';
+import jsyaml from 'js-yaml';
+
 export const defaultDetectionYaml = `# Below is a sample template. You may refer the documentation for more examples and update the fields accordingly.
 # Give a name for this anomaly detection pipeline (should be unique).
 detectionName: name_of_the_detection

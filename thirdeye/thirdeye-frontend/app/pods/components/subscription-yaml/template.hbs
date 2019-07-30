@@ -8,12 +8,12 @@
   {{#power-select
     placeholder="Create a new subscription group"
     options=subscriptionGroupNamesDisplay
-    selected=groupName
+    selected=selectedGroup
     searchField="name"
     onchange=(action 'onSubscriptionGroupSelectionAction')
-    as |groupName|
+    as |selectedGroup|
   }}
-    {{groupName.name}} ({{groupName.id}})
+    {{selectedGroup.name}} ({{selectedGroup.id}})
   {{/power-select}}
 </div>
 <div class="col-xs-12">

@@ -1,13 +1,18 @@
 /**
  * Component to render the detection configuration form editor.
  * @module components/detection-form
- * @property {boolean} isDetectionNameDuplicate - triggered by alert name validation action on parent
- * @property {boolean} isDetectionNameUserModified - triggered by alert name validation action on parent
+ * @property {boolean} isEditMode - flag to control submit button and method used for submiting changes
+ * @property {String} detectionYaml - yaml configuration of detection
+ * @property {Function} setDetectionYaml - action for sending yaml updates to parent
+ * @property {Function} changeGeneralFieldsEnabled - action for enabling subsequent fields
+ * @property {boolean} generalFieldsEnabled - flag to disable boxes for input flow control
  * @example
    {{detection-form
      isEditMode=false
      detectionYaml=detectionYaml
      setDetectionYaml=(action "updateDetectionYaml")
+     changeGeneralFieldsEnabled=(action "changeGeneralFieldsEnabled")
+     generalFieldsEnabled=generalFieldsEnabled
    }}
  * @author hjackson
  */
@@ -15,7 +20,7 @@
 import Component from '@ember/component';
 import { computed, set, get } from '@ember/object';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
-import { defaultDetectionYaml, fieldsToYaml } from 'thirdeye-frontend/utils/yaml-tools';
+import { defaultDetectionYaml, fieldsToYaml, redundantParse } from 'thirdeye-frontend/utils/yaml-tools';
 import RSVP from "rsvp";
 import fetch from 'fetch';
 import {
@@ -23,14 +28,11 @@ import {
 } from 'thirdeye-frontend/utils/api/self-serve';
 import config from 'thirdeye-frontend/config/environment';
 import { task, timeout } from 'ember-concurrency';
-import yamljs from 'yamljs';
 
 export default Component.extend({
   metricHelpMailto: `mailto:${config.email}?subject=Metric Onboarding Request (non-additive UMP or derived)`,
   isEditMode: false, // passed in by parent
   metricLookupCache: [],
-  isMetricSelected: false,
-  isMetricDataInvalid: false,
   selectedDimension: null,
   selectedMetric: null, // set using yaml or metric dropdown
   selectedApplication: null,
@@ -40,14 +42,8 @@ export default Component.extend({
   detectionName: null, // set using yaml or input box
   isDetectionNameUserModified: false, // set true if name passed in through yaml or typed
   isDetectionNameDuplicate: false, // set true if name not valid
+  generalFieldsEnabled: false, // controlled by parent, do not set
 
-  /**
-   * Determines whether input fields in general are enabled. When metric data is 'invalid',
-   * we will still enable alert creation.
-   * @method generalFieldsEnabled
-   * @return {Boolean}
-   */
-  generalFieldsEnabled: computed.or('isMetricSelected', 'isMetricDataInvalid'),
 
   /**
    * Generate alert name primer based on user selections
@@ -71,6 +67,20 @@ export default Component.extend({
       const dimension = selectedDimension ? `${selectedDimension.camelize()}_` : '';
       const metric = selectedMetric ? `${selectedMetric.name.camelize()}_` : 'metricName_';
       return `${dataset}${metric}${dimension}`;
+    }
+  ),
+
+  updatedFields: computed(
+    'detectionName',
+    'selectedMetric',
+    'selectedDataset',
+    function() {
+      const {
+        detectionName,
+        selectedMetric,
+        selectedDataset
+      } = this.getProperties('detectionName', 'selectedMetric', 'selectedDataset');
+      return (detectionName || selectedMetric || selectedDataset);
     }
   ),
 
@@ -102,17 +112,20 @@ export default Component.extend({
    * @return (undefined)
    */
   willDestroyElement() {
-    const fields = {
-      detectionName: this.get('detectionName'),
-      metric: this.get('selectedMetric') ? this.get('selectedMetric').name : null,
-      dataset: this.get('selectedDataset')
-      // to-do: put rules in here after rule component is operational
-    };
-    // send fields and yaml to yaml util to merge old to update values
-    let detectionYaml = get(this, 'detectionYaml') ? get(this, 'detectionYaml') : defaultDetectionYaml;
-    detectionYaml = fieldsToYaml(fields, detectionYaml);
-    // send new Yaml to parent
-    this.get('setDetectionYaml')(detectionYaml);
+    // don't need to run this unless there are new fields
+    if (get(this, 'updatedFields')){
+      const fields = {
+        detectionName: this.get('detectionName'),
+        metric: this.get('selectedMetric') ? this.get('selectedMetric').name : null,
+        dataset: this.get('selectedDataset')
+        // to-do: put rules in here after rule component is operational
+      };
+      // send fields and yaml to yaml util to merge old to update values
+      let detectionYaml = get(this, 'detectionYaml') ? get(this, 'detectionYaml') : defaultDetectionYaml;
+      detectionYaml = fieldsToYaml(fields, detectionYaml);
+      // send new Yaml to parent
+      this.get('setDetectionYaml')(detectionYaml);
+    }
   },
 
   /**
@@ -141,11 +154,10 @@ export default Component.extend({
     let metricAlias;
     let dataset;
     try {
-      yamlAsObject = yamljs.parse(yaml);
-      dy = yamljs.parse(defaultDetectionYaml);
+      yamlAsObject = redundantParse(yaml);
+      dy = redundantParse(defaultDetectionYaml);
       set(this, 'isYamlParseable', true);
-    }
-    catch(err){
+    } catch(err) {
       set(this, 'isYamlParseable', false);
       return null;
     }
@@ -160,7 +172,7 @@ export default Component.extend({
         name: yamlAsObject.metric
       };
       dataset = yamlAsObject.dataset;
-      set(this, 'isMetricSelected', true);
+      get(this, 'changeGeneralFieldsEnabled')('isMetricSelected', true);
     }
     // we only use fields that have been updated
     this.setProperties({
@@ -250,9 +262,9 @@ export default Component.extend({
       this.setProperties({
         isMetricDataLoading: true,
         selectedMetric: selectedObj,
-        selectedDataset: selectedObj.alias.split('::')[0], // grab dataset name
-        isMetricSelected: true
+        selectedDataset: selectedObj.alias.split('::')[0] // grab dataset name
       });
+      get(this, 'changeGeneralFieldsEnabled')('isMetricSelected', true);
       this._fetchMetricData(selectedObj.id)
         .then((metricHash) => {
           const { maxTime, filters, dimensions } = metricHash;
