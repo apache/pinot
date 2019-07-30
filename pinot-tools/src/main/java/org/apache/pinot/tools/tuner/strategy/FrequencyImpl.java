@@ -160,7 +160,7 @@ public class FrequencyImpl implements TuningStrategy {
         .forEach(colName -> {
           accumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
           accumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new FrequencyAccumulator());
-          ((FrequencyAccumulator) accumulatorOut.get(tableNameWithoutType).get(colName)).merge(1);
+          ((FrequencyAccumulator) accumulatorOut.get(tableNameWithoutType).get(colName)).incrementFrequency();
         });
   }
 

@@ -33,9 +33,9 @@ public class FrequencyAccumulator extends AbstractAccumulator {
     return _frequency;
   }
 
-  public void merge(int frequency) {
+  public void incrementFrequency() {
     super.increaseCount();
-    this._frequency += frequency;
+    this._frequency += 1;
   }
 
   public void merge(FrequencyAccumulator fobj) {
