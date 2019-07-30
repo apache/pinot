@@ -31,8 +31,7 @@ public class TunerTest extends TunerDriver {
             .setNumQueriesThreshold(ParserBasedImpl.DEFAULT_NUM_QUERIES_THRESHOLD)
             .build())
         .setQuerySrc(new LogQuerySrcImpl.Builder().setValidLinePrefixRegex(LogQuerySrcImpl.REGEX_VALID_LINE_TIME)
-            .setParser(new BrokerLogParserImpl())
-            .setPath("/Users/jiaguo/finalTestData/broker.audienceCount.log")
+            .setParser(new BrokerLogParserImpl()).setPath("/Users/jiaguo/finalTestData/broker.audienceCount2.log")
             .build())
         .setMetaManager(
             new JsonFileMetaManagerImpl.Builder().setPath("/Users/jiaguo/finalTestData/meta/prodMetaV2/metadata.json")
