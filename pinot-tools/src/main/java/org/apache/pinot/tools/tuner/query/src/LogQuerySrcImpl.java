@@ -138,13 +138,17 @@ public class LogQuerySrcImpl implements QuerySrc {
     }
     StringBuilder stringBuffer = new StringBuilder(_stringBufferNext);
     try {
+      /*
+       * There can be linebreaks in a query, therefore we want to concatenate the log lines if we do not see
+       * and EOF or a valid beginner of a line
+       */
       while ((_stringBufferNext = _bufferedReader.readLine()) != null && !_validLinePrefixPattern.matcher(
           _stringBufferNext).find()) {
         stringBuffer.append(_stringBufferNext);
         _stringBufferNext = null;
       }
     } catch (IOException e) {
-      LOGGER.error(e.getMessage());
+      LOGGER.error("Exception while reading lines from the file", e);
       _stringBufferNext = null;
     } finally {
       LOGGER.trace("FileReader returning: {}", stringBuffer.toString());

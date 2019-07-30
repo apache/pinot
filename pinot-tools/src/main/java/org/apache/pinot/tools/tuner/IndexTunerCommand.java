@@ -28,9 +28,13 @@ import org.apache.pinot.tools.tuner.query.src.LogQuerySrcImpl;
 import org.apache.pinot.tools.tuner.query.src.parser.BrokerLogParserImpl;
 import org.apache.pinot.tools.tuner.strategy.ParserBasedImpl;
 import org.kohsuke.args4j.Option;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class IndexTunerCommand extends AbstractBaseCommand implements Command {
+  private static final Logger LOGGER = LoggerFactory.getLogger(IndexTunerCommand.class);
+
   private static final long DEFAULT_NUM_ENTRIES_SCANNED_THRESHOLD = 0;
   private static final long DEFAULT_NUM_QUERIES_TO_GIVE_RECOMMENDATION = 0;
 
@@ -43,7 +47,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-brokerLog", required = true, metaVar = "<String>", usage = "Path to broker log file.")
   private String _brokerLog;
 
-  @Option(name = "-strategy", required = true, metaVar = "<inverted/sorted>", usage = "Select execution strategy.")
+  @Option(name = "-strategy", required = true, metaVar = "<inverted/sorted>", usage = "Select tuning strategy.")
   private String _strategy;
 
   @Option(name = "-entriesScannedThreshold", required = false, metaVar = "<long>", usage = "Log lines with numEntriesScannedInFilter below this threshold will be excluded.")
@@ -65,6 +69,8 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
     if (_tableNamesWithoutType != null && !_tableNamesWithoutType.trim().equals("")) {
       tableNamesWithoutType.addAll(Arrays.asList(_tableNamesWithoutType.split(",")));
     }
+    LOGGER.info("Strategy: {}\nmetadata file: {}\nbroker log: {}\ntables{}\n", _strategy, _metaData, _brokerLog,
+        tableNamesWithoutType.toString());
 
     if (_strategy.equals(INVERTED_INDEX)) {
       TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
