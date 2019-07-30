@@ -210,6 +210,15 @@ public class RealtimeReplicaGroupSegmentAssignmentStrategyTest {
     BaseConfiguration config = new BaseConfiguration();
     config.setProperty(RebalanceUserConfigConstants.INCLUDE_CONSUMING, true);
     assertEquals(_strategy.rebalanceTable(currentAssignment, config), newAssignment);
+
+    // Rebalance should not change the assignment for the OFFLINE segments
+    String offlineSegmentName = "offlineSegment";
+    Map<String, String> offlineSegmentInstanceStateMap = SegmentAssignmentUtils
+        .getInstanceStateMap(SegmentAssignmentTestUtils.getNameList("badInstance_", NUM_REPLICAS),
+            RealtimeSegmentOnlineOfflineStateModel.OFFLINE);
+    currentAssignment.put(offlineSegmentName, offlineSegmentInstanceStateMap);
+    newAssignment.put(offlineSegmentName, offlineSegmentInstanceStateMap);
+    assertEquals(_strategy.rebalanceTable(currentAssignment, config), newAssignment);
   }
 
   private void addToAssignment(Map<String, Map<String, String>> currentAssignment, int segmentId,
