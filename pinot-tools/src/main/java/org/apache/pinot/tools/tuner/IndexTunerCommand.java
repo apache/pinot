@@ -80,8 +80,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
               .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
               .build())
           .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
-          .setMetaManager(new JsonFileMetaManagerImpl.Builder().setUseExistingIndex(
-              JsonFileMetaManagerImpl.DONT_USE_EXISTING_INDEX) //Delete after demo
+          .setMetaManager(new JsonFileMetaManagerImpl.Builder()
               .setPath(_metaData).build());
       parserBased.execute();
     } else if (_strategy.equals(SORTED_INDEX)) {
@@ -92,8 +91,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
               .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
               .build())
           .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
-          .setMetaManager(new JsonFileMetaManagerImpl.Builder().setUseExistingIndex(
-              JsonFileMetaManagerImpl.DONT_USE_EXISTING_INDEX) //Delete after demo
+          .setMetaManager(new JsonFileMetaManagerImpl.Builder()
               .setPath(_metaData).build());
       parserBased.execute();
     } else {
