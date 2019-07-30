@@ -88,7 +88,7 @@ public class ParserBasedImpl implements TuningStrategy {
     }
 
     /**
-     * Lower order(FIRST_ORDER) for inverted index, higher order(THIRD_ORDER) for sorted (broad coverage), default to FIRST_ORDER
+     * Lower order(FIRST_ORDER) for inverted index, higher order(SECOND_ORDER) for sorted (broad coverage), default to FIRST_ORDER
      * @param val
      * @return
      */

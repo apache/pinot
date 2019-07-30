@@ -86,7 +86,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
           .setTuningStrategy(new ParserBasedImpl.Builder()
               .setTableNamesWithoutType(tableNamesWithoutType)
               .setNumQueriesThreshold(_numQueriesThreshold)
-              .setAlgorithmOrder(ParserBasedImpl.SECOND_ORDER)
+              .setAlgorithmOrder(ParserBasedImpl.THIRD_ORDER)
               .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
               .build())
           .setQuerySrc(new LogQuerySrcImpl.Builder()
