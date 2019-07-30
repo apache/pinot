@@ -256,7 +256,6 @@ public class ParserBasedImpl implements Strategy {
       _queryString = queryString;
     }
 
-
     /**
      * Navigate from root to predicateListContext of whereClauseContext, where all the filtering happens
      * @return a list of sorted tuples List<Tuple2<List<colName>, Score>>
@@ -297,7 +296,6 @@ public class ParserBasedImpl implements Strategy {
       cropList(results, _algorithmOrder);
       return results;
     }
-
 
     /**
      * Parse predicate list connected by AND and OR (recursively)
@@ -392,6 +390,7 @@ public class ParserBasedImpl implements Strategy {
      */
     List<Tuple2<List<String>, BigFraction>> parsePredicate(PQL2Parser.PredicateContext predicateContext) {
       LOGGER.debug("Parsing predicate: {}", predicateContext.getText());
+
       if (predicateContext instanceof PQL2Parser.PredicateParenthesisGroupContext) {
         PQL2Parser.PredicateParenthesisGroupContext predicateParenthesisGroupContext =
             (PQL2Parser.PredicateParenthesisGroupContext) predicateContext;
