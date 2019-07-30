@@ -59,5 +59,13 @@ public interface MetaManager {
    */
   BigFraction getColumnSelectivity(String tableNameWithoutType, String columnName);
 
+  /**
+   * Get the average num of entries per doc.
+   * @param tableNameWithoutType
+   * @param columnName
+   * @return
+   */
+  BigFraction getAverageNumEntries(String tableNameWithoutType, String columnName);
+
   boolean hasInvertedIndex(String tableNameWithoutType, String columnName);
 }

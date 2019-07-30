@@ -360,6 +360,17 @@ public class ParserBasedImpl implements Strategy {
       }
     }
 
+    private BigFraction EquivalentSelectivity(BigFraction selectivity, int clauseLength, BigFraction avgEntries,
+        Boolean invertSelection) {
+      BigFraction equvLen = avgEntries.multiply(clauseLength);
+      if (invertSelection == false) {
+        return selectivity.divide(equvLen);
+      } else if (selectivity.subtract(equvLen).compareTo(BigFraction.ONE) <= 0) { //(selectivity-equvLen)<=1
+        return selectivity;
+      } else {
+        return selectivity.divide(selectivity.subtract(equvLen));
+      }
+    }
 
     /**
      * Parse leaf predicates
@@ -388,55 +399,51 @@ public class ParserBasedImpl implements Strategy {
       } else if (predicateContext instanceof PQL2Parser.InPredicateContext) {
         LOGGER.debug("Entering IN clause!");
         String colName = ((PQL2Parser.InPredicateContext) predicateContext).inClause().expression().getText();
-        List<String> colNameList = new ArrayList<>();
-        colNameList.add(colName);
         ArrayList<Tuple2<List<String>, BigFraction>> ret = new ArrayList<>();
-
         BigFraction selectivity = _metaManager.getColumnSelectivity(_tableNameWithoutType, colName);
-        LOGGER.debug("Final Cardinality: {} {} {}", selectivity, _tableNameWithoutType, colName);
+        LOGGER.debug("Avg Cardinality: {} {} {}", selectivity, _tableNameWithoutType, colName);
         if (selectivity.compareTo(new BigFraction(BigInteger.ONE)) <= 0) {
           return ret;
         }
 
+        List<String> colNameList = new ArrayList<>();
+        colNameList.add(colName);
+        BigFraction avgEntries = _metaManager.getAverageNumEntries(_tableNameWithoutType, colName);
         int lenFilter = ((PQL2Parser.InPredicateContext) predicateContext).inClause().literal().size();
-        if (((PQL2Parser.InPredicateContext) predicateContext).inClause().NOT() != null) {
-          if (selectivity.subtract(lenFilter).compareTo(BigFraction.ZERO) <= 0) {
-            ret.add(new Tuple2<>(colNameList, selectivity));
-            return ret;
-          }
-          ret.add(new Tuple2<>(colNameList, selectivity.divide(selectivity.subtract(lenFilter))));
-        } else {
-          ret.add(new Tuple2<>(colNameList, selectivity.divide(lenFilter)));
-        }
+        Boolean notIn = ((PQL2Parser.InPredicateContext) predicateContext).inClause().NOT() != null;
+
+        ret.add(new Tuple2<>(colNameList, EquivalentSelectivity(selectivity, lenFilter, avgEntries, notIn)));
+
         LOGGER.debug("IN clause ret {}", ret.toString());
         return ret;
       } else if (predicateContext instanceof PQL2Parser.ComparisonPredicateContext) {
         LOGGER.debug("Entering COMP clause!");
         String colName =
             ((PQL2Parser.ComparisonPredicateContext) predicateContext).comparisonClause().expression(0).getText();
-        List<String> colNameList = new ArrayList<>();
-        colNameList.add(colName);
         ArrayList<Tuple2<List<String>, BigFraction>> ret = new ArrayList<>();
-
         BigFraction selectivity = _metaManager.getColumnSelectivity(_tableNameWithoutType, colName);
-        LOGGER.debug("Final Cardinality: {} {} {}", selectivity, _tableNameWithoutType, colName);
+        LOGGER.debug("Avg Cardinality: {} {} {}", selectivity, _tableNameWithoutType, colName);
         if (selectivity.compareTo(new BigFraction(BigInteger.ONE)) <= 0) {
           return ret;
         }
+
+        List<String> colNameList = new ArrayList<>();
+        colNameList.add(colName);
+        BigFraction avgEntries = _metaManager.getAverageNumEntries(_tableNameWithoutType, colName);
 
         String comparisonOp =
             ((PQL2Parser.ComparisonPredicateContext) predicateContext).comparisonClause().comparisonOperator()
                 .getText();
         LOGGER.debug("COMP operator {}", comparisonOp);
         if (comparisonOp.equals("=")) {
-          ret.add(new Tuple2<>(colNameList, selectivity));
+          ret.add(new Tuple2<>(colNameList, EquivalentSelectivity(selectivity, 1, avgEntries, false)));
           LOGGER.debug("COMP clause ret {}", ret.toString());
           return ret;
         } else if (comparisonOp.equals("!=") || comparisonOp.equals("<>")) {
-          if (selectivity.subtract(BigInteger.ONE).compareTo(BigFraction.ZERO) <= 0) {
+          if (selectivity.compareTo(BigFraction.ONE) <= 0) {
             return ret;
           }
-          ret.add(new Tuple2<>(colNameList, selectivity.divide(selectivity.subtract(BigFraction.ONE))));
+          ret.add(new Tuple2<>(colNameList, EquivalentSelectivity(selectivity, 1, avgEntries, true)));
           LOGGER.debug("COMP clause ret {}", ret.toString());
           return ret;
         } else {
