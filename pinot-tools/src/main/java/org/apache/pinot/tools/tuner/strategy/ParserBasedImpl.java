@@ -368,7 +368,8 @@ public class ParserBasedImpl implements TuningStrategy {
 
     private BigFraction EquivalentSelectivity(Boolean invertSelection, BigFraction selectivity, int numSelectedValues,
         BigFraction avgEntriesPerDoc) {
-      BigFraction equvLen = avgEntriesPerDoc.multiply(numSelectedValues);
+      //BigFraction equvLen = avgEntriesPerDoc.multiply(numSelectedValues);
+      BigFraction equvLen = new BigFraction(numSelectedValues);
       if (invertSelection == false) { // not invertSelection
         return selectivity.divide(equvLen); // return selectivity/equvLen
       } else { // invertSelection
