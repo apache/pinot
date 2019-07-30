@@ -32,7 +32,7 @@ import org.apache.pinot.tools.tuner.strategy.AbstractAccumulator;
 import org.apache.pinot.tools.tuner.strategy.FrequencyImpl;
 import org.apache.pinot.tools.tuner.strategy.OLSAnalysisImpl;
 import org.apache.pinot.tools.tuner.strategy.ParserBasedImpl;
-import org.apache.pinot.tools.tuner.strategy.Strategy;
+import org.apache.pinot.tools.tuner.strategy.TuningStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
  *TunerDriver is an executable interface, has three pluggable modules:
  *   {@link MetaManager}: A manager for metadata, which is an interface to access segment metadata.
  *   {@link QuerySrc}: An iterator interface over input source, has a pluggable {@link QueryParser}, who parses each item in input source, and returns {@link AbstractQueryStats}, a wrapper of relevant fields input.
- *   {@link Strategy}: Strategy, which has four user defined functions operating on a map of Map<ThreadID:Long, Map<TableName:String, Map<ColumnName:String, AbstractMergerObj>>>:
+ *   {@link TuningStrategy}: Strategy, which has four user defined functions operating on a map of Map<ThreadID:Long, Map<TableName:String, Map<ColumnName:String, AbstractMergerObj>>>:
  *       Filter: A function to filter AbstractQueryStats, by table name, number of entries scanned in filters, number of entries scanned post filter, etc. The relevant AbstractQueryStats will be feed to Accumulator.
  *       Accumulate: A function to process AbstractQueryStats and MetaManager; then accumulate stats to corresponding AbstractMergerObj entry.
  *       Merge: A function to merge two AbstractMergerObj entries having the same TableName/ColumnName from different threads.
@@ -53,7 +53,7 @@ public class TunerDriver {
 
   private QuerySrc _querySrc = null;
   private MetaManager _metaManager = null;
-  private Strategy _strategy = null;
+  private TuningStrategy _tuningStrategy = null;
   private int _threadPoolSize = 0;
 
   /**
@@ -88,11 +88,11 @@ public class TunerDriver {
 
   /**
    * Set the strategy for the recommendation, e.g. {@link FrequencyImpl}, {@link OLSAnalysisImpl}, {@link ParserBasedImpl}
-   * @param strategy
+   * @param tuningStrategy
    * @return this
    */
-  public TunerDriver setStrategy(Strategy strategy) {
-    _strategy = strategy;
+  public TunerDriver setTuningStrategy(TuningStrategy tuningStrategy) {
+    _tuningStrategy = tuningStrategy;
     return this;
   }
 
@@ -114,7 +114,7 @@ public class TunerDriver {
     }
     while (_querySrc.hasNext()) {
       AbstractQueryStats abstractQueryStats = _querySrc.next();
-      if (abstractQueryStats != null && _strategy.filter(abstractQueryStats)) {
+      if (abstractQueryStats != null && _tuningStrategy.filter(abstractQueryStats)) {
         LOGGER.debug("Master thread {} submitting: {}", Thread.currentThread().getId(), abstractQueryStats.toString());
         if (_threadPoolSize != NO_CONCURRENCY) {
           accumulateExecutor.execute(() -> {
@@ -122,14 +122,14 @@ public class TunerDriver {
             LOGGER.debug("Thread {} accumulating: {}", threadID, abstractQueryStats.toString());
             Map<String, Map<String, AbstractAccumulator>> perThreadTableToColAccumulators =
                 _threadToTableAccumulators.putIfAbsent(threadID, new HashMap<>());
-            _strategy.accumulate(abstractQueryStats, _metaManager, perThreadTableToColAccumulators);
+            _tuningStrategy.accumulate(abstractQueryStats, _metaManager, perThreadTableToColAccumulators);
           });
         } else {
           long threadID = Thread.currentThread().getId();
           LOGGER.debug("Thread {} accumulating: {}", threadID, abstractQueryStats.toString());
           Map<String, Map<String, AbstractAccumulator>> perThreadTableToColAccumulators =
               _threadToTableAccumulators.putIfAbsent(threadID, new HashMap<>());
-          _strategy.accumulate(abstractQueryStats, _metaManager, perThreadTableToColAccumulators);
+          _tuningStrategy.accumulate(abstractQueryStats, _metaManager, perThreadTableToColAccumulators);
         }
       }
     }
@@ -170,7 +170,7 @@ public class TunerDriver {
                     try {
                       AbstractAccumulator perColMerger = _tableToColMergers.get(tableNameWithoutType)
                           .putIfAbsent(colName, mergerObj.getClass().newInstance());
-                      _strategy.merge(perColMerger, mergerObj);
+                      _tuningStrategy.merge(perColMerger, mergerObj);
                     } catch (Exception e) {
                       LOGGER.error("Instantiation Exception in Merger!", e);
                     }
@@ -184,7 +184,7 @@ public class TunerDriver {
                   try {
                     AbstractAccumulator perColMerger = _tableToColMergers.get(tableNameWithoutType)
                         .putIfAbsent(colName, mergerObj.getClass().newInstance());
-                    _strategy.merge(perColMerger, mergerObj);
+                    _tuningStrategy.merge(perColMerger, mergerObj);
                   } catch (Exception e) {
                     LOGGER.error("Instantiation Exception in Merger!", e);
                   }
@@ -203,6 +203,6 @@ public class TunerDriver {
     }
 
     //Report
-    _strategy.report(_tableToColMergers);
+    _tuningStrategy.report(_tableToColMergers);
   }
 }

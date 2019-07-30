@@ -49,7 +49,7 @@ public class EntriesScannedQuantileReport extends AbstractBaseCommand implements
     }
 
     TunerDriver fitModel = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
-        .setStrategy(new OLSAnalysisImpl.Builder()
+        .setTuningStrategy(new OLSAnalysisImpl.Builder()
             .setTableNamesWithoutType(tableNamesWithoutType)
             .build())
         .setQuerySrc(new LogQuerySrcImpl.Builder()

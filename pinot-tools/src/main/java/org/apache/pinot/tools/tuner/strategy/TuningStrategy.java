@@ -26,7 +26,7 @@ import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 /**
  * Recommendation strategy
  */
-public interface Strategy {
+public interface TuningStrategy {
 
   /**
    * Filter out irrelevant query stats to target a specific table or specific range of nESI

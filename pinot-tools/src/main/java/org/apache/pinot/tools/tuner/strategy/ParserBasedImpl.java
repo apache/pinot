@@ -45,7 +45,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class ParserBasedImpl implements Strategy {
+public class ParserBasedImpl implements TuningStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(ParserBasedImpl.class);
 
   public final static int FIRST_ORDER = 1;

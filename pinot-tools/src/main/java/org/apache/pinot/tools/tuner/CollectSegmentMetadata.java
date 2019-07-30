@@ -50,7 +50,7 @@ public class CollectSegmentMetadata extends AbstractBaseCommand implements Comma
     }
 
     TunerDriver metaFetch = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
-        .setStrategy(new AccumulateStats.Builder()
+        .setTuningStrategy(new AccumulateStats.Builder()
             .setTableNamesWithoutType(tableNamesWithoutType)
             .setOutputDir(_workDir)
             .build())

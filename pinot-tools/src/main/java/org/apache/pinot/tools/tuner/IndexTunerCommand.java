@@ -67,7 +67,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
 
     if (_strategy.equals(INVERTED_INDEX)) {
       TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
-          .setStrategy(new ParserBasedImpl.Builder()
+          .setTuningStrategy(new ParserBasedImpl.Builder()
               .setTableNamesWithoutType(tableNamesWithoutType)
               .setNumProcessedThreshold(_numQueriesToGiveRecommendation)
               .setAlgorithmOrder(ParserBasedImpl.FIRST_ORDER)
@@ -83,7 +83,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
       parserBased.execute();
     } else if (_strategy.equals(SORTED_INDEX)) {
       TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
-          .setStrategy(new ParserBasedImpl.Builder()
+          .setTuningStrategy(new ParserBasedImpl.Builder()
               .setTableNamesWithoutType(tableNamesWithoutType)
               .setNumProcessedThreshold(_numQueriesToGiveRecommendation)
               .setAlgorithmOrder(ParserBasedImpl.SECOND_ORDER)

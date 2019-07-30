@@ -37,7 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class FrequencyImpl implements Strategy {
+public class FrequencyImpl implements TuningStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(FrequencyImpl.class);
 
   public final static String DIMENSION_REGEX = "(?:(\\w+) ((?:NOT )?IN) (\\(.+?\\)))|(?:(\\w+) (=|<>|!=) (.+?)[ |$)])";

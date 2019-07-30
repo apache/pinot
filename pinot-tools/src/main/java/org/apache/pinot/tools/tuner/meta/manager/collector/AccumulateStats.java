@@ -33,12 +33,12 @@ import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.tools.tuner.meta.manager.MetaManager;
 import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 import org.apache.pinot.tools.tuner.strategy.AbstractAccumulator;
-import org.apache.pinot.tools.tuner.strategy.Strategy;
+import org.apache.pinot.tools.tuner.strategy.TuningStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class AccumulateStats implements Strategy {
+public class AccumulateStats implements TuningStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(AccumulateStats.class);
   private static final String UNTAR = "tar -xf ";
   private static final String TMP_THREAD_FILE_PREFIX = "/tmpThreadFile";

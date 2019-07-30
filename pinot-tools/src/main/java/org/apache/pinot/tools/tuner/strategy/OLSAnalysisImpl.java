@@ -43,7 +43,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class OLSAnalysisImpl implements Strategy {
+public class OLSAnalysisImpl implements TuningStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(OLSAnalysisImpl.class);
 
   public final static long NO_IN_FILTER_THRESHOLD = 0;
