@@ -65,7 +65,7 @@ public final class FixedBitIntReaderWriter implements Closeable {
       throws IOException {
     if (_dataBitSet != null) {
       _dataBitSet.close();
-      _dataBitSet.close();
+      _dataBitSet = null;
     }
   }
 }
