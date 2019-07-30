@@ -49,6 +49,8 @@ public class FrequencyImpl implements TuningStrategy {
   public final static long DEFAULT_IN_FILTER_THRESHOLD = 0;
   public final static long DEFAULT_CARDINALITY_THRESHOLD = 1;
   public final static long DEFAULT_NUM_QUERIES_THRESHOLD = 0;
+  public static final int MATCHER_GROUP_DIMENSION = 1;
+  public static final int MATCHER_GROUP_VALUES = 4;
 
   public final static Pattern _dimensionPattern = Pattern.compile(DIMENSION_REGEX);
   private HashSet<String> _tableNamesWithoutType;
@@ -147,10 +149,10 @@ public class FrequencyImpl implements TuningStrategy {
 
     Matcher matcher = _dimensionPattern.matcher(query);
     while (matcher.find()) {
-      if (matcher.group(1) != null) {
-        counted.add(matcher.group(1));
-      } else if (matcher.group(4) != null) {
-        counted.add(matcher.group(4));
+      if (matcher.group(MATCHER_GROUP_DIMENSION) != null) {
+        counted.add(matcher.group(MATCHER_GROUP_DIMENSION));
+      } else if (matcher.group(MATCHER_GROUP_VALUES) != null) {
+        counted.add(matcher.group(MATCHER_GROUP_VALUES));
       } else {
       }
     }
