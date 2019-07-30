@@ -32,6 +32,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * The iterator over all tarred segments in _directory/tableName/
+ */
 public class CompressedFilePathIter implements QuerySrc {
   private static final Logger LOGGER = LoggerFactory.getLogger(CompressedFilePathIter.class);
   Iterator<Tuple2<String, File>> _iterator;

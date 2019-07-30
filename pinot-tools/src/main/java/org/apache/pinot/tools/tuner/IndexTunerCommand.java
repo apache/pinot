@@ -69,8 +69,14 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
     if (_tableNamesWithoutType != null && !_tableNamesWithoutType.trim().equals("")) {
       tableNamesWithoutType.addAll(Arrays.asList(_tableNamesWithoutType.split(",")));
     }
+    String tableNamesWithoutTypeStr;
+    if (tableNamesWithoutType.isEmpty()) {
+      tableNamesWithoutTypeStr = "All tables";
+    } else {
+      tableNamesWithoutTypeStr = tableNamesWithoutType.toString();
+    }
     LOGGER.info("Strategy: {}\nmetadata file: {}\nbroker log: {}\ntables{}\n", _strategy, _metaData, _brokerLog,
-        tableNamesWithoutType.toString());
+        tableNamesWithoutTypeStr);
 
     if (_strategy.equals(INVERTED_INDEX)) {
       TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)

@@ -25,6 +25,9 @@ import org.apache.pinot.tools.tuner.meta.manager.MetaManager;
 import org.apache.pinot.tools.tuner.strategy.AbstractAccumulator;
 
 
+/**
+ * Accumulator for relevant fields in metadata.properties and index_map
+ */
 public class ColStatsAccumulatorObj extends AbstractAccumulator {
 
   Map<String, BigInteger> accumulatedStats = new HashMap<>();
@@ -88,23 +91,19 @@ public class ColStatsAccumulatorObj extends AbstractAccumulator {
 
   public void merge() {
     accumulatedStats.put(MetaManager.WEIGHTED_SUM_CARDINALITY,
-        accumulatedStats.getOrDefault(MetaManager.WEIGHTED_SUM_CARDINALITY, BigInteger.ZERO)
-            .add(new BigInteger(_cardinality).multiply(new BigInteger(_totalDocs))));
+        accumulatedStats.getOrDefault(MetaManager.WEIGHTED_SUM_CARDINALITY, BigInteger.ZERO).add(new BigInteger(_cardinality).multiply(new BigInteger(_totalDocs))));
 
     accumulatedStats.put(MetaManager.SUM_SEGMENTS_COUNT,
         accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_COUNT, BigInteger.ZERO).add(BigInteger.ONE));
 
     accumulatedStats.put(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX,
-        accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX, BigInteger.ZERO)
-            .add(Integer.parseInt(_invertedIndexSize) > 0 ? BigInteger.ONE : BigInteger.ZERO));
+        accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX, BigInteger.ZERO).add(Integer.parseInt(_invertedIndexSize) > 0 ? BigInteger.ONE : BigInteger.ZERO));
 
     accumulatedStats.put(MetaManager.SUM_SEGMENTS_SORTED,
-        accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_SORTED, BigInteger.ZERO)
-            .add(_isSorted.trim().toLowerCase().equals("true") ? BigInteger.ONE : BigInteger.ZERO));
+        accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_SORTED, BigInteger.ZERO).add(_isSorted.trim().toLowerCase().equals("true") ? BigInteger.ONE : BigInteger.ZERO));
 
     accumulatedStats.put(MetaManager.SUM_TOTAL_ENTRIES,
-        accumulatedStats.getOrDefault(MetaManager.SUM_TOTAL_ENTRIES, BigInteger.ZERO)
-            .add(new BigInteger(_totalNumberOfEntries)));
+        accumulatedStats.getOrDefault(MetaManager.SUM_TOTAL_ENTRIES, BigInteger.ZERO).add(new BigInteger(_totalNumberOfEntries)));
 
     accumulatedStats.put(MetaManager.SUM_DOCS,
         accumulatedStats.getOrDefault(MetaManager.SUM_DOCS, BigInteger.ZERO).add(new BigInteger(_totalDocs)));
@@ -119,29 +118,21 @@ public class ColStatsAccumulatorObj extends AbstractAccumulator {
   }
 
   public void merge(ColStatsAccumulatorObj colStatsAccumulatorObj) {
-    accumulatedStats.put(MetaManager.WEIGHTED_SUM_CARDINALITY,
-        this.accumulatedStats.getOrDefault(MetaManager.WEIGHTED_SUM_CARDINALITY, BigInteger.ZERO)
-            .add(colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.WEIGHTED_SUM_CARDINALITY,
-                BigInteger.ZERO)));
+    accumulatedStats.put(MetaManager.WEIGHTED_SUM_CARDINALITY, this.accumulatedStats.getOrDefault(MetaManager.WEIGHTED_SUM_CARDINALITY, BigInteger.ZERO)
+        .add(colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.WEIGHTED_SUM_CARDINALITY, BigInteger.ZERO)));
 
     accumulatedStats.put(MetaManager.SUM_SEGMENTS_COUNT,
-        this.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_COUNT, BigInteger.ZERO)
-            .add(
-                colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_COUNT, BigInteger.ZERO)));
+        this.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_COUNT, BigInteger.ZERO).add(colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_COUNT, BigInteger.ZERO)));
 
-    accumulatedStats.put(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX,
-        this.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX, BigInteger.ZERO)
-            .add(colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX,
-                BigInteger.ZERO)));
+    accumulatedStats.put(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX, this.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX, BigInteger.ZERO)
+        .add(colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX,
+            BigInteger.ZERO)));
 
-    accumulatedStats.put(MetaManager.SUM_SEGMENTS_SORTED,
-        this.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_SORTED, BigInteger.ZERO)
-            .add(colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_SORTED,
-                BigInteger.ZERO)));
+    accumulatedStats.put(MetaManager.SUM_SEGMENTS_SORTED, this.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_SORTED, BigInteger.ZERO)
+        .add(colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_SORTED, BigInteger.ZERO)));
 
     accumulatedStats.put(MetaManager.SUM_TOTAL_ENTRIES,
-        this.accumulatedStats.getOrDefault(MetaManager.SUM_TOTAL_ENTRIES, BigInteger.ZERO)
-            .add(colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.SUM_TOTAL_ENTRIES, BigInteger.ZERO)));
+        this.accumulatedStats.getOrDefault(MetaManager.SUM_TOTAL_ENTRIES, BigInteger.ZERO).add(colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.SUM_TOTAL_ENTRIES, BigInteger.ZERO)));
 
     accumulatedStats.put(MetaManager.SUM_DOCS, this.accumulatedStats.getOrDefault(MetaManager.SUM_DOCS, BigInteger.ZERO)
         .add(colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.SUM_DOCS, BigInteger.ZERO)));

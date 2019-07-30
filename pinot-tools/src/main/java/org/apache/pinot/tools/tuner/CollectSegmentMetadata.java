@@ -26,9 +26,14 @@ import org.apache.pinot.tools.tuner.driver.TunerDriver;
 import org.apache.pinot.tools.tuner.meta.manager.collector.AccumulateStats;
 import org.apache.pinot.tools.tuner.meta.manager.collector.CompressedFilePathIter;
 import org.kohsuke.args4j.Option;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import sun.util.logging.PlatformLogger;
 
 
 public class CollectSegmentMetadata extends AbstractBaseCommand implements Command {
+  private static final Logger LOGGER = LoggerFactory.getLogger(CollectSegmentMetadata.class);
+
   @Option(name = "-workDir", required = true, metaVar = "<String>", usage = "An empty directory to work on, for tmp files and output metadata.json file，must have r/w access")
   private String _workDir;
 
@@ -48,6 +53,13 @@ public class CollectSegmentMetadata extends AbstractBaseCommand implements Comma
     if (_tableNamesWithoutType != null && !_tableNamesWithoutType.trim().equals("")) {
       tableNamesWithoutType.addAll(Arrays.asList(_tableNamesWithoutType.split(",")));
     }
+    String tableNamesWithoutTypeStr;
+    if (tableNamesWithoutType.isEmpty()) {
+      tableNamesWithoutTypeStr = "All tables";
+    } else {
+      tableNamesWithoutTypeStr = tableNamesWithoutType.toString();
+    }
+    LOGGER.info("\nTables{}\n", tableNamesWithoutTypeStr);
 
     TunerDriver metaFetch = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
         .setTuningStrategy(new AccumulateStats.Builder().setTableNamesWithoutType(tableNamesWithoutType)

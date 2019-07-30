@@ -38,6 +38,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Extract relevant fields in metadata.properties and index_map from tarred segments in controller
+ * And pack them into a json file
+ */
 public class AccumulateStats implements TuningStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(AccumulateStats.class);
   private static final String UNTAR = "tar -xf ";
@@ -80,8 +84,7 @@ public class AccumulateStats implements TuningStrategy {
    */
   @Override
   public boolean filter(AbstractQueryStats filePaths) {
-    return _tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType.contains(
-        ((PathWrapper) filePaths).getTableNameWithoutType());
+    return _tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType.contains(((PathWrapper) filePaths).getTableNameWithoutType());
   }
 
   /**
@@ -91,13 +94,11 @@ public class AccumulateStats implements TuningStrategy {
    * @param AccumulatorOut output, map of /tableMame: String/columnName: String/{@link AbstractAccumulator}
    */
   @Override
-  public void accumulate(AbstractQueryStats filePaths, MetaManager metaManager,
-      Map<String, Map<String, AbstractAccumulator>> AccumulatorOut) {
+  public void accumulate(AbstractQueryStats filePaths, MetaManager metaManager, Map<String, Map<String, AbstractAccumulator>> AccumulatorOut) {
     PathWrapper pathWrapper = ((PathWrapper) filePaths);
 
     File tmpFolder = new File(
-        _outputDir.getAbsolutePath() + TMP_THREAD_FILE_PREFIX + Thread.currentThread().getId() + "_" + (
-            System.currentTimeMillis() % 1000000));
+        _outputDir.getAbsolutePath() + TMP_THREAD_FILE_PREFIX + Thread.currentThread().getId() + "_" + (System.currentTimeMillis() % 1000000));
     LOGGER.info("Extracting: " + pathWrapper.getFile().getAbsolutePath() + " to " + tmpFolder.getAbsolutePath());
     try {
       tmpFolder.mkdirs();

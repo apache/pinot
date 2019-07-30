@@ -27,9 +27,12 @@ import org.apache.pinot.tools.tuner.query.src.LogQuerySrcImpl;
 import org.apache.pinot.tools.tuner.query.src.parser.BrokerLogParserImpl;
 import org.apache.pinot.tools.tuner.strategy.OLSAnalysisImpl;
 import org.kohsuke.args4j.Option;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class EntriesScannedQuantileReport extends AbstractBaseCommand implements Command {
+  private static final Logger LOGGER = LoggerFactory.getLogger(EntriesScannedQuantileReport.class);
 
   @Option(name = "-brokerLog", required = true, metaVar = "<String>", usage = "Path to broker log file.")
   private String _brokerLog;
@@ -47,6 +50,14 @@ public class EntriesScannedQuantileReport extends AbstractBaseCommand implements
     if (_tableNamesWithoutType != null && !_tableNamesWithoutType.trim().equals("")) {
       tableNamesWithoutType.addAll(Arrays.asList(_tableNamesWithoutType.split(",")));
     }
+    String tableNamesWithoutTypeStr;
+    if (tableNamesWithoutType.isEmpty()) {
+      tableNamesWithoutTypeStr = "All tables";
+    } else {
+      tableNamesWithoutTypeStr = tableNamesWithoutType.toString();
+    }
+    LOGGER.info("\nTables{}\n", tableNamesWithoutTypeStr);
+
 
     TunerDriver fitModel = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
         .setTuningStrategy(new OLSAnalysisImpl.Builder().setTableNamesWithoutType(tableNamesWithoutType).build())
