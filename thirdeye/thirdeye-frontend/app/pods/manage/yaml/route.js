@@ -8,6 +8,7 @@ import RSVP from 'rsvp';
 import { set, get } from '@ember/object';
 import { inject as service } from '@ember/service';
 import yamljs from 'yamljs';
+import jsyaml from 'js-yaml';
 import moment from 'moment';
 import { yamlAlertSettings, toastOptions } from 'thirdeye-frontend/utils/constants';
 import { formatYamlFilter } from 'thirdeye-frontend/utils/utils';
@@ -39,7 +40,17 @@ export default Route.extend(AuthenticatedRouteMixin, {
         notifications.error('Retrieval of alert yaml failed.', 'Error', toastOptions);
       } else {
         if (detection_json.yaml) {
-          const detectionInfo = yamljs.parse(detection_json.yaml);
+          let detectionInfo;
+          try {
+            detectionInfo = yamljs.parse(detection_json.yaml);
+          } catch (error) {
+            try {
+              // use jsyaml package to try parsing again, since yamljs doesn't parse some edge cases
+              detectionInfo = jsyaml.safeLoad(detection_json.yaml);
+            } catch (error) {
+              throw new Error('yaml parsing error');
+            }
+          }
           const lastDetection = new Date(detection_json.lastTimestamp);
           Object.assign(detectionInfo, {
             isActive: detection_json.active,
