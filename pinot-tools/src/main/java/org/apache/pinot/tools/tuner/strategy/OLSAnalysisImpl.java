@@ -46,6 +46,7 @@ import org.slf4j.LoggerFactory;
 public class OLSAnalysisImpl implements TuningStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(OLSAnalysisImpl.class);
 
+  private static final String NUM_QUERIES_COUNT = "PINOT_TUNER_COUNT*";
   public final static long NO_IN_FILTER_THRESHOLD = 0;
 
   public final static int NO_WEIGHT_FOR_VOTE = 0;
@@ -105,6 +106,9 @@ public class OLSAnalysisImpl implements TuningStrategy {
     LOGGER.debug("Accumulator: scoring query {}", query);
 
     AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
+    AccumulatorOut.get(tableNameWithoutType).putIfAbsent(NUM_QUERIES_COUNT, new ParseBasedAccumulator());
+    AccumulatorOut.get(tableNameWithoutType).get(NUM_QUERIES_COUNT).increaseCount();
+
     AccumulatorOut.get(tableNameWithoutType).putIfAbsent("*", new OLSAccumulator());
     ((OLSAccumulator) AccumulatorOut.get(tableNameWithoutType).get("*"))
         .merge(Long.parseLong(time), Long.parseLong(numEntriesScannedInFilter),
@@ -128,8 +132,7 @@ public class OLSAnalysisImpl implements TuningStrategy {
   public void reportTable(String tableNameWithoutType, Map<String, AbstractAccumulator> columnStats) {
     String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
 
-    AtomicLong totalCount = new AtomicLong(0);
-    columnStats.forEach((k, v) -> totalCount.addAndGet(v.getCount()));
+    long totalCount = columnStats.remove(NUM_QUERIES_COUNT).getCount();
     reportOut += MessageFormat.format("\nTotal lines accumulated: {0}\n\n", totalCount);
 
     if (!columnStats.containsKey("*")) {

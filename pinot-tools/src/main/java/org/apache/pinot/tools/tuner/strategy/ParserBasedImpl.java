@@ -28,7 +28,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
 import javax.validation.constraints.NotNull;
@@ -47,6 +46,7 @@ import org.slf4j.LoggerFactory;
 
 public class ParserBasedImpl implements TuningStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(ParserBasedImpl.class);
+  private static final String NUM_QUERIES_COUNT = "PINOT_TUNER_COUNT*";
 
   public final static int FIRST_ORDER = 1;
   public final static int SECOND_ORDER = 2;
@@ -61,14 +61,14 @@ public class ParserBasedImpl implements TuningStrategy {
   private int _algorithmOrder;
   private HashSet<String> _tableNamesWithoutType;
   private long _numEntriesScannedThreshold;
-  private long _numProcessedThreshold;
+  private long _numQueriesThreshold;
   private int _selectivityThreshold;
 
   private ParserBasedImpl(Builder builder) {
     _algorithmOrder = builder._algorithmOrder;
     _tableNamesWithoutType = builder._tableNamesWithoutType;
     _numEntriesScannedThreshold = builder._numEntriesScannedThreshold;
-    _numProcessedThreshold = builder._numProcessedThreshold;
+    _numQueriesThreshold = builder._numQueriesThreshold;
     _selectivityThreshold = builder._selectivityThreshold;
   }
 
@@ -76,7 +76,7 @@ public class ParserBasedImpl implements TuningStrategy {
     private int _algorithmOrder = FIRST_ORDER;
     private HashSet<String> _tableNamesWithoutType = new HashSet<>();
     private long _numEntriesScannedThreshold = NO_IN_FILTER_THRESHOLD;
-    private long _numProcessedThreshold = NO_PROCESSED_THRESH;
+    private long _numQueriesThreshold = NO_PROCESSED_THRESH;
     private int _selectivityThreshold = NO_SEL_THRESH;
 
     public Builder() {
@@ -126,8 +126,8 @@ public class ParserBasedImpl implements TuningStrategy {
      * @return
      */
     @Nonnull
-    public Builder setNumProcessedThreshold(long val) {
-      _numProcessedThreshold = val;
+    public Builder setNumQueriesThreshold(long val) {
+      _numQueriesThreshold = val;
       return this;
     }
 
@@ -161,6 +161,10 @@ public class ParserBasedImpl implements TuningStrategy {
     String tableNameWithoutType = indexSuggestQueryStatsImpl.getTableNameWithoutType();
     String numEntriesScannedInFilter = indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter();
     String query = indexSuggestQueryStatsImpl.getQuery();
+
+    AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
+    AccumulatorOut.get(tableNameWithoutType).putIfAbsent(NUM_QUERIES_COUNT, new ParseBasedAccumulator());
+    AccumulatorOut.get(tableNameWithoutType).get(NUM_QUERIES_COUNT).increaseCount();
 
     LOGGER.debug("Accumulator: scoring query {}", query);
 
@@ -202,9 +206,8 @@ public class ParserBasedImpl implements TuningStrategy {
   }
 
   public void reportTable(String tableNameWithoutType, Map<String, AbstractAccumulator> columnStats) {
-    AtomicLong totalCount = new AtomicLong(0);
-    columnStats.forEach((k, v) -> totalCount.addAndGet(v.getCount()));
-    if (totalCount.longValue() < _numProcessedThreshold) {
+    long totalCount = columnStats.remove(NUM_QUERIES_COUNT).getCount();
+    if (totalCount < _numQueriesThreshold) {
       return;
     }
 

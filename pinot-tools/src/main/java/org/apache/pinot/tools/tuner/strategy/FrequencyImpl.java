@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
@@ -40,6 +39,8 @@ import org.slf4j.LoggerFactory;
 public class FrequencyImpl implements TuningStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(FrequencyImpl.class);
 
+  private static final String NUM_QUERIES_COUNT = "PINOT_TUNER_COUNT*";
+
   public final static String DIMENSION_REGEX = "(?:(\\w+) ((?:NOT )?IN) (\\(.+?\\)))|(?:(\\w+) (=|<>|!=) (.+?)[ |$)])";
   public final static long NO_IN_FILTER_THRESHOLD = 0;
   public final static long CARD_THRESHOLD_ONE = 1;
@@ -50,20 +51,20 @@ public class FrequencyImpl implements TuningStrategy {
   private HashSet<String> _tableNamesWithoutType;
   private long _numEntriesScannedThreshold;
   private long _cardinalityThreshold;
-  private long _numProcessedThreshold;
+  private long _numQueriesThreshold;
 
   private FrequencyImpl(Builder builder) {
     _tableNamesWithoutType = builder._tableNamesWithoutType;
     _numEntriesScannedThreshold = builder._numEntriesScannedThreshold;
     _cardinalityThreshold = builder._cardinalityThreshold;
-    _numProcessedThreshold = builder._numProcessedThreshold;
+    _numQueriesThreshold = builder._numQueriesThreshold;
   }
 
   public static final class Builder {
     private HashSet<String> _tableNamesWithoutType = new HashSet<>();
     private long _numEntriesScannedThreshold = NO_IN_FILTER_THRESHOLD;
     private long _cardinalityThreshold = CARD_THRESHOLD_ONE;
-    private long _numProcessedThreshold = NO_PROCESSED_THRESH;
+    private long _numQueriesThreshold = NO_PROCESSED_THRESH;
 
     public Builder() {
     }
@@ -113,8 +114,8 @@ public class FrequencyImpl implements TuningStrategy {
      * @return
      */
     @Nonnull
-    public Builder setNumProcessedThreshold(long val) {
-      _numProcessedThreshold = val;
+    public Builder setNumQueriesThreshold(long val) {
+      _numQueriesThreshold = val;
       return this;
     }
   }
@@ -138,6 +139,10 @@ public class FrequencyImpl implements TuningStrategy {
     String query = indexSuggestQueryStatsImpl.getQuery();
     LOGGER.debug("Accumulator: scoring query {}", query);
     HashSet<String> counted = new HashSet<>();
+
+    AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
+    AccumulatorOut.get(tableNameWithoutType).putIfAbsent(NUM_QUERIES_COUNT, new ParseBasedAccumulator());
+    AccumulatorOut.get(tableNameWithoutType).get(NUM_QUERIES_COUNT).increaseCount();
 
     Matcher matcher = _dimensionPattern.matcher(query);
     while (matcher.find()) {
@@ -173,9 +178,8 @@ public class FrequencyImpl implements TuningStrategy {
   }
 
   public void reportTable(String tableNameWithoutType, Map<String, AbstractAccumulator> columnStats) {
-    AtomicLong totalCount = new AtomicLong(0);
-    columnStats.forEach((k, v) -> totalCount.addAndGet(v.getCount()));
-    if (totalCount.longValue() < _numProcessedThreshold) {
+    long totalCount = columnStats.remove(NUM_QUERIES_COUNT).getCount();
+    if (totalCount < _numQueriesThreshold) {
       return;
     }
 

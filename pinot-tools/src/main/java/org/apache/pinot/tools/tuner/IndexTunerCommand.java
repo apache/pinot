@@ -49,8 +49,8 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-entriesScannedThreshold", required = false, metaVar = "<long>", usage = "Log lines with numEntriesScannedInFilter below this threshold will be excluded.")
   private long _numEntriesScannedThreshold = DEFAULT_NUM_ENTRIES_SCANNED_THRESHOLD;
 
-  @Option(name = "-queriesToReport", required = false, metaVar = "<long>", usage = "Tables with log lines scanned threshold will be excluded.")
-  private long _numQueriesToGiveRecommendation = DEFAULT_NUM_QUERIES_TO_GIVE_RECOMMENDATION;
+  @Option(name = "-numQueriesThreshold", required = false, metaVar = "<long>", usage = "Tables with log lines scanned threshold will be excluded.")
+  private long _numQueriesThreshold = DEFAULT_NUM_QUERIES_TO_GIVE_RECOMMENDATION;
 
   @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (unset run on all tables)")
   private String _tableNamesWithoutType = null;
@@ -69,7 +69,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
       TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
           .setTuningStrategy(new ParserBasedImpl.Builder()
               .setTableNamesWithoutType(tableNamesWithoutType)
-              .setNumProcessedThreshold(_numQueriesToGiveRecommendation)
+              .setNumQueriesThreshold(_numQueriesThreshold)
               .setAlgorithmOrder(ParserBasedImpl.FIRST_ORDER)
               .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
               .build())
@@ -85,7 +85,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
       TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
           .setTuningStrategy(new ParserBasedImpl.Builder()
               .setTableNamesWithoutType(tableNamesWithoutType)
-              .setNumProcessedThreshold(_numQueriesToGiveRecommendation)
+              .setNumQueriesThreshold(_numQueriesThreshold)
               .setAlgorithmOrder(ParserBasedImpl.SECOND_ORDER)
               .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
               .build())
