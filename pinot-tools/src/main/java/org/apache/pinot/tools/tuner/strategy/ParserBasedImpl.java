@@ -360,8 +360,8 @@ public class ParserBasedImpl implements Strategy {
       }
     }
 
-    private BigFraction EquivalentSelectivity(BigFraction selectivity, int clauseLength, BigFraction avgEntries,
-        Boolean invertSelection) {
+    private BigFraction EquivalentSelectivity(Boolean invertSelection, BigFraction selectivity, int clauseLength,
+        BigFraction avgEntries) {
       BigFraction equvLen = avgEntries.multiply(clauseLength);
       if (invertSelection == false) {
         return selectivity.divide(equvLen);
@@ -402,7 +402,8 @@ public class ParserBasedImpl implements Strategy {
         ArrayList<Tuple2<List<String>, BigFraction>> ret = new ArrayList<>();
         BigFraction selectivity = _metaManager.getColumnSelectivity(_tableNameWithoutType, colName);
         LOGGER.debug("Avg Cardinality: {} {} {}", selectivity, _tableNameWithoutType, colName);
-        if (selectivity.compareTo(new BigFraction(BigInteger.ONE)) <= 0) {
+
+        if (selectivity.compareTo(BigFraction.ONE) <= 0) {
           return ret;
         }
 
@@ -412,7 +413,7 @@ public class ParserBasedImpl implements Strategy {
         int lenFilter = ((PQL2Parser.InPredicateContext) predicateContext).inClause().literal().size();
         Boolean notIn = ((PQL2Parser.InPredicateContext) predicateContext).inClause().NOT() != null;
 
-        ret.add(new Tuple2<>(colNameList, EquivalentSelectivity(selectivity, lenFilter, avgEntries, notIn)));
+        ret.add(new Tuple2<>(colNameList, EquivalentSelectivity(notIn, selectivity, lenFilter, avgEntries)));
 
         LOGGER.debug("IN clause ret {}", ret.toString());
         return ret;
@@ -423,7 +424,8 @@ public class ParserBasedImpl implements Strategy {
         ArrayList<Tuple2<List<String>, BigFraction>> ret = new ArrayList<>();
         BigFraction selectivity = _metaManager.getColumnSelectivity(_tableNameWithoutType, colName);
         LOGGER.debug("Avg Cardinality: {} {} {}", selectivity, _tableNameWithoutType, colName);
-        if (selectivity.compareTo(new BigFraction(BigInteger.ONE)) <= 0) {
+
+        if (selectivity.compareTo(BigFraction.ONE) <= 0) {
           return ret;
         }
 
@@ -436,14 +438,11 @@ public class ParserBasedImpl implements Strategy {
                 .getText();
         LOGGER.debug("COMP operator {}", comparisonOp);
         if (comparisonOp.equals("=")) {
-          ret.add(new Tuple2<>(colNameList, EquivalentSelectivity(selectivity, 1, avgEntries, false)));
+          ret.add(new Tuple2<>(colNameList, EquivalentSelectivity(false, selectivity, 1, avgEntries)));
           LOGGER.debug("COMP clause ret {}", ret.toString());
           return ret;
         } else if (comparisonOp.equals("!=") || comparisonOp.equals("<>")) {
-          if (selectivity.compareTo(BigFraction.ONE) <= 0) {
-            return ret;
-          }
-          ret.add(new Tuple2<>(colNameList, EquivalentSelectivity(selectivity, 1, avgEntries, true)));
+          ret.add(new Tuple2<>(colNameList, EquivalentSelectivity(true, selectivity, 1, avgEntries)));
           LOGGER.debug("COMP clause ret {}", ret.toString());
           return ret;
         } else {
