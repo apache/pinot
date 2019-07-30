@@ -31,9 +31,7 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignment;
 import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.ReplicaGroupTestUtils;
 import org.testng.Assert;
@@ -49,9 +47,9 @@ public class ReplicaGroupRebalanceStrategyTest extends ControllerTest {
   private static final int INITIAL_NUM_SEGMENTS = 20;
 
   private static final String TABLE_NAME = "testReplicaRebalanceReplace";
-  private final static String PARTITION_COLUMN = "memberId";
-  private final static String OFFLINE_TENENT_NAME = "DefaultTenant_OFFLINE";
-  private final static String NEW_SEGMENT_PREFIX = "new_segment_";
+  private static final String PARTITION_COLUMN = "memberId";
+  private static final String OFFLINE_TENENT_NAME = "DefaultTenant_OFFLINE";
+  private static final String NEW_SEGMENT_PREFIX = "new_segment_";
 
   private final TableConfig.Builder _offlineBuilder = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE);
 
@@ -63,12 +61,8 @@ public class ReplicaGroupRebalanceStrategyTest extends ControllerTest {
       ControllerConf config = getDefaultControllerConfiguration();
       config.setTableMinReplicas(MIN_NUM_REPLICAS);
       startController(config);
-      ControllerRequestBuilderUtil
-          .addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR,
-              NUM_BROKER_INSTANCES, true);
-      ControllerRequestBuilderUtil
-          .addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR,
-              NUM_SERVER_INSTANCES, true);
+      addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
+      addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
 
       _offlineBuilder.setTableName("testOfflineTable").setTimeColumnName("timeColumn").setTimeType("DAYS")
           .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5");
@@ -78,20 +72,12 @@ public class ReplicaGroupRebalanceStrategyTest extends ControllerTest {
       // Join 4 more servers as untagged
       String[] instanceNames = {"Server_localhost_a", "Server_localhost_b", "Server_localhost_c", "Server_localhost_d"};
       for (String instanceName : instanceNames) {
-        ControllerRequestBuilderUtil
-            .addFakeDataInstanceToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, instanceName,
-                true);
+        addFakeServerInstanceToAutoJoinHelixCluster(instanceName, true);
         _helixAdmin.removeInstanceTag(getHelixClusterName(), instanceName, OFFLINE_TENENT_NAME);
       }
     } catch (Exception e) {
       e.printStackTrace();
     }
-  }
-
-  @AfterClass
-  public void tearDown() {
-    stopController();
-    stopZk();
   }
 
   @Test
@@ -323,5 +309,12 @@ public class ReplicaGroupRebalanceStrategyTest extends ControllerTest {
     tableConfig.getValidationConfig().setReplication(Integer.toString(targetNumReplicaGroup));
     _helixResourceManager
         .setExistingTableConfig(tableConfig, tableNameWithType, CommonConstants.Helix.TableType.OFFLINE);
+  }
+
+  @AfterClass
+  public void tearDown() {
+    stopFakeInstances();
+    stopController();
+    stopZk();
   }
 }

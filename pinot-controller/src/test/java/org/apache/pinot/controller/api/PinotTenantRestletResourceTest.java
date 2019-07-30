@@ -23,8 +23,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -81,12 +79,8 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     // Add a table to the server
     String createTableUrl = _controllerRequestURLBuilder.forTableCreate();
 
-    ControllerRequestBuilderUtil
-        .addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR,
-            NUM_BROKER_INSTANCES, true);
-    ControllerRequestBuilderUtil
-        .addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR,
-            NUM_SERVER_INSTANCES, true);
+    addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
+    addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
 
     _offlineBuilder.setTableName("testOfflineTable").setTimeColumnName("timeColumn").setTimeType("DAYS")
         .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5").setServerTenant("DefaultTenant");
@@ -101,6 +95,8 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
         JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forTablesFromTenant("DefaultTenant")));
     assertEquals(tableList.get("tables").size(), 1, "Expected 1 table");
     assertEquals(tableList.get("tables").get(0).asText(), "mytable_OFFLINE");
+
+    stopFakeInstances();
   }
 
   @AfterClass
