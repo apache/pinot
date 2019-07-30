@@ -40,6 +40,7 @@ public class DeleteExtraPushedSegmentsTest {
     _defaultProperties.setProperty(JobConfigConstants.PUSH_TO_HOSTS, "sample_host");
     _defaultProperties.setProperty(JobConfigConstants.PUSH_TO_PORT, "1234");
     _defaultProperties.setProperty(JobConfigConstants.PATH_TO_OUTPUT, "sample_output_path");
+    _defaultProperties.setProperty(JobConfigConstants.SEGMENT_TABLE_NAME, "myTable");
   }
 
   @Test
@@ -85,5 +86,17 @@ public class DeleteExtraPushedSegmentsTest {
     List<String> segmentsToDelete = segmentTarPushJob.getSegmentsToDelete(allSegmentsInCluster, currentSegments);
     Assert.assertEquals(segmentsToDelete.size(), 2);
     Assert.assertFalse(segmentsToDelete.contains("mytable_02"));
+  }
+
+  @Test
+  public void checkDeleteWithoutSequenceIds() {
+    List<String> allSegmentsInCluster = new ArrayList<>();
+    allSegmentsInCluster.add("mytable");
+
+    List<Path> currentSegments = new ArrayList<>();
+    currentSegments.add(new Path("mytable"));
+    SegmentTarPushJob segmentTarPushJob = new SegmentTarPushJob(_defaultProperties);
+    List<String> segmentsToDelete = segmentTarPushJob.getSegmentsToDelete(allSegmentsInCluster, currentSegments);
+    Assert.assertEquals(segmentsToDelete.size(), 0);
   }
 }

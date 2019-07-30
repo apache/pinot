@@ -45,7 +45,7 @@ public class SegmentTarPushJob extends BaseSegmentJob {
     int port = Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_TO_PORT));
     _pushLocations = PushLocation.getPushLocations(hosts, port);
     _rawTableName = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME));
-    _deleteExtraSegments = Boolean.parseBoolean(properties.getProperty(JobConfigConstants.IS_DELETE_EXTRA_SEGMENTS, "false"));
+    _deleteExtraSegments = Boolean.parseBoolean(properties.getProperty(JobConfigConstants.DELETE_EXTRA_SEGMENTS, "false"));
   }
 
   @Override
