@@ -55,7 +55,8 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (unset run on all tables)")
   private String _tableNamesWithoutType = null;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h",
+      "--help"}, usage = "Print this message.")
   private boolean _help;
 
   @Override
@@ -67,35 +68,23 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
 
     if (_strategy.equals(INVERTED_INDEX)) {
       TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
-          .setTuningStrategy(new ParserBasedImpl.Builder()
-              .setTableNamesWithoutType(tableNamesWithoutType)
+          .setTuningStrategy(new ParserBasedImpl.Builder().setTableNamesWithoutType(tableNamesWithoutType)
               .setNumQueriesThreshold(_numQueriesThreshold)
               .setAlgorithmOrder(ParserBasedImpl.FIRST_ORDER)
               .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
               .build())
-          .setQuerySrc(new LogQuerySrcImpl.Builder()
-              .setParser(new BrokerLogParserImpl())
-              .setPath(_brokerLog)
-              .build())
-          .setMetaManager(new JsonFileMetaManagerImpl.Builder()
-              .setPath(_metaData)
-              .build());
+          .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
+          .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metaData).build());
       parserBased.execute();
     } else if (_strategy.equals(SORTED_INDEX)) {
       TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
-          .setTuningStrategy(new ParserBasedImpl.Builder()
-              .setTableNamesWithoutType(tableNamesWithoutType)
+          .setTuningStrategy(new ParserBasedImpl.Builder().setTableNamesWithoutType(tableNamesWithoutType)
               .setNumQueriesThreshold(_numQueriesThreshold)
               .setAlgorithmOrder(ParserBasedImpl.THIRD_ORDER)
               .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
               .build())
-          .setQuerySrc(new LogQuerySrcImpl.Builder()
-              .setParser(new BrokerLogParserImpl())
-              .setPath(_brokerLog)
-              .build())
-          .setMetaManager(new JsonFileMetaManagerImpl.Builder()
-              .setPath(_metaData)
-              .build());
+          .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
+          .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metaData).build());
       parserBased.execute();
     } else {
       return false;

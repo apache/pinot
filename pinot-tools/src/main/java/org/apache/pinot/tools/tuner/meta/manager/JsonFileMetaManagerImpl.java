@@ -43,7 +43,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
   public static final Boolean USE_EXISTING_INDEX = true;
   public static final Boolean DONT_USE_EXISTING_INDEX = false;
 
-   /*Meta data type:
+  /*Meta data type:
    *COL_META: Aggregated (sum and weighted sum of metadata)
    *SEGMENT_META: Individually stored metadata of each segment
    */
@@ -235,8 +235,8 @@ public class JsonFileMetaManagerImpl implements MetaManager {
         throw new NullPointerException();
       }
     } catch (NullPointerException e) {
-      LOGGER.debug("tableNameWithoutType:{} columnName:{} fieldName:{} Does not exist!",
-          tableNameWithoutType, columnName, fieldName);
+      LOGGER.debug("tableNameWithoutType:{} columnName:{} fieldName:{} Does not exist!", tableNameWithoutType,
+          columnName, fieldName);
       return null;
     }
     return ret.asText();

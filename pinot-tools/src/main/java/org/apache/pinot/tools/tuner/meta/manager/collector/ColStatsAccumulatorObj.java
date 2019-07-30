@@ -120,22 +120,24 @@ public class ColStatsAccumulatorObj extends AbstractAccumulator {
 
   public void merge(ColStatsAccumulatorObj colStatsAccumulatorObj) {
     accumulatedStats.put(MetaManager.WEIGHTED_SUM_CARDINALITY,
-        this.accumulatedStats.getOrDefault(MetaManager.WEIGHTED_SUM_CARDINALITY, BigInteger.ZERO).add(
-            colStatsAccumulatorObj.accumulatedStats
-                .getOrDefault(MetaManager.WEIGHTED_SUM_CARDINALITY, BigInteger.ZERO)));
+        this.accumulatedStats.getOrDefault(MetaManager.WEIGHTED_SUM_CARDINALITY, BigInteger.ZERO)
+            .add(colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.WEIGHTED_SUM_CARDINALITY,
+                BigInteger.ZERO)));
 
     accumulatedStats.put(MetaManager.SUM_SEGMENTS_COUNT,
-        this.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_COUNT, BigInteger.ZERO).add(
-            colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_COUNT, BigInteger.ZERO)));
+        this.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_COUNT, BigInteger.ZERO)
+            .add(
+                colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_COUNT, BigInteger.ZERO)));
 
     accumulatedStats.put(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX,
-        this.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX, BigInteger.ZERO).add(
-            colStatsAccumulatorObj.accumulatedStats
-                .getOrDefault(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX, BigInteger.ZERO)));
+        this.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX, BigInteger.ZERO)
+            .add(colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX,
+                BigInteger.ZERO)));
 
     accumulatedStats.put(MetaManager.SUM_SEGMENTS_SORTED,
-        this.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_SORTED, BigInteger.ZERO).add(
-            colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_SORTED, BigInteger.ZERO)));
+        this.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_SORTED, BigInteger.ZERO)
+            .add(colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_SORTED,
+                BigInteger.ZERO)));
 
     accumulatedStats.put(MetaManager.SUM_TOTAL_ENTRIES,
         this.accumulatedStats.getOrDefault(MetaManager.SUM_TOTAL_ENTRIES, BigInteger.ZERO)

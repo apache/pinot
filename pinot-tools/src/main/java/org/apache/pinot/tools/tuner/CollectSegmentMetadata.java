@@ -38,25 +38,22 @@ public class CollectSegmentMetadata extends AbstractBaseCommand implements Comma
   @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (unset to run on all tables)")
   private String _tableNamesWithoutType = null;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h",
+      "--help"}, usage = "Print this message.")
   private boolean _help;
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     HashSet<String> tableNamesWithoutType = new HashSet<>();
     if (_tableNamesWithoutType != null && !_tableNamesWithoutType.trim().equals("")) {
       tableNamesWithoutType.addAll(Arrays.asList(_tableNamesWithoutType.split(",")));
     }
 
     TunerDriver metaFetch = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
-        .setTuningStrategy(new AccumulateStats.Builder()
-            .setTableNamesWithoutType(tableNamesWithoutType)
+        .setTuningStrategy(new AccumulateStats.Builder().setTableNamesWithoutType(tableNamesWithoutType)
             .setOutputDir(_workDir)
             .build())
-        .setQuerySrc(new CompressedFilePathIter.Builder()
-            .setDirectory(_segmentsDir)
-            .build())
+        .setQuerySrc(new CompressedFilePathIter.Builder().setDirectory(_segmentsDir).build())
         .setMetaManager(null);
     metaFetch.execute();
     return true;

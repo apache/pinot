@@ -124,8 +124,8 @@ public class FrequencyImpl implements TuningStrategy {
   public boolean filter(AbstractQueryStats queryStats) {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     long numEntriesScannedInFilter = Long.parseLong(indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter());
-    return (_tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType
-        .contains(indexSuggestQueryStatsImpl.getTableNameWithoutType())) && (numEntriesScannedInFilter
+    return (_tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType.contains(
+        indexSuggestQueryStatsImpl.getTableNameWithoutType())) && (numEntriesScannedInFilter
         > _numEntriesScannedThreshold);
   }
 
@@ -154,12 +154,14 @@ public class FrequencyImpl implements TuningStrategy {
       }
     }
 
-    counted.stream().filter(colName -> metaManager.getColumnSelectivity(tableNameWithoutType, colName)
-        .compareTo(new BigFraction(_cardinalityThreshold)) > 0).forEach(colName -> {
-      accumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-      accumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new FrequencyAccumulator());
-      ((FrequencyAccumulator) accumulatorOut.get(tableNameWithoutType).get(colName)).merge(1);
-    });
+    counted.stream()
+        .filter(colName -> metaManager.getColumnSelectivity(tableNameWithoutType, colName)
+            .compareTo(new BigFraction(_cardinalityThreshold)) > 0)
+        .forEach(colName -> {
+          accumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
+          accumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new FrequencyAccumulator());
+          ((FrequencyAccumulator) accumulatorOut.get(tableNameWithoutType).get(colName)).merge(1);
+        });
   }
 
   @Override

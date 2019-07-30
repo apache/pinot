@@ -56,7 +56,6 @@ public class AccumulateStats implements TuningStrategy {
   private static final String REGEX_TOTAL_NUMBER_OF_ENTRIES = "\\.totalNumberOfEntries = (.*)";
   private static final String REGEX_INVERTED_INDEX_SIZE = "\\.inverted_index\\.size = (.*)";
 
-
   private HashSet<String> _tableNamesWithoutType;
   private File _outputDir;
 
@@ -81,8 +80,8 @@ public class AccumulateStats implements TuningStrategy {
    */
   @Override
   public boolean filter(AbstractQueryStats filePaths) {
-    return _tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType
-        .contains(((PathWrapper) filePaths).getTableNameWithoutType());
+    return _tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType.contains(
+        ((PathWrapper) filePaths).getTableNameWithoutType());
   }
 
   /**
@@ -96,14 +95,15 @@ public class AccumulateStats implements TuningStrategy {
       Map<String, Map<String, AbstractAccumulator>> AccumulatorOut) {
     PathWrapper pathWrapper = ((PathWrapper) filePaths);
 
-    File tmpFolder = new File(_outputDir.getAbsolutePath() + TMP_THREAD_FILE_PREFIX
-        + Thread.currentThread().getId() + "_" + (System.currentTimeMillis() % 1000000));
+    File tmpFolder = new File(
+        _outputDir.getAbsolutePath() + TMP_THREAD_FILE_PREFIX + Thread.currentThread().getId() + "_" + (
+            System.currentTimeMillis() % 1000000));
     LOGGER.info("Extracting: " + pathWrapper.getFile().getAbsolutePath() + " to " + tmpFolder.getAbsolutePath());
     try {
       tmpFolder.mkdirs();
-      Process p = Runtime.getRuntime().exec(
-          (UNTAR + pathWrapper.getFile().getAbsolutePath() + EXCLUDE_DATA
-              + STRIP_PATHS + OUT_PUT_PATH + tmpFolder.getAbsolutePath()));
+      Process p = Runtime.getRuntime()
+          .exec((UNTAR + pathWrapper.getFile().getAbsolutePath() + EXCLUDE_DATA + STRIP_PATHS + OUT_PUT_PATH + tmpFolder
+              .getAbsolutePath()));
       p.waitFor();
     } catch (IOException | InterruptedException e) {
       LOGGER.error("Error while extracting {}", pathWrapper.getFile().getAbsolutePath());
@@ -175,10 +175,14 @@ public class AccumulateStats implements TuningStrategy {
       String invertedIndexSize =
           invertedIndexSizeMatcher.find() ? invertedIndexSizeMatcher.group(REGEX_FIRST_GROUP) : "0";
 
-      ((ColStatsAccumulatorObj) AccumulatorOut.get(pathWrapper.getTableNameWithoutType()).get(colName))
-          .addCardinality(cardinality).addInvertedIndexSize(invertedIndexSize).addIsSorted(isSorted)
-          .addSegmentName(pathWrapper.getFile().getName()).addTotalDocs(totalDocs)
-          .addTotalNumberOfEntries(totalNumberOfEntries).merge();
+      ((ColStatsAccumulatorObj) AccumulatorOut.get(pathWrapper.getTableNameWithoutType()).get(colName)).addCardinality(
+          cardinality)
+          .addInvertedIndexSize(invertedIndexSize)
+          .addIsSorted(isSorted)
+          .addSegmentName(pathWrapper.getFile().getName())
+          .addTotalDocs(totalDocs)
+          .addTotalNumberOfEntries(totalNumberOfEntries)
+          .merge();
     }
 
     deleteTmp(tmpFolder);

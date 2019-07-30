@@ -132,15 +132,14 @@ public class LogQuerySrcImpl implements QuerySrc {
   }
 
   @Override
-  public AbstractQueryStats next()
-      throws NoSuchElementException {
+  public AbstractQueryStats next() throws NoSuchElementException {
     if (_stringBufferNext == null) {
       throw new NoSuchElementException();
     }
     StringBuilder stringBuffer = new StringBuilder(_stringBufferNext);
     try {
-      while ((_stringBufferNext = _bufferedReader.readLine()) != null && !_validLinePrefixPattern
-          .matcher(_stringBufferNext).find()) {
+      while ((_stringBufferNext = _bufferedReader.readLine()) != null && !_validLinePrefixPattern.matcher(
+          _stringBufferNext).find()) {
         stringBuffer.append(_stringBufferNext);
         _stringBufferNext = null;
       }

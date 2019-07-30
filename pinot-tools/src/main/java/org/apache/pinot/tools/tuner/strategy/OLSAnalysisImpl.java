@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nonnull;
 import javax.validation.constraints.NotNull;
 import org.antlr.v4.runtime.ANTLRInputStream;
@@ -89,8 +88,8 @@ public class OLSAnalysisImpl implements TuningStrategy {
   @Override
   public boolean filter(AbstractQueryStats queryStats) {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
-    return (_tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType
-        .contains(indexSuggestQueryStatsImpl.getTableNameWithoutType()));
+    return (_tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType.contains(
+        indexSuggestQueryStatsImpl.getTableNameWithoutType()));
   }
 
   @Override
@@ -110,9 +109,8 @@ public class OLSAnalysisImpl implements TuningStrategy {
     accumulatorOut.get(tableNameWithoutType).get(NUM_QUERIES_COUNT).increaseCount();
 
     accumulatorOut.get(tableNameWithoutType).putIfAbsent("*", new OLSAccumulator());
-    ((OLSAccumulator) accumulatorOut.get(tableNameWithoutType).get("*"))
-        .merge(Long.parseLong(time), Long.parseLong(numEntriesScannedInFilter),
-            Long.parseLong(numEntriesScannedPostFilter), 0, _lenBin);
+    ((OLSAccumulator) accumulatorOut.get(tableNameWithoutType).get("*")).merge(Long.parseLong(time),
+        Long.parseLong(numEntriesScannedInFilter), Long.parseLong(numEntriesScannedPostFilter), 0, _lenBin);
   }
 
   @Override
@@ -183,27 +181,27 @@ public class OLSAnalysisImpl implements TuningStrategy {
     numEntriesScannedInFilterPercentile[9] = percentile.evaluate(95);
 
     reportOut += "numEntriesScannedInFilter:\n";
-    reportOut += MessageFormat
-        .format("10%:{0} | 20%:{1} | 30%:{2} | 40%:{3} | 50%:{4} | 60%:{5} | 70%:{6} | 80%:{7} | 90%:{8} | 95%:{9}\n",
-            String.format("%.0f", numEntriesScannedInFilterPercentile[0]),
-            String.format("%.0f", numEntriesScannedInFilterPercentile[1]),
-            String.format("%.0f", numEntriesScannedInFilterPercentile[2]),
-            String.format("%.0f", numEntriesScannedInFilterPercentile[3]),
-            String.format("%.0f", numEntriesScannedInFilterPercentile[4]),
-            String.format("%.0f", numEntriesScannedInFilterPercentile[5]),
-            String.format("%.0f", numEntriesScannedInFilterPercentile[6]),
-            String.format("%.0f", numEntriesScannedInFilterPercentile[7]),
-            String.format("%.0f", numEntriesScannedInFilterPercentile[8]),
-            String.format("%.0f", numEntriesScannedInFilterPercentile[9]));
+    reportOut += MessageFormat.format(
+        "10%:{0} | 20%:{1} | 30%:{2} | 40%:{3} | 50%:{4} | 60%:{5} | 70%:{6} | 80%:{7} | 90%:{8} | 95%:{9}\n",
+        String.format("%.0f", numEntriesScannedInFilterPercentile[0]),
+        String.format("%.0f", numEntriesScannedInFilterPercentile[1]),
+        String.format("%.0f", numEntriesScannedInFilterPercentile[2]),
+        String.format("%.0f", numEntriesScannedInFilterPercentile[3]),
+        String.format("%.0f", numEntriesScannedInFilterPercentile[4]),
+        String.format("%.0f", numEntriesScannedInFilterPercentile[5]),
+        String.format("%.0f", numEntriesScannedInFilterPercentile[6]),
+        String.format("%.0f", numEntriesScannedInFilterPercentile[7]),
+        String.format("%.0f", numEntriesScannedInFilterPercentile[8]),
+        String.format("%.0f", numEntriesScannedInFilterPercentile[9]));
 
     reportOut += "\nLatency (ms):\n";
-    reportOut += MessageFormat
-        .format("10%:{0} | 20%:{1} | 30%:{2} | 40%:{3} | 50%:{4} | 60%:{5} | 70%:{6} | 80%:{7} | 90%:{8} | 95%:{9}\n",
-            String.format("%.0f", timePercentile[0]), String.format("%.0f", timePercentile[1]),
-            String.format("%.0f", timePercentile[2]), String.format("%.0f", timePercentile[3]),
-            String.format("%.0f", timePercentile[4]), String.format("%.0f", timePercentile[5]),
-            String.format("%.0f", timePercentile[6]), String.format("%.0f", timePercentile[7]),
-            String.format("%.0f", timePercentile[8]), String.format("%.0f", timePercentile[9]));
+    reportOut += MessageFormat.format(
+        "10%:{0} | 20%:{1} | 30%:{2} | 40%:{3} | 50%:{4} | 60%:{5} | 70%:{6} | 80%:{7} | 90%:{8} | 95%:{9}\n",
+        String.format("%.0f", timePercentile[0]), String.format("%.0f", timePercentile[1]),
+        String.format("%.0f", timePercentile[2]), String.format("%.0f", timePercentile[3]),
+        String.format("%.0f", timePercentile[4]), String.format("%.0f", timePercentile[5]),
+        String.format("%.0f", timePercentile[6]), String.format("%.0f", timePercentile[7]),
+        String.format("%.0f", timePercentile[8]), String.format("%.0f", timePercentile[9]));
 
     OLSMultipleLinearRegression regression = new OLSMultipleLinearRegression();
     regression.setNoIntercept(true);
@@ -239,7 +237,6 @@ public class OLSAnalysisImpl implements TuningStrategy {
             String.format("%.0f", numEntriesScannedInFilterPercentile[9] * params[0]));
         reportOut += MessageFormat.format("\nR-square: {0}\n", rSquared);
         reportOut += String.format("Params: %s %s\n", Double.toString(params[0]), Double.toString(params[1]));
-
       } else {
         reportOut += "\nunable to predict the optimization boundary of this table!";
       }
@@ -248,7 +245,6 @@ public class OLSAnalysisImpl implements TuningStrategy {
     }
     LOGGER.info(reportOut);
   }
-
 
   /**
    * Parse and count the total bitmaps used in a query
@@ -313,8 +309,8 @@ public class OLSAnalysisImpl implements TuningStrategy {
       if (predicateListContext.getChildCount() == 1) {
         LOGGER.debug("Parsing parenthesis group");
         return parsePredicate((PQL2Parser.PredicateContext) predicateListContext.getChild(0));
-      } else if (predicateListContext.getChild(1).getText().toUpperCase().equals(AND) || predicateListContext
-          .getChild(1).getText().toUpperCase().equals(OR)) {
+      } else if (predicateListContext.getChild(1).getText().toUpperCase().equals(AND) || predicateListContext.getChild(
+          1).getText().toUpperCase().equals(OR)) {
         LOGGER.debug("Parsing AND/OR list {}", predicateListContext.getText());
         int childResults = 0;
         for (int i = 0; i < predicateListContext.getChildCount(); i += 2) {
@@ -349,9 +345,9 @@ public class OLSAnalysisImpl implements TuningStrategy {
         String colName =
             ((PQL2Parser.ComparisonPredicateContext) predicateContext).comparisonClause().expression(0).getText();
         LOGGER.debug("Entering COMP clause!");
-        String comparisonOp =
-            ((PQL2Parser.ComparisonPredicateContext) predicateContext).comparisonClause().comparisonOperator()
-                .getText();
+        String comparisonOp = ((PQL2Parser.ComparisonPredicateContext) predicateContext).comparisonClause()
+            .comparisonOperator()
+            .getText();
         LOGGER.debug("COMP operator {}", comparisonOp);
         if (comparisonOp.equals("=") || comparisonOp.equals("!=") || comparisonOp.equals("<>")) {
           if (_metaManager.hasInvertedIndex(_tableNameWithoutType, colName)) {

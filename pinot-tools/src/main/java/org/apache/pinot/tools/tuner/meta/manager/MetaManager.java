@@ -49,7 +49,8 @@ public interface MetaManager {
    * @param fieldName
    * @return
    */
-  String getSegmentField(String tableNameWithoutType, String columnName, String segmentName, String fieldName); //get metadata of individual segment
+  String getSegmentField(String tableNameWithoutType, String columnName, String segmentName,
+      String fieldName); //get metadata of individual segment
 
   /**
    * Get the selectivity calculated by weighted average of cardinality.

@@ -19,7 +19,6 @@
 package org.apache.pinot.tools.tuner.strategy;
 
 import io.vavr.Tuple2;
-import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
@@ -153,8 +152,8 @@ public class ParserBasedImpl implements TuningStrategy {
   public boolean filter(AbstractQueryStats queryStats) {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     long numEntriesScannedInFilter = Long.parseLong(indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter());
-    return (_tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType
-        .contains(indexSuggestQueryStatsImpl.getTableNameWithoutType())) && (numEntriesScannedInFilter
+    return (_tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType.contains(
+        indexSuggestQueryStatsImpl.getTableNameWithoutType())) && (numEntriesScannedInFilter
         > _numEntriesScannedThreshold);
   }
 
@@ -189,8 +188,8 @@ public class ParserBasedImpl implements TuningStrategy {
             accumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new ParseBasedAccumulator());
             BigFraction weightedScore = BigFraction.ONE.subtract(tupleNamesScore._2().reciprocal())
                 .multiply(new BigInteger(numEntriesScannedInFilter));
-            ((ParseBasedAccumulator) accumulatorOut.get(tableNameWithoutType).get(colName))
-                .merge(1, weightedScore.bigDecimalValue(RoundingMode.DOWN.ordinal()).toBigInteger());
+            ((ParseBasedAccumulator) accumulatorOut.get(tableNameWithoutType).get(colName)).merge(1,
+                weightedScore.bigDecimalValue(RoundingMode.DOWN.ordinal()).toBigInteger());
           });
         });
   }
@@ -425,8 +424,8 @@ public class ParserBasedImpl implements TuningStrategy {
         int numValuesSelected = ((PQL2Parser.InPredicateContext) predicateContext).inClause().literal().size();
         Boolean isInvertIn = ((PQL2Parser.InPredicateContext) predicateContext).inClause().NOT() != null;
 
-        ret.add(new Tuple2<>(colNameList, EquivalentSelectivity(isInvertIn, selectivity, numValuesSelected,
-            avgEntriesPerDoc)));
+        ret.add(new Tuple2<>(colNameList,
+            EquivalentSelectivity(isInvertIn, selectivity, numValuesSelected, avgEntriesPerDoc)));
 
         LOGGER.debug("IN clause ret {}", ret.toString());
         return ret;
@@ -446,9 +445,9 @@ public class ParserBasedImpl implements TuningStrategy {
         colNameList.add(colName);
         BigFraction avgEntriesPerDoc = _metaManager.getAverageNumEntriesPerDoc(_tableNameWithoutType, colName);
 
-        String comparisonOp =
-            ((PQL2Parser.ComparisonPredicateContext) predicateContext).comparisonClause().comparisonOperator()
-                .getText();
+        String comparisonOp = ((PQL2Parser.ComparisonPredicateContext) predicateContext).comparisonClause()
+            .comparisonOperator()
+            .getText();
         LOGGER.debug("COMP operator {}", comparisonOp);
         if (comparisonOp.equals("=")) {
           ret.add(new Tuple2<>(colNameList, EquivalentSelectivity(false, selectivity, 1, avgEntriesPerDoc)));

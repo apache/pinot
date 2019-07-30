@@ -37,23 +37,20 @@ public class EntriesScannedQuantileReport extends AbstractBaseCommand implements
   @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (unset run on all tables)")
   private String _tableNamesWithoutType = null;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h",
+      "--help"}, usage = "Print this message.")
   private boolean _help;
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     HashSet<String> tableNamesWithoutType = new HashSet<>();
     if (_tableNamesWithoutType != null && !_tableNamesWithoutType.trim().equals("")) {
       tableNamesWithoutType.addAll(Arrays.asList(_tableNamesWithoutType.split(",")));
     }
 
     TunerDriver fitModel = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
-        .setTuningStrategy(new OLSAnalysisImpl.Builder()
-            .setTableNamesWithoutType(tableNamesWithoutType)
-            .build())
-        .setQuerySrc(new LogQuerySrcImpl.Builder()
-            .setValidLinePrefixRegex(LogQuerySrcImpl.REGEX_VALID_LINE_TIME)
+        .setTuningStrategy(new OLSAnalysisImpl.Builder().setTableNamesWithoutType(tableNamesWithoutType).build())
+        .setQuerySrc(new LogQuerySrcImpl.Builder().setValidLinePrefixRegex(LogQuerySrcImpl.REGEX_VALID_LINE_TIME)
             .setParser(new BrokerLogParserImpl())
             .setPath(_brokerLog)
             .build());

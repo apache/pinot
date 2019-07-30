@@ -37,6 +37,5 @@ public interface QuerySrc {
    * @return The next obj parsed from input
    * @throws NoSuchElementException
    */
-  AbstractQueryStats next()
-      throws NoSuchElementException;
+  AbstractQueryStats next() throws NoSuchElementException;
 }

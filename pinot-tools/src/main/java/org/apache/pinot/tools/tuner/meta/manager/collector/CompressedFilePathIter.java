@@ -36,7 +36,6 @@ public class CompressedFilePathIter implements QuerySrc {
   private static final Logger LOGGER = LoggerFactory.getLogger(CompressedFilePathIter.class);
   Iterator<Tuple2<String, File>> _iterator;
 
-
   private String _directory;
 
   private CompressedFilePathIter(Builder builder) {
@@ -78,11 +77,9 @@ public class CompressedFilePathIter implements QuerySrc {
    * @throws NoSuchElementException
    */
   @Override
-  public AbstractQueryStats next()
-      throws NoSuchElementException {
+  public AbstractQueryStats next() throws NoSuchElementException {
     Tuple2<String, File> nextTuple = _iterator.next();
-    return new PathWrapper.Builder().setTableNameWithoutType(nextTuple._1()).setFile(nextTuple._2())
-        .build();
+    return new PathWrapper.Builder().setTableNameWithoutType(nextTuple._1()).setFile(nextTuple._2()).build();
   }
 
   public static final class Builder {

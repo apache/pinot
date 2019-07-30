@@ -162,31 +162,27 @@ public class TunerDriver {
         mergeExecutor.execute(() -> {
           LOGGER.debug("Thread {} working on table {}", Thread.currentThread().getId(), tableNameWithoutType);
           _threadToTableAccumulators.forEach(
-              (threadID, perThreadTableToColAccumulators) -> perThreadTableToColAccumulators
-                  .getOrDefault(tableNameWithoutType, new HashMap<>())
-                  .forEach((colName, mergerObj) -> {
-                    try {
-                      _tableToColMergers.get(tableNameWithoutType)
-                          .putIfAbsent(colName, mergerObj.getClass().newInstance());
-                      _tuningStrategy.merge(_tableToColMergers.get(tableNameWithoutType).get(colName), mergerObj);
-                    } catch (Exception e) {
-                      LOGGER.error("Instantiation Exception in Merger!", e);
-                    }
-                  }));
+              (threadID, perThreadTableToColAccumulators) -> perThreadTableToColAccumulators.getOrDefault(
+                  tableNameWithoutType, new HashMap<>()).forEach((colName, mergerObj) -> {
+                try {
+                  _tableToColMergers.get(tableNameWithoutType).putIfAbsent(colName, mergerObj.getClass().newInstance());
+                  _tuningStrategy.merge(_tableToColMergers.get(tableNameWithoutType).get(colName), mergerObj);
+                } catch (Exception e) {
+                  LOGGER.error("Instantiation Exception in Merger!", e);
+                }
+              }));
         });
       } else {
         _threadToTableAccumulators.forEach(
-            (threadID, perThreadTableToColAccumulators) -> perThreadTableToColAccumulators
-                .getOrDefault(tableNameWithoutType, new HashMap<>())
-                .forEach((colName, mergerObj) -> {
-                  try {
-                    _tableToColMergers.get(tableNameWithoutType)
-                        .putIfAbsent(colName, mergerObj.getClass().newInstance());
-                    _tuningStrategy.merge(_tableToColMergers.get(tableNameWithoutType).get(colName), mergerObj);
-                  } catch (Exception e) {
-                    LOGGER.error("Instantiation Exception in Merger!", e);
-                  }
-                }));
+            (threadID, perThreadTableToColAccumulators) -> perThreadTableToColAccumulators.getOrDefault(
+                tableNameWithoutType, new HashMap<>()).forEach((colName, mergerObj) -> {
+              try {
+                _tableToColMergers.get(tableNameWithoutType).putIfAbsent(colName, mergerObj.getClass().newInstance());
+                _tuningStrategy.merge(_tableToColMergers.get(tableNameWithoutType).get(colName), mergerObj);
+              } catch (Exception e) {
+                LOGGER.error("Instantiation Exception in Merger!", e);
+              }
+            }));
       }
     }
     if (_threadPoolSize != NO_CONCURRENCY) {
