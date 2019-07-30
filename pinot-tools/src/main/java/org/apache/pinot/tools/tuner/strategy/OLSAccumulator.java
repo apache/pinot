@@ -23,6 +23,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 
+/**
+ * An implementation of {@link AbstractAccumulator}, to implement minimum pulling for {@link OLSAnalysisImpl}
+ */
 public class OLSAccumulator extends AbstractAccumulator {
 
   private ArrayList<Long> _timeList;
@@ -78,7 +81,6 @@ public class OLSAccumulator extends AbstractAccumulator {
 
   @Override
   public String toString() {
-    return "OLSMergerObj{" + "_timeList=" + _timeList + ", _inFilterList=" + _inFilterList + ", _minBin=" + _minBin
-        + '}';
+    return "OLSMergerObj{" + "_timeList=" + _timeList + ", _inFilterList=" + _inFilterList + ", _minBin=" + _minBin + '}';
   }
 }

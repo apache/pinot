@@ -19,13 +19,13 @@
 package org.apache.pinot.tools.tuner.strategy;
 
 /**
- * Accumulator for column stats
+ * Abstract accumulator for column stats.
  */
 public abstract class AbstractAccumulator {
   public abstract String toString();
 
   /**
-   * Get the default counter for BasicMergerObjs merged to this AbstractMergerObj
+   * Get the default count for the number of  {@link AbstractAccumulator} merged to this.
    * @return
    */
   public long getCount() {
@@ -38,12 +38,12 @@ public abstract class AbstractAccumulator {
    * Increase default counter by one
    */
   public void increaseCount() {
-    this._count += 1;
+    _count += 1;
   }
 
   /**
-   * Merge the default counter of two BasicMergerObjs
-   * @param abstractAccumulator AbstractMergerObj to merge to this AbstractMergerObj
+   * Merge the default counter of two {@link AbstractAccumulator}
+   * @param abstractAccumulator {@link AbstractAccumulator} to merge to this {@link AbstractAccumulator}
    */
   public void mergeCount(AbstractAccumulator abstractAccumulator) {
     this._count += abstractAccumulator._count;

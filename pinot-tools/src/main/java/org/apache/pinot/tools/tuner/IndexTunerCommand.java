@@ -37,7 +37,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
   private static final String INVERTED_INDEX = "inverted";
   private static final String SORTED_INDEX = "sorted";
 
-  @Option(name = "-metaData", required = true, metaVar = "<String>", usage = "Path to packed metadata file (json).")
+  @Option(name = "-metaData", required = true, metaVar = "<String>", usage = "Path to packed metadata file (json), CollectSegmentMetadata can be used to create this.")
   private String _metaData;
 
   @Option(name = "-brokerLog", required = true, metaVar = "<String>", usage = "Path to broker log file.")

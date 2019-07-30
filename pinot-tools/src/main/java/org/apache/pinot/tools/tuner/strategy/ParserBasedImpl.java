@@ -48,6 +48,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * A parser based implementation of {@link TuningStrategy} to give recommendation to inverted and sorted index
+ * by recursively scoring each sub predicate
+ */
 public class ParserBasedImpl implements TuningStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(ParserBasedImpl.class);
   private static final String NUM_QUERIES_COUNT = "PINOT_TUNER_COUNT*";
@@ -56,11 +60,9 @@ public class ParserBasedImpl implements TuningStrategy {
   public final static int SECOND_ORDER = 2;
   public final static int THIRD_ORDER = 3;
 
-  public final static long NO_IN_FILTER_THRESHOLD = 0;
-
-  public final static long NO_PROCESSED_THRESH = 0;
-
-  public final static int NO_SEL_THRESH = 1;
+  public final static long DEFAULT_NUM_ENTRIES_IN_FILTER_THRESHOLD = 0;
+  public final static long DEFAULT_NUM_QUERIES_THRESHOLD = 0;
+  public final static int DEFAULT_CARDINALITY_THRESHOLD = 1;
 
   private int _algorithmOrder;
   private HashSet<String> _tableNamesWithoutType;
@@ -79,9 +81,9 @@ public class ParserBasedImpl implements TuningStrategy {
   public static final class Builder {
     private int _algorithmOrder = FIRST_ORDER;
     private HashSet<String> _tableNamesWithoutType = new HashSet<>();
-    private long _numEntriesScannedThreshold = NO_IN_FILTER_THRESHOLD;
-    private long _numQueriesThreshold = NO_PROCESSED_THRESH;
-    private int _selectivityThreshold = NO_SEL_THRESH;
+    private long _numEntriesScannedThreshold = DEFAULT_NUM_ENTRIES_IN_FILTER_THRESHOLD;
+    private long _numQueriesThreshold = DEFAULT_NUM_QUERIES_THRESHOLD;
+    private int _selectivityThreshold = DEFAULT_CARDINALITY_THRESHOLD;
 
     public Builder() {
     }
@@ -153,13 +155,11 @@ public class ParserBasedImpl implements TuningStrategy {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     long numEntriesScannedInFilter = Long.parseLong(indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter());
     return (_tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType.contains(
-        indexSuggestQueryStatsImpl.getTableNameWithoutType())) && (numEntriesScannedInFilter
-        > _numEntriesScannedThreshold);
+        indexSuggestQueryStatsImpl.getTableNameWithoutType())) && (numEntriesScannedInFilter > _numEntriesScannedThreshold);
   }
 
   @Override
-  public void accumulate(AbstractQueryStats queryStats, MetaManager metaManager,
-      Map<String, Map<String, AbstractAccumulator>> accumulatorOut) {
+  public void accumulate(AbstractQueryStats queryStats, MetaManager metaManager, Map<String, Map<String, AbstractAccumulator>> accumulatorOut) {
 
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     String tableNameWithoutType = indexSuggestQueryStatsImpl.getTableNameWithoutType();
@@ -179,19 +179,17 @@ public class ParserBasedImpl implements TuningStrategy {
     HashSet<String> counted = new HashSet<>();
     //Discard if the effective selectivity is less than _selectivityThreshold
     BigFraction selectivityThresholdFraction = new BigFraction(_selectivityThreshold);
-    columnScores.stream().filter(tupleNamesScore -> tupleNamesScore._2().compareTo(selectivityThresholdFraction) > 0)
-        .forEach(tupleNamesScore -> {
-          //Do not count if already counted
-          tupleNamesScore._1().stream().filter(colName -> !counted.contains(colName)).forEach(colName -> {
-            counted.add(colName);
-            accumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-            accumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new ParseBasedAccumulator());
-            BigFraction weightedScore = BigFraction.ONE.subtract(tupleNamesScore._2().reciprocal())
-                .multiply(new BigInteger(numEntriesScannedInFilter));
-            ((ParseBasedAccumulator) accumulatorOut.get(tableNameWithoutType).get(colName)).merge(1,
-                weightedScore.bigDecimalValue(RoundingMode.DOWN.ordinal()).toBigInteger());
-          });
-        });
+    columnScores.stream().filter(tupleNamesScore -> tupleNamesScore._2().compareTo(selectivityThresholdFraction) > 0).forEach(tupleNamesScore -> {
+      //Do not count if already counted
+      tupleNamesScore._1().stream().filter(colName -> !counted.contains(colName)).forEach(colName -> {
+        counted.add(colName);
+        accumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
+        accumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new ParseBasedAccumulator());
+        BigFraction weightedScore = BigFraction.ONE.subtract(tupleNamesScore._2().reciprocal()).multiply(new BigInteger(numEntriesScannedInFilter));
+        ((ParseBasedAccumulator) accumulatorOut.get(tableNameWithoutType).get(colName)).merge(1,
+            weightedScore.bigDecimalValue(RoundingMode.DOWN.ordinal()).toBigInteger());
+      });
+    });
   }
 
   @Override
@@ -322,8 +320,7 @@ public class ParserBasedImpl implements TuningStrategy {
         List<Tuple2<List<String>, BigFraction>> childResults = new ArrayList<>();
 
         for (int i = 0; i < predicateListContext.getChildCount(); i += 2) {
-          List<Tuple2<List<String>, BigFraction>> childResult =
-              parsePredicate((PQL2Parser.PredicateContext) predicateListContext.getChild(i));
+          List<Tuple2<List<String>, BigFraction>> childResult = parsePredicate((PQL2Parser.PredicateContext) predicateListContext.getChild(i));
           if (childResult != null) {
             childResults.addAll(childResult);
           }
@@ -341,10 +338,8 @@ public class ParserBasedImpl implements TuningStrategy {
         List<Tuple2<List<String>, BigFraction>> childResults = new ArrayList<>();
 
         for (int i = 0; i < predicateListContext.getChildCount(); i += 2) {
-          List<Tuple2<List<String>, BigFraction>> childResult =
-              parsePredicate((PQL2Parser.PredicateContext) predicateListContext.getChild(i));
-          if (childResult != null && childResult.size() > 0
-              && childResult.get(0)._2().compareTo(BigFraction.ZERO) > 0) {
+          List<Tuple2<List<String>, BigFraction>> childResult = parsePredicate((PQL2Parser.PredicateContext) predicateListContext.getChild(i));
+          if (childResult != null && childResult.size() > 0 && childResult.get(0)._2().compareTo(BigFraction.ZERO) > 0) {
             colNames.addAll(childResult.get(0)._1());
             weight = weight.add(childResult.get(0)._2().reciprocal());
           }
@@ -404,8 +399,7 @@ public class ParserBasedImpl implements TuningStrategy {
       LOGGER.debug("Parsing predicate: {}", predicateContext.getText());
 
       if (predicateContext instanceof PQL2Parser.PredicateParenthesisGroupContext) {
-        PQL2Parser.PredicateParenthesisGroupContext predicateParenthesisGroupContext =
-            (PQL2Parser.PredicateParenthesisGroupContext) predicateContext;
+        PQL2Parser.PredicateParenthesisGroupContext predicateParenthesisGroupContext = (PQL2Parser.PredicateParenthesisGroupContext) predicateContext;
         return parsePredicateList(predicateParenthesisGroupContext.predicateList());
       } else if (predicateContext instanceof PQL2Parser.InPredicateContext) {
         LOGGER.debug("Entering IN clause!");
@@ -424,8 +418,7 @@ public class ParserBasedImpl implements TuningStrategy {
         int numValuesSelected = ((PQL2Parser.InPredicateContext) predicateContext).inClause().literal().size();
         Boolean isInvertIn = ((PQL2Parser.InPredicateContext) predicateContext).inClause().NOT() != null;
 
-        ret.add(new Tuple2<>(colNameList,
-            EquivalentSelectivity(isInvertIn, selectivity, numValuesSelected, avgEntriesPerDoc)));
+        ret.add(new Tuple2<>(colNameList, EquivalentSelectivity(isInvertIn, selectivity, numValuesSelected, avgEntriesPerDoc)));
 
         LOGGER.debug("IN clause ret {}", ret.toString());
         return ret;

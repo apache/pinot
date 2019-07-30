@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.tools.tuner.meta.manager.JsonFileMetaManagerImpl;
 import org.apache.pinot.tools.tuner.meta.manager.MetaManager;
 import org.apache.pinot.tools.tuner.query.src.LogQuerySrcImpl;
 import org.apache.pinot.tools.tuner.query.src.QuerySrc;
@@ -77,8 +78,8 @@ public class TunerDriver {
   }
 
   /**
-   * Set the metaManager for caching and query cardinality e.g. {@link MetaManager}
-   * @param metaManager E.g. {@link MetaManager}
+   * Set the metaManager for caching and query cardinality e.g. {@link JsonFileMetaManagerImpl}
+   * @param metaManager E.g. {@link JsonFileMetaManagerImpl}
    * @return this
    */
   public TunerDriver setMetaManager(MetaManager metaManager) {

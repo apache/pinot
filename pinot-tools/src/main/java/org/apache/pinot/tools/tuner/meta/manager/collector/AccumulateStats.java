@@ -86,9 +86,9 @@ public class AccumulateStats implements TuningStrategy {
 
   /**
    * Accumulate the parsed metadata.properties and index_map to corresponding entry
-   * @param filePaths input, PathWrapper
+   * @param filePaths input, {@link PathWrapper}
    * @param metaManager null,
-   * @param AccumulatorOut output, map of /tableMame: String/columnName: String/AbstractMergerObj
+   * @param AccumulatorOut output, map of /tableMame: String/columnName: String/{@link AbstractAccumulator}
    */
   @Override
   public void accumulate(AbstractQueryStats filePaths, MetaManager metaManager,
@@ -197,7 +197,7 @@ public class AccumulateStats implements TuningStrategy {
   }
 
   /**
-   * merge two ColStatsAccumulatorObj with same /tableName/colName
+   * merge two {@link ColStatsAccumulatorObj} with same /tableName/colName
    * @param abstractAccumulator input
    * @param abstractAccumulatorToMerge input
    */

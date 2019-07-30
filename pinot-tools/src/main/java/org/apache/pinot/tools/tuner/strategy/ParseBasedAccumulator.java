@@ -21,9 +21,12 @@ package org.apache.pinot.tools.tuner.strategy;
 import java.math.BigInteger;
 
 
+/**
+ * An implementation of {@link AbstractAccumulator}, to count the score for {@link ParserBasedImpl}
+ */
 public class ParseBasedAccumulator extends AbstractAccumulator {
-  private long _pureScore;
-  private BigInteger _weightedScore;
+  private long _pureScore; //the appearance of a dimension as the top pick for a query
+  private BigInteger _weightedScore; //the appearance weighted by numEntriesScannedInFilter
 
   public long getPureScore() {
     return _pureScore;

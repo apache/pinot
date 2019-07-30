@@ -24,7 +24,7 @@ import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 
 
 /**
- * Recommendation strategy
+ * Recommendation strategy interface.
  */
 public interface TuningStrategy {
 

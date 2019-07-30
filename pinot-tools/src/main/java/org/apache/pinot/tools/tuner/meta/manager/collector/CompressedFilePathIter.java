@@ -64,7 +64,7 @@ public class CompressedFilePathIter implements QuerySrc {
 
   /**
    *
-   * @return If the input has next stats obj
+   * @return If the input has next path
    */
   @Override
   public boolean hasNext() {
@@ -73,7 +73,7 @@ public class CompressedFilePathIter implements QuerySrc {
 
   /**
    *
-   * @return The next obj parsed from input
+   * @return The next path from directory
    * @throws NoSuchElementException
    */
   @Override

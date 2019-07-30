@@ -36,16 +36,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * A strategy of simply counting the number of appearances of each dimension and rank them.
+ */
 public class FrequencyImpl implements TuningStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(FrequencyImpl.class);
 
   private static final String NUM_QUERIES_COUNT = "PINOT_TUNER_COUNT*";
 
   public final static String DIMENSION_REGEX = "(?:(\\w+) ((?:NOT )?IN) (\\(.+?\\)))|(?:(\\w+) (=|<>|!=) (.+?)[ |$)])";
-  public final static long NO_IN_FILTER_THRESHOLD = 0;
-  public final static long CARD_THRESHOLD_ONE = 1;
 
-  public final static long NO_PROCESSED_THRESH = 0;
+  public final static long DEFAULT_IN_FILTER_THRESHOLD = 0;
+  public final static long DEFAULT_CARDINALITY_THRESHOLD = 1;
+  public final static long DEFAULT_NUM_QUERIES_THRESHOLD = 0;
 
   public final static Pattern _dimensionPattern = Pattern.compile(DIMENSION_REGEX);
   private HashSet<String> _tableNamesWithoutType;
@@ -62,9 +65,9 @@ public class FrequencyImpl implements TuningStrategy {
 
   public static final class Builder {
     private HashSet<String> _tableNamesWithoutType = new HashSet<>();
-    private long _numEntriesScannedThreshold = NO_IN_FILTER_THRESHOLD;
-    private long _cardinalityThreshold = CARD_THRESHOLD_ONE;
-    private long _numQueriesThreshold = NO_PROCESSED_THRESH;
+    private long _numEntriesScannedThreshold = DEFAULT_IN_FILTER_THRESHOLD;
+    private long _cardinalityThreshold = DEFAULT_CARDINALITY_THRESHOLD;
+    private long _numQueriesThreshold = DEFAULT_NUM_QUERIES_THRESHOLD;
 
     public Builder() {
     }
@@ -125,13 +128,11 @@ public class FrequencyImpl implements TuningStrategy {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     long numEntriesScannedInFilter = Long.parseLong(indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter());
     return (_tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType.contains(
-        indexSuggestQueryStatsImpl.getTableNameWithoutType())) && (numEntriesScannedInFilter
-        > _numEntriesScannedThreshold);
+        indexSuggestQueryStatsImpl.getTableNameWithoutType())) && (numEntriesScannedInFilter > _numEntriesScannedThreshold);
   }
 
   @Override
-  public void accumulate(AbstractQueryStats queryStats, MetaManager metaManager,
-      Map<String, Map<String, AbstractAccumulator>> accumulatorOut) {
+  public void accumulate(AbstractQueryStats queryStats, MetaManager metaManager, Map<String, Map<String, AbstractAccumulator>> accumulatorOut) {
 
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     String tableNameWithoutType = indexSuggestQueryStatsImpl.getTableNameWithoutType();
@@ -155,8 +156,7 @@ public class FrequencyImpl implements TuningStrategy {
     }
 
     counted.stream()
-        .filter(colName -> metaManager.getColumnSelectivity(tableNameWithoutType, colName)
-            .compareTo(new BigFraction(_cardinalityThreshold)) > 0)
+        .filter(colName -> metaManager.getColumnSelectivity(tableNameWithoutType, colName).compareTo(new BigFraction(_cardinalityThreshold)) > 0)
         .forEach(colName -> {
           accumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
           accumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new FrequencyAccumulator());
@@ -189,7 +189,7 @@ public class FrequencyImpl implements TuningStrategy {
     reportOut += MessageFormat.format("\nTotal lines accumulated: {0}\n\n", totalCount);
     List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
     columnStats.forEach(
-        (colName, score) -> sortedPure.add(new Tuple2<>(colName, ((FrequencyAccumulator) score).getPureScore())));
+        (colName, score) -> sortedPure.add(new Tuple2<>(colName, ((FrequencyAccumulator) score).getFrequency())));
     sortedPure.sort((p1, p2) -> (p2._2().compareTo(p1._2())));
     for (Tuple2<String, Long> tuple2 : sortedPure) {
       reportOut += "Dimension: " + tuple2._1() + "  " + tuple2._2().toString() + "\n";

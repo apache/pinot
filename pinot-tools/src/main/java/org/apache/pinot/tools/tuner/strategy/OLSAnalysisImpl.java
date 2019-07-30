@@ -42,14 +42,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * A report generator to show the quantile of numEntriesScanned, and give the estimated time used in filtering if possible
+ */
 public class OLSAnalysisImpl implements TuningStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(OLSAnalysisImpl.class);
 
   private static final String NUM_QUERIES_COUNT = "PINOT_TUNER_COUNT*";
-  public final static long NO_IN_FILTER_THRESHOLD = 0;
-
-  public final static int NO_WEIGHT_FOR_VOTE = 0;
-  public final static int IN_FILTER_WEIGHT_FOR_VOTE = 1;
+  public static final float MODEL_R_SQUARE_THRESHOLD = 0.7f;
 
   private HashSet<String> _tableNamesWithoutType;
   private long _lenBin;
@@ -93,8 +93,7 @@ public class OLSAnalysisImpl implements TuningStrategy {
   }
 
   @Override
-  public void accumulate(AbstractQueryStats queryStats, MetaManager metaManager,
-      Map<String, Map<String, AbstractAccumulator>> accumulatorOut) {
+  public void accumulate(AbstractQueryStats queryStats, MetaManager metaManager, Map<String, Map<String, AbstractAccumulator>> accumulatorOut) {
 
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     String tableNameWithoutType = indexSuggestQueryStatsImpl.getTableNameWithoutType();
@@ -109,8 +108,7 @@ public class OLSAnalysisImpl implements TuningStrategy {
     accumulatorOut.get(tableNameWithoutType).get(NUM_QUERIES_COUNT).increaseCount();
 
     accumulatorOut.get(tableNameWithoutType).putIfAbsent("*", new OLSAccumulator());
-    ((OLSAccumulator) accumulatorOut.get(tableNameWithoutType).get("*")).merge(Long.parseLong(time),
-        Long.parseLong(numEntriesScannedInFilter), Long.parseLong(numEntriesScannedPostFilter), 0, _lenBin);
+    ((OLSAccumulator) accumulatorOut.get(tableNameWithoutType).get("*")).merge(Long.parseLong(time), Long.parseLong(numEntriesScannedInFilter), Long.parseLong(numEntriesScannedPostFilter), 0, _lenBin);
   }
 
   @Override
@@ -182,26 +180,18 @@ public class OLSAnalysisImpl implements TuningStrategy {
 
     reportOut += "numEntriesScannedInFilter:\n";
     reportOut += MessageFormat.format(
-        "10%:{0} | 20%:{1} | 30%:{2} | 40%:{3} | 50%:{4} | 60%:{5} | 70%:{6} | 80%:{7} | 90%:{8} | 95%:{9}\n",
-        String.format("%.0f", numEntriesScannedInFilterPercentile[0]),
-        String.format("%.0f", numEntriesScannedInFilterPercentile[1]),
-        String.format("%.0f", numEntriesScannedInFilterPercentile[2]),
-        String.format("%.0f", numEntriesScannedInFilterPercentile[3]),
-        String.format("%.0f", numEntriesScannedInFilterPercentile[4]),
-        String.format("%.0f", numEntriesScannedInFilterPercentile[5]),
-        String.format("%.0f", numEntriesScannedInFilterPercentile[6]),
-        String.format("%.0f", numEntriesScannedInFilterPercentile[7]),
-        String.format("%.0f", numEntriesScannedInFilterPercentile[8]),
+        "10%:{0} | 20%:{1} | 30%:{2} | 40%:{3} | 50%:{4} | 60%:{5} | 70%:{6} | 80%:{7} | 90%:{8} | 95%:{9}\n", String.format("%.0f", numEntriesScannedInFilterPercentile[0]),
+        String.format("%.0f", numEntriesScannedInFilterPercentile[1]), String.format("%.0f", numEntriesScannedInFilterPercentile[2]),
+        String.format("%.0f", numEntriesScannedInFilterPercentile[3]), String.format("%.0f", numEntriesScannedInFilterPercentile[4]),
+        String.format("%.0f", numEntriesScannedInFilterPercentile[5]), String.format("%.0f", numEntriesScannedInFilterPercentile[6]),
+        String.format("%.0f", numEntriesScannedInFilterPercentile[7]), String.format("%.0f", numEntriesScannedInFilterPercentile[8]),
         String.format("%.0f", numEntriesScannedInFilterPercentile[9]));
 
     reportOut += "\nLatency (ms):\n";
     reportOut += MessageFormat.format(
-        "10%:{0} | 20%:{1} | 30%:{2} | 40%:{3} | 50%:{4} | 60%:{5} | 70%:{6} | 80%:{7} | 90%:{8} | 95%:{9}\n",
-        String.format("%.0f", timePercentile[0]), String.format("%.0f", timePercentile[1]),
-        String.format("%.0f", timePercentile[2]), String.format("%.0f", timePercentile[3]),
-        String.format("%.0f", timePercentile[4]), String.format("%.0f", timePercentile[5]),
-        String.format("%.0f", timePercentile[6]), String.format("%.0f", timePercentile[7]),
-        String.format("%.0f", timePercentile[8]), String.format("%.0f", timePercentile[9]));
+        "10%:{0} | 20%:{1} | 30%:{2} | 40%:{3} | 50%:{4} | 60%:{5} | 70%:{6} | 80%:{7} | 90%:{8} | 95%:{9}\n", String.format("%.0f", timePercentile[0]), String.format("%.0f", timePercentile[1]),
+        String.format("%.0f", timePercentile[2]), String.format("%.0f", timePercentile[3]), String.format("%.0f", timePercentile[4]), String.format("%.0f", timePercentile[5]),
+        String.format("%.0f", timePercentile[6]), String.format("%.0f", timePercentile[7]), String.format("%.0f", timePercentile[8]), String.format("%.0f", timePercentile[9]));
 
     OLSMultipleLinearRegression regression = new OLSMultipleLinearRegression();
     regression.setNoIntercept(true);
@@ -221,19 +211,16 @@ public class OLSAnalysisImpl implements TuningStrategy {
       regression.newSampleData(time, x_arr);
       double[] params = regression.estimateRegressionParameters();
       double rSquared = regression.calculateRSquared();
-      if (rSquared > 0.7) {
+      if (rSquared > MODEL_R_SQUARE_THRESHOLD) {
         reportOut += "\nMaximum Optimization(ms):\n";
         reportOut += MessageFormat.format(
             "10%:{0} | 20%:{1} | 30%:{2} | 40%:{3} | 50%:{4} | 60%:{5} | 70%:{6} | 80%:{7} | 90%:{8} | 95%:{9}\n",
             String.format("%.0f", numEntriesScannedInFilterPercentile[0] * params[0]),
             String.format("%.0f", numEntriesScannedInFilterPercentile[1] * params[0]),
             String.format("%.0f", numEntriesScannedInFilterPercentile[2] * params[0]),
-            String.format("%.0f", numEntriesScannedInFilterPercentile[3] * params[0]),
-            String.format("%.0f", numEntriesScannedInFilterPercentile[4] * params[0]),
-            String.format("%.0f", numEntriesScannedInFilterPercentile[5] * params[0]),
-            String.format("%.0f", numEntriesScannedInFilterPercentile[6] * params[0]),
-            String.format("%.0f", numEntriesScannedInFilterPercentile[7] * params[0]),
-            String.format("%.0f", numEntriesScannedInFilterPercentile[8] * params[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[3] * params[0]), String.format("%.0f", numEntriesScannedInFilterPercentile[4] * params[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[5] * params[0]), String.format("%.0f", numEntriesScannedInFilterPercentile[6] * params[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[7] * params[0]), String.format("%.0f", numEntriesScannedInFilterPercentile[8] * params[0]),
             String.format("%.0f", numEntriesScannedInFilterPercentile[9] * params[0]));
         reportOut += MessageFormat.format("\nR-square: {0}\n", rSquared);
         reportOut += String.format("Params: %s %s\n", Double.toString(params[0]), Double.toString(params[1]));
@@ -309,8 +296,7 @@ public class OLSAnalysisImpl implements TuningStrategy {
       if (predicateListContext.getChildCount() == 1) {
         LOGGER.debug("Parsing parenthesis group");
         return parsePredicate((PQL2Parser.PredicateContext) predicateListContext.getChild(0));
-      } else if (predicateListContext.getChild(1).getText().toUpperCase().equals(AND) || predicateListContext.getChild(
-          1).getText().toUpperCase().equals(OR)) {
+      } else if (predicateListContext.getChild(1).getText().toUpperCase().equals(AND) || predicateListContext.getChild(1).getText().toUpperCase().equals(OR)) {
         LOGGER.debug("Parsing AND/OR list {}", predicateListContext.getText());
         int childResults = 0;
         for (int i = 0; i < predicateListContext.getChildCount(); i += 2) {
@@ -331,8 +317,7 @@ public class OLSAnalysisImpl implements TuningStrategy {
     int parsePredicate(PQL2Parser.PredicateContext predicateContext) {
       LOGGER.debug("Parsing predicate: {}", predicateContext.getText());
       if (predicateContext instanceof PQL2Parser.PredicateParenthesisGroupContext) {
-        PQL2Parser.PredicateParenthesisGroupContext predicateParenthesisGroupContext =
-            (PQL2Parser.PredicateParenthesisGroupContext) predicateContext;
+        PQL2Parser.PredicateParenthesisGroupContext predicateParenthesisGroupContext = (PQL2Parser.PredicateParenthesisGroupContext) predicateContext;
         return parsePredicateList(predicateParenthesisGroupContext.predicateList());
       } else if (predicateContext instanceof PQL2Parser.InPredicateContext) {
         LOGGER.debug("Entering IN clause!");

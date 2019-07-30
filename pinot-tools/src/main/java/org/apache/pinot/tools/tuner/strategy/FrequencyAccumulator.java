@@ -19,32 +19,32 @@
 package org.apache.pinot.tools.tuner.strategy;
 
 /**
- *
+ * An implementation of {@link AbstractAccumulator}, count the frequency of dimension appearance for {@link FrequencyImpl}
  */
 public class FrequencyAccumulator extends AbstractAccumulator {
 
   public FrequencyAccumulator() {
-    _pureScore = 0;
+    _frequency = 0;
   }
 
-  private long _pureScore;
+  private long _frequency;
 
-  public long getPureScore() {
-    return _pureScore;
+  public long getFrequency() {
+    return _frequency;
   }
 
-  public void merge(int pureScore) {
+  public void merge(int frequency) {
     super.increaseCount();
-    this._pureScore += pureScore;
+    this._frequency += frequency;
   }
 
   public void merge(FrequencyAccumulator fobj) {
     super.mergeCount(fobj);
-    this._pureScore += fobj._pureScore;
+    this._frequency += fobj._frequency;
   }
 
   @Override
   public String toString() {
-    return "ParseBasedMergerObj{" + "_pureScore=" + _pureScore + '}';
+    return "ParseBasedMergerObj{" + "_frequency=" + _frequency + '}';
   }
 }
