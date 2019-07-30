@@ -74,7 +74,9 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
               .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
               .build())
           .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
-          .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metaData).build());
+          .setMetaManager(new JsonFileMetaManagerImpl.Builder().setUseExistingIndex(
+              JsonFileMetaManagerImpl.DONT_USE_EXISTING_INDEX) //Delete after demo
+              .setPath(_metaData).build());
       parserBased.execute();
     } else if (_strategy.equals(SORTED_INDEX)) {
       TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
