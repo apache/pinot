@@ -21,7 +21,9 @@ package org.apache.pinot.integration.tests;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import jdk.nashorn.internal.ir.annotations.Ignore;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -40,6 +42,7 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
+import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.core.TableRebalancer;
@@ -62,53 +65,46 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
   private static final String ZKSTR = ZkStarter.DEFAULT_ZK_STR;
   private final List<HelixManager> _helixManagers = new ArrayList<>();
   private static final int NUM_INITIAL_SERVERS = 3;
-  private final Set<String> servers = new HashSet<>();
   private SegmentStateTransitionStats _segmentStateTransitionStats;
   private boolean _raiseErrorOnSegmentStateTransition = false;
-
-  @Override
-  protected boolean isUsingNewConfigFormat() {
-    return true;
-  }
 
   @BeforeClass
   public void setup()
       throws Exception {
-    // basic cluster setup of 3 servers common to each test
-    // each test adds/removes servers as needed
     startZk();
     startController();
     startBroker();
-    startFakeServers(NUM_INITIAL_SERVERS, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
   }
 
   @AfterClass
   public void tearDown() {
-    stopFakeServers();
     stopBroker();
     stopController();
     stopZk();
   }
 
-  private void startFakeServers(final int numServers, final int basePort)
+  private void startFakeServers(final int numServers, final int basePort, final boolean realtime)
       throws Exception {
     for (int i = 0; i < numServers; i++) {
       final int nettyPort = basePort + i;
       final String instanceId =
           CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + NetUtil.getHostAddress() + "_" + nettyPort;
-      if (servers.contains(instanceId)) {
-        continue;
-      }
-      servers.add(instanceId);
       final HelixManager helixManager = HelixManagerFactory
           .getZKHelixManager(_clusterName, instanceId, InstanceType.PARTICIPANT, ZkStarter.DEFAULT_ZK_STR);
       helixManager.getStateMachineEngine()
           .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(),
               new FakeServerSegmentStateModelFactory());
       helixManager.connect();
-      helixManager.getClusterManagmentTool().addInstanceTag(_clusterName, instanceId,
-          TableNameBuilder.OFFLINE.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
-      _helixManagers.add(helixManager);
+      if (realtime) {
+        helixManager.getClusterManagmentTool().addInstanceTag(_clusterName, instanceId,
+            TableNameBuilder.REALTIME.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
+        _helixManagers.add(helixManager);
+      } else {
+        helixManager.getClusterManagmentTool().addInstanceTag(_clusterName, instanceId,
+            TableNameBuilder.OFFLINE.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
+        _helixManagers.add(helixManager);
+      }
+
       ControllerLeaderLocator.create(helixManager);
     }
   }
@@ -117,6 +113,7 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
     for (HelixManager helixManager : _helixManagers) {
       helixManager.disconnect();
     }
+    _helixManagers.clear();
   }
 
   /**
@@ -156,6 +153,10 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
    * write the ideal state in ZK -- this happens exactly once
    * as this ideal state is same as target and we finish.
    *
+   * Total of 2 segment movements:
+   * segment1 from host2 to host5
+   * segment2 from host3 to host4
+   *
    * @throws Exception
    */
   @Test
@@ -166,39 +167,46 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
     final int numAdditionalServers = 2;
     final String tableName = getTableName() + "DIRECT";
 
-    // add table
-    addOfflineTable(tableName, null, null, null, null,
-        getLoadMode(), SegmentVersion.v1, getInvertedIndexColumns(),
-        getBloomFilterIndexColumns(), getTaskConfig(), null, null);
-    completeTableConfiguration();
+    try {
+      startFakeServers(NUM_INITIAL_SERVERS, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT, false);
 
-    // init stats
-    _segmentStateTransitionStats = new SegmentStateTransitionStats();
+      // add table
+      addOfflineTable(tableName, null, null, null, null,
+          getLoadMode(), SegmentVersion.v1, getInvertedIndexColumns(),
+          getBloomFilterIndexColumns(), getTaskConfig(), null, null);
+      completeTableConfiguration();
 
-    // write ideal state
-    createIdealState(numSegments, numReplicas, tableName);
+      // init stats
+      _segmentStateTransitionStats = new SegmentStateTransitionStats();
 
-    // add additional servers to trigger the rebalance strategy,
-    // otherwise rebalance will be a NO-OP
-    startFakeServers(numAdditionalServers, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + NUM_INITIAL_SERVERS);
+      // write ideal state
+      createIdealState(numSegments, numReplicas, tableName);
 
-    // rebalance
-    final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, _clusterName, false, true, false, 2);
-    tableRebalancer.rebalance(tableName, "OFFLINE");
-    final TableRebalancer.RebalancerStats stats = tableRebalancer.getRebalancerStats();
+      // add additional servers to trigger the rebalance strategy,
+      // otherwise rebalance will be a NO-OP
+      startFakeServers(numAdditionalServers, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + NUM_INITIAL_SERVERS, false);
 
-    // check the algorithm stats on how we moved from current
-    // to target ideal state
-    Assert.assertEquals(stats.getDryRun(), 0);
-    Assert.assertEquals(stats.getUpdatestoIdealStateInZK(), 1);
-    Assert.assertEquals(stats.getDirectUpdatesToSegmentInstanceMap(), 2);
-    Assert.assertEquals(stats.getIncrementalUpdatesToSegmentInstanceMap(), 0);
+      // rebalance
+      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, _clusterName, false, true, false, 2);
+      tableRebalancer.rebalance(tableName, "OFFLINE");
+      final TableRebalancer.RebalancerStats stats = tableRebalancer.getRebalancerStats();
 
-    // as part of rebalancing, host2 lost segment1 and host3
-    // lost segment2 -- so 2 transitions from ON to OFF and
-    // OFF to DROP
-    Assert.assertEquals(_segmentStateTransitionStats.offFromOn, 2);
-    Assert.assertEquals(_segmentStateTransitionStats.dropFromOff, 2);
+      // check the algorithm stats on how we moved from current
+      // to target ideal state
+      Assert.assertEquals(stats.getDryRun(), 0);
+      Assert.assertEquals(stats.getUpdatestoIdealStateInZK(), 1);
+      Assert.assertEquals(stats.getDirectUpdatesToSegmentInstanceMap(), 2);
+      Assert.assertEquals(stats.getIncrementalUpdatesToSegmentInstanceMap(), 0);
+      Assert.assertEquals(stats.getNumSegmentMoves(), 2);
+
+      // as part of rebalancing, host2 lost segment1 and host3
+      // lost segment2 -- so 2 transitions from ON to OFF and
+      // OFF to DROP
+      Assert.assertEquals(_segmentStateTransitionStats.offFromOn, 2);
+      Assert.assertEquals(_segmentStateTransitionStats.dropFromOff, 2);
+    } finally {
+      stopFakeServers();
+    }
   }
 
   /**
@@ -259,6 +267,13 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
    * So, direct updates: 2+4 = 6, incremental updates = 2,
    * ideal state updates in ZK = 2
    *
+   * total 6 segment movements:
+   *
+   * segment1 moved once to host5
+   * segment2 moved from host1, host3 to host4, host6
+   * segment3 moved once to host5
+   * segment4 moved from host1, host3 to host4, host6
+   *
    * @throws Exception
    */
   @Test
@@ -269,40 +284,47 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
     final int numAdditionalServers = 3;
     final String tableName = getTableName() + "INCREMENTAL";
 
-    // add table
-    addOfflineTable(tableName, null, null,
-        null, null, getLoadMode(),
-        SegmentVersion.v1, getInvertedIndexColumns(), getBloomFilterIndexColumns(),
-        getTaskConfig(), null, null);
-    completeTableConfiguration();
+    try {
+      startFakeServers(NUM_INITIAL_SERVERS, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT, false);
 
-    // init stats
-    _segmentStateTransitionStats = new SegmentStateTransitionStats();
+      // add table
+      addOfflineTable(tableName, null, null,
+          null, null, getLoadMode(),
+          SegmentVersion.v1, getInvertedIndexColumns(), getBloomFilterIndexColumns(),
+          getTaskConfig(), null, null);
+      completeTableConfiguration();
 
-    // write ideal state
-    createIdealState(numSegments, numReplicas, tableName);
+      // init stats
+      _segmentStateTransitionStats = new SegmentStateTransitionStats();
 
-    // add additional servers to trigger the rebalance strategy,
-    // otherwise rebalance will be a NO-OP
-    startFakeServers(numAdditionalServers, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + NUM_INITIAL_SERVERS);
+      // write ideal state
+      createIdealState(numSegments, numReplicas, tableName);
 
-    // rebalance
-    final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, _clusterName, false, true, false, 2);
-    tableRebalancer.rebalance(tableName, "OFFLINE");
-    TableRebalancer.RebalancerStats stats = tableRebalancer.getRebalancerStats();
+      // add additional servers to trigger the rebalance strategy,
+      // otherwise rebalance will be a NO-OP
+      startFakeServers(numAdditionalServers, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + NUM_INITIAL_SERVERS, false);
 
-    // verify the algorithm stats on how we moved from
-    // current to target ideal state
-    Assert.assertEquals(0, stats.getDryRun());
-    Assert.assertEquals(stats.getUpdatestoIdealStateInZK(), 2);
-    Assert.assertEquals(stats.getDirectUpdatesToSegmentInstanceMap(), 6);
-    Assert.assertEquals(stats.getIncrementalUpdatesToSegmentInstanceMap(), 2);
+      // rebalance
+      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, _clusterName, false, true, false, 2);
+      tableRebalancer.rebalance(tableName, "OFFLINE");
+      TableRebalancer.RebalancerStats stats = tableRebalancer.getRebalancerStats();
 
-    // as part of rebalancing, host2 lost segment1 and segment3,
-    // host1 and host3 lost segment2 and segment4 -- so 6
-    // transitions from ON to OFF and OFF to DROP
-    Assert.assertEquals(_segmentStateTransitionStats.offFromOn, 6);
-    Assert.assertEquals(_segmentStateTransitionStats.dropFromOff, 6);
+      // verify the algorithm stats on how we moved from
+      // current to target ideal state
+      Assert.assertEquals(0, stats.getDryRun());
+      Assert.assertEquals(stats.getUpdatestoIdealStateInZK(), 2);
+      Assert.assertEquals(stats.getDirectUpdatesToSegmentInstanceMap(), 6);
+      Assert.assertEquals(stats.getIncrementalUpdatesToSegmentInstanceMap(), 2);
+      Assert.assertEquals(stats.getNumSegmentMoves(), 6);
+
+      // as part of rebalancing, host2 lost segment1 and segment3,
+      // host1 and host3 lost segment2 and segment4 -- so 6
+      // transitions from ON to OFF and OFF to DROP
+      Assert.assertEquals(_segmentStateTransitionStats.offFromOn, 6);
+      Assert.assertEquals(_segmentStateTransitionStats.dropFromOff, 6);
+    } finally {
+      stopFakeServers();
+    }
   }
 
   /**
@@ -348,7 +370,6 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
    * checking if we have reached target.
    * We haven't so we go over each segment again.
    *
-   *
    * Now for each segment we can do direct update -- once for
    * each of the 4 segments while still satisfying
    * the min replica requirement. Again we write the final
@@ -356,86 +377,89 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
    *
    * So, direct updates: 2+4 = 6, incremental updates = 2,
    * ideal state updates in ZK = 2
+   *
+   * total 6 segment movements
+   *
    * @throws Exception
    */
   @Test
   public void testPinotTableRebalancerAfterRemovingServers()
       throws Exception {
-    // basic cluster setup in this class is 3 servers (NUM_INITIAL_SERVERS).
-    // for this test where we will remove servers to trigger rebalancing,
-    // we will start with a cluster of 5 servers so add 2 more servers
-    startFakeServers(2, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + NUM_INITIAL_SERVERS);
+    try {
+      // basic cluster setup in this class is 3 servers (NUM_INITIAL_SERVERS).
+      // for this test where we will remove servers to trigger rebalancing,
+      // we will start with a cluster of 5 servers so add 2 more servers
+      startFakeServers(NUM_INITIAL_SERVERS + 2, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT, false);
 
-    // add table
-    final String tableName = getTableName() + "REMOVE";
-    addOfflineTable(tableName, null, null,
-        null, null, getLoadMode(),
-        SegmentVersion.v1, getInvertedIndexColumns(), getBloomFilterIndexColumns(),
-        getTaskConfig(), null, null);
-    completeTableConfiguration();
+      // add table
+      final String tableName = getTableName() + "REMOVE";
+      addOfflineTable(tableName, null, null,
+          null, null, getLoadMode(),
+          SegmentVersion.v1, getInvertedIndexColumns(), getBloomFilterIndexColumns(),
+          getTaskConfig(), null, null);
+      completeTableConfiguration();
 
-    // init stats
-    _segmentStateTransitionStats = new SegmentStateTransitionStats();
+      // init stats
+      _segmentStateTransitionStats = new SegmentStateTransitionStats();
 
-    // create ideal state
-    final HelixDataAccessor dataAccessor = _helixManagers.get(0).getHelixDataAccessor();
-    final String tableNameWithType = tableName + "_OFFLINE";
-    final PropertyKey idealStateKey = dataAccessor.keyBuilder().idealStates(tableNameWithType);
-    final IdealState idealState = dataAccessor.getProperty(idealStateKey);
-    final IdealState idealStateCopy = HelixHelper.cloneIdealState(idealState);
+      // create ideal state
+      final HelixDataAccessor dataAccessor = _helixManagers.get(0).getHelixDataAccessor();
+      final String tableNameWithType = tableName + "_OFFLINE";
+      final PropertyKey idealStateKey = dataAccessor.keyBuilder().idealStates(tableNameWithType);
+      final IdealState idealState = dataAccessor.getProperty(idealStateKey);
+      final IdealState idealStateCopy = HelixHelper.cloneIdealState(idealState);
 
-    idealStateCopy.setPartitionState("segment1", _helixManagers.get(0).getInstanceName(), "ONLINE");
-    idealStateCopy.setPartitionState("segment1", _helixManagers.get(2).getInstanceName(), "ONLINE");
-    idealStateCopy.setPartitionState("segment1", _helixManagers.get(4).getInstanceName(), "ONLINE");
+      idealStateCopy.setPartitionState("segment1", _helixManagers.get(0).getInstanceName(), "ONLINE");
+      idealStateCopy.setPartitionState("segment1", _helixManagers.get(2).getInstanceName(), "ONLINE");
+      idealStateCopy.setPartitionState("segment1", _helixManagers.get(4).getInstanceName(), "ONLINE");
 
-    idealStateCopy.setPartitionState("segment2", _helixManagers.get(1).getInstanceName(), "ONLINE");
-    idealStateCopy.setPartitionState("segment2", _helixManagers.get(2).getInstanceName(), "ONLINE");
-    idealStateCopy.setPartitionState("segment2", _helixManagers.get(3).getInstanceName(), "ONLINE");
+      idealStateCopy.setPartitionState("segment2", _helixManagers.get(1).getInstanceName(), "ONLINE");
+      idealStateCopy.setPartitionState("segment2", _helixManagers.get(2).getInstanceName(), "ONLINE");
+      idealStateCopy.setPartitionState("segment2", _helixManagers.get(3).getInstanceName(), "ONLINE");
 
-    idealStateCopy.setPartitionState("segment3", _helixManagers.get(0).getInstanceName(), "ONLINE");
-    idealStateCopy.setPartitionState("segment3", _helixManagers.get(3).getInstanceName(), "ONLINE");
-    idealStateCopy.setPartitionState("segment3", _helixManagers.get(4).getInstanceName(), "ONLINE");
+      idealStateCopy.setPartitionState("segment3", _helixManagers.get(0).getInstanceName(), "ONLINE");
+      idealStateCopy.setPartitionState("segment3", _helixManagers.get(3).getInstanceName(), "ONLINE");
+      idealStateCopy.setPartitionState("segment3", _helixManagers.get(4).getInstanceName(), "ONLINE");
 
-    idealStateCopy.setPartitionState("segment4", _helixManagers.get(1).getInstanceName(), "ONLINE");
-    idealStateCopy.setPartitionState("segment4", _helixManagers.get(3).getInstanceName(), "ONLINE");
-    idealStateCopy.setPartitionState("segment4", _helixManagers.get(4).getInstanceName(), "ONLINE");
+      idealStateCopy.setPartitionState("segment4", _helixManagers.get(1).getInstanceName(), "ONLINE");
+      idealStateCopy.setPartitionState("segment4", _helixManagers.get(3).getInstanceName(), "ONLINE");
+      idealStateCopy.setPartitionState("segment4", _helixManagers.get(4).getInstanceName(), "ONLINE");
 
-    // write ideal state for the setup of 4 segments, 5 servers and 3 replicas per segment
-    final ZkBaseDataAccessor zkBaseDataAccessor = (ZkBaseDataAccessor) dataAccessor.getBaseDataAccessor();
-    zkBaseDataAccessor.set(idealStateKey.getPath(), idealStateCopy.getRecord(), idealState.getRecord().getVersion(),
-        AccessOption.PERSISTENT);
+      // write ideal state for the setup of 4 segments, 5 servers and 3 replicas per segment
+      final ZkBaseDataAccessor zkBaseDataAccessor = (ZkBaseDataAccessor) dataAccessor.getBaseDataAccessor();
+      zkBaseDataAccessor.set(idealStateKey.getPath(), idealStateCopy.getRecord(), idealState.getRecord().getVersion(),
+          AccessOption.PERSISTENT);
 
-    // remove server3 and server4
-    final HelixManager host3 = _helixManagers.get(3);
-    final HelixManager host4 = _helixManagers.get(4);
-    host3.getClusterManagmentTool().removeInstanceTag(_clusterName, host3.getInstanceName(),
-        TableNameBuilder.OFFLINE.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
-    host4.getClusterManagmentTool().removeInstanceTag(_clusterName, host4.getInstanceName(),
-        TableNameBuilder.OFFLINE.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
+      // remove server3 and server4
+      final HelixManager host3 = _helixManagers.get(3);
+      final HelixManager host4 = _helixManagers.get(4);
+      host3.getClusterManagmentTool().removeInstanceTag(_clusterName, host3.getInstanceName(),
+          TableNameBuilder.OFFLINE.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
+      host4.getClusterManagmentTool().removeInstanceTag(_clusterName, host4.getInstanceName(),
+          TableNameBuilder.OFFLINE.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
 
-    // rebalance
-    final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, _clusterName, false, true, false, 2);
-    tableRebalancer.rebalance(tableName, "OFFLINE");
-    final TableRebalancer.RebalancerStats stats = tableRebalancer.getRebalancerStats();
+      // rebalance
+      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, _clusterName, false, true, false, 2);
+      tableRebalancer.rebalance(tableName, "OFFLINE");
+      final TableRebalancer.RebalancerStats stats = tableRebalancer.getRebalancerStats();
 
-    // check the algorithm stats on how we moved from current
-    // to target ideal state
-    Assert.assertEquals(stats.getDryRun(), 0);
-    Assert.assertEquals(stats.getUpdatestoIdealStateInZK(), 2);
-    Assert.assertEquals(stats.getDirectUpdatesToSegmentInstanceMap(), 6);
-    Assert.assertEquals(stats.getIncrementalUpdatesToSegmentInstanceMap(), 2);
+      // check the algorithm stats on how we moved from current
+      // to target ideal state
+      Assert.assertEquals(stats.getDryRun(), 0);
+      Assert.assertEquals(stats.getUpdatestoIdealStateInZK(), 2);
+      Assert.assertEquals(stats.getDirectUpdatesToSegmentInstanceMap(), 6);
+      Assert.assertEquals(stats.getIncrementalUpdatesToSegmentInstanceMap(), 2);
+      Assert.assertEquals(stats.getNumSegmentMoves(), 6);
 
-    // as part of rebalancing, host3 lost segment2, segment3,
-    // and segment4. similarly, host4 lost segment1, segment3
-    // and segment4 -- total 6 transitions from ONLINE to OFFLINE
-    // and OFFLINE to DROPPED
-    Assert.assertEquals(_segmentStateTransitionStats.offFromOn, 6);
-    Assert.assertEquals(_segmentStateTransitionStats.dropFromOff, 6);
-
-    host3.getClusterManagmentTool().addInstanceTag(_clusterName, host3.getInstanceName(),
-        TableNameBuilder.OFFLINE.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
-    host4.getClusterManagmentTool().addInstanceTag(_clusterName, host4.getInstanceName(),
-        TableNameBuilder.OFFLINE.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
+      // as part of rebalancing, host3 lost segment2, segment3,
+      // and segment4. similarly, host4 lost segment1, segment3
+      // and segment4 -- total 6 transitions from ONLINE to OFFLINE
+      // and OFFLINE to DROPPED
+      Assert.assertEquals(_segmentStateTransitionStats.offFromOn, 6);
+      Assert.assertEquals(_segmentStateTransitionStats.dropFromOff, 6);
+    } finally {
+      stopFakeServers();
+    }
   }
 
   /**
@@ -447,7 +471,7 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
    * to state. It then waits for the external view to converge.
    * Meanwhile as part of the change it did in ideal state and
    * state transition was not properly handled by the servers,
-   * external view will report error/ Rebalancer checks if
+   * external view will report ERROR state. Rebalancer checks if
    * for any segment the state is ERROR and bails out immediately
    *
    * To simulate the error scenario, we explicitly throw
@@ -462,6 +486,8 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       final int numAdditionalServers = 2;
       final String tableName = getTableName() + "FAILURE";
 
+      startFakeServers(NUM_INITIAL_SERVERS, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT, false);
+
       // add table
       addOfflineTable(tableName, null, null, null, null,
           getLoadMode(), SegmentVersion.v1, getInvertedIndexColumns(),
@@ -473,7 +499,7 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
 
       // add additional servers to trigger the rebalance strategy,
       // otherwise rebalance will be a NO-OP
-      startFakeServers(numAdditionalServers, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + NUM_INITIAL_SERVERS);
+      startFakeServers(numAdditionalServers, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + NUM_INITIAL_SERVERS, false);
 
       // set the flag to raise error on segment state transition to true
       // this will ensure that as part of rebalancer when a particular
@@ -495,6 +521,274 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       Assert.assertTrue(e.getMessage().contains("External view reports error state for segment segment0"));
     }
     _raiseErrorOnSegmentStateTransition = false;
+    stopFakeServers();
+  }
+
+  /**
+   * Test for realtime table in no downtime mode
+   * with LLC consumer and rebalancer is asked
+   * to consider segments in consuming state as well
+   *
+   * Scenario: 4 segments 3 replicas
+   *
+   * Current ideal state
+   *
+   * segment__0__0: {host1:online, host2:online, host3:online}
+   * segment__0__1: {host1:consuming, host2:consuming, host3:consuming}
+   * segment__1__0: {host1:online, host2:online, host3:online}
+   * segment__1__1: {host1:consuming, host2:consuming, host3:consuming}
+   *
+   * We add 3 additional hosts: host4, host5 and host6
+   * The rebalancer will use the table config to get the
+   * appropriate rebalance strategy (default strategy in this case)
+   * and come up with the target ideal state
+   *
+   * segment__0__0: {host1:online, host3:online, host5:online}
+   * segment__0__1: {host1:consuming, host2:consuming, host6:consuming}
+   * segment__1__0: {host2:online, host4:online, host6:online}
+   * segment__1__1: {host3:consuming, host4:consuming, host5:consuming}
+   *
+   * total 6 segment moves
+   *
+   * segment00 : host2 -> host5
+   * segment01 : host3 -> host6
+   * segment10 : host1, host3 -> host4, host6
+   * segment11 : host1, host2 -> host4, host5
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testLLCRealtimeTableIncludeConsuming() throws Exception {
+    final int numSegments = 4;
+    final int numReplicas = 3;
+    final int numAdditionalServers = 3;
+    final String tableName = getTableName() + "LLCONSUMING";
+
+    try {
+      startFakeServers(NUM_INITIAL_SERVERS, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT, true);
+      startKafka();
+      setUpRealtimeTable(null, numReplicas, true, tableName);
+
+      // init stats
+      _segmentStateTransitionStats = new SegmentStateTransitionStats();
+
+      // write ideal state
+      createIdealStateForRealtime(numSegments, numReplicas, tableName, true);
+
+      // add additional servers to trigger the rebalance strategy,
+      // otherwise rebalance will be a NO-OP
+      startFakeServers(numAdditionalServers, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + NUM_INITIAL_SERVERS, true);
+
+      // rebalance
+      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, _clusterName, false, true, true, 2);
+      tableRebalancer.rebalance(tableName, "REALTIME");
+      final TableRebalancer.RebalancerStats stats = tableRebalancer.getRebalancerStats();
+
+      // verify the algorithm stats on how we moved from
+      // current to target ideal state
+      Assert.assertEquals(0, stats.getDryRun());
+      Assert.assertEquals(stats.getUpdatestoIdealStateInZK(), 2);
+      Assert.assertEquals(stats.getDirectUpdatesToSegmentInstanceMap(), 6);
+      Assert.assertEquals(stats.getIncrementalUpdatesToSegmentInstanceMap(), 2);
+      Assert.assertEquals(stats.getNumSegmentMoves(), 6);
+
+      // as part of rebalancing, host2 lost segment1 and segment3,
+      // host1 and host3 lost segment2 and segment4 -- so 6
+      // transitions from ON to OFF and OFF to DROP
+      Assert.assertEquals(_segmentStateTransitionStats.offFromOn, 3);
+      Assert.assertEquals(_segmentStateTransitionStats.dropFromOff, 3);
+    } finally {
+      stopFakeServers();
+      stopKafka();
+    }
+  }
+
+  /**
+   * Test for realtime table in no downtime mode
+   * with LLC consumer and rebalancer is asked
+   * not to consider segments in consuming state
+   *
+   * Scenario: 4 segments 3 replicas
+   *
+   * Current ideal state
+   *
+   * segment__0__0: {host1:online, host2:online, host3:online}
+   * segment__0__1: {host1:consuming, host2:consuming, host3:consuming}
+   * segment__1__0: {host1:online, host2:online, host3:online}
+   * segment__1__1: {host1:consuming, host2:consuming, host3:consuming}
+   *
+   * We add 3 additional hosts: host4, host5 and host6
+   * The rebalancer will use the table config to get the
+   * appropriate rebalance strategy (default strategy in this case)
+   * and come up with the target ideal state
+   *
+   * segment__0__0: {host1:online, host3:online, host5:online}
+   * segment__0__1: {host1:consuming, host2:consuming, host3:consuming}
+   * segment__1__0: {host2:online, host4:online, host6:online}
+   * segment__1__1: {host1:consuming, host2:consuming, host3:consuming}
+   *
+   * consuming segments will not be moved so total 3 segment moves
+   *
+   * segment00 : host2 -> host5
+   * segment10: host1, host3 - > host4, host6
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testLLCRealtimeTableNoIncludeConsuming() throws Exception {
+    final int numSegments = 4;
+    final int numReplicas = 3;
+    final int numAdditionalServers = 3;
+    final String tableName = getTableName() + "LLNOCONSUMING";
+
+    try {
+      startFakeServers(NUM_INITIAL_SERVERS, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT, true);
+      startKafka();
+      setUpRealtimeTable(null, numReplicas, true, tableName);
+
+      // init stats
+      _segmentStateTransitionStats = new SegmentStateTransitionStats();
+
+      // write ideal state
+      createIdealStateForRealtime(numSegments, numReplicas, tableName, true);
+
+      // add additional servers to trigger the rebalance strategy,
+      // otherwise rebalance will be a NO-OP
+      startFakeServers(numAdditionalServers, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + NUM_INITIAL_SERVERS, true);
+
+      // rebalance
+      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, _clusterName, false, true, false, 2);
+      tableRebalancer.rebalance(tableName, "REALTIME");
+      final TableRebalancer.RebalancerStats stats = tableRebalancer.getRebalancerStats();
+
+      // verify the algorithm stats on how we moved from
+      // current to target ideal state
+      Assert.assertEquals(0, stats.getDryRun());
+      Assert.assertEquals(stats.getUpdatestoIdealStateInZK(), 2);
+      Assert.assertEquals(stats.getDirectUpdatesToSegmentInstanceMap(), 7);
+      Assert.assertEquals(stats.getIncrementalUpdatesToSegmentInstanceMap(), 1);
+      Assert.assertEquals(stats.getNumSegmentMoves(), 3);
+
+      // as part of rebalancing, host2 lost segment1 and segment3,
+      // host1 and host3 lost segment2 and segment4 -- so 6
+      // transitions from ON to OFF and OFF to DROP
+      Assert.assertEquals(_segmentStateTransitionStats.offFromOn, 3);
+      Assert.assertEquals(_segmentStateTransitionStats.dropFromOff, 3);
+    } finally {
+      stopFakeServers();
+      stopKafka();
+    }
+  }
+
+  /**
+   * Test for realtime table in no downtime mode
+   * with HLC consumer
+   *
+   * Scenario: 4 segments 3 replicas
+   *
+   * Current ideal state
+   *
+   * segment__0__0: {host1:online, host2:online, host3:online}
+   * segment__0__1: {host1:consuming, host2:consuming, host3:consuming}
+   * segment__1__0: {host1:online, host2:online, host3:online}
+   * segment__1__1: {host1:consuming, host2:consuming, host3:consuming}
+   *
+   * We add 3 additional hosts: host4, host5 and host6 and check that
+   * rebalancer does not do anything for realtime table with
+   * HLC consumer
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testHLCRealtimeTable() throws Exception {
+    final int numSegments = 4;
+    final int numReplicas = 3;
+    final int numAdditionalServers = 3;
+    final String tableName = getTableName() +"HLC";
+
+    try {
+      startFakeServers(NUM_INITIAL_SERVERS, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT, true);
+      startKafka();
+      setUpRealtimeTable(null, numReplicas, false, tableName);
+
+      // init stats
+      _segmentStateTransitionStats = new SegmentStateTransitionStats();
+
+      // write ideal state
+      createIdealStateForRealtime(numSegments, numReplicas, tableName, false);
+
+      // add additional servers to trigger the rebalance strategy,
+      // otherwise rebalance will be a NO-OP
+      startFakeServers(numAdditionalServers, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + NUM_INITIAL_SERVERS, true);
+
+      // rebalance
+      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, _clusterName, false, true, false, 2);
+      tableRebalancer.rebalance(tableName, "REALTIME");
+      final TableRebalancer.RebalancerStats stats = tableRebalancer.getRebalancerStats();
+
+      // verify the algorithm stats on how we moved from
+      // current to target ideal state
+      Assert.assertEquals(0, stats.getDryRun());
+      Assert.assertEquals(stats.getUpdatestoIdealStateInZK(), 0);
+      Assert.assertEquals(stats.getDirectUpdatesToSegmentInstanceMap(), 0);
+      Assert.assertEquals(stats.getIncrementalUpdatesToSegmentInstanceMap(), 0);
+      Assert.assertEquals(stats.getNumSegmentMoves(), 0);
+
+      Assert.assertEquals(_segmentStateTransitionStats.offFromOn, 0);
+      Assert.assertEquals(_segmentStateTransitionStats.dropFromOff, 0);
+    } finally {
+      stopFakeServers();
+      stopKafka();
+    }
+  }
+
+  private void createIdealStateForRealtime(final int numSegments, final int numReplicas,
+      final String tableName, boolean llc)
+      throws Exception {
+    final HelixDataAccessor dataAccessor = _helixManagers.get(0).getHelixDataAccessor();
+    final String tableNameWithType = tableName + "_REALTIME";
+    final PropertyKey idealStateKey = dataAccessor.keyBuilder().idealStates(tableNameWithType);
+    final IdealState idealState = dataAccessor.getProperty(idealStateKey);
+    final IdealState idealStateCopy = HelixHelper.cloneIdealState(idealState);
+    final String serverPrefix = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + NetUtil.getHostAddress() + "_";
+    Map<String, Map<String, String>> idealStateMap = idealStateCopy.getRecord().getMapFields();
+
+    // the creation of LLC realtime table would have already created ideal state
+    // with segments from 2 partitions in CONSUMING state.
+    // make that state as ONLINE so next we can add
+    // segments with higher sequence number for the same kafka partition
+    // in CONSUMING state
+    for (String segment : idealStateMap.keySet()) {
+      if (idealStateCopy.getInstanceStateMap(segment) != null) {
+        idealStateCopy.getInstanceStateMap(segment).clear();
+      }
+      for (int i = 0; i < numReplicas; i++) {
+        final int port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + i;
+        final String instanceID = serverPrefix + port;
+        idealStateCopy.setPartitionState(segment, instanceID, "ONLINE");
+      }
+    }
+
+    if (llc) {
+      // write 2 latest segments for the same kafka partitions (0 and 1)
+      // with higher sequence number and in CONSUMING state
+      final String timestamp = idealStateMap.keySet().iterator().next().split(SegmentName.SEPARATOR)[3];
+      final String segmentPrefix = tableName + "__";
+      final String segmentSuffix = "__"+ timestamp;
+      int sequenceNumber = 1;
+      for (int kafkaPartition = 0; kafkaPartition < 2; kafkaPartition++) {
+        final String segmentID = segmentPrefix + kafkaPartition + "__" + sequenceNumber + segmentSuffix;
+        for (int j = 0; j < numReplicas; j++) {
+          final int port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + j;
+          final String instanceID = serverPrefix + port;
+          idealStateCopy.setPartitionState(segmentID, instanceID, "CONSUMING");
+        }
+      }
+    }
+
+    final ZkBaseDataAccessor zkBaseDataAccessor = (ZkBaseDataAccessor) dataAccessor.getBaseDataAccessor();
+    zkBaseDataAccessor.set(idealStateKey.getPath(), idealStateCopy.getRecord(), idealState.getRecord().getVersion(),
+        AccessOption.PERSISTENT);
   }
 
   private void createIdealState(final int numSegments, final int numReplicas,
@@ -530,8 +824,16 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
     }
 
     @SuppressWarnings("unused")
-    @StateModelInfo(states = "{'OFFLINE', 'ONLINE', 'DROPPED'}", initialState = "OFFLINE")
+    @StateModelInfo(states = "{'OFFLINE', 'ONLINE', , 'CONSUMING', 'DROPPED'}", initialState = "OFFLINE")
     public class FakeSegmentStateModel extends StateModel {
+
+      @Transition(from = "OFFLINE", to = "CONSUMING")
+      public void onBecomeConsumingFromOffline(Message message, NotificationContext context) {
+      }
+
+      @Transition(from = "CONSUMING", to = "ONLINE")
+      public void onBecomeOnlineFromConsuming(Message message, NotificationContext context) {
+      }
 
       @Transition(from = "OFFLINE", to = "ONLINE")
       public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
@@ -563,5 +865,15 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
   private static class SegmentStateTransitionStats {
     private int offFromOn = 0;
     private int dropFromOff = 0;
+  }
+
+  @Override
+  protected boolean isUsingNewConfigFormat() {
+    return false;
+  }
+
+  @Override
+  protected boolean useLlc() {
+    return true;
   }
 }

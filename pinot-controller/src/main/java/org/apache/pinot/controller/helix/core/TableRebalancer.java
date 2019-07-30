@@ -163,8 +163,10 @@ public class TableRebalancer {
       }
 
       // if ideal state needs to change, get the next 'safe' state (based on whether downtime is OK or not)
+      final int currentMovements = _rebalancerStats.numSegmentMoves;
       IdealState nextIdealState = getNextState(currentIdealState, targetIdealState, rebalanceConfig);
-      LOGGER.info("Got new ideal state after making changes to partition map of all segments. Will attempt to persist this in ZK. Logging the difference between new and target ideal state");
+      LOGGER.info("Got new ideal state after moving {} segments. Will attempt to persist this in ZK. Logging the difference between new and target ideal state",
+          _rebalancerStats.numSegmentMoves - currentMovements);
       printIdealStateDifference(targetIdealState, nextIdealState);
 
       // If the ideal state is large enough, enable compression
@@ -364,12 +366,15 @@ public class TableRebalancer {
       prettyPrintMap(targetIdealStateSegmentHosts, Level.DEBUG);
     }
 
+    MapDifference difference = Maps.difference(targetIdealStateSegmentHosts, currentIdealStateSegmentHosts);
+
     if (rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DOWNTIME,
         RebalanceUserConfigConstants.DEFAULT_DOWNTIME)) {
       // in downtime mode, set the current ideal state to target at one go
       LOGGER.debug("Downtime mode is enabled. Will set to target state at one go");
       setTargetState(idealStateToUpdate, segmentId, targetIdealStateSegmentHosts);
       ++_rebalancerStats.directUpdatesToSegmentInstanceMap;
+      _rebalancerStats.numSegmentMoves += targetIdealStateSegmentHosts.size();
       return;
     }
 
@@ -391,7 +396,6 @@ public class TableRebalancer {
       minReplicasToKeepUp = RebalanceUserConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME;
     }
 
-    MapDifference difference = Maps.difference(targetIdealStateSegmentHosts, currentIdealStateSegmentHosts);
     if (difference.entriesInCommon().size() >= minReplicasToKeepUp) {
       // if there are enough hosts in common between current and target ideal states
       // to satisfy the min replicas condition, then there won't be any downtime
@@ -399,6 +403,7 @@ public class TableRebalancer {
       LOGGER.debug("Current and target ideal states have sufficient common hosts. Will set to target state at one go");
       setTargetState(idealStateToUpdate, segmentId, targetIdealStateSegmentHosts);
       ++_rebalancerStats.directUpdatesToSegmentInstanceMap;
+      _rebalancerStats.numSegmentMoves += difference.entriesOnlyOnLeft().size();
     } else {
       // remove one entry
       String hostToRemove = "";
@@ -433,6 +438,7 @@ public class TableRebalancer {
       idealStateToUpdate.setPartitionState(segmentId, hostToAdd, targetIdealStateSegmentHosts.get(hostToAdd));
       LOGGER.debug("Adding " + hostToAdd + " to serve segment " + segmentId);
       ++_rebalancerStats.incrementalUpdatesToSegmentInstanceMap;
+      ++_rebalancerStats.numSegmentMoves;
 
       // dump additional detailed info for debugging
       if (LOGGER.isDebugEnabled()) {
@@ -588,6 +594,7 @@ public class TableRebalancer {
     private int updatestoIdealStateInZK;
     private int directUpdatesToSegmentInstanceMap;
     private int incrementalUpdatesToSegmentInstanceMap;
+    private int numSegmentMoves;
 
     RebalancerStats() {
     }
@@ -613,7 +620,7 @@ public class TableRebalancer {
 
     /**
      * Get the number of times we updated the instance-state
-     * mapping of a segment in ideal state in one step. This
+     * mapping acrosss all segments in ideal state in one step. This
      * happens in downtime rebalancing and can also happen
      * in no-downtime rebalancing if there are sufficient common
      * hosts between current and target ideal states
@@ -625,13 +632,22 @@ public class TableRebalancer {
 
     /**
      * Get the number of times we updated the instance-state
-     * mapping of a segment in ideal state incrementally
+     * mapping across all segments in ideal state incrementally
      * to keep the requirement of having some number of
      * serving replicas up for each segment
      * @return incremental updates
      */
     public int getIncrementalUpdatesToSegmentInstanceMap() {
       return incrementalUpdatesToSegmentInstanceMap;
+    }
+
+    /**
+     * Get the total number of segment movements
+     * @return number of times segments were moved
+     * from one host to another
+     */
+    public int getNumSegmentMoves() {
+      return numSegmentMoves;
     }
   }
 

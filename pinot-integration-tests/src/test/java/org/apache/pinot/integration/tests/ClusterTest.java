@@ -405,7 +405,18 @@ public abstract class ClusterTest extends ControllerTest {
       String kafkaTopic, int realtimeSegmentFlushRows, File avroFile, String timeColumnName, String timeType,
       String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
       List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
-      TableTaskConfig taskConfig, String streamConsumerFactoryName)
+      TableTaskConfig taskConfig, String streamConsumerFactoryName) throws Exception {
+    addRealtimeTable(tableName, useLlc, kafkaBrokerList, kafkaZkUrl, kafkaTopic, realtimeSegmentFlushRows,
+        avroFile, timeColumnName, timeType, schemaName, brokerTenant, serverTenant, loadMode, sortedColumn,
+        invertedIndexColumns, bloomFilterColumns, noDictionaryColumns, taskConfig, streamConsumerFactoryName,
+        1);
+  }
+
+  protected void addRealtimeTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,
+      String kafkaTopic, int realtimeSegmentFlushRows, File avroFile, String timeColumnName, String timeType,
+      String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
+      List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
+      TableTaskConfig taskConfig, String streamConsumerFactoryName, int numReplicas)
       throws Exception {
     Map<String, String> streamConfigs = new HashMap<>();
     String streamType = "kafka";
@@ -447,7 +458,8 @@ public abstract class ClusterTest extends ControllerTest {
         .setTimeColumnName(timeColumnName).setTimeType(timeType).setSchemaName(schemaName).setBrokerTenant(brokerTenant)
         .setServerTenant(serverTenant).setLoadMode(loadMode).setSortedColumn(sortedColumn)
         .setInvertedIndexColumns(invertedIndexColumns).setBloomFilterColumns(bloomFilterColumns)
-        .setNoDictionaryColumns(noDictionaryColumns).setStreamConfigs(streamConfigs).setTaskConfig(taskConfig).build();
+        .setNoDictionaryColumns(noDictionaryColumns).setStreamConfigs(streamConfigs).setTaskConfig(taskConfig)
+        .setNumReplicas(numReplicas).build();
 
     // save the realtime table config
     _realtimeTableConfig = tableConfig;

@@ -474,7 +474,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("includeConsuming") Boolean includeConsuming,
       @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("downtime") Boolean downtime,
       @ApiParam(value = "number of serving replicas to keep alive per segment while rebalancing in no downtime mode")
-      @DefaultValue("1") @QueryParam("minReplicasToKeepUpForNoDowntime") Integer minReplicasToKeepUp) {
+      @DefaultValue("1") @QueryParam("minAvailableReplicas") Integer minAvailableReplicas) {
 
     if (tableType != null && !EnumUtils.isValidEnum(CommonConstants.Helix.TableType.class, tableType.toUpperCase())) {
       throw new ControllerApplicationException(LOGGER, "Illegal table type " + tableType, Response.Status.BAD_REQUEST);
@@ -485,7 +485,7 @@ public class PinotTableRestletResource {
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.INCLUDE_CONSUMING, includeConsuming);
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.DOWNTIME, downtime);
     rebalanceUserConfig
-        .addProperty(RebalanceUserConfigConstants.MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME, minReplicasToKeepUp);
+        .addProperty(RebalanceUserConfigConstants.MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME, minAvailableReplicas);
 
     TableType type = TableType.valueOf(tableType.toUpperCase());
     if (type == TableType.OFFLINE && (!_pinotHelixResourceManager.hasOfflineTable(tableName))

@@ -406,8 +406,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .testQuery(sqlQuery, "sql", _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
   }
 
-  protected void setUpRealtimeTable(File avroFile)
-      throws Exception {
+  protected void setUpRealtimeTable(File avroFile,
+      int numReplicas, boolean useLLC, String tableName) throws Exception {
     File schemaFile = getSchemaFile();
     Schema schema = Schema.fromFile(schemaFile);
     String schemaName = schema.getSchemaName();
@@ -419,16 +419,21 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     Assert.assertNotNull(outgoingTimeUnit);
     String timeType = outgoingTimeUnit.toString();
 
-    addRealtimeTable(getTableName(), useLlc(), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
+    addRealtimeTable(tableName, useLLC, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
         getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName,
         getBrokerTenant(), getServerTenant(), getLoadMode(), getSortedColumn(), getInvertedIndexColumns(),
-        getBloomFilterIndexColumns(), getRawIndexColumns(), getTaskConfig(), getStreamConsumerFactoryClassName());
+        getBloomFilterIndexColumns(), getRawIndexColumns(), getTaskConfig(), getStreamConsumerFactoryClassName(),
+        numReplicas);
 
     completeTableConfiguration();
   }
 
-  protected void completeTableConfiguration()
-      throws IOException {
+  protected void setUpRealtimeTable(File avroFile)
+      throws Exception {
+    setUpRealtimeTable(avroFile, 1, useLlc(), getTableName());
+  }
+
+  protected void completeTableConfiguration() throws IOException {
     if (isUsingNewConfigFormat()) {
       CombinedConfig combinedConfig = new CombinedConfig(_offlineTableConfig, _realtimeTableConfig, _schema);
       sendPostRequest(_controllerRequestURLBuilder.forNewTableCreate(), Serializer.serializeToString(combinedConfig));
