@@ -49,7 +49,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-entriesScannedThreshold", required = false, metaVar = "<long>", usage = "Log lines with numEntriesScannedInFilter below this threshold will be excluded.")
   private long _numEntriesScannedThreshold = DEFAULT_NUM_ENTRIES_SCANNED_THRESHOLD;
 
-  @Option(name = "-queriesToReport", required = false, metaVar = "<long>", usage = "Log lines with numEntriesScannedInFilter below this threshold will be excluded.")
+  @Option(name = "-queriesToReport", required = false, metaVar = "<long>", usage = "Tables with log lines scanned threshold will be excluded.")
   private long _numQueriesToGiveRecommendation = DEFAULT_NUM_QUERIES_TO_GIVE_RECOMMENDATION;
 
   @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (unset run on all tables)")
