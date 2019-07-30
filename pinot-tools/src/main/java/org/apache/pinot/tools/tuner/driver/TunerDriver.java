@@ -120,16 +120,14 @@ public class TunerDriver {
           accumulateExecutor.execute(() -> {
             long threadID = Thread.currentThread().getId();
             LOGGER.debug("Thread {} accumulating: {}", threadID, abstractQueryStats.toString());
-            Map<String, Map<String, AbstractAccumulator>> perThreadTableToColAccumulators =
-                _threadToTableAccumulators.putIfAbsent(threadID, new HashMap<>());
-            _tuningStrategy.accumulate(abstractQueryStats, _metaManager, perThreadTableToColAccumulators);
+            _threadToTableAccumulators.putIfAbsent(threadID, new HashMap<>());
+            _tuningStrategy.accumulate(abstractQueryStats, _metaManager, _threadToTableAccumulators.get(threadID));
           });
         } else {
           long threadID = Thread.currentThread().getId();
           LOGGER.debug("Thread {} accumulating: {}", threadID, abstractQueryStats.toString());
-          Map<String, Map<String, AbstractAccumulator>> perThreadTableToColAccumulators =
-              _threadToTableAccumulators.putIfAbsent(threadID, new HashMap<>());
-          _tuningStrategy.accumulate(abstractQueryStats, _metaManager, perThreadTableToColAccumulators);
+          _threadToTableAccumulators.putIfAbsent(threadID, new HashMap<>());
+          _tuningStrategy.accumulate(abstractQueryStats, _metaManager, _threadToTableAccumulators.get(threadID));
         }
       }
     }
@@ -168,9 +166,9 @@ public class TunerDriver {
                   .getOrDefault(tableNameWithoutType, new HashMap<>())
                   .forEach((colName, mergerObj) -> {
                     try {
-                      AbstractAccumulator perColMerger = _tableToColMergers.get(tableNameWithoutType)
+                      _tableToColMergers.get(tableNameWithoutType)
                           .putIfAbsent(colName, mergerObj.getClass().newInstance());
-                      _tuningStrategy.merge(perColMerger, mergerObj);
+                      _tuningStrategy.merge(_tableToColMergers.get(tableNameWithoutType).get(colName), mergerObj);
                     } catch (Exception e) {
                       LOGGER.error("Instantiation Exception in Merger!", e);
                     }
@@ -182,9 +180,9 @@ public class TunerDriver {
                 .getOrDefault(tableNameWithoutType, new HashMap<>())
                 .forEach((colName, mergerObj) -> {
                   try {
-                    AbstractAccumulator perColMerger = _tableToColMergers.get(tableNameWithoutType)
+                    _tableToColMergers.get(tableNameWithoutType)
                         .putIfAbsent(colName, mergerObj.getClass().newInstance());
-                    _tuningStrategy.merge(perColMerger, mergerObj);
+                    _tuningStrategy.merge(_tableToColMergers.get(tableNameWithoutType).get(colName), mergerObj);
                   } catch (Exception e) {
                     LOGGER.error("Instantiation Exception in Merger!", e);
                   }

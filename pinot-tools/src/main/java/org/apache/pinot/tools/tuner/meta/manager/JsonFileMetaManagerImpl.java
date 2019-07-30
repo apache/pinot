@@ -163,7 +163,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
       }
       return new BigFraction(entriesNumerator, entriesDenominator);
     } catch (Exception e) {
-      LOGGER.error("Invalid AverageNumEntries info for {} {}", tableNameWithoutType, columnName);
+      LOGGER.trace("Set average entries to 1 {} {}", tableNameWithoutType, columnName);
       return BigFraction.ONE;
     }
   }
