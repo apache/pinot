@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator;
 import com.google.common.base.Preconditions;
 import io.netty.util.internal.ConcurrentSet;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +35,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.GroupBy;
+import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -72,8 +76,8 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
   private final boolean _aggregtionsInOrderBy;
   private final List<OrderByDefn> _orderByDefns;
 
-  public CombineGroupByOrderByOperator(List<Operator> operators, BrokerRequest brokerRequest, ExecutorService executorService,
-      long timeOutMs, int innerSegmentNumGroupsLimit) {
+  public CombineGroupByOrderByOperator(List<Operator> operators, BrokerRequest brokerRequest,
+      ExecutorService executorService, long timeOutMs, int innerSegmentNumGroupsLimit) {
     Preconditions.checkArgument(brokerRequest.isSetAggregationsInfo() && brokerRequest.isSetGroupBy());
 
     _operators = operators;
@@ -84,15 +88,10 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
     _interSegmentNumGroupsLimit =
         (int) Math.min((long) innerSegmentNumGroupsLimit * INTER_SEGMENT_NUM_GROUPS_LIMIT_FACTOR, Integer.MAX_VALUE);
 
-    // 2. If order by, don't trim results at merge
-    // 2.a if order by is on group keys, can compare while merging
-    // 2.b if order by is on aggregation, trimming anything is wrong
-
-    _orderByDefns = OrderByDefn.getDummyOrderByDefn(); // get from broker request
-    _aggregtionsInOrderBy = true; // if order by has aggregations, set this to true
-
-
-
+    _orderByDefns =
+        OrderByDefn.getOrderByDefnsFromBrokerRequest(_brokerRequest.getOrderBy(), _brokerRequest.getGroupBy(),
+            _brokerRequest.getAggregationsInfo());
+    _aggregtionsInOrderBy = OrderByDefn.isAggregationsInOrderBy(_orderByDefns);
   }
 
   /**
@@ -156,10 +155,13 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
 
             // Merge aggregation group-by result.
             aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
+
             if (aggregationGroupByResult != null) {
               Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
 
-              // aggregtions in order by clause, do not trim anything
+              // 2. If order by, we should not trim results at merge arbitrarily
+              // 2.a if order by is on group keys, can compare while merging
+              // 2.b if order by is on aggregation, trimming anything at all is wrong
               if (_aggregtionsInOrderBy) {
                 while (groupKeyIterator.hasNext()) {
                   GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
@@ -213,7 +215,8 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
                   if (priorityQueue.size() > _interSegmentNumGroupsLimit) { // this block is not thread safe
                     GroupByRow poll = priorityQueue.poll(); // poll in while?
                     resultsMap.remove(poll.getStringKey());
-                    keysAlreadyRemoved.add(poll.getStringKey()); // others could be adding to results before the key reaches here. think about this more
+                    keysAlreadyRemoved.add(
+                        poll.getStringKey()); // others could be adding to results before the key reaches here. think about this more
                   }
                 }
               }

@@ -256,14 +256,18 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
               preserveType);
         } else {
           // Aggregation group-by query.
-          boolean orderBy = true;
-          if (orderBy) {
-            setOrderByGroupByResults(brokerResponseNative, aggregationFunctions, dataTableMap, OrderByDefn.getDummyOrderByDefn(),
-                brokerRequest.getGroupBy().getTopN(), true);
-          } else {
-            boolean[] aggregationFunctionSelectStatus = AggregationFunctionUtils.getAggregationFunctionsSelectStatus(brokerRequest.getAggregationsInfo());
+
+          // group by order by
+          if (brokerRequest.isSetOrderBy()) {
+            setOrderByGroupByResults(brokerResponseNative, aggregationFunctions, dataTableMap,
+                OrderByDefn.getOrderByDefnsFromBrokerRequest(brokerRequest.getOrderBy(), brokerRequest.getGroupBy(),
+                    brokerRequest.getAggregationsInfo()), brokerRequest.getGroupBy().getTopN(), true);
+          } else { // group by, no order by
+            boolean[] aggregationFunctionSelectStatus =
+                AggregationFunctionUtils.getAggregationFunctionsSelectStatus(brokerRequest.getAggregationsInfo());
             setGroupByHavingResults(brokerResponseNative, aggregationFunctions, aggregationFunctionSelectStatus,
-                brokerRequest.getGroupBy(), dataTableMap, brokerRequest.getHavingFilterQuery(), brokerRequest.getHavingFilterSubQueryMap(), preserveType);
+                brokerRequest.getGroupBy(), dataTableMap, brokerRequest.getHavingFilterQuery(),
+                brokerRequest.getHavingFilterSubQueryMap(), preserveType);
             if (brokerMetrics != null && (!brokerResponseNative.getAggregationResults().isEmpty())) {
               // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the same.
               // Thus, we can just emit the one from the 1st result.
