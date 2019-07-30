@@ -19,14 +19,19 @@
 package org.apache.pinot.tools.tuner.strategy;
 
 import io.vavr.Tuple2;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.text.MessageFormat;
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
@@ -210,11 +215,11 @@ public class ParserBasedImpl implements TuningStrategy {
     if (totalCount < _numQueriesThreshold) {
       return;
     }
-
-    String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
-    reportOut += MessageFormat.format("\nTotal lines accumulated: {0}\n\n", totalCount);
+    NumberFormat formatter = new DecimalFormat("0.######E0", DecimalFormatSymbols.getInstance(Locale.ROOT));
     List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
     List<Tuple2<String, BigInteger>> sortedWeighted = new ArrayList<>();
+    String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
+    reportOut += MessageFormat.format("\nTotal lines accumulated: {0}\n\n", totalCount);
     columnStats.forEach((colName, score) -> {
       sortedPure.add(new Tuple2<>(colName, ((ParseBasedAccumulator) score).getPureScore()));
       sortedWeighted.add(new Tuple2<>(colName, ((ParseBasedAccumulator) score).getWeightedScore()));
@@ -226,7 +231,7 @@ public class ParserBasedImpl implements TuningStrategy {
     }
     reportOut += "\n***********************************************************************************\n";
     for (Tuple2<String, BigInteger> tuple2 : sortedWeighted) {
-      reportOut += "Dimension: " + tuple2._1() + "  " + tuple2._2().toString() + "\n";
+      reportOut += "Dimension: " + tuple2._1() + "  " + formatter.format(tuple2._2()) + "\n";
     }
     LOGGER.info(reportOut);
   }
