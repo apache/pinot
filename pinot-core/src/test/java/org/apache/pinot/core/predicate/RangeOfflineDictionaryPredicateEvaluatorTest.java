@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.predicate;
 
+import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.pinot.core.common.predicate.RangePredicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory;
@@ -51,8 +52,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       Assert.assertFalse(evaluator.applySV(rangeEnd + 1));
 
       int[] dictIds = new int[]{1, 3, 7};
-      Assert.assertTrue(evaluator.applyMV(dictIds, dictIds.length, new int[]{0}));
-      Assert.assertFalse(evaluator.applyMV(dictIds, 1, new int[]{0}));
+      Assert.assertTrue(evaluator.applyMV(dictIds, dictIds.length, new MutableInt(0)));
+      Assert.assertFalse(evaluator.applyMV(dictIds, 1, new MutableInt(0)));
       dictIds = evaluator.getMatchingDictIds();
       verifyDictId(dictIds, rangeStart, rangeEnd);
     }
@@ -72,8 +73,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       Assert.assertFalse(evaluator.applySV(rangeEnd + 1));
 
       int[] dictIds = new int[]{1, 3, 7};
-      Assert.assertTrue(evaluator.applyMV(dictIds, dictIds.length, new int[]{0}));
-      Assert.assertFalse(evaluator.applyMV(dictIds, 1, new int[]{0}));
+      Assert.assertTrue(evaluator.applyMV(dictIds, dictIds.length, new MutableInt(0)));
+      Assert.assertFalse(evaluator.applyMV(dictIds, 1, new MutableInt(0)));
       dictIds = evaluator.getMatchingDictIds();
       verifyDictId(dictIds, rangeStart + 1, rangeEnd);
     }
@@ -93,8 +94,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       Assert.assertFalse(evaluator.applySV(rangeEnd + 1));
 
       int[] dictIds = new int[]{1, 3, 7};
-      Assert.assertTrue(evaluator.applyMV(dictIds, dictIds.length, new int[]{0}));
-      Assert.assertFalse(evaluator.applyMV(dictIds, 1, new int[]{0}));
+      Assert.assertTrue(evaluator.applyMV(dictIds, dictIds.length, new MutableInt(0)));
+      Assert.assertFalse(evaluator.applyMV(dictIds, 1, new MutableInt(0)));
       dictIds = evaluator.getMatchingDictIds();
       verifyDictId(dictIds, rangeStart, rangeEnd - 1);
     }
@@ -114,8 +115,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       Assert.assertFalse(evaluator.applySV(rangeEnd + 1));
 
       int[] dictIds = new int[]{1, 3, 7};
-      Assert.assertTrue(evaluator.applyMV(dictIds, dictIds.length, new int[]{0}));
-      Assert.assertFalse(evaluator.applyMV(dictIds, 1, new int[]{0}));
+      Assert.assertTrue(evaluator.applyMV(dictIds, dictIds.length, new MutableInt(0)));
+      Assert.assertFalse(evaluator.applyMV(dictIds, 1, new MutableInt(0)));
       dictIds = evaluator.getMatchingDictIds();
       verifyDictId(dictIds, rangeStart + 1, rangeEnd - 1);
     }
@@ -146,8 +147,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       Assert.assertFalse(evaluator.applySV(rangeEnd + 1));
 
       int[] dictIds = new int[]{5, 7, 9};
-      Assert.assertFalse(evaluator.applyMV(dictIds, dictIds.length, new int[]{0}));
-      Assert.assertFalse(evaluator.applyMV(dictIds, 1, new int[]{0}));
+      Assert.assertFalse(evaluator.applyMV(dictIds, dictIds.length, new MutableInt(0)));
+      Assert.assertFalse(evaluator.applyMV(dictIds, 1, new MutableInt(0)));
       dictIds = evaluator.getMatchingDictIds();
       verifyDictId(dictIds, rangeStart, rangeEnd - 1);
     }
@@ -180,8 +181,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       Assert.assertFalse(evaluator.applySV(rangeStart - 1));
 
       int[] dictIds = new int[]{5, 7, 9};
-      Assert.assertTrue(evaluator.applyMV(dictIds, dictIds.length, new int[]{0}));
-      Assert.assertFalse(evaluator.applyMV(dictIds, 1, new int[]{0}));
+      Assert.assertTrue(evaluator.applyMV(dictIds, dictIds.length, new MutableInt(0)));
+      Assert.assertFalse(evaluator.applyMV(dictIds, 1, new MutableInt(0)));
       dictIds = evaluator.getMatchingDictIds();
       verifyDictId(dictIds, rangeStart, rangeEnd);
     }
@@ -233,8 +234,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       Assert.assertFalse(evaluator.applySV(rangeStart - 1));
 
       int[] dictIds = new int[]{5, 7, 9};
-      Assert.assertFalse(evaluator.applyMV(dictIds, dictIds.length, new int[]{0}));
-      Assert.assertFalse(evaluator.applyMV(dictIds, 1, new int[]{0}));
+      Assert.assertFalse(evaluator.applyMV(dictIds, dictIds.length, new MutableInt(0)));
+      Assert.assertFalse(evaluator.applyMV(dictIds, 1, new MutableInt(0)));
       dictIds = evaluator.getMatchingDictIds();
       verifyDictId(dictIds, rangeStart + 1, rangeEnd - 1);
     }
