@@ -55,7 +55,7 @@ import static org.apache.pinot.thirdeye.dataframe.DoubleSeries.*;
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 @Components(title = "History mean and standard deviation based forecasting and detection.",
-    type = "WOW_STD_RULE",
+    type = "MEAN_VARIANCE_RULE",
     tags = {DetectionTag.RULE_DETECTION},
     description = "Forecast using history mean and standard deviation.",
     params = {
