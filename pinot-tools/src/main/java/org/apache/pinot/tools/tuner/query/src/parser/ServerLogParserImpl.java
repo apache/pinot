@@ -27,6 +27,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Implementation of {@link QueryParser}, to parse complete lines of server log text
+ */
 public class ServerLogParserImpl implements QueryParser {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerLogParserImpl.class);
   /*Regex to parse Server Log*/

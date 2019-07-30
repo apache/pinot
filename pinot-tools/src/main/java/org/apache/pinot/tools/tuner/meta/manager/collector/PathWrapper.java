@@ -23,6 +23,9 @@ import javax.annotation.Nonnull;
 import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 
 
+/**
+ * The path wrapper used to feed the tarred segment path to the worker threads
+ */
 public class PathWrapper extends AbstractQueryStats {
   private File _file;
 
