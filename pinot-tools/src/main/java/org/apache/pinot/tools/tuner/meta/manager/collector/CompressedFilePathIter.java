@@ -92,7 +92,7 @@ public class CompressedFilePathIter implements QuerySrc {
     }
 
     @Nonnull
-    public Builder set_directory(@Nonnull String val) {
+    public Builder setDirectory(@Nonnull String val) {
       _directory = val;
       return this;
     }

@@ -55,7 +55,7 @@ public class CollectSegmentMetadata extends AbstractBaseCommand implements Comma
             .setOutputDir(_workDir)
             .build())
         .setQuerySrc(new CompressedFilePathIter.Builder()
-            .set_directory(_segmentsDir)
+            .setDirectory(_segmentsDir)
             .build())
         .setMetaManager(null);
     metaFetch.execute();
