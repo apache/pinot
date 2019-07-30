@@ -104,7 +104,7 @@ public class OLSAnalysisImpl implements TuningStrategy {
     LOGGER.debug("Accumulator: scoring query {}", query);
 
     accumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-    accumulatorOut.get(tableNameWithoutType).putIfAbsent(NUM_QUERIES_COUNT, new ParseBasedAccumulator());
+    accumulatorOut.get(tableNameWithoutType).putIfAbsent(NUM_QUERIES_COUNT, new OLSAccumulator());
     accumulatorOut.get(tableNameWithoutType).get(NUM_QUERIES_COUNT).increaseCount();
 
     accumulatorOut.get(tableNameWithoutType).putIfAbsent("*", new OLSAccumulator());
