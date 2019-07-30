@@ -141,14 +141,15 @@ public class CombinePlanNode implements PlanNode {
 
     // TODO: use the same combine operator for both aggregation and selection query.
     if (_brokerRequest.isSetAggregationsInfo()) {
-      //if (_brokerRequest.getGroupBy() != null) {
-        // Aggregation group-by query
-       // return new CombineGroupByOperator(operators, _brokerRequest, _executorService, _timeOutMs, _numGroupsLimit);
-      //}
-      //if (_brokerRequest.getPinotQuery().isSetOrderByList()) {
-        return new CombineGroupByOrderByOperator(operators, _brokerRequest, _executorService, _timeOutMs,
-            _numGroupsLimit);
-      //}
+      if (_brokerRequest.getGroupBy() != null) {
+        if (_brokerRequest.isSetOrderBy()) {
+          return new CombineGroupByOrderByOperator(operators, _brokerRequest, _executorService, _timeOutMs,
+              _numGroupsLimit);
+        } else {
+          // Aggregation group-by query
+          return new CombineGroupByOperator(operators, _brokerRequest, _executorService, _timeOutMs, _numGroupsLimit);
+        }
+      }
     } // Selection or aggregation only query
     return new CombineOperator(operators, _executorService, _timeOutMs, _brokerRequest);
   }
