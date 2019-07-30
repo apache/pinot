@@ -36,13 +36,13 @@ public interface TuningStrategy {
   boolean filter(AbstractQueryStats queryStats);
 
   /**
-   * Accumulate the parsed queryStats to corresponding entry in MapperOut, see FrequencyImpl for ex
+   * Accumulate the parsed queryStats to corresponding entry in MapperOut
    * @param queryStats input, the stats extracted and parsed from QuerySrc
    * @param metaManager input, the metaManager where cardinality info can be get from
-   * @param AccumulatorOut output, map of /tableMame: String/columnName: String/AbstractMergerObj
+   * @param accumulatorOut output, map of /tableMame: String/columnName: String/AbstractMergerObj
    */
   void accumulate(AbstractQueryStats queryStats, MetaManager metaManager,
-      Map<String, Map<String, AbstractAccumulator>> AccumulatorOut);
+      Map<String, Map<String, AbstractAccumulator>> accumulatorOut);
 
   /**
    * merge two AbstractMergerObj with same /tableName/colName

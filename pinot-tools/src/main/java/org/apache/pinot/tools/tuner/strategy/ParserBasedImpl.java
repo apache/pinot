@@ -155,16 +155,16 @@ public class ParserBasedImpl implements TuningStrategy {
 
   @Override
   public void accumulate(AbstractQueryStats queryStats, MetaManager metaManager,
-      Map<String, Map<String, AbstractAccumulator>> AccumulatorOut) {
+      Map<String, Map<String, AbstractAccumulator>> accumulatorOut) {
 
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     String tableNameWithoutType = indexSuggestQueryStatsImpl.getTableNameWithoutType();
     String numEntriesScannedInFilter = indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter();
     String query = indexSuggestQueryStatsImpl.getQuery();
 
-    AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-    AccumulatorOut.get(tableNameWithoutType).putIfAbsent(NUM_QUERIES_COUNT, new ParseBasedAccumulator());
-    AccumulatorOut.get(tableNameWithoutType).get(NUM_QUERIES_COUNT).increaseCount();
+    accumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
+    accumulatorOut.get(tableNameWithoutType).putIfAbsent(NUM_QUERIES_COUNT, new ParseBasedAccumulator());
+    accumulatorOut.get(tableNameWithoutType).get(NUM_QUERIES_COUNT).increaseCount();
 
     LOGGER.debug("Accumulator: scoring query {}", query);
 
@@ -180,11 +180,11 @@ public class ParserBasedImpl implements TuningStrategy {
           //Do not count if already counted
           tupleNamesScore._1().stream().filter(colName -> !counted.contains(colName)).forEach(colName -> {
             counted.add(colName);
-            AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-            AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new ParseBasedAccumulator());
+            accumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
+            accumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new ParseBasedAccumulator());
             BigFraction weightedScore = BigFraction.ONE.subtract(tupleNamesScore._2().reciprocal())
                 .multiply(new BigInteger(numEntriesScannedInFilter));
-            ((ParseBasedAccumulator) AccumulatorOut.get(tableNameWithoutType).get(colName))
+            ((ParseBasedAccumulator) accumulatorOut.get(tableNameWithoutType).get(colName))
                 .merge(1, weightedScore.bigDecimalValue(RoundingMode.DOWN.ordinal()).toBigInteger());
           });
         });

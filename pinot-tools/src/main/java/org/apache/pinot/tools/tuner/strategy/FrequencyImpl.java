@@ -131,7 +131,7 @@ public class FrequencyImpl implements TuningStrategy {
 
   @Override
   public void accumulate(AbstractQueryStats queryStats, MetaManager metaManager,
-      Map<String, Map<String, AbstractAccumulator>> AccumulatorOut) {
+      Map<String, Map<String, AbstractAccumulator>> accumulatorOut) {
 
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     String tableNameWithoutType = indexSuggestQueryStatsImpl.getTableNameWithoutType();
@@ -140,9 +140,9 @@ public class FrequencyImpl implements TuningStrategy {
     LOGGER.debug("Accumulator: scoring query {}", query);
     HashSet<String> counted = new HashSet<>();
 
-    AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-    AccumulatorOut.get(tableNameWithoutType).putIfAbsent(NUM_QUERIES_COUNT, new ParseBasedAccumulator());
-    AccumulatorOut.get(tableNameWithoutType).get(NUM_QUERIES_COUNT).increaseCount();
+    accumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
+    accumulatorOut.get(tableNameWithoutType).putIfAbsent(NUM_QUERIES_COUNT, new ParseBasedAccumulator());
+    accumulatorOut.get(tableNameWithoutType).get(NUM_QUERIES_COUNT).increaseCount();
 
     Matcher matcher = _dimensionPattern.matcher(query);
     while (matcher.find()) {
@@ -156,9 +156,9 @@ public class FrequencyImpl implements TuningStrategy {
 
     counted.stream().filter(colName -> metaManager.getColumnSelectivity(tableNameWithoutType, colName)
         .compareTo(new BigFraction(_cardinalityThreshold)) > 0).forEach(colName -> {
-      AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-      AccumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new FrequencyAccumulator());
-      ((FrequencyAccumulator) AccumulatorOut.get(tableNameWithoutType).get(colName)).merge(1);
+      accumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
+      accumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new FrequencyAccumulator());
+      ((FrequencyAccumulator) accumulatorOut.get(tableNameWithoutType).get(colName)).merge(1);
     });
   }
 

@@ -95,7 +95,7 @@ public class OLSAnalysisImpl implements TuningStrategy {
 
   @Override
   public void accumulate(AbstractQueryStats queryStats, MetaManager metaManager,
-      Map<String, Map<String, AbstractAccumulator>> AccumulatorOut) {
+      Map<String, Map<String, AbstractAccumulator>> accumulatorOut) {
 
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     String tableNameWithoutType = indexSuggestQueryStatsImpl.getTableNameWithoutType();
@@ -105,12 +105,12 @@ public class OLSAnalysisImpl implements TuningStrategy {
     String query = indexSuggestQueryStatsImpl.getQuery();
     LOGGER.debug("Accumulator: scoring query {}", query);
 
-    AccumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-    AccumulatorOut.get(tableNameWithoutType).putIfAbsent(NUM_QUERIES_COUNT, new ParseBasedAccumulator());
-    AccumulatorOut.get(tableNameWithoutType).get(NUM_QUERIES_COUNT).increaseCount();
+    accumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
+    accumulatorOut.get(tableNameWithoutType).putIfAbsent(NUM_QUERIES_COUNT, new ParseBasedAccumulator());
+    accumulatorOut.get(tableNameWithoutType).get(NUM_QUERIES_COUNT).increaseCount();
 
-    AccumulatorOut.get(tableNameWithoutType).putIfAbsent("*", new OLSAccumulator());
-    ((OLSAccumulator) AccumulatorOut.get(tableNameWithoutType).get("*"))
+    accumulatorOut.get(tableNameWithoutType).putIfAbsent("*", new OLSAccumulator());
+    ((OLSAccumulator) accumulatorOut.get(tableNameWithoutType).get("*"))
         .merge(Long.parseLong(time), Long.parseLong(numEntriesScannedInFilter),
             Long.parseLong(numEntriesScannedPostFilter), 0, _lenBin);
   }
