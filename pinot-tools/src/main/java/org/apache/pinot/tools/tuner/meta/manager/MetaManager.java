@@ -65,7 +65,7 @@ public interface MetaManager {
    * @param columnName
    * @return
    */
-  BigFraction getAverageNumEntries(String tableNameWithoutType, String columnName);
+  BigFraction getAverageNumEntriesPerDoc(String tableNameWithoutType, String columnName);
 
   boolean hasInvertedIndex(String tableNameWithoutType, String columnName);
 }

@@ -361,15 +361,15 @@ public class ParserBasedImpl implements TuningStrategy {
       }
     }
 
-    private BigFraction EquivalentSelectivity(Boolean invertSelection, BigFraction selectivity, int clauseLength,
-        BigFraction avgEntries) {
-      BigFraction equvLen = avgEntries.multiply(clauseLength);
+    private BigFraction EquivalentSelectivity(Boolean invertSelection, BigFraction selectivity, int numSelectedValues,
+        BigFraction avgEntriesPerDoc) {
+      BigFraction equvLen = avgEntriesPerDoc.multiply(numSelectedValues);
       if (invertSelection == false) {
-        return selectivity.divide(equvLen);
-      } else if (selectivity.subtract(equvLen).compareTo(BigFraction.ONE) <= 0) { //(selectivity-equvLen)<=1
-        return selectivity;
+        return selectivity.divide(equvLen); // selectivity/equvLen
+      } else if (selectivity.subtract(equvLen).compareTo(BigFraction.ONE) <= 0) { // if (selectivity-equvLen)<=1
+        return selectivity; // selectivity/1
       } else {
-        return selectivity.divide(selectivity.subtract(equvLen));
+        return selectivity.divide(selectivity.subtract(equvLen)); // selectivity/(selectivity-equvLen)
       }
     }
 
@@ -411,11 +411,12 @@ public class ParserBasedImpl implements TuningStrategy {
 
         List<String> colNameList = new ArrayList<>();
         colNameList.add(colName);
-        BigFraction avgEntries = _metaManager.getAverageNumEntries(_tableNameWithoutType, colName);
-        int lenFilter = ((PQL2Parser.InPredicateContext) predicateContext).inClause().literal().size();
-        Boolean notIn = ((PQL2Parser.InPredicateContext) predicateContext).inClause().NOT() != null;
+        BigFraction avgEntriesPerDoc = _metaManager.getAverageNumEntriesPerDoc(_tableNameWithoutType, colName);
+        int numValuesSelected = ((PQL2Parser.InPredicateContext) predicateContext).inClause().literal().size();
+        Boolean isInvertIn = ((PQL2Parser.InPredicateContext) predicateContext).inClause().NOT() != null;
 
-        ret.add(new Tuple2<>(colNameList, EquivalentSelectivity(notIn, selectivity, lenFilter, avgEntries)));
+        ret.add(new Tuple2<>(colNameList, EquivalentSelectivity(isInvertIn, selectivity, numValuesSelected,
+            avgEntriesPerDoc)));
 
         LOGGER.debug("IN clause ret {}", ret.toString());
         return ret;
@@ -433,18 +434,18 @@ public class ParserBasedImpl implements TuningStrategy {
 
         List<String> colNameList = new ArrayList<>();
         colNameList.add(colName);
-        BigFraction avgEntries = _metaManager.getAverageNumEntries(_tableNameWithoutType, colName);
+        BigFraction avgEntriesPerDoc = _metaManager.getAverageNumEntriesPerDoc(_tableNameWithoutType, colName);
 
         String comparisonOp =
             ((PQL2Parser.ComparisonPredicateContext) predicateContext).comparisonClause().comparisonOperator()
                 .getText();
         LOGGER.debug("COMP operator {}", comparisonOp);
         if (comparisonOp.equals("=")) {
-          ret.add(new Tuple2<>(colNameList, EquivalentSelectivity(false, selectivity, 1, avgEntries)));
+          ret.add(new Tuple2<>(colNameList, EquivalentSelectivity(false, selectivity, 1, avgEntriesPerDoc)));
           LOGGER.debug("COMP clause ret {}", ret.toString());
           return ret;
         } else if (comparisonOp.equals("!=") || comparisonOp.equals("<>")) {
-          ret.add(new Tuple2<>(colNameList, EquivalentSelectivity(true, selectivity, 1, avgEntries)));
+          ret.add(new Tuple2<>(colNameList, EquivalentSelectivity(true, selectivity, 1, avgEntriesPerDoc)));
           LOGGER.debug("COMP clause ret {}", ret.toString());
           return ret;
         } else {

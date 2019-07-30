@@ -154,7 +154,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     return false;
   }
 
-  public BigFraction getAverageNumEntries(String tableNameWithoutType, String columnName) {
+  public BigFraction getAverageNumEntriesPerDoc(String tableNameWithoutType, String columnName) {
     try {
       BigInteger entriesNumerator = new BigInteger(getColField(tableNameWithoutType, columnName, SUM_TOTAL_ENTRIES));
       BigInteger entriesDenominator = new BigInteger(getColField(tableNameWithoutType, columnName, SUM_DOCS));
