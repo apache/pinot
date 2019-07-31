@@ -38,7 +38,7 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   private PredicateEvaluator evaluator;
 
   private String datasourceName;
-  private int _numEntriesScanned = 0;
+  private MutableInt _numEntriesScanned = new MutableInt(0);
 
   public MVScanDocIdIterator(String datasourceName, BlockValSet blockValSet, BlockMetadata blockMetadata,
       PredicateEvaluator evaluator) {
@@ -82,10 +82,7 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
     valueIterator.skipTo(docId);
     int length = valueIterator.nextIntVal(intArray);
-    MutableInt numEntriesScannedInEvaluator = new MutableInt(0);
-    boolean ret = evaluator.applyMV(intArray, length, numEntriesScannedInEvaluator);
-    _numEntriesScanned += numEntriesScannedInEvaluator.toInteger();
-    return ret;
+    return evaluator.applyMV(intArray, length, _numEntriesScanned);
   }
 
   @Override
@@ -113,17 +110,14 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     if (currentDocId == Constants.EOF) {
       return currentDocId;
     }
-    MutableInt numEntriesScannedInEvaluator = new MutableInt(0);
     while (valueIterator.hasNext() && currentDocId < endDocId) {
       currentDocId = currentDocId + 1;
       int length = valueIterator.nextIntVal(intArray);
-      if (evaluator.applyMV(intArray, length, numEntriesScannedInEvaluator)) {
-        _numEntriesScanned += numEntriesScannedInEvaluator.toInteger();
+      if (evaluator.applyMV(intArray, length, _numEntriesScanned)) {
         return currentDocId;
       }
     }
     currentDocId = Constants.EOF;
-    _numEntriesScanned += numEntriesScannedInEvaluator.toInteger();
     return Constants.EOF;
   }
 
@@ -146,23 +140,21 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
     IntIterator intIterator = answer.getIntIterator();
     int docId = -1, length;
-    MutableInt numEntriesScannedInEvaluator = new MutableInt(0);
     while (intIterator.hasNext() && docId < endDocId) {
       docId = intIterator.next();
       if (docId >= startDocId) {
         valueIterator.skipTo(docId);
         length = valueIterator.nextIntVal(intArray);
-        if (evaluator.applyMV(intArray, length, numEntriesScannedInEvaluator)) {
+        if (evaluator.applyMV(intArray, length, _numEntriesScanned)) {
           result.add(docId);
         }
       }
     }
-    _numEntriesScanned += numEntriesScannedInEvaluator.toInteger();
     return result;
   }
 
   @Override
   public int getNumEntriesScanned() {
-    return _numEntriesScanned;
+    return _numEntriesScanned.intValue();
   }
 }
