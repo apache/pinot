@@ -20,6 +20,7 @@ package org.apache.pinot.tools.tuner.query.src;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.NoSuchElementException;
@@ -98,20 +99,20 @@ public class LogQuerySrcImpl implements QuerySrc {
     }
 
     @Nonnull
-    public LogQuerySrcImpl build() {
+    public LogQuerySrcImpl build() throws FileNotFoundException {
       LOGGER.info("Line prefix pattern is set to:{}", this._validLinePrefixRegex);
       return new LogQuerySrcImpl(this).openFile();
     }
   }
 
-  private LogQuerySrcImpl openFile() {
+  private LogQuerySrcImpl openFile() throws FileNotFoundException {
     try {
       _fileInputStream = new FileInputStream(this._path);
       _bufferedReader = new BufferedReader(new InputStreamReader(_fileInputStream));
       _stringBufferNext = _bufferedReader.readLine();
     } catch (IOException e) {
       LOGGER.error(e.toString());
-      System.exit(1);
+      throw new FileNotFoundException();
     }
     return this;
   }

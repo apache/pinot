@@ -20,6 +20,7 @@ package org.apache.pinot.tools.tuner.meta.manager;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.HashMap;
@@ -108,7 +109,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     }
 
     @Nonnull
-    public JsonFileMetaManagerImpl build() {
+    public JsonFileMetaManagerImpl build() throws FileNotFoundException {
       return new JsonFileMetaManagerImpl(this).fetch();
     }
   }
@@ -117,14 +118,14 @@ public class JsonFileMetaManagerImpl implements MetaManager {
    * fetch the metadata from file
    * @return this
    */
-  public JsonFileMetaManagerImpl fetch() {
+  public JsonFileMetaManagerImpl fetch() throws FileNotFoundException {
     File file = new File(this._path);
     String metaBytes = "";
     try {
       metaBytes = FileUtils.readFileToString(file);
     } catch (IOException e) {
-      LOGGER.error(e.toString());
-      System.exit(1);
+      LOGGER.error("Can't read json file! ", e);
+      throw new FileNotFoundException();
     }
     try {
       JsonNode jnode = JsonUtils.stringToJsonNode(metaBytes);
@@ -132,7 +133,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
       _segmentMap = jnode.get(SEGMENT_META);
     } catch (IOException e) {
       LOGGER.error("Can not parse Json file!");
-      System.exit(1);
+      throw new FileNotFoundException();
     }
     return this;
   }

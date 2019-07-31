@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.tuner;
 
+import java.io.FileNotFoundException;
 import java.util.Arrays;
 import java.util.HashSet;
 import org.apache.pinot.tools.AbstractBaseCommand;
@@ -92,45 +93,52 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
       _selectivityThreshold = 1;
     }
 
-    if (_strategy.equals(STRATEGY_PARSER_BASED)) {
-      if (_indexType.equals(INVERTED_INDEX)) {
-        TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
-            .setTuningStrategy(new ParserBasedImpl.Builder().setTableNamesWithoutType(tableNamesWithoutType)
-                .setNumQueriesThreshold(_numQueriesThreshold)
-                .setAlgorithmOrder(ParserBasedImpl.FIRST_ORDER)
-                .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
-                .setSelectivityThreshold(_selectivityThreshold)
-                .build())
-            .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
-            .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metadata).build());
-        parserBased.execute();
-      } else if (_indexType.equals(SORTED_INDEX)) {
-        TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
-            .setTuningStrategy(new ParserBasedImpl.Builder().setTableNamesWithoutType(tableNamesWithoutType)
-                .setNumQueriesThreshold(_numQueriesThreshold)
-                .setAlgorithmOrder(ParserBasedImpl.THIRD_ORDER)
-                .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
-                .setSelectivityThreshold(_selectivityThreshold)
-                .build())
-            .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
-            .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metadata).build());
-        parserBased.execute();
+    try {
+      if (_strategy.equals(STRATEGY_PARSER_BASED)) {
+        if (_indexType.equals(INVERTED_INDEX)) {
+          TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
+              .setTuningStrategy(new ParserBasedImpl.Builder().setTableNamesWithoutType(tableNamesWithoutType)
+                  .setNumQueriesThreshold(_numQueriesThreshold)
+                  .setAlgorithmOrder(ParserBasedImpl.FIRST_ORDER)
+                  .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
+                  .setSelectivityThreshold(_selectivityThreshold)
+                  .build())
+              .setQuerySrc(
+                  new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
+              .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metadata).build());
+          parserBased.execute();
+        } else if (_indexType.equals(SORTED_INDEX)) {
+          TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
+              .setTuningStrategy(new ParserBasedImpl.Builder().setTableNamesWithoutType(tableNamesWithoutType)
+                  .setNumQueriesThreshold(_numQueriesThreshold)
+                  .setAlgorithmOrder(ParserBasedImpl.THIRD_ORDER)
+                  .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
+                  .setSelectivityThreshold(_selectivityThreshold)
+                  .build())
+              .setQuerySrc(
+                  new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
+              .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metadata).build());
+          parserBased.execute();
+        } else {
+          return false;
+        }
       } else {
-        return false;
+        if (_indexType.equals(SORTED_INDEX)) {
+          LOGGER.error("Simple frequency strategy is for inverted index only!");
+          return false;
+        }
+        TunerDriver freqBased = new TunerTest().setThreadPoolSize(3)
+            .setTuningStrategy(new FrequencyImpl.Builder().setNumQueriesThreshold(_numQueriesThreshold)
+                .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
+                .setTableNamesWithoutType(tableNamesWithoutType)
+                .setCardinalityThreshold(_selectivityThreshold)
+                .build())
+            .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
+            .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metadata).build());
+        freqBased.execute();
       }
-    } else {
-      if (_indexType == SORTED_INDEX) {
-        LOGGER.error("Simple frequency strategy is for inverted index only!");
-        return false;
-      }
-      TunerDriver freqBased = new TunerTest().setThreadPoolSize(3)
-          .setTuningStrategy(new FrequencyImpl.Builder().setNumQueriesThreshold(_numQueriesThreshold)
-              .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
-              .setTableNamesWithoutType(tableNamesWithoutType).setCardinalityThreshold(_selectivityThreshold)
-              .build())
-          .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
-          .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metadata).build());
-      freqBased.execute();
+    } catch (FileNotFoundException e) {
+      LOGGER.error("FileNotFoundException: ", e);
     }
     return true;
   }
