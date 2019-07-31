@@ -219,7 +219,7 @@ public class ParserBasedImpl implements TuningStrategy {
     List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
     List<Tuple2<String, BigInteger>> sortedWeighted = new ArrayList<>();
     reportOut += MessageFormat.format("\nTotal lines accumulated: {0}\n\n", totalCount);
-    reportOut += "\n________________________________Coverage_______________________________________\n";
+    reportOut += "________________________________Coverage_______________________________________\n";
     columnStats.forEach((colName, score) -> {
       sortedPure.add(new Tuple2<>(colName, ((ParseBasedAccumulator) score).getPureScore()));
       sortedWeighted.add(new Tuple2<>(colName, ((ParseBasedAccumulator) score).getWeightedScore()));
