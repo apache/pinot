@@ -59,14 +59,6 @@ public class DetectionConfigTuner {
   private static final String DEFAULT_TIMEZONE = "America/Los_Angeles";
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
-  static {
-    // do not tune for alerts migrated from legacy anomaly function.
-    DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibAlertFilter",
-        "MIGRATED_ALGORITHM_FILTER");
-    DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibAnomalyDetector",
-        "MIGRATED_ALGORITHM");
-  }
-
   public static final String PROP_YAML_PARAMS = "yamlParams";
   public static final Set<String> TURNOFF_TUNING_COMPONENTS =
       ImmutableSet.of("MIGRATED_ALGORITHM_FILTER", "MIGRATED_ALGORITHM", "MIGRATED_ALGORITHM_BASELINE");
