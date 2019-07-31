@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.tuner;
 
+import java.io.FileNotFoundException;
 import java.util.Arrays;
 import java.util.HashSet;
 import org.apache.pinot.tools.AbstractBaseCommand;
@@ -61,13 +62,18 @@ public class CollectSegmentMetadata extends AbstractBaseCommand implements Comma
     }
     LOGGER.info("\nTables{}\n", tableNamesWithoutTypeStr);
 
-    TunerDriver metaFetch = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
-        .setTuningStrategy(new AccumulateStats.Builder().setTableNamesWithoutType(tableNamesWithoutType)
-            .setOutputDir(_workDir)
-            .build())
-        .setQuerySrc(new CompressedFilePathIter.Builder().setDirectory(_segmentsDir).build())
-        .setMetaManager(null);
-    metaFetch.execute();
+    try {
+      TunerDriver metaFetch = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
+          .setTuningStrategy(new AccumulateStats.Builder().setTableNamesWithoutType(tableNamesWithoutType)
+              .setOutputDir(_workDir)
+              .build())
+          .setQuerySrc(new CompressedFilePathIter.Builder().setDirectory(_segmentsDir).build())
+          .setMetaManager(null);
+      metaFetch.execute();
+    } catch (FileNotFoundException e) {
+      LOGGER.error("Invalid tarred segments dir: {}", _segmentsDir);
+      return false;
+    }
     return true;
   }
 

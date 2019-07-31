@@ -20,6 +20,7 @@ package org.apache.pinot.tools.tuner.meta.manager.collector;
 
 import io.vavr.Tuple2;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -37,19 +38,19 @@ import org.slf4j.LoggerFactory;
  */
 public class CompressedFilePathIter implements QuerySrc {
   private static final Logger LOGGER = LoggerFactory.getLogger(CompressedFilePathIter.class);
-  Iterator<Tuple2<String, File>> _iterator;
+  private Iterator<Tuple2<String, File>> _iterator;
 
-  private String _directory;
+  private String _segmentTarDir;
 
   private CompressedFilePathIter(Builder builder) {
-    _directory = builder._directory;
+    _segmentTarDir = builder._directory;
   }
 
-  private CompressedFilePathIter openDirectory() {
-    File dir = new File(_directory);
+  private CompressedFilePathIter openDirectory() throws FileNotFoundException {
+    File dir = new File(_segmentTarDir);
     if (!dir.exists() || dir.isFile()) {
       LOGGER.error("Wrong input directory!");
-      System.exit(1);
+      throw new FileNotFoundException();
     }
 
     ArrayList<Tuple2<String, File>> validTableNameWithoutTypeSegmentFile = new ArrayList<>();
@@ -98,7 +99,7 @@ public class CompressedFilePathIter implements QuerySrc {
     }
 
     @Nonnull
-    public CompressedFilePathIter build() {
+    public CompressedFilePathIter build() throws FileNotFoundException {
       return new CompressedFilePathIter(this).openDirectory();
     }
   }
