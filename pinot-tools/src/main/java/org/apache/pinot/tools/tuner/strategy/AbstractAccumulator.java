@@ -18,10 +18,22 @@
  */
 package org.apache.pinot.tools.tuner.strategy;
 
+import java.util.HashMap;
+import java.util.Map;
+
+
 /**
  * Abstract accumulator for column stats.
  */
 public abstract class AbstractAccumulator {
+  public static AbstractAccumulator putAccumulatorToMapIfAbsent(
+      Map<String, Map<String, AbstractAccumulator>> tableToColAccumulators, String tableNameWithoutType, String colName,
+      AbstractAccumulator abstractAccumulator) {
+    tableToColAccumulators.putIfAbsent(tableNameWithoutType, new HashMap<>());
+    tableToColAccumulators.get(tableNameWithoutType).putIfAbsent(colName, abstractAccumulator);
+    return tableToColAccumulators.get(tableNameWithoutType).get(colName);
+  }
+
   public abstract String toString();
 
   /**

@@ -145,9 +145,8 @@ public class FrequencyImpl implements TuningStrategy {
     LOGGER.debug("Accumulator: scoring query {}", query);
     HashSet<String> counted = new HashSet<>();
 
-    accumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-    accumulatorOut.get(tableNameWithoutType).putIfAbsent(NUM_QUERIES_COUNT, new ParseBasedAccumulator());
-    accumulatorOut.get(tableNameWithoutType).get(NUM_QUERIES_COUNT).increaseCount();
+    AbstractAccumulator.putAccumulatorToMapIfAbsent(accumulatorOut, tableNameWithoutType, NUM_QUERIES_COUNT,
+        new FrequencyAccumulator()).increaseCount();
 
     Matcher matcher = _dimensionPattern.matcher(query);
     while (matcher.find()) {
@@ -162,9 +161,8 @@ public class FrequencyImpl implements TuningStrategy {
     counted.stream()
         .filter(colName -> metaManager.getColumnSelectivity(tableNameWithoutType, colName).compareTo(new BigFraction(_cardinalityThreshold)) > 0)
         .forEach(colName -> {
-          accumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-          accumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new FrequencyAccumulator());
-          ((FrequencyAccumulator) accumulatorOut.get(tableNameWithoutType).get(colName)).incrementFrequency();
+          ((FrequencyAccumulator) AbstractAccumulator.putAccumulatorToMapIfAbsent(accumulatorOut, tableNameWithoutType,
+              colName, new FrequencyAccumulator())).incrementFrequency();
         });
   }
 

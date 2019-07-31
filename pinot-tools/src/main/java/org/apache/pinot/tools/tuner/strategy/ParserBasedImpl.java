@@ -168,9 +168,8 @@ public class ParserBasedImpl implements TuningStrategy {
     String numEntriesScannedInFilter = indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter();
     String query = indexSuggestQueryStatsImpl.getQuery();
 
-    accumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-    accumulatorOut.get(tableNameWithoutType).putIfAbsent(NUM_QUERIES_COUNT, new ParseBasedAccumulator());
-    accumulatorOut.get(tableNameWithoutType).get(NUM_QUERIES_COUNT).increaseCount();
+    AbstractAccumulator.putAccumulatorToMapIfAbsent(accumulatorOut, tableNameWithoutType, NUM_QUERIES_COUNT,
+        new ParseBasedAccumulator()).increaseCount();
 
     LOGGER.debug("Accumulator: scoring query {}", query);
 
@@ -185,10 +184,9 @@ public class ParserBasedImpl implements TuningStrategy {
       //Do not count if already counted
       tupleNamesScore._1().stream().filter(colName -> !counted.contains(colName)).forEach(colName -> {
         counted.add(colName);
-        accumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-        accumulatorOut.get(tableNameWithoutType).putIfAbsent(colName, new ParseBasedAccumulator());
         BigFraction weightedScore = BigFraction.ONE.subtract(tupleNamesScore._2().reciprocal()).multiply(new BigInteger(numEntriesScannedInFilter));
-        ((ParseBasedAccumulator) accumulatorOut.get(tableNameWithoutType).get(colName)).merge(1,
+        ((ParseBasedAccumulator) AbstractAccumulator.putAccumulatorToMapIfAbsent(accumulatorOut, tableNameWithoutType,
+            colName, new ParseBasedAccumulator())).merge(1,
             weightedScore.bigDecimalValue(RoundingMode.DOWN.ordinal()).toBigInteger());
       });
     });
