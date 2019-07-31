@@ -23,6 +23,7 @@ import org.apache.pinot.tools.tuner.driver.TunerDriver;
 import org.apache.pinot.tools.tuner.meta.manager.JsonFileMetaManagerImpl;
 import org.apache.pinot.tools.tuner.query.src.LogQuerySrcImpl;
 import org.apache.pinot.tools.tuner.query.src.parser.BrokerLogParserImpl;
+import org.apache.pinot.tools.tuner.strategy.FrequencyImpl;
 import org.apache.pinot.tools.tuner.strategy.ParserBasedImpl;
 import org.apache.pinot.tools.tuner.strategy.QuantileAnalysisImpl;
 
@@ -71,7 +72,7 @@ public class TunerTest extends TunerDriver {
             JsonFileMetaManagerImpl.USE_EXISTING_INDEX) //Delete after demo
             .setPath("/Users/jiaguo/finalTestData/meta/prodMetaV2/metadata.json").build());
     parserBased.execute();
-//
+////
 //    TunerDriver freqBased=new TunerTest()
 //        .setThreadPoolSize(3)
 //        .setStrategy(new FrequencyImpl.Builder()._numEntriesScannedThreshold(ParserBasedImpl.NO_IN_FILTER_THRESHOLD).build())
@@ -81,7 +82,7 @@ public class TunerTest extends TunerDriver {
 
 //    TunerDriver fitModel = new TunerTest().setThreadPoolSize(3).setTuningStrategy(new QuantileAnalysisImpl.Builder().build())
 //        .setQuerySrc(new LogQuerySrcImpl.Builder().setValidLinePrefixRegex(LogQuerySrcImpl.REGEX_VALID_LINE_TIME)
-//            .setParser(new BrokerLogParserImpl()).setPath("/Users/jiaguo/finalTestData/originalBrokerLogs/suForecasting/broker.offsiteForecasting.log")
+//            .setParser(new BrokerLogParserImpl()).setPath("/Users/jiaguo/finalTestData/originalBrokerLogs/suForecasting/broker.suForecasting.log")
 //            .build());
 //    fitModel.execute();
   }

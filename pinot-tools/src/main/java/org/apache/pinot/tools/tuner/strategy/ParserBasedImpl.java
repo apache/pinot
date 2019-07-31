@@ -273,6 +273,7 @@ public class ParserBasedImpl implements TuningStrategy {
       LOGGER.debug("Parsing query: {}", _queryString);
       PQL2Parser.OptionalClauseContext optionalClauseContext;
       PQL2Parser.WhereClauseContext whereClauseContext = null;
+
       if (_queryString == null) {
         return new ArrayList<>();
       }
@@ -299,6 +300,7 @@ public class ParserBasedImpl implements TuningStrategy {
       if (whereClauseContext == null) {
         return new ArrayList<>();
       }
+
       LOGGER.debug("whereClauseContext: {}", whereClauseContext.getText());
 
       List<Tuple2<List<String>, BigFraction>> results = parsePredicateList(whereClauseContext.predicateList());
@@ -367,9 +369,9 @@ public class ParserBasedImpl implements TuningStrategy {
     private BigFraction EquivalentSelectivity(Boolean invertSelection, BigFraction selectivity, int numSelectedValues,
         BigFraction avgEntriesPerDoc) {
       BigFraction equvLen = avgEntriesPerDoc.multiply(numSelectedValues);
-      //BigFraction equvLen = new BigFraction(numSelectedValues);
       if (invertSelection == false) { // not invertSelection
-        return selectivity.divide(equvLen); // return selectivity/equvLen
+        return selectivity.divide(
+            equvLen); // return selectivity/equvLen; equvLen=len(literals to match)*len(avgEntries)
       } else { // invertSelection
         BigFraction complementary = selectivity.subtract(equvLen); // complementary=(selectivity-equvLen)
         if (complementary.compareTo(BigFraction.ONE) <= 0)  // if (selectivity-equvLen)<=1
@@ -386,10 +388,10 @@ public class ParserBasedImpl implements TuningStrategy {
      * The score is calculated as:
      *  IN clause:
      *    IN: selectivity/len(literals to match)
-     *    NOT IN: selectivity/(selectivity-len(literals to match))
+     *    NOT IN: selectivity/(selectivity-len(literals to match)*len(avgEntries))
      *  Comparison clause:
      *    '=': selectivity
-     *    '!=' '<>' selectivity/(selectivity-1)
+     *    '!=' '<>' selectivity/(selectivity-1*len(avgEntries))
      *
      *  Other Predicates have no scoring for now
      *  TODO:
