@@ -50,6 +50,7 @@ public class QuantileAnalysisImpl implements TuningStrategy {
 
   private static final String NUM_QUERIES_COUNT = "PINOT_TUNER_COUNT*";
   public static final float MODEL_R_SQUARE_THRESHOLD = 0.7f;
+  private static final String QUANTILE_REPORT_KEY = "PINOT_QUANTILE_REPORT";
 
   private HashSet<String> _tableNamesWithoutType;
   private long _lenBin;
@@ -103,12 +104,11 @@ public class QuantileAnalysisImpl implements TuningStrategy {
     String query = indexSuggestQueryStatsImpl.getQuery();
     LOGGER.debug("Accumulator: scoring query {}", query);
 
-    accumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-    accumulatorOut.get(tableNameWithoutType).putIfAbsent(NUM_QUERIES_COUNT, new QuantileAnalysisAccumulator());
-    accumulatorOut.get(tableNameWithoutType).get(NUM_QUERIES_COUNT).increaseCount();
+    AbstractAccumulator.putAccumulatorToMapIfAbsent(accumulatorOut, tableNameWithoutType, NUM_QUERIES_COUNT,
+        new QuantileAnalysisAccumulator()).increaseCount();
 
-    accumulatorOut.get(tableNameWithoutType).putIfAbsent("*", new QuantileAnalysisAccumulator());
-    ((QuantileAnalysisAccumulator) accumulatorOut.get(tableNameWithoutType).get("*")).merge(Long.parseLong(time),
+    ((QuantileAnalysisAccumulator) AbstractAccumulator.putAccumulatorToMapIfAbsent(accumulatorOut, tableNameWithoutType,
+        QUANTILE_REPORT_KEY, new QuantileAnalysisAccumulator())).merge(Long.parseLong(time),
         Long.parseLong(numEntriesScannedInFilter), Long.parseLong(numEntriesScannedPostFilter), 0, _lenBin);
   }
 
@@ -132,11 +132,11 @@ public class QuantileAnalysisImpl implements TuningStrategy {
     long totalCount = columnStats.remove(NUM_QUERIES_COUNT).getCount();
     reportOut += MessageFormat.format("\nTotal lines accumulated: {0}\n\n", totalCount);
 
-    if (!columnStats.containsKey("*")) {
+    if (!columnStats.containsKey(QUANTILE_REPORT_KEY)) {
       return;
     }
 
-    QuantileAnalysisAccumulator olsMergerObj = (QuantileAnalysisAccumulator) columnStats.get("*");
+    QuantileAnalysisAccumulator olsMergerObj = (QuantileAnalysisAccumulator) columnStats.get(QUANTILE_REPORT_KEY);
     LOGGER.debug(olsMergerObj.getMinBin().toString());
 
     double[] timeAll = new double[olsMergerObj.getTimeList().size()];
