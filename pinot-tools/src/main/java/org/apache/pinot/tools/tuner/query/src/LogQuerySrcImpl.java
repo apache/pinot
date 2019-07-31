@@ -111,7 +111,7 @@ public class LogQuerySrcImpl implements QuerySrc {
       _bufferedReader = new BufferedReader(new InputStreamReader(_fileInputStream));
       _stringBufferNext = _bufferedReader.readLine();
     } catch (IOException e) {
-      LOGGER.error(e.toString());
+      LOGGER.error("Can't open log file: {}", _path, e);
       throw new FileNotFoundException();
     }
     return this;

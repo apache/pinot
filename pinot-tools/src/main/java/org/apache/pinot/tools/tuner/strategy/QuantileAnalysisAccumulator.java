@@ -24,9 +24,9 @@ import java.util.HashMap;
 
 
 /**
- * An implementation of {@link AbstractAccumulator}, to implement minimum pulling for {@link OLSAnalysisImpl}
+ * An implementation of {@link AbstractAccumulator}, to implement minimum pulling for {@link QuantileAnalysisImpl}
  */
-public class OLSAccumulator extends AbstractAccumulator {
+public class QuantileAnalysisAccumulator extends AbstractAccumulator {
 
   private ArrayList<Long> _timeList;
   private ArrayList<Long> _inFilterList;
@@ -44,7 +44,7 @@ public class OLSAccumulator extends AbstractAccumulator {
     return _minBin;
   }
 
-  public OLSAccumulator() {
+  public QuantileAnalysisAccumulator() {
     _timeList = new ArrayList<>();
     _inFilterList = new ArrayList<>();
     _minBin = new HashMap<>();
@@ -64,7 +64,7 @@ public class OLSAccumulator extends AbstractAccumulator {
     }
   }
 
-  public void merge(OLSAccumulator o2) {
+  public void merge(QuantileAnalysisAccumulator o2) {
     super.mergeCount(o2);
     _timeList.addAll(o2._timeList);
     _inFilterList.addAll(o2._inFilterList);

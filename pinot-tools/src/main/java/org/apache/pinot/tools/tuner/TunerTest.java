@@ -22,7 +22,6 @@ import org.apache.pinot.tools.tuner.driver.TunerDriver;
 import org.apache.pinot.tools.tuner.meta.manager.JsonFileMetaManagerImpl;
 import org.apache.pinot.tools.tuner.query.src.LogQuerySrcImpl;
 import org.apache.pinot.tools.tuner.query.src.parser.BrokerLogParserImpl;
-import org.apache.pinot.tools.tuner.strategy.OLSAnalysisImpl;
 import org.apache.pinot.tools.tuner.strategy.ParserBasedImpl;
 
 

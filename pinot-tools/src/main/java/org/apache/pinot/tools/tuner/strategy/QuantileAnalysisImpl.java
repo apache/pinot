@@ -45,8 +45,8 @@ import org.slf4j.LoggerFactory;
 /**
  * A report generator to show the quantile of numEntriesScanned, and give the estimated time used in filtering if possible
  */
-public class OLSAnalysisImpl implements TuningStrategy {
-  private static final Logger LOGGER = LoggerFactory.getLogger(OLSAnalysisImpl.class);
+public class QuantileAnalysisImpl implements TuningStrategy {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QuantileAnalysisImpl.class);
 
   private static final String NUM_QUERIES_COUNT = "PINOT_TUNER_COUNT*";
   public static final float MODEL_R_SQUARE_THRESHOLD = 0.7f;
@@ -54,7 +54,7 @@ public class OLSAnalysisImpl implements TuningStrategy {
   private HashSet<String> _tableNamesWithoutType;
   private long _lenBin;
 
-  private OLSAnalysisImpl(Builder builder) {
+  private QuantileAnalysisImpl(Builder builder) {
     _tableNamesWithoutType = builder._tableNamesWithoutType;
     _lenBin = builder._lenBin;
   }
@@ -68,8 +68,8 @@ public class OLSAnalysisImpl implements TuningStrategy {
     }
 
     @Nonnull
-    public OLSAnalysisImpl build() {
-      return new OLSAnalysisImpl(this);
+    public QuantileAnalysisImpl build() {
+      return new QuantileAnalysisImpl(this);
     }
 
     @Nonnull
@@ -104,16 +104,17 @@ public class OLSAnalysisImpl implements TuningStrategy {
     LOGGER.debug("Accumulator: scoring query {}", query);
 
     accumulatorOut.putIfAbsent(tableNameWithoutType, new HashMap<>());
-    accumulatorOut.get(tableNameWithoutType).putIfAbsent(NUM_QUERIES_COUNT, new OLSAccumulator());
+    accumulatorOut.get(tableNameWithoutType).putIfAbsent(NUM_QUERIES_COUNT, new QuantileAnalysisAccumulator());
     accumulatorOut.get(tableNameWithoutType).get(NUM_QUERIES_COUNT).increaseCount();
 
-    accumulatorOut.get(tableNameWithoutType).putIfAbsent("*", new OLSAccumulator());
-    ((OLSAccumulator) accumulatorOut.get(tableNameWithoutType).get("*")).merge(Long.parseLong(time), Long.parseLong(numEntriesScannedInFilter), Long.parseLong(numEntriesScannedPostFilter), 0, _lenBin);
+    accumulatorOut.get(tableNameWithoutType).putIfAbsent("*", new QuantileAnalysisAccumulator());
+    ((QuantileAnalysisAccumulator) accumulatorOut.get(tableNameWithoutType).get("*")).merge(Long.parseLong(time),
+        Long.parseLong(numEntriesScannedInFilter), Long.parseLong(numEntriesScannedPostFilter), 0, _lenBin);
   }
 
   @Override
   public void merge(AbstractAccumulator p1, AbstractAccumulator p2) {
-    ((OLSAccumulator) p1).merge((OLSAccumulator) p2);
+    ((QuantileAnalysisAccumulator) p1).merge((QuantileAnalysisAccumulator) p2);
   }
 
   /**
@@ -135,7 +136,7 @@ public class OLSAnalysisImpl implements TuningStrategy {
       return;
     }
 
-    OLSAccumulator olsMergerObj = (OLSAccumulator) columnStats.get("*");
+    QuantileAnalysisAccumulator olsMergerObj = (QuantileAnalysisAccumulator) columnStats.get("*");
     LOGGER.debug(olsMergerObj.getMinBin().toString());
 
     double[] timeAll = new double[olsMergerObj.getTimeList().size()];

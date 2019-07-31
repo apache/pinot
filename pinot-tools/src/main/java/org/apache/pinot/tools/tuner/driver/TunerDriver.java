@@ -31,7 +31,7 @@ import org.apache.pinot.tools.tuner.query.src.parser.QueryParser;
 import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 import org.apache.pinot.tools.tuner.strategy.AbstractAccumulator;
 import org.apache.pinot.tools.tuner.strategy.FrequencyImpl;
-import org.apache.pinot.tools.tuner.strategy.OLSAnalysisImpl;
+import org.apache.pinot.tools.tuner.strategy.QuantileAnalysisImpl;
 import org.apache.pinot.tools.tuner.strategy.ParserBasedImpl;
 import org.apache.pinot.tools.tuner.strategy.TuningStrategy;
 import org.slf4j.Logger;
@@ -88,7 +88,7 @@ public class TunerDriver {
   }
 
   /**
-   * Set the strategy for the recommendation, e.g. {@link FrequencyImpl}, {@link OLSAnalysisImpl}, {@link ParserBasedImpl}
+   * Set the strategy for the recommendation, e.g. {@link FrequencyImpl}, {@link QuantileAnalysisImpl}, {@link ParserBasedImpl}
    * @param tuningStrategy
    * @return this
    */
