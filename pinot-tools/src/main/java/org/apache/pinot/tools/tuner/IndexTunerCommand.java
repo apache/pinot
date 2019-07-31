@@ -38,6 +38,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
 
   private static final long DEFAULT_NUM_ENTRIES_SCANNED_THRESHOLD = 0;
   private static final long DEFAULT_NUM_QUERIES_TO_GIVE_RECOMMENDATION = 0;
+  public static final int DEFAULT_SELECTIVITY_THRESHOLD = 1;
 
   private static final String INVERTED_INDEX = "inverted";
   private static final String SORTED_INDEX = "sorted";
@@ -54,6 +55,9 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
 
   @Option(name = "-strategy", required = true, metaVar = "<freq/parser>", usage = "Select tuning strategy.")
   private String _strategy;
+
+  @Option(name = "-selectivityThreshold", required = false, metaVar = "<long>", usage = "Selectivity threshold (>1), default to 1, ")
+  private int _selectivityThreshold = DEFAULT_SELECTIVITY_THRESHOLD;
 
   @Option(name = "-entriesScannedThreshold", required = false, metaVar = "<long>", usage = "Log lines with numEntriesScannedInFilter below this threshold will be excluded.")
   private long _numEntriesScannedThreshold = DEFAULT_NUM_ENTRIES_SCANNED_THRESHOLD;
@@ -84,6 +88,10 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
         _metaData, _brokerLog,
         tableNamesWithoutTypeStr);
 
+    if (_selectivityThreshold < 1) {
+      _selectivityThreshold = 1;
+    }
+
     if (_strategy.equals(STRATEGY_PARSER_BASED)) {
       if (_indexType.equals(INVERTED_INDEX)) {
         TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
@@ -91,6 +99,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
                 .setNumQueriesThreshold(_numQueriesThreshold)
                 .setAlgorithmOrder(ParserBasedImpl.FIRST_ORDER)
                 .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
+                .setSelectivityThreshold(_selectivityThreshold)
                 .build())
             .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
             .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metaData).build());
@@ -101,6 +110,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
                 .setNumQueriesThreshold(_numQueriesThreshold)
                 .setAlgorithmOrder(ParserBasedImpl.THIRD_ORDER)
                 .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
+                .setSelectivityThreshold(_selectivityThreshold)
                 .build())
             .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
             .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metaData).build());
@@ -116,7 +126,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
       TunerDriver freqBased = new TunerTest().setThreadPoolSize(3)
           .setTuningStrategy(new FrequencyImpl.Builder().setNumQueriesThreshold(_numQueriesThreshold)
               .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
-              .setTableNamesWithoutType(tableNamesWithoutType)
+              .setTableNamesWithoutType(tableNamesWithoutType).setCardinalityThreshold(_selectivityThreshold)
               .build())
           .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
           .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metaData).build());
