@@ -22,6 +22,7 @@ import org.apache.pinot.tools.tuner.driver.TunerDriver;
 import org.apache.pinot.tools.tuner.meta.manager.JsonFileMetaManagerImpl;
 import org.apache.pinot.tools.tuner.query.src.LogQuerySrcImpl;
 import org.apache.pinot.tools.tuner.query.src.parser.BrokerLogParserImpl;
+import org.apache.pinot.tools.tuner.strategy.OLSAnalysisImpl;
 import org.apache.pinot.tools.tuner.strategy.ParserBasedImpl;
 
 
@@ -63,12 +64,13 @@ public class TunerTest extends TunerDriver {
             .setNumEntriesScannedThreshold(0)
             .build())
         .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl())
-            .setPath("/Users/jiaguo/finalTestData/broker.audienceCount.log")
+            .setPath("/Users/jiaguo/finalTestData/originalBrokerLogs/suForecasting/broker.offsiteForecasting.log")
             .build())
-        .setMetaManager(new JsonFileMetaManagerImpl.Builder().setUseExistingIndex(JsonFileMetaManagerImpl.DONT_USE_EXISTING_INDEX) //Delete after demo
+        .setMetaManager(new JsonFileMetaManagerImpl.Builder().setUseExistingIndex(
+            JsonFileMetaManagerImpl.USE_EXISTING_INDEX) //Delete after demo
             .setPath("/Users/jiaguo/finalTestData/meta/prodMetaV2/metadata.json").build());
     parserBased.execute();
-
+//
 //    TunerDriver freqBased=new TunerTest()
 //        .setThreadPoolSize(3)
 //        .setStrategy(new FrequencyImpl.Builder()._numEntriesScannedThreshold(ParserBasedImpl.NO_IN_FILTER_THRESHOLD).build())
@@ -76,9 +78,9 @@ public class TunerTest extends TunerDriver {
 //        .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath("/Users/jiaguo/Workspace/pinot-tuna-script/data/meta/scin_v2_additive/col_meta").useExistingIndex(JsonFileMetaManagerImpl.USE_EXISTING_INDEX).build());
 //    freqBased.execute();
 
-//    TunerDriver fitModel = new TunerTest().setThreadPoolSize(3).setStrategy(new OLSAnalysisImpl.Builder().build())
+//    TunerDriver fitModel = new TunerTest().setThreadPoolSize(3).setTuningStrategy(new OLSAnalysisImpl.Builder().build())
 //        .setQuerySrc(new LogQuerySrcImpl.Builder().setValidLinePrefixRegex(LogQuerySrcImpl.REGEX_VALID_LINE_TIME)
-//            .setParser(new BrokerLogParserImpl()).setPath("/Users/jiaguo/broker/pinot-broker.log.2019-07-25")
+//            .setParser(new BrokerLogParserImpl()).setPath("/Users/jiaguo/finalTestData/originalBrokerLogs/suForecasting/broker.offsiteForecasting.log")
 //            .build());
 //    fitModel.execute();
   }
