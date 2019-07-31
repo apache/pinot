@@ -42,8 +42,8 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, new String[]{"426752"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 62480L, 1053656L, 62480L, 400000L, new String[]{"62480"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
+        new String[]{"62480"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
     QueriesTestUtils
@@ -63,7 +63,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         new String[]{"2147483647.00000"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1053656L, 62480L, 400000L,
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
         new String[]{"2147483647.00000"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
@@ -84,7 +84,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, new String[]{"1001.00000"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1053656L, 62480L, 400000L,
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
         new String[]{"1009.00000"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
@@ -105,7 +105,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         new String[]{"484324601810280.00000"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1053656L, 62480L, 400000L,
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
         new String[]{"114652613591912.00000"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
@@ -126,7 +126,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         new String[]{"1134908803.73210"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1053656L, 62480L, 400000L,
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
         new String[]{"1835029026.75916"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
@@ -147,7 +147,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         new String[]{"2147482646.00000"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1053656L, 62480L, 400000L,
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
         new String[]{"2147482638.00000"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
@@ -168,8 +168,8 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, new String[]{"18499"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 62480L, 1053656L, 62480L, 400000L, new String[]{"1186"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
+        new String[]{"1186"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
     QueriesTestUtils
@@ -189,8 +189,8 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, new String[]{"20039"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 62480L, 1053656L, 62480L, 400000L, new String[]{"1296"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
+        new String[]{"1296"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
     QueriesTestUtils
@@ -211,8 +211,8 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, cardinalityExtractor, new String[]{"20039"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 62480L, 1053656L, 62480L, 400000L, cardinalityExtractor, new String[]{"1296"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
+        cardinalityExtractor, new String[]{"1296"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
     QueriesTestUtils
@@ -232,7 +232,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         new String[]{"2147483647.00000"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1053656L, 62480L, 400000L,
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
         new String[]{"2147483647.00000"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
@@ -253,7 +253,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         new String[]{"2147483647.00000"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1053656L, 62480L, 400000L,
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
         new String[]{"2147483647.00000"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
@@ -274,7 +274,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         new String[]{"2147483647.00000"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1053656L, 62480L, 400000L,
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
         new String[]{"2147483647.00000"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
@@ -295,7 +295,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         new String[]{"2147483647.00000"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1053656L, 62480L, 400000L,
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
         new String[]{"2147483647.00000"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
@@ -316,7 +316,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, new String[]{"2147483647"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1053656L, 62480L, 400000L,
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
         new String[]{"2147483647"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
@@ -337,7 +337,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, new String[]{"2147483647"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1053656L, 62480L, 400000L,
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
         new String[]{"2147483647"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
@@ -358,7 +358,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, new String[]{"2147483647"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1053656L, 62480L, 400000L,
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
         new String[]{"2147483647"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
@@ -379,7 +379,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, new String[]{"2147483647"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1053656L, 62480L, 400000L,
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
         new String[]{"2147483647"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
