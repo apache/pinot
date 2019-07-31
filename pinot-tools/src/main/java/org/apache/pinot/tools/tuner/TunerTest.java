@@ -18,18 +18,20 @@
  */
 package org.apache.pinot.tools.tuner;
 
+import java.io.FileNotFoundException;
 import org.apache.pinot.tools.tuner.driver.TunerDriver;
 import org.apache.pinot.tools.tuner.meta.manager.JsonFileMetaManagerImpl;
 import org.apache.pinot.tools.tuner.query.src.LogQuerySrcImpl;
 import org.apache.pinot.tools.tuner.query.src.parser.BrokerLogParserImpl;
 import org.apache.pinot.tools.tuner.strategy.ParserBasedImpl;
+import org.apache.pinot.tools.tuner.strategy.QuantileAnalysisImpl;
 
 
 /**
  * TODO: This is test and will be deleted
  */
 public class TunerTest extends TunerDriver {
-  public static void main(String[] args) {
+  public static void main(String[] args) throws FileNotFoundException {
 //    TunerDriver metaFetch = new TunerTest().setThreadPoolSize(3)
 //        .setTuningStrategy(new AccumulateStats.Builder()
 //            .setTableNamesWithoutType(new HashSet<String>() {{
@@ -77,7 +79,7 @@ public class TunerTest extends TunerDriver {
 //        .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath("/Users/jiaguo/Workspace/pinot-tuna-script/data/meta/scin_v2_additive/col_meta").useExistingIndex(JsonFileMetaManagerImpl.USE_EXISTING_INDEX).build());
 //    freqBased.execute();
 
-//    TunerDriver fitModel = new TunerTest().setThreadPoolSize(3).setTuningStrategy(new OLSAnalysisImpl.Builder().build())
+//    TunerDriver fitModel = new TunerTest().setThreadPoolSize(3).setTuningStrategy(new QuantileAnalysisImpl.Builder().build())
 //        .setQuerySrc(new LogQuerySrcImpl.Builder().setValidLinePrefixRegex(LogQuerySrcImpl.REGEX_VALID_LINE_TIME)
 //            .setParser(new BrokerLogParserImpl()).setPath("/Users/jiaguo/finalTestData/originalBrokerLogs/suForecasting/broker.offsiteForecasting.log")
 //            .build());

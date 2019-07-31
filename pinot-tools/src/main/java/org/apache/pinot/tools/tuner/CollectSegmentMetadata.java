@@ -29,7 +29,6 @@ import org.apache.pinot.tools.tuner.meta.manager.collector.CompressedFilePathIte
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.util.logging.PlatformLogger;
 
 
 public class CollectSegmentMetadata extends AbstractBaseCommand implements Command {
