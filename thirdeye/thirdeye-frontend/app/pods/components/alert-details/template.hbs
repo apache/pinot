@@ -3,16 +3,14 @@
   <div class="pull-right">
     {{#if isPreviewMode}}
       {{#if showDetails}}
-        {{#unless dataIsCurrent}}
-          {{bs-button
-            defaultText=(if showDetails "Rerun Preview" "Preview Alert")
-            disabled=disablePreviewButton
-            type="outline-primary"
-            buttonType="refresh"
-            onClick=(action "getPreview")
-            class="te-button te-button--cancel"
-          }}
-        {{/unless}}
+        {{bs-button
+          defaultText=(if showDetails "Rerun Preview" "Preview Alert")
+          disabled=disableRerunButton
+          type="outline-primary"
+          buttonType="refresh"
+          onClick=(action "getPreview")
+          class="te-button te-button--cancel"
+        }}
       {{else}}
         {{bs-button
           defaultText="Preview Alert"
