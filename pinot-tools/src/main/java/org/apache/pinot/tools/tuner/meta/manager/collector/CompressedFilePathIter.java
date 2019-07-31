@@ -21,6 +21,7 @@ package org.apache.pinot.tools.tuner.meta.manager.collector;
 import io.vavr.Tuple2;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -84,6 +85,24 @@ public class CompressedFilePathIter implements QuerySrc {
   public AbstractQueryStats next() throws NoSuchElementException {
     Tuple2<String, File> nextTuple = _iterator.next();
     return new PathWrapper.Builder().setTableNameWithoutType(nextTuple._1()).setFile(nextTuple._2()).build();
+  }
+
+  /**
+   * Closes this stream and releases any system resources associated
+   * with it. If the stream is already closed then invoking this
+   * method has no effect.
+   *
+   * <p> As noted in {@link AutoCloseable#close()}, cases where the
+   * close may fail require careful attention. It is strongly advised
+   * to relinquish the underlying resources and to internally
+   * <em>mark</em> the {@code Closeable} as closed, prior to throwing
+   * the {@code IOException}.
+   *
+   * @throws IOException if an I/O error occurs
+   */
+  @Override
+  public void close() throws IOException {
+    return;
   }
 
   public static final class Builder {

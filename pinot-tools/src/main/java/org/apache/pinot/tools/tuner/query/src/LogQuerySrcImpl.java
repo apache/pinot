@@ -120,11 +120,11 @@ public class LogQuerySrcImpl implements QuerySrc {
     @Nonnull
     public LogQuerySrcImpl build() throws FileNotFoundException {
       LOGGER.info("Line prefix pattern is set to:{}", this._validLinePrefixRegex);
-      return new LogQuerySrcImpl(this).openFile();
+      return new LogQuerySrcImpl(this).init();
     }
   }
 
-  private LogQuerySrcImpl openFile() throws FileNotFoundException {
+  private LogQuerySrcImpl init() throws FileNotFoundException {
     try {
       _fileInputStream = new FileInputStream(this._path);
       _bufferedReader = new BufferedReader(new InputStreamReader(_fileInputStream));
