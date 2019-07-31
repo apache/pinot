@@ -37,9 +37,9 @@ public class BrokerLogParserImpl implements QueryParser {
   private static final String BROKER_LOG_REGEX =
       "^.*?table:(.+?)(?:_OFFLINE|_REALTIME|_HYBRID|)?, timeMs:(\\d+), docs:(\\d+)/(\\d+).*, entries:(\\d+)/(\\d+),.*, query:(.+)$";
 
-  private static final Pattern _compiledPattern = Pattern.compile(BROKER_LOG_REGEX);
+  private static final Pattern COMPILED_PATTERN = Pattern.compile(BROKER_LOG_REGEX);
 
-  private enum GROUP_NAMES {
+  private enum GroupNames {
     ALL,
     TABLE_NAME_WITHOUT_TYPE,
     TOTAL_TIME,
@@ -54,22 +54,22 @@ public class BrokerLogParserImpl implements QueryParser {
   @Override
   public AbstractQueryStats parse(String line) {
     try {
-      Matcher match = _compiledPattern.matcher(line);
+      Matcher match = COMPILED_PATTERN.matcher(line);
       LOGGER.trace("Original line: " + line);
       if (match.find()) {
         IndexSuggestQueryStatsImpl ret =
-            new IndexSuggestQueryStatsImpl.Builder().setTime(match.group(GROUP_NAMES.TOTAL_TIME.ordinal()))
-                .setTableNameWithoutType(match.group(GROUP_NAMES.TABLE_NAME_WITHOUT_TYPE.ordinal()))
-                .setNumEntriesScannedInFilter(match.group(GROUP_NAMES.NUM_ENTRIES_SCANNED_IN_FILTER.ordinal()))
-                .setNumEntriesScannedPostFilter(match.group(GROUP_NAMES.NUM_ENTRIES_SCANNED_POST_FILTER.ordinal()))
-                .setQuery(match.group(GROUP_NAMES.QUERY.ordinal()))
+            new IndexSuggestQueryStatsImpl.Builder().setTime(match.group(GroupNames.TOTAL_TIME.ordinal()))
+                .setTableNameWithoutType(match.group(GroupNames.TABLE_NAME_WITHOUT_TYPE.ordinal()))
+                .setNumEntriesScannedInFilter(match.group(GroupNames.NUM_ENTRIES_SCANNED_IN_FILTER.ordinal()))
+                .setNumEntriesScannedPostFilter(match.group(GroupNames.NUM_ENTRIES_SCANNED_POST_FILTER.ordinal()))
+                .setQuery(match.group(GroupNames.QUERY.ordinal()))
                 .build();
         LOGGER.debug("Parsed line: " + ret.toString());
         return ret;
       }
       return null;
     } catch (Exception e) {
-      LOGGER.error("Exception {} while parsing {}", e, line);
+      LOGGER.error("Exception while parsing line {}", line, e);
       return null;
     }
   }

@@ -30,8 +30,8 @@ import org.apache.pinot.tools.tuner.strategy.AbstractAccumulator;
  */
 public class ColStatsAccumulatorObj extends AbstractAccumulator {
 
-  Map<String, BigInteger> accumulatedStats = new HashMap<>();
-  Map<String, Map<String, String>> segmentStats = new HashMap<>();
+  Map<String, BigInteger> _accumulatedStats = new HashMap<>();
+  Map<String, Map<String, String>> _segmentStats = new HashMap<>();
 
   private static final String CARDINALITY = "cardinality";
   private static final String TOTAL_DOCS = "totalDocs";
@@ -41,7 +41,8 @@ public class ColStatsAccumulatorObj extends AbstractAccumulator {
 
   @Override
   public String toString() {
-    return "ColStatsAccumulatorObj{" + "accumulatedStats=" + accumulatedStats + ", segmentStats=" + segmentStats + '}';
+    return "ColStatsAccumulatorObj{" + "accumulatedStats=" + _accumulatedStats + ", segmentStats=" + _segmentStats
+        + '}';
   }
 
   private String _segmentName;
@@ -52,11 +53,11 @@ public class ColStatsAccumulatorObj extends AbstractAccumulator {
   private String _invertedIndexSize;
 
   public Map<String, BigInteger> getAccumulatedStats() {
-    return accumulatedStats;
+    return _accumulatedStats;
   }
 
   public Map<String, Map<String, String>> getSegmentStats() {
-    return segmentStats;
+    return _segmentStats;
   }
 
   public ColStatsAccumulatorObj addInvertedIndexSize(String invertedIndexSize) {
@@ -90,23 +91,27 @@ public class ColStatsAccumulatorObj extends AbstractAccumulator {
   }
 
   public void merge() {
-    accumulatedStats.put(MetaManager.WEIGHTED_SUM_CARDINALITY,
-        accumulatedStats.getOrDefault(MetaManager.WEIGHTED_SUM_CARDINALITY, BigInteger.ZERO).add(new BigInteger(_cardinality).multiply(new BigInteger(_totalDocs))));
+    _accumulatedStats.put(MetaManager.WEIGHTED_SUM_CARDINALITY,
+        _accumulatedStats.getOrDefault(MetaManager.WEIGHTED_SUM_CARDINALITY, BigInteger.ZERO)
+            .add(new BigInteger(_cardinality).multiply(new BigInteger(_totalDocs))));
 
-    accumulatedStats.put(MetaManager.SUM_SEGMENTS_COUNT,
-        accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_COUNT, BigInteger.ZERO).add(BigInteger.ONE));
+    _accumulatedStats.put(MetaManager.SUM_SEGMENTS_COUNT,
+        _accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_COUNT, BigInteger.ZERO).add(BigInteger.ONE));
 
-    accumulatedStats.put(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX,
-        accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX, BigInteger.ZERO).add(Integer.parseInt(_invertedIndexSize) > 0 ? BigInteger.ONE : BigInteger.ZERO));
+    _accumulatedStats.put(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX,
+        _accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX, BigInteger.ZERO)
+            .add(Integer.parseInt(_invertedIndexSize) > 0 ? BigInteger.ONE : BigInteger.ZERO));
 
-    accumulatedStats.put(MetaManager.SUM_SEGMENTS_SORTED,
-        accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_SORTED, BigInteger.ZERO).add(_isSorted.trim().toLowerCase().equals("true") ? BigInteger.ONE : BigInteger.ZERO));
+    _accumulatedStats.put(MetaManager.SUM_SEGMENTS_SORTED,
+        _accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_SORTED, BigInteger.ZERO)
+            .add(_isSorted.trim().toLowerCase().equals("true") ? BigInteger.ONE : BigInteger.ZERO));
 
-    accumulatedStats.put(MetaManager.SUM_TOTAL_ENTRIES,
-        accumulatedStats.getOrDefault(MetaManager.SUM_TOTAL_ENTRIES, BigInteger.ZERO).add(new BigInteger(_totalNumberOfEntries)));
+    _accumulatedStats.put(MetaManager.SUM_TOTAL_ENTRIES,
+        _accumulatedStats.getOrDefault(MetaManager.SUM_TOTAL_ENTRIES, BigInteger.ZERO)
+            .add(new BigInteger(_totalNumberOfEntries)));
 
-    accumulatedStats.put(MetaManager.SUM_DOCS,
-        accumulatedStats.getOrDefault(MetaManager.SUM_DOCS, BigInteger.ZERO).add(new BigInteger(_totalDocs)));
+    _accumulatedStats.put(MetaManager.SUM_DOCS,
+        _accumulatedStats.getOrDefault(MetaManager.SUM_DOCS, BigInteger.ZERO).add(new BigInteger(_totalDocs)));
 
     HashMap<String, String> segmentMeta = new HashMap<>();
     segmentMeta.put(CARDINALITY, _cardinality);
@@ -114,29 +119,39 @@ public class ColStatsAccumulatorObj extends AbstractAccumulator {
     segmentMeta.put(TOTAL_NUMBER_OF_ENTRIES, _totalNumberOfEntries);
     segmentMeta.put(IS_SORTED, _isSorted);
     segmentMeta.put(INVERTED_INDEX_SIZE, _invertedIndexSize);
-    segmentStats.put(_segmentName, segmentMeta);
+    _segmentStats.put(_segmentName, segmentMeta);
   }
 
   public void merge(ColStatsAccumulatorObj colStatsAccumulatorObj) {
-    accumulatedStats.put(MetaManager.WEIGHTED_SUM_CARDINALITY, this.accumulatedStats.getOrDefault(MetaManager.WEIGHTED_SUM_CARDINALITY, BigInteger.ZERO)
-        .add(colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.WEIGHTED_SUM_CARDINALITY, BigInteger.ZERO)));
+    _accumulatedStats.put(MetaManager.WEIGHTED_SUM_CARDINALITY,
+        this._accumulatedStats.getOrDefault(MetaManager.WEIGHTED_SUM_CARDINALITY, BigInteger.ZERO)
+            .add(colStatsAccumulatorObj._accumulatedStats.getOrDefault(MetaManager.WEIGHTED_SUM_CARDINALITY,
+                BigInteger.ZERO)));
 
-    accumulatedStats.put(MetaManager.SUM_SEGMENTS_COUNT,
-        this.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_COUNT, BigInteger.ZERO).add(colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_COUNT, BigInteger.ZERO)));
+    _accumulatedStats.put(MetaManager.SUM_SEGMENTS_COUNT,
+        this._accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_COUNT, BigInteger.ZERO)
+            .add(colStatsAccumulatorObj._accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_COUNT,
+                BigInteger.ZERO)));
 
-    accumulatedStats.put(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX, this.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX, BigInteger.ZERO)
-        .add(colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX,
+    _accumulatedStats.put(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX,
+        this._accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX, BigInteger.ZERO)
+            .add(colStatsAccumulatorObj._accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX,
             BigInteger.ZERO)));
 
-    accumulatedStats.put(MetaManager.SUM_SEGMENTS_SORTED, this.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_SORTED, BigInteger.ZERO)
-        .add(colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_SORTED, BigInteger.ZERO)));
+    _accumulatedStats.put(MetaManager.SUM_SEGMENTS_SORTED,
+        this._accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_SORTED, BigInteger.ZERO)
+            .add(colStatsAccumulatorObj._accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_SORTED,
+                BigInteger.ZERO)));
 
-    accumulatedStats.put(MetaManager.SUM_TOTAL_ENTRIES,
-        this.accumulatedStats.getOrDefault(MetaManager.SUM_TOTAL_ENTRIES, BigInteger.ZERO).add(colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.SUM_TOTAL_ENTRIES, BigInteger.ZERO)));
+    _accumulatedStats.put(MetaManager.SUM_TOTAL_ENTRIES,
+        this._accumulatedStats.getOrDefault(MetaManager.SUM_TOTAL_ENTRIES, BigInteger.ZERO)
+            .add(
+                colStatsAccumulatorObj._accumulatedStats.getOrDefault(MetaManager.SUM_TOTAL_ENTRIES, BigInteger.ZERO)));
 
-    accumulatedStats.put(MetaManager.SUM_DOCS, this.accumulatedStats.getOrDefault(MetaManager.SUM_DOCS, BigInteger.ZERO)
-        .add(colStatsAccumulatorObj.accumulatedStats.getOrDefault(MetaManager.SUM_DOCS, BigInteger.ZERO)));
+    _accumulatedStats.put(MetaManager.SUM_DOCS,
+        this._accumulatedStats.getOrDefault(MetaManager.SUM_DOCS, BigInteger.ZERO)
+            .add(colStatsAccumulatorObj._accumulatedStats.getOrDefault(MetaManager.SUM_DOCS, BigInteger.ZERO)));
 
-    this.segmentStats.putAll(colStatsAccumulatorObj.segmentStats);
+    this._segmentStats.putAll(colStatsAccumulatorObj._segmentStats);
   }
 }

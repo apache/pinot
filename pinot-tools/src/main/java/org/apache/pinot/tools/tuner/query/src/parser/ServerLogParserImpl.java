@@ -38,7 +38,7 @@ public class ServerLogParserImpl implements QueryParser {
 
   private static final Pattern _compiledPattern = Pattern.compile(SERVER_LOG_REGEX);
 
-  private enum GROUP_NAMES {
+  private enum GroupNames {
     ALL, TABLE_NAME_WITHOUT_TYPE, TOTAL_TIME, NUM_ENTRIES_SCANNED_IN_FILTER, NUM_ENTRIES_SCANNED_POST_FILTER, QUERY
   }
 
@@ -50,17 +50,17 @@ public class ServerLogParserImpl implements QueryParser {
       LOGGER.debug("Original line: " + line);
       if (match.find()) {
         IndexSuggestQueryStatsImpl ret =
-            new IndexSuggestQueryStatsImpl.Builder().setTime(match.group(GROUP_NAMES.TOTAL_TIME.ordinal()))
-                .setTableNameWithoutType(match.group(GROUP_NAMES.TABLE_NAME_WITHOUT_TYPE.ordinal()))
-                .setNumEntriesScannedInFilter(match.group(GROUP_NAMES.NUM_ENTRIES_SCANNED_IN_FILTER.ordinal()))
-                .setNumEntriesScannedPostFilter(match.group(GROUP_NAMES.NUM_ENTRIES_SCANNED_POST_FILTER.ordinal()))
+            new IndexSuggestQueryStatsImpl.Builder().setTime(match.group(GroupNames.TOTAL_TIME.ordinal()))
+                .setTableNameWithoutType(match.group(GroupNames.TABLE_NAME_WITHOUT_TYPE.ordinal()))
+                .setNumEntriesScannedInFilter(match.group(GroupNames.NUM_ENTRIES_SCANNED_IN_FILTER.ordinal()))
+                .setNumEntriesScannedPostFilter(match.group(GroupNames.NUM_ENTRIES_SCANNED_POST_FILTER.ordinal()))
                 .build();
         LOGGER.debug("Parsed line: " + ret.toString());
         return ret;
       }
       return null;
     } catch (Exception e) {
-      LOGGER.error("Exception {} while parsing {}", e, line);
+      LOGGER.error("Exception while parsing line {}", line, e);
       return null;
     }
   }
