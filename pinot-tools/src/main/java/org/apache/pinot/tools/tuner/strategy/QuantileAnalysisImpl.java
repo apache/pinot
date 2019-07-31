@@ -133,6 +133,8 @@ public class QuantileAnalysisImpl implements TuningStrategy {
     reportOut += MessageFormat.format("\nTotal lines accumulated: {0}\n\n", totalCount);
 
     if (!columnStats.containsKey(QUANTILE_REPORT_KEY)) {
+      reportOut += "No valid data accumulated!\n";
+      LOGGER.info(reportOut);
       return;
     }
 

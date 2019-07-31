@@ -182,12 +182,14 @@ public class FrequencyImpl implements TuningStrategy {
   }
 
   public void reportTable(String tableNameWithoutType, Map<String, AbstractAccumulator> columnStats) {
+    String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
     long totalCount = columnStats.remove(NUM_QUERIES_COUNT).getCount();
     if (totalCount < _numQueriesThreshold) {
+      reportOut += "No enough data accumulated for this table!\n";
+      LOGGER.info(reportOut);
       return;
     }
 
-    String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
     reportOut += MessageFormat.format("\nTotal lines accumulated: {0}\n\n", totalCount);
     List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
     columnStats.forEach(

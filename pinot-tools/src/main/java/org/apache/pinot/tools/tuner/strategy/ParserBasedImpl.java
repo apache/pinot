@@ -208,14 +208,16 @@ public class ParserBasedImpl implements TuningStrategy {
   }
 
   public void reportTable(String tableNameWithoutType, Map<String, AbstractAccumulator> columnStats) {
+    String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
     long totalCount = columnStats.remove(NUM_QUERIES_COUNT).getCount();
     if (totalCount < _numQueriesThreshold) {
+      reportOut += "No enough data accumulated for this table!\n";
+      LOGGER.info(reportOut);
       return;
     }
     NumberFormat formatter = new DecimalFormat("0.######E0", DecimalFormatSymbols.getInstance(Locale.ROOT));
     List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
     List<Tuple2<String, BigInteger>> sortedWeighted = new ArrayList<>();
-    String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
     reportOut += MessageFormat.format("\nTotal lines accumulated: {0}\n\n", totalCount);
     columnStats.forEach((colName, score) -> {
       sortedPure.add(new Tuple2<>(colName, ((ParseBasedAccumulator) score).getPureScore()));
