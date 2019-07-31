@@ -57,12 +57,14 @@ public class FrequencyImpl implements TuningStrategy {
   private long _numEntriesScannedThreshold;
   private long _cardinalityThreshold;
   private long _numQueriesThreshold;
+  private boolean _skipTableCheck;
 
   private FrequencyImpl(Builder builder) {
     _tableNamesWithoutType = builder._tableNamesWithoutType;
     _numEntriesScannedThreshold = builder._numEntriesScannedThreshold;
     _cardinalityThreshold = builder._cardinalityThreshold;
     _numQueriesThreshold = builder._numQueriesThreshold;
+    _skipTableCheck = (_tableNamesWithoutType == null) || _tableNamesWithoutType.isEmpty();
   }
 
   public static final class Builder {
@@ -129,7 +131,7 @@ public class FrequencyImpl implements TuningStrategy {
   public boolean filter(AbstractQueryStats queryStats) {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     long numEntriesScannedInFilter = Long.parseLong(indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter());
-    return (_tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType.contains(
+    return (_skipTableCheck || _tableNamesWithoutType.contains(
         indexSuggestQueryStatsImpl.getTableNameWithoutType())) && (numEntriesScannedInFilter > _numEntriesScannedThreshold);
   }
 

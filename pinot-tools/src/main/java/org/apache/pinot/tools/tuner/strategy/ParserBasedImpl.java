@@ -69,6 +69,7 @@ public class ParserBasedImpl implements TuningStrategy {
   private long _numEntriesScannedThreshold;
   private long _numQueriesThreshold;
   private int _selectivityThreshold;
+  private boolean _skipTableCheck;
 
   private ParserBasedImpl(Builder builder) {
     _algorithmOrder = builder._algorithmOrder;
@@ -76,6 +77,7 @@ public class ParserBasedImpl implements TuningStrategy {
     _numEntriesScannedThreshold = builder._numEntriesScannedThreshold;
     _numQueriesThreshold = builder._numQueriesThreshold;
     _selectivityThreshold = builder._selectivityThreshold;
+    _skipTableCheck = (_tableNamesWithoutType == null) || _tableNamesWithoutType.isEmpty();
   }
 
   public static final class Builder {
@@ -154,7 +156,7 @@ public class ParserBasedImpl implements TuningStrategy {
   public boolean filter(AbstractQueryStats queryStats) {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     long numEntriesScannedInFilter = Long.parseLong(indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter());
-    return (_tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType.contains(
+    return (_skipTableCheck || _tableNamesWithoutType.contains(
         indexSuggestQueryStatsImpl.getTableNameWithoutType())) && (numEntriesScannedInFilter > _numEntriesScannedThreshold);
   }
 
