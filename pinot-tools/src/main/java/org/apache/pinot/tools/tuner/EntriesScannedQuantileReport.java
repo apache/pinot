@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 public class EntriesScannedQuantileReport extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(EntriesScannedQuantileReport.class);
 
-  @Option(name = "-brokerLog", required = true, metaVar = "<String>", usage = "Path to broker log file.")
+  @Option(name = "-log", required = true, metaVar = "<String>", usage = "Path to broker log file.")
   private String _brokerLog;
 
   @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (unset run on all tables)")

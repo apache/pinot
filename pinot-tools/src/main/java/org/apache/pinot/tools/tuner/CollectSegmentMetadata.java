@@ -34,10 +34,10 @@ import sun.util.logging.PlatformLogger;
 public class CollectSegmentMetadata extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(CollectSegmentMetadata.class);
 
-  @Option(name = "-workDir", required = true, metaVar = "<String>", usage = "An empty directory to work on, for tmp files and output metadata.json file，must have r/w access")
+  @Option(name = "-out", required = true, metaVar = "<String>", usage = "An empty directory to work on, for tmp files and output metadata.json file，must have r/w access")
   private String _workDir;
 
-  @Option(name = "-segmentsDir", required = true, metaVar = "<String>", usage = "The directory, which contains tableNamesWithoutType/{tarred segments}")
+  @Option(name = "-segments", required = true, metaVar = "<String>", usage = "The directory, which contains tableNamesWithoutType/{tarred segments}")
   private String _segmentsDir;
 
   @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (unset to run on all tables)")
