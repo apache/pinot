@@ -99,7 +99,7 @@ public class LogQuerySrcImpl implements QuerySrc {
 
     @Nonnull
     public LogQuerySrcImpl build() {
-      LOGGER.info("Line beginner is set to:{}", this._validLinePrefixRegex);
+      LOGGER.info("Line prefix pattern is set to:{}", this._validLinePrefixRegex);
       return new LogQuerySrcImpl(this).openFile();
     }
   }

@@ -26,6 +26,7 @@ import org.apache.pinot.tools.tuner.driver.TunerDriver;
 import org.apache.pinot.tools.tuner.meta.manager.JsonFileMetaManagerImpl;
 import org.apache.pinot.tools.tuner.query.src.LogQuerySrcImpl;
 import org.apache.pinot.tools.tuner.query.src.parser.BrokerLogParserImpl;
+import org.apache.pinot.tools.tuner.strategy.FrequencyImpl;
 import org.apache.pinot.tools.tuner.strategy.ParserBasedImpl;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -40,6 +41,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
 
   private static final String INVERTED_INDEX = "inverted";
   private static final String SORTED_INDEX = "sorted";
+  private static final String STRATEGY_PARSER_BASED = "parser";
 
   @Option(name = "-metaData", required = true, metaVar = "<String>", usage = "Path to packed metadata file (json), CollectSegmentMetadata can be used to create this.")
   private String _metaData;
@@ -47,7 +49,10 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-brokerLog", required = true, metaVar = "<String>", usage = "Path to broker log file.")
   private String _brokerLog;
 
-  @Option(name = "-strategy", required = true, metaVar = "<inverted/sorted>", usage = "Select tuning strategy.")
+  @Option(name = "-indexType", required = true, metaVar = "<inverted/sorted>", usage = "Select target index.")
+  private String _indexType;
+
+  @Option(name = "-strategy", required = true, metaVar = "<freq/parser>", usage = "Select tuning strategy.")
   private String _strategy;
 
   @Option(name = "-entriesScannedThreshold", required = false, metaVar = "<long>", usage = "Log lines with numEntriesScannedInFilter below this threshold will be excluded.")
@@ -75,33 +80,47 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
     } else {
       tableNamesWithoutTypeStr = tableNamesWithoutType.toString();
     }
-    LOGGER.info("Strategy: {}\nmetadata file: {}\nbroker log: {}\ntables{}\n", _strategy, _metaData, _brokerLog,
+    LOGGER.info("Index: {}\nstrategy: {}\nmetadata file: {}\nbroker log: {}\ntables{}\n", _indexType, _strategy,
+        _metaData, _brokerLog,
         tableNamesWithoutTypeStr);
 
-    if (_strategy.equals(INVERTED_INDEX)) {
-      TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
-          .setTuningStrategy(new ParserBasedImpl.Builder().setTableNamesWithoutType(tableNamesWithoutType)
-              .setNumQueriesThreshold(_numQueriesThreshold)
-              .setAlgorithmOrder(ParserBasedImpl.FIRST_ORDER)
-              .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
-              .build())
-          .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
-          .setMetaManager(new JsonFileMetaManagerImpl.Builder()
-              .setPath(_metaData).build());
-      parserBased.execute();
-    } else if (_strategy.equals(SORTED_INDEX)) {
-      TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
-          .setTuningStrategy(new ParserBasedImpl.Builder().setTableNamesWithoutType(tableNamesWithoutType)
-              .setNumQueriesThreshold(_numQueriesThreshold)
-              .setAlgorithmOrder(ParserBasedImpl.THIRD_ORDER)
-              .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
-              .build())
-          .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
-          .setMetaManager(new JsonFileMetaManagerImpl.Builder()
-              .setPath(_metaData).build());
-      parserBased.execute();
+    if (_strategy.equals(STRATEGY_PARSER_BASED)) {
+      if (_indexType.equals(INVERTED_INDEX)) {
+        TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
+            .setTuningStrategy(new ParserBasedImpl.Builder().setTableNamesWithoutType(tableNamesWithoutType)
+                .setNumQueriesThreshold(_numQueriesThreshold)
+                .setAlgorithmOrder(ParserBasedImpl.FIRST_ORDER)
+                .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
+                .build())
+            .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
+            .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metaData).build());
+        parserBased.execute();
+      } else if (_indexType.equals(SORTED_INDEX)) {
+        TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
+            .setTuningStrategy(new ParserBasedImpl.Builder().setTableNamesWithoutType(tableNamesWithoutType)
+                .setNumQueriesThreshold(_numQueriesThreshold)
+                .setAlgorithmOrder(ParserBasedImpl.THIRD_ORDER)
+                .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
+                .build())
+            .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
+            .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metaData).build());
+        parserBased.execute();
+      } else {
+        return false;
+      }
     } else {
-      return false;
+      if (_indexType == SORTED_INDEX) {
+        LOGGER.error("Simple frequency strategy is for inverted index only!");
+        return false;
+      }
+      TunerDriver freqBased = new TunerTest().setThreadPoolSize(3)
+          .setTuningStrategy(new FrequencyImpl.Builder().setNumQueriesThreshold(_numQueriesThreshold)
+              .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
+              .setTableNamesWithoutType(tableNamesWithoutType)
+              .build())
+          .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
+          .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metaData).build());
+      freqBased.execute();
     }
     return true;
   }

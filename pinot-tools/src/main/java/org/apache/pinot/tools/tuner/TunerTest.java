@@ -59,8 +59,7 @@ public class TunerTest extends TunerDriver {
 
     TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
         .setTuningStrategy(new ParserBasedImpl.Builder().setTableNamesWithoutType(null)
-            .setNumQueriesThreshold(0)
-            .setAlgorithmOrder(ParserBasedImpl.THIRD_ORDER)
+            .setNumQueriesThreshold(0).setAlgorithmOrder(ParserBasedImpl.FIRST_ORDER)
             .setNumEntriesScannedThreshold(0)
             .build())
         .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl())
