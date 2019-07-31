@@ -49,12 +49,11 @@ public class PinotControllerModeTest extends ControllerTest {
     // Start a Helix-only controller
     ControllerConf helixOnlyControllerConfig = getDefaultControllerConfiguration();
     helixOnlyControllerConfig.setControllerMode(ControllerConf.ControllerMode.HELIX_ONLY);
-    ControllerStarter helixOnlyController = getControllerStarter(helixOnlyControllerConfig);
-    helixOnlyController.start();
-    TestUtils.waitForCondition(aVoid -> helixOnlyController.getHelixControllerManager().isConnected(), TIMEOUT_IN_MS,
+    startController(helixOnlyControllerConfig);
+    TestUtils.waitForCondition(aVoid -> _helixManager.isConnected(), TIMEOUT_IN_MS,
         "Failed to start the Helix-only controller");
 
-    helixOnlyController.stop();
+    stopController();
   }
 
   @Test
@@ -62,23 +61,20 @@ public class PinotControllerModeTest extends ControllerTest {
     // Start the first dual-mode controller
     ControllerConf firstDualModeControllerConfig = getDefaultControllerConfiguration();
     firstDualModeControllerConfig.setControllerMode(ControllerConf.ControllerMode.DUAL);
-    ControllerStarter firstDualModeController = getControllerStarter(firstDualModeControllerConfig);
-    firstDualModeController.start();
-    HelixManager helixControllerManager = firstDualModeController.getHelixControllerManager();
-    HelixAdmin helixAdmin = helixControllerManager.getClusterManagmentTool();
-    TestUtils.waitForCondition(aVoid -> helixControllerManager.isConnected(), TIMEOUT_IN_MS,
+    startController(firstDualModeControllerConfig);
+    TestUtils.waitForCondition(aVoid -> _helixManager.isConnected(), TIMEOUT_IN_MS,
         "Failed to start the first dual-mode controller");
 
     // There should be no partition in the external view because the resource is disabled
     TestUtils.waitForCondition(aVoid -> {
       ExternalView leadControllerResourceExternalView =
-          helixAdmin.getResourceExternalView(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME);
+          _helixAdmin.getResourceExternalView(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME);
       return leadControllerResourceExternalView.getPartitionSet().isEmpty();
     }, TIMEOUT_IN_MS, "There should be no partition in the disabled resource's external view");
 
     // Enable the lead controller resource, and the first controller should be the MASTER for all partitions
-    helixAdmin.enableResource(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, true);
-    checkInstanceState(helixAdmin, "MASTER");
+    _helixAdmin.enableResource(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, true);
+    checkInstanceState(_helixAdmin, "MASTER");
 
     // Start the second dual-mode controller
     ControllerConf secondDualModeControllerConfig = getDefaultControllerConfiguration();
@@ -91,22 +87,22 @@ public class PinotControllerModeTest extends ControllerTest {
             TIMEOUT_IN_MS, "Failed to start the second dual-mode controller");
 
     // There should still be only one MASTER instance for each partition
-    checkInstanceState(helixAdmin, "MASTER");
+    checkInstanceState(_helixAdmin, "MASTER");
 
     // Disable the lead controller resource, and there should be only one OFFLINE instance for each partition
-    helixAdmin.enableResource(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, false);
-    checkInstanceState(helixAdmin, "OFFLINE");
+    _helixAdmin.enableResource(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, false);
+    checkInstanceState(_helixAdmin, "OFFLINE");
 
     // Re-enable the lead controller resource, and there should be only one MASTER instance for each partition
-    helixAdmin.enableResource(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, true);
-    checkInstanceState(helixAdmin, "MASTER");
+    _helixAdmin.enableResource(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, true);
+    checkInstanceState(_helixAdmin, "MASTER");
 
     // Stop the second controller, and there should still be only one MASTER instance for each partition
     secondDualModeController.stop();
-    checkInstanceState(helixAdmin, "MASTER");
+    checkInstanceState(_helixAdmin, "MASTER");
 
     // Stop the first controller
-    firstDualModeController.stop();
+    stopController();
   }
 
   // TODO: enable it after removing ControllerLeadershipManager which requires both CONTROLLER and PARTICIPANT
