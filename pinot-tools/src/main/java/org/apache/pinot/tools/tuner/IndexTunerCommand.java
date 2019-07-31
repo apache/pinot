@@ -44,13 +44,13 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
   private static final String SORTED_INDEX = "sorted";
   private static final String STRATEGY_PARSER_BASED = "parser";
 
-  @Option(name = "-metaData", required = true, metaVar = "<String>", usage = "Path to packed metadata file (json), CollectSegmentMetadata can be used to create this.")
-  private String _metaData;
+  @Option(name = "-metadata", required = true, metaVar = "<String>", usage = "Path to packed metadata file (json), CollectSegmentMetadata can be used to create this.")
+  private String _metadata;
 
-  @Option(name = "-brokerLog", required = true, metaVar = "<String>", usage = "Path to broker log file.")
+  @Option(name = "-log", required = true, metaVar = "<String>", usage = "Path to broker log file.")
   private String _brokerLog;
 
-  @Option(name = "-indexType", required = true, metaVar = "<inverted/sorted>", usage = "Select target index.")
+  @Option(name = "-index", required = true, metaVar = "<inverted/sorted>", usage = "Select target index.")
   private String _indexType;
 
   @Option(name = "-strategy", required = true, metaVar = "<freq/parser>", usage = "Select tuning strategy.")
@@ -85,7 +85,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
       tableNamesWithoutTypeStr = tableNamesWithoutType.toString();
     }
     LOGGER.info("Index: {}\nstrategy: {}\nmetadata file: {}\nbroker log: {}\ntables{}\n", _indexType, _strategy,
-        _metaData, _brokerLog,
+        _metadata, _brokerLog,
         tableNamesWithoutTypeStr);
 
     if (_selectivityThreshold < 1) {
@@ -102,7 +102,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
                 .setSelectivityThreshold(_selectivityThreshold)
                 .build())
             .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
-            .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metaData).build());
+            .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metadata).build());
         parserBased.execute();
       } else if (_indexType.equals(SORTED_INDEX)) {
         TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
@@ -113,7 +113,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
                 .setSelectivityThreshold(_selectivityThreshold)
                 .build())
             .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
-            .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metaData).build());
+            .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metadata).build());
         parserBased.execute();
       } else {
         return false;
@@ -129,7 +129,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
               .setTableNamesWithoutType(tableNamesWithoutType).setCardinalityThreshold(_selectivityThreshold)
               .build())
           .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
-          .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metaData).build());
+          .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metadata).build());
       freqBased.execute();
     }
     return true;
