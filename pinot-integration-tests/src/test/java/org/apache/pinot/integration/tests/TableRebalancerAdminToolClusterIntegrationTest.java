@@ -90,22 +90,20 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       final String instanceId =
           CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + NetUtil.getHostAddress() + "_" + nettyPort;
       final HelixManager helixManager = HelixManagerFactory
-          .getZKHelixManager(_clusterName, instanceId, InstanceType.PARTICIPANT, ZkStarter.DEFAULT_ZK_STR);
+          .getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, ZkStarter.DEFAULT_ZK_STR);
       helixManager.getStateMachineEngine()
           .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(),
               new FakeServerSegmentStateModelFactory());
       helixManager.connect();
       if (realtime) {
-        helixManager.getClusterManagmentTool().addInstanceTag(_clusterName, instanceId,
+        helixManager.getClusterManagmentTool().addInstanceTag(getHelixClusterName(), instanceId,
             TableNameBuilder.REALTIME.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
         _helixManagers.add(helixManager);
       } else {
-        helixManager.getClusterManagmentTool().addInstanceTag(_clusterName, instanceId,
+        helixManager.getClusterManagmentTool().addInstanceTag(getHelixClusterName(), instanceId,
             TableNameBuilder.OFFLINE.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
         _helixManagers.add(helixManager);
       }
-
-      ControllerLeaderLocator.create(helixManager);
     }
   }
 
@@ -187,7 +185,7 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       startFakeServers(numAdditionalServers, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + NUM_INITIAL_SERVERS, false);
 
       // rebalance
-      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, _clusterName, false, true, false, 2);
+      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, getHelixClusterName(), false, true, false, 2);
       tableRebalancer.rebalance(tableName, "OFFLINE");
       final TableRebalancer.RebalancerStats stats = tableRebalancer.getRebalancerStats();
 
@@ -305,7 +303,7 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       startFakeServers(numAdditionalServers, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + NUM_INITIAL_SERVERS, false);
 
       // rebalance
-      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, _clusterName, false, true, false, 2);
+      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, getHelixClusterName(), false, true, false, 2);
       tableRebalancer.rebalance(tableName, "OFFLINE");
       TableRebalancer.RebalancerStats stats = tableRebalancer.getRebalancerStats();
 
@@ -433,13 +431,13 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       // remove server3 and server4
       final HelixManager host3 = _helixManagers.get(3);
       final HelixManager host4 = _helixManagers.get(4);
-      host3.getClusterManagmentTool().removeInstanceTag(_clusterName, host3.getInstanceName(),
+      host3.getClusterManagmentTool().removeInstanceTag(getHelixClusterName(), host3.getInstanceName(),
           TableNameBuilder.OFFLINE.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
-      host4.getClusterManagmentTool().removeInstanceTag(_clusterName, host4.getInstanceName(),
+      host4.getClusterManagmentTool().removeInstanceTag(getHelixClusterName(), host4.getInstanceName(),
           TableNameBuilder.OFFLINE.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
 
       // rebalance
-      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, _clusterName, false, true, false, 2);
+      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, getHelixClusterName(), false, true, false, 2);
       tableRebalancer.rebalance(tableName, "OFFLINE");
       final TableRebalancer.RebalancerStats stats = tableRebalancer.getRebalancerStats();
 
@@ -508,7 +506,7 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       _raiseErrorOnSegmentStateTransition = true;
 
       // rebalance
-      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, _clusterName, false, true, false, 2);
+      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, getHelixClusterName(), false, true, false, 2);
       tableRebalancer.rebalance(tableName, "OFFLINE");
       Assert.fail("Expecting exception");
 
@@ -580,7 +578,7 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       startFakeServers(numAdditionalServers, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + NUM_INITIAL_SERVERS, true);
 
       // rebalance
-      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, _clusterName, false, true, true, 2);
+      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, getHelixClusterName(), false, true, true, 2);
       tableRebalancer.rebalance(tableName, "REALTIME");
       final TableRebalancer.RebalancerStats stats = tableRebalancer.getRebalancerStats();
 
@@ -657,7 +655,7 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       startFakeServers(numAdditionalServers, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + NUM_INITIAL_SERVERS, true);
 
       // rebalance
-      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, _clusterName, false, true, false, 2);
+      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, getHelixClusterName(), false, true, false, 2);
       tableRebalancer.rebalance(tableName, "REALTIME");
       final TableRebalancer.RebalancerStats stats = tableRebalancer.getRebalancerStats();
 
@@ -722,7 +720,7 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       startFakeServers(numAdditionalServers, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT + NUM_INITIAL_SERVERS, true);
 
       // rebalance
-      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, _clusterName, false, true, false, 2);
+      final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, getHelixClusterName(), false, true, false, 2);
       tableRebalancer.rebalance(tableName, "REALTIME");
       final TableRebalancer.RebalancerStats stats = tableRebalancer.getRebalancerStats();
 

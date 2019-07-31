@@ -202,7 +202,7 @@ public class TableRebalancer {
           if (e.getCause() instanceof ExternalViewErrored) {
             LOGGER.error("External view reported error for table {} after updating ideal state", tableNameWithType);
           } else if (e.getCause() instanceof ExternalViewConvergeTimeout) {
-            LOGGER.error("Timedout while waiting for external view to converge for table {}", tableNameWithType);
+            LOGGER.error("Timed out while waiting for external view to converge for table {}", tableNameWithType);
           }
           // remove the cause as it is private and is only used to detect exact error within this class
           throw new IllegalStateException(e.getMessage());
@@ -236,23 +236,16 @@ public class TableRebalancer {
 
   private void validateMinReplicas(final String tableNameWithType,
       final Configuration rebalanceConfig, final IdealState idealState) {
+    final int replicas = Integer.valueOf(idealState.getReplicas());
     if (rebalanceConfig.getBoolean(RebalanceUserConfigConstants.DOWNTIME,
         RebalanceUserConfigConstants.DEFAULT_DOWNTIME)) {
       final int minReplicasToKeepUp = rebalanceConfig
           .getInt(RebalanceUserConfigConstants.MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME,
               RebalanceUserConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME);
-      Map<String, Map<String, String>> currentMapFields = idealState.getRecord().getMapFields();
-      for (String segment : currentMapFields.keySet()) {
-        final Map<String, String> segmentHostsMap = currentMapFields.get(segment);
-        if (minReplicasToKeepUp >= segmentHostsMap.size()) {
-          final StringBuilder sb = new StringBuilder();
-          sb.append("User specified invalid number of min replicas: ").append(minReplicasToKeepUp)
-              .append(" to keep alive in no-downtime mode").append("for table ").append(tableNameWithType)
-              .append(" current replicas for segment ").append(segment)
-              .append(segmentHostsMap.size());
-          LOGGER.error(sb.toString());
-          throw new IllegalArgumentException(sb.toString());
-        }
+      if (minReplicasToKeepUp >= replicas) {
+        LOGGER.error("User specified invalid number of min replicas: {} to keep alive in no-downtime mode for table {}. Replica count for table {} ",
+            minReplicasToKeepUp, tableNameWithType, replicas);
+        throw new IllegalArgumentException("User specified invalid number of min available replicas " + minReplicasToKeepUp);
       }
     }
   }
