@@ -227,7 +227,8 @@ public class ParserBasedImpl implements TuningStrategy {
     sortedPure.sort((p1, p2) -> (p2._2().compareTo(p1._2())));
     sortedWeighted.sort((p1, p2) -> (p2._2().compareTo(p1._2())));
     for (Tuple2<String, Long> tuple2 : sortedPure) {
-      reportOut += "Dimension: " + tuple2._1() + "  " + Double.parseDouble(tuple2._2().toString()) / totalCount + "\n";
+      reportOut += "Dimension: " + tuple2._1() + "  " + String.valueOf(
+          Double.parseDouble(tuple2._2().toString()) / totalCount * 100).substring(0, 4) + "%\n";
     }
     reportOut += "\n________________________________Score_______________________________________\n";
     for (Tuple2<String, BigInteger> tuple2 : sortedWeighted) {

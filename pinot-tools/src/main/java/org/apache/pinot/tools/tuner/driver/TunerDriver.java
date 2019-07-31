@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.tuner.driver;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -132,6 +133,12 @@ public class TunerDriver {
         }
       }
     }
+    try {
+      _querySrc.close();
+    } catch (IOException e) {
+      LOGGER.error("Error closing query src ", e);
+    }
+
     if (_threadPoolSize != NO_CONCURRENCY) {
       accumulateExecutor.shutdown();
       LOGGER.info("All queries queued for accumulation");

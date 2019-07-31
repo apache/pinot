@@ -57,6 +57,25 @@ public class LogQuerySrcImpl implements QuerySrc {
     _validLinePrefixPattern = Pattern.compile(_validLinePrefixRegex);
   }
 
+  /**
+   * Closes this stream and releases any system resources associated
+   * with it. If the stream is already closed then invoking this
+   * method has no effect.
+   *
+   * <p> As noted in {@link AutoCloseable#close()}, cases where the
+   * close may fail require careful attention. It is strongly advised
+   * to relinquish the underlying resources and to internally
+   * <em>mark</em> the {@code Closeable} as closed, prior to throwing
+   * the {@code IOException}.
+   *
+   * @throws IOException if an I/O error occurs
+   */
+  @Override
+  public void close() throws IOException {
+    _fileInputStream.close();
+    _bufferedReader.close();
+  }
+
   public static final class Builder {
     private QueryParser _parser;
     private String _path;
@@ -122,13 +141,7 @@ public class LogQuerySrcImpl implements QuerySrc {
     if (this._stringBufferNext != null) {
       return true;
     } else {
-      try {
-        this._fileInputStream.close();
-      } catch (IOException e) {
-        LOGGER.error(e.toString());
-      } finally {
-        return false;
-      }
+      return false;
     }
   }
 

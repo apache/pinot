@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.tuner.query.src;
 
+import java.io.Closeable;
 import java.util.NoSuchElementException;
 import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 
@@ -25,7 +26,7 @@ import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 /**
  * Iterator interface for query text & related stats
  */
-public interface QuerySrc {
+public interface QuerySrc extends Closeable {
   /**
    *
    * @return If the input has next stats obj
