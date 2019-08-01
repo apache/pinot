@@ -410,7 +410,7 @@ public class TableRebalancerTest {
 
   private void verifyStateForMinReplicaConstraint(
       final IdealState updated, final IdealState target,
-      final int same, final boolean sizeCheck) {
+      final int numCommonHosts, final boolean sizeCheck) {
     Set<String> updatedSegmentInstances = updated.getInstanceStateMap(segmentId).keySet();
     Set<String> currentSegmentInstances = target.getInstanceStateMap(segmentId).keySet();
     if (sizeCheck) {
@@ -422,6 +422,6 @@ public class TableRebalancerTest {
         ++count;
       }
     }
-    Assert.assertEquals(count, same);
+    Assert.assertEquals(count, numCommonHosts);
   }
 }

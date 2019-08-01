@@ -109,6 +109,14 @@ public class TableRebalancer {
     PropertyKey idealStateKey = dataAccessor.keyBuilder().idealStates(tableNameWithType);
     IdealState previousIdealState = dataAccessor.getProperty(idealStateKey);
 
+    // before running rebalancer if external view is fine to begin with
+    // if it is already in error state, we return
+    if (!preCheckErrorInExternalView(tableNameWithType)) {
+      result.setStatus("Will not run rebalancer as external view is already in ERROR state for table" + tableNameWithType);
+      result.setStatusCode(RebalanceResult.RebalanceStatus.FAILED);
+      return result;
+    }
+
     if (rebalanceConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN, RebalanceUserConfigConstants.DEFAULT_DRY_RUN)) {
       LOGGER.info("Rebalancer running in dry run mode. Will return the target ideal state");
       PartitionAssignment partitionAssignment =
@@ -120,14 +128,6 @@ public class TableRebalancer {
       result.setStatus("Successfully ran rebalancer in dry run mode");
       result.setStatusCode(RebalanceResult.RebalanceStatus.DONE);
       _rebalancerStats.dryRun = 1;
-      return result;
-    }
-
-    // before running rebalancer if external view is fine to begin with
-    // if it is already in error state, we return
-    if (!preCheckErrorInExternalView(tableNameWithType)) {
-      result.setStatus("Will not run rebalancer as external view is already in ERROR state for table" + tableNameWithType);
-      result.setStatusCode(RebalanceResult.RebalanceStatus.FAILED);
       return result;
     }
 

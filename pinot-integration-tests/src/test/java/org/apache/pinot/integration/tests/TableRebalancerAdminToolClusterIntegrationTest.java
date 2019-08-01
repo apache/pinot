@@ -68,6 +68,7 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
   private SegmentStateTransitionStats _segmentStateTransitionStats;
   private boolean _raiseErrorOnSegmentStateTransition = false;
 
+  // todo: re-use fake server start/stop methods from ControllerTest
   @BeforeClass
   public void setup()
       throws Exception {
