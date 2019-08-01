@@ -219,20 +219,21 @@ public class ParserBasedImpl implements TuningStrategy {
     List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
     List<Tuple2<String, BigInteger>> sortedWeighted = new ArrayList<>();
     reportOut += MessageFormat.format("\nTotal lines accumulated: {0}\n\n", totalCount);
-    reportOut += "________________________________Coverage_______________________________________\n";
     columnStats.forEach((colName, score) -> {
       sortedPure.add(new Tuple2<>(colName, ((ParseBasedAccumulator) score).getPureScore()));
       sortedWeighted.add(new Tuple2<>(colName, ((ParseBasedAccumulator) score).getWeightedScore()));
     });
     sortedPure.sort((p1, p2) -> (p2._2().compareTo(p1._2())));
     sortedWeighted.sort((p1, p2) -> (p2._2().compareTo(p1._2())));
-    for (Tuple2<String, Long> tuple2 : sortedPure) {
-      reportOut += "Dimension: " + tuple2._1() + "  " + String.valueOf(
-          Double.parseDouble(tuple2._2().toString()) / totalCount * 100).substring(0, 4) + "%\n";
-    }
     reportOut += "\n________________________________Score_______________________________________\n";
     for (Tuple2<String, BigInteger> tuple2 : sortedWeighted) {
       reportOut += "Dimension: " + tuple2._1() + "  " + formatter.format(tuple2._2()) + "\n";
+    }
+    reportOut += "________________________________Coverage_______________________________________\n";
+    reportOut += "At least % of queries will benefit from a given index.";
+    for (Tuple2<String, Long> tuple2 : sortedPure) {
+      reportOut += "Dimension: " + tuple2._1() + "  " + String.valueOf(
+          Double.parseDouble(tuple2._2().toString()) / totalCount * 100).substring(0, 4) + "%\n";
     }
     LOGGER.info(reportOut);
   }
