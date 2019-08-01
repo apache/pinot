@@ -23,7 +23,7 @@ import java.util.HashSet;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.tuner.driver.TunerDriver;
-import org.apache.pinot.tools.tuner.query.src.LogQuerySrcImpl;
+import org.apache.pinot.tools.tuner.query.src.LogInputIteratorImpl;
 import org.apache.pinot.tools.tuner.query.src.parser.BrokerLogParserImpl;
 import org.apache.pinot.tools.tuner.strategy.QuantileAnalysisImpl;
 import org.kohsuke.args4j.Option;
@@ -61,7 +61,7 @@ public class EntriesScannedQuantileReport extends AbstractBaseCommand implements
 
     TunerDriver fitModel = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
         .setTuningStrategy(new QuantileAnalysisImpl.Builder().setTableNamesWithoutType(tableNamesWithoutType).build())
-        .setQuerySrc(new LogQuerySrcImpl.Builder()
+        .setInputIterator(new LogInputIteratorImpl.Builder()
             .setParser(new BrokerLogParserImpl())
             .setPath(_brokerLog)
             .build());

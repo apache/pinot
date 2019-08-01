@@ -36,8 +36,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Generic class to iterate over lines in file
  */
-public class LogQuerySrcImpl implements QuerySrc {
-  private static final Logger LOGGER = LoggerFactory.getLogger(LogQuerySrcImpl.class);
+public class LogInputIteratorImpl implements InputIterator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(LogInputIteratorImpl.class);
 
   public static final String REGEX_VALID_LINE_STANDALONE = "^(Processed requestId|RequestId).*$";
   public static final String REGEX_VALID_LINE_TIME = "^(\\d{4})/(\\d{2})/(\\d{2}) [\\d:.].*$";
@@ -50,7 +50,7 @@ public class LogQuerySrcImpl implements QuerySrc {
   private QueryParser _parser;
   private String _path;
 
-  private LogQuerySrcImpl(Builder builder) {
+  private LogInputIteratorImpl(Builder builder) {
     _parser = builder._parser;
     _path = builder._path;
     String _validLinePrefixRegex = builder._validLinePrefixRegex;
@@ -87,7 +87,6 @@ public class LogQuerySrcImpl implements QuerySrc {
     /**
      * Choose a parser
      * @param val A parser, e.g. {@link BrokerLogParserImpl}
-     * @return
      */
     @Nonnull
     public Builder setParser(@Nonnull QueryParser val) {
@@ -98,7 +97,6 @@ public class LogQuerySrcImpl implements QuerySrc {
     /**
      *
      * @param val Path to the log file
-     * @return
      */
     @Nonnull
     public Builder setPath(@Nonnull String val) {
@@ -109,7 +107,6 @@ public class LogQuerySrcImpl implements QuerySrc {
     /**
      *
      * @param val Starting pattern of a log line, default to REGEX_VALID_LINE_TIME = "^(\\d{4})/(\\d{2})/(\\d{2}) [\\d:.].*$"
-     * @return
      */
     @Nonnull
     public Builder setValidLinePrefixRegex(@Nonnull String val) {
@@ -118,13 +115,13 @@ public class LogQuerySrcImpl implements QuerySrc {
     }
 
     @Nonnull
-    public LogQuerySrcImpl build() throws FileNotFoundException {
+    public LogInputIteratorImpl build() throws FileNotFoundException {
       LOGGER.info("Line prefix pattern is set to:{}", this._validLinePrefixRegex);
-      return new LogQuerySrcImpl(this).init();
+      return new LogInputIteratorImpl(this).init();
     }
   }
 
-  private LogQuerySrcImpl init() throws FileNotFoundException {
+  private LogInputIteratorImpl init() throws FileNotFoundException {
     try {
       _fileInputStream = new FileInputStream(this._path);
       _bufferedReader = new BufferedReader(new InputStreamReader(_fileInputStream));
@@ -138,11 +135,7 @@ public class LogQuerySrcImpl implements QuerySrc {
 
   @Override
   public boolean hasNext() {
-    if (this._stringBufferNext != null) {
-      return true;
-    } else {
-      return false;
-    }
+    return this._stringBufferNext != null;
   }
 
   @Override

@@ -26,7 +26,7 @@ import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 /**
  * Iterator interface for query text & related stats
  */
-public interface QuerySrc extends Closeable {
+public interface InputIterator extends Closeable {
   /**
    *
    * @return If the input has next stats obj
@@ -36,7 +36,6 @@ public interface QuerySrc extends Closeable {
   /**
    *
    * @return The next obj parsed from input
-   * @throws NoSuchElementException
    */
   AbstractQueryStats next() throws NoSuchElementException;
 }

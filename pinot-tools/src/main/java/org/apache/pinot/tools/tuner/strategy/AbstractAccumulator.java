@@ -38,7 +38,6 @@ public abstract class AbstractAccumulator {
 
   /**
    * Get the default count for the number of  {@link AbstractAccumulator} merged to this.
-   * @return
    */
   public long getCount() {
     return _count;

@@ -30,8 +30,8 @@ import org.apache.pinot.tools.tuner.strategy.AbstractAccumulator;
  */
 public class ColStatsAccumulatorObj extends AbstractAccumulator {
 
-  Map<String, BigInteger> _accumulatedStats = new HashMap<>();
-  Map<String, Map<String, String>> _segmentStats = new HashMap<>();
+  private Map<String, BigInteger> _accumulatedStats = new HashMap<>();
+  private Map<String, Map<String, String>> _segmentStats = new HashMap<>();
 
   private static final String CARDINALITY = "cardinality";
   private static final String TOTAL_DOCS = "totalDocs";
@@ -52,40 +52,40 @@ public class ColStatsAccumulatorObj extends AbstractAccumulator {
   private String _isSorted;
   private String _invertedIndexSize;
 
-  public Map<String, BigInteger> getAccumulatedStats() {
+  Map<String, BigInteger> getAccumulatedStats() {
     return _accumulatedStats;
   }
 
-  public Map<String, Map<String, String>> getSegmentStats() {
+  Map<String, Map<String, String>> getSegmentStats() {
     return _segmentStats;
   }
 
-  public ColStatsAccumulatorObj addInvertedIndexSize(String invertedIndexSize) {
+  ColStatsAccumulatorObj addInvertedIndexSize(String invertedIndexSize) {
     _invertedIndexSize = invertedIndexSize;
     return this;
   }
 
-  public ColStatsAccumulatorObj addSegmentName(String segmentName) {
+  ColStatsAccumulatorObj addSegmentName(String segmentName) {
     _segmentName = segmentName;
     return this;
   }
 
-  public ColStatsAccumulatorObj addCardinality(String cardinality) {
+  ColStatsAccumulatorObj addCardinality(String cardinality) {
     _cardinality = cardinality;
     return this;
   }
 
-  public ColStatsAccumulatorObj addTotalDocs(String totalDocs) {
+  ColStatsAccumulatorObj addTotalDocs(String totalDocs) {
     _totalDocs = totalDocs;
     return this;
   }
 
-  public ColStatsAccumulatorObj addTotalNumberOfEntries(String totalNumberOfEntries) {
+  ColStatsAccumulatorObj addTotalNumberOfEntries(String totalNumberOfEntries) {
     _totalNumberOfEntries = totalNumberOfEntries;
     return this;
   }
 
-  public ColStatsAccumulatorObj addIsSorted(String isSorted) {
+  ColStatsAccumulatorObj addIsSorted(String isSorted) {
     _isSorted = isSorted;
     return this;
   }

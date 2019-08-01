@@ -30,14 +30,13 @@ public interface TuningStrategy {
 
   /**
    * Filter out irrelevant query stats to target a specific table or specific range of nESI
-   * @param queryStats the stats extracted and parsed from QuerySrc
-   * @return
+   * @param queryStats the stats extracted and parsed from InputIterator
    */
   boolean filter(AbstractQueryStats queryStats);
 
   /**
    * Accumulate the parsed queryStats to corresponding entry in MapperOut
-   * @param queryStats input, the stats extracted and parsed from QuerySrc
+   * @param queryStats input, the stats extracted and parsed from InputIterator
    * @param metaManager input, the metaManager where cardinality info can be get from
    * @param accumulatorOut output, map of /tableMame: String/columnName: String/AbstractMergerObj
    */

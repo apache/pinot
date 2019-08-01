@@ -28,7 +28,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import javax.annotation.Nonnull;
-import org.apache.pinot.tools.tuner.query.src.QuerySrc;
+import org.apache.pinot.tools.tuner.query.src.InputIterator;
 import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
 /**
  * The iterator over all tarred segments in _directory/tableName/
  */
-public class CompressedFilePathIter implements QuerySrc {
+public class CompressedFilePathIter implements InputIterator {
   private static final Logger LOGGER = LoggerFactory.getLogger(CompressedFilePathIter.class);
   private Iterator<Tuple2<String, File>> _iterator;
 
@@ -79,7 +79,6 @@ public class CompressedFilePathIter implements QuerySrc {
   /**
    *
    * @return The next path from directory
-   * @throws NoSuchElementException
    */
   @Override
   public AbstractQueryStats next() throws NoSuchElementException {
@@ -102,7 +101,6 @@ public class CompressedFilePathIter implements QuerySrc {
    */
   @Override
   public void close() throws IOException {
-    return;
   }
 
   public static final class Builder {

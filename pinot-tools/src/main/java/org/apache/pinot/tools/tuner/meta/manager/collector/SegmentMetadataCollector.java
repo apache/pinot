@@ -42,8 +42,8 @@ import org.slf4j.LoggerFactory;
  * Extract relevant fields in metadata.properties and index_map from tarred segments in controller
  * And pack them into a json file
  */
-public class AccumulateStats implements TuningStrategy {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AccumulateStats.class);
+public class SegmentMetadataCollector implements TuningStrategy {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMetadataCollector.class);
   private static final String UNTAR = "tar -xf ";
   private static final String TMP_THREAD_FILE_PREFIX = "/tmpThreadFile";
   private static final String EXCLUDE_DATA = " --exclude columns.psf ";
@@ -63,7 +63,7 @@ public class AccumulateStats implements TuningStrategy {
   private HashSet<String> _tableNamesWithoutType;
   private File _outputDir;
 
-  public AccumulateStats(Builder builder) {
+  public SegmentMetadataCollector(Builder builder) {
     _tableNamesWithoutType = builder._tableNamesWithoutType;
 
     if (builder._outputDir == null) {
@@ -264,8 +264,8 @@ public class AccumulateStats implements TuningStrategy {
     }
 
     @Nonnull
-    public AccumulateStats build() {
-      return new AccumulateStats(this);
+    public SegmentMetadataCollector build() {
+      return new SegmentMetadataCollector(this);
     }
   }
 }

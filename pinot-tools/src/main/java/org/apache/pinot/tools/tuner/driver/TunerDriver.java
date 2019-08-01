@@ -26,8 +26,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.tools.tuner.meta.manager.JsonFileMetaManagerImpl;
 import org.apache.pinot.tools.tuner.meta.manager.MetaManager;
-import org.apache.pinot.tools.tuner.query.src.LogQuerySrcImpl;
-import org.apache.pinot.tools.tuner.query.src.QuerySrc;
+import org.apache.pinot.tools.tuner.query.src.InputIterator;
+import org.apache.pinot.tools.tuner.query.src.LogInputIteratorImpl;
 import org.apache.pinot.tools.tuner.query.src.parser.QueryParser;
 import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 import org.apache.pinot.tools.tuner.strategy.AbstractAccumulator;
@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
 /**
  *TunerDriver is an executable interface, has three pluggable modules:
  *   {@link MetaManager}: A manager for metadata, which is an interface to access segment metadata.
- *   {@link QuerySrc}: An iterator interface over input source, has a pluggable {@link QueryParser}, who parses each item in input source, and returns {@link AbstractQueryStats}, a wrapper of relevant fields input.
+ *   {@link InputIterator}: An iterator interface over input source, has a pluggable {@link QueryParser}, who parses each item in input source, and returns {@link AbstractQueryStats}, a wrapper of relevant fields input.
  *   {@link TuningStrategy}: Strategy, which has four user defined functions operating on a map of Map<ThreadID:Long, Map<TableName:String, Map<ColumnName:String, AbstractMergerObj>>>:
  *       Filter: A function to filter AbstractQueryStats, by table name, number of entries scanned in filters, number of entries scanned post filter, etc. The relevant AbstractQueryStats will be feed to Accumulator.
  *       Accumulate: A function to process AbstractQueryStats and MetaManager; then accumulate stats to corresponding AbstractMergerObj entry.
@@ -53,7 +53,7 @@ public class TunerDriver {
   private static final Logger LOGGER = LoggerFactory.getLogger(TunerDriver.class);
   public static final int NO_CONCURRENCY = 0;
 
-  private QuerySrc _querySrc = null;
+  private InputIterator _inputIterator = null;
   private MetaManager _metaManager = null;
   private TuningStrategy _tuningStrategy = null;
   private int _threadPoolSize = 0;
@@ -69,12 +69,12 @@ public class TunerDriver {
   }
 
   /**
-   * Set the query source, e.g. {@link LogQuerySrcImpl}
-   * @param querySrc E.g. {@link LogQuerySrcImpl}
+   * Set the query source, e.g. {@link LogInputIteratorImpl}
+   * @param inputIterator E.g. {@link LogInputIteratorImpl}
    * @return this
    */
-  public TunerDriver setQuerySrc(QuerySrc querySrc) {
-    _querySrc = querySrc;
+  public TunerDriver setInputIterator(InputIterator inputIterator) {
+    _inputIterator = inputIterator;
     return this;
   }
 
@@ -90,7 +90,6 @@ public class TunerDriver {
 
   /**
    * Set the strategy for the recommendation, e.g. {@link FrequencyImpl}, {@link QuantileAnalysisImpl}, {@link ParserBasedImpl}
-   * @param tuningStrategy
    * @return this
    */
   public TunerDriver setTuningStrategy(TuningStrategy tuningStrategy) {
@@ -114,8 +113,8 @@ public class TunerDriver {
       accumulateExecutor = new ThreadPoolExecutor(this._threadPoolSize, this._threadPoolSize, 365, TimeUnit.DAYS,
           new LinkedBlockingQueue<>(Integer.MAX_VALUE), new ThreadPoolExecutor.CallerRunsPolicy());
     }
-    while (_querySrc.hasNext()) {
-      AbstractQueryStats abstractQueryStats = _querySrc.next();
+    while (_inputIterator.hasNext()) {
+      AbstractQueryStats abstractQueryStats = _inputIterator.next();
       if (abstractQueryStats != null && _tuningStrategy.filter(abstractQueryStats)) {
         LOGGER.debug("Master thread {} submitting: {}", Thread.currentThread().getId(), abstractQueryStats.toString());
         if (_threadPoolSize != NO_CONCURRENCY) {
@@ -134,7 +133,7 @@ public class TunerDriver {
       }
     }
     try {
-      _querySrc.close();
+      _inputIterator.close();
     } catch (IOException e) {
       LOGGER.error("Error closing query src ", e);
     }

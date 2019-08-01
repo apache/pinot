@@ -21,7 +21,6 @@ package org.apache.pinot.tools.tuner.strategy;
 import io.vavr.Tuple2;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -49,8 +48,8 @@ public class FrequencyImpl implements TuningStrategy {
   public final static long DEFAULT_IN_FILTER_THRESHOLD = 0;
   public final static long DEFAULT_CARDINALITY_THRESHOLD = 1;
   public final static long DEFAULT_NUM_QUERIES_THRESHOLD = 0;
-  public static final int MATCHER_GROUP_DIMENSION = 1;
-  public static final int MATCHER_GROUP_VALUES = 4;
+  public static final int MATCHER_GROUP_DIMENSION_IN = 1;
+  public static final int MATCHER_GROUP_DIMENSION_COMP = 4;
 
   public final static Pattern _dimensionPattern = Pattern.compile(DIMENSION_REGEX);
   private HashSet<String> _tableNamesWithoutType;
@@ -84,7 +83,6 @@ public class FrequencyImpl implements TuningStrategy {
     /**
      * set the tables to work on, other tables will be filtered out
      * @param val set of table names without type
-     * @return
      */
     @Nonnull
     public Builder setTableNamesWithoutType(@Nonnull HashSet<String> val) {
@@ -94,8 +92,7 @@ public class FrequencyImpl implements TuningStrategy {
 
     /**
      * set the threshold for _numEntriesScannedInFilter, the queries with _numEntriesScannedInFilter below this will be filtered out
-     * @param val
-     * @return
+     * @param val threshold for _numEntriesScannedInFilter, default to 0
      */
     @Nonnull
     public Builder setNumEntriesScannedThreshold(long val) {
@@ -107,7 +104,6 @@ public class FrequencyImpl implements TuningStrategy {
      * set the cardinality threshold, column with cardinality below this will be ignored,
      * setting a high value will force the system to ignore low card columns
      * @param val cardinality threshold, default to 1
-     * @return
      */
     @Nonnull
     public Builder setCardinalityThreshold(long val) {
@@ -118,7 +114,6 @@ public class FrequencyImpl implements TuningStrategy {
     /**
      * set the minimum number of records scanned to give a recommendation
      * @param val minimum number of records scanned to give a recommendation, default to 0
-     * @return
      */
     @Nonnull
     public Builder setNumQueriesThreshold(long val) {
@@ -150,11 +145,10 @@ public class FrequencyImpl implements TuningStrategy {
 
     Matcher matcher = _dimensionPattern.matcher(query);
     while (matcher.find()) {
-      if (matcher.group(MATCHER_GROUP_DIMENSION) != null) {
-        counted.add(matcher.group(MATCHER_GROUP_DIMENSION));
-      } else if (matcher.group(MATCHER_GROUP_VALUES) != null) {
-        counted.add(matcher.group(MATCHER_GROUP_VALUES));
-      } else {
+      if (matcher.group(MATCHER_GROUP_DIMENSION_IN) != null) {
+        counted.add(matcher.group(MATCHER_GROUP_DIMENSION_IN));
+      } else if (matcher.group(MATCHER_GROUP_DIMENSION_COMP) != null) {
+        counted.add(matcher.group(MATCHER_GROUP_DIMENSION_COMP));
       }
     }
 
@@ -181,7 +175,7 @@ public class FrequencyImpl implements TuningStrategy {
     });
   }
 
-  public void reportTable(String tableNameWithoutType, Map<String, AbstractAccumulator> columnStats) {
+  private void reportTable(String tableNameWithoutType, Map<String, AbstractAccumulator> columnStats) {
     String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
     long totalCount = columnStats.remove(NUM_QUERIES_COUNT).getCount();
     if (totalCount < _numQueriesThreshold) {

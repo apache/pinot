@@ -126,7 +126,7 @@ public class QuantileAnalysisImpl implements TuningStrategy {
     tableResults.forEach((table, map) -> reportTable(table, map));
   }
 
-  public void reportTable(String tableNameWithoutType, Map<String, AbstractAccumulator> columnStats) {
+  private void reportTable(String tableNameWithoutType, Map<String, AbstractAccumulator> columnStats) {
     String reportOut = "\n**********************Report For Table: " + tableNameWithoutType + "**********************\n";
 
     long totalCount = columnStats.remove(NUM_QUERIES_COUNT).getCount();

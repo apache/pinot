@@ -24,7 +24,7 @@ import java.util.HashSet;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.tuner.driver.TunerDriver;
-import org.apache.pinot.tools.tuner.meta.manager.collector.AccumulateStats;
+import org.apache.pinot.tools.tuner.meta.manager.collector.SegmentMetadataCollector;
 import org.apache.pinot.tools.tuner.meta.manager.collector.CompressedFilePathIter;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -63,10 +63,10 @@ public class CollectSegmentMetadata extends AbstractBaseCommand implements Comma
 
     try {
       TunerDriver metaFetch = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
-          .setTuningStrategy(new AccumulateStats.Builder().setTableNamesWithoutType(tableNamesWithoutType)
+          .setTuningStrategy(new SegmentMetadataCollector.Builder().setTableNamesWithoutType(tableNamesWithoutType)
               .setOutputDir(_workDir)
               .build())
-          .setQuerySrc(new CompressedFilePathIter.Builder().setDirectory(_segmentsDir).build())
+          .setInputIterator(new CompressedFilePathIter.Builder().setDirectory(_segmentsDir).build())
           .setMetaManager(null);
       metaFetch.execute();
     } catch (FileNotFoundException e) {

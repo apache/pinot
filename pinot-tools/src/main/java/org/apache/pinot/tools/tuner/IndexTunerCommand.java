@@ -25,7 +25,7 @@ import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.tuner.driver.TunerDriver;
 import org.apache.pinot.tools.tuner.meta.manager.JsonFileMetaManagerImpl;
-import org.apache.pinot.tools.tuner.query.src.LogQuerySrcImpl;
+import org.apache.pinot.tools.tuner.query.src.LogInputIteratorImpl;
 import org.apache.pinot.tools.tuner.query.src.parser.BrokerLogParserImpl;
 import org.apache.pinot.tools.tuner.strategy.FrequencyImpl;
 import org.apache.pinot.tools.tuner.strategy.ParserBasedImpl;
@@ -103,8 +103,8 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
                   .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
                   .setSelectivityThreshold(_selectivityThreshold)
                   .build())
-              .setQuerySrc(
-                  new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
+              .setInputIterator(
+                  new LogInputIteratorImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
               .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metadata).build());
           parserBased.execute();
         } else if (_indexType.equals(SORTED_INDEX)) {
@@ -115,8 +115,8 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
                   .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
                   .setSelectivityThreshold(_selectivityThreshold)
                   .build())
-              .setQuerySrc(
-                  new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
+              .setInputIterator(
+                  new LogInputIteratorImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
               .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metadata).build());
           parserBased.execute();
         } else {
@@ -127,13 +127,14 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
           LOGGER.error("Simple frequency strategy is for inverted index only!");
           return false;
         }
-        TunerDriver freqBased = new TunerTest().setThreadPoolSize(3)
+        TunerDriver freqBased = new TunerTest().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
             .setTuningStrategy(new FrequencyImpl.Builder().setNumQueriesThreshold(_numQueriesThreshold)
                 .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
                 .setTableNamesWithoutType(tableNamesWithoutType)
                 .setCardinalityThreshold(_selectivityThreshold)
                 .build())
-            .setQuerySrc(new LogQuerySrcImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
+            .setInputIterator(
+                new LogInputIteratorImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
             .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metadata).build());
         freqBased.execute();
       }

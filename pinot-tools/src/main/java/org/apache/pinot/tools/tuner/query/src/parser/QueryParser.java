@@ -28,7 +28,7 @@ import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
 public interface QueryParser {
   /**
    * parse the the complete log line to a parsed obj
-   * @param line the complete log line to be parsed, QuerySrc should put broken lines together
+   * @param line the complete log line to be parsed, InputIterator should put broken lines together
    * @return the parsed log line obj
    */
   @Nullable
