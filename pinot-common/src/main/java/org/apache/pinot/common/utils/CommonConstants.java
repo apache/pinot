@@ -381,6 +381,11 @@ public class CommonConstants {
       OFFLINE, REALTIME
     }
 
+    public static class AssignmentStrategy {
+      public static String BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY = "BalanceNumSegmentAssignmentStrategy";
+      public static String REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "ReplicaGroupSegmentAssignmentStrategy";
+    }
+
     @Deprecated
     public static final String TABLE_NAME = "segment.table.name";
   }

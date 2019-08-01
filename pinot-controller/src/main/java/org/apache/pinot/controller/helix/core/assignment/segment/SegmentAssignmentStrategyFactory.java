@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.common.utils.CommonConstants.Segment.AssignmentStrategy;
 
 
 /**
@@ -30,14 +31,10 @@ public class SegmentAssignmentStrategyFactory {
   private SegmentAssignmentStrategyFactory() {
   }
 
-  public enum Strategy {
-    BalanceNumSegmentAssignmentStrategy, ReplicaGroupSegmentAssignmentStrategy
-  }
-
   public static SegmentAssignmentStrategy getSegmentAssignmentStrategy(HelixManager helixManager,
       TableConfig tableConfig) {
     SegmentAssignmentStrategy segmentAssignmentStrategy;
-    if (Strategy.ReplicaGroupSegmentAssignmentStrategy.name()
+    if (AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY
         .equalsIgnoreCase(tableConfig.getValidationConfig().getSegmentAssignmentStrategy())) {
       if (tableConfig.getTableType() == TableType.OFFLINE) {
         segmentAssignmentStrategy = new OfflineReplicaGroupSegmentAssignmentStrategy();

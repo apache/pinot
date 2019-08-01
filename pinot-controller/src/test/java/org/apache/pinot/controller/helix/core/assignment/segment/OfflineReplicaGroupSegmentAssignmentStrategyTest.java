@@ -34,8 +34,9 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.common.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.common.utils.InstancePartitionsType;
 import org.apache.pinot.controller.helix.core.assignment.InstancePartitions;
 import org.testng.annotations.BeforeClass;
@@ -103,9 +104,9 @@ public class OfflineReplicaGroupSegmentAssignmentStrategyTest {
     when(helixManagerWithoutPartitions.getHelixPropertyStore()).thenReturn(propertyStoreWithoutPartitions);
 
     TableConfig tableConfigWithoutPartitions =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITHOUT_PARTITION)
-            .setNumReplicas(NUM_REPLICAS).setSegmentAssignmentStrategy(
-            SegmentAssignmentStrategyFactory.Strategy.ReplicaGroupSegmentAssignmentStrategy.name()).build();
+        new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITHOUT_PARTITION)
+            .setNumReplicas(NUM_REPLICAS)
+            .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY).build();
     _strategyWithoutPartition = SegmentAssignmentStrategyFactory
         .getSegmentAssignmentStrategy(helixManagerWithoutPartitions, tableConfigWithoutPartitions);
 
@@ -163,9 +164,9 @@ public class OfflineReplicaGroupSegmentAssignmentStrategyTest {
     ReplicaGroupStrategyConfig strategyConfig = new ReplicaGroupStrategyConfig();
     strategyConfig.setPartitionColumn(PARTITION_COLUMN);
     TableConfig tableConfigWithPartitions =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITH_PARTITION)
-            .setNumReplicas(NUM_REPLICAS).setSegmentAssignmentStrategy(
-            SegmentAssignmentStrategyFactory.Strategy.ReplicaGroupSegmentAssignmentStrategy.name()).build();
+        new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITH_PARTITION)
+            .setNumReplicas(NUM_REPLICAS)
+            .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY).build();
     tableConfigWithPartitions.getValidationConfig().setReplicaGroupStrategyConfig(strategyConfig);
     _strategyWithPartition = SegmentAssignmentStrategyFactory
         .getSegmentAssignmentStrategy(helixManagerWithPartitions, tableConfigWithPartitions);

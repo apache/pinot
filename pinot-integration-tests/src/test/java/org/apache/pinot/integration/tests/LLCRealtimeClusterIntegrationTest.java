@@ -23,6 +23,7 @@ import com.google.common.base.Function;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,7 @@ import org.apache.pinot.common.config.TableCustomConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.TenantConfig;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -161,20 +163,8 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
 
   @Test
   public void testAddHLCTableShouldFail() {
-    TableConfig tableConfig = new TableConfig();
-    IndexingConfig indexingConfig = new IndexingConfig();
-    Map<String, String> streamConfigs = new HashMap<>();
-    streamConfigs.put("stream.kafka.consumer.type", "HIGHLEVEL");
-    indexingConfig.setStreamConfigs(streamConfigs);
-    tableConfig.setIndexingConfig(indexingConfig);
-    tableConfig.setTableName("testTable");
-    tableConfig.setTableType(CommonConstants.Helix.TableType.REALTIME);
-    SegmentsValidationAndRetentionConfig validationAndRetentionConfig = new SegmentsValidationAndRetentionConfig();
-    tableConfig.setValidationConfig(validationAndRetentionConfig);
-    TenantConfig tenantConfig = new TenantConfig();
-    tableConfig.setTenantConfig(tenantConfig);
-    TableCustomConfig tableCustomConfig = new TableCustomConfig();
-    tableConfig.setCustomConfig(tableCustomConfig);
+    TableConfig tableConfig = new TableConfig.Builder(TableType.REALTIME).setTableName("testTable")
+        .setStreamConfigs(Collections.singletonMap("stream.kafka.consumer.type", "HIGHLEVEL")).build();
     try {
       sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
       Assert.fail();
@@ -183,4 +173,3 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
     }
   }
 }
-

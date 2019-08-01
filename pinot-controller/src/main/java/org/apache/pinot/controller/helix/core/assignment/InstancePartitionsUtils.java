@@ -23,12 +23,10 @@ import java.util.List;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.HelixPropertyStore;
-import org.apache.pinot.common.config.OfflineTagConfig;
-import org.apache.pinot.common.config.RealtimeTagConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.InstancePartitionsType;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -60,26 +58,13 @@ public class InstancePartitionsUtils {
     // Compute the instance partitions (for backward compatible)
     // Sort all enabled instances with the server tag, rotate the list based on the table name to prevent creating
     // hotspot servers
-    InstancePartitions instancePartitions = new InstancePartitions(instancePartitionsName);
-    List<InstanceConfig> instanceConfigs = HelixHelper.getInstanceConfigs(helixManager);
-    String serverTag;
-    switch (instancePartitionsType) {
-      case OFFLINE:
-        serverTag = new OfflineTagConfig(tableConfig).getOfflineServerTag();
-        break;
-      case CONSUMING:
-        serverTag = new RealtimeTagConfig(tableConfig).getConsumingServerTag();
-        break;
-      case COMPLETED:
-        serverTag = new RealtimeTagConfig(tableConfig).getCompletedServerTag();
-        break;
-      default:
-        throw new IllegalArgumentException();
-    }
-    List<String> instances = HelixHelper.getEnabledInstancesWithTag(instanceConfigs, serverTag);
+    String serverTag =
+        TagNameUtils.getServerTagFromTableConfigAndInstancePartitionsType(tableConfig, instancePartitionsType);
+    List<String> instances = HelixHelper.getEnabledInstancesWithTag(helixManager, serverTag);
     instances.sort(null);
     int numInstances = instances.size();
     Collections.rotate(instances, -(Math.abs(tableNameWithType.hashCode()) % numInstances));
+    InstancePartitions instancePartitions = new InstancePartitions(instancePartitionsName);
     instancePartitions.setInstances(0, 0, instances);
     return instancePartitions;
   }
