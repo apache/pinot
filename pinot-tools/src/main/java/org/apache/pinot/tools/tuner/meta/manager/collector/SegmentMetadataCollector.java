@@ -99,93 +99,95 @@ public class SegmentMetadataCollector implements TuningStrategy {
     File tmpFolder = new File(
         _outputDir.getAbsolutePath() + TMP_THREAD_FILE_PREFIX + Thread.currentThread().getId() + "_" + (System.currentTimeMillis() % 1000000));
     LOGGER.info("Extracting: " + pathWrapper.getFile().getAbsolutePath() + " to " + tmpFolder.getAbsolutePath());
-    try {
-      tmpFolder.mkdirs();
-      Process p = Runtime.getRuntime()
-          .exec((UNTAR + pathWrapper.getFile().getAbsolutePath() + EXCLUDE_DATA + STRIP_PATHS + OUT_PUT_PATH + tmpFolder
-              .getAbsolutePath()));
-      p.waitFor();
-    } catch (IOException | InterruptedException e) {
-      LOGGER.error("Error while extracting {}", pathWrapper.getFile().getAbsolutePath());
-      deleteTmp(tmpFolder);
-      return;
-    }
 
-    File metaDataProperties;
-    File indexMap;
     try {
-      metaDataProperties = tmpFolder.listFiles((dir, name) -> name.equals("metadata.properties"))[0];
-      if (!metaDataProperties.exists()) {
-        throw new NullPointerException();
+      try {
+        tmpFolder.mkdirs();
+        Process p = Runtime.getRuntime()
+            .exec(
+                (UNTAR + pathWrapper.getFile().getAbsolutePath() + EXCLUDE_DATA + STRIP_PATHS + OUT_PUT_PATH + tmpFolder
+                    .getAbsolutePath()));
+        p.waitFor();
+      } catch (IOException | InterruptedException e) {
+        LOGGER.error("Error while extracting {}", pathWrapper.getFile().getAbsolutePath());
+        return;
       }
-    } catch (NullPointerException | ArrayIndexOutOfBoundsException e) {
-      LOGGER.error("No metadata.properties file for {}!", pathWrapper.getFile().getAbsolutePath());
-      deleteTmp(tmpFolder);
-      return;
-    }
 
-    try {
-      indexMap = tmpFolder.listFiles((dir, name) -> name.equals("index_map"))[0];
-      if (!indexMap.exists()) {
-        throw new NullPointerException();
+      File metaDataProperties;
+      File indexMap;
+      try {
+        metaDataProperties = tmpFolder.listFiles((dir, name) -> name.equals("metadata.properties"))[0];
+        if (!metaDataProperties.exists()) {
+          throw new NullPointerException();
+        }
+      } catch (NullPointerException | ArrayIndexOutOfBoundsException e) {
+        LOGGER.error("No metadata.properties file for {}!", pathWrapper.getFile().getAbsolutePath());
+        return;
       }
-    } catch (NullPointerException | ArrayIndexOutOfBoundsException e) {
-      LOGGER.error("No index_map file for {}!", pathWrapper.getFile().getAbsolutePath());
-      indexMap = null;
-    }
 
-    String metadataString = "";
-    try {
-      metadataString = FileUtils.readFileToString(metaDataProperties);
-    } catch (IOException | NullPointerException e) {
-      LOGGER.error("No metadata.properties for {}!", pathWrapper.getFile().getAbsolutePath());
+      try {
+        indexMap = tmpFolder.listFiles((dir, name) -> name.equals("index_map"))[0];
+        if (!indexMap.exists()) {
+          throw new NullPointerException();
+        }
+      } catch (NullPointerException | ArrayIndexOutOfBoundsException e) {
+        LOGGER.error("No index_map file for {}!", pathWrapper.getFile().getAbsolutePath());
+        indexMap = null;
+      }
+
+      String metadataString = "";
+      try {
+        metadataString = FileUtils.readFileToString(metaDataProperties);
+      } catch (IOException | NullPointerException e) {
+        LOGGER.error("No metadata.properties for {}!", pathWrapper.getFile().getAbsolutePath());
+        return;
+      }
+
+      String indexMapString = "";
+      try {
+        indexMapString = FileUtils.readFileToString(indexMap);
+      } catch (IOException | NullPointerException e) {
+        LOGGER.error("No index_map for {}!", pathWrapper.getFile().getAbsolutePath());
+        indexMapString = "";
+      }
+
+      Matcher colMatcher = Pattern.compile(REGEX_COL_EXTRACT).matcher(metadataString);
+      while (colMatcher.find()) {
+        String colName = colMatcher.group(REGEX_FIRST_GROUP);
+        AccumulatorOut.putIfAbsent(pathWrapper.getTableNameWithoutType(), new HashMap<>());
+        AccumulatorOut.get(pathWrapper.getTableNameWithoutType()).putIfAbsent(colName, new ColStatsAccumulatorObj());
+
+        Matcher cardinalityMatcher =
+            Pattern.compile(REGEX_COLUMN + colName + REGEX_CARDINALITY).matcher(metadataString);
+        String cardinality = cardinalityMatcher.find() ? cardinalityMatcher.group(REGEX_FIRST_GROUP) : "1";
+
+        Matcher totalDocsMatcher = Pattern.compile(REGEX_COLUMN + colName + REGEX_TOTAL_DOCS).matcher(metadataString);
+        String totalDocs = totalDocsMatcher.find() ? totalDocsMatcher.group(REGEX_FIRST_GROUP) : "0";
+
+        Matcher isSortedMatcher = Pattern.compile(REGEX_COLUMN + colName + REGEX_IS_SORTED).matcher(metadataString);
+        String isSorted = isSortedMatcher.find() ? isSortedMatcher.group(REGEX_FIRST_GROUP) : "false";
+
+        Matcher totalNumberOfEntriesMatcher =
+            Pattern.compile(REGEX_COLUMN + colName + REGEX_TOTAL_NUMBER_OF_ENTRIES).matcher(metadataString);
+        String totalNumberOfEntries =
+            totalNumberOfEntriesMatcher.find() ? totalNumberOfEntriesMatcher.group(REGEX_FIRST_GROUP) : "0";
+
+        Matcher invertedIndexSizeMatcher = Pattern.compile(colName + REGEX_INVERTED_INDEX_SIZE).matcher(indexMapString);
+        String invertedIndexSize =
+            invertedIndexSizeMatcher.find() ? invertedIndexSizeMatcher.group(REGEX_FIRST_GROUP) : "0";
+
+        ((ColStatsAccumulatorObj) AccumulatorOut.get(pathWrapper.getTableNameWithoutType())
+            .get(colName)).setCardinality(cardinality)
+            .setInvertedIndexSize(invertedIndexSize)
+            .setIsSorted(isSorted)
+            .setSegmentName(pathWrapper.getFile().getName())
+            .setTotalDocs(totalDocs)
+            .setTotalNumberOfEntries(totalNumberOfEntries)
+            .merge();
+      }
+    } finally {
       deleteTmp(tmpFolder);
-      return;
     }
-
-    String indexMapString = "";
-    try {
-      indexMapString = FileUtils.readFileToString(indexMap);
-    } catch (IOException | NullPointerException e) {
-      LOGGER.error("No index_map for {}!", pathWrapper.getFile().getAbsolutePath());
-      indexMapString = "";
-    }
-
-    Matcher colMatcher = Pattern.compile(REGEX_COL_EXTRACT).matcher(metadataString);
-    while (colMatcher.find()) {
-      String colName = colMatcher.group(REGEX_FIRST_GROUP);
-      AccumulatorOut.putIfAbsent(pathWrapper.getTableNameWithoutType(), new HashMap<>());
-      AccumulatorOut.get(pathWrapper.getTableNameWithoutType()).putIfAbsent(colName, new ColStatsAccumulatorObj());
-
-      Matcher cardinalityMatcher = Pattern.compile(REGEX_COLUMN + colName + REGEX_CARDINALITY).matcher(metadataString);
-      String cardinality = cardinalityMatcher.find() ? cardinalityMatcher.group(REGEX_FIRST_GROUP) : "1";
-
-      Matcher totalDocsMatcher = Pattern.compile(REGEX_COLUMN + colName + REGEX_TOTAL_DOCS).matcher(metadataString);
-      String totalDocs = totalDocsMatcher.find() ? totalDocsMatcher.group(REGEX_FIRST_GROUP) : "0";
-
-      Matcher isSortedMatcher = Pattern.compile(REGEX_COLUMN + colName + REGEX_IS_SORTED).matcher(metadataString);
-      String isSorted = isSortedMatcher.find() ? isSortedMatcher.group(REGEX_FIRST_GROUP) : "false";
-
-      Matcher totalNumberOfEntriesMatcher =
-          Pattern.compile(REGEX_COLUMN + colName + REGEX_TOTAL_NUMBER_OF_ENTRIES).matcher(metadataString);
-      String totalNumberOfEntries =
-          totalNumberOfEntriesMatcher.find() ? totalNumberOfEntriesMatcher.group(REGEX_FIRST_GROUP) : "0";
-
-      Matcher invertedIndexSizeMatcher = Pattern.compile(colName + REGEX_INVERTED_INDEX_SIZE).matcher(indexMapString);
-      String invertedIndexSize =
-          invertedIndexSizeMatcher.find() ? invertedIndexSizeMatcher.group(REGEX_FIRST_GROUP) : "0";
-
-      ((ColStatsAccumulatorObj) AccumulatorOut.get(pathWrapper.getTableNameWithoutType()).get(colName)).setCardinality(
-          cardinality)
-          .setInvertedIndexSize(invertedIndexSize)
-          .setIsSorted(isSorted)
-          .setSegmentName(pathWrapper.getFile().getName())
-          .setTotalDocs(totalDocs)
-          .setTotalNumberOfEntries(totalNumberOfEntries)
-          .merge();
-    }
-
-    deleteTmp(tmpFolder);
   }
 
   private void deleteTmp(File tmpFolder) {
