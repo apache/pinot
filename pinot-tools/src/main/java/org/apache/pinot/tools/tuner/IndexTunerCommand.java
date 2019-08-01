@@ -99,8 +99,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
         if (_indexType.equals(INVERTED_INDEX)) {
           TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
               .setTuningStrategy(new ParserBasedImpl.Builder().setTableNamesWithoutType(tableNamesWithoutType)
-                  .setNumQueriesThreshold(_numQueriesThreshold)
-                  .setAlgorithmOrder(ParserBasedImpl.FIRST_ORDER)
+                  .setNumQueriesThreshold(_numQueriesThreshold).setAlgorithmOrder(ParserBasedImpl.SECOND_ORDER)
                   .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
                   .setSelectivityThreshold(_selectivityThreshold)
                   .build())

@@ -90,25 +90,24 @@ public class ColStatsAccumulatorObj extends AbstractAccumulator {
     return this;
   }
 
+  /**
+   * Merge the fields of a particular segment, set by set*
+   */
   public void merge() {
     _accumulatedStats.put(MetaManager.WEIGHTED_SUM_CARDINALITY,
-        _accumulatedStats.getOrDefault(MetaManager.WEIGHTED_SUM_CARDINALITY, BigInteger.ZERO)
-            .add(new BigInteger(_cardinality).multiply(new BigInteger(_totalDocs))));
+        _accumulatedStats.getOrDefault(MetaManager.WEIGHTED_SUM_CARDINALITY, BigInteger.ZERO).add(new BigInteger(_cardinality).multiply(new BigInteger(_totalDocs))));
 
     _accumulatedStats.put(MetaManager.SUM_SEGMENTS_COUNT,
         _accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_COUNT, BigInteger.ZERO).add(BigInteger.ONE));
 
     _accumulatedStats.put(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX,
-        _accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX, BigInteger.ZERO)
-            .add(Integer.parseInt(_invertedIndexSize) > 0 ? BigInteger.ONE : BigInteger.ZERO));
+        _accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_HAS_INVERTED_INDEX, BigInteger.ZERO).add(Integer.parseInt(_invertedIndexSize) > 0 ? BigInteger.ONE : BigInteger.ZERO));
 
     _accumulatedStats.put(MetaManager.SUM_SEGMENTS_SORTED,
-        _accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_SORTED, BigInteger.ZERO)
-            .add(_isSorted.trim().toLowerCase().equals("true") ? BigInteger.ONE : BigInteger.ZERO));
+        _accumulatedStats.getOrDefault(MetaManager.SUM_SEGMENTS_SORTED, BigInteger.ZERO).add(_isSorted.trim().toLowerCase().equals("true") ? BigInteger.ONE : BigInteger.ZERO));
 
     _accumulatedStats.put(MetaManager.SUM_TOTAL_ENTRIES,
-        _accumulatedStats.getOrDefault(MetaManager.SUM_TOTAL_ENTRIES, BigInteger.ZERO)
-            .add(new BigInteger(_totalNumberOfEntries)));
+        _accumulatedStats.getOrDefault(MetaManager.SUM_TOTAL_ENTRIES, BigInteger.ZERO).add(new BigInteger(_totalNumberOfEntries)));
 
     _accumulatedStats.put(MetaManager.SUM_DOCS,
         _accumulatedStats.getOrDefault(MetaManager.SUM_DOCS, BigInteger.ZERO).add(new BigInteger(_totalDocs)));
