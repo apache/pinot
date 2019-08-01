@@ -2269,7 +2269,7 @@ public class PinotHelixResourceManager {
   @Nonnull
   public RebalanceResult rebalanceTable(final String rawTableName, TableType tableType,
       Configuration rebalanceUserConfig)
-      throws InvalidConfigException, TableNotFoundException {
+      throws InvalidConfigException, TableNotFoundException, IllegalStateException {
 
     TableConfig tableConfig = getTableConfig(rawTableName, tableType);
     if (tableConfig == null) {
@@ -2284,6 +2284,9 @@ public class PinotHelixResourceManager {
       result = _tableRebalancer.rebalance(tableConfig, rebalanceSegmentsStrategy, rebalanceUserConfig);
     } catch (InvalidConfigException e) {
       LOGGER.error("Exception in rebalancing config for table {}", tableNameWithType, e);
+      throw e;
+    } catch (IllegalStateException e) {
+      LOGGER.error("Exception while rebalancing table {}", tableNameWithType, e);
       throw e;
     }
     return result;

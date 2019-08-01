@@ -139,6 +139,13 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
     // get target num replicas
     int targetNumReplicas;
     if (tableType.equals(CommonConstants.Helix.TableType.REALTIME)) {
+      if (tableConfig.getIndexingConfig().getStreamConfigs() != null) {
+        StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+        if (!streamConfig.hasLowLevelConsumerType()) {
+          LOGGER.info("Table {} does not have LLC and therefore no change for rebalanced ideal state", tableNameWithType);
+          return idealState;
+        }
+      }
       String replicasString = tableConfig.getValidationConfig().getReplicasPerPartition();
       try {
         targetNumReplicas = Integer.parseInt(replicasString);
