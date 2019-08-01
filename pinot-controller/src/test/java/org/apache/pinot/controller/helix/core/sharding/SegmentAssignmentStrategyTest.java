@@ -186,8 +186,7 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
     replicaGroupTableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
 
     // Check that the replica group partition assignment is created
-    _helixResourceManager
-        .setExistingTableConfig(replicaGroupTableConfig, tableNameWithType, CommonConstants.Helix.TableType.OFFLINE);
+    _helixResourceManager.setExistingTableConfig(replicaGroupTableConfig);
     partitionAssignment = _partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType);
     Assert.assertTrue(partitionAssignment != null);
 
@@ -252,8 +251,7 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
 
     // Check that the replica group partition assignment is created
     try {
-      _helixResourceManager
-          .setExistingTableConfig(replicaGroupTableConfig, tableNameWithType, CommonConstants.Helix.TableType.REALTIME);
+      _helixResourceManager.setExistingTableConfig(replicaGroupTableConfig);
     } catch (Exception e) {
       // ignore
     }

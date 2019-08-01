@@ -23,6 +23,9 @@ import org.apache.pinot.common.utils.TenantRole;
 
 
 public class TagNameUtils {
+  private TagNameUtils() {
+  }
+
   public final static String DEFAULT_TENANT_NAME = "DefaultTenant";
 
   private static String buildRealtimeTagFromTenantName(String tenantName) {
@@ -51,13 +54,6 @@ public class TagNameUtils {
 
   public static boolean isBrokerTag(String tagName) {
     return tagName.endsWith(TenantRole.BROKER.toString());
-  }
-
-  public static String getTagFromTenantAndServerType(String tenantName, ServerType type) {
-    if (type == ServerType.OFFLINE) {
-      return getOfflineTagForTenant(tenantName);
-    }
-    return getRealtimeTagForTenant(tenantName);
   }
 
   public static String getRealtimeTagForTenant(String tenantName) {

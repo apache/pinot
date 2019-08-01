@@ -92,14 +92,12 @@ public class ReplicaGroupRebalanceStrategyTest extends ControllerTest {
     replicaGroupStrategyConfig.setNumInstancesPerPartition(numInstancesPerPartition);
     replicaGroupStrategyConfig.setMirrorAssignmentAcrossReplicaGroups(true);
 
-    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
-    TableConfig tableConfig = _helixResourceManager.getTableConfig(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE);
+    TableConfig tableConfig = _helixResourceManager.getOfflineTableConfig(TABLE_NAME);
     tableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
     tableConfig.getValidationConfig().setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy");
     tableConfig.getValidationConfig().setReplication("2");
 
-    _helixResourceManager
-        .setExistingTableConfig(tableConfig, tableNameWithType, CommonConstants.Helix.TableType.OFFLINE);
+    _helixResourceManager.setExistingTableConfig(tableConfig);
 
     // Test rebalancing after migration from non-replica to replica group table
     _helixResourceManager.rebalanceTable(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE, rebalanceUserConfig);
@@ -302,13 +300,11 @@ public class ReplicaGroupRebalanceStrategyTest extends ControllerTest {
 
   private void updateTableConfig(int targetNumInstancePerPartition, int targetNumReplicaGroup)
       throws IOException {
-    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
-    TableConfig tableConfig = _helixResourceManager.getTableConfig(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE);
+    TableConfig tableConfig = _helixResourceManager.getOfflineTableConfig(TABLE_NAME);
     tableConfig.getValidationConfig().getReplicaGroupStrategyConfig()
         .setNumInstancesPerPartition(targetNumInstancePerPartition);
     tableConfig.getValidationConfig().setReplication(Integer.toString(targetNumReplicaGroup));
-    _helixResourceManager
-        .setExistingTableConfig(tableConfig, tableNameWithType, CommonConstants.Helix.TableType.OFFLINE);
+    _helixResourceManager.setExistingTableConfig(tableConfig);
   }
 
   @AfterClass

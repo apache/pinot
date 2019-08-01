@@ -43,7 +43,6 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.config.TagOverrideConfig;
 import org.apache.pinot.common.config.Tenant;
-import org.apache.pinot.common.config.TenantConfig;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -236,6 +235,9 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
 
     // Delete the table
     _helixResourceManager.deleteOfflineTable(TABLE_NAME);
+
+    // Untag the brokers
+    untagBrokers();
   }
 
   @Test
@@ -304,164 +306,98 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     Assert.assertEquals(serverTenantNames.iterator().next(), SERVER_TENANT_NAME);
 
     _helixAdmin.removeInstanceTag(getHelixClusterName(), testServerInstance, "wrong_tag");
+
+    untagBrokers();
   }
 
   @Test
-  public void testValidateTenantConfigs() {
-    String tableNameWithType = "testTable_OFFLINE";
-    TableType tableType = TableType.OFFLINE;
-    int numReplica = 2;
-    TableConfig tableConfig = null;
-    String brokerTag = "aBrokerTag";
-    String serverTag = "aServerTag";
-
-    // null table config
-    try {
-      _helixResourceManager.validateTableTenantConfig(tableConfig, tableNameWithType, tableType);
-      Assert.fail("Expected InvalidTableConfigException");
-    } catch (InvalidTableConfigException e1) {
-      // expected
-    } catch (Exception e2) {
-      Assert.fail("Expected InvalidTableConfigException");
-    }
-
-    // null tenant config
-    tableConfig = new TableConfig.Builder(tableType).setTableName(tableNameWithType).setNumReplicas(numReplica).build();
-    try {
-      _helixResourceManager.validateTableTenantConfig(tableConfig, tableNameWithType, tableType);
-      Assert.fail("Expected InvalidTableConfigException");
-    } catch (InvalidTableConfigException e1) {
-      // expected
-    } catch (Exception e2) {
-      Assert.fail("Expected InvalidTableConfigException");
-    }
-
-    // null broker tenant
-    TenantConfig tenantConfig = new TenantConfig();
-    tenantConfig.setServer(serverTag);
-    tableConfig.setTenantConfig(tenantConfig);
-    try {
-      _helixResourceManager.validateTableTenantConfig(tableConfig, tableNameWithType, tableType);
-      Assert.fail("Expected InvalidTableConfigException");
-    } catch (InvalidTableConfigException e1) {
-      // expected
-    } catch (Exception e2) {
-      Assert.fail("Expected InvalidTableConfigException");
-    }
-
-    // null server tenant
-    tenantConfig.setServer(null);
-    tenantConfig.setBroker(brokerTag);
-    try {
-      _helixResourceManager.validateTableTenantConfig(tableConfig, tableNameWithType, tableType);
-      Assert.fail("Expected InvalidTableConfigException");
-    } catch (InvalidTableConfigException e1) {
-      // expected
-    } catch (Exception e2) {
-      Assert.fail("Expected InvalidTableConfigException");
-    }
-
-    // empty broker instances list
-    tenantConfig.setServer(serverTag);
-    try {
-      _helixResourceManager.validateTableTenantConfig(tableConfig, tableNameWithType, tableType);
-      Assert.fail("Expected InvalidTableConfigException");
-    } catch (InvalidTableConfigException e1) {
-      // expected
-    } catch (Exception e2) {
-      Assert.fail("Expected InvalidTableConfigException");
-    }
-
+  public void testValidateTenantConfig() {
     // Create broker tenant on 3 Brokers
-    Tenant brokerTenant = new Tenant.TenantBuilder(brokerTag).setRole(TenantRole.BROKER).setTotalInstances(3).build();
+    Tenant brokerTenant =
+        new Tenant.TenantBuilder(BROKER_TENANT_NAME).setRole(TenantRole.BROKER).setTotalInstances(3).build();
     _helixResourceManager.createBrokerTenant(brokerTenant);
 
-    // empty server instances list
+    String rawTableName = "testTable";
+    TableConfig offlineTableConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName(rawTableName).build();
+
+    // Empty broker tag (DefaultTenant_BROKER)
     try {
-      _helixResourceManager.validateTableTenantConfig(tableConfig, tableNameWithType, tableType);
+      _helixResourceManager.validateTableTenantConfig(offlineTableConfig);
       Assert.fail("Expected InvalidTableConfigException");
-    } catch (InvalidTableConfigException e1) {
+    } catch (InvalidTableConfigException e) {
       // expected
-    } catch (Exception e2) {
-      Assert.fail("Expected InvalidTableConfigException");
     }
 
-    // valid tenant config, null tagOverrideConfig
-    serverTag = SERVER_TENANT_NAME;
-    tenantConfig.setServer(serverTag);
+    // Empty server tag (DefaultTenant_OFFLINE)
+    offlineTableConfig.getTenantConfig().setBroker(BROKER_TENANT_NAME);
     try {
-      _helixResourceManager.validateTableTenantConfig(tableConfig, tableNameWithType, tableType);
-    } catch (Exception e2) {
-      Assert.fail("No exceptions expected");
+      _helixResourceManager.validateTableTenantConfig(offlineTableConfig);
+      Assert.fail("Expected InvalidTableConfigException");
+    } catch (InvalidTableConfigException e) {
+      // expected
     }
 
-    // valid tagOverride config
+    // Valid tenant config without tagOverrideConfig
+    offlineTableConfig.getTenantConfig().setServer(SERVER_TENANT_NAME);
+    _helixResourceManager.validateTableTenantConfig(offlineTableConfig);
+
+    TableConfig realtimeTableConfig =
+        new TableConfig.Builder(TableType.REALTIME).setTableName(rawTableName).setBrokerTenant(BROKER_TENANT_NAME)
+            .setServerTenant(SERVER_TENANT_NAME).build();
+
+    // Empty server tag (serverTenant_REALTIME)
+    try {
+      _helixResourceManager.validateTableTenantConfig(realtimeTableConfig);
+      Assert.fail("Expected InvalidTableConfigException");
+    } catch (InvalidTableConfigException e) {
+      // expected
+    }
+
+    // Incorrect CONSUMING server tag (serverTenant_BROKER)
     TagOverrideConfig tagOverrideConfig = new TagOverrideConfig();
-    tenantConfig.setTagOverrideConfig(tagOverrideConfig);
+    tagOverrideConfig.setRealtimeConsuming(TagNameUtils.getBrokerTagForTenant(SERVER_TENANT_NAME));
+    tagOverrideConfig.setRealtimeCompleted(TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME));
+    realtimeTableConfig.getTenantConfig().setTagOverrideConfig(tagOverrideConfig);
     try {
-      _helixResourceManager.validateTableTenantConfig(tableConfig, tableNameWithType, tableType);
-    } catch (Exception e2) {
-      Assert.fail("No exceptions expected");
-    }
-
-    // incorrect realtime consuming tag suffix
-    tagOverrideConfig.setRealtimeConsuming("incorrectTag_XXX");
-    try {
-      _helixResourceManager.validateTableTenantConfig(tableConfig, tableNameWithType, tableType);
+      _helixResourceManager.validateTableTenantConfig(realtimeTableConfig);
       Assert.fail("Expected InvalidTableConfigException");
-    } catch (InvalidTableConfigException e1) {
+    } catch (InvalidTableConfigException e) {
       // expected
-    } catch (Exception e2) {
-      Assert.fail("Expected InvalidTableConfigException");
     }
 
-    // incorrect realtime consuming tag suffix
-    tagOverrideConfig.setRealtimeConsuming("correctTagEmptyList_OFFLINE");
+    // Empty CONSUMING server tag (serverTenant_REALTIME)
+    tagOverrideConfig.setRealtimeConsuming(TagNameUtils.getRealtimeTagForTenant(SERVER_TENANT_NAME));
     try {
-      _helixResourceManager.validateTableTenantConfig(tableConfig, tableNameWithType, tableType);
+      _helixResourceManager.validateTableTenantConfig(realtimeTableConfig);
       Assert.fail("Expected InvalidTableConfigException");
-    } catch (InvalidTableConfigException e1) {
+    } catch (InvalidTableConfigException e) {
       // expected
-    } catch (Exception e2) {
-      Assert.fail("Expected InvalidTableConfigException");
     }
 
-    // incorrect realtime completed tag suffix
-    tagOverrideConfig.setRealtimeConsuming(serverTag + "_OFFLINE");
-    tagOverrideConfig.setRealtimeCompleted("incorrectTag_XXX");
+    // Incorrect COMPLETED server tag (serverTenant_BROKER)
+    tagOverrideConfig.setRealtimeConsuming(TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME));
+    tagOverrideConfig.setRealtimeCompleted(TagNameUtils.getBrokerTagForTenant(SERVER_TENANT_NAME));
     try {
-      _helixResourceManager.validateTableTenantConfig(tableConfig, tableNameWithType, tableType);
+      _helixResourceManager.validateTableTenantConfig(realtimeTableConfig);
       Assert.fail("Expected InvalidTableConfigException");
-    } catch (InvalidTableConfigException e1) {
+    } catch (InvalidTableConfigException e) {
       // expected
-    } catch (Exception e2) {
-      Assert.fail("Expected InvalidTableConfigException");
     }
 
-    // empty list in realtime completed
-    tagOverrideConfig.setRealtimeCompleted("correctTagEmptyList_OFFLINE");
+    // Empty COMPLETED server tag (serverTenant_REALTIME)
+    tagOverrideConfig.setRealtimeCompleted(TagNameUtils.getRealtimeTagForTenant(SERVER_TENANT_NAME));
     try {
-      _helixResourceManager.validateTableTenantConfig(tableConfig, tableNameWithType, tableType);
+      _helixResourceManager.validateTableTenantConfig(realtimeTableConfig);
       Assert.fail("Expected InvalidTableConfigException");
-    } catch (InvalidTableConfigException e1) {
+    } catch (InvalidTableConfigException e) {
       // expected
-    } catch (Exception e2) {
-      Assert.fail("Expected InvalidTableConfigException");
     }
 
-    // all good
-    tagOverrideConfig.setRealtimeCompleted(serverTag + "_OFFLINE");
-    try {
-      _helixResourceManager.validateTableTenantConfig(tableConfig, tableNameWithType, tableType);
-    } catch (Exception e2) {
-      Assert.fail("No exceptions expected");
-    }
+    // Valid tenant config with tagOverrideConfig
+    tagOverrideConfig.setRealtimeCompleted(TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME));
+    _helixResourceManager.validateTableTenantConfig(realtimeTableConfig);
 
-    for (String brokerInstance : _helixResourceManager.getAllInstancesForBrokerTenant(brokerTag)) {
-      _helixAdmin
-          .removeInstanceTag(getHelixClusterName(), brokerInstance, TagNameUtils.getBrokerTagForTenant(brokerTag));
-      _helixAdmin.addInstanceTag(getHelixClusterName(), brokerInstance, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
-    }
+    untagBrokers();
   }
 
   @Test
@@ -562,9 +498,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     }
   }
 
-  @AfterMethod
-  public void cleanUpBrokerTags() {
-    // Untag all Brokers for other tests
+  private void untagBrokers() {
     for (String brokerInstance : _helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME)) {
       _helixAdmin.removeInstanceTag(getHelixClusterName(), brokerInstance,
           TagNameUtils.getBrokerTagForTenant(BROKER_TENANT_NAME));
