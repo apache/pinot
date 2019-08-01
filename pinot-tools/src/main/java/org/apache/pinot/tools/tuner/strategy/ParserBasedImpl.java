@@ -227,12 +227,12 @@ public class ParserBasedImpl implements TuningStrategy {
     sortedPure.sort((p1, p2) -> (p2._2().compareTo(p1._2())));
     sortedWeighted.sort((p1, p2) -> (p2._2().compareTo(p1._2())));
     reportOut += "________________________________Score_______________________________________\n";
-    reportOut += "The overall goodness of a index, the score is for reference only:\n\n";
+    reportOut += "The overall goodness of a index, the score is the overall goodness of index:\n\n";
     for (Tuple2<String, BigInteger> tuple2 : sortedWeighted) {
       reportOut += "Dimension: " + tuple2._1() + "  " + formatter.format(tuple2._2()) + "\n";
     }
     reportOut += "\n________________________________Coverage___________________________________\n";
-    reportOut += "At least % of queries will benefit from a given index:\n\n";
+    reportOut += "At least % of queries will benefit from a given index, for reference only:\n\n";
     for (Tuple2<String, Long> tuple2 : sortedPure) {
       reportOut += "Dimension: " + tuple2._1() + "  " + String.valueOf(
           Double.parseDouble(tuple2._2().toString()) / totalCount * 100).substring(0, 4) + "%\n";
@@ -362,8 +362,8 @@ public class ParserBasedImpl implements TuningStrategy {
     private BigFraction equivalentSelectivity(Boolean invertSelection, BigFraction selectivity, int numSelectedValues) {
       BigFraction equivalentLen = new BigFraction(numSelectedValues);
       if (!invertSelection) { // not invertSelection
-        return selectivity.divide(
-            equivalentLen); // return selectivity/equivalentLen; equivalentLen=len(literals to match)*len(avgEntries)
+        return selectivity.divide(equivalentLen);
+        // return selectivity/equivalentLen; equivalentLen=len(literals to match)*len(avgEntries)
       } else { // invertSelection
         BigFraction complementary = selectivity.subtract(equivalentLen); // complementary=(selectivity-equivalentLen)
         if (complementary.compareTo(BigFraction.ONE) <= 0) { // if (selectivity-equivalentLen)<=1

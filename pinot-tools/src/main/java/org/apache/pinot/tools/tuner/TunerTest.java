@@ -66,7 +66,7 @@ public class TunerTest extends TunerDriver {
             .build())
         .setInputIterator(new LogInputIteratorImpl.Builder().setParser(new BrokerLogParserImpl())
             .setValidLinePrefixRegex(LogInputIteratorImpl.REGEX_VALID_LINE_STANDALONE)
-            .setPath("/Users/jiaguo/finalTestData/finalTestLog/audienceCount_OFFLINE/broker.audienceCount_noindex.log")
+            .setPath("/Users/jiaguo/finalTestData/finalTestLog/suForecasting_OFFLINE/broker.suForecasting_noindex.log")
             .build())
         .setMetaManager(new JsonFileMetaManagerImpl.Builder().setUseExistingIndex(
             JsonFileMetaManagerImpl.DONT_USE_EXISTING_INDEX) //Delete after demo
