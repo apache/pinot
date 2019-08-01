@@ -87,6 +87,13 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     return recipients;
   }
 
+  private void configureAdminRecipients(DetectionAlertFilterRecipients recipients) {
+    if (recipients.getCc() == null) {
+      recipients.setCc(new HashSet<>());
+    }
+    recipients.getCc().addAll(ConfigUtils.getList(this.teConfig.getAlerterConfiguration().get(PROP_ADMIN_RECIPIENTS)));
+  }
+
   private void whitelistRecipients(DetectionAlertFilterRecipients recipients) {
     if (recipients != null) {
       List<String> emailWhitelist = ConfigUtils.getList(
@@ -180,6 +187,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   }
 
   private void sendEmail(DetectionAlertFilterRecipients recipients, Set<MergedAnomalyResultDTO> anomalies) throws Exception {
+    configureAdminRecipients(recipients);
     whitelistRecipients(recipients);
     validateAlert(recipients, anomalies);
 
@@ -205,12 +213,12 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     email.setSubject(emailEntity.getSubject());
     email.setFrom(this.config.getFrom());
     email.setTo(AlertUtils.toAddress(recipients.getTo()));
-    if (recipients.getCc() == null) {
-      recipients.setCc(new HashSet<>());
+    if (!CollectionUtils.isEmpty(recipients.getCc())) {
+      email.setCc(AlertUtils.toAddress(recipients.getCc()));
     }
-    recipients.getCc().addAll(ConfigUtils.getList(this.teConfig.getAlerterConfiguration().get(PROP_ADMIN_RECIPIENTS)));
-    email.setCc(AlertUtils.toAddress(recipients.getCc()));
-    email.setBcc(AlertUtils.toAddress(recipients.getBcc()));
+    if (!CollectionUtils.isEmpty(recipients.getBcc())) {
+      email.setBcc(AlertUtils.toAddress(recipients.getBcc()));
+    }
 
     sendEmail(emailEntity);
   }
