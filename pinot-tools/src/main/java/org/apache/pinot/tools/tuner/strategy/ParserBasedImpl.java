@@ -359,9 +359,8 @@ public class ParserBasedImpl implements TuningStrategy {
       }
     }
 
-    private BigFraction equivalentSelectivity(Boolean invertSelection, BigFraction selectivity, int numSelectedValues,
-        BigFraction avgEntriesPerDoc) {
-      BigFraction equivalentLen = avgEntriesPerDoc.multiply(numSelectedValues);
+    private BigFraction equivalentSelectivity(Boolean invertSelection, BigFraction selectivity, int numSelectedValues) {
+      BigFraction equivalentLen = new BigFraction(numSelectedValues);
       if (!invertSelection) { // not invertSelection
         return selectivity.divide(
             equivalentLen); // return selectivity/equivalentLen; equivalentLen=len(literals to match)*len(avgEntries)
@@ -413,12 +412,10 @@ public class ParserBasedImpl implements TuningStrategy {
 
         List<String> colNameList = new ArrayList<>();
         colNameList.add(colName);
-        BigFraction avgEntriesPerDoc = _metaManager.getAverageNumEntriesPerDoc(_tableNameWithoutType, colName);
         int numValuesSelected = ((PQL2Parser.InPredicateContext) predicateContext).inClause().literal().size();
         Boolean isInvertIn = ((PQL2Parser.InPredicateContext) predicateContext).inClause().NOT() != null;
 
-        ret.add(new Tuple2<>(colNameList,
-            equivalentSelectivity(isInvertIn, selectivity, numValuesSelected, avgEntriesPerDoc)));
+        ret.add(new Tuple2<>(colNameList, equivalentSelectivity(isInvertIn, selectivity, numValuesSelected)));
 
         LOGGER.debug("IN clause ret {}", ret.toString());
         return ret;
@@ -435,18 +432,17 @@ public class ParserBasedImpl implements TuningStrategy {
 
         List<String> colNameList = new ArrayList<>();
         colNameList.add(colName);
-        BigFraction avgEntriesPerDoc = _metaManager.getAverageNumEntriesPerDoc(_tableNameWithoutType, colName);
 
         String comparisonOperator = ((PQL2Parser.ComparisonPredicateContext) predicateContext).comparisonClause()
             .comparisonOperator()
             .getText();
         LOGGER.debug("COMP operator {}", comparisonOperator);
         if (comparisonOperator.equals("=")) {
-          ret.add(new Tuple2<>(colNameList, equivalentSelectivity(false, selectivity, 1, avgEntriesPerDoc)));
+          ret.add(new Tuple2<>(colNameList, equivalentSelectivity(false, selectivity, 1)));
           LOGGER.debug("COMP clause ret {}", ret.toString());
           return ret;
         } else if (comparisonOperator.equals("!=") || comparisonOperator.equals("<>")) {
-          ret.add(new Tuple2<>(colNameList, equivalentSelectivity(true, selectivity, 1, avgEntriesPerDoc)));
+          ret.add(new Tuple2<>(colNameList, equivalentSelectivity(true, selectivity, 1)));
           LOGGER.debug("COMP clause ret {}", ret.toString());
           return ret;
         }

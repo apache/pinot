@@ -60,16 +60,19 @@ public class TunerTest extends TunerDriver {
 
     TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
         .setTuningStrategy(new ParserBasedImpl.Builder().setTableNamesWithoutType(null)
-            .setNumQueriesThreshold(0).setAlgorithmOrder(ParserBasedImpl.FIRST_ORDER)
+            .setNumQueriesThreshold(0)
+            .setAlgorithmOrder(ParserBasedImpl.FIRST_ORDER)
             .setNumEntriesScannedThreshold(0)
-            .build()).setInputIterator(new LogInputIteratorImpl.Builder().setParser(new BrokerLogParserImpl())
-            .setPath("/Users/jiaguo/finalTestData/originalBrokerLogs/suForecasting/broker.offsiteForecasting.log")
+            .build())
+        .setInputIterator(new LogInputIteratorImpl.Builder().setParser(new BrokerLogParserImpl())
+            .setValidLinePrefixRegex(LogInputIteratorImpl.REGEX_VALID_LINE_STANDALONE)
+            .setPath("/Users/jiaguo/finalTestData/finalTestLog/audienceCount_OFFLINE/broker.audienceCount_noindex.log")
             .build())
         .setMetaManager(new JsonFileMetaManagerImpl.Builder().setUseExistingIndex(
-            JsonFileMetaManagerImpl.USE_EXISTING_INDEX) //Delete after demo
+            JsonFileMetaManagerImpl.DONT_USE_EXISTING_INDEX) //Delete after demo
             .setPath("/Users/jiaguo/finalTestData/meta/prodMetaV2/metadata.json").build());
     parserBased.execute();
-////
+
 //    TunerDriver freqBased=new TunerTest()
 //        .setThreadPoolSize(3)
 //        .setStrategy(new FrequencyImpl.Builder()._numEntriesScannedThreshold(ParserBasedImpl.NO_IN_FILTER_THRESHOLD).build())
