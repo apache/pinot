@@ -117,8 +117,6 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
-
 
 public class PinotHelixResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixResourceManager.class);
@@ -287,7 +285,7 @@ public class PinotHelixResourceManager {
     // Registers Master-Slave state model to state machine engine, which is for calculating participant assignment in lead controller resource.
     if (_helixInstanceType.equals(InstanceType.PARTICIPANT)) {
       _helixZkManager.getStateMachineEngine().registerStateModelFactory(MasterSlaveSMD.name,
-          new LeadControllerResourceMasterSlaveStateModelFactory(_leadControllerManager));
+          new LeadControllerResourceMasterSlaveStateModelFactory(_instanceId, _leadControllerManager));
     }
     try {
       _helixZkManager.connect();
