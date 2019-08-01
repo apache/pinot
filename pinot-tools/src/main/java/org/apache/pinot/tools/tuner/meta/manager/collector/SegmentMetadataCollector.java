@@ -80,7 +80,6 @@ public class SegmentMetadataCollector implements TuningStrategy {
   /**
    * Filter out irrelevant tables' segments.
    * @param filePaths the (tableNamesWithoutType,segmentPaths) extracted and parsed from directory
-   * @return
    */
   @Override
   public boolean filter(AbstractQueryStats filePaths) {

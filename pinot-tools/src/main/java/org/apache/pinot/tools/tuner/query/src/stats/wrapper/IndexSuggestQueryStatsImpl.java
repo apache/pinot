@@ -43,7 +43,6 @@ public class IndexSuggestQueryStatsImpl extends AbstractQueryStats {
     /**
      *
      * @param val Query text
-     * @return
      */
     @Nonnull
     public Builder setQuery(@Nonnull String val) {

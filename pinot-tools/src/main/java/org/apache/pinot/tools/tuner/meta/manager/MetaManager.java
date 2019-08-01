@@ -34,37 +34,24 @@ public interface MetaManager {
 
   /**
    * Get aggregated (sum and weighted sum) of metadata
-   * @param tableNameWithoutType
-   * @param columnName
    * @param fieldName one of {WEIGHTED_SUM_CARDINALITY, SUM_DOCS, NUM_SEGMENTS_HAS_INVERTED_INDEX, NUM_SEGMENTS_SORTED, NUM_SEGMENTS_COUNT}
-   * @return
    */
   String getColField(String tableNameWithoutType, String columnName, String fieldName);
 
   /**
    * Getter to certain fields for a specific column, for forward compatibility precise inverted index prediction.
-   * @param tableNameWithoutType
-   * @param columnName
-   * @param segmentName
-   * @param fieldName
-   * @return
    */
   String getSegmentField(String tableNameWithoutType, String columnName, String segmentName,
       String fieldName); //get metadata of individual segment
 
   /**
    * Get the selectivity calculated by weighted average of cardinality.
-   * @param tableNameWithoutType
-   * @param columnName
    * @return Selectivity, a BigFraction.
    */
   BigFraction getColumnSelectivity(String tableNameWithoutType, String columnName);
 
   /**
    * Get the average num of entries per doc.
-   * @param tableNameWithoutType
-   * @param columnName
-   * @return
    */
   BigFraction getAverageNumEntriesPerDoc(String tableNameWithoutType, String columnName);
 
