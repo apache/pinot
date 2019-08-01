@@ -36,11 +36,13 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.query.ReduceService;
+import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.HavingFilterQuery;
 import org.apache.pinot.common.request.HavingFilterQueryMap;
 import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -260,8 +262,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           // group by order by
           if (brokerRequest.isSetOrderBy()) {
             setOrderByGroupByResults(brokerResponseNative, aggregationFunctions, dataTableMap,
-                OrderByDefn.getOrderByDefnsFromBrokerRequest(brokerRequest.getOrderBy(), brokerRequest.getGroupBy(),
-                    brokerRequest.getAggregationsInfo()), brokerRequest.getGroupBy().getTopN(), true);
+                brokerRequest.getAggregationsInfo(), brokerRequest.getOrderBy(), brokerRequest.getGroupBy(), true);
           } else { // group by, no order by
             boolean[] aggregationFunctionSelectStatus =
                 AggregationFunctionUtils.getAggregationFunctionsSelectStatus(brokerRequest.getAggregationsInfo());
@@ -406,8 +407,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
   private void setOrderByGroupByResults(@Nonnull BrokerResponseNative brokerResponseNative,
       @Nonnull AggregationFunction[] aggregationFunctions, @Nonnull Map<ServerInstance, DataTable> dataTableMap,
-      List<OrderByDefn> orderByDefns, long topN, boolean preserveType) {
-    OrderByExecutor orderByExecutor = new OrderByExecutor();
+      List<AggregationInfo> aggregationInfos, List<SelectionSort> orderByClause, GroupBy groupBy, boolean preserveType) {
+
     Map<String, GroupByRow> groupByRowsMap = new HashMap<>();
     for (DataTable dataTable : dataTableMap.values()) {
       for (int rowId = 0; rowId < dataTable.getNumberOfRows(); rowId ++) {
@@ -429,10 +430,17 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       }
     }
     List<GroupByRow> groupByRows = new ArrayList<>(groupByRowsMap.values());
+
+    OrderByExecutor orderByExecutor = new OrderByExecutor();
+    List<OrderByDefn> orderByDefns =
+        OrderByDefn.getOrderByDefnsFromBrokerRequest(orderByClause, groupBy, aggregationInfos);
     orderByExecutor.sort(groupByRows, orderByDefns);
 
-    int numRows = Math.min((int) topN, groupByRows.size());
+    int numRows = Math.min((int) groupBy.getTopN(), groupByRows.size());
     List<String> columns = new ArrayList<>();
+    for (SelectionSort orderBy : orderByClause) {
+      columns.add(orderBy.getColumn());
+    }
 
     List<String[]> groupByKeys = new ArrayList<>();
     List<Serializable[]> results = new ArrayList<>();
@@ -443,8 +451,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       Serializable[] result = new Serializable[aggregationResults.length];
       for (int j = 0; j < aggregationResults.length; j++) {
         Object aggregationResult = aggregationResults[j];
-        Number aggregationResult1 = (Number) aggregationResult;
-        double v = aggregationResult1.doubleValue();
+        Number aggregationNumber = (Number) aggregationResult;
+        double v = aggregationNumber.doubleValue();
         result[j] = v;
       }
       results.add(result);

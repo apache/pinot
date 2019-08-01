@@ -19,11 +19,13 @@
 package org.apache.pinot.queries;
 
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.Function;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.GroupByOrderByResults;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -114,6 +116,35 @@ public class QueriesTestUtils {
         // Group-by.
         Assert.assertEquals(responseMapper.apply(aggregationResult.getGroupByResult().get(0).getValue()), expectedAggregationResult);
       }
+    }
+  }
+
+
+  public static void testInterSegmentAggregationGroupByOrderByResult(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
+      long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
+      GroupByOrderByResults expectedGroupByOrderByResults) {
+    Assert.assertEquals(brokerResponse.getNumDocsScanned(), expectedNumDocsScanned);
+    Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), expectedNumEntriesScannedInFilter);
+    Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), expectedNumEntriesScannedPostFilter);
+    Assert.assertEquals(brokerResponse.getTotalDocs(), expectedNumTotalDocs);
+
+    GroupByOrderByResults groupByOrderByResults = brokerResponse.getGroupByOrderByResults();
+    List<String> actualColumns = groupByOrderByResults.getColumns();
+    List<String[]> actualGroupByKeys = groupByOrderByResults.getGroupByKeys();
+    List<Serializable[]> actualResults = groupByOrderByResults.getRows();
+
+    List<String> expectedColumns = expectedGroupByOrderByResults.getColumns();
+    List<String[]> expectedGroupByKeys = expectedGroupByOrderByResults.getGroupByKeys();
+    List<Serializable[]> expectedResults = expectedGroupByOrderByResults.getRows();
+
+    Assert.assertEquals(actualColumns, expectedColumns);
+    Assert.assertEquals(actualGroupByKeys.size(), expectedGroupByKeys.size());
+    Assert.assertEquals(actualResults.size(), expectedResults.size());
+
+    for (int i = 0; i < actualGroupByKeys.size(); i++) {
+      Assert.assertEquals(Arrays.asList(actualGroupByKeys.get(i)), Arrays.asList(expectedGroupByKeys.get(i)));
+      Assert.assertEquals(Arrays.asList(actualResults.get(i)), Arrays.asList(expectedResults.get(i)));
+
     }
   }
 }

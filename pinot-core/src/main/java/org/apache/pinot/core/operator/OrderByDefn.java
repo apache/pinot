@@ -89,7 +89,7 @@ public class OrderByDefn {
     index = 0;
     for (AggregationInfo aggregationInfo : aggregationInfos) {
       aggregationColumnToIndex.put(
-          aggregationInfo.getAggregationType() + "(" + AggregationFunctionUtils.getColumn(aggregationInfo) + ")",
+          aggregationInfo.getAggregationType().toLowerCase() + "(" + AggregationFunctionUtils.getColumn(aggregationInfo) + ")",
           index++);
     }
 
