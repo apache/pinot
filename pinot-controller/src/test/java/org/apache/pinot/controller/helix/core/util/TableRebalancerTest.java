@@ -23,13 +23,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.core.TableRebalancer;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -39,17 +36,12 @@ public class TableRebalancerTest {
 
   private IdealState current;
   private final String segmentId = "segment1";
-  private Configuration downtime = new PropertiesConfiguration();
-  private Configuration noDowntime = new PropertiesConfiguration();
 
   @BeforeMethod
   public void setup() {
     current = new IdealState("rebalance");
     current.setPartitionState(segmentId, "host1", "ONLINE");
     current.setPartitionState(segmentId, "host2", "ONLINE");
-
-    downtime.setProperty(RebalanceUserConfigConstants.DOWNTIME, true);
-    noDowntime.setProperty(RebalanceUserConfigConstants.DOWNTIME, false);
   }
 
   // no-downtime rebalance with common elements - target state is set in one go
@@ -62,7 +54,7 @@ public class TableRebalancerTest {
     Map<String, String> srcMap = current.getRecord().getMapField(segmentId);
     Assert.assertEquals(srcMap.size(), 2);
     TableRebalancer updater = new TableRebalancer(null, null, null);
-    updater.updateSegmentIfNeeded(segmentId, srcMap, targetMap, current, noDowntime);
+    updater.updateSegmentIfNeeded(segmentId, srcMap, targetMap, current, false, 1);
 
     Map<String, String> tempMap = current.getRecord().getMapField(segmentId);
     Assert.assertTrue(EqualityUtils.isEqual(tempMap, targetMap));
@@ -78,7 +70,7 @@ public class TableRebalancerTest {
     Map<String, String> srcMap = current.getRecord().getMapField(segmentId);
     Assert.assertEquals(srcMap.size(), 2);
     TableRebalancer updater = new TableRebalancer(null, null, null);
-    updater.updateSegmentIfNeeded(segmentId, srcMap, targetMap, current, downtime);
+    updater.updateSegmentIfNeeded(segmentId, srcMap, targetMap, current, true, 1);
 
     Map<String, String> tempMap = current.getRecord().getMapField(segmentId);
     Assert.assertTrue(EqualityUtils.isEqual(tempMap, targetMap));
@@ -93,8 +85,8 @@ public class TableRebalancerTest {
 
     Map<String, String> srcMap = current.getRecord().getMapField(segmentId);
     TableRebalancer updater = new TableRebalancer(null, null, null);
-    updater.updateSegmentIfNeeded(segmentId, srcMap, targetMap, current, noDowntime);
-    updater.updateSegmentIfNeeded(segmentId, srcMap, targetMap, current, noDowntime);
+    updater.updateSegmentIfNeeded(segmentId, srcMap, targetMap, current, false, 1);
+    updater.updateSegmentIfNeeded(segmentId, srcMap, targetMap, current, false, 1);
 
     Map<String, String> tempMap = current.getRecord().getMapField(segmentId);
     Set<String> targetHosts = new HashSet<String>(Arrays.asList("host3", "host4"));
@@ -114,14 +106,14 @@ public class TableRebalancerTest {
 
     Map<String, String> srcMap = current.getRecord().getMapField(segmentId);
     TableRebalancer updater = new TableRebalancer(null, null, null);
-    updater.updateSegmentIfNeeded(segmentId, srcMap, targetMap, current, downtime);
+    updater.updateSegmentIfNeeded(segmentId, srcMap, targetMap, current, true, 1);
 
     Map<String, String> tempMap = current.getRecord().getMapField(segmentId);
     Assert.assertTrue(EqualityUtils.isEqual(tempMap, targetMap));
   }
 
   /**
-   * Test for now downtime rebalance with no common hosts between
+   * Test for no downtime rebalance with no common hosts between
    * current and target ideal state and a request to keep minimum
    * 2 replicas up while rebalancing
    */
@@ -146,15 +138,12 @@ public class TableRebalancerTest {
     // the current ideal state from ZK
     IdealState toUpdateIdealState = HelixHelper.cloneIdealState(currentIdealState);
 
-    // test for no-downtime rebalance with minimum 2 replicas of each segment to be kept up
-    noDowntime.setProperty(RebalanceUserConfigConstants.MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME, 2);
-
     final TableRebalancer rebalancer = new TableRebalancer(null, null, null);
     final Map<String, String> targetSegmentInstancesMap = targetIdealState.getInstanceStateMap(segmentId);
 
     // STEP 1
     rebalancer.updateSegmentIfNeeded(segmentId, currentIdealState.getRecord().getMapField(segmentId),
-        targetSegmentInstancesMap, toUpdateIdealState, noDowntime);
+        targetSegmentInstancesMap, toUpdateIdealState, false, 2);
     // After step 1, let's assume that
     // toUpdateIdealState : { SEGMENT1 : { host4 : online, host2 : online, host3 : online } }
     // Essentially, host1 from current state got replaced with host4 from target state
@@ -165,7 +154,7 @@ public class TableRebalancerTest {
 
     // STEP 2
     rebalancer.updateSegmentIfNeeded(segmentId, currentIdealState.getRecord().getMapField(segmentId),
-        targetSegmentInstancesMap, toUpdateIdealState, noDowntime);
+        targetSegmentInstancesMap, toUpdateIdealState, false, 2);
     // Now if the logic to keep up minimum number of serving replicas is doing
     // the right thing, in step 2 it should not have simply updated the ideal
     // state to target in one step simply because there is one common element (host4).
@@ -184,7 +173,7 @@ public class TableRebalancerTest {
 
     // STEP 3
     rebalancer.updateSegmentIfNeeded(segmentId, currentIdealState.getRecord().getMapField(segmentId),
-        targetSegmentInstancesMap, toUpdateIdealState, noDowntime);
+        targetSegmentInstancesMap, toUpdateIdealState, false, 2);
     // At this point, it would be perfectly fine to just directly set the ideal
     // state to target by updating the segment's partition map since the number
     // of hosts in common >= min serving replicas we need
@@ -219,15 +208,12 @@ public class TableRebalancerTest {
 
     IdealState toUpdateIdealState = HelixHelper.cloneIdealState(currentIdealState);
 
-    // test for no-downtime rebalance with minimum 2 replicas of each segment to be kept up
-    noDowntime.setProperty(RebalanceUserConfigConstants.MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME, 2);
-
     final TableRebalancer rebalancer = new TableRebalancer(null, null, null);
     final Map<String, String> targetSegmentInstancesMap = targetIdealState.getInstanceStateMap(segmentId);
 
     // STEP 1
     rebalancer.updateSegmentIfNeeded(segmentId, currentIdealState.getRecord().getMapField(segmentId),
-        targetSegmentInstancesMap, toUpdateIdealState, noDowntime);
+        targetSegmentInstancesMap, toUpdateIdealState, false, 2);
     // After step 1, let's assume that
     // toUpdateIdealState : { SEGMENT1 : { host4 : online, host2 : online, host3 : online } }
     // Essentially, host1 from current state got replaced with host4 from target state
@@ -238,7 +224,7 @@ public class TableRebalancerTest {
 
     // STEP 2
     rebalancer.updateSegmentIfNeeded(segmentId, currentIdealState.getRecord().getMapField(segmentId),
-        targetSegmentInstancesMap, toUpdateIdealState, noDowntime);
+        targetSegmentInstancesMap, toUpdateIdealState, false, 2);
     // another incremental transition to keep up with 2 serving replicas requirement
     // toUpdateIdealState : { SEGMENT1 : { host4 : online, host5 : online, host3 : online } }
     // Essentially, host2 from current state got replaced with host5
@@ -249,7 +235,7 @@ public class TableRebalancerTest {
 
     // STEP 3
     rebalancer.updateSegmentIfNeeded(segmentId, currentIdealState.getRecord().getMapField(segmentId),
-        targetSegmentInstancesMap, toUpdateIdealState, noDowntime);
+        targetSegmentInstancesMap, toUpdateIdealState, false, 2);
     // At this point, it would be perfectly fine to just directly set the partition
     // map in ideal state to target since the number of hosts in common >= min serving
     // replicas we need
@@ -264,7 +250,7 @@ public class TableRebalancerTest {
   }
 
   /**
-   * Test for now downtime rebalance with no common hosts between
+   * Test for no downtime rebalance with no common hosts between
    * current and target ideal state and a request to keep minimum
    * 1 replica up while rebalancing
    */
@@ -282,15 +268,12 @@ public class TableRebalancerTest {
 
     IdealState toUpdateIdealState = HelixHelper.cloneIdealState(currentIdealState);
 
-    // test for no-downtime rebalance with minimum 2 replicas of each segment to be kept up
-    noDowntime.setProperty(RebalanceUserConfigConstants.MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME, 1);
-
     final TableRebalancer rebalancer = new TableRebalancer(null, null, null);
     final Map<String, String> targetSegmentInstancesMap = targetIdealState.getInstanceStateMap(segmentId);
 
     // STEP 1
     rebalancer.updateSegmentIfNeeded(segmentId, currentIdealState.getRecord().getMapField(segmentId),
-        targetSegmentInstancesMap, toUpdateIdealState, noDowntime);
+        targetSegmentInstancesMap, toUpdateIdealState, false, 1);
     // After step 1, let's assume that
     // toUpdateIdealState : { SEGMENT1 : { host4 : online, host2 : online, host3 : online } }
     // Essentially, host1 from current state got replaced with host4
@@ -301,7 +284,7 @@ public class TableRebalancerTest {
 
     // STEP 2
     rebalancer.updateSegmentIfNeeded(segmentId, currentIdealState.getRecord().getMapField(segmentId),
-        targetSegmentInstancesMap, toUpdateIdealState, noDowntime);
+        targetSegmentInstancesMap, toUpdateIdealState, false, 1);
     // Now since the minimum number of serving replicas we need is 1, it is fine
     // to directly (in one step) set the partition mapping to target by replacing
     // host2 and host3 from current state with host5 and host6 from target state
@@ -321,7 +304,7 @@ public class TableRebalancerTest {
   }
 
   /**
-   * Test for now downtime rebalance with no common hosts between
+   * Test for no downtime rebalance with no common hosts between
    * current and target ideal state and a request to keep an invalid
    * number of minimum replicas up while rebalancing
    */
@@ -339,15 +322,12 @@ public class TableRebalancerTest {
 
     IdealState toUpdateIdealState = HelixHelper.cloneIdealState(currentIdealState);
 
-    // test for no-downtime rebalance with minimum 4 (impossible) replicas of each segment to be kept up
-    noDowntime.setProperty(RebalanceUserConfigConstants.MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME, 4);
-
     final TableRebalancer rebalancer = new TableRebalancer(null, null, null);
     final Map<String, String> targetSegmentInstancesMap = targetIdealState.getInstanceStateMap(segmentId);
 
     // STEP 1
     rebalancer.updateSegmentIfNeeded(segmentId, currentIdealState.getRecord().getMapField(segmentId),
-        targetSegmentInstancesMap, toUpdateIdealState, noDowntime);
+        targetSegmentInstancesMap, toUpdateIdealState, false, 4);
     // After step 1, let's assume that
     // toUpdateIdealState : { SEGMENT1 : { host4 : online, host2 : online, host3 : online } }
     // Essentially, host1 from current state got replaced with host4
@@ -358,7 +338,7 @@ public class TableRebalancerTest {
 
     // STEP 2
     rebalancer.updateSegmentIfNeeded(segmentId, currentIdealState.getRecord().getMapField(segmentId),
-        targetSegmentInstancesMap, toUpdateIdealState, noDowntime);
+        targetSegmentInstancesMap, toUpdateIdealState, false, 4);
     // Now since the minimum number of serving replicas we asked for are 4,
     // the rebalancer will detect that is impossible to keep up 4 replicas
     // since a segment only has 3 replicas in the current configuration. So
@@ -396,15 +376,12 @@ public class TableRebalancerTest {
 
     IdealState toUpdateIdealState = HelixHelper.cloneIdealState(currentIdealState);
 
-    // test for no-downtime rebalance with minimum 4 (impossible) replicas of each segment to be kept up
-    noDowntime.setProperty(RebalanceUserConfigConstants.MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME, 2);
-
     final TableRebalancer rebalancer = new TableRebalancer(null, null, null);
     final Map<String, String> targetSegmentInstancesMap = targetIdealState.getInstanceStateMap(segmentId);
 
     // STEP 1
     rebalancer.updateSegmentIfNeeded(segmentId, currentIdealState.getRecord().getMapField(segmentId),
-        targetSegmentInstancesMap, toUpdateIdealState, noDowntime);
+        targetSegmentInstancesMap, toUpdateIdealState, false, 2);
     // After step 1, let's assume that
     // toUpdateIdealState : { SEGMENT1 : { host1 : online, host5 : online, host3 : online } }
     // Essentially, host2 from current state got replaced with host5
@@ -415,7 +392,7 @@ public class TableRebalancerTest {
 
     // STEP 2
     rebalancer.updateSegmentIfNeeded(segmentId, currentIdealState.getRecord().getMapField(segmentId),
-        targetSegmentInstancesMap, toUpdateIdealState, noDowntime);
+        targetSegmentInstancesMap, toUpdateIdealState, false, 2);
     // Now since the minimum number of serving replicas we asked for are 2,
     // we don't need to update the segment's partition map incrementally. Since
     // the common hosts (host1 and host5) satisfy the requirement of minimum

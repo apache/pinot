@@ -470,10 +470,13 @@ public class PinotTableRestletResource {
   public String rebalance(
       @ApiParam(value = "Name of the table to rebalance") @Nonnull @PathParam("tableName") String tableName,
       @ApiParam(value = "offline|realtime") @Nonnull @QueryParam("type") String tableType,
-      @ApiParam(value = "true|false") @Nonnull @DefaultValue("true") @QueryParam("dryrun") Boolean dryRun,
-      @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("includeConsuming") Boolean includeConsuming,
-      @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("downtime") Boolean downtime,
-      @ApiParam(value = "number of serving replicas to keep alive per segment while rebalancing in no downtime mode")
+      @ApiParam(value = "true if rebalancer should be run in dryRun mode, false otherwise")
+      @Nonnull @DefaultValue("true") @QueryParam("dryrun") Boolean dryRun,
+      @ApiParam(value = "true if consuming segments should be considered for rebalancing realtime tables, false otherwise")
+      @DefaultValue("false") @QueryParam("includeConsuming") Boolean includeConsuming,
+      @ApiParam(value = "true if downtime is acceptable during rebalance, false otherwise")
+      @DefaultValue("false") @QueryParam("downtime") Boolean downtime,
+      @ApiParam(value = "minimum number of replicas to keep alive during rebalance(if downtime is false)")
       @DefaultValue("1") @QueryParam("minAvailableReplicas") Integer minAvailableReplicas) {
 
     if (tableType != null && !EnumUtils.isValidEnum(CommonConstants.Helix.TableType.class, tableType.toUpperCase())) {

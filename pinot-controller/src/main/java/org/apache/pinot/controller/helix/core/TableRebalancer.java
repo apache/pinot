@@ -23,7 +23,6 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.exception.ZkBadVersionException;
@@ -33,7 +32,6 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
-import org.apache.helix.api.config.RebalanceConfig;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -72,7 +70,7 @@ public class TableRebalancer {
 
   private static final int MAX_RETRIES = 10;
   private static final int EXTERNAL_VIEW_CHECK_INTERVAL_MS = 30000;
-  private static final int EXTERNVAL_VIEW_STABILIZATON_MAX_WAIT_MS = 300000;
+  private static final int EXTERNVAL_VIEW_STABILIZATON_MAX_WAIT_MINS = 20;
 
   private final HelixManager _helixManager;
   private final HelixAdmin _helixAdmin;
@@ -112,6 +110,7 @@ public class TableRebalancer {
     IdealState previousIdealState = dataAccessor.getProperty(idealStateKey);
 
     if (rebalanceConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN, RebalanceUserConfigConstants.DEFAULT_DRY_RUN)) {
+      LOGGER.info("Rebalancer running in dry run mode. Will return the target ideal state");
       PartitionAssignment partitionAssignment =
           strategy.rebalancePartitionAssignment(previousIdealState, tableConfig, rebalanceConfig);
       IdealState idealState =
@@ -124,13 +123,32 @@ public class TableRebalancer {
       return result;
     }
 
+    // before running rebalancer if external view is fine to begin with
+    // if it is already in error state, we return
+    if (!preCheckErrorInExternalView(tableNameWithType)) {
+      result.setStatus("Will not run rebalancer as external view is already in ERROR state for table" + tableNameWithType);
+      result.setStatusCode(RebalanceResult.RebalanceStatus.FAILED);
+      return result;
+    }
+
     long startTime = System.nanoTime();
     IdealState targetIdealState = null;
     PartitionAssignment targetPartitionAssignment = null;
 
-    // validate the number of min replicas to keep alive
-    // if using no-downtime mode
-    validateMinReplicas(tableNameWithType, rebalanceConfig, previousIdealState);
+    final boolean downtime = rebalanceConfig.getBoolean(RebalanceUserConfigConstants.DOWNTIME,
+        RebalanceUserConfigConstants.DEFAULT_DOWNTIME);
+    final int minAvailableReplicas = rebalanceConfig
+        .getInt(RebalanceUserConfigConstants.MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME,
+            RebalanceUserConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME);
+
+    if (downtime) {
+      LOGGER.info("Downtime mode is enabled");
+    } else {
+      LOGGER.info("No downtime mode is enabled with {} min available replicas", minAvailableReplicas);
+      // validate the number of min replicas to keep alive
+      // if using no-downtime mode
+      validateMinReplicas(tableNameWithType, rebalanceConfig, previousIdealState);
+    }
 
     long retryDelayMs = 60000; // 1 min
     int retries = 0;
@@ -164,8 +182,8 @@ public class TableRebalancer {
 
       // if ideal state needs to change, get the next 'safe' state (based on whether downtime is OK or not)
       final int currentMovements = _rebalancerStats.numSegmentMoves;
-      IdealState nextIdealState = getNextState(currentIdealState, targetIdealState, rebalanceConfig);
-      LOGGER.info("Got new ideal state after moving {} segments. Will attempt to persist this in ZK. Logging the difference between new and target ideal state",
+      IdealState nextIdealState = getNextState(currentIdealState, targetIdealState, downtime, minAvailableReplicas);
+      LOGGER.info("Got new ideal state after doing {} segment movements. Will attempt to persist this in ZK. Logging the difference (if any) between new and target ideal state",
           _rebalancerStats.numSegmentMoves - currentMovements);
       printIdealStateDifference(targetIdealState, nextIdealState);
 
@@ -264,14 +282,19 @@ public class TableRebalancer {
       if (updatedInstanceMap == null) {
         LOGGER.info("Segment {} missing from current ideal state", segment);
       } else {
-        LOGGER.info("Printing the common and differing hosts between updated and target ideal states for segment {}", segment);
         MapDifference diff = Maps.difference(targetInstanceMap, updatedInstanceMap);
-        LOGGER.debug("Common hosts");
-        prettyPrintMap(diff.entriesInCommon(), Level.DEBUG);
-        LOGGER.info("Hosts from target state not yet added");
-        prettyPrintMap(diff.entriesOnlyOnLeft(), Level.INFO);
-        LOGGER.debug("Hosts from updated state not yet removed");
-        prettyPrintMap(diff.entriesOnlyOnRight(), Level.DEBUG);
+        if (diff.entriesInCommon().size() > 0) {
+          LOGGER.debug("Common hosts for segment {}", segment);
+          prettyPrintMap(diff.entriesInCommon(), Level.DEBUG);
+        }
+        if (diff.entriesOnlyOnLeft().size() > 0) {
+          LOGGER.info("Hosts from target state not yet added for segment {}", segment);
+          prettyPrintMap(diff.entriesOnlyOnLeft(), Level.INFO);
+        }
+        if (diff.entriesOnlyOnRight().size() > 0) {
+          LOGGER.debug("Hosts from updated state not yet removed for segment {}", segment);
+          prettyPrintMap(diff.entriesOnlyOnRight(), Level.DEBUG);
+        }
       }
     }
   }
@@ -280,7 +303,8 @@ public class TableRebalancer {
    * Gets the next ideal state based on the target (rebalanced) state. If no downtime is desired, the next state
    * is set such that there is always atleast one common replica for each segment between current and next state.
    */
-  private IdealState getNextState(IdealState currentState, IdealState targetState, Configuration rebalanceUserConfig) {
+  private IdealState getNextState(IdealState currentState, IdealState targetState,
+      boolean downtime, int minAvailableReplicas) {
     // make a copy of the ideal state so it can be updated
     IdealState idealStateToUpdate = HelixHelper.cloneIdealState(currentState);
 
@@ -292,7 +316,7 @@ public class TableRebalancer {
 
     for (String segmentId : targetMapFields.keySet()) {
       updateSegmentIfNeeded(segmentId, currentMapFields.get(segmentId), targetMapFields.get(segmentId),
-          idealStateToUpdate, rebalanceUserConfig);
+          idealStateToUpdate, downtime, minAvailableReplicas);
     }
 
     LOGGER.info("Updated instance state map of {} segments by directly setting to target ideal state mapping",
@@ -336,12 +360,14 @@ public class TableRebalancer {
    *                                     in target ideal state
    * @param idealStateToUpdate the ideal state that is updated as (caller
    *                           passes this as a copy of current ideal state)
-   * @param rebalanceUserConfig rebalance configuration
+   * @param downtime true if downtime is enabled, false otherwise
+   * @param minAvailableReplicas min number of replicas to be available
+   *                             if downtime is false
    */
   @VisibleForTesting
   public void updateSegmentIfNeeded(String segmentId, Map<String, String> currentIdealStateSegmentHosts,
       Map<String, String> targetIdealStateSegmentHosts, IdealState idealStateToUpdate,
-      Configuration rebalanceUserConfig) {
+      boolean downtime, int minAvailableReplicas) {
 
     LOGGER.debug("Will update instance map of segment: {}", segmentId);
 
@@ -361,8 +387,7 @@ public class TableRebalancer {
 
     MapDifference difference = Maps.difference(targetIdealStateSegmentHosts, currentIdealStateSegmentHosts);
 
-    if (rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DOWNTIME,
-        RebalanceUserConfigConstants.DEFAULT_DOWNTIME)) {
+    if (downtime) {
       // in downtime mode, set the current ideal state to target at one go
       LOGGER.debug("Downtime mode is enabled. Will set to target state at one go");
       setTargetState(idealStateToUpdate, segmentId, targetIdealStateSegmentHosts);
@@ -372,24 +397,18 @@ public class TableRebalancer {
     }
 
     // we are in no-downtime mode
-    int minReplicasToKeepUp = rebalanceUserConfig
-        .getInt(RebalanceUserConfigConstants.MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME,
-            RebalanceUserConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME);
-    LOGGER.debug("No downtime mode is enabled. Need to keep {} serving replicas up while rebalancing",
-        minReplicasToKeepUp);
-
-    if (minReplicasToKeepUp >= currentIdealStateSegmentHosts.size()) {
+    if (minAvailableReplicas >= currentIdealStateSegmentHosts.size()) {
       // if the minimum number of serving replicas in rebalance config is
       // greater than or equal to number of replicas of a segment, then it
       // is impossible to honor the request. so we use the default number
       // of minimum serving replicas we will keep for no downtime mode
       // (currently 1)
       LOGGER.debug("Unable to keep {} min replicas alive as the segment {} has {} replicas",
-          minReplicasToKeepUp, segmentId, currentIdealStateSegmentHosts.size());
-      minReplicasToKeepUp = RebalanceUserConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME;
+          minAvailableReplicas, segmentId, currentIdealStateSegmentHosts.size());
+      minAvailableReplicas = RebalanceUserConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME;
     }
 
-    if (difference.entriesInCommon().size() >= minReplicasToKeepUp) {
+    if (difference.entriesInCommon().size() >= minAvailableReplicas) {
       // if there are enough hosts in common between current and target ideal states
       // to satisfy the min replicas condition, then there won't be any downtime
       // and we can directly set the current ideal state to target ideal state
@@ -448,6 +467,31 @@ public class TableRebalancer {
   private void setTargetState(IdealState idealState, String segmentId, Map<String, String> targetMap) {
     idealState.getInstanceStateMap(segmentId).clear();
     idealState.setInstanceStateMap(segmentId, targetMap);
+  }
+
+  private boolean preCheckErrorInExternalView(final String tableName) {
+    ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableName);
+    LOGGER.info("Checking if external view is already in ERROR state before rebalancing table {}", tableName);
+
+    if (externalView == null) {
+      LOGGER.info("External view is null for table {}", tableName);
+      return true;
+    }
+
+    Map<String, Map<String, String>> segmentsAndHosts = externalView.getRecord().getMapFields();
+    for (String segment : segmentsAndHosts.keySet()) {
+      Map<String, String> hostsAndStates = segmentsAndHosts.get(segment);
+      for (String server : hostsAndStates.keySet()) {
+        if (hostsAndStates.get(server).equalsIgnoreCase("error")) {
+          LOGGER.error("Detected error state for segment {} for server {}", segment, server);
+          prettyPrintMap(hostsAndStates, Level.ERROR);
+          return false;
+        }
+      }
+    }
+
+    LOGGER.info("External view is fine for table {}", tableName);
+    return true;
   }
 
   /**
@@ -524,6 +568,11 @@ public class TableRebalancer {
     return stable;
   }
 
+  /**
+   * Pretty print a map
+   * @param map hashmap
+   * @param level logging level
+   */
   private static void prettyPrintMap(final Map<String, String> map, final Level level) {
     if (map.size() > 0) {
       final Joiner.MapJoiner mapJoiner = Joiner.on(",").withKeyValueSeparator(":");
@@ -544,6 +593,7 @@ public class TableRebalancer {
     int INITIAL_WAIT_MS = 3000;
     int wait = 0;
     boolean done = false;
+    final int maxWaitTimeMillis = EXTERNVAL_VIEW_STABILIZATON_MAX_WAIT_MINS * 60 * 1000;
     try {
       Thread.sleep(INITIAL_WAIT_MS);
       // the isStable method will bail out on detecting ERROR state
@@ -552,7 +602,7 @@ public class TableRebalancer {
       // don't want to wait indefinitely for the external view to converge
       // thus, we use a fix max wait period  and bail out if external
       // view hasn't converged within that time period
-      while (wait < EXTERNVAL_VIEW_STABILIZATON_MAX_WAIT_MS) {
+      while (wait < maxWaitTimeMillis) {
         if (isStable(resourceName)) {
           done = true;
           break;
@@ -568,9 +618,10 @@ public class TableRebalancer {
     }
 
     if (!done) {
-      LOGGER.error("External view didn't converge for table {} within max wait time of 5mins. Bailing out",
-          resourceName);
-      throw new IllegalStateException("External view didn't converge for table " + resourceName + " within max wait period of 5mins",
+      LOGGER.error("External view didn't converge for table {} within max wait time of {} mins. Bailing out",
+          resourceName, EXTERNVAL_VIEW_STABILIZATON_MAX_WAIT_MINS);
+      throw new IllegalStateException("External view didn't converge for table " + resourceName +
+          " within max wait period of " + EXTERNVAL_VIEW_STABILIZATON_MAX_WAIT_MINS + " mins",
           new ExternalViewConvergeTimeout());
     }
   }
@@ -613,10 +664,17 @@ public class TableRebalancer {
 
     /**
      * Get the number of times we updated the instance-state
-     * mapping acrosss all segments in ideal state in one step. This
-     * happens in downtime rebalancing and can also happen
-     * in no-downtime rebalancing if there are sufficient common
-     * hosts between current and target ideal states
+     * mapping acrosss all segments in ideal state to target ideal state
+     * mapping in one step. This happens in downtime rebalancing
+     * and can also happen in no-downtime rebalancing if there are
+     * sufficient common hosts between current and target ideal states
+     *
+     * Note that this does not reflect the number of times we wrote
+     * the changed ideal state to ZK. Use getUpdatesToIdealStateInZK
+     * for that. This counter is for the direct changes (cumulative across
+     * segments) to in-progress ideal state which we later attempt to
+     * write in ZK
+     *
      * @return direct updates
      */
     public int getDirectUpdatesToSegmentInstanceMap() {
@@ -626,9 +684,16 @@ public class TableRebalancer {
     /**
      * Get the number of times we updated the instance-state
      * mapping across all segments in ideal state incrementally
-     * to keep the requirement of having some number of
-     * serving replicas up for each segment
+     * by removing a host from current ideal state and adding
+     * a host from target ideal state to keep the requirement of
+     * having some number of serving replicas up for each segment
      * @return incremental updates
+     *
+     * Note that this does not reflect the number of times we wrote
+     * the changed ideal state to ZK. Use getUpdatesToIdealStateInZK
+     * for that. This counter is for the incremental changes (cumulative across
+     * segments) to in-progress ideal state which we later attempt to
+     * write in ZK
      */
     public int getIncrementalUpdatesToSegmentInstanceMap() {
       return incrementalUpdatesToSegmentInstanceMap;

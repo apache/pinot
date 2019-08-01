@@ -74,12 +74,14 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
     startZk();
     startController();
     startBroker();
+    startKafka();
   }
 
   @AfterClass
   public void tearDown() {
     stopBroker();
     stopController();
+    stopKafka();
     stopZk();
   }
 
@@ -509,17 +511,12 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       final PinotTableRebalancer tableRebalancer = new PinotTableRebalancer(ZKSTR, getHelixClusterName(), false, true, false, 2);
       tableRebalancer.rebalance(tableName, "OFFLINE");
       Assert.fail("Expecting exception");
-
-      final TableRebalancer.RebalancerStats stats = tableRebalancer.getRebalancerStats();
-      // we would have persisted the new ideal state in ZK and then
-      // waited for external view to converge and bailed out on seeing
-      // error state
-      Assert.assertEquals(stats.getUpdatestoIdealStateInZK(), 1);
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("External view reports error state for segment segment0"));
+    } finally {
+      _raiseErrorOnSegmentStateTransition = false;
+      stopFakeServers();
     }
-    _raiseErrorOnSegmentStateTransition = false;
-    stopFakeServers();
   }
 
   /**
@@ -564,7 +561,6 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
 
     try {
       startFakeServers(NUM_INITIAL_SERVERS, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT, true);
-      startKafka();
       setUpRealtimeTable(null, numReplicas, true, tableName);
 
       // init stats
@@ -597,7 +593,6 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       Assert.assertEquals(_segmentStateTransitionStats.dropFromOff, 3);
     } finally {
       stopFakeServers();
-      stopKafka();
     }
   }
 
@@ -641,7 +636,6 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
 
     try {
       startFakeServers(NUM_INITIAL_SERVERS, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT, true);
-      startKafka();
       setUpRealtimeTable(null, numReplicas, true, tableName);
 
       // init stats
@@ -674,7 +668,6 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       Assert.assertEquals(_segmentStateTransitionStats.dropFromOff, 3);
     } finally {
       stopFakeServers();
-      stopKafka();
     }
   }
 
@@ -706,7 +699,6 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
 
     try {
       startFakeServers(NUM_INITIAL_SERVERS, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT, true);
-      startKafka();
       setUpRealtimeTable(null, numReplicas, false, tableName);
 
       // init stats
@@ -736,7 +728,6 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       Assert.assertEquals(_segmentStateTransitionStats.dropFromOff, 0);
     } finally {
       stopFakeServers();
-      stopKafka();
     }
   }
 
