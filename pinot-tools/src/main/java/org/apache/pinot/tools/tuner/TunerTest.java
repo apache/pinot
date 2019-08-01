@@ -60,7 +60,7 @@ public class TunerTest extends TunerDriver {
 //                .build());
 //    parserBased.execute();
 
-    TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
+    TunerDriver parserBased = new TunerDriver().setThreadPoolSize(0)
         .setTuningStrategy(new ParserBasedImpl.Builder().setTableNamesWithoutType(null)
             .setNumQueriesThreshold(0)
             .setAlgorithmOrder(ParserBasedImpl.SECOND_ORDER).setSelectivityThreshold(4)

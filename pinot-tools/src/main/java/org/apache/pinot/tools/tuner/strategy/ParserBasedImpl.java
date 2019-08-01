@@ -414,7 +414,7 @@ public class ParserBasedImpl implements TuningStrategy {
         colNameList.add(colName);
         int numValuesSelected = ((PQL2Parser.InPredicateContext) predicateContext).inClause().literal().size();
         Boolean isInvertIn = ((PQL2Parser.InPredicateContext) predicateContext).inClause().NOT() != null;
-
+        LOGGER.debug("Length of in clause: {}", numValuesSelected);
         ret.add(new Tuple2<>(colNameList, equivalentSelectivity(isInvertIn, selectivity, numValuesSelected)));
 
         LOGGER.debug("IN clause ret {}", ret.toString());
