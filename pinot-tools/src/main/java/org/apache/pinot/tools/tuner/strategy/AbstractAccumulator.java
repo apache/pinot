@@ -20,11 +20,13 @@ package org.apache.pinot.tools.tuner.strategy;
 
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.concurrent.NotThreadSafe;
 
 
 /**
  * Abstract accumulator for column stats.
  */
+@NotThreadSafe
 public abstract class AbstractAccumulator {
   public static AbstractAccumulator putAccumulatorToMapIfAbsent(
       Map<String, Map<String, AbstractAccumulator>> tableToColAccumulators, String tableNameWithoutType, String colName,

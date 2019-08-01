@@ -60,32 +60,32 @@ public class ColStatsAccumulatorObj extends AbstractAccumulator {
     return _segmentStats;
   }
 
-  ColStatsAccumulatorObj addInvertedIndexSize(String invertedIndexSize) {
+  ColStatsAccumulatorObj setInvertedIndexSize(String invertedIndexSize) {
     _invertedIndexSize = invertedIndexSize;
     return this;
   }
 
-  ColStatsAccumulatorObj addSegmentName(String segmentName) {
+  ColStatsAccumulatorObj setSegmentName(String segmentName) {
     _segmentName = segmentName;
     return this;
   }
 
-  ColStatsAccumulatorObj addCardinality(String cardinality) {
+  ColStatsAccumulatorObj setCardinality(String cardinality) {
     _cardinality = cardinality;
     return this;
   }
 
-  ColStatsAccumulatorObj addTotalDocs(String totalDocs) {
+  ColStatsAccumulatorObj setTotalDocs(String totalDocs) {
     _totalDocs = totalDocs;
     return this;
   }
 
-  ColStatsAccumulatorObj addTotalNumberOfEntries(String totalNumberOfEntries) {
+  ColStatsAccumulatorObj setTotalNumberOfEntries(String totalNumberOfEntries) {
     _totalNumberOfEntries = totalNumberOfEntries;
     return this;
   }
 
-  ColStatsAccumulatorObj addIsSorted(String isSorted) {
+  ColStatsAccumulatorObj setIsSorted(String isSorted) {
     _isSorted = isSorted;
     return this;
   }

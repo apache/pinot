@@ -175,13 +175,13 @@ public class SegmentMetadataCollector implements TuningStrategy {
       String invertedIndexSize =
           invertedIndexSizeMatcher.find() ? invertedIndexSizeMatcher.group(REGEX_FIRST_GROUP) : "0";
 
-      ((ColStatsAccumulatorObj) AccumulatorOut.get(pathWrapper.getTableNameWithoutType()).get(colName)).addCardinality(
+      ((ColStatsAccumulatorObj) AccumulatorOut.get(pathWrapper.getTableNameWithoutType()).get(colName)).setCardinality(
           cardinality)
-          .addInvertedIndexSize(invertedIndexSize)
-          .addIsSorted(isSorted)
-          .addSegmentName(pathWrapper.getFile().getName())
-          .addTotalDocs(totalDocs)
-          .addTotalNumberOfEntries(totalNumberOfEntries)
+          .setInvertedIndexSize(invertedIndexSize)
+          .setIsSorted(isSorted)
+          .setSegmentName(pathWrapper.getFile().getName())
+          .setTotalDocs(totalDocs)
+          .setTotalNumberOfEntries(totalNumberOfEntries)
           .merge();
     }
 
@@ -239,7 +239,7 @@ public class SegmentMetadataCollector implements TuningStrategy {
       file.createNewFile();
       FileUtils.writeStringToFile(file, json);
     } catch (IOException e) {
-      e.printStackTrace();
+      LOGGER.error("Error writing to the json file: {}", file.getAbsolutePath());
     }
   }
 

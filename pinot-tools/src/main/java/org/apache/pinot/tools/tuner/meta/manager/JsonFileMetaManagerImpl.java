@@ -160,7 +160,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
       BigInteger entriesNumerator = new BigInteger(getColField(tableNameWithoutType, columnName, SUM_TOTAL_ENTRIES));
       BigInteger entriesDenominator = new BigInteger(getColField(tableNameWithoutType, columnName, SUM_DOCS));
       if (entriesNumerator.compareTo(entriesDenominator) < 0 || entriesDenominator.equals(BigInteger.ZERO)) {
-        throw new Exception();
+        throw new Exception("Invalid state: SUM_DOCS < SUM_TOTAL_ENTRIES or SUM_DOCS is 0!");
       }
       return new BigFraction(entriesNumerator, entriesDenominator);
     } catch (Exception e) {
@@ -169,6 +169,10 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     }
   }
 
+  /**
+   * Get the Sum_across_segments(cardinality*totalDocs)/Sum_across_segments(totalDocs), i.e. the weighted average cardinality
+   * At the same time, fix this value by numSegmentsNotSorted/numSegments
+   */
   public BigFraction getColumnSelectivity(String tableNameWithoutType, String columnName) {
     LOGGER.debug("Getting cardinality from: {} {}", tableNameWithoutType, columnName);
 

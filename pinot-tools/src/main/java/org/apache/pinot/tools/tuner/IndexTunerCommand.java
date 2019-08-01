@@ -34,6 +34,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * A command to give indexing recommendation for inverted and sorted indices
+ */
 public class IndexTunerCommand extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(IndexTunerCommand.class);
 
@@ -45,7 +48,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
   private static final String SORTED_INDEX = "sorted";
   private static final String STRATEGY_PARSER_BASED = "parser";
 
-  @Option(name = "-metadata", required = true, metaVar = "<String>", usage = "Path to packed metadata file (json), CollectSegmentMetadata can be used to create this.")
+  @Option(name = "-metadata", required = true, metaVar = "<String>", usage = "Path to packed metadata file (json), CollectMetadataForIndexTuning can be used to create this.")
   private String _metadata;
 
   @Option(name = "-log", required = true, metaVar = "<String>", usage = "Path to broker log file.")
@@ -69,8 +72,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (unset run on all tables)")
   private String _tableNamesWithoutType = null;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h",
-      "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help;
 
   @Override
@@ -86,8 +88,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
       tableNamesWithoutTypeStr = tableNamesWithoutType.toString();
     }
     LOGGER.info("Index: {}\nstrategy: {}\nmetadata file: {}\nbroker log: {}\ntables{}\n", _indexType, _strategy,
-        _metadata, _brokerLog,
-        tableNamesWithoutTypeStr);
+        _metadata, _brokerLog, tableNamesWithoutTypeStr);
 
     if (_selectivityThreshold < 1) {
       _selectivityThreshold = 1;

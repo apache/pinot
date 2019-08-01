@@ -31,13 +31,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class CollectSegmentMetadata extends AbstractBaseCommand implements Command {
-  private static final Logger LOGGER = LoggerFactory.getLogger(CollectSegmentMetadata.class);
+/**
+ * Used to collect relevant fields metadata.properties and index_map from tarred segments,
+ * And packed them into a json file
+ */
+public class CollectMetadataForIndexTuning extends AbstractBaseCommand implements Command {
+  private static final Logger LOGGER = LoggerFactory.getLogger(CollectMetadataForIndexTuning.class);
 
   @Option(name = "-out", required = true, metaVar = "<String>", usage = "An empty directory to work on, for tmp files and output metadata.json file，must have r/w access")
   private String _workDir;
 
-  @Option(name = "-segments", required = true, metaVar = "<String>", usage = "The directory, which contains tableNamesWithoutType/{tarred segments}")
+  @Option(name = "-segments", required = true, metaVar = "<String>", usage = "The directory containing /tableNamesWithoutType/{tarred segments}")
   private String _segmentsDir;
 
   @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (unset to run on all tables)")
@@ -83,7 +87,7 @@ public class CollectSegmentMetadata extends AbstractBaseCommand implements Comma
 
   @Override
   public String getName() {
-    return "CollectSegmentMetadata";
+    return "CollectMetadataForIndexTuning";
   }
 
   @Override

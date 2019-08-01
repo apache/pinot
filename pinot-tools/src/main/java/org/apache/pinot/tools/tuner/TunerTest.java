@@ -19,6 +19,8 @@
 package org.apache.pinot.tools.tuner;
 
 import java.io.FileNotFoundException;
+import java.util.HashMap;
+import java.util.HashSet;
 import org.apache.pinot.tools.tuner.driver.TunerDriver;
 import org.apache.pinot.tools.tuner.meta.manager.JsonFileMetaManagerImpl;
 import org.apache.pinot.tools.tuner.query.src.LogInputIteratorImpl;
@@ -61,15 +63,21 @@ public class TunerTest extends TunerDriver {
     TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
         .setTuningStrategy(new ParserBasedImpl.Builder().setTableNamesWithoutType(null)
             .setNumQueriesThreshold(0)
-            .setAlgorithmOrder(ParserBasedImpl.FIRST_ORDER)
-            .setNumEntriesScannedThreshold(0)
+            .setAlgorithmOrder(ParserBasedImpl.SECOND_ORDER)
+            .setSelectivityThreshold(0)
+            .setNumEntriesScannedThreshold(999999)
             .build())
         .setInputIterator(new LogInputIteratorImpl.Builder().setParser(new BrokerLogParserImpl())
-            .setValidLinePrefixRegex(LogInputIteratorImpl.REGEX_VALID_LINE_STANDALONE)
-            .setPath("/Users/jiaguo/finalTestData/finalTestLog/suForecasting_OFFLINE/broker.suForecasting_noindex.log")
+            .setValidLinePrefixRegex(LogInputIteratorImpl.REGEX_VALID_LINE_TIME)
+            .setPath("/Users/jiaguo/Documents/suForecasting2.log")
             .build())
         .setMetaManager(new JsonFileMetaManagerImpl.Builder().setUseExistingIndex(
-            JsonFileMetaManagerImpl.DONT_USE_EXISTING_INDEX) //Delete after demo
+            JsonFileMetaManagerImpl.USE_EXISTING_INDEX) //Delete after demo
+            .setAdditionalMaskingCols(new HashMap<String, HashSet<String>>() {{
+              put("offsiteForecasting", new HashSet<String>() {{
+                add("dimension_interfaceLanguage");
+              }});
+            }})
             .setPath("/Users/jiaguo/finalTestData/meta/prodMetaV2/metadata.json").build());
     parserBased.execute();
 

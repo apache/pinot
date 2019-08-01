@@ -235,7 +235,7 @@ public class ParserBasedImpl implements TuningStrategy {
     reportOut += "At least % of queries will benefit from a given index, for reference only:\n\n";
     for (Tuple2<String, Long> tuple2 : sortedPure) {
       reportOut += "Dimension: " + tuple2._1() + "  " + String.valueOf(
-          Double.parseDouble(tuple2._2().toString()) / totalCount * 100).substring(0, 4) + "%\n";
+          Double.parseDouble(tuple2._2().toString()) / totalCount * 100) + "%\n";
     }
     LOGGER.info(reportOut);
   }

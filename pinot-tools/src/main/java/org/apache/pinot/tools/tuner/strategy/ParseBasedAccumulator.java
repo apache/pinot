@@ -19,11 +19,13 @@
 package org.apache.pinot.tools.tuner.strategy;
 
 import java.math.BigInteger;
+import javax.annotation.concurrent.NotThreadSafe;
 
 
 /**
  * An implementation of {@link AbstractAccumulator}, to count the score for {@link ParserBasedImpl}
  */
+@NotThreadSafe
 public class ParseBasedAccumulator extends AbstractAccumulator {
   private long _pureScore; //the appearance of a dimension as the top pick for a query
   private BigInteger _weightedScore; //the appearance weighted by numEntriesScannedInFilter

@@ -18,9 +18,13 @@
  */
 package org.apache.pinot.tools.tuner.strategy;
 
+import javax.annotation.concurrent.NotThreadSafe;
+
+
 /**
  * An implementation of {@link AbstractAccumulator}, count the frequency of dimension appearance for {@link FrequencyImpl}
  */
+@NotThreadSafe
 public class FrequencyAccumulator extends AbstractAccumulator {
 
   public FrequencyAccumulator() {

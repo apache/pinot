@@ -21,11 +21,13 @@ package org.apache.pinot.tools.tuner.strategy;
 import io.vavr.Tuple2;
 import java.util.ArrayList;
 import java.util.HashMap;
+import javax.annotation.concurrent.NotThreadSafe;
 
 
 /**
  * An implementation of {@link AbstractAccumulator}, to implement minimum pulling for {@link QuantileAnalysisImpl}
  */
+@NotThreadSafe
 public class QuantileAnalysisAccumulator extends AbstractAccumulator {
 
   private ArrayList<Long> _timeList;
