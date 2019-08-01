@@ -35,6 +35,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -71,7 +72,6 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableCustomConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.TagNameUtils;
-import org.apache.pinot.common.config.TagOverrideConfig;
 import org.apache.pinot.common.config.Tenant;
 import org.apache.pinot.common.config.TenantConfig;
 import org.apache.pinot.common.data.Schema;
@@ -797,19 +797,6 @@ public class PinotHelixResourceManager {
     return PinotResourceManagerResponse.failure(message);
   }
 
-  public boolean isTenantExisted(String tenantName) {
-    if (!HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getBrokerTagForTenant(tenantName)).isEmpty()) {
-      return true;
-    }
-    if (!HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getOfflineTagForTenant(tenantName)).isEmpty()) {
-      return true;
-    }
-    if (!HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getRealtimeTagForTenant(tenantName)).isEmpty()) {
-      return true;
-    }
-    return false;
-  }
-
   public boolean isBrokerTenantDeletable(String tenantName) {
     String brokerTag = TagNameUtils.getBrokerTagForTenant(tenantName);
     Set<String> taggedInstances = new HashSet<>(HelixHelper.getInstancesWithTag(_helixZkManager, brokerTag));
@@ -1055,17 +1042,16 @@ public class PinotHelixResourceManager {
    */
   public void addTable(@Nonnull TableConfig tableConfig)
       throws IOException {
-    final String tableNameWithType = tableConfig.getTableName();
-    TableType tableType = tableConfig.getTableType();
-
     if (isSingleTenantCluster()) {
       TenantConfig tenantConfig = new TenantConfig();
       tenantConfig.setBroker(TagNameUtils.DEFAULT_TENANT_NAME);
       tenantConfig.setServer(TagNameUtils.DEFAULT_TENANT_NAME);
       tableConfig.setTenantConfig(tenantConfig);
     }
-    validateTableTenantConfig(tableConfig, tableNameWithType, tableType);
+    validateTableTenantConfig(tableConfig);
 
+    String tableNameWithType = tableConfig.getTableName();
+    TableType tableType = tableConfig.getTableType();
     SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
     switch (tableType) {
       case OFFLINE:
@@ -1141,55 +1127,34 @@ public class PinotHelixResourceManager {
    * Validates the tenant config for the table
    */
   @VisibleForTesting
-  protected void validateTableTenantConfig(TableConfig tableConfig, String tableNameWithType, TableType tableType) {
-    if (tableConfig == null) {
-      throw new InvalidTableConfigException("Table config is null for table: " + tableNameWithType);
-    }
+  void validateTableTenantConfig(TableConfig tableConfig) {
+    String tableNameWithType = tableConfig.getTableName();
     TenantConfig tenantConfig = tableConfig.getTenantConfig();
-    if (tenantConfig == null || tenantConfig.getBroker() == null || tenantConfig.getServer() == null) {
-      throw new InvalidTableConfigException("Tenant is not configured for table: " + tableNameWithType);
-    }
-    // Check if tenant exists before creating the table
-    String brokerTenantName = TagNameUtils.getBrokerTagForTenant(tenantConfig.getBroker());
-    List<String> brokersForTenant = getInstancesWithTag(brokerTenantName);
-    if (brokersForTenant.isEmpty()) {
-      throw new InvalidTableConfigException(
-          "Broker tenant: " + brokerTenantName + " does not exist for table: " + tableNameWithType);
-    }
-    String serverTenantName =
-        TagNameUtils.getTagFromTenantAndServerType(tenantConfig.getServer(), tableType.getServerType());
-    if (getInstancesWithTag(serverTenantName).isEmpty()) {
-      throw new InvalidTableConfigException(
-          "Server tenant: " + serverTenantName + " does not exist for table: " + tableNameWithType);
-    }
-    TagOverrideConfig tagOverrideConfig = tenantConfig.getTagOverrideConfig();
-    if (tagOverrideConfig != null) {
-      String realtimeConsumingTag = tagOverrideConfig.getRealtimeConsuming();
-      if (realtimeConsumingTag != null) {
-        if (!TagNameUtils.isServerTag(realtimeConsumingTag)) {
-          throw new InvalidTableConfigException(
-              "Invalid realtime consuming tag: " + realtimeConsumingTag + " for table " + tableNameWithType
-                  + ". Must have suffix _REALTIME or _OFFLINE");
-        }
-        if (getInstancesWithTag(realtimeConsumingTag).isEmpty()) {
-          throw new InvalidTableConfigException(
-              "No instances found with overridden realtime consuming tag: " + realtimeConsumingTag + " for table: "
-                  + tableNameWithType);
-        }
-      }
 
-      String realtimeCompletedTag = tagOverrideConfig.getRealtimeCompleted();
-      if (realtimeCompletedTag != null) {
-        if (!TagNameUtils.isServerTag(realtimeCompletedTag)) {
-          throw new InvalidTableConfigException(
-              "Invalid realtime completed tag: " + realtimeCompletedTag + " for table " + tableNameWithType
-                  + ". Must have suffix _REALTIME or _OFFLINE");
-        }
-        if (getInstancesWithTag(realtimeCompletedTag).isEmpty()) {
-          throw new InvalidTableConfigException(
-              "No instances found with overridden realtime completed tag: " + realtimeCompletedTag + " for table: "
-                  + tableNameWithType);
-        }
+    // Check if tenant exists before creating the table
+    Set<String> tagsToCheck = new TreeSet<>();
+    tagsToCheck.add(TagNameUtils.getBrokerTagForTenant(tenantConfig.getBroker()));
+    if (tableConfig.getTableType() == TableType.OFFLINE) {
+      tagsToCheck.add(new OfflineTagConfig(tableConfig).getOfflineServerTag());
+    } else {
+      RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig);
+      String consumingServerTag = realtimeTagConfig.getConsumingServerTag();
+      if (!TagNameUtils.isServerTag(consumingServerTag)) {
+        throw new InvalidTableConfigException(
+            "Invalid CONSUMING server tag: " + consumingServerTag + " for table: " + tableNameWithType);
+      }
+      tagsToCheck.add(consumingServerTag);
+      String completedServerTag = realtimeTagConfig.getCompletedServerTag();
+      if (!TagNameUtils.isServerTag(completedServerTag)) {
+        throw new InvalidTableConfigException(
+            "Invalid COMPLETED server tag: " + completedServerTag + " for table: " + tableNameWithType);
+      }
+      tagsToCheck.add(completedServerTag);
+    }
+    for (String tag : tagsToCheck) {
+      if (getInstancesWithTag(tag).isEmpty()) {
+        throw new InvalidTableConfigException(
+            "Failed to find instances with tag: " + tag + " for table: " + tableNameWithType);
       }
     }
   }
@@ -1334,19 +1299,19 @@ public class PinotHelixResourceManager {
    * Validate the table config and update it
    * @throws IOException
    */
-  public void updateTableConfig(TableConfig tableConfig, String tableNameWithType, TableType tableType)
+  public void updateTableConfig(TableConfig tableConfig)
       throws IOException {
-
-    validateTableTenantConfig(tableConfig, tableNameWithType, tableType);
-    setExistingTableConfig(tableConfig, tableNameWithType, tableType);
+    validateTableTenantConfig(tableConfig);
+    setExistingTableConfig(tableConfig);
   }
 
   /**
    * Sets the given table config into zookeeper
    */
-  public void setExistingTableConfig(TableConfig tableConfig, String tableNameWithType, TableType tableType)
+  public void setExistingTableConfig(TableConfig tableConfig)
       throws IOException {
-
+    String tableNameWithType = tableConfig.getTableName();
+    TableType tableType = tableConfig.getTableType();
     if (tableType == TableType.REALTIME) {
       IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
       verifyIndexingConfig(tableNameWithType, indexingConfig);
@@ -1385,7 +1350,7 @@ public class PinotHelixResourceManager {
       throw new RuntimeException("Table: " + tableName + " of type: " + type + " does not exist");
     }
     tableConfig.setCustomConfig(newConfigs);
-    setExistingTableConfig(tableConfig, tableNameWithType, type);
+    setExistingTableConfig(tableConfig);
   }
 
   public void updateSegmentsValidationAndRetentionConfigFor(String tableName, TableType type,
@@ -1397,7 +1362,7 @@ public class PinotHelixResourceManager {
       throw new RuntimeException("Table: " + tableName + " of type: " + type + " does not exist");
     }
     tableConfig.setValidationConfig(newConfigs);
-    setExistingTableConfig(tableConfig, tableNameWithType, type);
+    setExistingTableConfig(tableConfig);
   }
 
   public void updateIndexingConfigFor(String tableName, TableType type, IndexingConfig newConfigs)
@@ -1408,7 +1373,7 @@ public class PinotHelixResourceManager {
       throw new RuntimeException("Table: " + tableName + " of type: " + type + " does not exist");
     }
     tableConfig.setIndexingConfig(newConfigs);
-    setExistingTableConfig(tableConfig, tableNameWithType, type);
+    setExistingTableConfig(tableConfig);
 
     if (type == TableType.REALTIME) {
       // Check if HLC table is allowed
@@ -1741,10 +1706,8 @@ public class PinotHelixResourceManager {
     if (customConfig != null) {
       Map<String, String> customConfigMap = customConfig.getCustomConfigs();
       if (customConfigMap != null) {
-        if (customConfigMap.containsKey(TableCustomConfig.MESSAGE_BASED_REFRESH_KEY) && !Boolean
-            .valueOf(customConfigMap.get(TableCustomConfig.MESSAGE_BASED_REFRESH_KEY))) {
-          return false;
-        }
+        return !customConfigMap.containsKey(TableCustomConfig.MESSAGE_BASED_REFRESH_KEY) || Boolean
+            .valueOf(customConfigMap.get(TableCustomConfig.MESSAGE_BASED_REFRESH_KEY));
       }
     }
     return true;
@@ -2067,12 +2030,16 @@ public class PinotHelixResourceManager {
         : PinotResourceManagerResponse.failure("Timed out. External view not completely updated");
   }
 
+  public boolean hasTable(String tableNameWithType) {
+    return getAllResources().contains(tableNameWithType);
+  }
+
   public boolean hasOfflineTable(String tableName) {
-    return getAllResources().contains(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    return hasTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
   }
 
   public boolean hasRealtimeTable(String tableName) {
-    return getAllResources().contains(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    return hasTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
   }
 
   /**

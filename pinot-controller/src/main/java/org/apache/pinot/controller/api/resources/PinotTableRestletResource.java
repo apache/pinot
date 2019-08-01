@@ -286,30 +286,22 @@ public class PinotTableRestletResource {
     }
 
     try {
-      CommonConstants.Helix.TableType tableType = tableConfig.getTableType();
-      String configTableName = tableConfig.getTableName();
-      String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
-      if (!configTableName.equals(tableNameWithType)) {
+      String tableNameWithType = tableConfig.getTableName();
+      if (!TableNameBuilder.forType(tableConfig.getTableType()).tableNameWithType(tableName)
+          .equals(tableNameWithType)) {
         throw new ControllerApplicationException(LOGGER,
-            "Request table " + tableNameWithType + " does not match table name in the body " + configTableName,
+            "Request table " + tableName + " does not match table name in the body " + tableNameWithType,
             Response.Status.BAD_REQUEST);
       }
 
-      if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
-        if (!_pinotHelixResourceManager.hasOfflineTable(tableName)) {
-          throw new ControllerApplicationException(LOGGER, "Table " + tableName + " does not exist",
-              Response.Status.BAD_REQUEST);
-        }
-      } else {
-        if (!_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-          throw new ControllerApplicationException(LOGGER, "Table " + tableName + " does not exist",
-              Response.Status.NOT_FOUND);
-        }
+      if (!_pinotHelixResourceManager.hasTable(tableNameWithType)) {
+        throw new ControllerApplicationException(LOGGER, "Table " + tableNameWithType + " does not exist",
+            Response.Status.NOT_FOUND);
       }
 
       ensureMinReplicas(tableConfig);
       verifyTableConfigs(tableConfig);
-      _pinotHelixResourceManager.updateTableConfig(tableConfig, tableNameWithType, tableType);
+      _pinotHelixResourceManager.updateTableConfig(tableConfig);
     } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
       String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
