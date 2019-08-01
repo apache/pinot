@@ -34,6 +34,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nonnull;
 import javax.validation.constraints.NotNull;
@@ -225,12 +226,13 @@ public class ParserBasedImpl implements TuningStrategy {
     });
     sortedPure.sort((p1, p2) -> (p2._2().compareTo(p1._2())));
     sortedWeighted.sort((p1, p2) -> (p2._2().compareTo(p1._2())));
-    reportOut += "\n________________________________Score_______________________________________\n";
+    reportOut += "________________________________Score_______________________________________\n";
+    reportOut += "The overall goodness of a index, the score is for reference only:\n\n";
     for (Tuple2<String, BigInteger> tuple2 : sortedWeighted) {
       reportOut += "Dimension: " + tuple2._1() + "  " + formatter.format(tuple2._2()) + "\n";
     }
-    reportOut += "________________________________Coverage_______________________________________\n";
-    reportOut += "At least % of queries will benefit from a given index.";
+    reportOut += "\n________________________________Coverage___________________________________\n";
+    reportOut += "At least % of queries will benefit from a given index:\n\n";
     for (Tuple2<String, Long> tuple2 : sortedPure) {
       reportOut += "Dimension: " + tuple2._1() + "  " + String.valueOf(
           Double.parseDouble(tuple2._2().toString()) / totalCount * 100).substring(0, 4) + "%\n";
@@ -248,17 +250,6 @@ public class ParserBasedImpl implements TuningStrategy {
     private MetaManager _metaManager;
     private String _queryString;
     private final Logger LOGGER = LoggerFactory.getLogger(DimensionScoring.class);
-
-    /*
-     * Crop a list to finalLength
-     */
-    private void cropList(List list, int finalLength) {
-      int listSize = list.size();
-      int numToReMove = listSize - finalLength;
-      for (int i = 1; i <= numToReMove; i++) {
-        list.remove(listSize - i);
-      }
-    }
 
     DimensionScoring(String tableNameWithoutType, MetaManager metaManager, String queryString) {
       _tableNameWithoutType = tableNameWithoutType;
@@ -305,8 +296,7 @@ public class ParserBasedImpl implements TuningStrategy {
       LOGGER.debug("whereClauseContext: {}", whereClauseContext.getText());
 
       List<Tuple2<List<String>, BigFraction>> results = parsePredicateList(whereClauseContext.predicateList());
-      cropList(results, _algorithmOrder);
-      return results;
+      return results.stream().limit(_algorithmOrder).collect(Collectors.toList());
     }
 
     /**
@@ -336,9 +326,8 @@ public class ParserBasedImpl implements TuningStrategy {
 
         childResults.sort(
             Comparator.comparing((Function<Tuple2<List<String>, BigFraction>, BigFraction>) Tuple2::_2).reversed());
-        cropList(childResults, _algorithmOrder);
         LOGGER.debug("AND rank: {}", childResults.toString());
-        return childResults;
+        return childResults.stream().limit(_algorithmOrder).collect(Collectors.toList());
       } else if (predicateListContext.getChild(1).getText().toUpperCase().equals(OR)) {
         LOGGER.debug("Parsing OR list: {}", predicateListContext.getText());
         BigFraction weight = BigFraction.ZERO;
