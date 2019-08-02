@@ -19,6 +19,10 @@ import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 
 
+/**
+ * Flatten the anomaly results for UI purpose.
+ * Convert a list of anomalies to rows of columns so that UI can directly convert the anomalies to table
+ */
 @Path("thirdeye/table")
 public class AnomalyFlattenResource {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
