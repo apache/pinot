@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.config;
 
+import org.apache.pinot.common.utils.InstancePartitionsType;
 import org.apache.pinot.common.utils.ServerType;
 import org.apache.pinot.common.utils.TenantRole;
 
@@ -100,5 +101,19 @@ public class TagNameUtils {
       return tag.substring(0, tag.length() - (TenantRole.BROKER.toString().length() + 1));
     }
     return tag;
+  }
+
+  public static String getServerTagFromTableConfigAndInstancePartitionsType(TableConfig tableConfig,
+      InstancePartitionsType instancePartitionsType) {
+    switch (instancePartitionsType) {
+      case OFFLINE:
+        return new OfflineTagConfig(tableConfig).getOfflineServerTag();
+      case CONSUMING:
+        return new RealtimeTagConfig(tableConfig).getConsumingServerTag();
+      case COMPLETED:
+        return new RealtimeTagConfig(tableConfig).getCompletedServerTag();
+      default:
+        throw new IllegalArgumentException();
+    }
   }
 }
