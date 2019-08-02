@@ -40,7 +40,7 @@ public class InterSegmentAggregationGroupByOrderBySingleValueQueriesTest extends
 
   @Test
   public void testDummy() {
-    String orderByQuery = "select min(column6) from testTable group by column12";
+    String orderByQuery = "select * from testTable limit 20";
     BrokerResponseNative brokerResponse = getBrokerResponseForQuery(orderByQuery);
     GroupByOrderByResults expectedGroupByOrderBy = new GroupByOrderByResults(null, null, null);
   }
