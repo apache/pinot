@@ -105,13 +105,29 @@ public class ControllerLeaderLocator {
   }
 
   /**
-   * If partition leader exists, use this as the leader for realtime segment completion.
+   * Firstly checks whether lead controller resource has been enabled or not.
+   * If yes, use this as the leader for realtime segment completion once partition leader exists.
    * Otherwise, try to use Helix leader.
    * @param rawTableName table name without type
    * @return the controller leader id with hostname and port for this table, e.g. localhost_9000
    */
   private String getLeaderForTable(String rawTableName) {
-    String leaderForTable;
+    // Checks whether lead controller resource has been enabled or not.
+    if (isLeadControllerResourceEnabled()) {
+      // Gets leader from lead controller resource.
+      return getLeaderFromLeadControllerResource(rawTableName);
+    } else {
+      // Gets Helix leader to be the leader to this table, otherwise returns null.
+      return getHelixClusterLeader();
+    }
+  }
+
+  /**
+   * Gets leader from lead controller resource. Null if there is no leader.
+   * @param rawTableName raw table name.
+   * @return instance id of Helix cluster leader, e.g. localhost_9000.
+   */
+  private String getLeaderFromLeadControllerResource(String rawTableName) {
     ExternalView leadControllerResourceExternalView =
         _helixManager.getClusterManagmentTool().getResourceExternalView(_clusterName, LEAD_CONTROLLER_RESOURCE_NAME);
     String leadControllerInstance =
@@ -119,12 +135,10 @@ public class ControllerLeaderLocator {
     if (leadControllerInstance != null) {
       // Converts participant id (with Prefix "Controller_") to controller id and assigns it as the leader,
       // since realtime segment completion protocol doesn't need the prefix in controller instance id.
-      leaderForTable = LeadControllerUtils.extractLeadControllerHostNameAndPort(leadControllerInstance);
+      return LeadControllerUtils.extractLeadControllerHostNameAndPort(leadControllerInstance);
     } else {
-      // Gets Helix leader to be the leader to this table, otherwise returns null.
-      leaderForTable = getHelixClusterLeader();
+      return null;
     }
-    return leaderForTable;
   }
 
   /**
@@ -144,6 +158,23 @@ public class ControllerLeaderLocator {
     } catch (Exception e) {
       LOGGER.warn("Could not locate Helix leader", e);
       return null;
+    }
+  }
+
+  /**
+   * Checks whether lead controller resource is enabled or not. The switch is in resource config.
+   */
+  private boolean isLeadControllerResourceEnabled() {
+    BaseDataAccessor<ZNRecord> dataAccessor = _helixManager.getHelixDataAccessor().getBaseDataAccessor();
+    Stat stat = new Stat();
+    try {
+      ZNRecord znRecord = dataAccessor
+          .get("/" + _clusterName + "/CONFIGS/RESOURCE/" + LEAD_CONTROLLER_RESOURCE_NAME, stat,
+              AccessOption.THROW_EXCEPTION_IFNOTEXIST);
+      return Boolean.parseBoolean(znRecord.getSimpleField(LeadControllerUtils.RESOURCE_ENABLED));
+    } catch (Exception e) {
+      LOGGER.warn("Could not get whether lead controller resource is enabled or not.", e);
+      return false;
     }
   }
 
