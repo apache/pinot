@@ -124,7 +124,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     completeTableConfiguration();
 
     // Upload all segments
-    uploadSegments(_tarDir);
+    uploadSegments(getTableName(), _tarDir);
 
     // Set up service status callbacks
     // NOTE: put this step after creating the table and uploading all segments so that brokers and servers can find the
@@ -136,17 +136,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   private void registerCallbackHandlers() {
-    List<String> instances = _helixAdmin.getInstancesInCluster(_clusterName);
+    List<String> instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
     instances.removeIf(instance -> (!instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) && !instance
         .startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)));
-    List<String> resourcesInCluster = _helixAdmin.getResourcesInCluster(_clusterName);
+    List<String> resourcesInCluster = _helixAdmin.getResourcesInCluster(getHelixClusterName());
     resourcesInCluster.removeIf(
         resource -> (!TableNameBuilder.isTableResource(resource) && !CommonConstants.Helix.BROKER_RESOURCE_INSTANCE
             .equals(resource)));
     for (String instance : instances) {
       List<String> resourcesToMonitor = new ArrayList<>();
       for (String resourceName : resourcesInCluster) {
-        IdealState idealState = _helixAdmin.getResourceIdealState(_clusterName, resourceName);
+        IdealState idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), resourceName);
         for (String partitionName : idealState.getPartitionSet()) {
           if (idealState.getInstanceSet(partitionName).contains(instance)) {
             resourcesToMonitor.add(resourceName);
@@ -155,10 +155,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         }
       }
       _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
-          .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _clusterName,
-                  instance, resourcesToMonitor, 100.0),
-              new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _clusterName,
-                  instance, resourcesToMonitor, 100.0))));
+          .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager,
+                  getHelixClusterName(), instance, resourcesToMonitor, 100.0),
+              new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager,
+                  getHelixClusterName(), instance, resourcesToMonitor, 100.0))));
     }
   }
 
@@ -199,7 +199,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Refresh time is when the segment gets refreshed (existing segment)
     long refreshTime = segmentZKMetadata.getRefreshTime();
 
-    uploadSegments(_tarDir);
+    uploadSegments(getTableName(), _tarDir);
     for (OfflineSegmentZKMetadata segmentZKMetadataAfterUpload : _helixResourceManager
         .getOfflineSegmentMetadata(getTableName())) {
       // Only check one segment
@@ -741,11 +741,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // TODO: Add test to delete broker instance. Currently, stopBroker() does not work correctly.
 
     // Check if '/INSTANCES/<serverName>' has been erased correctly
-    String instancePath = "/" + _clusterName + "/INSTANCES/" + serverName;
+    String instancePath = "/" + getHelixClusterName() + "/INSTANCES/" + serverName;
     assertFalse(_propertyStore.exists(instancePath, 0));
 
     // Check if '/CONFIGS/PARTICIPANT/<serverName>' has been erased correctly
-    String configPath = "/" + _clusterName + "/CONFIGS/PARTICIPANT/" + serverName;
+    String configPath = "/" + getHelixClusterName() + "/CONFIGS/PARTICIPANT/" + serverName;
     assertFalse(_propertyStore.exists(configPath, 0));
   }
 

@@ -60,6 +60,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
+import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator.*;
 
 
 /**
@@ -95,6 +96,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectorWrapper.class);
 
   private final String metricUrn;
+  private final String entityName;
   private final AnomalyDetector anomalyDetector;
 
   private final int windowDelay;
@@ -114,6 +116,9 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
 
   public AnomalyDetectorWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
+
+    Preconditions.checkArgument(this.config.getProperties().containsKey(PROP_SUB_ENTITY_NAME));
+    this.entityName = MapUtils.getString(config.getProperties(), PROP_SUB_ENTITY_NAME);
 
     this.metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
     this.metricEntity = MetricEntity.fromURN(this.metricUrn);
@@ -208,6 +213,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       anomaly.setCollection(this.metric.getDataset());
       anomaly.setDimensions(DetectionUtils.toFilterMap(this.metricEntity.getFilters()));
       anomaly.getProperties().put(PROP_DETECTOR_COMPONENT_NAME, this.detectorName);
+      anomaly.getProperties().put(PROP_SUB_ENTITY_NAME, this.entityName);
     }
     long lastTimeStamp = this.getLastTimeStamp();
     List<MergedAnomalyResultDTO> anomalyResults = anomalies.stream().filter(anomaly -> anomaly.getEndTime() <= lastTimeStamp).collect(

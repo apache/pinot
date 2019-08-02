@@ -208,7 +208,7 @@ public class BackfillDateTimeColumnCommand extends AbstractBaseAdminCommand impl
 
       // upload segment
       LOGGER.info("Uploading segment {} to host: {} port: {}", segmentName, _controllerHost, _controllerPort);
-      backfillSegmentUtils.uploadSegment(segmentName, new File(outputDir, segmentName), outputDir);
+      backfillSegmentUtils.uploadSegment(_tableName, segmentName, new File(outputDir, segmentName), outputDir);
     }
 
     // verify that all segments exist

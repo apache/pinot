@@ -43,9 +43,8 @@ import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
-import org.apache.pinot.tools.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 
@@ -76,6 +75,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
   protected final File _avroDir = new File(_tempDir, "avroDir");
+  protected final File _preprocessingDir = new File(_tempDir, "preprocessingDir");
   protected final File _segmentDir = new File(_tempDir, "segmentDir");
   protected final File _tarDir = new File(_tempDir, "tarDir");
   protected List<StreamDataServerStartable> _kafkaStarters;
@@ -83,7 +83,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   private org.apache.pinot.client.Connection _pinotConnection;
   private Connection _h2Connection;
   private QueryGenerator _queryGenerator;
-
 
   /**
    * The following getters can be overridden to change default settings.
@@ -117,7 +116,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected String getStreamConsumerFactoryClassName() {
-    return KafkaConsumerFactory.class.getName();
+    return KafkaStarterUtils.KAFKA_STREAM_CONSUMER_FACTORY_CLASS_NAME;
   }
 
   protected int getRealtimeSegmentFlushSize() {
@@ -324,9 +323,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       @Override
       public void run() {
         try {
-          ClusterIntegrationTestUtils
-              .pushAvroIntoKafka(avroFiles, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, kafkaTopic,
-                  getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
+          ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, kafkaTopic,
+              getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
         } catch (Exception e) {
           // Ignored
         }
@@ -336,8 +334,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected void startKafka() {
 
-    _kafkaStarters =
-        KafkaStarterUtils.startServers(getNumKafkaBrokers(), KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_ZK_STR,
+    _kafkaStarters = KafkaStarterUtils
+        .startServers(getNumKafkaBrokers(), KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_ZK_STR,
             KafkaStarterUtils.getDefaultKafkaConfiguration());
     _kafkaStarters.get(0)
         .createTopic(getKafkaTopic(), KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
@@ -408,8 +406,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .testQuery(sqlQuery, "sql", _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
   }
 
-  protected void setUpRealtimeTable(File avroFile)
-      throws Exception {
+  protected void setUpRealtimeTable(File avroFile,
+      int numReplicas, boolean useLLC, String tableName) throws Exception {
     File schemaFile = getSchemaFile();
     Schema schema = Schema.fromFile(schemaFile);
     String schemaName = schema.getSchemaName();
@@ -421,13 +419,18 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     Assert.assertNotNull(outgoingTimeUnit);
     String timeType = outgoingTimeUnit.toString();
 
-    addRealtimeTable(getTableName(), useLlc(), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
+    addRealtimeTable(tableName, useLLC, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
         getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName,
-        getBrokerTenant(), getServerTenant(), getLoadMode(), getSortedColumn(),
-        getInvertedIndexColumns(), getBloomFilterIndexColumns(), getRawIndexColumns(), getTaskConfig(),
-        getStreamConsumerFactoryClassName());
+        getBrokerTenant(), getServerTenant(), getLoadMode(), getSortedColumn(), getInvertedIndexColumns(),
+        getBloomFilterIndexColumns(), getRawIndexColumns(), getTaskConfig(), getStreamConsumerFactoryClassName(),
+        numReplicas);
 
     completeTableConfiguration();
+  }
+
+  protected void setUpRealtimeTable(File avroFile)
+      throws Exception {
+    setUpRealtimeTable(avroFile, 1, useLlc(), getTableName());
   }
 
   protected void completeTableConfiguration() throws IOException {

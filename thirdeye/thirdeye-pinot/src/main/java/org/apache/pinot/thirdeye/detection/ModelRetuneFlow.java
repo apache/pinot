@@ -22,8 +22,11 @@
 
 package org.apache.pinot.thirdeye.detection;
 
+import com.google.common.base.Preconditions;
+import com.sun.org.apache.xpath.internal.operations.Mod;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
@@ -34,6 +37,10 @@ import org.apache.pinot.thirdeye.detection.spi.components.ModelEvaluator;
 import org.apache.pinot.thirdeye.detection.spi.model.ModelStatus;
 import org.apache.pinot.thirdeye.detection.yaml.DetectionConfigTuner;
 import org.joda.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil.*;
 
 
 /**
@@ -42,16 +49,18 @@ import org.joda.time.Instant;
  */
 public class ModelRetuneFlow implements ModelMaintenanceFlow {
   private static final int DEFAULT_TUNING_WINDOW_DAYS = 28;
+  private static final Logger LOG = LoggerFactory.getLogger(ModelRetuneFlow.class);
 
   private final DataProvider provider;
   private final DetectionRegistry detectionRegistry;
 
-  ModelRetuneFlow(DataProvider provider, DetectionRegistry detectionRegistry) {
+  public ModelRetuneFlow(DataProvider provider, DetectionRegistry detectionRegistry) {
     this.provider = provider;
     this.detectionRegistry = detectionRegistry;
   }
 
   public DetectionConfigDTO maintain(DetectionConfigDTO config, Instant timestamp) {
+    Preconditions.checkArgument(!Objects.isNull(config.getComponents()) && !config.getComponents().isEmpty(), "Components not initialized");
     if (isTunable(config)) {
       // if the pipeline is tunable, get the model evaluators
       Collection<? extends ModelEvaluator<? extends AbstractSpec>> modelEvaluators = getModelEvaluators(config);
@@ -59,6 +68,8 @@ public class ModelRetuneFlow implements ModelMaintenanceFlow {
       for (ModelEvaluator<? extends AbstractSpec> modelEvaluator : modelEvaluators) {
         // if returns bad model status, trigger model tuning
         if (modelEvaluator.evaluateModel(timestamp).getStatus().equals(ModelStatus.BAD)) {
+          LOG.info("Status for detection pipeline {} is {}, re-tuning", config.getId(), ModelStatus.BAD.toString());
+          detectionRetuneCounter.inc();
           DetectionConfigTuner detectionConfigTuner = new DetectionConfigTuner(config, provider);
           config = detectionConfigTuner.tune(timestamp.toDateTime().minusDays(DEFAULT_TUNING_WINDOW_DAYS).getMillis(),
               timestamp.getMillis());

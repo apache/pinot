@@ -199,15 +199,6 @@ public class DetectionUtils {
     return entityAnomaly;
   }
 
-  public static MergedAnomalyResultDTO makeEntityCopy(MergedAnomalyResultDTO anomaly) {
-    MergedAnomalyResultDTO anomalyCopy = makeEntityAnomaly();
-    anomalyCopy.setStartTime(anomaly.getStartTime());
-    anomalyCopy.setEndTime(anomaly.getEndTime());
-    anomalyCopy.setChild(anomaly.isChild());
-    anomalyCopy.setChildren(anomaly.getChildren());
-    return anomalyCopy;
-  }
-
   public static MergedAnomalyResultDTO makeParentEntityAnomaly(MergedAnomalyResultDTO childAnomaly) {
     MergedAnomalyResultDTO newEntityAnomaly = makeEntityAnomaly();
     newEntityAnomaly.setStartTime(childAnomaly.getStartTime());

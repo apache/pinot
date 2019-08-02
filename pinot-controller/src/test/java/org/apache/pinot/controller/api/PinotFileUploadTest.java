@@ -25,8 +25,6 @@ import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -41,6 +39,20 @@ import org.testng.annotations.Test;
 public class PinotFileUploadTest extends ControllerTest {
   private static final String TABLE_NAME = "testTable";
 
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    startZk();
+    startController();
+    addFakeBrokerInstancesToAutoJoinHelixCluster(5, true);
+    addFakeServerInstancesToAutoJoinHelixCluster(5, true);
+
+    // Adding table
+    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setSegmentAssignmentStrategy("RandomAssignmentStrategy").setNumReplicas(2).build();
+    _helixResourceManager.addTable(tableConfig);
+  }
+
   @Test
   public void testUploadBogusData()
       throws Exception {
@@ -54,28 +66,9 @@ public class PinotFileUploadTest extends ControllerTest {
     Assert.assertTrue(statusCode >= 400 && statusCode < 500, "Status code = " + statusCode);
   }
 
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    startZk();
-    startController();
-    ControllerRequestBuilderUtil
-        .addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, 5, true);
-    ControllerRequestBuilderUtil
-        .addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, 5, true);
-
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(),
-        5);
-
-    // Adding table
-    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setSegmentAssignmentStrategy("RandomAssignmentStrategy").setNumReplicas(2).build();
-    _helixResourceManager.addTable(tableConfig);
-  }
-
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() {
+    stopFakeInstances();
     stopController();
     stopZk();
   }

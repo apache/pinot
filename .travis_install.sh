@@ -38,10 +38,15 @@ if [ $noThirdEyeChange -eq 0 ]; then
   fi
 fi
 
+KAFKA_BUILD_OPTS=""
+if [ "$KAFKA_VERSION" != '0.9' ]; then
+  KAFKA_BUILD_OPTS="-Dkafka.version=${KAFKA_VERSION}"
+fi
+
 if [ $noThirdEyeChange -ne 0 ]; then
   echo "Full Pinot build"
   echo "No ThirdEye changes"
-  mvn clean install -B -DskipTests=true -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true || exit $?
+  mvn clean install -B -DskipTests=true -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true ${KAFKA_BUILD_OPTS} || exit $?
 fi
 
 # Build ThirdEye for ThirdEye related changes

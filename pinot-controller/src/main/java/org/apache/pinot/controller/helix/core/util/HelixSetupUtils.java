@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.util;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
+import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -37,6 +38,7 @@ import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.MasterSlaveSMD;
+import org.apache.helix.model.ResourceConfig;
 import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.helix.model.builder.FullAutoModeISBuilder;
@@ -87,6 +89,7 @@ public class HelixSetupUtils {
       HelixAdmin helixAdmin = new ZKHelixAdmin(zkClient);
       HelixDataAccessor helixDataAccessor =
           new ZKHelixDataAccessor(helixClusterName, new ZkBaseDataAccessor<>(zkClient));
+      ConfigAccessor configAccessor = new ConfigAccessor(zkClient);
 
       Preconditions.checkState(helixAdmin.getClusters().contains(helixClusterName),
           String.format("Helix cluster: %s hasn't been set up", helixClusterName));
@@ -98,7 +101,7 @@ public class HelixSetupUtils {
       createBrokerResourceIfNeeded(helixClusterName, helixAdmin, enableBatchMessageMode);
 
       // Add lead controller resource if needed
-      createLeadControllerResourceIfNeeded(helixClusterName, helixAdmin, enableBatchMessageMode);
+      createLeadControllerResourceIfNeeded(helixClusterName, helixAdmin, configAccessor, enableBatchMessageMode);
     } finally {
       if (zkClient != null) {
         zkClient.close();
@@ -144,7 +147,7 @@ public class HelixSetupUtils {
   }
 
   private static void createLeadControllerResourceIfNeeded(String helixClusterName, HelixAdmin helixAdmin,
-      boolean enableBatchMessageMode) {
+      ConfigAccessor configAccessor, boolean enableBatchMessageMode) {
     if (helixAdmin.getResourceIdealState(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME) == null) {
       LOGGER.info("Adding resource: {}", LEAD_CONTROLLER_RESOURCE_NAME);
 
@@ -177,5 +180,16 @@ public class HelixSetupUtils {
 
       helixAdmin.addResource(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, idealState);
     }
+
+    // Create resource config for lead controller resource if it doesn't exist
+    ResourceConfig resourceConfig = configAccessor.getResourceConfig(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME);
+    if (resourceConfig == null) {
+      resourceConfig = new ResourceConfig(LEAD_CONTROLLER_RESOURCE_NAME);
+    }
+    // Set RESOURCE_ENABLED to false if it's absent in resource config
+    if (resourceConfig.getSimpleConfig("RESOURCE_ENABLED") == null) {
+      resourceConfig.putSimpleConfig("RESOURCE_ENABLED", Boolean.FALSE.toString());
+    }
+    configAccessor.setResourceConfig(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, resourceConfig);
   }
 }

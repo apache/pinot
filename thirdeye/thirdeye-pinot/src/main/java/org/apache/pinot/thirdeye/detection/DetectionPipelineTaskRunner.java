@@ -95,7 +95,7 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
    * @param loader pipeline loader
    * @param provider pipeline data provider
    */
-  DetectionPipelineTaskRunner(DetectionConfigManager detectionDAO, MergedAnomalyResultManager anomalyDAO,
+  public DetectionPipelineTaskRunner(DetectionConfigManager detectionDAO, MergedAnomalyResultManager anomalyDAO,
       EvaluationManager evaluationDAO, DetectionPipelineLoader loader, DataProvider provider) {
     this.detectionDAO = detectionDAO;
     this.anomalyDAO = anomalyDAO;
@@ -125,7 +125,6 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
       }
 
       config.setLastTimestamp(result.getLastTimestamp());
-      this.detectionDAO.update(config);
 
       for (MergedAnomalyResultDTO mergedAnomalyResultDTO : result.getAnomalies()) {
         this.anomalyDAO.save(mergedAnomalyResultDTO);
@@ -138,8 +137,12 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
         this.evaluationDAO.save(evaluationDTO);
       }
 
-      // run maintenance flow to update model
-      config = maintenanceFlow.maintain(config, Instant.now());
+      try {
+        // run maintenance flow to update model
+        config = maintenanceFlow.maintain(config, Instant.now());
+      } catch (Exception e) {
+        LOG.warn("Re-tune pipeline {} failed", config.getId(), e);
+      }
       this.detectionDAO.update(config);
 
       return Collections.emptyList();

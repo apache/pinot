@@ -43,9 +43,11 @@ import org.apache.commons.io.FileUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -252,9 +254,12 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTestSet
           @Override
           public Integer call()
               throws Exception {
+            List<NameValuePair> parameters = Collections.singletonList(
+                new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, getTableName()));
+
             return fileUploadDownloadClient
                 .sendSegmentUri(FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort),
-                    downloadUri, httpHeaders, null, 60 * 1000).getStatusCode();
+                    downloadUri, httpHeaders, parameters, 60 * 1000).getStatusCode();
           }
         }));
       }

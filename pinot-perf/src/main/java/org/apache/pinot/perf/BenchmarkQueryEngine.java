@@ -94,7 +94,6 @@ public class BenchmarkQueryEngine {
     conf.setStartController(true);
     conf.setStartServer(true);
     conf.setStartZookeeper(true);
-    conf.setUploadIndexes(false);
     conf.setRunQueries(false);
     conf.setServerInstanceSegmentTarDir(null);
     conf.setServerInstanceDataDir(DATA_DIRECTORY);

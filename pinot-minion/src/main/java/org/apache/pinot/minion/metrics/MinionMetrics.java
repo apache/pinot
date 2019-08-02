@@ -26,7 +26,11 @@ import org.apache.pinot.common.utils.CommonConstants;
 public class MinionMetrics extends AbstractMetrics<MinionQueryPhase, MinionMeter, MinionGauge, MinionTimer> {
 
   public MinionMetrics(MetricsRegistry metricsRegistry) {
-    super(CommonConstants.Minion.METRICS_PREFIX, metricsRegistry, MinionMetrics.class);
+    this(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX, metricsRegistry);
+  }
+
+  public MinionMetrics(String prefix, MetricsRegistry metricsRegistry) {
+    super(prefix, metricsRegistry, MinionMetrics.class);
   }
 
   @Override

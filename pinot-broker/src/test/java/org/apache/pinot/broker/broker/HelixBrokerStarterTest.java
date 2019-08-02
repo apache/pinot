@@ -18,287 +18,194 @@
  */
 package org.apache.pinot.broker.broker;
 
-import com.google.common.util.concurrent.Uninterruptibles;
-import java.io.IOException;
-import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
-import org.I0Itec.zkclient.ZkClient;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.broker.routing.HelixExternalViewBasedRouting;
+import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
 import org.apache.pinot.broker.routing.TimeBoundaryService;
-import org.apache.pinot.broker.routing.builder.RoutingTableBuilder;
+import org.apache.pinot.broker.routing.TimeBoundaryService.TimeBoundaryInfo;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Broker;
+import org.apache.pinot.common.utils.CommonConstants.Helix;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
-import org.testng.Assert;
-import org.testng.annotations.AfterTest;
-import org.testng.annotations.BeforeTest;
+import org.apache.pinot.util.TestUtils;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class HelixBrokerStarterTest extends ControllerTest {
-  private static final int SEGMENT_COUNT = 6;
-  private static final String RAW_DINING_TABLE_NAME = "dining";
-  private static final String DINING_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_DINING_TABLE_NAME);
-  private static final String COFFEE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType("coffee");
+  private static final String RAW_TABLE_NAME = "testTable";
+  private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
+  private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
+  private static final String TIME_COLUMN_NAME = "daysSinceEpoch";
+  private static final int NUM_BROKERS = 3;
+  private static final int NUM_SERVERS = 1;
+  private static final int NUM_OFFLINE_SEGMENTS = 5;
 
-  private final Configuration _brokerConf = new BaseConfiguration();
+  private HelixBrokerStarter _brokerStarter;
 
-  private ZkClient _zkClient;
-  private HelixBrokerStarter _helixBrokerStarter;
-  private ZkStarter.ZookeeperInstance _zookeeperInstance;
-
-  @BeforeTest
+  @BeforeClass
   public void setUp()
       throws Exception {
-    _zookeeperInstance = ZkStarter.startLocalZkServer();
-    _zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
-
+    startZk();
     startController();
 
-    _brokerConf.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, 8943);
-    _brokerConf.addProperty(CommonConstants.Broker.CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL, 100L);
-    _helixBrokerStarter = new HelixBrokerStarter(_brokerConf, getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR);
-    _helixBrokerStarter.start();
+    Configuration brokerConf = new BaseConfiguration();
+    brokerConf.addProperty(Helix.KEY_OF_BROKER_QUERY_PORT, 18099);
+    brokerConf.addProperty(Broker.CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL, 100L);
+    _brokerStarter = new HelixBrokerStarter(brokerConf, getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR);
+    _brokerStarter.start();
 
-    ControllerRequestBuilderUtil
-        .addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, 5, true);
-    ControllerRequestBuilderUtil
-        .addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, 1, true);
+    addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKERS - 1, true);
+    addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVERS, true);
 
-    while (_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size() == 0
-        || _helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size() == 0) {
-      Thread.sleep(100);
-    }
-
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addTime(TIME_COLUMN_NAME, TimeUnit.DAYS, FieldSpec.DataType.INT).build();
+    _helixResourceManager.addOrUpdateSchema(schema);
     TableConfig offlineTableConfig =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(RAW_DINING_TABLE_NAME)
-            .setTimeColumnName("timeColumn").setTimeType("DAYS").build();
+        new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
+            .setTimeType(TimeUnit.DAYS.name()).build();
     _helixResourceManager.addTable(offlineTableConfig);
-    setupRealtimeTable();
+    TableConfig realtimeTimeConfig =
+        new TableConfig.Builder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
+            .setTimeType(TimeUnit.DAYS.name()).
+            setStreamConfigs(getStreamConfigs()).build();
+    _helixResourceManager.addTable(realtimeTimeConfig);
 
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < NUM_OFFLINE_SEGMENTS; i++) {
       _helixResourceManager
-          .addNewSegment(DINING_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(RAW_DINING_TABLE_NAME),
+          .addNewSegment(OFFLINE_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME),
               "downloadUrl");
     }
 
-    Thread.sleep(1000);
-
-    ExternalView externalView = _helixAdmin.getResourceExternalView(getHelixClusterName(), DINING_TABLE_NAME);
-    Assert.assertEquals(externalView.getPartitionSet().size(), 5);
+    TestUtils.waitForCondition(aVoid -> {
+      ExternalView offlineTableExternalView =
+          _helixAdmin.getResourceExternalView(getHelixClusterName(), OFFLINE_TABLE_NAME);
+      return offlineTableExternalView != null
+          && offlineTableExternalView.getPartitionSet().size() == NUM_OFFLINE_SEGMENTS;
+    }, 30_000L, "Failed to find all OFFLINE segments in the ExternalView");
   }
 
-  private void setupRealtimeTable()
-      throws IOException {
-    // Set up the realtime table.
+  private Map<String, String> getStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
     streamConfigs.put("stream.kafka.consumer.type", "highLevel");
     streamConfigs.put("stream.kafka.topic.name", "kafkaTopic");
     streamConfigs
         .put("stream.kafka.decoder.class.name", "org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder");
-    streamConfigs.put("stream.kafka.hlc.zk.connect.string", "localhost:1111/zkConnect");
-    streamConfigs.put("stream.kafka.decoder.prop.schema.registry.rest.url", "http://localhost:2222/schemaRegistry");
-    TableConfig realtimeTimeConfig =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(RAW_DINING_TABLE_NAME)
-            .setTimeColumnName("timeColumn").setTimeType("DAYS").
-            setStreamConfigs(streamConfigs).build();
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_DINING_TABLE_NAME)
-        .addTime("timeColumn", TimeUnit.DAYS, FieldSpec.DataType.INT).build();
-    _helixResourceManager.addOrUpdateSchema(schema);
-    _helixResourceManager.addTable(realtimeTimeConfig);
-    _helixBrokerStarter.getHelixExternalViewBasedRouting()
-        .markDataResourceOnline(realtimeTimeConfig, null, new ArrayList<>());
-  }
-
-  @AfterTest
-  public void tearDown() {
-    _helixResourceManager.stop();
-    _zkClient.close();
-    ZkStarter.stopLocalZkServer(_zookeeperInstance);
+    return streamConfigs;
   }
 
   @Test
   public void testResourceAndTagAssignment()
       throws Exception {
-    IdealState idealState;
+    assertEquals(
+        _helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), TagNameUtils.getBrokerTagForTenant(null))
+            .size(), NUM_BROKERS);
 
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(),
-        6);
-    idealState =
-        _helixAdmin.getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    Assert.assertEquals(idealState.getInstanceSet(DINING_TABLE_NAME).size(), SEGMENT_COUNT);
+    IdealState brokerResourceIdealState =
+        _helixAdmin.getResourceIdealState(getHelixClusterName(), Helix.BROKER_RESOURCE_INSTANCE);
+    assertEquals(brokerResourceIdealState.getInstanceSet(OFFLINE_TABLE_NAME).size(), NUM_BROKERS);
+    assertEquals(brokerResourceIdealState.getInstanceSet(REALTIME_TABLE_NAME).size(), NUM_BROKERS);
 
-    ExternalView externalView =
-        _helixAdmin.getResourceExternalView(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    Assert.assertEquals(externalView.getStateMap(DINING_TABLE_NAME).size(), SEGMENT_COUNT);
+    ExternalView brokerResourceExternalView =
+        _helixAdmin.getResourceExternalView(getHelixClusterName(), Helix.BROKER_RESOURCE_INSTANCE);
+    assertEquals(brokerResourceExternalView.getStateMap(OFFLINE_TABLE_NAME).size(), NUM_BROKERS);
+    assertEquals(brokerResourceExternalView.getStateMap(REALTIME_TABLE_NAME).size(), NUM_BROKERS);
 
-    HelixExternalViewBasedRouting helixExternalViewBasedRouting =
-        _helixBrokerStarter.getHelixExternalViewBasedRouting();
-    Field brokerRoutingTableBuilderMapField;
-    brokerRoutingTableBuilderMapField = HelixExternalViewBasedRouting.class.getDeclaredField("_routingTableBuilderMap");
-    brokerRoutingTableBuilderMapField.setAccessible(true);
+    HelixExternalViewBasedRouting routing = _brokerStarter.getHelixExternalViewBasedRouting();
+    assertTrue(routing.routingTableExists(OFFLINE_TABLE_NAME));
+    assertTrue(routing.routingTableExists(REALTIME_TABLE_NAME));
 
-    final Map<String, RoutingTableBuilder> brokerRoutingTableBuilderMap =
-        (Map<String, RoutingTableBuilder>) brokerRoutingTableBuilderMapField.get(helixExternalViewBasedRouting);
+    RoutingTableLookupRequest routingTableLookupRequest = new RoutingTableLookupRequest(OFFLINE_TABLE_NAME);
+    Map<String, List<String>> routingTable = routing.getRoutingTable(routingTableLookupRequest);
+    assertEquals(routingTable.size(), NUM_SERVERS);
+    assertEquals(routingTable.values().iterator().next().size(), NUM_OFFLINE_SEGMENTS);
 
-    // Wait up to 30s for routing table to reach the expected size
-    waitForPredicate(new Callable<Boolean>() {
-      @Override
-      public Boolean call()
-          throws Exception {
-        return brokerRoutingTableBuilderMap.size() == 1;
-      }
-    }, 30000L);
-
-    Assert.assertEquals(Arrays.toString(brokerRoutingTableBuilderMap.keySet().toArray()),
-        "[dining_OFFLINE, dining_REALTIME]");
-
-    final String tableName = "coffee";
-    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName)
-        .setBrokerTenant("testBroker").setServerTenant("testServer").build();
-    _helixResourceManager.addTable(tableConfig);
-
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(),
-        6);
-    idealState =
-        _helixAdmin.getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    Assert.assertEquals(idealState.getInstanceSet(COFFEE_TABLE_NAME).size(), SEGMENT_COUNT);
-    Assert.assertEquals(idealState.getInstanceSet(DINING_TABLE_NAME).size(), SEGMENT_COUNT);
-
-    // Wait up to 30s for broker external view to reach the expected size
-    waitForPredicate(new Callable<Boolean>() {
-      @Override
-      public Boolean call()
-          throws Exception {
-        return
-            _helixAdmin.getResourceExternalView(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-                .getStateMap(COFFEE_TABLE_NAME).size() == SEGMENT_COUNT;
-      }
-    }, 30000L);
-
-    externalView =
-        _helixAdmin.getResourceExternalView(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    Assert.assertEquals(externalView.getStateMap(COFFEE_TABLE_NAME).size(), SEGMENT_COUNT);
-
-    // Wait up to 30s for routing table to reach the expected size
-    waitForPredicate(new Callable<Boolean>() {
-      @Override
-      public Boolean call()
-          throws Exception {
-        return brokerRoutingTableBuilderMap.size() == 2;
-      }
-    }, 30000L);
-
-    Object[] tableArray = brokerRoutingTableBuilderMap.keySet().toArray();
-    Arrays.sort(tableArray);
-    Assert.assertEquals(Arrays.toString(tableArray), "[coffee_OFFLINE, dining_OFFLINE, dining_REALTIME]");
-
-    Assert.assertEquals(
-        brokerRoutingTableBuilderMap.get(DINING_TABLE_NAME).getRoutingTables().get(0).values().iterator().next().size(),
-        5);
-
+    // Add a new segment into the OFFLINE table
     _helixResourceManager
-        .addNewSegment(DINING_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(RAW_DINING_TABLE_NAME),
-            "downloadUrl");
+        .addNewSegment(OFFLINE_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME), "downloadUrl");
 
-    // Wait up to 30s for external view to reach the expected size
-    waitForPredicate(new Callable<Boolean>() {
-      @Override
-      public Boolean call()
-          throws Exception {
-        return _helixAdmin.getResourceExternalView(getHelixClusterName(), DINING_TABLE_NAME).getPartitionSet().size()
-            == SEGMENT_COUNT;
-      }
-    }, 30000L);
+    TestUtils.waitForCondition(
+        aVoid -> routing.getRoutingTable(routingTableLookupRequest).values().iterator().next().size()
+            == NUM_OFFLINE_SEGMENTS + 1, 30_000L, "Failed to add the new segment into the routing table");
 
-    externalView = _helixAdmin.getResourceExternalView(getHelixClusterName(), DINING_TABLE_NAME);
-    Assert.assertEquals(externalView.getPartitionSet().size(), SEGMENT_COUNT);
-    tableArray = brokerRoutingTableBuilderMap.keySet().toArray();
-    Arrays.sort(tableArray);
-    Assert.assertEquals(Arrays.toString(tableArray), "[coffee_OFFLINE, dining_OFFLINE, dining_REALTIME]");
+    // Add a new table with different broker tenant
+    String newRawTableName = "newTable";
+    String newOfflineTableName = TableNameBuilder.OFFLINE.tableNameWithType(newRawTableName);
+    TableConfig newTableConfig =
+        new TableConfig.Builder(TableType.OFFLINE).setTableName(newRawTableName).setBrokerTenant("testBroker").build();
+    _helixResourceManager.addTable(newTableConfig);
 
-    // Wait up to 30s for routing table to reach the expected size
-    waitForPredicate(new Callable<Boolean>() {
-      @Override
-      public Boolean call()
-          throws Exception {
-        Map<String, List<String>> routingTable =
-            brokerRoutingTableBuilderMap.get(DINING_TABLE_NAME).getRoutingTables().get(0);
-        return routingTable.values().iterator().next().size() == SEGMENT_COUNT;
-      }
-    }, 30000L);
+    // Broker tenant should be overridden to DefaultTenant
+    TableConfig newTableConfigInCluster = _helixResourceManager.getTableConfig(newOfflineTableName);
+    assertNotNull(newTableConfigInCluster);
+    assertEquals(newTableConfigInCluster.getTenantConfig().getBroker(), TagNameUtils.DEFAULT_TENANT_NAME);
 
-    Assert.assertEquals(
-        brokerRoutingTableBuilderMap.get(DINING_TABLE_NAME).getRoutingTables().get(0).values().iterator().next().size(),
-        SEGMENT_COUNT);
+    brokerResourceIdealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), Helix.BROKER_RESOURCE_INSTANCE);
+    assertEquals(brokerResourceIdealState.getInstanceSet(newOfflineTableName).size(), NUM_BROKERS);
+
+    TestUtils.waitForCondition(aVoid -> {
+      Map<String, String> newTableStateMap =
+          _helixAdmin.getResourceExternalView(getHelixClusterName(), Helix.BROKER_RESOURCE_INSTANCE)
+              .getStateMap(newOfflineTableName);
+      return newTableStateMap != null && newTableStateMap.size() == NUM_BROKERS;
+    }, 30_000L, "Failed to find all brokers for the new table in the brokerResource ExternalView");
+
+    assertTrue(routing.routingTableExists(newOfflineTableName));
   }
 
+  /**
+   * This test verifies that when the segments of an OFFLINE are refreshed, the TimeBoundaryInfo is also updated.
+   */
   @Test
-  public void testTimeBoundaryUpdate()
-      throws Exception {
-    // This test verifies that when the segments of an offline table are refreshed, the TimeBoundaryInfo is also updated
-    // to a newer timestamp.
-    final long currentTimeBoundary = 10;
-    TimeBoundaryService.TimeBoundaryInfo tbi = _helixBrokerStarter.getHelixExternalViewBasedRouting().
-        getTimeBoundaryService().getTimeBoundaryInfoFor(DINING_TABLE_NAME);
+  public void testTimeBoundaryUpdate() {
+    TimeBoundaryService timeBoundaryService = _brokerStarter.getHelixExternalViewBasedRouting().
+        getTimeBoundaryService();
 
-    Assert.assertEquals(tbi.getTimeValue(), Long.toString(currentTimeBoundary - 1));
+    // Time boundary should be 1 day smaller than the end time
+    int currentEndTime = 10;
+    TimeBoundaryInfo timeBoundaryInfo = timeBoundaryService.getTimeBoundaryInfoFor(OFFLINE_TABLE_NAME);
+    assertEquals(timeBoundaryInfo.getTimeValue(), Integer.toString(currentEndTime - 1));
 
-    List<String> segmentNames = _helixResourceManager.getSegmentsFor(DINING_TABLE_NAME);
-    long endTime = currentTimeBoundary + 10;
-    // Refresh all 5 segments.
-    for (String segment : segmentNames) {
-      OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-          _helixResourceManager.getOfflineSegmentZKMetadata(RAW_DINING_TABLE_NAME, segment);
-      Assert.assertNotNull(offlineSegmentZKMetadata);
-      _helixResourceManager.refreshSegment(DINING_TABLE_NAME,
-          SegmentMetadataMockUtils.mockSegmentMetadataWithEndTimeInfo(RAW_DINING_TABLE_NAME, segment, endTime++),
-          offlineSegmentZKMetadata);
-    }
-    // Due to the asynchronous nature of the TimeboundaryInfo update and thread scheduling, the updated time boundary
-    // may not always be the max endtime of segments. We do not expect such exact update either as long as the timestamp
-    // is updated to some newer value.
-    waitForPredicate(() -> {
-      TimeBoundaryService.TimeBoundaryInfo timeBoundaryInfo = _helixBrokerStarter.getHelixExternalViewBasedRouting().
-          getTimeBoundaryService().getTimeBoundaryInfoFor(DINING_TABLE_NAME);
-      return currentTimeBoundary < Long.parseLong(timeBoundaryInfo.getTimeValue());
-    }, 5 * _brokerConf.getLong(CommonConstants.Broker.CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL));
-    tbi = _helixBrokerStarter.getHelixExternalViewBasedRouting().
-        getTimeBoundaryService().getTimeBoundaryInfoFor(DINING_TABLE_NAME);
-    Assert.assertTrue(currentTimeBoundary < Long.parseLong(tbi.getTimeValue()));
+    // Refresh a segment with a new end time
+    String segmentToRefresh = _helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME).get(0);
+    int newEndTime = currentEndTime + 10;
+    OfflineSegmentZKMetadata segmentZKMetadata =
+        _helixResourceManager.getOfflineSegmentZKMetadata(RAW_TABLE_NAME, segmentToRefresh);
+    _helixResourceManager.refreshSegment(OFFLINE_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadataWithEndTimeInfo(RAW_TABLE_NAME, segmentToRefresh, newEndTime),
+        segmentZKMetadata);
+
+    TestUtils.waitForCondition(aVoid -> timeBoundaryService.getTimeBoundaryInfoFor(OFFLINE_TABLE_NAME).getTimeValue()
+        .equals(Integer.toString(newEndTime - 1)), 30_000L, "Failed to update the time boundary for refreshed segment");
   }
 
-  private void waitForPredicate(Callable<Boolean> predicate, long timeout) {
-    long deadline = System.currentTimeMillis() + timeout;
-    while (System.currentTimeMillis() < deadline) {
-      try {
-        if (predicate.call()) {
-          return;
-        }
-      } catch (Exception e) {
-        // Do nothing
-      }
-
-      Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
-    }
+  @AfterClass
+  public void tearDown() {
+    stopFakeInstances();
+    _brokerStarter.shutdown();
+    stopController();
+    stopZk();
   }
 }

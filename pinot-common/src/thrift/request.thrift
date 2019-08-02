@@ -154,6 +154,7 @@ struct BrokerRequest {
  15: optional HavingFilterQuery havingFilterQuery;
  16: optional HavingFilterQueryMap havingFilterSubQueryMap;
  17: optional query.PinotQuery pinotQuery;
+ 18: optional list<SelectionSort> orderBy;
 }
 
 /**

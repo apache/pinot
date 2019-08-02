@@ -60,7 +60,6 @@ import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
@@ -88,7 +87,6 @@ public abstract class ClusterTest extends ControllerTest {
   private static final Random RANDOM = new Random();
   private static final int DEFAULT_BROKER_PORT = 18099;
 
-  protected final String _clusterName = getHelixClusterName();
   protected String _brokerBaseApiUrl;
 
   private List<HelixBrokerStarter> _brokerStarters = new ArrayList<>();
@@ -129,7 +127,7 @@ public abstract class ClusterTest extends ControllerTest {
         brokerConf.setProperty(Broker.CONFIG_OF_REQUEST_HANDLER_TYPE, Broker.SINGLE_CONNECTION_REQUEST_HANDLER_TYPE);
       }
       overrideBrokerConf(brokerConf);
-      HelixBrokerStarter brokerStarter = new HelixBrokerStarter(brokerConf, _clusterName, zkStr);
+      HelixBrokerStarter brokerStarter = new HelixBrokerStarter(brokerConf, getHelixClusterName(), zkStr, LOCAL_HOST);
       brokerStarter.start();
       _brokerStarters.add(brokerStarter);
     }
@@ -171,7 +169,7 @@ public abstract class ClusterTest extends ControllerTest {
             .setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, baseAdminApiPort - i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
-        _serverStarters.add(new HelixServerStarter(_clusterName, zkStr, configuration));
+        _serverStarters.add(new HelixServerStarter(getHelixClusterName(), zkStr, configuration));
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -191,7 +189,7 @@ public abstract class ClusterTest extends ControllerTest {
         config.setProperty(Helix.Instance.INSTANCE_ID_KEY,
             Minion.INSTANCE_PREFIX + "minion" + i + "_" + (Minion.DEFAULT_HELIX_PORT + i));
         config.setProperty(Helix.Instance.DATA_DIR_KEY, Minion.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
-        MinionStarter minionStarter = new MinionStarter(ZkStarter.DEFAULT_ZK_STR, _clusterName, config);
+        MinionStarter minionStarter = new MinionStarter(ZkStarter.DEFAULT_ZK_STR, getHelixClusterName(), config);
 
         // Register task executor factories
         if (taskExecutorFactoryRegistry != null) {
@@ -273,7 +271,7 @@ public abstract class ClusterTest extends ControllerTest {
    *
    * @param segmentDir Segment directory
    */
-  protected void uploadSegments(@Nonnull File segmentDir)
+  protected void uploadSegments(@Nonnull String tableName, @Nonnull File segmentDir)
       throws Exception {
     String[] segmentNames = segmentDir.list();
     Assert.assertNotNull(segmentNames);
@@ -290,7 +288,7 @@ public abstract class ClusterTest extends ControllerTest {
           @Override
           public Integer call()
               throws Exception {
-            return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentName, segmentFile)
+            return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentName, segmentFile, tableName)
                 .getStatusCode();
           }
         }));
@@ -407,7 +405,18 @@ public abstract class ClusterTest extends ControllerTest {
       String kafkaTopic, int realtimeSegmentFlushRows, File avroFile, String timeColumnName, String timeType,
       String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
       List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
-      TableTaskConfig taskConfig, String streamConsumerFactoryName)
+      TableTaskConfig taskConfig, String streamConsumerFactoryName) throws Exception {
+    addRealtimeTable(tableName, useLlc, kafkaBrokerList, kafkaZkUrl, kafkaTopic, realtimeSegmentFlushRows,
+        avroFile, timeColumnName, timeType, schemaName, brokerTenant, serverTenant, loadMode, sortedColumn,
+        invertedIndexColumns, bloomFilterColumns, noDictionaryColumns, taskConfig, streamConsumerFactoryName,
+        1);
+  }
+
+  protected void addRealtimeTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,
+      String kafkaTopic, int realtimeSegmentFlushRows, File avroFile, String timeColumnName, String timeType,
+      String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
+      List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
+      TableTaskConfig taskConfig, String streamConsumerFactoryName, int numReplicas)
       throws Exception {
     Map<String, String> streamConfigs = new HashMap<>();
     String streamType = "kafka";
@@ -427,6 +436,9 @@ public abstract class ClusterTest extends ControllerTest {
       streamConfigs.put(KafkaStreamConfigProperties
               .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING),
           kafkaZkUrl);
+      streamConfigs.put(KafkaStreamConfigProperties
+              .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_BOOTSTRAP_SERVER),
+          kafkaBrokerList);
     }
     streamConfigs.put(StreamConfigProperties
             .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
@@ -446,7 +458,8 @@ public abstract class ClusterTest extends ControllerTest {
         .setTimeColumnName(timeColumnName).setTimeType(timeType).setSchemaName(schemaName).setBrokerTenant(brokerTenant)
         .setServerTenant(serverTenant).setLoadMode(loadMode).setSortedColumn(sortedColumn)
         .setInvertedIndexColumns(invertedIndexColumns).setBloomFilterColumns(bloomFilterColumns)
-        .setNoDictionaryColumns(noDictionaryColumns).setStreamConfigs(streamConfigs).setTaskConfig(taskConfig).build();
+        .setNoDictionaryColumns(noDictionaryColumns).setStreamConfigs(streamConfigs).setTaskConfig(taskConfig)
+        .setNumReplicas(numReplicas).build();
 
     // save the realtime table config
     _realtimeTableConfig = tableConfig;
@@ -494,20 +507,6 @@ public abstract class ClusterTest extends ControllerTest {
     addRealtimeTable(tableName, useLlc, kafkaBrokerList, kafkaZkUrl, kafkaTopic, realtimeSegmentFlushSize, avroFile,
         timeColumnName, timeType, schemaName, brokerTenant, serverTenant, loadMode, sortedColumn, invertedIndexColumns,
         bloomFilterColumns, noDictionaryColumns, taskConfig, streamConsumerFactoryName);
-  }
-
-  protected void createBrokerTenant(String tenantName, int brokerCount)
-      throws Exception {
-    String request = ControllerRequestBuilderUtil.buildBrokerTenantCreateRequestJSON(tenantName, brokerCount);
-    sendPostRequest(_controllerRequestURLBuilder.forBrokerTenantCreate(), request);
-  }
-
-  protected void createServerTenant(String tenantName, int offlineServerCount, int realtimeServerCount)
-      throws Exception {
-    String request = ControllerRequestBuilderUtil
-        .buildServerTenantCreateRequestJSON(tenantName, offlineServerCount + realtimeServerCount, offlineServerCount,
-            realtimeServerCount);
-    sendPostRequest(_controllerRequestURLBuilder.forServerTenantCreate(), request);
   }
 
   protected JsonNode getDebugInfo(final String uri)

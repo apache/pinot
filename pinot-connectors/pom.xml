@@ -32,12 +32,15 @@
   <artifactId>pinot-connectors</artifactId>
   <packaging>pom</packaging>
   <name>Pinot Connectors</name>
+  <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
   </properties>
 
   <modules>
+    <module>pinot-connector-kafka-base</module>
     <module>pinot-connector-kafka-0.9</module>
+    <module>pinot-connector-kafka-2.0</module>
   </modules>
 
   <dependencies>
@@ -45,11 +48,23 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
       <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.scala-lang</groupId>
+          <artifactId>scala-library</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>
       <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.scala-lang</groupId>
+          <artifactId>scala-library</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <!-- test -->

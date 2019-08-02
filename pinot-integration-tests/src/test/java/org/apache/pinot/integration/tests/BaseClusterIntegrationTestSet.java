@@ -141,7 +141,6 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
             + "HAVING SUM(ArrDelay) <> 6325.973 AND AVG(CAST(CRSDepTime AS DOUBLE)) <= 1569.8755 OR SUM(TaxiIn) = 1003.87274"));
   }
 
-
   /**
    * Test hardcoded queries.
    * <p>NOTE:
@@ -361,14 +360,14 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    */
   public void testInstanceShutdown()
       throws Exception {
-    List<String> instances = _helixAdmin.getInstancesInCluster(_clusterName);
+    List<String> instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
     Assert.assertFalse(instances.isEmpty(), "List of instances should not be empty");
 
     // Mark all instances in the cluster as shutting down
     for (String instance : instances) {
-      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_clusterName, instance);
+      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), instance);
       instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, true);
-      _helixAdmin.setInstanceConfig(_clusterName, instance, instanceConfig);
+      _helixAdmin.setInstanceConfig(getHelixClusterName(), instance, instanceConfig);
     }
 
     // Check that the routing table is empty
@@ -376,9 +375,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
     // Mark all instances as not shutting down
     for (String instance : instances) {
-      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_clusterName, instance);
+      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), instance);
       instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
-      _helixAdmin.setInstanceConfig(_clusterName, instance, instanceConfig);
+      _helixAdmin.setInstanceConfig(getHelixClusterName(), instance, instanceConfig);
     }
 
     // Check that the routing table is not empty
@@ -394,16 +393,16 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       checkForInstanceInRoutingTable(true, instanceName);
 
       // Mark the server instance as shutting down
-      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_clusterName, instanceName);
+      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), instanceName);
       instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, true);
-      _helixAdmin.setInstanceConfig(_clusterName, instanceName, instanceConfig);
+      _helixAdmin.setInstanceConfig(getHelixClusterName(), instanceName, instanceConfig);
 
       // Check that it is not in the routing table
       checkForInstanceInRoutingTable(false, instanceName);
 
       // Re-enable the server instance
       instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
-      _helixAdmin.setInstanceConfig(_clusterName, instanceName, instanceConfig);
+      _helixAdmin.setInstanceConfig(getHelixClusterName(), instanceName, instanceConfig);
 
       // Check that it is in the routing table
       checkForInstanceInRoutingTable(true, instanceName);

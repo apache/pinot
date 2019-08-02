@@ -35,7 +35,6 @@ import org.testng.annotations.Test;
 public class HelixHelperTest extends ControllerTest {
   public static final String RESOURCE_NAME = "potato_OFFLINE";
   public static final String INSTANCE_NAME = "Server_1.2.3.4_1234";
-  private String helixClusterName;
 
   @BeforeClass
   public void setUp() {
@@ -46,8 +45,7 @@ public class HelixHelperTest extends ControllerTest {
     idealState.setStateModelDefRef("OnlineOffline");
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
     idealState.setReplicas("0");
-    helixClusterName = getHelixClusterName();
-    _helixAdmin.addResource(helixClusterName, RESOURCE_NAME, idealState);
+    _helixAdmin.addResource(getHelixClusterName(), RESOURCE_NAME, idealState);
   }
 
   /**
@@ -68,7 +66,7 @@ public class HelixHelperTest extends ControllerTest {
       }
     }, RetryPolicies.noDelayRetryPolicy(1));
 
-    IdealState resourceIdealState = _helixAdmin.getResourceIdealState(helixClusterName, RESOURCE_NAME);
+    IdealState resourceIdealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), RESOURCE_NAME);
     for (int i = 0; i < numSegments; i++) {
       Assert.assertEquals(resourceIdealState.getInstanceStateMap("segment_" + i).get(INSTANCE_NAME), "ONLINE");
     }
