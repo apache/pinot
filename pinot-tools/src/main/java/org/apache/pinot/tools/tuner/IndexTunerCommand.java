@@ -80,7 +80,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (unset run on all tables)")
   private String _tableNamesWithoutType = null;
 
-  @Option(name = "-untrackedInvertedIndex", required = false, usage = "{tabelNameWithoutType1: [colName1, colName2, colName3]}")
+  @Option(name = "-untrackedInvertedIndex", required = false, usage = "\"{\\\"tabelNameWithoutType1\\\": [\\\"colName1\\\",\\\"colName2\\\"]}\"")
   private String _untrackedInvertedIndex = null;
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
@@ -121,7 +121,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
     }
 
     LOGGER.info(
-        "Index: {}\nstrategy: {}\nmetadata file: {}\nbroker log: {}\ntables{}\ntrackingIndexOn: {}\nselectivityThreshold: {}\n",
+        "Index: {}\nstrategy: {}\nmetadata file: {}\nbroker log: {}\ntables: {}\ntrackingIndexOn: {}\nselectivityThreshold: {}\n",
         _indexType, _strategy, _metadata, _brokerLog, tableNamesWithoutTypeStr, untrackedInvertedIndexMap,
         _selectivityThreshold);
 
