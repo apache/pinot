@@ -25,6 +25,8 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
@@ -56,7 +58,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
   private static final String TYPE_REGEX = "(_REALTIME|_OFFLINE|_HYBRID)";
   private String _path;
   private Boolean _useExistingIndex;
-  private HashMap<String, HashSet<String>> _additionalMaskingCols;
+  private Map<String, Set<String>> _additionalMaskingCols;
 
   private JsonNode _aggregatedMap = null;
   private JsonNode _segmentMap = null;
@@ -70,7 +72,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
   public static final class Builder {
     private String _path;
     private Boolean _useExistingIndex = USE_EXISTING_INDEX;
-    private HashMap<String, HashSet<String>> _additionalMaskingCols = new HashMap<>();
+    private Map<String, Set<String>> _additionalMaskingCols = new HashMap<>();
 
     public Builder() {
     }
@@ -103,7 +105,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
      * @return this
      */
     @Nonnull
-    public Builder setAdditionalMaskingCols(@Nonnull HashMap<String, HashSet<String>> val) {
+    public Builder setAdditionalMaskingCols(@Nonnull Map<String, Set<String>> val) {
       _additionalMaskingCols = val;
       return this;
     }
@@ -140,9 +142,6 @@ public class JsonFileMetaManagerImpl implements MetaManager {
 
   /**
    * If there is already inverted index on a column
-   * @param tableNameWithoutType
-   * @param columnName
-   * @return
    */
   public boolean hasInvertedIndex(String tableNameWithoutType, String columnName) {
     if (_additionalMaskingCols.getOrDefault(tableNameWithoutType, new HashSet<>()).contains(columnName)) {
@@ -210,9 +209,8 @@ public class JsonFileMetaManagerImpl implements MetaManager {
 
     sorted_ratio = BigFraction.ONE.subtract(sorted_ratio);
     BigFraction averageCard = new BigFraction(new BigInteger(cardNumerator), new BigInteger(cardDenominator));
-    BigFraction ret = averageCard.multiply(sorted_ratio);
 
-    return ret;
+    return averageCard.multiply(sorted_ratio);
   }
 
   public String getSegmentField(String tableNameWithoutType, String columnName, String segmentName, String fieldName) {

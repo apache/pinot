@@ -21,9 +21,11 @@ package org.apache.pinot.tools.tuner.strategy;
 import io.vavr.Tuple2;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
@@ -52,7 +54,7 @@ public class FrequencyImpl implements TuningStrategy {
   public static final int MATCHER_GROUP_DIMENSION_COMP = 4;
 
   public final static Pattern _dimensionPattern = Pattern.compile(DIMENSION_REGEX);
-  private HashSet<String> _tableNamesWithoutType;
+  private Set<String> _tableNamesWithoutType;
   private long _numEntriesScannedThreshold;
   private long _cardinalityThreshold;
   private long _numQueriesThreshold;
@@ -67,7 +69,7 @@ public class FrequencyImpl implements TuningStrategy {
   }
 
   public static final class Builder {
-    private HashSet<String> _tableNamesWithoutType = new HashSet<>();
+    private Set<String> _tableNamesWithoutType = Collections.EMPTY_SET;
     private long _numEntriesScannedThreshold = DEFAULT_IN_FILTER_THRESHOLD;
     private long _cardinalityThreshold = DEFAULT_CARDINALITY_THRESHOLD;
     private long _numQueriesThreshold = DEFAULT_NUM_QUERIES_THRESHOLD;
@@ -85,7 +87,7 @@ public class FrequencyImpl implements TuningStrategy {
      * @param val set of table names without type
      */
     @Nonnull
-    public Builder setTableNamesWithoutType(@Nonnull HashSet<String> val) {
+    public Builder setTableNamesWithoutType(@Nonnull Set<String> val) {
       _tableNamesWithoutType = val;
       return this;
     }

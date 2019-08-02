@@ -18,9 +18,17 @@
  */
 package org.apache.pinot.tools.tuner;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.tuner.driver.TunerDriver;
@@ -72,12 +80,33 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
   @Option(name = "-tables", required = false, usage = "Comma separated list of table names to work on without type (unset run on all tables)")
   private String _tableNamesWithoutType = null;
 
+  @Option(name = "-untrackedInvertedIndex", required = false, usage = "{tabelNameWithoutType1: [colName1, colName2, colName3]}")
+  private String _untrackedInvertedIndex = null;
+
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help;
 
   @Override
   public boolean execute() {
-    HashSet<String> tableNamesWithoutType = new HashSet<>();
+    Map<String, Set<String>> untrackedInvertedIndexMap;
+    try {
+      JsonNode untrackedInvertedIndexNode = JsonUtils.stringToJsonNode(_untrackedInvertedIndex);
+      LOGGER.info(untrackedInvertedIndexNode.toString());
+      untrackedInvertedIndexMap = new HashMap<>();
+      Map<String, Set<String>> finalUntrackedInvertedIndexMap = untrackedInvertedIndexMap;
+      untrackedInvertedIndexNode.fields().forEachRemaining(tableNameToJson -> {
+        HashSet<String> colNames = new HashSet<String>();
+        tableNameToJson.getValue().elements().forEachRemaining(colNode -> {
+          colNames.add(colNode.textValue());
+        });
+        finalUntrackedInvertedIndexMap.put(tableNameToJson.getKey(), colNames);
+      });
+    } catch (Exception e) {
+      LOGGER.error("Invalid untrackedInvertedIndex: {}", _untrackedInvertedIndex);
+      untrackedInvertedIndexMap = Collections.EMPTY_MAP;
+    }
+
+    Set<String> tableNamesWithoutType = new HashSet<>();
     if (_tableNamesWithoutType != null && !_tableNamesWithoutType.trim().equals("")) {
       tableNamesWithoutType.addAll(Arrays.asList(_tableNamesWithoutType.split(",")));
     }
@@ -87,25 +116,30 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
     } else {
       tableNamesWithoutTypeStr = tableNamesWithoutType.toString();
     }
-    LOGGER.info("Index: {}\nstrategy: {}\nmetadata file: {}\nbroker log: {}\ntables{}\n", _indexType, _strategy,
-        _metadata, _brokerLog, tableNamesWithoutTypeStr);
-
     if (_selectivityThreshold < 1) {
       _selectivityThreshold = 1;
     }
+
+    LOGGER.info(
+        "Index: {}\nstrategy: {}\nmetadata file: {}\nbroker log: {}\ntables{}\ntrackingIndexOn: {}\nselectivityThreshold: {}\n",
+        _indexType, _strategy, _metadata, _brokerLog, tableNamesWithoutTypeStr, untrackedInvertedIndexMap,
+        _selectivityThreshold);
 
     try {
       if (_strategy.equals(STRATEGY_PARSER_BASED)) {
         if (_indexType.equals(INVERTED_INDEX)) {
           TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
               .setTuningStrategy(new ParserBasedImpl.Builder().setTableNamesWithoutType(tableNamesWithoutType)
-                  .setNumQueriesThreshold(_numQueriesThreshold).setAlgorithmOrder(ParserBasedImpl.SECOND_ORDER)
+                  .setNumQueriesThreshold(_numQueriesThreshold)
+                  .setAlgorithmOrder(ParserBasedImpl.SECOND_ORDER)
                   .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
                   .setSelectivityThreshold(_selectivityThreshold)
                   .build())
               .setInputIterator(
                   new LogInputIteratorImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
-              .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metadata).build());
+              .setMetaManager(new JsonFileMetaManagerImpl.Builder().setAdditionalMaskingCols(untrackedInvertedIndexMap)
+                  .setPath(_metadata)
+                  .build());
           parserBased.execute();
         } else if (_indexType.equals(SORTED_INDEX)) {
           TunerDriver parserBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
@@ -117,7 +151,9 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
                   .build())
               .setInputIterator(
                   new LogInputIteratorImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
-              .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metadata).build());
+              .setMetaManager(new JsonFileMetaManagerImpl.Builder().setAdditionalMaskingCols(untrackedInvertedIndexMap)
+                  .setPath(_metadata)
+                  .build());
           parserBased.execute();
         } else {
           return false;
@@ -127,7 +163,7 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
           LOGGER.error("Simple frequency strategy is for inverted index only!");
           return false;
         }
-        TunerDriver freqBased = new TunerTest().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
+        TunerDriver freqBased = new TunerDriver().setThreadPoolSize(Runtime.getRuntime().availableProcessors() - 1)
             .setTuningStrategy(new FrequencyImpl.Builder().setNumQueriesThreshold(_numQueriesThreshold)
                 .setNumEntriesScannedThreshold(_numEntriesScannedThreshold)
                 .setTableNamesWithoutType(tableNamesWithoutType)
@@ -135,7 +171,9 @@ public class IndexTunerCommand extends AbstractBaseCommand implements Command {
                 .build())
             .setInputIterator(
                 new LogInputIteratorImpl.Builder().setParser(new BrokerLogParserImpl()).setPath(_brokerLog).build())
-            .setMetaManager(new JsonFileMetaManagerImpl.Builder().setPath(_metadata).build());
+            .setMetaManager(new JsonFileMetaManagerImpl.Builder().setAdditionalMaskingCols(untrackedInvertedIndexMap)
+                .setPath(_metadata)
+                .build());
         freqBased.execute();
       }
     } catch (FileNotFoundException e) {

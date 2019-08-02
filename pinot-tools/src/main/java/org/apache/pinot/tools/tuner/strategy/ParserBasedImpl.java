@@ -68,7 +68,7 @@ public class ParserBasedImpl implements TuningStrategy {
   public final static int DEFAULT_CARDINALITY_THRESHOLD = 1;
 
   private int _algorithmOrder;
-  private HashSet<String> _tableNamesWithoutType;
+  private Set<String> _tableNamesWithoutType;
   private long _numEntriesScannedThreshold;
   private long _numQueriesThreshold;
   private int _selectivityThreshold;
@@ -85,7 +85,7 @@ public class ParserBasedImpl implements TuningStrategy {
 
   public static final class Builder {
     private int _algorithmOrder = FIRST_ORDER;
-    private HashSet<String> _tableNamesWithoutType = new HashSet<>();
+    private Set<String> _tableNamesWithoutType = Collections.EMPTY_SET;
     private long _numEntriesScannedThreshold = DEFAULT_NUM_ENTRIES_IN_FILTER_THRESHOLD;
     private long _numQueriesThreshold = DEFAULT_NUM_QUERIES_THRESHOLD;
     private int _selectivityThreshold = DEFAULT_CARDINALITY_THRESHOLD;
@@ -112,7 +112,7 @@ public class ParserBasedImpl implements TuningStrategy {
      * @param val set of table names without type
      */
     @Nonnull
-    public Builder setTableNamesWithoutType(@Nonnull HashSet<String> val) {
+    public Builder setTableNamesWithoutType(@Nonnull Set<String> val) {
       _tableNamesWithoutType = val;
       return this;
     }
