@@ -56,7 +56,7 @@ public class PinotControllerModeTest extends ControllerTest {
     stopController();
   }
 
-  @Test
+  @Test(enabled = false)
   public void testDualModeController() {
     // Start the first dual-mode controller
     ControllerConf firstDualModeControllerConfig = getDefaultControllerConfiguration();
