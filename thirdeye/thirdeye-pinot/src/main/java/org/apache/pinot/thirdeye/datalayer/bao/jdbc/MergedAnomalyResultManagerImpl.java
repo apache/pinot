@@ -253,8 +253,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     Predicate predicate =
         Predicate.AND(Predicate.LT("startTime", endTime), Predicate.GT("endTime", startTime),
             Predicate.EQ("functionId", functionId));
-    List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
-    return convertMergedAnomalyBean2DTO(list);
+    return findByPredicate(predicate);
   }
 
   @Override

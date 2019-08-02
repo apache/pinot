@@ -1,3 +1,22 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 package org.apache.pinot.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,17 +46,17 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 public class AnomalyFlattenResource {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
-  public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   public static final String ANOMALY_ID = "anomalyId";
   public static final String ANOMALY_COMMENT = "comment";
   public static final String FUNCTION_ID = "functionId";
   public static final String WINDOW_START = "start";
   public static final String WINDOW_END = "end";
-  public static final String DIMENSION_KEYS  = "keys";
+  private static final String DIMENSION_KEYS  = "keys";
 
-  public static final List<String> REQUIRED_JSON_KEYS =Arrays.asList(FUNCTION_ID, WINDOW_START, WINDOW_END);
-  public static final String DEFAULT_DELIMINATOR = ",";
+  private static final List<String> REQUIRED_JSON_KEYS =Arrays.asList(FUNCTION_ID, WINDOW_START, WINDOW_END);
+  private static final String DEFAULT_DELIMINATOR = ",";
 
   public AnomalyFlattenResource() {
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
@@ -49,7 +68,8 @@ public class AnomalyFlattenResource {
 
   /**
    * Flatten a list of anomaly results to a list of map
-   * @param jsonPayload a json string
+   * @param jsonPayload a json string; the jsonPayload should include keys: [functionId, start, end].
+   *                    start and end are in the format of epoch time
    * @return a list of map
    * @throws IOException
    */
