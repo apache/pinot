@@ -385,8 +385,12 @@ public class ServiceStatus {
     protected CurrentState getState(String resourceName) {
       PropertyKey.Builder keyBuilder = _helixDataAccessor.keyBuilder();
       LiveInstance liveInstance = _helixDataAccessor.getProperty(keyBuilder.liveInstance(_instanceName));
-      String sessionId = liveInstance.getSessionId();
-      return _helixDataAccessor.getProperty(keyBuilder.currentState(_instanceName, sessionId, resourceName));
+      if (liveInstance == null) {
+        return null;
+      } else {
+        String sessionId = liveInstance.getSessionId();
+        return _helixDataAccessor.getProperty(keyBuilder.currentState(_instanceName, sessionId, resourceName));
+      }
     }
 
     @Override

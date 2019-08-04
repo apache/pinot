@@ -838,6 +838,9 @@ public class PinotHelixResourceManager {
     List<String> instancesInCluster = _helixAdmin.getInstancesInCluster(_helixClusterName);
     for (String instanceName : instancesInCluster) {
       InstanceConfig config = _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
+      if (config == null) {
+        continue;
+      }
       for (String tag : config.getTags()) {
         if (TagNameUtils.isBrokerTag(tag)) {
           tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
@@ -852,6 +855,9 @@ public class PinotHelixResourceManager {
     List<String> instancesInCluster = _helixAdmin.getInstancesInCluster(_helixClusterName);
     for (String instanceName : instancesInCluster) {
       InstanceConfig config = _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
+      if (config == null) {
+        continue;
+      }
       for (String tag : config.getTags()) {
         if (TagNameUtils.isServerTag(tag)) {
           tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
@@ -863,7 +869,11 @@ public class PinotHelixResourceManager {
 
   private List<String> getTagsForInstance(String instanceName) {
     InstanceConfig config = _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
-    return config.getTags();
+    if (config == null) {
+      return new ArrayList<>(0);
+    } else {
+      return config.getTags();
+    }
   }
 
   public PinotResourceManagerResponse createServerTenant(Tenant serverTenant) {

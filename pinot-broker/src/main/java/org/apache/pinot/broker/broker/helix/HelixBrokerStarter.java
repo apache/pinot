@@ -272,14 +272,22 @@ public class HelixBrokerStarter {
   private void addInstanceTagIfNeeded() {
     InstanceConfig instanceConfig =
         _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().instanceConfig(_brokerId));
-    List<String> instanceTags = instanceConfig.getTags();
-    if (instanceTags == null || instanceTags.isEmpty()) {
-      if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
-        _helixAdmin.addInstanceTag(_clusterName, _brokerId,
-            TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME));
-      } else {
-        _helixAdmin.addInstanceTag(_clusterName, _brokerId, Helix.UNTAGGED_BROKER_INSTANCE);
+    if (instanceConfig == null) {
+      addInstanceConfig();
+    } else {
+      List<String> instanceTags = instanceConfig.getTags();
+      if (instanceTags == null || instanceTags.isEmpty()) {
+        addInstanceConfig();
       }
+    }
+  }
+
+  private void addInstanceConfig() {
+    if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
+      _helixAdmin.addInstanceTag(_clusterName, _brokerId,
+          TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME));
+    } else {
+      _helixAdmin.addInstanceTag(_clusterName, _brokerId, Helix.UNTAGGED_BROKER_INSTANCE);
     }
   }
 

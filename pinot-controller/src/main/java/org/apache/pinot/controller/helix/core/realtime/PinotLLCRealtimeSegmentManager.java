@@ -223,17 +223,19 @@ public class PinotLLCRealtimeSegmentManager {
     // If there are any completions in the pipeline we let them commit.
     Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
 
-    IdealState idealState = HelixHelper.getTableIdealState(_helixManager, realtimeTableName);
     final List<String> segmentsToRemove = new ArrayList<String>();
-    Set<String> allSegments = idealState.getPartitionSet();
-    int removeCount = 0;
-    for (String segmentName : allSegments) {
-      if (SegmentName.isLowLevelConsumerSegmentName(segmentName)) {
-        segmentsToRemove.add(segmentName);
-        removeCount++;
+    IdealState idealState = HelixHelper.getTableIdealState(_helixManager, realtimeTableName);
+    if (idealState != null) {
+      Set<String> allSegments = idealState.getPartitionSet();
+      int removeCount = 0;
+      for (String segmentName : allSegments) {
+        if (SegmentName.isLowLevelConsumerSegmentName(segmentName)) {
+          segmentsToRemove.add(segmentName);
+          removeCount++;
+        }
       }
+      LOGGER.info("Attempting to remove {} LLC segments of table {}", removeCount, realtimeTableName);
     }
-    LOGGER.info("Attempting to remove {} LLC segments of table {}", removeCount, realtimeTableName);
 
     _helixResourceManager.deleteSegments(realtimeTableName, segmentsToRemove);
   }
