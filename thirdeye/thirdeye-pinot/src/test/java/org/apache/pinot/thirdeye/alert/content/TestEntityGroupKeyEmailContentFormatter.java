@@ -46,7 +46,9 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.thirdeye.alert.content.EntityGroupKeyContentFormatter.*;
@@ -63,8 +65,8 @@ public class TestEntityGroupKeyEmailContentFormatter {
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
   private MetricConfigManager metricDAO;
 
-  @BeforeClass
-  public void beforeClass(){
+  @BeforeMethod
+  public void beforeMethod(){
     testDAOProvider = DAOTestBase.getInstance();
     DAORegistry daoRegistry = DAORegistry.getInstance();
     detectionDAO = daoRegistry.getDetectionConfigManager();
@@ -72,8 +74,8 @@ public class TestEntityGroupKeyEmailContentFormatter {
     metricDAO = daoRegistry.getMetricConfigDAO();
   }
 
-  @AfterClass(alwaysRun = true)
-  void afterClass() {
+  @AfterMethod(alwaysRun = true)
+  void afterMethod() {
     testDAOProvider.cleanup();
   }
 
