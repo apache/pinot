@@ -122,7 +122,7 @@ export default Component.extend({
       };
       // send fields and yaml to yaml util to merge old to update values
       let detectionYaml = get(this, 'detectionYaml') ? get(this, 'detectionYaml') : defaultDetectionYaml;
-      detectionYaml = fieldsToYaml(fields, detectionYaml);
+      detectionYaml = fieldsToYaml(fields, detectionYaml, defaultDetectionYaml);
       // send new Yaml to parent
       this.get('setDetectionYaml')(detectionYaml);
     }

@@ -1,9 +1,6 @@
 import yamljs from 'yamljs';
 import jsyaml from 'js-yaml';
 
-import yamljs from 'yamljs';
-import jsyaml from 'js-yaml';
-
 export const defaultDetectionYaml = `# Below is a sample template. You may refer the documentation for more examples and update the fields accordingly.
 # Give a name for this anomaly detection pipeline (should be unique).
 detectionName: name_of_the_detection
@@ -113,16 +110,22 @@ export function redundantParse(yamlString) {
  * @method fieldsToYaml
  * @param {Object} fields (assumes keys are same as target fields in yaml)
  * @param {String} yamlString (the yaml string to be updated)
+ * @param {String} defaultYaml (yaml to use if yamlString is not valid yaml)
  * @return {String} - updatedYaml
  */
-export function fieldsToYaml(fields, yamlString) {
+export function fieldsToYaml(fields, yamlString, defaultYaml) {
   // parse yamlString to JSON
   let yamlAsObject = {};
   try {
     yamlAsObject = redundantParse(yamlString);
   }
   catch(err) {
-    return null;
+    // if yaml is not valid, we will merge the fields into default yaml
+    try {
+      yamlAsObject = redundantParse(defaultYaml);
+    } catch(err) {
+      return null;
+    }
   }
   const fieldKeys = Object.keys(fields);
   const yamlKeys = yamlAsObject ? Object.keys(yamlAsObject) : [];

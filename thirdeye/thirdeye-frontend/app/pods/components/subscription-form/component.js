@@ -143,7 +143,7 @@ export default Component.extend({
         updatedFields.recipients = recipients;
       }
       // send fields and yaml to yaml util to update values
-      subscriptionYaml = fieldsToYaml(updatedFields, subscriptionYaml);
+      subscriptionYaml = fieldsToYaml(updatedFields, subscriptionYaml, defaultSubscriptionYaml);
       // send new Yaml to parent
       this.get('setSubscriptionYaml')(subscriptionYaml);
     }
