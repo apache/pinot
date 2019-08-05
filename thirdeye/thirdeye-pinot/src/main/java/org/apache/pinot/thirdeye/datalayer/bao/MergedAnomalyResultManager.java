@@ -60,6 +60,8 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
 
   List<MergedAnomalyResultDTO> findByStartTimeInRangeAndFunctionId(long startTime, long endTime, long functionId);
 
+  List<MergedAnomalyResultDTO> findByStartTimeInRangeAndDetectionConfigId(long startTime, long endTime, long detectionConfigId);
+
   List<MergedAnomalyResultDTO> findByTime(long startTime, long endTime);
 
   List<MergedAnomalyResultDTO> findUnNotifiedByFunctionIdAndIdLesserThanAndEndTimeGreaterThanLastOneDay(long functionId,
