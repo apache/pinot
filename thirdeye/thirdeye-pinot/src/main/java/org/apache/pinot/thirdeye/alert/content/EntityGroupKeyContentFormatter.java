@@ -46,21 +46,28 @@ import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfi
 
 /**
  * This email formatter generates a report/alert from the anomalies having a groupKey
+ * and optionally a whitelist metric which will be listed at the top of the alert report
  */
 public class EntityGroupKeyContentFormatter extends BaseEmailContentFormatter{
   private static final Logger LOG = LoggerFactory.getLogger(EntityGroupKeyContentFormatter.class);
 
-
   private static final String EMAIL_TEMPLATE = "entity-groupkey-anomaly-report.ftl";
 
+  // Give some kind of special status to this metric entity. Anomalies from this whitelisted metric entity
+  // will appear at the top of the alert report. Specify the entity name of the metric alert here.
   static final String PROP_ENTITY_WHITELIST = "entityWhitelist";
+
   static final String PROP_ANOMALY_SCORE = "groupScore";
   static final String PROP_GROUP_KEY = "groupKey";
 
   private DetectionConfigManager configDAO = null;
   private Multimap<String, AnomalyReportEntity> entityToAnomaliesMap = ArrayListMultimap.create();
   private Multimap<String, AnomalyReportEntity> entityToSortedAnomaliesMap = ArrayListMultimap.create();
+
+  // WhitelistMetric is usually a top level metric which should be given special status in the alert report.
+  // This map holds info on all the whitelisted metric anomalies which will appear at the top of the alert report.
   private Multimap<String, AnomalyReportEntity> whitelistMetricToAnomaliesMap = ArrayListMultimap.create();
+
   private Map<AnomalyReportEntity, Double> anomalyToGroupScoreMap = new HashMap<>();
   private Map<String, String> anomalyToChildIdsMap = new HashMap<>();
   private List<String> entityWhitelist = new ArrayList<>();
