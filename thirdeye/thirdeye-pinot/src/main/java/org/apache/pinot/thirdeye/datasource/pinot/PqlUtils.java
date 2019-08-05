@@ -104,9 +104,7 @@ public class PqlUtils {
     StringBuilder sb = new StringBuilder();
     String selectionClause = getSelectionClause(metricConfig, metricFunction);
 
-    String tableName = ThirdEyeUtils.computeTableName(dataset);
-
-    sb.append("SELECT ").append(selectionClause).append(" FROM ").append(tableName);
+    sb.append("SELECT ").append(selectionClause).append(" FROM ").append(dataset);
     String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec, dataset);
     sb.append(" WHERE ").append(betweenClause);
 
@@ -197,10 +195,7 @@ public class PqlUtils {
 
     StringBuilder sb = new StringBuilder();
     String selectionClause = getDimensionAsMetricSelectionClause(metricFunction, metricValuesColumn);
-
-    String tableName = ThirdEyeUtils.computeTableName(dataset);
-
-    sb.append("SELECT ").append(selectionClause).append(" FROM ").append(tableName);
+    sb.append("SELECT ").append(selectionClause).append(" FROM ").append(dataset);
     String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec, dataset);
     sb.append(" WHERE ").append(betweenClause);
 

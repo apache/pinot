@@ -338,22 +338,6 @@ public abstract class ThirdEyeUtils {
     return alias;
   }
 
-
-  //By default, query only offline, unless dataset has been marked as realtime
-  public static String computeTableName(String collection) {
-    String dataset = null;
-    try {
-      DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
-      dataset = collection + DatasetConfigBean.DATASET_OFFLINE_PREFIX;
-      if (datasetConfig.isRealtime()) {
-        dataset = collection;
-      }
-    } catch (ExecutionException e) {
-      LOG.error("Exception in getting dataset name {}", collection, e);
-    }
-    return dataset;
-  }
-
   public static Period getbaselineOffsetPeriodByMode(COMPARE_MODE compareMode) {
     int numWeeksAgo = 1;
     switch (compareMode) {
