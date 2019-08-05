@@ -218,10 +218,24 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       // For empty data table map, construct empty result using the cached data schema.
 
       // This will only happen to selection query.
-      if (cachedDataSchema != null) {
-        List<String> selectionColumns = SelectionOperatorUtils
-            .getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), cachedDataSchema);
-        brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, new ArrayList<>(0)));
+      if (brokerRequest.isSetSelections()) {
+        if (cachedDataSchema != null) {
+          List<String> selectionColumns =
+              SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(),
+                  cachedDataSchema);
+          brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, new ArrayList<>(0)));
+        }
+      } else if (brokerRequest.isSetOrderBy()) {
+        if (cachedDataSchema != null) {
+          List<String> columns = new ArrayList<>();
+          for (SelectionSort orderBy : brokerRequest.getOrderBy()) {
+            columns.add(orderBy.getColumn());
+          }
+          brokerResponseNative.setGroupByOrderByResults(
+              new GroupByOrderByResults(columns, new ArrayList<>(0), new ArrayList<>(0)));
+        }
+      } else {
+        throw new IllegalStateException("Cannot have empty result here for anything other than selection or order by");
       }
     } else {
       // Reduce server responses data and set query results into the broker response.
