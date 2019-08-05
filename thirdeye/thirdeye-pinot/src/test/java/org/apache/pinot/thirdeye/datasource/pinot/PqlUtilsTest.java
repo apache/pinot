@@ -185,7 +185,7 @@ public class PqlUtilsTest {
 
     String pql = PqlUtils.getPql(request, metricFunction, ArrayListMultimap.<String, String>create(), timeSpec);
 
-    Assert.assertEquals(pql, "SELECT AVG(metric) FROM collection_OFFLINE WHERE  metric >= 1 AND metric < 2 GROUP BY dimension TOP 12345");
+    Assert.assertEquals(pql, "SELECT AVG(metric) FROM collection WHERE  metric >= 1 AND metric < 2 GROUP BY dimension TOP 12345");
   }
 
   @Test
@@ -203,6 +203,6 @@ public class PqlUtilsTest {
 
     String pql = PqlUtils.getPql(request, metricFunction, ArrayListMultimap.<String, String>create(), timeSpec);
 
-    Assert.assertEquals(pql, "SELECT AVG(metric) FROM collection_OFFLINE WHERE  metric >= 1 AND metric < 2 GROUP BY dimension TOP 100000");
+    Assert.assertEquals(pql, "SELECT AVG(metric) FROM collection WHERE  metric >= 1 AND metric < 2 GROUP BY dimension TOP 100000");
   }
 }
