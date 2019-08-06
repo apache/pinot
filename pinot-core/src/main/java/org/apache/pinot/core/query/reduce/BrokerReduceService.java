@@ -84,7 +84,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     long numSegmentsQueried = 0L;
     long numSegmentsProcessed = 0L;
     long numSegmentsMatched = 0L;
-    long numConsumingSegmentsQueried = 0L;
+    long numConsumingSegmentsProcessed = 0L;
     long minConsumingFreshnessTimeMs = Long.MAX_VALUE;
     long numTotalRawDocs = 0L;
     boolean numGroupsLimitReached = false;
@@ -140,9 +140,9 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         numSegmentsMatched += Long.parseLong(numSegmentsMatchedString);
       }
 
-      String numConsumingString = metadata.get(DataTable.NUM_CONSUMING_SEGMENTS_QUERIED);
+      String numConsumingString = metadata.get(DataTable.NUM_CONSUMING_SEGMENTS_PROCESSED);
       if (numConsumingString != null) {
-        numConsumingSegmentsQueried += Long.parseLong(numConsumingString);
+        numConsumingSegmentsProcessed += Long.parseLong(numConsumingString);
       }
 
       String minConsumingFreshnessTimeMsString = metadata.get(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS);
@@ -182,8 +182,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     brokerResponseNative.setNumSegmentsMatched(numSegmentsMatched);
     brokerResponseNative.setTotalDocs(numTotalRawDocs);
     brokerResponseNative.setNumGroupsLimitReached(numGroupsLimitReached);
-    if (numConsumingSegmentsQueried > 0) {
-      brokerResponseNative.setNumConsumingSegmentsQueried(numConsumingSegmentsQueried);
+    if (numConsumingSegmentsProcessed > 0) {
+      brokerResponseNative.setNumConsumingSegmentsQueried(numConsumingSegmentsProcessed);
       brokerResponseNative.setMinConsumingFreshnessTimeMs(minConsumingFreshnessTimeMs);
     }
 
@@ -197,7 +197,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       brokerMetrics
           .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
 
-      if (numConsumingSegmentsQueried > 0 && minConsumingFreshnessTimeMs > 0) {
+      if (numConsumingSegmentsProcessed > 0 && minConsumingFreshnessTimeMs > 0) {
         brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
             System.currentTimeMillis() - minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);
       }
