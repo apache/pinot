@@ -193,7 +193,7 @@ export default Component.extend({
   metricGranularity: reads('anomaly.attributes.metricGranularity.firstObject'),
 
   /**
-   * Anomaly metric dataset name
+   * Anomaly detect rule
    * @type {string}
    */
   detectRule: reads('anomaly.attributes.detectorComponentName'),
