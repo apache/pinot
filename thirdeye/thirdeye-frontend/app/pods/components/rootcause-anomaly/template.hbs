@@ -39,6 +39,15 @@
           </div>
         </div>
 
+        <div class="row">
+          <div class="col-xs-2 rootcause-anomaly__props-label">
+            <span>Detect rule</span>
+          </div>
+          <div class="col-xs-10">
+            <span class="rootcause-anomaly__props-value">{{detectRule}}</span>
+          </div>
+        </div>
+
         <div class="rootcause-anomaly__stats-wrapper">
           {{#each availableOffsets as |offset|}}
             <div class="rootcause-anomaly__stats">
