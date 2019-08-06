@@ -193,8 +193,9 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
 
     Map<String, Object> emailParams = ConfigUtils.getMap(this.config.getAlertSchemes().get(PROP_EMAIL_SCHEME));
     EmailContentFormatter emailContentFormatter = makeTemplate(emailParams);
-    emailContentFormatter.init(new Properties(),
-        EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(this.teConfig));
+    Properties props = new Properties();
+    props.putAll(emailParams);
+    emailContentFormatter.init(props, EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(this.teConfig));
 
     List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>(anomalies);
     anomalyResultListOfGroup.sort(COMPARATOR_DESC);

@@ -83,6 +83,7 @@ import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Run adhoc queries to db
  */

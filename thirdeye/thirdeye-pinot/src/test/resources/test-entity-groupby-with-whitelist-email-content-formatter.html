@@ -27,6 +27,38 @@
 
         <!-- List all the alerts -->
         <tr>
+          <td style="border-bottom:1px solid rgba(0,0,0,0.15); padding:12px 24px; align:left">
+            <p>
+              <span style="color: #1D1D1D; font-size: 20px; font-weight: bold; display:inline-block; vertical-align: middle;">Metric:&nbsp;</span>
+              <span style="color: #606060; font-size: 20px; text-decoration: none; display:inline-block; vertical-align: middle; width: 70%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">test</span>
+            </p>
+
+            <!-- List all the anomalies under this detection -->
+            <table border="0" width="100%" align="center" style="width:100%; padding:0; margin:0; border-collapse: collapse;text-align:left;">
+              <tr style="text-align:center; background-color: #F6F8FA; border-top: 2px solid #C7D1D8; border-bottom: 2px solid #C7D1D8;">
+                <th style="text-align:left; padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Start / Duration</th>
+                <th style="padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Dimensions</th>
+                <th style="padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Current</th>
+                <th style="padding: 6px 12px; font-size: 12px; font-weight: bold; line-height: 20px;">Predicted</th>
+              </tr>
+              <tr style="border-bottom: 1px solid #C7D1D8;">
+                <td style="padding: 6px 12px;white-space: nowrap;">
+                  <div style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px;">Nov 07, 10:00 PDT</div>
+                  <span style="color: rgba(0,0,0,0.6); font-size:12px; line-height:16px;">7 hours</span>
+                  <a style="font-weight: bold; text-decoration: none; font-size:14px; line-height:20px; color: #0073B1;" href="http://localhost:8080/dashboard/app/#/rootcause?anomalyId=3"
+                     target="_blank">(view)</a>
+                </td>
+                <td style="word-break: break-all; width: 200px; padding-right:4px 20px 4px 0">
+                </td>
+                <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">150</td>
+                <td style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px; text-align:center;">100
+                  <div style="font-size: 12px; color:#3A8C18;">(+50.00%)</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
           <td style="border-bottom: 1px solid rgba(0,0,0,0.15); padding: 12px 24px; align: left">
             <!-- Display Entity Name -->
             <p>
