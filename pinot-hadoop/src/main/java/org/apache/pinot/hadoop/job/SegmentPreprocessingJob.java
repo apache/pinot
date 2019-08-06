@@ -30,6 +30,7 @@ import java.util.zip.GZIPInputStream;
 import javax.annotation.Nullable;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroKey;
@@ -177,7 +178,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     }
 
     _fileSystem = FileSystem.get(_conf);
-    final List<Path> inputDataPath = getDataFilePaths(_inputSegmentDir);
+    final List<Path> inputDataPaths = getDataFilePaths(_inputSegmentDir);
 
     if (_fileSystem.exists(_preprocessedOutputDir)) {
       _logger.warn("Found the output folder {}, deleting it", _preprocessedOutputDir);
@@ -212,6 +213,8 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     _logger.info("Initializing a pre-processing job");
     Job job = Job.getInstance(_conf);
 
+    long totalAvroRecords = countAvroRecords(inputDataPaths);
+
     // TODO: Serialize and deserialize validation config by creating toJson and fromJson
     // If the use case is an append use case, check that one time unit is contained in one file. If there is more than one,
     // the job should be disabled, as we should not resize for these use cases. Therefore, setting the time column name
@@ -223,7 +226,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       job.getConfiguration().set(SEGMENT_TIME_TYPE, validationConfig.getTimeType().toString());
       job.getConfiguration().set(SEGMENT_TIME_FORMAT, _pinotTableSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeFormat());
       job.getConfiguration().set(SEGMENT_PUSH_FREQUENCY, validationConfig.getSegmentPushFrequency());
-      _dataStreamReader = getAvroReader(inputDataPath.get(0));
+      _dataStreamReader = getAvroReader(inputDataPaths.get(0));
       job.getConfiguration().set(TIME_COLUMN_VALUE, (String) _dataStreamReader.next().get(timeColumnName));
     }
 
@@ -258,7 +261,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     }
 
     // Avro Schema configs.
-    Schema avroSchema = getSchema(inputDataPath.get(0));
+    Schema avroSchema = getSchema(inputDataPaths.get(0));
     _logger.info("Schema is: {}", avroSchema.toString(true));
 
     // Validates configs against schema.
@@ -268,7 +271,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     job.setMapperClass(SegmentPreprocessingMapper.class);
     job.setMapOutputKeyClass(AvroKey.class);
     job.setMapOutputValueClass(AvroValue.class);
-    job.getConfiguration().setInt(JobContext.NUM_MAPS, inputDataPath.size());
+    job.getConfiguration().setInt(JobContext.NUM_MAPS, inputDataPaths.size());
 
     // Reducer configs.
     job.setReducerClass(SegmentPreprocessingReducer.class);
@@ -283,13 +286,13 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     // Input and output paths.
     FileInputFormat.setInputPaths(job, _inputSegmentDir);
     FileOutputFormat.setOutputPath(job, _preprocessedOutputDir);
-    _logger.info("Total number of files to be pre-processed: {}", inputDataPath.size());
+    _logger.info("Total number of files to be pre-processed: {}", inputDataPaths.size());
 
     // Set up mapper output key
     Set<Schema.Field> fieldSet = new HashSet<>();
 
     // Partition configs.
-    int numReduceTasks = (_numberOfPartitions != 0) ? _numberOfPartitions : inputDataPath.size();
+    int numReduceTasks = (_numberOfPartitions != 0) ? _numberOfPartitions : inputDataPaths.size();
     if (_partitionColumn != null) {
       job.getConfiguration().set(JobConfigConstants.ENABLE_PARTITIONING, "true");
       job.setPartitionerClass(GenericPartitioner.class);
@@ -306,7 +309,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       // so that all the rows can be spread evenly.
       addHashCodeField(fieldSet);
     }
-    setMaxNumRecordsConfigIfSpecified(job);
+    setMaxNumRecordsConfigIfSpecified(job, totalAvroRecords);
     job.setInputFormatClass(CombineAvroKeyInputFormat.class);
 
     _logger.info("Number of reduce tasks for pre-processing job: {}", numReduceTasks);
@@ -412,17 +415,36 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     }
   }
 
-  private void setMaxNumRecordsConfigIfSpecified(Job job) {
+  // TODO: Handle case where #records exceed long max
+  private void setMaxNumRecordsConfigIfSpecified(Job job, long totalAvroRecords) {
     TableCustomConfig tableCustomConfig = _tableConfig.getCustomConfig();
     if (tableCustomConfig == null) {
       return;
     }
     Map<String, String> customConfigsMap = tableCustomConfig.getCustomConfigs();
     if (customConfigsMap != null && customConfigsMap.containsKey("max.num.records")) {
-      int maxNumRecords = Integer.parseInt(customConfigsMap.get("max.num.records"));
+      long maxNumRecords = Long.getLong(customConfigsMap.get("max.num.records"));
       Preconditions.checkArgument(maxNumRecords > 0, "The value of max.num.records should be positive. Current value: " + customConfigsMap.get("max.num.records"));
-      _logger.info("Setting max.num.records to {}", maxNumRecords);
-      job.getConfiguration().set("max.num.records", Integer.toString(maxNumRecords));
+      _logger.info("Received max.num.records as {}", maxNumRecords);
+      long approxMaxRecords = getAverageMaxNumRecords(maxNumRecords, totalAvroRecords);
+      _logger.info("After approximation to even out file size, setting max.num.records to {}", approxMaxRecords);
+      job.getConfiguration().set("max.num.records", Long.toString(maxNumRecords));
+    }
+  }
+
+  /**
+   * Guarantees that max.num.records is an upper bound. This method is to ensure that segments are evenly distributed.
+   * @param maxNumRecords what client has set as max number of records
+   * @param totalAvroRecords total avro records in all input paths
+   * @return suggested approximate max num records so # records in files are around even
+   */
+  private long getAverageMaxNumRecords(long maxNumRecords, long totalAvroRecords) {
+    long approxNumFiles = totalAvroRecords / maxNumRecords;
+    // There is some remainder, means we will redivide max num records
+    if (approxNumFiles * maxNumRecords != totalAvroRecords) {
+      return (totalAvroRecords / (approxNumFiles + 1)) + 1;
+    } else {
+      return maxNumRecords;
     }
   }
 
@@ -444,6 +466,21 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       }
     }
     return avroSchema;
+  }
+
+  private long countAvroRecords(List<Path> inputPaths) throws IOException {
+    long count = 0;
+
+    for (Path path : inputPaths) {
+      DataFileStream<GenericRecord> dataFileStream = getAvroReader(path);
+      GenericRecord record=new GenericData.Record(dataFileStream.getSchema());
+      while (dataFileStream.hasNext()) {
+        count ++;
+        dataFileStream.next(record);
+      }
+      dataFileStream.close();
+    }
+    return count;
   }
 
   /**
