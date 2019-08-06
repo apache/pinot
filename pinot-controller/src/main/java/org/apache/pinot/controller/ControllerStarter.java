@@ -258,6 +258,7 @@ public class ControllerStarter {
     LOGGER.info("Registering controller leadership manager");
     // TODO: when Helix separation is completed, leadership only depends on the master in leadControllerResource, remove
     //       ControllerLeadershipManager and this callback.
+    _controllerLeadershipManager.start();
     helixParticipantManager.addControllerListener(
         (ControllerChangeListener) changeContext -> _controllerLeadershipManager.onControllerChange());
 
