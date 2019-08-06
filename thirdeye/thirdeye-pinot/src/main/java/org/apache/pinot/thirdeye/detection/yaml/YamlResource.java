@@ -740,8 +740,9 @@ public class YamlResource {
 
       Preconditions.checkNotNull(detectionConfig);
       DetectionPipeline pipeline = this.loader.from(this.provider, detectionConfig, start, end);
-      future = this.executor.submit(pipeline::run);
-      result = future.get(this.previewTimeout, TimeUnit.MILLISECONDS);
+//      future = this.executor.submit(pipeline::run);
+//      result = future.get(this.previewTimeout, TimeUnit.MILLISECONDS);
+      result = pipeline.run();
       LOG.info("Preview successful, used {} milliseconds", System.currentTimeMillis() - ts);
       return Response.ok(result).build();
     } catch (IllegalArgumentException e) {

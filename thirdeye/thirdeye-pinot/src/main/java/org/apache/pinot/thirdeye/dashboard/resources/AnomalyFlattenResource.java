@@ -19,23 +19,22 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
+import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import java.io.IOException;
+import io.swagger.annotations.ApiParam;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
-import org.apache.commons.lang3.StringUtils;
+import javax.ws.rs.QueryParam;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
+import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import org.apache.pinot.thirdeye.datasource.DAORegistry;
 
 
 /**
@@ -43,72 +42,39 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
  * Convert a list of anomalies to rows of columns so that UI can directly convert the anomalies to table
  */
 @Path("thirdeye/table")
+@Api(tags = {Constants.ANOMALY_TAG})
 public class AnomalyFlattenResource {
-  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
   public static final String ANOMALY_ID = "anomalyId";
   public static final String ANOMALY_COMMENT = "comment";
-  public static final String FUNCTION_ID = "functionId";
-  public static final String WINDOW_START = "start";
-  public static final String WINDOW_END = "end";
-  private static final String DIMENSION_KEYS  = "keys";
-
-  private static final List<String> REQUIRED_JSON_KEYS =Arrays.asList(FUNCTION_ID, WINDOW_START, WINDOW_END);
-  private static final String DEFAULT_DELIMINATOR = ",";
-
-  public AnomalyFlattenResource() {
-    this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
-  }
 
   public AnomalyFlattenResource(MergedAnomalyResultManager mergedAnomalyResultDAO) {
     this.mergedAnomalyResultDAO = mergedAnomalyResultDAO;
   }
 
   /**
-   * Flatten a list of anomaly results to a list of map
-   * @param jsonPayload a json string; the jsonPayload should include keys: [functionId, start, end].
-   *                    start and end are in the format of epoch time
-   * @return a list of map
-   * @throws IOException
+   * Returns a list of formatted merged anomalies for UI to render a table
+   * @param detectionConfigId detectionConfigId
+   * @param start start time in epoc milliseconds
+   * @param end end time in epoc milliseconds
+   * @param dimensionKeys a list of keys in dimensions; if null, will return all  dimension keys for the anomaly
+   * @return a list of formatted anomalies
    */
   @GET
-  @ApiOperation(value = "View a flatted merged anomalies for collection")
-  public List<Map<String, String>> flatAnomalyResults(String jsonPayload) throws IOException {
-    if (StringUtils.isBlank(jsonPayload)) {
-      throw new IllegalArgumentException("jsonPayload cannot be null or empty");
-    }
-    Map<String, Object> inputMap = OBJECT_MAPPER.readValue(jsonPayload, Map.class);
-
-    // Assert if reuired keys are in the map
-    for (String requiredKey : REQUIRED_JSON_KEYS) {
-      if (!inputMap.containsKey(requiredKey)) {
-        throw new IllegalArgumentException(String.format("Miss %s in input json String; %s are required", requiredKey,
-            REQUIRED_JSON_KEYS.toString()));
-      }
-    }
-
+  @ApiOperation(value = "Returns a list of formatted merged anomalies ")
+  public List<Map<String, Object>> flatAnomalyResults(
+      @ApiParam("detection config id") @QueryParam("detectionConfigId") long detectionConfigId,
+      @ApiParam("start time for anomalies") @QueryParam("start") long start,
+      @ApiParam("end time for anomalies") @QueryParam("end") long end,
+      @ApiParam("dimension keys") @QueryParam("dimensionKeys") List<String> dimensionKeys) {
     // Retrieve anomalies
-    long functionId = Long.valueOf(inputMap.get(FUNCTION_ID).toString());
-    long start = Long.valueOf(inputMap.get(WINDOW_START).toString());
-    long end = Long.valueOf(inputMap.get(WINDOW_END).toString());
     List<MergedAnomalyResultDTO> anomalies = mergedAnomalyResultDAO.
-        findByStartTimeInRangeAndDetectionConfigId(start, end, functionId);
+        findByStartTimeInRangeAndDetectionConfigId(start, end, detectionConfigId);
 
     // flatten anomaly result information
-    List<String> tableKeys = null;
-    if (inputMap.containsKey(DIMENSION_KEYS)){
-      Object dimensionKeysObj = inputMap.get(DIMENSION_KEYS);
-      if (dimensionKeysObj instanceof List) {
-        tableKeys = (List<String>) dimensionKeysObj;
-      } else {
-        tableKeys = Arrays.asList(dimensionKeysObj.toString().split(DEFAULT_DELIMINATOR));
-      }
-    }
-    List<Map<String, String>> resultList = new ArrayList<>();
+    List<Map<String, Object>> resultList = new ArrayList<>();
     for (MergedAnomalyResultDTO result : anomalies) {
-      resultList.add(flatAnomalyResult(result, tableKeys));
+      resultList.add(flatAnomalyResult(result, dimensionKeys));
     }
     return resultList;
   }
@@ -119,17 +85,17 @@ public class AnomalyFlattenResource {
    * @param tableKeys a list of keys in dimensions; if null, use all keys in dimension
    * @return a map of information in the anomaly result with the required keys
    */
-  public static Map<String, String> flatAnomalyResult(MergedAnomalyResultDTO anomalyResult,
+  public static Map<String, Object> flatAnomalyResult(MergedAnomalyResultDTO anomalyResult,
       List<String> tableKeys) {
     Preconditions.checkNotNull(anomalyResult);
-    Map<String, String> flatMap = new HashMap<>();
-    flatMap.put(ANOMALY_ID, Long.toString(anomalyResult.getId()));
+    Map<String, Object> flatMap = new HashMap<>();
+    flatMap.put(ANOMALY_ID, anomalyResult.getId());
     DimensionMap dimension = anomalyResult.getDimensions();
     if (tableKeys == null) {
       tableKeys = new ArrayList<>(dimension.keySet());
     }
     for (String key : tableKeys) {
-      flatMap.put(key, dimension.containsKey(key)? dimension.get(key) : "");
+      flatMap.put(key, dimension.getOrDefault(key, ""));
     }
     AnomalyFeedback feedback = anomalyResult.getFeedback();
     if (feedback != null) {
@@ -137,7 +103,7 @@ public class AnomalyFlattenResource {
     } else {
       flatMap.put(ANOMALY_COMMENT, "");
     }
-    flatMap.put(anomalyResult.getMetric(), Double.toString(anomalyResult.getAvgCurrentVal()));
+    flatMap.put(anomalyResult.getMetric(), anomalyResult.getAvgCurrentVal());
     return flatMap;
   }
 }
