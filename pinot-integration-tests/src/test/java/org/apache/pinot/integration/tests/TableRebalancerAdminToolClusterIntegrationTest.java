@@ -845,9 +845,6 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
 
       @Transition(from = "ONLINE", to = "DROPPED")
       public void onBecomeDroppedFromOnline(Message message, NotificationContext context) {
-        if (_segmentStateTransitionStats != null) {
-          System.out.println("online to dropped");
-        }
       }
     }
   }
