@@ -309,7 +309,15 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       // so that all the rows can be spread evenly.
       addHashCodeField(fieldSet);
     }
-    setMaxNumRecordsConfigIfSpecified(job, totalAvroRecords);
+    String enablePartitioningString = job.getConfiguration().get(JobConfigConstants.ENABLE_PARTITIONING);
+    boolean enablePartitioning = false;
+    if (enablePartitioningString != null) {
+      if (Boolean.parseBoolean(enablePartitioningString)) {
+        enablePartitioning = true;
+      }
+    }
+
+    setMaxNumRecordsConfigIfSpecified(job, totalAvroRecords, enablePartitioning);
     job.setInputFormatClass(CombineAvroKeyInputFormat.class);
 
     _logger.info("Number of reduce tasks for pre-processing job: {}", numReduceTasks);
@@ -416,7 +424,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
   }
 
   // TODO: Handle case where #records exceed long max
-  private void setMaxNumRecordsConfigIfSpecified(Job job, long totalAvroRecords) {
+  private void setMaxNumRecordsConfigIfSpecified(Job job, long totalAvroRecords, boolean isPartitioning) {
     TableCustomConfig tableCustomConfig = _tableConfig.getCustomConfig();
     if (tableCustomConfig == null) {
       return;
@@ -426,9 +434,13 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       long maxNumRecords = Long.getLong(customConfigsMap.get("max.num.records"));
       Preconditions.checkArgument(maxNumRecords > 0, "The value of max.num.records should be positive. Current value: " + customConfigsMap.get("max.num.records"));
       _logger.info("Received max.num.records as {}", maxNumRecords);
+      if (isPartitioning) {
+        _logger.warn("Because partitioning is enabled, setting max.num.records to original value {}", maxNumRecords);
+        job.getConfiguration().set("max.num.records", Long.toString(maxNumRecords));
+      }
       long approxMaxRecords = getAverageMaxNumRecords(maxNumRecords, totalAvroRecords);
       _logger.info("After approximation to even out file size, setting max.num.records to {}", approxMaxRecords);
-      job.getConfiguration().set("max.num.records", Long.toString(maxNumRecords));
+      job.getConfiguration().set("max.num.records", Long.toString(approxMaxRecords));
     }
   }
 
