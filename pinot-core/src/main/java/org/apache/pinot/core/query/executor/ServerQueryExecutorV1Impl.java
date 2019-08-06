@@ -151,13 +151,13 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       TraceContext.register(requestId);
     }
 
-    int numConsumingSegmentsQueried = 0;
+    int numConsumingSegmentsProcessed = 0;
     long minIndexTimeMs = Long.MAX_VALUE;
     long minIngestionTimeMs = Long.MAX_VALUE;
     // gather stats for realtime consuming segments
     for (SegmentDataManager segmentMgr : segmentDataManagers) {
       if (segmentMgr.getSegment() instanceof MutableSegment) {
-        numConsumingSegmentsQueried += 1;
+        numConsumingSegmentsProcessed += 1;
         SegmentMetadata metadata = segmentMgr.getSegment().getSegmentMetadata();
         long indexedTime = metadata.getLastIndexedTimestamp();
         if (indexedTime != Long.MIN_VALUE && indexedTime < minIndexTimeMs) {
@@ -171,12 +171,12 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     long minConsumingFreshnessTimeMs = minIngestionTimeMs;
-    if (numConsumingSegmentsQueried > 0) {
+    if (numConsumingSegmentsProcessed > 0) {
       if (minIngestionTimeMs == Long.MAX_VALUE) {
         LOGGER.debug("Did not find valid ingestionTimestamp across consuming segments! Using indexTime instead");
         minConsumingFreshnessTimeMs = minIndexTimeMs;
       }
-      LOGGER.debug("Querying {} consuming segments with min minConsumingFreshnessTimeMs {}", numConsumingSegmentsQueried, minConsumingFreshnessTimeMs);
+      LOGGER.debug("Querying {} consuming segments with min minConsumingFreshnessTimeMs {}", numConsumingSegmentsProcessed, minConsumingFreshnessTimeMs);
     }
 
     DataTable dataTable = null;
@@ -256,8 +256,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, missingSegments);
     }
 
-    if (numConsumingSegmentsQueried > 0) {
-      dataTable.getMetadata().put(DataTable.NUM_CONSUMING_SEGMENTS_QUERIED, Integer.toString(numConsumingSegmentsQueried));
+    if (numConsumingSegmentsProcessed > 0) {
+      dataTable.getMetadata().put(DataTable.NUM_CONSUMING_SEGMENTS_PROCESSED, Integer.toString(numConsumingSegmentsProcessed));
       dataTable.getMetadata().put(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS, Long.toString(minConsumingFreshnessTimeMs));
     }
 
