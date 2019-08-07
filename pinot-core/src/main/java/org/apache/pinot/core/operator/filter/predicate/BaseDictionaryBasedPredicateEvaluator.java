@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import org.apache.commons.lang3.mutable.MutableInt;
+
+
 public abstract class BaseDictionaryBasedPredicateEvaluator extends BasePredicateEvaluator {
   protected boolean _alwaysTrue;
   protected boolean _alwaysFalse;
@@ -101,20 +104,24 @@ public abstract class BaseDictionaryBasedPredicateEvaluator extends BasePredicat
    */
   @SuppressWarnings("Duplicates")
   @Override
-  public boolean applyMV(int[] dictIds, int length) {
+  public boolean applyMV(int[] dictIds, int length, MutableInt numEntriesScanned) {
     if (isExclusive()) {
       for (int i = 0; i < length; i++) {
         if (!applySV(dictIds[i])) {
+          numEntriesScanned.add(i + 1);
           return false;
         }
       }
+      numEntriesScanned.add(length);
       return true;
     } else {
       for (int i = 0; i < length; i++) {
         if (applySV(dictIds[i])) {
+          numEntriesScanned.add(i + 1);
           return true;
         }
       }
+      numEntriesScanned.add(length);
       return false;
     }
   }

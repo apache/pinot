@@ -25,8 +25,6 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.testng.Assert;
@@ -36,34 +34,20 @@ import org.testng.annotations.Test;
 
 
 public class PinotSegmentRestletResourceTest extends ControllerTest {
-  private final static String ZK_SERVER = ZkStarter.DEFAULT_ZK_STR;
-  private final static String TABLE_NAME = "testTable";
+  private static final String TABLE_NAME = "testTable";
 
   @BeforeClass
   public void setUp()
       throws Exception {
     startZk();
     startController();
-
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZK_SERVER, 1, true);
-    ControllerRequestBuilderUtil
-        .addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZK_SERVER, 1, true);
-
-    while (_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size() == 0) {
-      Thread.sleep(100);
-    }
+    addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
+    addFakeServerInstancesToAutoJoinHelixCluster(1, true);
 
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size(),
         1);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(),
         1);
-  }
-
-  @AfterClass
-  public void tearDown()
-      throws Exception {
-    stopController();
-    stopZk();
   }
 
   @Test
@@ -122,5 +106,12 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
       Assert.assertEquals(crcMap.get(segmentName), metadata.getCrc());
     }
     Assert.assertEquals(crcMap.size(), expectedSize);
+  }
+
+  @AfterClass
+  public void tearDown() {
+    stopFakeInstances();
+    stopController();
+    stopZk();
   }
 }

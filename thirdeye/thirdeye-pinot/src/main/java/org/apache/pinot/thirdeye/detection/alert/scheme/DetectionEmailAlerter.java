@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.detection.alert.scheme;
 
 import com.google.common.base.Preconditions;
+import java.util.HashSet;
 import org.apache.pinot.thirdeye.alert.commons.EmailContentFormatterFactory;
 import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
 import org.apache.pinot.thirdeye.alert.content.EmailContentFormatter;
@@ -62,7 +63,10 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
 
   private static final Comparator<AnomalyResult> COMPARATOR_DESC =
       (o1, o2) -> -1 * Long.compare(o1.getStartTime(), o2.getStartTime());
-  private static final String EMAIL_WHITELIST_KEY = "emailWhitelist";
+
+  private static final String PROP_EMAIL_WHITELIST = "emailWhitelist";
+  private static final String PROP_ADMIN_RECIPIENTS = "adminRecipients";
+
   private static final String PROP_EMAIL_SCHEME = "emailScheme";
   private static final String PROP_EMAIL_TEMPLATE = "template";
   private static final String PROP_EMAIL_SUBJECT_STYLE = "subject";
@@ -83,10 +87,17 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     return recipients;
   }
 
+  private void configureAdminRecipients(DetectionAlertFilterRecipients recipients) {
+    if (recipients.getCc() == null) {
+      recipients.setCc(new HashSet<>());
+    }
+    recipients.getCc().addAll(ConfigUtils.getList(this.teConfig.getAlerterConfiguration().get(PROP_ADMIN_RECIPIENTS)));
+  }
+
   private void whitelistRecipients(DetectionAlertFilterRecipients recipients) {
     if (recipients != null) {
       List<String> emailWhitelist = ConfigUtils.getList(
-          this.teConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY).get(EMAIL_WHITELIST_KEY));
+          this.teConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY).get(PROP_EMAIL_WHITELIST));
       if (!emailWhitelist.isEmpty()) {
         recipients.setTo(retainWhitelisted(recipients.getTo(), emailWhitelist));
         recipients.setCc(retainWhitelisted(recipients.getCc(), emailWhitelist));
@@ -176,13 +187,15 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   }
 
   private void sendEmail(DetectionAlertFilterRecipients recipients, Set<MergedAnomalyResultDTO> anomalies) throws Exception {
+    configureAdminRecipients(recipients);
     whitelistRecipients(recipients);
     validateAlert(recipients, anomalies);
 
     Map<String, Object> emailParams = ConfigUtils.getMap(this.config.getAlertSchemes().get(PROP_EMAIL_SCHEME));
     EmailContentFormatter emailContentFormatter = makeTemplate(emailParams);
-    emailContentFormatter.init(new Properties(),
-        EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(this.teConfig));
+    Properties props = new Properties();
+    props.putAll(emailParams);
+    emailContentFormatter.init(props, EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(this.teConfig));
 
     List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>(anomalies);
     anomalyResultListOfGroup.sort(COMPARATOR_DESC);
@@ -198,13 +211,13 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
         new EmailContentFormatterContext());
 
     HtmlEmail email = emailEntity.getContent();
+    email.setSubject(emailEntity.getSubject());
     email.setFrom(this.config.getFrom());
     email.setTo(AlertUtils.toAddress(recipients.getTo()));
-    email.setSubject(emailEntity.getSubject());
-    if (CollectionUtils.isNotEmpty(recipients.getCc())) {
+    if (!CollectionUtils.isEmpty(recipients.getCc())) {
       email.setCc(AlertUtils.toAddress(recipients.getCc()));
     }
-    if (CollectionUtils.isNotEmpty(recipients.getBcc())) {
+    if (!CollectionUtils.isEmpty(recipients.getBcc())) {
       email.setBcc(AlertUtils.toAddress(recipients.getBcc()));
     }
 

@@ -19,6 +19,8 @@ const queryParamsConfig = {
   refreshModel: true
 };
 
+const REPORT_DISPLAY_DATE_FORMAT = 'MM/DD/YYYY HH:mm A (z)';
+
 export default Route.extend(AuthenticatedRouteMixin, {
   anomaliesApiService: service('services/api/anomalies'),
   shareDashboardApiService: service('services/api/share-dashboard'),
@@ -239,8 +241,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
       columns,
       start: get(this, 'startDate'),
       end: get(this, 'endDate'),
-      startDateDisplay:  moment(get(this, 'startDate')).format('MM/DD/YYYY'),
-      endDateDisplay: moment(get(this, 'endDate')).format('MM/DD/YYYY'),
+      startDateDisplay:  moment(get(this, 'startDate')).tz(moment.tz.guess()).format(REPORT_DISPLAY_DATE_FORMAT),
+      endDateDisplay: moment(get(this, 'endDate')).tz(moment.tz.guess()).format(REPORT_DISPLAY_DATE_FORMAT),
       appNameDisplay: get(this, 'appName'),
       subGroupDisplay: get(this, 'subGroup'),
       anomaliesCount: get(this, 'anomalies.content') ? get(this, 'anomalies.content').length : 0

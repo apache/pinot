@@ -29,9 +29,9 @@ public class RebalanceResult {
   private Map<String, Map<String, String>> idealStateMapping;
   private PartitionAssignment partitionAssignment;
   private String status;
+  private RebalanceStatus statusCode;
 
   public RebalanceResult() {
-
   }
 
   public RebalanceResult(@JsonProperty("idealState") Map<String, Map<String, String>> idealStateMapping,
@@ -57,11 +57,23 @@ public class RebalanceResult {
     this.partitionAssignment = partitionAssignment;
   }
 
+  public void setStatus(String status) {
+    this.status = status;
+  }
+
   public String getStatus() {
     return status;
   }
 
-  public void setStatus(String status) {
-    this.status = status;
+  public enum RebalanceStatus {
+    DONE, FAILED
+  }
+
+  public RebalanceStatus getStatusCode() {
+    return statusCode;
+  }
+
+  public void setStatusCode(RebalanceStatus status) {
+    this.statusCode = status;
   }
 }

@@ -57,6 +57,11 @@ public class AbstractBaseCommand {
                 option.required()));
       }
     }
+    printExamples();
+  }
+
+  public void printExamples() {
+
   }
 
   public void cleanup() {

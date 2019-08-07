@@ -66,14 +66,13 @@ public class PinotDataSourceMaxTime {
     try {
       DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
       // By default, query only offline, unless dataset has been marked as realtime
-      String tableName = ThirdEyeUtils.computeTableName(dataset);
       TimeSpec timeSpec = ThirdEyeUtils.getTimestampTimeSpecFromDatasetConfig(datasetConfig);
 
       long cutoffTime = System.currentTimeMillis() + TimeUnit.DAYS.toMillis(1);
       String timeClause = PqlUtils.getBetweenClause(new DateTime(0, DateTimeZone.UTC), new DateTime(cutoffTime, DateTimeZone.UTC), timeSpec, dataset);
 
-      String maxTimePql = String.format(COLLECTION_MAX_TIME_QUERY_TEMPLATE, timeSpec.getColumnName(), tableName, timeClause);
-      PinotQuery maxTimePinotQuery = new PinotQuery(maxTimePql, tableName);
+      String maxTimePql = String.format(COLLECTION_MAX_TIME_QUERY_TEMPLATE, timeSpec.getColumnName(), dataset, timeClause);
+      PinotQuery maxTimePinotQuery = new PinotQuery(maxTimePql, dataset);
 
       ThirdEyeResultSetGroup resultSetGroup;
       final long tStart = System.nanoTime();
@@ -87,7 +86,7 @@ public class PinotDataSourceMaxTime {
       }
 
       if (resultSetGroup.size() == 0 || resultSetGroup.get(0).getRowCount() == 0) {
-        LOGGER.error("Failed to get latest max time for dataset {} with PQL: {}", tableName, maxTimePinotQuery.getQuery());
+        LOGGER.error("Failed to get latest max time for dataset {} with PQL: {}", dataset, maxTimePinotQuery.getQuery());
         this.collectionToPrevMaxDataTimeMap.remove(dataset);
       } else {
         DateTimeZone timeZone = Utils.getDataTimeZone(dataset);

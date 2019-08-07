@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.core.common.predicate.InPredicate;
 import org.apache.pinot.core.common.predicate.NotInPredicate;
@@ -93,8 +94,8 @@ public class NoDictionaryInPredicateEvaluatorTest {
     PredicateEvaluatorTestUtils.fillRandom(multiValues);
     multiValues[_random.nextInt(NUM_MULTI_VALUES)] =
         Integer.parseInt(stringValues.get(_random.nextInt(NUM_PREDICATE_VALUES)));
-    Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
-    Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
+    Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES, new MutableInt(0)));
+    Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES, new MutableInt(0)));
   }
 
   @Test

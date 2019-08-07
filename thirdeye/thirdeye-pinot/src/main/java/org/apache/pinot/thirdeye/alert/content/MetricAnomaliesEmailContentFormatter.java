@@ -51,10 +51,7 @@ import org.slf4j.LoggerFactory;
 public class MetricAnomaliesEmailContentFormatter extends BaseEmailContentFormatter{
   private static final Logger LOG = LoggerFactory.getLogger(MetricAnomaliesEmailContentFormatter.class);
 
-  public static final String EMAIL_TEMPLATE = "emailTemplate";
-
-  public static final String DEFAULT_EMAIL_TEMPLATE = "metric-anomalies-template.ftl";
-
+  private static final String EMAIL_TEMPLATE = "metric-anomalies-template.ftl";
   private DetectionConfigManager configDAO = null;
 
   public MetricAnomaliesEmailContentFormatter(){
@@ -64,7 +61,7 @@ public class MetricAnomaliesEmailContentFormatter extends BaseEmailContentFormat
   @Override
   public void init(Properties properties, EmailContentFormatterConfiguration configuration) {
     super.init(properties, configuration);
-    this.emailTemplate = properties.getProperty(EMAIL_TEMPLATE, DEFAULT_EMAIL_TEMPLATE);
+    this.emailTemplate = EMAIL_TEMPLATE;
     this.configDAO = DAORegistry.getInstance().getDetectionConfigManager();
   }
 

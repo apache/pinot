@@ -91,6 +91,7 @@
     "ember-cryptojs-shim": "^4.3.0",
     "ember-simple-tree": "^0.4.2",
     "ion-rangeslider": "^2.2.0",
+    "js-yaml": "^3.13.1",
     "moment": "^2.18.1",
     "yamljs": "^0.3.0"
   }

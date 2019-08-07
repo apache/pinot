@@ -28,8 +28,10 @@ public class RebalanceUserConfigConstants {
   public static final String INCLUDE_CONSUMING = "includeConsuming";
   /** Whether rebalance can have downtime */
   public static final String DOWNTIME = "downtime";
+  public static final String MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME = "minReplicasToKeepUpForNoDowntime";
 
   public static final boolean DEFAULT_DRY_RUN = true;
   public static final boolean DEFAULT_INCLUDE_CONSUMING = false;
   public static final boolean DEFAULT_DOWNTIME = false;
+  public static final int DEFAULT_MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME = 1;
 }

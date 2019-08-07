@@ -27,7 +27,6 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
 import org.apache.pinot.common.utils.InstancePartitionsType;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils.CompletedConsumingSegmentAssignmentPair;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,10 +94,12 @@ public class RealtimeBalanceNumSegmentAssignmentStrategy implements SegmentAssig
   @Override
   public Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
       Configuration config) {
-    CompletedConsumingSegmentAssignmentPair pair = new CompletedConsumingSegmentAssignmentPair(currentAssignment);
+    SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment completedConsumingOfflineSegmentAssignment =
+        new SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment(currentAssignment);
 
     // Rebalance COMPLETED segments first
-    Map<String, Map<String, String>> completedSegmentAssignment = pair.getCompletedSegmentAssignment();
+    Map<String, Map<String, String>> completedSegmentAssignment =
+        completedConsumingOfflineSegmentAssignment.getCompletedSegmentAssignment();
     List<String> instancesForCompletedSegments = SegmentAssignmentUtils
         .getInstancesForBalanceNumStrategy(_helixManager, _tableConfig, _replication, InstancePartitionsType.COMPLETED);
     Map<String, Map<String, String>> newAssignment = SegmentAssignmentUtils
@@ -106,7 +107,8 @@ public class RealtimeBalanceNumSegmentAssignmentStrategy implements SegmentAssig
             _replication);
 
     // Rebalance CONSUMING segments if needed
-    Map<String, Map<String, String>> consumingSegmentAssignment = pair.getConsumingSegmentAssignment();
+    Map<String, Map<String, String>> consumingSegmentAssignment =
+        completedConsumingOfflineSegmentAssignment.getConsumingSegmentAssignment();
     if (config.getBoolean(RebalanceUserConfigConstants.INCLUDE_CONSUMING,
         RebalanceUserConfigConstants.DEFAULT_INCLUDE_CONSUMING)) {
       List<String> instancesForConsumingSegments = SegmentAssignmentUtils
@@ -131,6 +133,10 @@ public class RealtimeBalanceNumSegmentAssignmentStrategy implements SegmentAssig
           SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(completedSegmentAssignment, newAssignment));
       newAssignment.putAll(consumingSegmentAssignment);
     }
+
+    // Keep the OFFLINE segments not moved, and RealtimeSegmentValidationManager will periodically detect the OFFLINE
+    // segments and re-assign them
+    newAssignment.putAll(completedConsumingOfflineSegmentAssignment.getOfflineSegmentAssignment());
 
     return newAssignment;
   }

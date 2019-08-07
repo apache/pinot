@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import java.util.Arrays;
+import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockMultiValIterator;
 import org.apache.pinot.core.common.BlockValSet;
@@ -37,7 +38,7 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   private PredicateEvaluator evaluator;
 
   private String datasourceName;
-  private int _numEntriesScanned = 0;
+  private MutableInt _numEntriesScanned = new MutableInt(0);
 
   public MVScanDocIdIterator(String datasourceName, BlockValSet blockValSet, BlockMetadata blockMetadata,
       PredicateEvaluator evaluator) {
@@ -80,9 +81,8 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
       return false;
     }
     valueIterator.skipTo(docId);
-    _numEntriesScanned++;
     int length = valueIterator.nextIntVal(intArray);
-    return evaluator.applyMV(intArray, length);
+    return evaluator.applyMV(intArray, length, _numEntriesScanned);
   }
 
   @Override
@@ -112,9 +112,8 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
     while (valueIterator.hasNext() && currentDocId < endDocId) {
       currentDocId = currentDocId + 1;
-      _numEntriesScanned++;
       int length = valueIterator.nextIntVal(intArray);
-      if (evaluator.applyMV(intArray, length)) {
+      if (evaluator.applyMV(intArray, length, _numEntriesScanned)) {
         return currentDocId;
       }
     }
@@ -145,9 +144,8 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
       docId = intIterator.next();
       if (docId >= startDocId) {
         valueIterator.skipTo(docId);
-        _numEntriesScanned++;
         length = valueIterator.nextIntVal(intArray);
-        if (evaluator.applyMV(intArray, length)) {
+        if (evaluator.applyMV(intArray, length, _numEntriesScanned)) {
           result.add(docId);
         }
       }
@@ -157,6 +155,6 @@ public class MVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   @Override
   public int getNumEntriesScanned() {
-    return _numEntriesScanned;
+    return _numEntriesScanned.intValue();
   }
 }
