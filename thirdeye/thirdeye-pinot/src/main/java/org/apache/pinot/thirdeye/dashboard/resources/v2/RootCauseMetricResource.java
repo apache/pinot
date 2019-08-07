@@ -648,8 +648,8 @@ public class RootCauseMetricResource {
     // align to time buckets and request time zone
     long offset = DateTimeZone.forID(timezone).getOffset(slice.getStart());
     long timeGranularity = granularity.toMillis();
-    long start = ((slice.getStart() + offset) / timeGranularity) * timeGranularity - offset;
-    long end = ((slice.getEnd() + offset + timeGranularity - 1) / timeGranularity) * timeGranularity - offset;
+    long start = ((slice.getStart() + offset + timeGranularity - 1) / timeGranularity) * timeGranularity - offset; // round up the start time to time granularity boundary of the requested time zone
+    long end = start + (slice.getEnd() - slice.getStart());
 
     return slice.withStart(start).withEnd(end).withGranularity(granularity);
   }

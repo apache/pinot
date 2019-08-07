@@ -20,6 +20,7 @@ import {computed, set, get, getProperties, setProperties} from '@ember/object';
 import {checkStatus} from 'thirdeye-frontend/utils/utils';
 import {yamlAlertProps, toastOptions} from 'thirdeye-frontend/utils/constants';
 import yamljs from 'yamljs';
+import jsyaml from 'js-yaml';
 import RSVP from "rsvp";
 import fetch from 'fetch';
 import {
@@ -211,8 +212,14 @@ export default Component.extend({
         set(this, 'isYamlParseable', true);
       }
       catch(err){
-        set(this, 'isYamlParseable', false);
-        return noResultsArray;
+        try {
+          // use jsyaml package to try parsing again, since yamljs doesn't parse some edge cases
+          yamlAsObject = jsyaml.safeLoad(detectionYaml);
+          set(this, 'isYamlParseable', true);
+        } catch (error) {
+          set(this, 'isYamlParseable', false);
+          return noResultsArray;
+        }
       }
       // if editor.metricId field contains a value, metric was just chosen.  Populate caches for filters and dimensions
       if(editor.metricId){

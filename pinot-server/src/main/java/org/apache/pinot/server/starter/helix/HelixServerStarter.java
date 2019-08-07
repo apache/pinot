@@ -300,10 +300,8 @@ public class HelixServerStarter {
     List<String> instanceTags = instanceConfig.getTags();
     if (instanceTags == null || instanceTags.size() == 0) {
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
-        _helixAdmin.addInstanceTag(clusterName, instanceName,
-            TableNameBuilder.OFFLINE.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
-        _helixAdmin.addInstanceTag(clusterName, instanceName,
-            TableNameBuilder.REALTIME.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
+        _helixAdmin.addInstanceTag(clusterName, instanceName, TagNameUtils.getOfflineTagForTenant(null));
+        _helixAdmin.addInstanceTag(clusterName, instanceName, TagNameUtils.getRealtimeTagForTenant(null));
       } else {
         _helixAdmin.addInstanceTag(clusterName, instanceName, UNTAGGED_SERVER_INSTANCE);
       }

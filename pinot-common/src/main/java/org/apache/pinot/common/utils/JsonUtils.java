@@ -19,6 +19,7 @@
 package org.apache.pinot.common.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
@@ -40,14 +41,20 @@ public class JsonUtils {
   private JsonUtils() {
   }
 
-  public static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
+  // NOTE: Do not expose the ObjectMapper to prevent configuration change
+  private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
   public static final ObjectReader DEFAULT_READER = DEFAULT_MAPPER.reader();
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();
 
   public static <T> T stringToObject(String jsonString, Class<T> valueType)
       throws IOException {
-    return DEFAULT_MAPPER.readValue(jsonString, valueType);
+    return DEFAULT_READER.forType(valueType).readValue(jsonString);
+  }
+
+  public static <T> T stringToObject(String jsonString, TypeReference<T> valueTypeRef)
+      throws IOException {
+    return DEFAULT_READER.forType(valueTypeRef).readValue(jsonString);
   }
 
   public static JsonNode stringToJsonNode(String jsonString)
@@ -57,19 +64,19 @@ public class JsonUtils {
 
   public static <T> T fileToObject(File jsonFile, Class<T> valueType)
       throws IOException {
-    return DEFAULT_MAPPER.readValue(jsonFile, valueType);
+    return DEFAULT_READER.forType(valueType).readValue(jsonFile);
   }
 
   public static JsonNode fileToJsonNode(File jsonFile)
       throws IOException {
     try (InputStream inputStream = new FileInputStream(jsonFile)) {
-      return inputStreamToJsonNode(inputStream);
+      return DEFAULT_READER.readTree(inputStream);
     }
   }
 
   public static <T> T inputStreamToObject(InputStream jsonInputStream, Class<T> valueType)
       throws IOException {
-    return DEFAULT_MAPPER.readValue(jsonInputStream, valueType);
+    return DEFAULT_READER.forType(valueType).readValue(jsonInputStream);
   }
 
   public static JsonNode inputStreamToJsonNode(InputStream jsonInputStream)
@@ -79,17 +86,22 @@ public class JsonUtils {
 
   public static <T> T bytesToObject(byte[] jsonBytes, Class<T> valueType)
       throws IOException {
-    return DEFAULT_MAPPER.readValue(jsonBytes, valueType);
+    return DEFAULT_READER.forType(valueType).readValue(jsonBytes);
   }
 
   public static JsonNode bytesToJsonNode(byte[] jsonBytes)
       throws IOException {
-    return inputStreamToJsonNode(new ByteArrayInputStream(jsonBytes));
+    return DEFAULT_READER.readTree(new ByteArrayInputStream(jsonBytes));
   }
 
   public static <T> T jsonNodeToObject(JsonNode jsonNode, Class<T> valueType)
-      throws JsonProcessingException {
-    return DEFAULT_READER.treeToValue(jsonNode, valueType);
+      throws IOException {
+    return DEFAULT_READER.forType(valueType).readValue(jsonNode);
+  }
+
+  public static <T> T jsonNodeToObject(JsonNode jsonNode, TypeReference<T> valueTypeRef)
+      throws IOException {
+    return DEFAULT_READER.forType(valueTypeRef).readValue(jsonNode);
   }
 
   public static String objectToString(Object object)

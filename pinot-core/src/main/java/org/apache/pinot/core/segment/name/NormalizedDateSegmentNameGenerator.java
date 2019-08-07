@@ -32,16 +32,20 @@ import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
  * Segment name generator that normalizes the date to human readable format.
  */
 public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator {
-  private final String _segmentNamePrefix;
-  private final boolean _excludeSequenceId;
-  private final boolean _appendPushType;
+  private String _segmentNamePrefix;
+  private boolean _excludeSequenceId;
+  private boolean _appendPushType;
 
   // For APPEND tables
-  private final SimpleDateFormat _outputSDF;
+  private SimpleDateFormat _outputSDF;
   // For EPOCH time format
-  private final TimeUnit _inputTimeUnit;
+  private TimeUnit _inputTimeUnit;
   // For SIMPLE_DATE_FORMAT time format
-  private final SimpleDateFormat _inputSDF;
+  private SimpleDateFormat _inputSDF;
+
+  public NormalizedDateSegmentNameGenerator(@Nullable String pushFrequency, @Nullable TimeUnit timeType, @Nullable String timeFormat) {
+    new NormalizedDateSegmentNameGenerator("myTable", null, false, "APPEND", pushFrequency, timeType, timeFormat);
+  }
 
   public NormalizedDateSegmentNameGenerator(String tableName, @Nullable String segmentNamePrefix,
       boolean excludeSequenceId, @Nullable String pushType, @Nullable String pushFrequency, @Nullable TimeUnit timeType,
@@ -98,7 +102,7 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
    * @param timeValue Time value
    * @return Normalized date string
    */
-  private String getNormalizedDate(Object timeValue) {
+  public String getNormalizedDate(Object timeValue) {
     if (_inputTimeUnit != null) {
       return _outputSDF.format(new Date(_inputTimeUnit.toMillis(Long.parseLong(timeValue.toString()))));
     } else {

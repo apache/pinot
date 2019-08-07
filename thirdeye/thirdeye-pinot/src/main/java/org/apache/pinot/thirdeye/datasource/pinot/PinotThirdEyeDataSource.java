@@ -169,9 +169,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
                   datasetConfig.getPreAggregatedKeyword());
         }
 
-        // By default, query only offline, unless dataset has been marked as realtime
-        String tableName = ThirdEyeUtils.computeTableName(dataset);
-        String pql = null;
+        String pql;
         MetricConfigDTO metricConfig = metricFunction.getMetricConfig();
         if (metricConfig != null && metricConfig.isDimensionAsMetric()) {
           pql = PqlUtils.getDimensionAsMetricPql(request, metricFunction, decoratedFilterSet, dataTimeSpec,
@@ -183,7 +181,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
         ThirdEyeResultSetGroup resultSetGroup;
         final long tStartFunction = System.nanoTime();
         try {
-          resultSetGroup = this.executePQL(new PinotQuery(pql, tableName));
+          resultSetGroup = this.executePQL(new PinotQuery(pql, dataset));
           if (metricConfig != null) {
             ThirdeyeMetricsUtil.getRequestLog()
                 .success(this.getName(), metricConfig.getDataset(), metricConfig.getName(), tStartFunction, System.nanoTime());

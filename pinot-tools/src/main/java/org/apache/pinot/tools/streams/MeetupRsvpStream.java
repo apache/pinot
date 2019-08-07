@@ -32,16 +32,14 @@ import javax.websocket.MessageHandler;
 import javax.websocket.Session;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.apache.pinot.core.realtime.stream.StreamDataProducer;
 import org.apache.pinot.core.realtime.stream.StreamDataProvider;
 import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
-import org.apache.pinot.tools.KafkaStarterUtils;
 import org.glassfish.tyrus.client.ClientManager;
 
 
 public class MeetupRsvpStream {
-
-  private static final String DEFAULT_KAFKA_BROKER = "localhost:19092";
 
   private Schema schema;
   private StreamDataProducer producer;
@@ -52,7 +50,7 @@ public class MeetupRsvpStream {
       throws Exception {
     schema = Schema.fromFile(schemaFile);
     Properties properties = new Properties();
-    properties.put("metadata.broker.list", DEFAULT_KAFKA_BROKER);
+    properties.put("metadata.broker.list", KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
     producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
@@ -60,6 +58,7 @@ public class MeetupRsvpStream {
 
   public void stopPublishing() {
     keepPublishing = false;
+    producer.close();
     client.shutdown();
   }
 

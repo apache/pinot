@@ -29,8 +29,9 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.common.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.common.utils.InstancePartitionsType;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.assignment.InstancePartitions;
@@ -125,9 +126,9 @@ public class RealtimeReplicaGroupSegmentAssignmentStrategyTest {
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
     TableConfig tableConfig =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-            .setNumReplicas(NUM_REPLICAS).setLLC(true).setSegmentAssignmentStrategy(
-            SegmentAssignmentStrategyFactory.Strategy.ReplicaGroupSegmentAssignmentStrategy.name()).build();
+        new TableConfig.Builder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
+            .setLLC(true).setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)
+            .build();
     _strategy = SegmentAssignmentStrategyFactory.getSegmentAssignmentStrategy(helixManager, tableConfig);
   }
 
@@ -209,6 +210,15 @@ public class RealtimeReplicaGroupSegmentAssignmentStrategyTest {
     // Rebalance all segments (both completed and consuming) should give the same assignment
     BaseConfiguration config = new BaseConfiguration();
     config.setProperty(RebalanceUserConfigConstants.INCLUDE_CONSUMING, true);
+    assertEquals(_strategy.rebalanceTable(currentAssignment, config), newAssignment);
+
+    // Rebalance should not change the assignment for the OFFLINE segments
+    String offlineSegmentName = "offlineSegment";
+    Map<String, String> offlineSegmentInstanceStateMap = SegmentAssignmentUtils
+        .getInstanceStateMap(SegmentAssignmentTestUtils.getNameList("badInstance_", NUM_REPLICAS),
+            RealtimeSegmentOnlineOfflineStateModel.OFFLINE);
+    currentAssignment.put(offlineSegmentName, offlineSegmentInstanceStateMap);
+    newAssignment.put(offlineSegmentName, offlineSegmentInstanceStateMap);
     assertEquals(_strategy.rebalanceTable(currentAssignment, config), newAssignment);
   }
 

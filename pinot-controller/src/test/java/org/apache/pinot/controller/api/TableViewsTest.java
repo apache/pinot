@@ -26,9 +26,7 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.api.resources.TableViews;
-import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
@@ -52,13 +50,8 @@ public class TableViewsTest extends ControllerTest {
       throws Exception {
     startZk();
     startController();
-
-    ControllerRequestBuilderUtil
-        .addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR,
-            NUM_BROKER_INSTANCES, true);
-    ControllerRequestBuilderUtil
-        .addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR,
-            NUM_SERVER_INSTANCES, true);
+    addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
+    addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
 
     // Create the offline table and add one segment
     TableConfig tableConfig =
@@ -178,6 +171,7 @@ public class TableViewsTest extends ControllerTest {
 
   @AfterClass
   public void tearDown() {
+    stopFakeInstances();
     stopController();
     stopZk();
   }

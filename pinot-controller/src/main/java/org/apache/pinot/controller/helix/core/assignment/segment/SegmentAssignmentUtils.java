@@ -248,19 +248,27 @@ class SegmentAssignmentUtils {
   }
 
   /**
-   * Class that splits segment assignment into CONSUMING segments and COMPLETED segments.
+   * Class that splits segment assignment into COMPLETED, CONSUMING and OFFLINE segments.
    */
-  static class CompletedConsumingSegmentAssignmentPair {
+  static class CompletedConsumingOfflineSegmentAssignment {
     private final Map<String, Map<String, String>> _completedSegmentAssignment = new TreeMap<>();
     private final Map<String, Map<String, String>> _consumingSegmentAssignment = new TreeMap<>();
+    private final Map<String, Map<String, String>> _offlineSegmentAssignment = new TreeMap<>();
 
-    CompletedConsumingSegmentAssignmentPair(Map<String, Map<String, String>> segmentAssignment) {
+    // NOTE: split the segments based on the following criteria:
+    //       1. At least one instance ONLINE -> COMPLETED segment
+    //       2. At least one instance CONSUMING -> CONSUMING segment
+    //       3. All instances OFFLINE (all instances encountered error while consuming) -> OFFLINE segment
+    CompletedConsumingOfflineSegmentAssignment(Map<String, Map<String, String>> segmentAssignment) {
       for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
+        String segmentName = entry.getKey();
         Map<String, String> instanceStateMap = entry.getValue();
         if (instanceStateMap.values().contains(RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
-          _completedSegmentAssignment.put(entry.getKey(), instanceStateMap);
+          _completedSegmentAssignment.put(segmentName, instanceStateMap);
+        } else if (instanceStateMap.values().contains(RealtimeSegmentOnlineOfflineStateModel.CONSUMING)) {
+          _consumingSegmentAssignment.put(segmentName, instanceStateMap);
         } else {
-          _consumingSegmentAssignment.put(entry.getKey(), instanceStateMap);
+          _offlineSegmentAssignment.put(segmentName, instanceStateMap);
         }
       }
     }
@@ -271,6 +279,10 @@ class SegmentAssignmentUtils {
 
     Map<String, Map<String, String>> getConsumingSegmentAssignment() {
       return _consumingSegmentAssignment;
+    }
+
+    Map<String, Map<String, String>> getOfflineSegmentAssignment() {
+      return _offlineSegmentAssignment;
     }
   }
 }

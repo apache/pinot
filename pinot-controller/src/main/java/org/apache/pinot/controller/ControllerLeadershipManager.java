@@ -23,6 +23,7 @@ import java.util.Map;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,17 +36,57 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class ControllerLeadershipManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerLeadershipManager.class);
+  private static final long CONTROLLER_LEADERSHIP_FETCH_INTERVAL = 60_000L;
 
   private final HelixManager _helixControllerManager;
   private final ControllerMetrics _controllerMetrics;
+  private final Map<String, LeadershipChangeSubscriber> _subscribers = new HashMap<>();
+  private final Thread _controllerLeadershipFetchingThread;
 
-  private Map<String, LeadershipChangeSubscriber> _subscribers = new HashMap<>();
   private boolean _amILeader = false;
+  private boolean _stopped = false;
 
   public ControllerLeadershipManager(HelixManager helixControllerManager, ControllerMetrics controllerMetrics) {
     _helixControllerManager = helixControllerManager;
     _controllerMetrics = controllerMetrics;
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_LEADER, 0L);
+
+    // Create a thread to periodically fetch controller leadership as a work-around of Helix callback delay
+    _controllerLeadershipFetchingThread = new Thread("ControllerLeadershipFetchingThread") {
+      @Override
+      public void run() {
+        while (true) {
+          try {
+            synchronized (ControllerLeadershipManager.this) {
+              if (_stopped) {
+                return;
+              }
+              if (_helixControllerManager.isLeader()) {
+                if (!_amILeader) {
+                  _amILeader = true;
+                  LOGGER.warn("Becoming leader without getting Helix change callback");
+                  _controllerMetrics
+                      .addMeteredGlobalValue(ControllerMeter.CONTROLLER_LEADERSHIP_CHANGE_WITHOUT_CALLBACK, 1L);
+                  onBecomingLeader();
+                }
+              } else {
+                if (_amILeader) {
+                  _amILeader = false;
+                  LOGGER.warn("Losing leadership without getting Helix change callback");
+                  _controllerMetrics
+                      .addMeteredGlobalValue(ControllerMeter.CONTROLLER_LEADERSHIP_CHANGE_WITHOUT_CALLBACK, 1L);
+                  onBecomingNonLeader();
+                }
+              }
+              ControllerLeadershipManager.this.wait(CONTROLLER_LEADERSHIP_FETCH_INTERVAL);
+            }
+          } catch (Exception e) {
+            // Ignore all exceptions. The thread keeps running until ControllerLeadershipManager.stop() is invoked.
+            LOGGER.error("Caught exception within controller leadership fetching thread", e);
+          }
+        }
+      }
+    };
   }
 
   /**
@@ -65,12 +106,30 @@ public class ControllerLeadershipManager {
   }
 
   /**
+   * Starts the service.
+   */
+  public synchronized void start() {
+    onControllerChange();
+    _controllerLeadershipFetchingThread.start();
+  }
+
+  /**
    * Stops the service.
    * <p>If controller is leader, invoke {@link ControllerLeadershipManager#onBecomingNonLeader()}
    */
-  public synchronized void stop() {
-    if (_amILeader) {
-      onBecomingNonLeader();
+  public void stop() {
+    synchronized (this) {
+      if (_amILeader) {
+        onBecomingNonLeader();
+      }
+      _stopped = true;
+      notify();
+    }
+    try {
+      _controllerLeadershipFetchingThread.join();
+    } catch (InterruptedException e) {
+      LOGGER.error("Caught InterruptedException while waiting for controller leadership fetching thread to die");
+      Thread.currentThread().interrupt();
     }
   }
 
@@ -81,18 +140,14 @@ public class ControllerLeadershipManager {
     if (_helixControllerManager.isLeader()) {
       if (!_amILeader) {
         _amILeader = true;
-        LOGGER.info("Became leader");
+        LOGGER.info("Becoming leader");
         onBecomingLeader();
-      } else {
-        LOGGER.info("Already leader. Duplicate notification");
       }
     } else {
       if (_amILeader) {
         _amILeader = false;
-        LOGGER.info("Lost leadership");
+        LOGGER.info("Losing leadership");
         onBecomingNonLeader();
-      } else {
-        LOGGER.info("Already not leader. Duplicate notification");
       }
     }
   }

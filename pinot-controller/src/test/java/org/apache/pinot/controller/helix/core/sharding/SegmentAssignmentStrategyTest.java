@@ -22,8 +22,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import org.I0Itec.zkclient.ZkClient;
-import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.config.ColumnPartitionConfig;
 import org.apache.pinot.common.config.IndexingConfig;
@@ -35,71 +33,39 @@ import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignment;
 import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.ReplicaGroupTestUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
-import org.apache.pinot.core.realtime.stream.StreamConfig;
-import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
 import org.testng.Assert;
-import org.testng.annotations.AfterTest;
-import org.testng.annotations.BeforeTest;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
 public class SegmentAssignmentStrategyTest extends ControllerTest {
-  private final static String ZK_SERVER = ZkStarter.DEFAULT_ZK_STR;
-  private final static String TABLE_NAME_BALANCED = "testResourceBalanced";
-  private final static String TABLE_NAME_RANDOM = "testResourceRandom";
-  private final static String TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT = "testReplicaGroupPartitionAssignment";
-  private final static String TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP = "testTableLevelReplicaGroup";
-  private final static String TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP = "testPartitionLevelReplicaGroup";
+  private static final String TABLE_NAME_BALANCED = "testResourceBalanced";
+  private static final String TABLE_NAME_RANDOM = "testResourceRandom";
+  private static final String TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT = "testReplicaGroupPartitionAssignment";
+  private static final String TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP = "testTableLevelReplicaGroup";
+  private static final String TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP = "testPartitionLevelReplicaGroup";
+  private static final String PARTITION_COLUMN = "memberId";
+  private static final int NUM_REPLICAS = 2;
+  private static final int NUM_SERVERS = 10;
+  private static final int NUM_BROKERS = 1;
+  private static final Random RANDOM = new Random();
 
-  private static final Random random = new Random();
-  private final static String PARTITION_COLUMN = "memberId";
-  private final static int NUM_REPLICA = 2;
-  private ZkClient _zkClient;
-  private final int _numServerInstance = 10;
-  private final int _numBrokerInstance = 1;
-  private ZkStarter.ZookeeperInstance _zookeeperInstance;
   private ReplicaGroupPartitionAssignmentGenerator _partitionAssignmentGenerator;
 
-  @BeforeTest
-  public void setup()
+  @BeforeClass
+  public void setUp()
       throws Exception {
-    _zookeeperInstance = ZkStarter.startLocalZkServer();
-    _zkClient = new ZkClient(ZK_SERVER);
-    final String zkPath = "/" + getHelixClusterName();
-    if (_zkClient.exists(zkPath)) {
-      _zkClient.deleteRecursive(zkPath);
-    }
+    startZk();
     startController();
-    HelixManager helixZkManager = _helixResourceManager.getHelixZkManager();
+    addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKERS, true);
+    addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVERS, true);
 
-    _partitionAssignmentGenerator =
-        new ReplicaGroupPartitionAssignmentGenerator(helixZkManager.getHelixPropertyStore());
-
-    ControllerRequestBuilderUtil
-        .addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZK_SERVER, _numServerInstance, true);
-    ControllerRequestBuilderUtil
-        .addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZK_SERVER, _numBrokerInstance, true);
-    Thread.sleep(100);
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size(),
-        _numServerInstance);
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_REALTIME").size(),
-        _numServerInstance);
-
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(),
-        _numBrokerInstance);
-  }
-
-  @AfterTest
-  public void tearDown() {
-    _helixResourceManager.stop();
-    _zkClient.close();
-    ZkStarter.stopLocalZkServer(_zookeeperInstance);
+    _partitionAssignmentGenerator = new ReplicaGroupPartitionAssignmentGenerator(_propertyStore);
   }
 
   @Test
@@ -108,7 +74,7 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
     // Adding table
     TableConfig tableConfig =
         new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TABLE_NAME_RANDOM)
-            .setSegmentAssignmentStrategy("RandomAssignmentStrategy").setNumReplicas(NUM_REPLICA).build();
+            .setSegmentAssignmentStrategy("RandomAssignmentStrategy").setNumReplicas(NUM_REPLICAS).build();
     _helixResourceManager.addTable(tableConfig);
 
     // Wait for the table addition
@@ -125,8 +91,7 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
       while (!allSegmentsPushedToIdealState(TABLE_NAME_RANDOM, i + 1)) {
         Thread.sleep(100);
       }
-      final Set<String> taggedInstances =
-          _helixResourceManager.getAllInstancesForServerTenant("DefaultTenant_OFFLINE");
+      final Set<String> taggedInstances = _helixResourceManager.getAllInstancesForServerTenant("DefaultTenant_OFFLINE");
       final Map<String, Integer> instanceToNumSegmentsMap = new HashMap<>();
       for (final String instance : taggedInstances) {
         instanceToNumSegmentsMap.put(instance, 0);
@@ -135,7 +100,7 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
           .getResourceIdealState(getHelixClusterName(), TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME_RANDOM));
       Assert.assertEquals(idealState.getPartitionSet().size(), i + 1);
       for (final String segmentId : idealState.getPartitionSet()) {
-        Assert.assertEquals(idealState.getInstanceStateMap(segmentId).size(), NUM_REPLICA);
+        Assert.assertEquals(idealState.getInstanceStateMap(segmentId).size(), NUM_REPLICAS);
       }
     }
   }
@@ -163,8 +128,7 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
       Thread.sleep(100);
     }
 
-    final Set<String> taggedInstances =
-        _helixResourceManager.getAllInstancesForServerTenant("DefaultTenant_OFFLINE");
+    final Set<String> taggedInstances = _helixResourceManager.getAllInstancesForServerTenant("DefaultTenant_OFFLINE");
     final Map<String, Integer> instance2NumSegmentsMap = new HashMap<>();
     for (final String instance : taggedInstances) {
       instance2NumSegmentsMap.put(instance, 0);
@@ -177,9 +141,9 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
       }
     }
     final int totalSegments = (numSegments) * numReplicas;
-    final int minNumSegmentsPerInstance = totalSegments / _numServerInstance;
+    final int minNumSegmentsPerInstance = totalSegments / NUM_SERVERS;
     int maxNumSegmentsPerInstance = minNumSegmentsPerInstance;
-    if ((minNumSegmentsPerInstance * _numServerInstance) < totalSegments) {
+    if ((minNumSegmentsPerInstance * NUM_SERVERS) < totalSegments) {
       maxNumSegmentsPerInstance = maxNumSegmentsPerInstance + 1;
     }
     for (final String instance : instance2NumSegmentsMap.keySet()) {
@@ -200,7 +164,7 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
     // Adding a table without replica group
     TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE)
         .setTableName(TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT)
-        .setSegmentAssignmentStrategy("RandomAssignmentStrategy").setNumReplicas(NUM_REPLICA).build();
+        .setSegmentAssignmentStrategy("RandomAssignmentStrategy").setNumReplicas(NUM_REPLICAS).build();
     _helixResourceManager.addTable(tableConfig);
 
     // Check that partition assignment does not exist
@@ -216,14 +180,13 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
     replicaGroupStrategyConfig.setMirrorAssignmentAcrossReplicaGroups(true);
 
     TableConfig replicaGroupTableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE)
-        .setTableName(TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT).setNumReplicas(NUM_REPLICA)
+        .setTableName(TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT).setNumReplicas(NUM_REPLICAS)
         .setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy").build();
 
     replicaGroupTableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
 
     // Check that the replica group partition assignment is created
-    _helixResourceManager
-        .setExistingTableConfig(replicaGroupTableConfig, tableNameWithType, CommonConstants.Helix.TableType.OFFLINE);
+    _helixResourceManager.setExistingTableConfig(replicaGroupTableConfig);
     partitionAssignment = _partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType);
     Assert.assertTrue(partitionAssignment != null);
 
@@ -257,13 +220,10 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
     Map<String, String> streamConfigMap = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
 
     // Adding a table without replica group
-    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(
-        TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT)
-        .setSegmentAssignmentStrategy("RandomAssignmentStrategy")
-        .setNumReplicas(NUM_REPLICA)
-        .setStreamConfigs(streamConfigMap)
-        .setLLC(true)
-        .build();
+    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME)
+        .setTableName(TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT)
+        .setSegmentAssignmentStrategy("RandomAssignmentStrategy").setNumReplicas(NUM_REPLICAS)
+        .setStreamConfigs(streamConfigMap).setLLC(true).build();
     try {
       _helixResourceManager.addTable(tableConfig);
     } catch (Exception e) {
@@ -282,20 +242,16 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
     replicaGroupStrategyConfig.setNumInstancesPerPartition(numInstancesPerPartition);
     replicaGroupStrategyConfig.setMirrorAssignmentAcrossReplicaGroups(true);
 
-    TableConfig replicaGroupTableConfig =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(
-            TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT)
-            .setNumReplicas(NUM_REPLICA)
-            .setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy")
-            .setStreamConfigs(streamConfigMap)
-            .setLLC(true)
-            .build();
+    TableConfig replicaGroupTableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME)
+        .setTableName(TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT).setNumReplicas(NUM_REPLICAS)
+        .setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy").setStreamConfigs(streamConfigMap)
+        .setLLC(true).build();
 
     replicaGroupTableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
 
     // Check that the replica group partition assignment is created
     try {
-      _helixResourceManager.setExistingTableConfig(replicaGroupTableConfig, tableNameWithType, CommonConstants.Helix.TableType.REALTIME);
+      _helixResourceManager.setExistingTableConfig(replicaGroupTableConfig);
     } catch (Exception e) {
       // ignore
     }
@@ -333,7 +289,7 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
 
     // Create table config
     TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE)
-        .setTableName(TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP).setNumReplicas(NUM_REPLICA)
+        .setTableName(TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP).setNumReplicas(NUM_REPLICAS)
         .setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy").build();
 
     tableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
@@ -373,9 +329,9 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
   @Test
   public void testPartitionLevelReplicaGroupSegmentAssignmentStrategy()
       throws Exception {
-    int totalPartitionNumber = random.nextInt(8) + 2;
-    int numInstancesPerPartition = random.nextInt(5) + 1;
-    int numSegments = random.nextInt(10) + 10;
+    int totalPartitionNumber = RANDOM.nextInt(8) + 2;
+    int numInstancesPerPartition = RANDOM.nextInt(5) + 1;
+    int numSegments = RANDOM.nextInt(10) + 10;
 
     // Create the configuration for segment assignment strategy.
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig();
@@ -392,7 +348,7 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
 
     // Create table config
     TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE)
-        .setTableName(TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP).setNumReplicas(NUM_REPLICA)
+        .setTableName(TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP).setNumReplicas(NUM_REPLICAS)
         .setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy").build();
 
     tableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
@@ -435,5 +391,12 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
         _helixAdmin.getResourceIdealState(getHelixClusterName(), TableNameBuilder.OFFLINE.tableNameWithType(tableName));
     return idealState != null && idealState.getPartitionSet() != null
         && idealState.getPartitionSet().size() == segmentNum;
+  }
+
+  @AfterClass
+  public void tearDown() {
+    stopFakeInstances();
+    stopController();
+    stopZk();
   }
 }

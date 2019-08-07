@@ -22,13 +22,11 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -37,28 +35,23 @@ import org.testng.annotations.Test;
 
 
 public class PinotResourceManagerTest extends ControllerTest {
-  private final static String TABLE_NAME = "testTable";
-
-  private ZkStarter.ZookeeperInstance _zookeeperInstance;
-  private ZkClient _zkClient;
+  private static final String TABLE_NAME = "testTable";
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    _zookeeperInstance = ZkStarter.startLocalZkServer();
-    _zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
-
+    startZk();
     startController();
+    addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
+    addFakeServerInstancesToAutoJoinHelixCluster(1, true);
 
-    ControllerRequestBuilderUtil
-        .addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, 1, true);
-    ControllerRequestBuilderUtil
-        .addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, 1, true);
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(), 1);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(),
+        1);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size(),
+        1);
     Assert
-        .assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size(), 1);
-    Assert
-        .assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_REALTIME").size(), 1);
+        .assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_REALTIME").size(),
+            1);
 
     // Adding table
     TableConfig tableConfig =
@@ -78,11 +71,13 @@ public class PinotResourceManagerTest extends ControllerTest {
     Assert.assertTrue(_helixResourceManager.updateZkMetadata("testTable_OFFLINE", segmentZKMetadata));
 
     // Update ZK metadata
-    Assert.assertEquals(
-        _helixResourceManager.getSegmentMetadataZnRecord("testTable_OFFLINE", "testSegment").getVersion(), 0);
+    Assert
+        .assertEquals(_helixResourceManager.getSegmentMetadataZnRecord("testTable_OFFLINE", "testSegment").getVersion(),
+            0);
     Assert.assertTrue(_helixResourceManager.updateZkMetadata("testTable_OFFLINE", segmentZKMetadata, 0));
-    Assert.assertEquals(
-        _helixResourceManager.getSegmentMetadataZnRecord("testTable_OFFLINE", "testSegment").getVersion(), 1);
+    Assert
+        .assertEquals(_helixResourceManager.getSegmentMetadataZnRecord("testTable_OFFLINE", "testSegment").getVersion(),
+            1);
     Assert.assertFalse(_helixResourceManager.updateZkMetadata("testTable_OFFLINE", segmentZKMetadata, 0));
   }
 
@@ -151,8 +146,8 @@ public class PinotResourceManagerTest extends ControllerTest {
 
   @AfterClass
   public void tearDown() {
-    _helixResourceManager.stop();
-    _zkClient.close();
-    ZkStarter.stopLocalZkServer(_zookeeperInstance);
+    stopFakeInstances();
+    stopController();
+    stopZk();
   }
 }

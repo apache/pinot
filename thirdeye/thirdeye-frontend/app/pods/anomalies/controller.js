@@ -15,6 +15,7 @@ import { inject as service } from '@ember/service';
 import { isPresent, isEmpty } from '@ember/utils';
 import Controller from '@ember/controller';
 import yamljs from 'yamljs';
+import jsyaml from 'js-yaml';
 import { reads } from '@ember/object/computed';
 import { toastOptions } from 'thirdeye-frontend/utils/constants';
 import { setUpTimeRangeOptions, powerSort } from 'thirdeye-frontend/utils/manage-alert-utils';
@@ -398,14 +399,23 @@ export default Controller.extend({
       let additionalAlertNames = [];
       // for each group, grab yaml, extract alert names for adding to filterObj
       selectedSubGroupObjects.forEach(group => {
+        let yamlAsObject;
         try {
-          const yamlAsObject = yamljs.parse(group.get('yaml'));
+          yamlAsObject = yamljs.parse(group.get('yaml'));
           if (Array.isArray(yamlAsObject.subscribedDetections)) {
             additionalAlertNames = [ ...additionalAlertNames, ...yamlAsObject.subscribedDetections];
           }
         }
         catch(error){
-          notifications.error(`Failed to retrieve alert names for subscription group: ${group.get('name')}`, 'Error', toastOptions);
+          try {
+            // use jsyaml package to try parsing again, since yamljs doesn't parse some edge cases
+            yamlAsObject = jsyaml.safeLoad(group.get('yaml'));
+            if (Array.isArray(yamlAsObject.subscribedDetections)) {
+              additionalAlertNames = [ ...additionalAlertNames, ...yamlAsObject.subscribedDetections];
+            }
+          } catch (error) {
+            notifications.error(`Failed to retrieve alert names for subscription group: ${group.get('name')}`, 'Error', toastOptions);
+          }
         }
       });
       // add the alert names extracted from groups to any that are already present

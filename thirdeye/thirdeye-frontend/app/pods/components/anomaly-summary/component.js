@@ -211,6 +211,7 @@ export default Component.extend({
           end: a.endTime,
           metricName: a.metric,
           dataset: a.collection,
+          dimensions: a.dimensions,
           startDateStr: this._formatAnomaly(a),
           durationStr: getFormattedDuration(a.startTime, a.endTime),
           shownCurrent: a.avgCurrentVal === "Infinity" ? 0 : humanizeFloat(a.avgCurrentVal),

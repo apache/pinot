@@ -51,7 +51,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.tools.KafkaStarterUtils;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.ITestContext;
@@ -90,15 +90,19 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
     public long getRealtimeSegmentValidationManagerInitialDelaySeconds() {
       return PERIODIC_TASK_INITIAL_DELAY_SECONDS;
     }
+
     public long getStatusCheckerInitialDelayInSeconds() {
       return PERIODIC_TASK_INITIAL_DELAY_SECONDS;
     }
+
     public long getRealtimeSegmentRelocationInitialDelayInSeconds() {
       return PERIODIC_TASK_INITIAL_DELAY_SECONDS;
     }
+
     public long getBrokerResourceValidationInitialDelayInSeconds() {
       return PERIODIC_TASK_INITIAL_DELAY_SECONDS;
     }
+
     public long getOfflineSegmentIntervalCheckerInitialDelayInSeconds() {
       return PERIODIC_TASK_INITIAL_DELAY_SECONDS;
     }
@@ -119,7 +123,8 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
    * @throws Exception
    */
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     startZk();
@@ -159,7 +164,8 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
   /**
    * Setup offline table, but no segments
    */
-  private void setupOfflineTable(String table) throws Exception {
+  private void setupOfflineTable(String table)
+      throws Exception {
     _realtimeTableConfig = null;
     addOfflineTable(table, null, null, TENANT_NAME, TENANT_NAME, null, SegmentVersion.v1, null, null, null, null, null);
     completeTableConfiguration();
@@ -168,7 +174,8 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
   /**
    * Setup offline table, with segments from avro
    */
-  private void setupOfflineTableAndSegments(String tableName, List<File> avroFiles) throws Exception {
+  private void setupOfflineTableAndSegments(String tableName, List<File> avroFiles)
+      throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
     setTableName(tableName);
     _realtimeTableConfig = null;
@@ -184,12 +191,13 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
     Assert.assertNotNull(outgoingTimeUnit);
     String timeType = outgoingTimeUnit.toString();
 
-    addOfflineTable(tableName, timeColumnName, timeType, TENANT_NAME, TENANT_NAME, null, SegmentVersion.v1, null, null, null, null, null);
+    addOfflineTable(tableName, timeColumnName, timeType, TENANT_NAME, TENANT_NAME, null, SegmentVersion.v1, null, null,
+        null, null, null);
     completeTableConfiguration();
 
     ExecutorService executor = Executors.newCachedThreadPool();
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName, false,
-        null, null, null, executor);
+    ClusterIntegrationTestUtils
+        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName, false, null, null, null, executor);
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
     uploadSegments(getTableName(), _tarDir);
@@ -199,7 +207,8 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
   /**
    * Setup realtime table for given tablename and topic
    */
-  private void setupRealtimeTable(String table, String  topic, File avroFile) throws Exception {
+  private void setupRealtimeTable(String table, String topic, File avroFile)
+      throws Exception {
     _offlineTableConfig = null;
     File schemaFile = getSchemaFile();
     Schema schema = Schema.fromFile(schemaFile);
@@ -233,7 +242,8 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
    * @throws Exception
    */
   @BeforeGroups(groups = "segmentStatusChecker")
-  public void beforeTestSegmentStatusCheckerTest(ITestContext context) throws Exception {
+  public void beforeTestSegmentStatusCheckerTest(ITestContext context)
+      throws Exception {
     String emptyTable = "table1_OFFLINE";
     String disabledOfflineTable = "table2_OFFLINE";
     String basicOfflineTable = getDefaultOfflineTableName();
@@ -253,7 +263,7 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
 
     // table with disabled ideal state
     setupOfflineTable(disabledOfflineTable);
-    _helixAdmin.enableResource(_clusterName, disabledOfflineTable, false);
+    _helixAdmin.enableResource(getHelixClusterName(), disabledOfflineTable, false);
 
     // some segments offline
     setupOfflineTableAndSegments(errorOfflineTable, _avroFiles);
@@ -282,7 +292,8 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
    * Validate that we are seeing the expected numbers
    */
   @Test(groups = "segmentStatusChecker")
-  public void testSegmentStatusChecker(ITestContext context) throws Exception {
+  public void testSegmentStatusChecker(ITestContext context)
+      throws Exception {
     String emptyTable = (String) context.getAttribute("emptyTable");
     String disabledOfflineTable = (String) context.getAttribute("disabledOfflineTable");
     String basicOfflineTable = (String) context.getAttribute("basicOfflineTable");
@@ -292,9 +303,9 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
 
     ControllerMetrics controllerMetrics = _controllerStarter.getControllerMetrics();
 
-    TestUtils.waitForCondition(input ->
-        controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED,
-            "SegmentStatusChecker") >= numTables, 240_000, "Timed out waiting for SegmentStatusChecker");
+    TestUtils.waitForCondition(input -> controllerMetrics
+            .getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, "SegmentStatusChecker") >= numTables,
+        240_000, "Timed out waiting for SegmentStatusChecker");
 
     // empty table - table1_OFFLINE
     // num replicas set from ideal state
@@ -344,7 +355,8 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
   }
 
   @AfterGroups(groups = "segmentStatusChecker")
-  public void afterTestSegmentStatusChecker(ITestContext context) throws Exception {
+  public void afterTestSegmentStatusChecker(ITestContext context)
+      throws Exception {
     String emptyTable = (String) context.getAttribute("emptyTable");
     String disabledOfflineTable = (String) context.getAttribute("disabledOfflineTable");
     String errorOfflineTable = (String) context.getAttribute("errorOfflineTable");
@@ -361,7 +373,8 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
    * @throws Exception
    */
   @BeforeGroups(groups = "realtimeSegmentRelocator", dependsOnGroups = "segmentStatusChecker")
-  public void beforeRealtimeSegmentRelocatorTest(ITestContext context) throws Exception {
+  public void beforeRealtimeSegmentRelocatorTest(ITestContext context)
+      throws Exception {
     String relocationTable = getDefaultRealtimeTableName();
     context.setAttribute("relocationTable", relocationTable);
 
@@ -377,20 +390,22 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
   }
 
   @Test(groups = "realtimeSegmentRelocator", dependsOnGroups = "segmentStatusChecker")
-  public void testRealtimeSegmentRelocator(ITestContext context) throws Exception {
+  public void testRealtimeSegmentRelocator(ITestContext context)
+      throws Exception {
 
     String relocationTable = (String) context.getAttribute("relocationTable");
 
     ControllerMetrics controllerMetrics = _controllerStarter.getControllerMetrics();
 
-    long taskRunCount = controllerMetrics.getMeteredTableValue("RealtimeSegmentRelocator",
-        ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN).count();
+    long taskRunCount =
+        controllerMetrics.getMeteredTableValue("RealtimeSegmentRelocator", ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN)
+            .count();
     TestUtils.waitForCondition(input ->
         controllerMetrics.getMeteredTableValue("RealtimeSegmentRelocator", ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN)
             .count() > taskRunCount, 60_000, "Timed out waiting for RealtimeSegmentRelocation to run");
 
-    Assert.assertTrue(controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED,
-        "RealtimeSegmentRelocator") > 0);
+    Assert.assertTrue(controllerMetrics
+        .getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, "RealtimeSegmentRelocator") > 0);
 
     // check servers for ONLINE segment and CONSUMING segments are disjoint sets
     Set<String> consuming = new HashSet<>();
@@ -425,7 +440,8 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
     // Check that the first table we added doesn't need to be rebuilt(case where ideal state brokers and brokers in broker resource are the same.
     String table1 = (String) context.getAttribute("testTableOne");
     String table2 = (String) context.getAttribute("testTableTwo");
-    TableConfig tableConfigOne = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(table1).build();
+    TableConfig tableConfigOne =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(table1).build();
     String partitionNameOne = tableConfigOne.getTableName();
 
     // Ensure that the broker resource is not rebuilt.
@@ -517,27 +533,29 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
    * @throws Exception
    */
 
-  @Test(groups="realtimeSegmentValidationManager", dependsOnGroups = "offlineSegmentIntervalChecker")
-  public void testRealtimeSegmentValidationManager(ITestContext context) throws Exception {
+  @Test(groups = "realtimeSegmentValidationManager", dependsOnGroups = "offlineSegmentIntervalChecker")
+  public void testRealtimeSegmentValidationManager(ITestContext context)
+      throws Exception {
     ControllerMetrics controllerMetrics = _controllerStarter.getControllerMetrics();
-    long taskRunCount = controllerMetrics.getMeteredTableValue("RealtimeSegmentValidationManager",
-        ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN).count();
+    long taskRunCount = controllerMetrics
+        .getMeteredTableValue("RealtimeSegmentValidationManager", ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN).count();
 
     // Wait until the RealtimeSegmentValidationManager runs at least once. Most likely it already ran once
     // on the realtime table (default one) already setup, so we should have the total document count on that
     // realtime table.
-    TestUtils.waitForCondition(input ->
-        controllerMetrics.getMeteredTableValue("RealtimeSegmentValidationManager", ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN)
-            .count() > taskRunCount, 60_000, "Timed out waiting for RealtimeSegmentValidationManager to run");
+    TestUtils.waitForCondition(input -> controllerMetrics
+        .getMeteredTableValue("RealtimeSegmentValidationManager", ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN).count()
+        > taskRunCount, 60_000, "Timed out waiting for RealtimeSegmentValidationManager to run");
 
-    Assert.assertTrue(controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED,
-        "RealtimeSegmentValidationManager") > 0);
+    Assert.assertTrue(controllerMetrics
+        .getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, "RealtimeSegmentValidationManager")
+        > 0);
     RealtimeSegmentValidationManager validationManager = _controllerStarter.getRealtimeSegmentValidationManager();
     ValidationMetrics validationMetrics = validationManager.getValidationMetrics();
     // Make sure we processed the realtime table to get the total document count. Should have been done the first
     // time RealtimeSegmentValidationManager ran on the default realtime table.
-    Assert.assertTrue(validationMetrics.getValueOfGauge(ValidationMetrics.makeGaugeName(getDefaultRealtimeTableName(),
-        "TotalDocumentCount")) > 0);
+    Assert.assertTrue(validationMetrics
+        .getValueOfGauge(ValidationMetrics.makeGaugeName(getDefaultRealtimeTableName(), "TotalDocumentCount")) > 0);
   }
 
   // TODO: tests for other ControllerPeriodicTasks (RetentionManagert , RealtimeSegmentValidationManager)
@@ -565,7 +583,8 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
    * @throws Exception
    */
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     stopServer();
     stopBroker();
     stopController();
