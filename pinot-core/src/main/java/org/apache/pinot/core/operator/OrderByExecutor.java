@@ -20,7 +20,14 @@ package org.apache.pinot.core.operator;
 
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import org.apache.pinot.common.utils.BytesUtils;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.primitive.ByteArray;
+
+import static org.apache.pinot.common.utils.DataSchema.*;
 
 
 public class OrderByExecutor {
@@ -28,6 +35,7 @@ public class OrderByExecutor {
   private Comparator<GroupByRow> getComparator(OrderByDefn orderByDefn) {
     OrderType orderType = orderByDefn.getOrderType();
     int index = orderByDefn.getIndex();
+    ColumnDataType columnDataType = orderByDefn.getColumnDataType();
 
     Comparator<GroupByRow> comparator = null;
     if (orderType.equals(OrderType.AGGREGATION_VALUE)) {
@@ -40,10 +48,60 @@ public class OrderByExecutor {
                 ((Number) s1[index]).doubleValue())); // TODO: other data types?
       }
     } else if (orderType.equals(OrderType.GROUP_BY_KEY)) {
-      if (orderByDefn.isAscending()) {
-        comparator = Comparator.comparing(GroupByRow::getArrayKey, Comparator.comparing(s -> s[index]));
-      } else {
-        comparator = Comparator.comparing(GroupByRow::getArrayKey, (s1, s2) -> s2[index].compareTo(s1[index]));
+      switch (columnDataType) {
+        case INT:
+          if (orderByDefn.isAscending()) {
+            comparator = Comparator.comparing(GroupByRow::getArrayKey,
+                Comparator.comparingInt(s -> Integer.valueOf(s[index])));
+          } else {
+            comparator = Comparator.comparing(GroupByRow::getArrayKey,
+                (s1, s2) -> Integer.compare(Integer.valueOf(s2[index]), Integer.valueOf(s1[index])));
+          }
+          break;
+        case LONG:
+          if (orderByDefn.isAscending()) {
+            comparator = Comparator.comparing(GroupByRow::getArrayKey,
+                Comparator.comparingLong(s -> Long.valueOf(s[index])));
+          } else {
+            comparator = Comparator.comparing(GroupByRow::getArrayKey,
+                (s1, s2) -> Long.compare(Long.valueOf(s2[index]), Long.valueOf(s1[index])));
+          }
+          break;
+        case FLOAT:
+          if (orderByDefn.isAscending()) {
+            comparator = Comparator.comparing(GroupByRow::getArrayKey,
+                Comparator.comparing(s -> Float.valueOf(s[index])));
+          } else {
+            comparator = Comparator.comparing(GroupByRow::getArrayKey,
+                (s1, s2) -> Float.valueOf(s2[index]).compareTo(Float.valueOf(s1[index])));
+          }
+          break;
+        case DOUBLE:
+          if (orderByDefn.isAscending()) {
+            comparator = Comparator.comparing(GroupByRow::getArrayKey,
+                Comparator.comparingDouble(s -> Integer.valueOf(s[index])));
+          } else {
+            comparator = Comparator.comparing(GroupByRow::getArrayKey,
+                (s1, s2) -> Double.compare(Double.valueOf(s2[index]), Double.valueOf(s1[index])));
+          }
+          break;
+        case BYTES:
+          if (orderByDefn.isAscending()) {
+            comparator = (o1, o2) -> ByteArray.compare(BytesUtils.toBytes(o1.getArrayKey()[index]),
+                BytesUtils.toBytes(o2.getArrayKey()[index]));
+          } else {
+            comparator =
+                (o1, o2) -> ByteArray.compare(o2.getArrayKey()[index].getBytes(), o1.getArrayKey()[index].getBytes());
+          }
+          break;
+        case STRING:
+        default:
+          if (orderByDefn.isAscending()) {
+            comparator = Comparator.comparing(GroupByRow::getArrayKey, Comparator.comparing(s -> s[index]));
+          } else {
+            comparator = Comparator.comparing(GroupByRow::getArrayKey, (s1, s2) -> s2[index].compareTo(s1[index]));
+          }
+          break;
       }
     }
     return comparator;
@@ -51,8 +109,8 @@ public class OrderByExecutor {
 
   public Comparator<GroupByRow> getComparator(List<OrderByDefn> orderByDefns) {
     Comparator<GroupByRow> globalComparator = null;
-    for (OrderByDefn orderByDefn : orderByDefns) {
-      Comparator<GroupByRow> comparator = getComparator(orderByDefn);
+    for (int i = 0; i < orderByDefns.size(); i++) {
+      Comparator<GroupByRow> comparator = getComparator(orderByDefns.get(i));
       if (globalComparator == null) {
         globalComparator = comparator;
       } else {

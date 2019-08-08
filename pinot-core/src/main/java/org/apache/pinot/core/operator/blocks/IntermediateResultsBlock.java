@@ -47,6 +47,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
  */
 public class IntermediateResultsBlock implements Block {
   private DataSchema _selectionDataSchema;
+  private DataSchema _orderByDataSchema;
   private Collection<Serializable[]> _selectionResult;
   private AggregationFunctionContext[] _aggregationFunctionContexts;
   private List<Object> _aggregationResult;
@@ -92,9 +93,10 @@ public class IntermediateResultsBlock implements Block {
    */
   @SuppressWarnings("unchecked")
   public IntermediateResultsBlock(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
-      @Nonnull List aggregationResult) {
+      @Nonnull List aggregationResult, DataSchema dataSchema) {
     _aggregationFunctionContexts = aggregationFunctionContexts;
     _groupByOrderByResult = aggregationResult;
+    _orderByDataSchema = dataSchema;
   }
 
   /**
@@ -104,6 +106,16 @@ public class IntermediateResultsBlock implements Block {
       @Nullable AggregationGroupByResult aggregationGroupByResults) {
     _aggregationFunctionContexts = aggregationFunctionContexts;
     _aggregationGroupByResult = aggregationGroupByResults;
+  }
+
+  /**
+   * Constructor for aggregation group-by order-by result with {@link AggregationGroupByResult}.
+   */
+  public IntermediateResultsBlock(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
+      @Nullable AggregationGroupByResult aggregationGroupByResults, DataSchema orderByDataSchema) {
+    _aggregationFunctionContexts = aggregationFunctionContexts;
+    _aggregationGroupByResult = aggregationGroupByResults;
+    _orderByDataSchema = orderByDataSchema;
   }
 
   /**
@@ -124,6 +136,11 @@ public class IntermediateResultsBlock implements Block {
   @Nullable
   public DataSchema getSelectionDataSchema() {
     return _selectionDataSchema;
+  }
+
+  @Nullable
+  public DataSchema getOrderByDataSchema() {
+    return _orderByDataSchema;
   }
 
   public void setSelectionDataSchema(@Nullable DataSchema dataSchema) {
@@ -287,26 +304,21 @@ public class IntermediateResultsBlock implements Block {
 
   @Nonnull
   private DataTable getAggregationGroupByOrderByResultDataTable() throws Exception {
-    int numAggregationFunctions = _aggregationFunctionContexts.length;
-    String[] columnNames = new String[numAggregationFunctions + 1];
-    columnNames[0] = "groupByKeyString";
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numAggregationFunctions + 1];
-    columnDataTypes[0] = DataSchema.ColumnDataType.STRING;
-    for (int i = 0; i < numAggregationFunctions; i++) {
-      AggregationFunctionContext aggregationFunctionContext = _aggregationFunctionContexts[i];
-      columnNames[i + 1] = aggregationFunctionContext.getAggregationColumnName();
-      columnDataTypes[i + 1] = aggregationFunctionContext.getAggregationFunction().getIntermediateResultColumnType();
-    }
 
     // Build the data table.
-    DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnDataTypes));
+    DataTableBuilder dataTableBuilder = new DataTableBuilder(_orderByDataSchema);
+
 
     for (GroupByRow groupByRow : _groupByOrderByResult) {
       dataTableBuilder.startRow();
-      dataTableBuilder.setColumn(0, groupByRow.getStringKey());
       Object[] aggregationResults = groupByRow.getAggregationResults();
-      for (int i = 0; i < aggregationResults.length; i++) {
-        dataTableBuilder.setColumn(i + 1, aggregationResults[i]); // TODO: handle dta types separately instead of having object?
+      String[] groupKey = groupByRow.getArrayKey();
+      int i = 0;
+      for (String key : groupKey) {
+        dataTableBuilder.setColumn(i++, key);
+      }
+      for (Object value : aggregationResults) {
+        dataTableBuilder.setColumn(i++, value);
       }
       dataTableBuilder.finishRow();
     }

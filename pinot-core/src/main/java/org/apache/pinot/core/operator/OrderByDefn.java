@@ -25,8 +25,11 @@ import java.util.Map;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+
+import static org.apache.pinot.common.utils.DataSchema.*;
 
 
 public class OrderByDefn {
@@ -34,35 +37,29 @@ public class OrderByDefn {
   private OrderType _orderType; // from group by key, or from aggregation results
   private int _index; // the index, among all the group by keys or aggregation results
   private boolean _ascending;
+  private ColumnDataType _columnDataType;
 
-  public OrderByDefn(OrderType orderType, int index, boolean ascending) {
+  public OrderByDefn(OrderType orderType, int index, boolean ascending, ColumnDataType columnDataType) {
     _orderType = orderType;
     _index = index;
     _ascending = ascending;
+    _columnDataType = columnDataType;
   }
 
   public OrderType getOrderType() {
     return _orderType;
   }
 
-  public void setOrderType(OrderType orderType) {
-    _orderType = orderType;
-  }
-
   public int getIndex() {
     return _index;
-  }
-
-  public void setIndex(int index) {
-    _index = index;
   }
 
   public boolean isAscending() {
     return _ascending;
   }
 
-  public void setAscending(boolean ascending) {
-    _ascending = ascending;
+  public ColumnDataType getColumnDataType() {
+    return _columnDataType;
   }
 
   @Override
@@ -78,7 +75,8 @@ public class OrderByDefn {
     OrderByDefn that = (OrderByDefn) o;
 
     return EqualityUtils.isEqual(_index, that._index) && EqualityUtils.isEqual(_orderType, that._orderType)
-        && EqualityUtils.isEqual(_ascending, that._ascending);
+        && EqualityUtils.isEqual(_ascending, that._ascending) && EqualityUtils.isEqual(_columnDataType,
+        that._columnDataType);
   }
 
   @Override
@@ -86,6 +84,7 @@ public class OrderByDefn {
     int result = EqualityUtils.hashCodeOf(_orderType);
     result = EqualityUtils.hashCodeOf(result, _index);
     result = EqualityUtils.hashCodeOf(result, _ascending);
+    result = EqualityUtils.hashCodeOf(result, _columnDataType);
     return result;
   }
 
@@ -94,7 +93,7 @@ public class OrderByDefn {
   }
 
   public static List<OrderByDefn> getOrderByDefnsFromBrokerRequest(List<SelectionSort> orderByClause, GroupBy groupBy,
-      List<AggregationInfo> aggregationInfos) {
+      List<AggregationInfo> aggregationInfos, DataSchema dataSchema) {
     List<OrderByDefn> orderByDefns = new ArrayList<>(orderByClause.size());
 
     Map<String, Integer> groupByColumnToIndex = new HashMap<>(groupBy.getExpressionsSize());
@@ -107,17 +106,25 @@ public class OrderByDefn {
     index = 0;
     for (AggregationInfo aggregationInfo : aggregationInfos) {
       aggregationColumnToIndex.put(
-          aggregationInfo.getAggregationType().toLowerCase() + "(" + AggregationFunctionUtils.getColumn(aggregationInfo) + ")",
-          index++);
+          aggregationInfo.getAggregationType().toLowerCase() + "(" + AggregationFunctionUtils.getColumn(aggregationInfo)
+              + ")", index++);
+    }
+
+    Map<String, ColumnDataType> columnDataTypeMap = new HashMap<>(dataSchema.size());
+    for (int i = 0; i < dataSchema.size(); i++) {
+      columnDataTypeMap.put(dataSchema.getColumnName(i), dataSchema.getColumnDataType(i));
     }
 
     for (SelectionSort orderBy : orderByClause) {
       boolean isAsc = orderBy.isIsAsc();
       String column = orderBy.getColumn();
+      ColumnDataType columnDataType = columnDataTypeMap.get(column);
       if (groupByColumnToIndex.containsKey(column)) {
-        orderByDefns.add(new OrderByDefn(OrderType.GROUP_BY_KEY, groupByColumnToIndex.get(column), isAsc));
+        orderByDefns.add(
+            new OrderByDefn(OrderType.GROUP_BY_KEY, groupByColumnToIndex.get(column), isAsc, columnDataType));
       } else if (aggregationColumnToIndex.containsKey(column)) {
-        orderByDefns.add(new OrderByDefn(OrderType.AGGREGATION_VALUE, aggregationColumnToIndex.get(column), isAsc));
+        orderByDefns.add(
+            new OrderByDefn(OrderType.AGGREGATION_VALUE, aggregationColumnToIndex.get(column), isAsc, columnDataType));
       } else {
         throw new UnsupportedOperationException(
             "Currently only support order by on group by columns or aggregations, already in query");

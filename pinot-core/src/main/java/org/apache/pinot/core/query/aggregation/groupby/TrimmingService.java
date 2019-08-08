@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.MinMaxPriorityQueue;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.PriorityBlockingQueue;
 import org.apache.pinot.core.operator.GroupByRow;
 import org.apache.pinot.core.operator.OrderByDefn;
 import org.apache.pinot.core.operator.OrderByExecutor;
@@ -33,37 +36,22 @@ public class TrimmingService {
 
   private int _trimSize;
   private int _trimThreshold;
-  private List<OrderByDefn> _orderByDefns = null;
 
-  public TrimmingService(int interSegmentNumGroupsLimit, long topN, List<OrderByDefn> orderByDefns) {
+  public TrimmingService(int interSegmentNumGroupsLimit, long topN) {
     _trimSize = Math.max(Math.min(interSegmentNumGroupsLimit, (int) topN) * 5, 5000);
     _trimThreshold = _trimSize * 4;
-    _orderByDefns = orderByDefns;
   }
 
-  public List<GroupByRow> trim(List<GroupByRow> groupByRows) {
+  public List<GroupByRow> trim(PriorityBlockingQueue<GroupByRow> priorityQueue) {
 
     // within threshold, no need to trim
-    if (groupByRows.size() <= _trimThreshold) {
-      return groupByRows;
+    if (priorityQueue.size() <= _trimThreshold) {
+      return Lists.newArrayList(priorityQueue);
     }
 
-    // greater than trim threshold, needs trimming
-    List<GroupByRow> trimmedRows = new ArrayList<>();
-    if (_orderByDefns != null) {
-      // if order by, sort by that order
-      OrderByExecutor orderByExecutor = new OrderByExecutor();
-      Comparator<GroupByRow> comparator = orderByExecutor.getComparator(_orderByDefns);
-
-      MinMaxPriorityQueue<GroupByRow> priorityQueue =
-          MinMaxPriorityQueue.orderedBy(comparator).maximumSize(_trimSize).create();
-      for (GroupByRow row : groupByRows) {
-        priorityQueue.add(row);
-      }
-      trimmedRows.addAll(priorityQueue);
-    } else {
-      trimmedRows = groupByRows.subList(0, _trimSize);
+    while (priorityQueue.size() > _trimSize) {
+      priorityQueue.remove();
     }
-    return trimmedRows;
+    return Lists.newArrayList(priorityQueue);
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator;
 
+import com.google.common.base.Joiner;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 
@@ -33,28 +34,22 @@ public class GroupByRow {
     _aggregationResults = aggregationResults;
   }
 
-  public String[] getArrayKey() {
-    return _arrayKey;
+  public GroupByRow(String[] arrayKey, Object[] aggregationResults) {
+    _stringKey = Joiner.on("\t").join(arrayKey);
+    _arrayKey = arrayKey;
+    _aggregationResults = aggregationResults;
   }
 
-  public void setArrayKey(String[] arrayKey) {
-    _arrayKey = arrayKey;
+  public String[] getArrayKey() {
+    return _arrayKey;
   }
 
   public Object[] getAggregationResults() {
     return _aggregationResults;
   }
 
-  public void setAggregationResults(Object[] aggregationResults) {
-    _aggregationResults = aggregationResults;
-  }
-
   public String getStringKey() {
     return _stringKey;
-  }
-
-  public void setStringKey(String stringKey) {
-    _stringKey = stringKey;
   }
 
   public void merge(GroupByRow rowToMerge, AggregationFunction[] aggregationFunctions, int numAggregationFunctions) {

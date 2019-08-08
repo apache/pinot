@@ -424,16 +424,25 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       List<AggregationInfo> aggregationInfos, List<SelectionSort> orderByClause, GroupBy groupBy, boolean preserveType) {
 
     Map<String, GroupByRow> groupByRowsMap = new HashMap<>();
+    DataSchema dataSchema = null;
     for (DataTable dataTable : dataTableMap.values()) {
+      if (dataSchema == null) {
+        dataSchema = dataTable.getDataSchema();
+      }
       for (int rowId = 0; rowId < dataTable.getNumberOfRows(); rowId ++) {
-        String stringKey = dataTable.getString(rowId, 0);
+        String[] groupKey = new String[groupBy.getExpressionsSize()];
         Object[] results = new Object[aggregationFunctions.length];
-        for (int i = 0; i < aggregationFunctions.length; i ++) {
-          results[i] = dataTable.getObject(rowId, i + 1);
-        }
-        GroupByRow groupByRow = new GroupByRow(stringKey, results);
 
-        groupByRowsMap.compute(stringKey, (key, value) -> {
+        int index = 0;
+        for (int i = 0; i < groupBy.getExpressionsSize(); i ++) {
+          groupKey[i] = dataTable.getString(rowId, index++);
+        }
+        for (int i = 0; i < aggregationFunctions.length; i ++) {
+          results[i] = dataTable.getObject(rowId, index++);
+        }
+        GroupByRow groupByRow = new GroupByRow(groupKey, results);
+
+        groupByRowsMap.compute(groupByRow.getStringKey(), (key, value) -> {
           if (value == null) {
             return groupByRow;
           } else {
@@ -447,7 +456,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
     OrderByExecutor orderByExecutor = new OrderByExecutor();
     List<OrderByDefn> orderByDefns =
-        OrderByDefn.getOrderByDefnsFromBrokerRequest(orderByClause, groupBy, aggregationInfos);
+        OrderByDefn.getOrderByDefnsFromBrokerRequest(orderByClause, groupBy, aggregationInfos, dataSchema);
     orderByExecutor.sort(groupByRows, orderByDefns);
 
     int numRows = Math.min((int) groupBy.getTopN(), groupByRows.size());
