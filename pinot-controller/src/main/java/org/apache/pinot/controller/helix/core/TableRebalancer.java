@@ -564,19 +564,13 @@ public class TableRebalancer {
 
       // now do the reverse comparison
       // if a server had lost a segment as part of rebalancing (implying ideal state no
-      // longer has that server for the particular segment) then one of the following should
-      // be true in external view
-      // (1) either the server is no longer present for that segment in external view as well OR
-      // (2) the server has state DROPPED for that segment in external view
-      // if none of the above conditions is true, it implies that external view still hasn't converged.
+      // longer has that server for the particular segment) then the server should
+      // no longer present for that segment in external view as well
       for (String server : hostAndStatesInExternalView.keySet()) {
         if (!hostAndStatesInIdealState.containsKey(server)) {
-          if (hostAndStatesInExternalView.containsKey(server) &&
-              !hostAndStatesInExternalView.get(server).equalsIgnoreCase("dropped")) {
             stable = false;
-            LOGGER.info("Server {} has not yet dropped segment {} in external view", server, segment);
+            LOGGER.info("Server {} for segment {} should not be present in external view", server, segment);
           }
-        }
       }
     }
 
