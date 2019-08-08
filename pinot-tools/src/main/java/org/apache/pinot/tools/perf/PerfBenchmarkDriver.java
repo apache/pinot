@@ -38,7 +38,12 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.helix.HelixManager;
+import org.apache.helix.HelixManagerFactory;
+import org.apache.helix.InstanceType;
+import org.apache.helix.examples.MasterSlaveStateModelFactory;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
+import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.tools.ClusterVerifiers.StrictMatchExternalViewVerifier;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.config.TableConfig;
@@ -252,7 +257,8 @@ public class PerfBenchmarkDriver {
       ControllerConf controllerConf = getControllerConf();
       controllerConf.setControllerPort(Integer.toString(_conf.getControllerPort() + 1));
       _helixResourceManager = new PinotHelixResourceManager(controllerConf);
-      _helixResourceManager.start();
+      HelixManager helixManager = registerAndConnectAsHelixSpectator(controllerConf);
+      _helixResourceManager.start(helixManager);
     }
 
     // Create server tenants if required
@@ -267,6 +273,25 @@ public class PerfBenchmarkDriver {
     if (_conf.shouldStartBroker()) {
       Tenant brokerTenant = new TenantBuilder(_brokerTenantName).setRole(TenantRole.BROKER).setTotalInstances(1).build();
       _helixResourceManager.createBrokerTenant(brokerTenant);
+    }
+  }
+
+  /**
+   * Register and connect to Helix cluster as Spectator role.
+   */
+  private HelixManager registerAndConnectAsHelixSpectator(ControllerConf controllerConf) {
+    String instanceId = controllerConf.getControllerHost() + "_" + controllerConf.getControllerPort();
+
+    HelixManager helixManager =
+        HelixManagerFactory.getZKHelixManager(_clusterName, instanceId, InstanceType.SPECTATOR, _zkAddress);
+
+    try {
+      helixManager.connect();
+      return helixManager;
+    } catch (Exception e) {
+      String errorMsg = String.format("Exception when connecting the instance %s as Participant to Helix.", instanceId);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg);
     }
   }
 

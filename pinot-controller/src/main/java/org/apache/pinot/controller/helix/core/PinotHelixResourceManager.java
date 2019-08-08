@@ -168,8 +168,8 @@ public class PinotHelixResourceManager {
   /**
    * Create Helix cluster if needed, and then start a Pinot controller instance.
    */
-  public synchronized void start() {
-    _helixZkManager = registerAndConnectAsHelixParticipant();
+  public synchronized void start(HelixManager helixZkManager) {
+    _helixZkManager = helixZkManager;
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     _propertyStore = _helixZkManager.getHelixPropertyStore();
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
@@ -252,28 +252,6 @@ public class PinotHelixResourceManager {
    */
   public ZkHelixPropertyStore<ZNRecord> getPropertyStore() {
     return _propertyStore;
-  }
-
-  /**
-   * Register and connect to Helix cluster as PARTICIPANT role.
-   */
-  private HelixManager registerAndConnectAsHelixParticipant() {
-    HelixManager helixManager =
-        HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _helixZkURL);
-
-    // Registers Master-Slave state model to state machine engine, which is for calculating participant assignment in lead controller resource.
-    helixManager.getStateMachineEngine()
-        .registerStateModelFactory(MasterSlaveSMD.name, new MasterSlaveStateModelFactory());
-
-    try {
-      helixManager.connect();
-      return helixManager;
-    } catch (Exception e) {
-      String errorMsg =
-          String.format("Exception when connecting the instance %s as Participant to Helix.", _instanceId);
-      LOGGER.error(errorMsg, e);
-      throw new RuntimeException(errorMsg);
-    }
   }
 
   /**
