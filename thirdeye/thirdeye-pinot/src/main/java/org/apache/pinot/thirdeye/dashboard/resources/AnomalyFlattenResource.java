@@ -38,6 +38,7 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import org.apache.commons.collections4.map.ListOrderedMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
 import org.apache.pinot.thirdeye.api.Constants;
@@ -127,6 +128,15 @@ public class AnomalyFlattenResource {
     return reformatDataFrameAndAnomalies(metricDataFrame, anomalies, dimensionKeys);
   }
 
+  /**
+   * Return a Future thread with aggregated metric value as return
+   * @param aggregationLoader an aggregation loader
+   * @param metricId the metric id
+   * @param start the start time in epoch time
+   * @param end the end time in epoch time
+   * @param dimensionKeys the list of dimension keys
+   * @return a Future thread with aggregated metric value
+   */
   private Future<DataFrame> fetchAggregatedMetric(AggregationLoader aggregationLoader, long metricId, long start,
       long end, List<String> dimensionKeys) {
     return executor.submit(() -> {
@@ -170,7 +180,7 @@ public class AnomalyFlattenResource {
     }
 
     for (DimensionMap dimensionMap : metricValues.keySet()) {
-      Map<String, Object> resultMap = new HashMap<>();
+      Map<String, Object> resultMap = new ListOrderedMap<>();
       for (String key : dimensionMap.keySet()) {
         resultMap.put(key, dimensionMap.get(key));
       }
