@@ -26,8 +26,6 @@ import java.util.Map;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.dashboard.resources.AnomalyFlattenResource;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
-import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
-import org.apache.pinot.thirdeye.dataframe.StringSeries;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
@@ -140,12 +138,6 @@ public class TestAnomalyFlattenResource {
   }
 
   private DataFrame mockDataFrame() {
-    StringSeries what = StringSeries.buildFrom("a", "e");
-    StringSeries where = StringSeries.buildFrom("b", "f");
-    StringSeries when = StringSeries.buildFrom("c", "g");
-    StringSeries how = StringSeries.buildFrom("d", "h");
-    DoubleSeries value = DoubleSeries.buildFrom(0.1d, 0.2d);
-
     return DataFrame.builder("what", "where", "when", "how", "value")
         .append("a", "b", "c", "d", 0.1d).append("e", "f", "g", "h", 0.2d).build();
   }

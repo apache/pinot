@@ -23,9 +23,7 @@ import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
-import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -35,7 +33,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -86,26 +83,24 @@ public class AnomalyFlattenResource {
 
   /**
    * Returns a list of formatted metric values and anomaly comments for UI to generate a table
-   * @param metricIdStr a string of metric ids separated by comma
+   * @param metricIds a list of metric ids
    * @param start start time in epoc milliseconds
    * @param end end time in epoc milliseconds
-   * @param dimensionStrings a list of keys in dimensions joined by comma
+   * @param dimensionKeys a list of keys in dimensions
    * @return a list of formatted metric info and anomaly comments
    */
   @GET
   @ApiOperation(value = "View a collection of metrics and anonalies feedback in a list of maps")
   @Produces("Application/json")
   public List<Map<String, Object>> listDimensionValues(
-      @ApiParam("metric config id") @NotNull @QueryParam("metricIds") String metricIdStr,
+      @ApiParam("metric config id") @NotNull @QueryParam("metricIds") List<Long> metricIds,
       @ApiParam("start time for anomalies") @QueryParam("start") long start,
       @ApiParam("end time for anomalies") @QueryParam("end") long end,
-      @ApiParam("dimension keys") @NotNull @QueryParam("dimensionKeys") String dimensionStrings) throws Exception {
-    Preconditions.checkArgument(StringUtils.isNotBlank(metricIdStr));
-    List<String> dimensionKeys = Arrays.asList(dimensionStrings.split(","));
+      @ApiParam("dimension keys") @NotNull @QueryParam("dimensionKeys") List<String> dimensionKeys) throws Exception {
+    Preconditions.checkArgument(!metricIds.isEmpty());
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     List<MetricConfigDTO> metrics = new ArrayList<>();
-    for (String metricId : metricIdStr.split(",")) {
-      long id = Long.valueOf(metricId);
+    for (long id : metricIds) {
       metrics.add(metricConfigDAO.findById(id));
       anomalies.addAll(mergedAnomalyResultDAO.findAnomaliesByMetricIdAndTimeRange(id, start, end));
     }
@@ -180,6 +175,7 @@ public class AnomalyFlattenResource {
         resultMap.put(key, dimensionMap.get(key));
       }
       for (String metric : metrics) {
+        resultMap.put(metric, metricValues.get(dimensionMap).getOrDefault(metric, Double.NaN));
         if (metricValues.containsKey(dimensionMap)) {
           resultMap.put(metric, metricValues.get(dimensionMap).getOrDefault(metric, Double.NaN));
         } else {
