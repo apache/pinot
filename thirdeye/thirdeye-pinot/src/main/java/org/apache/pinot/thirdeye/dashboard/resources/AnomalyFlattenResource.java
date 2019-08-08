@@ -23,12 +23,19 @@ import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -51,8 +58,7 @@ import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
 
 
 /**
- * Flatten the anomaly results for UI purpose.
- * Convert a list of anomalies to rows of columns so that UI can directly convert the anomalies to table
+ * Provide a table combining metrics data and anomaly feedback for UI representation
  */
 @Path("thirdeye/table")
 @Api(tags = {Constants.ANOMALY_TAG})
@@ -60,16 +66,21 @@ public class AnomalyFlattenResource {
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
   private final MetricConfigManager metricConfigDAO;
   private final DatasetConfigManager datasetConfgDAO;
-  public static final String ANOMALY_ID = "anomalyId";
+
+  private final ExecutorService executor;
+
   public static final String ANOMALY_COMMENT = "comment";
   private static final String DATAFRAME_VALUE = "value";
   private static final String DEFAULT_COMMENT_FORMAT = "#%d is %s";
+  private static final int DEFAULT_THREAD_POOLS_SIZE = 5;
+  private static final long DEFAULT_TIME_OUT_IN_MINUTES = 1;
 
   public AnomalyFlattenResource(MergedAnomalyResultManager mergedAnomalyResultDAO, DatasetConfigManager datasetConfgDAO,
       MetricConfigManager metricConfigDAO) {
     this.mergedAnomalyResultDAO = mergedAnomalyResultDAO;
     this.datasetConfgDAO = datasetConfgDAO;
     this.metricConfigDAO = metricConfigDAO;
+    this.executor = Executors.newFixedThreadPool(DEFAULT_THREAD_POOLS_SIZE);
   }
 
 
@@ -82,7 +93,7 @@ public class AnomalyFlattenResource {
    * @return a list of formatted metric info and anomaly comments
    */
   @GET
-  @ApiOperation(value = "View a flatted merged anomalies for collection")
+  @ApiOperation(value = "View a collection of metrics and anonalies feedback in a list of maps")
   @Produces("Application/json")
   public List<Map<String, Object>> listDimensionValues(
       @ApiParam("metric config id") @NotNull @QueryParam("metricIds") String metricIdStr,
@@ -106,13 +117,33 @@ public class AnomalyFlattenResource {
             ThirdEyeCacheRegistry.getInstance().getQueryCache(),
             ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
 
-    for (MetricConfigDTO metricDTO : metrics) {
-      MetricSlice metricSlice = MetricSlice.from(metricDTO.getId(), start, end);
-      DataFrame dataFrame = aggregationLoader.loadAggregate(metricSlice, dimensionKeys, -1);
-      metricDataFrame.put(metricDTO.getName(), dataFrame);
+    Map<String, Future<DataFrame>> futureMap = new HashMap<String, Future<DataFrame>>() {{
+      for (MetricConfigDTO metricDTO : metrics) {
+        Future<DataFrame> future = fetchAggregatedMetric(aggregationLoader, metricDTO.getId(), start, end,
+            dimensionKeys);
+        put(metricDTO.getName(), future);
+      }
+    }};
+    for (String metric : futureMap.keySet()) {
+      Future<DataFrame> future = futureMap.get(metric);
+      metricDataFrame.put(metric, future.get(DEFAULT_TIME_OUT_IN_MINUTES, TimeUnit.MINUTES));
     }
 
     return reformatDataFrameAndAnomalies(metricDataFrame, anomalies, dimensionKeys);
+  }
+
+  private Future<DataFrame> fetchAggregatedMetric(AggregationLoader aggregationLoader, long metricId, long start,
+      long end, List<String> dimensionKeys) {
+    return executor.submit(() -> {
+      MetricSlice metricSlice = MetricSlice.from(metricId, start, end);
+      DataFrame resultDataFrame = null;
+      try {
+        resultDataFrame = aggregationLoader.loadAggregate(metricSlice, dimensionKeys, -1);
+      } catch (Exception e) {
+        throw new ExecutionException(e);
+      }
+      return resultDataFrame;
+    });
   }
 
   /**
