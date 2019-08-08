@@ -60,7 +60,6 @@ import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
 import org.apache.pinot.core.util.ReplicationUtils;
 import org.slf4j.LoggerFactory;
@@ -207,33 +206,35 @@ public class PinotTableRestletResource {
       if (stateStr == null) {
         return listTableConfigs(tableName, tableTypeStr);
       }
-      Constants.validateState(stateStr);
+
+      StateType stateType = Constants.validateState(stateStr);
+      TableType tableType = Constants.validateTableType(tableTypeStr);
+
       ArrayNode ret = JsonUtils.newArrayNode();
       boolean tableExists = false;
 
-      if ((tableTypeStr == null || CommonConstants.Helix.TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
-          && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
+      if (tableType != TableType.REALTIME && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
         String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
         ObjectNode offline = JsonUtils.newObjectNode();
         tableExists = true;
 
         offline.put(FileUploadPathProvider.TABLE_NAME, offlineTableName);
         offline.set(FileUploadPathProvider.STATE,
-            JsonUtils.objectToJsonNode(toggleTableState(offlineTableName, stateStr)));
+            JsonUtils.objectToJsonNode(_pinotHelixResourceManager.toggleTableState(offlineTableName, stateType)));
         ret.add(offline);
       }
 
-      if ((tableTypeStr == null || CommonConstants.Helix.TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr))
-          && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-        String realTimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-        ObjectNode realTime = JsonUtils.newObjectNode();
+      if (tableType != TableType.OFFLINE && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+        String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+        ObjectNode realtime = JsonUtils.newObjectNode();
         tableExists = true;
 
-        realTime.put(FileUploadPathProvider.TABLE_NAME, realTimeTableName);
-        realTime.set(FileUploadPathProvider.STATE,
-            JsonUtils.objectToJsonNode(toggleTableState(realTimeTableName, stateStr)));
-        ret.add(realTime);
+        realtime.put(FileUploadPathProvider.TABLE_NAME, realtimeTableName);
+        realtime.set(FileUploadPathProvider.STATE,
+            JsonUtils.objectToJsonNode(_pinotHelixResourceManager.toggleTableState(realtimeTableName, stateType)));
+        ret.add(realtime);
       }
+
       if (tableExists) {
         return ret.toString();
       } else {
@@ -252,19 +253,19 @@ public class PinotTableRestletResource {
   public SuccessResponse deleteTable(
       @ApiParam(value = "Name of the table to delete", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+
     List<String> tablesDeleted = new LinkedList<>();
     try {
-      if ((tableTypeStr == null || tableTypeStr.equalsIgnoreCase(CommonConstants.Helix.TableType.OFFLINE.name()))
-          && !TableNameBuilder.REALTIME.tableHasTypeSuffix(tableName)) {
+      if (tableType != TableType.REALTIME && !TableNameBuilder.REALTIME.tableHasTypeSuffix(tableName)) {
         _pinotHelixResourceManager.deleteOfflineTable(tableName);
         tablesDeleted.add(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
       }
-      if ((tableTypeStr == null || tableTypeStr.equalsIgnoreCase(CommonConstants.Helix.TableType.REALTIME.name()))
-          && !TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableName)) {
+      if (tableType != TableType.OFFLINE && !TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableName)) {
         _pinotHelixResourceManager.deleteRealtimeTable(tableName);
         tablesDeleted.add(TableNameBuilder.REALTIME.tableNameWithType(tableName));
       }
-      return new SuccessResponse("Table deleted " + tablesDeleted);
+      return new SuccessResponse("Tables: " + tablesDeleted + " deleted");
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
@@ -332,21 +333,6 @@ public class PinotTableRestletResource {
       return tableConfigValidateStr.toString();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
-    }
-  }
-
-  // TODO: move this method into PinotHelixResourceManager
-  private PinotResourceManagerResponse toggleTableState(String tableName, String state) {
-    if (StateType.ENABLE.name().equalsIgnoreCase(state)) {
-      return _pinotHelixResourceManager.toggleTableState(tableName, true);
-    } else if (StateType.DISABLE.name().equalsIgnoreCase(state)) {
-      return _pinotHelixResourceManager.toggleTableState(tableName, false);
-    } else if (StateType.DROP.name().equalsIgnoreCase(state)) {
-      return _pinotHelixResourceManager.dropTable(tableName);
-    } else {
-      String errorMessage = "Invalid state: " + state + ", must be one of {enable|disable|drop}";
-      LOGGER.info(errorMessage);
-      return PinotResourceManagerResponse.failure(errorMessage);
     }
   }
 
@@ -462,14 +448,10 @@ public class PinotTableRestletResource {
   public String rebalance(
       @ApiParam(value = "Name of the table to rebalance") @Nonnull @PathParam("tableName") String tableName,
       @ApiParam(value = "offline|realtime") @Nonnull @QueryParam("type") String tableType,
-      @ApiParam(value = "true if rebalancer should be run in dryRun mode, false otherwise")
-      @Nonnull @DefaultValue("true") @QueryParam("dryrun") Boolean dryRun,
-      @ApiParam(value = "true if consuming segments should be considered for rebalancing realtime tables, false otherwise")
-      @DefaultValue("false") @QueryParam("includeConsuming") Boolean includeConsuming,
-      @ApiParam(value = "true if downtime is acceptable during rebalance, false otherwise")
-      @DefaultValue("false") @QueryParam("downtime") Boolean downtime,
-      @ApiParam(value = "minimum number of replicas to keep alive during rebalance(if downtime is false)")
-      @DefaultValue("1") @QueryParam("minAvailableReplicas") Integer minAvailableReplicas) {
+      @ApiParam(value = "true if rebalancer should be run in dryRun mode, false otherwise") @Nonnull @DefaultValue("true") @QueryParam("dryrun") Boolean dryRun,
+      @ApiParam(value = "true if consuming segments should be considered for rebalancing realtime tables, false otherwise") @DefaultValue("false") @QueryParam("includeConsuming") Boolean includeConsuming,
+      @ApiParam(value = "true if downtime is acceptable during rebalance, false otherwise") @DefaultValue("false") @QueryParam("downtime") Boolean downtime,
+      @ApiParam(value = "minimum number of replicas to keep alive during rebalance(if downtime is false)") @DefaultValue("1") @QueryParam("minAvailableReplicas") Integer minAvailableReplicas) {
 
     if (tableType != null && !EnumUtils.isValidEnum(CommonConstants.Helix.TableType.class, tableType.toUpperCase())) {
       throw new ControllerApplicationException(LOGGER, "Illegal table type " + tableType, Response.Status.BAD_REQUEST);
@@ -507,8 +489,7 @@ public class PinotTableRestletResource {
           }
         });
         result = new RebalanceResult();
-        result
-            .setStatus("Rebalance for table " + tableName + " in progress. Check controller logs for updates.");
+        result.setStatus("Rebalance for table " + tableName + " in progress. Check controller logs for updates.");
       }
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
