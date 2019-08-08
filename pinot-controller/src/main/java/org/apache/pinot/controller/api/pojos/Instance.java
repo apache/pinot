@@ -29,6 +29,8 @@ import org.apache.pinot.common.utils.CommonConstants;
  */
 //@Example("{\n" + "\t\"host\": \"hostname.example.com\",\n" + "\t\"port\": \"1234\",\n" + "\t\"type\": \"server\"\n" + "}")
 public class Instance {
+  public static final String POOL_KEY = "pool";
+
   private final String _host;
   private final String _port;
   private final String _type;

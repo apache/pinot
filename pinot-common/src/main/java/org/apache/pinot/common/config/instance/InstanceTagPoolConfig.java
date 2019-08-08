@@ -37,11 +37,11 @@ public class InstanceTagPoolConfig {
   private boolean _poolBased;
 
   @ConfigKey("numPools")
-  @ConfigDoc("Number of pools to select for pool based selection, contradict to pools")
+  @ConfigDoc("Number of pools to select for pool based selection, contradict to pools, select all pools if neither of them are specified")
   private int _numPools;
 
   @ConfigKey("pools")
-  @ConfigDoc("Pools to select for pool based selection, contradict to numPools")
+  @ConfigDoc("Pools to select for pool based selection, contradict to numPools, select all pools if neither of them are specified")
   private List<Integer> _pools;
 
   @JsonProperty

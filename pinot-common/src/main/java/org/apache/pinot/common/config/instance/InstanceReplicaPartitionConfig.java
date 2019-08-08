@@ -32,24 +32,24 @@ public class InstanceReplicaPartitionConfig {
   private boolean _replicaGroupBased;
 
   @ConfigKey("numServers")
-  @ConfigDoc("Number of servers to select for non-replica-group based selection, select all servers if not specified")
-  private int _numServers;
+  @ConfigDoc("Number of instances to select for non-replica-group based selection, select all instances if not specified")
+  private int _numInstances;
 
   @ConfigKey("numReplicas")
   @ConfigDoc("Number of replicas (replica-groups) for replica-group based selection")
   private int _numReplicas;
 
   @ConfigKey("numServersPerReplica")
-  @ConfigDoc("Number of servers per replica (replica-group) for replica-group based selection, select all servers if not specified")
-  private int _numServersPerReplica;
+  @ConfigDoc("Number of instances per replica for replica-group based selection, select as many instances as possible if not specified")
+  private int _numInstancesPerReplica;
 
   @ConfigKey("numPartitions")
   @ConfigDoc("Number of partitions for replica-group based selection, do not partition the replica-group (1 partition) if not specified")
   private int _numPartitions;
 
   @ConfigKey("numServersPerPartition")
-  @ConfigDoc("Number of servers per partition (within a replica) for replica-group based selection, select all servers if not specified")
-  private int _numServersPerPartition;
+  @ConfigDoc("Number of instances per partition (within a replica) for replica-group based selection, select all instances if not specified")
+  private int _numInstancesPerPartition;
 
   @JsonProperty
   public boolean isReplicaGroupBased() {
@@ -62,13 +62,13 @@ public class InstanceReplicaPartitionConfig {
   }
 
   @JsonProperty
-  public int getNumServers() {
-    return _numServers;
+  public int getNumInstances() {
+    return _numInstances;
   }
 
   @JsonProperty
-  public void setNumServers(int numServers) {
-    _numServers = numServers;
+  public void setNumInstances(int numInstances) {
+    _numInstances = numInstances;
   }
 
   @JsonProperty
@@ -82,13 +82,13 @@ public class InstanceReplicaPartitionConfig {
   }
 
   @JsonProperty
-  public int getNumServersPerReplica() {
-    return _numServersPerReplica;
+  public int getNumInstancesPerReplica() {
+    return _numInstancesPerReplica;
   }
 
   @JsonProperty
-  public void setNumServersPerReplica(int numServersPerReplica) {
-    _numServersPerReplica = numServersPerReplica;
+  public void setNumInstancesPerReplica(int numInstancesPerReplica) {
+    _numInstancesPerReplica = numInstancesPerReplica;
   }
 
   @JsonProperty
@@ -102,12 +102,12 @@ public class InstanceReplicaPartitionConfig {
   }
 
   @JsonProperty
-  public int getNumServersPerPartition() {
-    return _numServersPerPartition;
+  public int getNumInstancesPerPartition() {
+    return _numInstancesPerPartition;
   }
 
   @JsonProperty
-  public void setNumServersPerPartition(int numServersPerPartition) {
-    _numServersPerPartition = numServersPerPartition;
+  public void setNumInstancesPerPartition(int numInstancesPerPartition) {
+    _numInstancesPerPartition = numInstancesPerPartition;
   }
 }
