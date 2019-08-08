@@ -103,10 +103,7 @@ export function humanizeScore(f) {
  * Helps with shorthand for repetitive date generation
  */
 export function buildDateEod(unit, type) {
-  if (unit === 1) {
-    return makeTime().startOf('day');
-  }
-  return makeTime().subtract(unit-1, type).startOf('day');
+  return makeTime().subtract(unit, type).startOf('day');
 }
 
 /**
