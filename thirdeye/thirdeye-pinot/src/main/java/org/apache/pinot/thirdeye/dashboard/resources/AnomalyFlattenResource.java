@@ -185,12 +185,7 @@ public class AnomalyFlattenResource {
         resultMap.put(key, dimensionMap.get(key));
       }
       for (String metric : metrics) {
-        resultMap.put(metric, metricValues.get(dimensionMap).getOrDefault(metric, Double.NaN));
-        if (metricValues.containsKey(dimensionMap)) {
-          resultMap.put(metric, metricValues.get(dimensionMap).getOrDefault(metric, Double.NaN));
-        } else {
-          resultMap.put(metric, Double.NaN);
-        }
+        resultMap.put(metric, metricValues.getOrDefault(dimensionMap, Collections.emptyMap()).getOrDefault(metric, Double.NaN));
       }
       Map<Long, String> comment = Collections.emptyMap();
       if (anomalyCommentMap.containsKey(dimensionMap)) {
