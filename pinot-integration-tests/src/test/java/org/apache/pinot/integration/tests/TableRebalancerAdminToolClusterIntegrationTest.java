@@ -19,11 +19,8 @@
 package org.apache.pinot.integration.tests;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import jdk.nashorn.internal.ir.annotations.Ignore;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -47,7 +44,6 @@ import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.core.TableRebalancer;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.starter.helix.SegmentOnlineOfflineStateModelFactory;
 import org.apache.pinot.tools.PinotTableRebalancer;
 import org.testng.Assert;

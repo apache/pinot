@@ -153,10 +153,22 @@ public class TableRebalancer {
     long retryDelayMs = 60000; // 1 min
     int retries = 0;
     LOGGER.info("Start rebalancing table :{}", tableNameWithType);
+    boolean fetchIdealState = false;
+    final long cTime = previousIdealState.getStat().getCreationTime();
+    final long ephOwner = previousIdealState.getStat().getEphemeralOwner();
     while (true) {
-      IdealState currentIdealState = dataAccessor.getProperty(idealStateKey);
+      // fetch the ideal state from ZK only if
+      // (1) this the first entry in loop or
+      // (2) in the previous iteration, we failed to write the udpated (after moving segments)
+      // ideal state to ZK
+      IdealState currentIdealState = fetchIdealState ? dataAccessor.getProperty(idealStateKey) : previousIdealState;
+      int version = previousIdealState.getStat().getVersion();
 
-      if (targetIdealState == null || !EqualityUtils.isEqual(previousIdealState, currentIdealState)) {
+      if (targetIdealState == null || fetchIdealState) {
+        // compute the target ideal state only if:
+        // (1) this is the first entry in loop (in which case target is null) or
+        // (2) in the previous iteration, we failed to write the updated (after moving segments)
+        // ideal state to ZK
         LOGGER.info("Computing target ideal state for table {}", tableNameWithType);
         // we need to recompute target state
         // Make a copy of the the idealState above to pass it to the rebalancer
@@ -182,25 +194,39 @@ public class TableRebalancer {
 
       // if ideal state needs to change, get the next 'safe' state (based on whether downtime is OK or not)
       final int currentMovements = _rebalancerStats.numSegmentMoves;
-      IdealState nextIdealState = getNextState(currentIdealState, targetIdealState, downtime, minAvailableReplicas);
-      LOGGER.info("Got new ideal state after doing {} segment movements. Will attempt to persist this in ZK. Logging the difference (if any) between new and target ideal state",
+      IdealState updatedIdealState = getNextState(currentIdealState, targetIdealState, downtime, minAvailableReplicas);
+      LOGGER.info("Got updated ideal state after doing {} segment movements. Will attempt to persist this in ZK. Logging the difference (if any) between new and target ideal state",
           _rebalancerStats.numSegmentMoves - currentMovements);
-      printIdealStateDifference(targetIdealState, nextIdealState);
+      printIdealStateDifference(targetIdealState, updatedIdealState);
 
       // If the ideal state is large enough, enable compression
-      if (HelixHelper.MAX_PARTITION_COUNT_IN_UNCOMPRESSED_IDEAL_STATE < nextIdealState.getPartitionSet().size()) {
-        nextIdealState.getRecord().setBooleanField("enableCompression", true);
+      if (HelixHelper.MAX_PARTITION_COUNT_IN_UNCOMPRESSED_IDEAL_STATE < updatedIdealState.getPartitionSet().size()) {
+        updatedIdealState.getRecord().setBooleanField("enableCompression", true);
       }
+
+      // bump version and mTime as we will write updatedIdealState in ZK
+      // and if that goes through, we won't fetch ideal state again from ZK
+      // in next iteration
+      final long mTime = System.currentTimeMillis();
+      updatedIdealState.getRecord().setVersion(version + 1);
+      updatedIdealState.getStat().setVersion(version + 1);
+      updatedIdealState.getRecord().setModifiedTime(mTime);
+      updatedIdealState.getStat().setModifiedTime(mTime);
+      // store cTime as well since cloning didn't pick (it should ideally) this from currentIdealState
+      updatedIdealState.getRecord().setCreationTime(cTime);
+      updatedIdealState.getStat().setCreationTime(cTime);
+      // store ephemeralOwner info
+      updatedIdealState.getRecord().setEphemeralOwner(ephOwner);
+      updatedIdealState.getStat().setEphemeralOwner(ephOwner);
 
       // Check version and set ideal state to nextIdealState
       try {
-        LOGGER.info("Going to update current IdealState in ZK for table {}, current version {} and creation time {}",
-            tableNameWithType, currentIdealState.getRecord().getVersion(), currentIdealState.getRecord().getCreationTime());
+        LOGGER.info("Going to update current IdealState in ZK for table {}, current version {} and ctime {}",
+            tableNameWithType, version, cTime);
         if (zkBaseDataAccessor
-            .set(idealStateKey.getPath(), nextIdealState.getRecord(), currentIdealState.getRecord().getVersion(),
-                AccessOption.PERSISTENT)) {
-          LOGGER.info("Successfully persisted the ideal state for table {} in ZK. Will wait for External view to converge",
-              tableNameWithType);
+            .set(idealStateKey.getPath(), updatedIdealState.getRecord(), version, AccessOption.PERSISTENT)) {
+          LOGGER.info("Successfully persisted the ideal state for table {} in ZK. Will wait for External view to converge, new version {}, mtime {}",
+              tableNameWithType, version + 1, mTime);
           ++_rebalancerStats.updatestoIdealStateInZK;
           // if we succeeded, wait for the change to stabilize
           waitForStable(tableNameWithType);
@@ -208,11 +234,17 @@ public class TableRebalancer {
           retries = 0;
           LOGGER.info("External view converged for the change in ideal state for table {}. Will start the next iteration (if any)",
               tableNameWithType);
+          // start with the updated ideal state in next iteration and see if we need more movements
+          // or if we have reached the target
+          previousIdealState = updatedIdealState;
+          fetchIdealState = false;
+          ++version;
           continue;
         }
         // in case of any error, we retry a bounded number of times
       } catch (ZkBadVersionException e) {
-        // we will go back in the loop and reattempt by recomputing the target ideal state
+        // we will go back in the loop and reattempt by fetching the ideal state again from ZK and
+        // recomputing the target ideal state
         LOGGER.info("Version changed while updating ideal state for resource: {}, was expecting version {}",
             tableNameWithType, currentIdealState.getRecord().getVersion());
       } catch (Exception e) {
@@ -232,7 +264,7 @@ public class TableRebalancer {
 
       // if we are here, we failed to persist the updated ideal state in ZK
       // due to version mismatch, will attempt again
-      previousIdealState = currentIdealState;
+      fetchIdealState = true;
       if (retries++ > MAX_RETRIES) {
         LOGGER.error("Unable to rebalance table {} in {} attempts. Giving up", tableNameWithType, MAX_RETRIES);
         result.setStatus("Cancelling the rebalance operation as we have exhausted the max number of retries after ZK version mismatch");
