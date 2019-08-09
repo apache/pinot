@@ -100,6 +100,7 @@ import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.apache.pinot.common.utils.retry.RetryPolicy;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.pojos.Instance;
+import org.apache.pinot.controller.api.resources.StateType;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategyFactory;
@@ -1397,8 +1398,8 @@ public class PinotHelixResourceManager {
         }, RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
   }
 
-  public void deleteOfflineTable(String rawTableName) {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+  public void deleteOfflineTable(String tableName) {
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     LOGGER.info("Deleting table {}: Start", offlineTableName);
 
     // Remove the table from brokerResource
@@ -1476,60 +1477,43 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Toggle the status of the table between OFFLINE and ONLINE.
-   *
-   * @param tableName: Name of the table for which to toggle the status.
-   * @param status: True for ONLINE and False for OFFLINE.
-   * @return
+   * Toggles the state (ONLINE|OFFLINE|DROP) of the given table.
    */
-  public PinotResourceManagerResponse toggleTableState(String tableName, boolean status) {
-    if (!_helixAdmin.getResourcesInCluster(_helixClusterName).contains(tableName)) {
-      return PinotResourceManagerResponse.failure("Table " + tableName + " not found");
+  public PinotResourceManagerResponse toggleTableState(String tableNameWithType, StateType stateType) {
+    if (!hasTable(tableNameWithType)) {
+      return PinotResourceManagerResponse.failure("Table: " + tableNameWithType + " not found");
     }
-    _helixAdmin.enableResource(_helixClusterName, tableName, status);
-
-    // If enabling a resource, also reset segments in error state for that resource
-    boolean resetSuccessful = false;
-    if (status) {
-      try {
-        _helixAdmin.resetResource(_helixClusterName, Collections.singletonList(tableName));
-        resetSuccessful = true;
-      } catch (HelixException e) {
-        LOGGER.warn("Caught exception while resetting resource {}, ignoring.", e, tableName);
-      }
+    switch (stateType) {
+      case ENABLE:
+        _helixAdmin.enableResource(_helixClusterName, tableNameWithType, true);
+        // Reset segments in ERROR state
+        boolean resetSuccessful = false;
+        try {
+          _helixAdmin.resetResource(_helixClusterName, Collections.singletonList(tableNameWithType));
+          resetSuccessful = true;
+        } catch (HelixException e) {
+          LOGGER.warn("Caught exception while resetting resource: {}", tableNameWithType, e);
+        }
+        return PinotResourceManagerResponse
+            .success("Table: " + tableNameWithType + " enabled (reset success = " + resetSuccessful + ")");
+      case DISABLE:
+        _helixAdmin.enableResource(_helixClusterName, tableNameWithType, false);
+        return PinotResourceManagerResponse.success("Table: " + tableNameWithType + " disabled");
+      case DROP:
+        TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+        if (tableType == TableType.OFFLINE) {
+          deleteOfflineTable(tableNameWithType);
+        } else {
+          deleteRealtimeTable(tableNameWithType);
+        }
+        return PinotResourceManagerResponse.success("Table: " + tableNameWithType + " dropped");
+      default:
+        throw new IllegalStateException();
     }
-
-    return (status) ? PinotResourceManagerResponse
-        .success("Table " + tableName + " enabled (reset success = " + resetSuccessful + ")")
-        : PinotResourceManagerResponse.success("Table " + tableName + " disabled");
-  }
-
-  /**
-   * Drop the table from helix cluster.
-   *
-   * @param tableName: Name of table to be dropped.
-   * @return
-   */
-  public PinotResourceManagerResponse dropTable(String tableName) {
-    if (!_helixAdmin.getResourcesInCluster(_helixClusterName).contains(tableName)) {
-      return PinotResourceManagerResponse.failure("Table " + tableName + " not found");
-    }
-
-    if (getSegmentsFor(tableName).size() != 0) {
-      return PinotResourceManagerResponse.failure("Table " + tableName + " has segments, drop them first");
-    }
-
-    _helixAdmin.dropResource(_helixClusterName, tableName);
-
-    // remove from property store
-    ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(getPropertyStore(), tableName);
-    ZKMetadataProvider.removeResourceConfigFromPropertyStore(getPropertyStore(), tableName);
-
-    return PinotResourceManagerResponse.success("Table " + tableName + " dropped");
   }
 
   private Set<String> getAllInstancesForTable(String tableName) {
-    Set<String> instanceSet = new HashSet<String>();
+    Set<String> instanceSet = new HashSet<>();
     IdealState tableIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
     for (String partition : tableIdealState.getPartitionSet()) {
       instanceSet.addAll(tableIdealState.getInstanceSet(partition));
