@@ -268,6 +268,10 @@ public class PinotHelixResourceManager {
     }
   }
 
+  public String getInstanceId() {
+    return _instanceId;
+  }
+
   /**
    * Instance related APIs
    */

@@ -271,7 +271,8 @@ public class PerfBenchmarkDriver {
 
     // Create broker tenant if required
     if (_conf.shouldStartBroker()) {
-      Tenant brokerTenant = new TenantBuilder(_brokerTenantName).setRole(TenantRole.BROKER).setTotalInstances(1).build();
+      Tenant brokerTenant =
+          new TenantBuilder(_brokerTenantName).setRole(TenantRole.BROKER).setTotalInstances(1).build();
       _helixResourceManager.createBrokerTenant(brokerTenant);
     }
   }
@@ -289,7 +290,8 @@ public class PerfBenchmarkDriver {
       helixManager.connect();
       return helixManager;
     } catch (Exception e) {
-      String errorMsg = String.format("Exception when connecting the instance %s as Participant to Helix.", instanceId);
+      String errorMsg =
+          String.format("Exception when connecting the instance %s as Spectator role to Helix.", instanceId);
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg);
     }

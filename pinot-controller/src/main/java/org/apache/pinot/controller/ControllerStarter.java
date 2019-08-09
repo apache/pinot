@@ -436,8 +436,9 @@ public class ControllerStarter {
    * Register and connect to Helix cluster as PARTICIPANT role.
    */
   private HelixManager registerAndConnectAsHelixParticipant() {
-    HelixManager helixManager =
-        HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _helixZkURL);
+    String controllerParticipantInstanceId = _helixResourceManager.getInstanceId();
+    HelixManager helixManager = HelixManagerFactory
+        .getZKHelixManager(_helixClusterName, controllerParticipantInstanceId, InstanceType.PARTICIPANT, _helixZkURL);
 
     // Registers Master-Slave state model to state machine engine, which is for calculating participant assignment in lead controller resource.
     helixManager.getStateMachineEngine()
@@ -447,8 +448,8 @@ public class ControllerStarter {
       helixManager.connect();
       return helixManager;
     } catch (Exception e) {
-      String errorMsg =
-          String.format("Exception when connecting the instance %s as Participant to Helix.", _instanceId);
+      String errorMsg = String.format("Exception when connecting the instance %s as Participant role to Helix.",
+          controllerParticipantInstanceId);
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg);
     }
