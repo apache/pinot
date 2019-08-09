@@ -622,9 +622,9 @@ public class TableRebalancer {
           LOGGER.info("Waiting for externalView to match idealstate for table:" + resourceName);
           Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
           wait += EXTERNAL_VIEW_CHECK_INTERVAL_MS;
-          }
         }
-      } catch (InterruptedException e) {
+      }
+    } catch (InterruptedException e) {
       LOGGER.error("Rebalancer got interrupted while waiting for external view to converge");
       Thread.currentThread().interrupt();
     }
