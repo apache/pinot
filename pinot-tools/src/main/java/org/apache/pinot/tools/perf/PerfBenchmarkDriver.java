@@ -257,7 +257,8 @@ public class PerfBenchmarkDriver {
       ControllerConf controllerConf = getControllerConf();
       controllerConf.setControllerPort(Integer.toString(_conf.getControllerPort() + 1));
       _helixResourceManager = new PinotHelixResourceManager(controllerConf);
-      HelixManager helixManager = registerAndConnectAsHelixSpectator(controllerConf);
+      String instanceId = controllerConf.getControllerHost() + "_" + controllerConf.getControllerPort();
+      HelixManager helixManager = registerAndConnectAsHelixSpectator(instanceId);
       _helixResourceManager.start(helixManager);
     }
 
@@ -280,9 +281,7 @@ public class PerfBenchmarkDriver {
   /**
    * Register and connect to Helix cluster as Spectator role.
    */
-  private HelixManager registerAndConnectAsHelixSpectator(ControllerConf controllerConf) {
-    String instanceId = controllerConf.getControllerHost() + "_" + controllerConf.getControllerPort();
-
+  private HelixManager registerAndConnectAsHelixSpectator(String instanceId) {
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(_clusterName, instanceId, InstanceType.SPECTATOR, _zkAddress);
 

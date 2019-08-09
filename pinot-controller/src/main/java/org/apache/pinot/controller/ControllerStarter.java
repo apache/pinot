@@ -98,7 +98,8 @@ public class ControllerStarter {
 
   private final String _helixZkURL;
   private final String _helixClusterName;
-  private final String _instanceId;
+  private final String _helixControllerInstanceId;
+  private final String _helixParticipantInstanceId;
   private final boolean _isUpdateStateModel;
   private final boolean _enableBatchMessageMode;
   private final ControllerConf.ControllerMode _controllerMode;
@@ -129,7 +130,8 @@ public class ControllerStarter {
     // Helix related settings.
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
     _helixClusterName = _config.getHelixClusterName();
-    _instanceId = conf.getControllerHost() + "_" + conf.getControllerPort();
+    _helixControllerInstanceId = conf.getControllerHost() + "_" + conf.getControllerPort();
+    _helixParticipantInstanceId = CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + _helixControllerInstanceId;
     _isUpdateStateModel = _config.isUpdateSegmentStateModel();
     _enableBatchMessageMode = _config.getEnableBatchMessageMode();
 
@@ -225,7 +227,8 @@ public class ControllerStarter {
   private void setUpHelixController() {
     // Register and connect instance as Helix controller.
     LOGGER.info("Starting Helix controller");
-    _helixControllerManager = HelixSetupUtils.setupHelixController(_helixClusterName, _helixZkURL, _instanceId);
+    _helixControllerManager = HelixSetupUtils.setupHelixController(_helixClusterName, _helixZkURL,
+        _helixControllerInstanceId);
 
     // Emit helix controller metrics
     _controllerMetrics.addCallbackGauge(CommonConstants.Helix.INSTANCE_CONNECTED_METRIC_NAME,
@@ -436,9 +439,8 @@ public class ControllerStarter {
    * Register and connect to Helix cluster as PARTICIPANT role.
    */
   private HelixManager registerAndConnectAsHelixParticipant() {
-    String controllerParticipantInstanceId = _helixResourceManager.getInstanceId();
     HelixManager helixManager = HelixManagerFactory
-        .getZKHelixManager(_helixClusterName, controllerParticipantInstanceId, InstanceType.PARTICIPANT, _helixZkURL);
+        .getZKHelixManager(_helixClusterName, _helixParticipantInstanceId, InstanceType.PARTICIPANT, _helixZkURL);
 
     // Registers Master-Slave state model to state machine engine, which is for calculating participant assignment in lead controller resource.
     helixManager.getStateMachineEngine()
@@ -449,7 +451,7 @@ public class ControllerStarter {
       return helixManager;
     } catch (Exception e) {
       String errorMsg = String.format("Exception when connecting the instance %s as Participant role to Helix.",
-          controllerParticipantInstanceId);
+          _helixParticipantInstanceId);
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg);
     }
