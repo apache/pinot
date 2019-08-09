@@ -127,7 +127,6 @@ public class PinotHelixResourceManager {
 
   private final String _helixZkURL;
   private final String _helixClusterName;
-  private final String _instanceId;
   private final String _dataDir;
   private final long _externalViewOnlineToOfflineTimeoutMillis;
   private final boolean _isSingleTenantCluster;
@@ -135,6 +134,7 @@ public class PinotHelixResourceManager {
   private final boolean _allowHLCTables;
 
   private HelixManager _helixZkManager;
+  private String _instanceId;
   private HelixAdmin _helixAdmin;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private HelixDataAccessor _helixDataAccessor;
@@ -145,12 +145,11 @@ public class PinotHelixResourceManager {
   private RebalanceSegmentStrategyFactory _rebalanceSegmentStrategyFactory;
   private TableRebalancer _tableRebalancer;
 
-  public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
-      @Nonnull String controllerInstanceId, String dataDir, long externalViewOnlineToOfflineTimeoutMillis,
-      boolean isSingleTenantCluster, boolean enableBatchMessageMode, boolean allowHLCTables) {
+  public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName, String dataDir,
+      long externalViewOnlineToOfflineTimeoutMillis, boolean isSingleTenantCluster, boolean enableBatchMessageMode,
+      boolean allowHLCTables) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
-    _instanceId = controllerInstanceId;
     _dataDir = dataDir;
     _externalViewOnlineToOfflineTimeoutMillis = externalViewOnlineToOfflineTimeoutMillis;
     _isSingleTenantCluster = isSingleTenantCluster;
@@ -159,18 +158,17 @@ public class PinotHelixResourceManager {
   }
 
   public PinotHelixResourceManager(@Nonnull ControllerConf controllerConf) {
-    this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(),
-        CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + controllerConf.getControllerHost() + "_" + controllerConf
-            .getControllerPort(), controllerConf.getDataDir(), controllerConf.getExternalViewOnlineToOfflineTimeout(),
-        controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
-        controllerConf.getHLCTablesAllowed());
+    this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
+        controllerConf.getExternalViewOnlineToOfflineTimeout(), controllerConf.tenantIsolationEnabled(),
+        controllerConf.getEnableBatchMessageMode(), controllerConf.getHLCTablesAllowed());
   }
 
   /**
    * Create Helix cluster if needed, and then start a Pinot controller instance.
    */
-  public synchronized void start() {
-    _helixZkManager = registerAndConnectAsHelixParticipant();
+  public synchronized void start(HelixManager helixZkManager) {
+    _helixZkManager = helixZkManager;
+    _instanceId = _helixZkManager.getInstanceName();
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     _propertyStore = _helixZkManager.getHelixPropertyStore();
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
@@ -253,28 +251,6 @@ public class PinotHelixResourceManager {
    */
   public ZkHelixPropertyStore<ZNRecord> getPropertyStore() {
     return _propertyStore;
-  }
-
-  /**
-   * Register and connect to Helix cluster as PARTICIPANT role.
-   */
-  private HelixManager registerAndConnectAsHelixParticipant() {
-    HelixManager helixManager =
-        HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _helixZkURL);
-
-    // Registers Master-Slave state model to state machine engine, which is for calculating participant assignment in lead controller resource.
-    helixManager.getStateMachineEngine()
-        .registerStateModelFactory(MasterSlaveSMD.name, new MasterSlaveStateModelFactory());
-
-    try {
-      helixManager.connect();
-      return helixManager;
-    } catch (Exception e) {
-      String errorMsg =
-          String.format("Exception when connecting the instance %s as Participant to Helix.", _instanceId);
-      LOGGER.error(errorMsg, e);
-      throw new RuntimeException(errorMsg);
-    }
   }
 
   /**

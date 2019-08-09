@@ -38,8 +38,12 @@ import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
+import org.apache.helix.HelixManagerFactory;
+import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.api.listeners.ControllerChangeListener;
+import org.apache.helix.examples.MasterSlaveStateModelFactory;
+import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.task.TaskDriver;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -94,7 +98,8 @@ public class ControllerStarter {
 
   private final String _helixZkURL;
   private final String _helixClusterName;
-  private final String _instanceId;
+  private final String _helixControllerInstanceId;
+  private final String _helixParticipantInstanceId;
   private final boolean _isUpdateStateModel;
   private final boolean _enableBatchMessageMode;
   private final ControllerConf.ControllerMode _controllerMode;
@@ -125,7 +130,8 @@ public class ControllerStarter {
     // Helix related settings.
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
     _helixClusterName = _config.getHelixClusterName();
-    _instanceId = conf.getControllerHost() + "_" + conf.getControllerPort();
+    _helixControllerInstanceId = conf.getControllerHost() + "_" + conf.getControllerPort();
+    _helixParticipantInstanceId = CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + _helixControllerInstanceId;
     _isUpdateStateModel = _config.isUpdateSegmentStateModel();
     _enableBatchMessageMode = _config.getEnableBatchMessageMode();
 
@@ -221,7 +227,8 @@ public class ControllerStarter {
   private void setUpHelixController() {
     // Register and connect instance as Helix controller.
     LOGGER.info("Starting Helix controller");
-    _helixControllerManager = HelixSetupUtils.setupHelixController(_helixClusterName, _helixZkURL, _instanceId);
+    _helixControllerManager = HelixSetupUtils.setupHelixController(_helixClusterName, _helixZkURL,
+        _helixControllerInstanceId);
 
     // Emit helix controller metrics
     _controllerMetrics.addCallbackGauge(CommonConstants.Helix.INSTANCE_CONNECTED_METRIC_NAME,
@@ -251,9 +258,11 @@ public class ControllerStarter {
     initSegmentFetcherFactory();
     initPinotCrypterFactory();
 
+    LOGGER.info("Starting Helix manager as Helix participant");
+    HelixManager helixParticipantManager = registerAndConnectAsHelixParticipant();
+
     LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
-    _helixResourceManager.start();
-    HelixManager helixParticipantManager = _helixResourceManager.getHelixZkManager();
+    _helixResourceManager.start(helixParticipantManager);
 
     LOGGER.info("Registering controller leadership manager");
     // TODO: when Helix separation is completed, leadership only depends on the master in leadControllerResource, remove
@@ -423,6 +432,28 @@ public class ControllerStarter {
       PinotCrypterFactory.init(pinotCrypterConfig);
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while initializing PinotCrypterFactory", e);
+    }
+  }
+
+  /**
+   * Register and connect to Helix cluster as PARTICIPANT role.
+   */
+  private HelixManager registerAndConnectAsHelixParticipant() {
+    HelixManager helixManager = HelixManagerFactory
+        .getZKHelixManager(_helixClusterName, _helixParticipantInstanceId, InstanceType.PARTICIPANT, _helixZkURL);
+
+    // Registers Master-Slave state model to state machine engine, which is for calculating participant assignment in lead controller resource.
+    helixManager.getStateMachineEngine()
+        .registerStateModelFactory(MasterSlaveSMD.name, new MasterSlaveStateModelFactory());
+
+    try {
+      helixManager.connect();
+      return helixManager;
+    } catch (Exception e) {
+      String errorMsg = String.format("Exception when connecting the instance %s as Participant role to Helix.",
+          _helixParticipantInstanceId);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg);
     }
   }
 
