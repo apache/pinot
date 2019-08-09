@@ -48,7 +48,6 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixException;
 import org.apache.helix.HelixManager;
-import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
@@ -61,7 +60,6 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
-import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.OfflineTagConfig;
@@ -94,12 +92,10 @@ import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnl
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
-import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
 import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.apache.pinot.common.utils.retry.RetryPolicy;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.pojos.Instance;
 import org.apache.pinot.controller.api.resources.StateType;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
@@ -108,7 +104,6 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy
 import org.apache.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy;
 import org.apache.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyEnum;
 import org.apache.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyFactory;
-import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceMasterSlaveStateModelFactory;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
@@ -134,8 +129,6 @@ public class PinotHelixResourceManager {
   private final boolean _isSingleTenantCluster;
   private final boolean _enableBatchMessageMode;
   private final boolean _allowHLCTables;
-  private final InstanceType _helixInstanceType;
-  private final LeadControllerManager _leadControllerManager;
 
   private HelixManager _helixZkManager;
   private String _instanceId;
@@ -151,7 +144,7 @@ public class PinotHelixResourceManager {
 
   public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName, String dataDir,
       long externalViewOnlineToOfflineTimeoutMillis, boolean isSingleTenantCluster, boolean enableBatchMessageMode,
-      boolean allowHLCTables, String helixInstanceType) {
+      boolean allowHLCTables) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
@@ -159,18 +152,12 @@ public class PinotHelixResourceManager {
     _isSingleTenantCluster = isSingleTenantCluster;
     _enableBatchMessageMode = enableBatchMessageMode;
     _allowHLCTables = allowHLCTables;
-    _helixInstanceType = helixInstanceType;
-
-    _helixZkManager =
-        HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, _helixInstanceType, _helixZkURL);
-    // LeadControllerManager needs to be initialized before registering as Helix participant.
-    _leadControllerManager = new LeadControllerManager(_instanceId, _helixZkManager);
   }
 
   public PinotHelixResourceManager(@Nonnull ControllerConf controllerConf) {
     this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
         controllerConf.getExternalViewOnlineToOfflineTimeout(), controllerConf.tenantIsolationEnabled(),
-        controllerConf.getEnableBatchMessageMode(), controllerConf.getHLCTablesAllowed(), controllerConf.getHelixInstanceType());
+        controllerConf.getEnableBatchMessageMode(), controllerConf.getHLCTablesAllowed());
   }
 
   /**
@@ -179,10 +166,6 @@ public class PinotHelixResourceManager {
   public synchronized void start(HelixManager helixZkManager) {
     _helixZkManager = helixZkManager;
     _instanceId = _helixZkManager.getInstanceName();
-
-    // LeadControllerManager needs to be initialized before registering to Helix participant.
-    _leadControllerManager = new LeadControllerManager();
-
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     _propertyStore = _helixZkManager.getHelixPropertyStore();
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
@@ -207,7 +190,6 @@ public class PinotHelixResourceManager {
    * Stop the Pinot controller instance.
    */
   public synchronized void stop() {
-    _leadControllerManager.stop();
     _segmentDeletionManager.stop();
     _helixZkManager.disconnect();
   }
@@ -266,35 +248,6 @@ public class PinotHelixResourceManager {
    */
   public ZkHelixPropertyStore<ZNRecord> getPropertyStore() {
     return _propertyStore;
-  }
-
-  /**
-   * Get lead controller manager.
-   *
-   * @return lead controller manager
-   */
-  public LeadControllerManager getLeadControllerManager() {
-    return _leadControllerManager;
-  }
-
-  /**
-   * Register and connect to Helix cluster as PARTICIPANT role.
-   */
-  private void registerAndConnectToHelixCluster() {
-    Preconditions.checkArgument(_helixZkManager != null, "HelixZkManager should not be null!");
-    // Registers Master-Slave state model to state machine engine, which is for calculating participant assignment in lead controller resource.
-    if (_helixInstanceType.equals(InstanceType.PARTICIPANT)) {
-      _helixZkManager.getStateMachineEngine().registerStateModelFactory(MasterSlaveSMD.name,
-          new LeadControllerResourceMasterSlaveStateModelFactory(_instanceId, _leadControllerManager));
-    }
-    try {
-      _helixZkManager.connect();
-    } catch (Exception e) {
-      String errorMsg =
-          String.format("Exception when connecting the instance %s as Participant to Helix.", _instanceId);
-      LOGGER.error(errorMsg, e);
-      throw new RuntimeException(errorMsg);
-    }
   }
 
   /**

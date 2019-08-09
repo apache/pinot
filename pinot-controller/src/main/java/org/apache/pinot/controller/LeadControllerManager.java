@@ -38,16 +38,16 @@ import static org.apache.pinot.common.utils.CommonConstants.Helix.NUMBER_OF_PART
 public class LeadControllerManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerManager.class);
 
-  private Set<Integer> _partitionIndexCache;
-  private String _instanceId;
-  private HelixManager _helixManager;
+  private final Set<Integer> _partitionIndexCache;
+  private final String _instanceId;
+  private final HelixManager _helixManager;
   private volatile boolean _isLeadControllerResourceEnabled = false;
   private volatile boolean _amIHelixLeader = false;
   private volatile boolean _isShuttingDown = false;
 
-  public LeadControllerManager(String instanceId, HelixManager helixManager) {
-    _instanceId = instanceId;
+  public LeadControllerManager(HelixManager helixManager) {
     _helixManager = helixManager;
+    _instanceId = helixManager.getInstanceName();
     _partitionIndexCache = ConcurrentHashMap.newKeySet();
   }
 

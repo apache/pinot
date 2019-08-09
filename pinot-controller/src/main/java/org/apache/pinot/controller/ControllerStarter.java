@@ -19,6 +19,7 @@
 package org.apache.pinot.controller;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -39,12 +40,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
-import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.api.listeners.ControllerChangeListener;
-import org.apache.helix.examples.MasterSlaveStateModelFactory;
 import org.apache.helix.model.MasterSlaveSMD;
-import org.apache.helix.api.listeners.ControllerChangeListener;
 import org.apache.helix.task.TaskDriver;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -68,6 +66,7 @@ import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategyFactory;
 import org.apache.pinot.controller.helix.core.relocation.RealtimeSegmentRelocator;
 import org.apache.pinot.controller.helix.core.retention.RetentionManager;
+import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceMasterSlaveStateModelFactory;
 import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
@@ -109,6 +108,7 @@ public class ControllerStarter {
   private final ControllerConf.ControllerMode _controllerMode;
 
   private HelixManager _helixControllerManager;
+  private HelixManager _helixParticipantManager;
 
   // Can only be constructed after resource manager getting started
   private OfflineSegmentIntervalChecker _offlineSegmentIntervalChecker;
@@ -154,7 +154,7 @@ public class ControllerStarter {
       // Other places like {@link PerfBenchmarkDriver} which directly call {@link PinotHelixResourceManager} should NOT register as PARTICIPANT,
       // which would be put to lead controller resource and mess up the leadership assignment. Those places should use ADMINISTRATOR other than PARTICIPANT.
       // Do not use this before the invocation of {@link PinotHelixResourceManager::start()}, which happens in {@link ControllerStarter::start()}
-      _helixResourceManager = new PinotHelixResourceManager(_config, InstanceType.PARTICIPANT);
+      _helixResourceManager = new PinotHelixResourceManager(_config);
       _executorService =
           Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("restapi-multiget-thread-%d").build());
     }
@@ -192,6 +192,10 @@ public class ControllerStarter {
    */
   public HelixManager getHelixControllerManager() {
     return _helixControllerManager;
+  }
+
+  public LeadControllerManager getLeadControllerManager() {
+    return _leadControllerManager;
   }
 
   public OfflineSegmentIntervalChecker getOfflineSegmentIntervalChecker() {
@@ -245,8 +249,8 @@ public class ControllerStarter {
   private void setUpHelixController() {
     // Register and connect instance as Helix controller.
     LOGGER.info("Starting Helix controller");
-    _helixControllerManager = HelixSetupUtils.setupHelixController(_helixClusterName, _helixZkURL,
-        _helixControllerInstanceId);
+    _helixControllerManager =
+        HelixSetupUtils.setupHelixController(_helixClusterName, _helixZkURL, _helixControllerInstanceId);
 
     // Emit helix controller metrics
     _controllerMetrics.addCallbackGauge(CommonConstants.Helix.INSTANCE_CONNECTED_METRIC_NAME,
@@ -268,20 +272,24 @@ public class ControllerStarter {
     initSegmentFetcherFactory();
     initPinotCrypterFactory();
 
-    LOGGER.info("Starting Helix manager as Helix participant");
-    HelixManager helixParticipantManager = registerAndConnectAsHelixParticipant();
+    LOGGER.info("Initializing Helix participant manager");
+    _helixParticipantManager = initHelixParticipantManager();
+
+    // LeadControllerManager needs to be initialized before registering as Helix participant.
+    LOGGER.info("Starting lead controller manager");
+    _leadControllerManager = new LeadControllerManager(_helixParticipantManager);
+
+    LOGGER.info("Registering Helix participant manager as Helix Participant role");
+    registerAndConnectAsHelixParticipant();
 
     LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
-    _helixResourceManager.start(helixParticipantManager);
-
-    // Get lead controller manager from resource manager.
-    _leadControllerManager = _helixResourceManager.getLeadControllerManager();
+    _helixResourceManager.start(_helixParticipantManager);
 
     // Register listeners.
-    registerListeners(helixParticipantManager);
+    registerListeners(_helixParticipantManager);
 
     LOGGER.info("Starting task resource manager");
-    _helixTaskResourceManager = new PinotHelixTaskResourceManager(new TaskDriver(helixParticipantManager));
+    _helixTaskResourceManager = new PinotHelixTaskResourceManager(new TaskDriver(_helixParticipantManager));
 
     // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
     LOGGER.info("Starting realtime segment manager");
@@ -290,7 +298,7 @@ public class ControllerStarter {
     // TODO: Need to put this inside HelixResourceManager when HelixControllerLeadershipManager is removed.
     _helixResourceManager.registerPinotLLCRealtimeSegmentManager(_pinotLLCRealtimeSegmentManager);
     _segmentCompletionManager =
-        new SegmentCompletionManager(helixParticipantManager, _pinotLLCRealtimeSegmentManager, _controllerMetrics,
+        new SegmentCompletionManager(_helixParticipantManager, _pinotLLCRealtimeSegmentManager, _controllerMetrics,
             _leadControllerManager, _config.getSegmentCommitTimeoutSeconds());
 
     if (_config.getHLCTablesAllowed()) {
@@ -312,7 +320,7 @@ public class ControllerStarter {
 
     LOGGER.info("Registering rebalance segments factory");
     _helixResourceManager
-        .registerRebalanceSegmentStrategyFactory(new RebalanceSegmentStrategyFactory(helixParticipantManager));
+        .registerRebalanceSegmentStrategyFactory(new RebalanceSegmentStrategyFactory(_helixParticipantManager));
 
     String accessControlFactoryClass = _config.getAccessControlFactoryClass();
     LOGGER.info("Use class: {} as the AccessControlFactory", accessControlFactoryClass);
@@ -377,7 +385,7 @@ public class ControllerStarter {
       }
     });
 
-    _serviceStatusCallbackList.add(generateServiceStatusCallback(helixParticipantManager));
+    _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixParticipantManager));
   }
 
   private ServiceStatus.ServiceStatusCallback generateServiceStatusCallback(HelixManager helixManager) {
@@ -444,20 +452,22 @@ public class ControllerStarter {
     }
   }
 
+  private HelixManager initHelixParticipantManager() {
+    return HelixManagerFactory
+        .getZKHelixManager(_helixClusterName, _helixParticipantInstanceId, InstanceType.PARTICIPANT, _helixZkURL);
+  }
+
   /**
    * Register and connect to Helix cluster as PARTICIPANT role.
    */
-  private HelixManager registerAndConnectAsHelixParticipant() {
-    HelixManager helixManager = HelixManagerFactory
-        .getZKHelixManager(_helixClusterName, _helixParticipantInstanceId, InstanceType.PARTICIPANT, _helixZkURL);
-
+  private void registerAndConnectAsHelixParticipant() {
+    Preconditions.checkArgument(_helixParticipantManager != null, "HelixZkManager should not be null!");
     // Registers Master-Slave state model to state machine engine, which is for calculating participant assignment in lead controller resource.
-    helixManager.getStateMachineEngine()
-        .registerStateModelFactory(MasterSlaveSMD.name, new MasterSlaveStateModelFactory());
+    _helixParticipantManager.getStateMachineEngine().registerStateModelFactory(MasterSlaveSMD.name,
+        new LeadControllerResourceMasterSlaveStateModelFactory(_helixParticipantInstanceId, _leadControllerManager));
 
     try {
-      helixManager.connect();
-      return helixManager;
+      _helixParticipantManager.connect();
     } catch (Exception e) {
       String errorMsg = String.format("Exception when connecting the instance %s as Participant role to Helix.",
           _helixParticipantInstanceId);
@@ -545,6 +555,9 @@ public class ControllerStarter {
       // Stop controller periodic task.
       LOGGER.info("Stopping controller periodic tasks");
       _periodicTaskScheduler.stop();
+
+      LOGGER.info("Stopping lead controller manager");
+      _leadControllerManager.stop();
 
       // Stop PinotLLCSegmentManager before stopping Jersey API. It is possible that stopping Jersey API
       // may interrupt the handlers waiting on an I/O.
