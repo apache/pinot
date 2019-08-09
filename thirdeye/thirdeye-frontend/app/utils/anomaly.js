@@ -14,7 +14,8 @@ import {
   getAnomaliesByAlertIdUrl,
   getAnomalyFiltersByTimeRangeUrl,
   getAnomalyFiltersByAnomalyIdUrl,
-  getBoundsUrl
+  getBoundsUrl,
+  getAiAvailabilityUrl
 } from 'thirdeye-frontend/utils/api/anomaly';
 
 /**
@@ -122,6 +123,19 @@ export function getYamlPreviewAnomalies(yamlString, startTime, endTime, alertId)
 export function getBounds(detectionId, startTime, endTime) {
   const url = getBoundsUrl(detectionId, startTime, endTime);
   return fetch(url, getProps()).then((res) => checkStatus(res));
+}
+
+/**
+ * Get table data for AI Availability
+ * @method getAiAvailability
+ * @param {Number} detectionConfigId - the config id for the table data's alert
+ * @param {Number} startDate - start time of analysis range
+ * @param {Number} endDate - end time of analysis range
+ * @return {Ember.RSVP.Promise}
+ */
+export function getAiAvailability(detectionConfigId, startDate, endDate) {
+  const url = getAiAvailabilityUrl(startDate, endDate);
+  return fetch(url).then(checkStatus);
 }
 
 /**

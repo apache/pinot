@@ -65,13 +65,24 @@ export function getAnomalyFiltersByAnomalyIdUrl(startTime, endTime, anomalyIds) 
   return `/anomalies/search/anomalyIds/${startTime}/${endTime}/1?anomalyIds=${encodeURIComponent(anomalyIds)}`;
 }
 
+/**
+ * Returns the url for getting ai availability table
+ * @param {Number} startDate - beginning of time range of interest
+ * @param {Number} endDate - end of time range of interest
+ * @example getAiAvailabilityUrl(1, 1508472700000, 1508472800000) // yields => /thirdeye/table?detectionConfigId=1&start=1508472700000&end=1508472800000
+ */
+export function getAiAvailabilityUrl(startDate, endDate) {
+  return `/thirdeye/table?metricIds=128856623,128856625&start=${startDate}&end=${endDate}&dimensionKeys=grid,flow,project,owner,managers,sla,url`;
+}
+
 export const anomalyApiUrls = {
   getAnomalyDataUrl,
   getAnomaliesForYamlPreviewUrl,
   getAnomaliesByAlertIdUrl,
   getAnomalyFiltersByTimeRangeUrl,
   getAnomalyFiltersByAnomalyIdUrl,
-  getBoundsUrl
+  getBoundsUrl,
+  getAiAvailabilityUrl
 };
 
 export default {
