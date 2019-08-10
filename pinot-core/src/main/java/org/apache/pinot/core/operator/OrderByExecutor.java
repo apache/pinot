@@ -20,11 +20,8 @@ package org.apache.pinot.core.operator;
 
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.common.utils.BytesUtils;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.primitive.ByteArray;
 
 import static org.apache.pinot.common.utils.DataSchema.*;
@@ -79,7 +76,7 @@ public class OrderByExecutor {
         case DOUBLE:
           if (orderByDefn.isAscending()) {
             comparator = Comparator.comparing(GroupByRow::getArrayKey,
-                Comparator.comparingDouble(s -> Integer.valueOf(s[index])));
+                Comparator.comparingDouble(s -> Double.valueOf(s[index])));
           } else {
             comparator = Comparator.comparing(GroupByRow::getArrayKey,
                 (s1, s2) -> Double.compare(Double.valueOf(s2[index]), Double.valueOf(s1[index])));

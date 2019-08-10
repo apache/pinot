@@ -40,7 +40,7 @@ public class InterSegmentAggregationGroupByOrderBySingleValueQueriesTest extends
 
   @Test
   public void testDummy() {
-    String orderByQuery = "select count(*) from testTable group by column17 top 50";
+    String orderByQuery = "select count(*) from testTable group by sub(column1, 100000) top 100 order by sub(column1, 100000)";
     BrokerResponseNative brokerResponse = getBrokerResponseForQuery(orderByQuery);
     GroupByOrderByResults expectedGroupByOrderBy = new GroupByOrderByResults(null, null, null);
   }
@@ -213,6 +213,17 @@ public class InterSegmentAggregationGroupByOrderBySingleValueQueriesTest extends
     data.add(new Object[]{query, columns, groupByKeys, results, numDocsScanned, numEntriesScannedInFilter,
         numEntriesScannedPostFilter, numTotalDocs});
 
+    // order by aggregation with space/tab in order by
+    query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY SUM  ( column1) DESC TOP 3";
+    columns = Lists.newArrayList("sum(column1)");
+    groupByKeys = Lists.newArrayList(new String[]{"P", "MaztCmmxxgguBUxPti"}, new String[]{"P", "HEuxNvH"},
+        new String[]{"P", "KrNxpdycSiwoRohEiTIlLqDHnx"});
+    results = Lists.newArrayList(new Serializable[]{27177029040008.00000}, new Serializable[]{21998672845052.00000},
+        new Serializable[]{18069909216728.00000});
+    numEntriesScannedPostFilter = 360000;
+    data.add(new Object[]{query, columns, groupByKeys, results, numDocsScanned, numEntriesScannedInFilter,
+        numEntriesScannedPostFilter, numTotalDocs});
+
     // order by an aggregation DESC, and group by column
     query = "SELECT MIN(column6) FROM testTable GROUP BY column12 ORDER BY MIN(column6) DESC, column12";
     columns = Lists.newArrayList("min(column6)", "column12");
@@ -235,10 +246,30 @@ public class InterSegmentAggregationGroupByOrderBySingleValueQueriesTest extends
         new String[]{"402773817"}, new String[]{"423049234"}, new String[]{"561673250"}, new String[]{"635942547"},
         new String[]{"638936844"}, new String[]{"939479517"}, new String[]{"984091268"}, new String[]{"1230252339"},
         new String[]{"1284373442"}, new String[]{"1555255521"}, new String[]{"1618904660"}, new String[]{"1670085862"});
-    results = Lists.newArrayList(new Serializable[]{2924}, new Serializable[]{3892}, new Serializable[]{6564},
-        new Serializable[]{7304}, new Serializable[]{6556}, new Serializable[]{7420}, new Serializable[]{3308},
-        new Serializable[]{3816}, new Serializable[]{3116}, new Serializable[]{3824}, new Serializable[]{5620},
-        new Serializable[]{7428}, new Serializable[]{2900}, new Serializable[]{2744}, new Serializable[]{3388});
+    results = Lists.newArrayList(new Serializable[]{2924.0}, new Serializable[]{3892.0}, new Serializable[]{6564.0},
+        new Serializable[]{7304.0}, new Serializable[]{6556.0}, new Serializable[]{7420.0}, new Serializable[]{3308.0},
+        new Serializable[]{3816.0}, new Serializable[]{3116.0}, new Serializable[]{3824.0}, new Serializable[]{5620.0},
+        new Serializable[]{7428.0}, new Serializable[]{2900.0}, new Serializable[]{2744.0}, new Serializable[]{3388.0});
+    numEntriesScannedPostFilter = 120000;
+    data.add(new Object[]{query, columns, groupByKeys, results, numDocsScanned, numEntriesScannedInFilter,
+        numEntriesScannedPostFilter, numTotalDocs});
+
+    // group by UDF order by UDF
+    query = "SELECT COUNT(*) FROM testTable GROUP BY sub(column1, 100000) TOP 3 ORDER BY sub(column1, 100000)";
+    columns = Lists.newArrayList("sub(column1,'100000')");
+    groupByKeys = Lists.newArrayList(new String[]{"140528.0"}, new String[]{"194355.0"},
+        new String[]{"532157.0"});
+    results = Lists.newArrayList(new Serializable[]{28.0}, new Serializable[]{12.0}, new Serializable[]{12.0});
+    numEntriesScannedPostFilter = 120000;
+    data.add(new Object[]{query, columns, groupByKeys, results, numDocsScanned, numEntriesScannedInFilter,
+        numEntriesScannedPostFilter, numTotalDocs});
+
+    // spaces in UDF
+    query = "SELECT COUNT(*) FROM testTable GROUP BY sub(column1, 100000) TOP 3 ORDER BY SUB(   column1, 100000 )";
+    columns = Lists.newArrayList("sub(column1,'100000')");
+    groupByKeys = Lists.newArrayList(new String[]{"140528.0"}, new String[]{"194355.0"},
+        new String[]{"532157.0"});
+    results = Lists.newArrayList(new Serializable[]{28.0}, new Serializable[]{12.0}, new Serializable[]{12.0});
     numEntriesScannedPostFilter = 120000;
     data.add(new Object[]{query, columns, groupByKeys, results, numDocsScanned, numEntriesScannedInFilter,
         numEntriesScannedPostFilter, numTotalDocs});
