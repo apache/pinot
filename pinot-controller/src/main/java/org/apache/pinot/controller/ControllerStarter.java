@@ -156,7 +156,7 @@ public class ControllerStarter {
 
   private void inferHostnameIfNeeded(ControllerConf config) {
     if (config.getControllerHost() == null) {
-      if (config.getBoolean(CommonConstants.Helix.PREFER_HOSTNAME_IN_DEFAULT_INSTANCD_ID_KEY, false)) {
+      if (config.getBoolean(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)) {
         final String inferredHostname = NetUtil.getHostnameOrAddress();
         if (inferredHostname != null) {
           config.setControllerHost(inferredHostname);

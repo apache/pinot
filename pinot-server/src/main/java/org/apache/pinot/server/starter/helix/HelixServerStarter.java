@@ -143,7 +143,7 @@ public class HelixServerStarter {
       _instanceId = _serverConf.getString(CONFIG_OF_INSTANCE_ID);
     } else {
       String host = _serverConf.getString(KEY_OF_SERVER_NETTY_HOST,
-          _serverConf.getBoolean(CommonConstants.Helix.PREFER_HOSTNAME_IN_DEFAULT_INSTANCD_ID_KEY, false) ? NetUtil
+          _serverConf.getBoolean(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil
               .getHostnameOrAddress() : NetUtil.getHostAddress());
 
       int port = _serverConf.getInt(KEY_OF_SERVER_NETTY_PORT, DEFAULT_SERVER_NETTY_PORT);

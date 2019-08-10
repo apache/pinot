@@ -109,7 +109,7 @@ public class HelixBrokerStarter {
 
     if (brokerHost == null) {
       brokerHost =
-        _brokerConf.getBoolean(CommonConstants.Helix.PREFER_HOSTNAME_IN_DEFAULT_INSTANCD_ID_KEY, false) ? NetUtil
+        _brokerConf.getBoolean(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil
             .getHostnameOrAddress() : NetUtil.getHostAddress();
     }
     _brokerId = _brokerConf.getString(Helix.Instance.INSTANCE_ID_KEY,
