@@ -52,6 +52,7 @@ import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
@@ -141,7 +142,10 @@ public class HelixServerStarter {
     if (_serverConf.containsKey(CONFIG_OF_INSTANCE_ID)) {
       _instanceId = _serverConf.getString(CONFIG_OF_INSTANCE_ID);
     } else {
-      String host = _serverConf.getString(KEY_OF_SERVER_NETTY_HOST, NetUtil.getHostAddress());
+      String host = _serverConf.getString(KEY_OF_SERVER_NETTY_HOST,
+          _serverConf.getBoolean(CommonConstants.Helix.PREFER_HOSTNAME_IN_DEFAULT_INSTANCD_ID_KEY, false) ? NetUtil
+              .getHostnameOrAddress() : NetUtil.getHostAddress());
+
       int port = _serverConf.getInt(KEY_OF_SERVER_NETTY_PORT, DEFAULT_SERVER_NETTY_PORT);
       _instanceId = PREFIX_OF_SERVER_INSTANCE + host + "_" + port;
       _serverConf.addProperty(CONFIG_OF_INSTANCE_ID, _instanceId);
