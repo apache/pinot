@@ -202,10 +202,11 @@ var HELPERS = {
   },
 
   executeQuery: function(query, traceEnabled, callback) {
-    var url = "/pql";
+    var url = "/queryByFormat";
     var params = JSON.stringify({
-      "pql": query,
-      "trace": traceEnabled
+      "query": query,
+      "trace": traceEnabled,
+      "queryFormat": "pql"
     });
     $.ajax({
       type: 'POST',

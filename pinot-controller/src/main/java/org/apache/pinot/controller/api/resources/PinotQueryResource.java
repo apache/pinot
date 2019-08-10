@@ -20,6 +20,10 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.PQL;
+import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.SQL;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
@@ -50,14 +54,16 @@ import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 @Path("/")
-public class PqlQueryResource {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PqlQueryResource.class);
-  private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
+public class PinotQueryResource {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotQueryResource.class);
+  private static final Pql2Compiler PQL_COMPILER = new Pql2Compiler();
+  private static final CalciteSqlCompiler SQL_COMPILER = new CalciteSqlCompiler();
   private static final Random RANDOM = new Random();
 
   @Inject
@@ -67,7 +73,30 @@ public class PqlQueryResource {
   AccessControlFactory _accessControlFactory;
 
   @POST
+  @Path("queryByFormat")
+  public String postQuery(String requestJsonStr, @Context HttpHeaders httpHeaders) {
+    try {
+      JsonNode requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
+      String query = requestJson.get("query").asText();
+      String traceEnabled = "false";
+      if (requestJson.has("trace")) {
+        traceEnabled = requestJson.get("trace").toString();
+      }
+      String queryFormat = "pql";
+      if (requestJson.has("queryFormat")) {
+        queryFormat = requestJson.get("queryFormat").asText();
+      }
+      LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, query);
+      return getQueryResponse(query, traceEnabled, httpHeaders, queryFormat);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while processing post request", e);
+      return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
+    }
+  }
+
+  @POST
   @Path("pql")
+  @Deprecated
   public String post(String requestJsonStr, @Context HttpHeaders httpHeaders) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
@@ -77,7 +106,7 @@ public class PqlQueryResource {
         traceEnabled = requestJson.get("trace").toString();
       }
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, pqlQuery);
-      return getQueryResponse(pqlQuery, traceEnabled, httpHeaders);
+      return getQueryResponse(pqlQuery, traceEnabled, httpHeaders, "pql");
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing post request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -86,24 +115,34 @@ public class PqlQueryResource {
 
   @GET
   @Path("pql")
-  public String get(@QueryParam("pql") String pqlQuery, @QueryParam("trace") String traceEnabled,
+  public String getPql(@QueryParam("pql") String pqlQuery, @QueryParam("trace") String traceEnabled,
       @Context HttpHeaders httpHeaders) {
     try {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, pqlQuery);
-      return getQueryResponse(pqlQuery, traceEnabled, httpHeaders);
+      return getQueryResponse(pqlQuery, traceEnabled, httpHeaders, "pql");
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
     }
   }
 
-  public String getQueryResponse(String pqlQuery, String traceEnabled, HttpHeaders httpHeaders) {
+  public String getQueryResponse(String query, String traceEnabled,
+		  HttpHeaders httpHeaders, String queryFormat) {
     // Get resource table name.
     BrokerRequest brokerRequest;
     try {
-      brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(pqlQuery);
+      switch (queryFormat) {
+        case PQL:
+          brokerRequest = PQL_COMPILER.compileToBrokerRequest(query);
+          break;
+        case SQL:
+          brokerRequest = SQL_COMPILER.compileToBrokerRequest(query);
+          break;
+        default:
+          throw new UnsupportedOperationException("Unknown query format - " + queryFormat);
+      }
     } catch (Exception e) {
-      LOGGER.info("Caught exception while compiling PQL query: {}, {}", pqlQuery, e.getMessage());
+      LOGGER.info("Caught exception while compiling {} query: {}, {}", queryFormat, query, e.getMessage());
       return QueryException.getException(QueryException.PQL_PARSING_ERROR, e).toString();
     }
     String tableName = TableNameBuilder.extractRawTableName(brokerRequest.getQuerySource().getTableName());
@@ -137,7 +176,7 @@ public class PqlQueryResource {
     String url =
         "http://" + hostNameWithPrefix.substring(hostNameWithPrefix.indexOf("_") + 1) + ":" + instanceConfig.getPort()
             + "/query";
-    return sendPQLRaw(url, pqlQuery, traceEnabled);
+    return sendPQLRaw(url, query, traceEnabled);
   }
 
   public String sendPostRaw(String urlStr, String requestStr, Map<String, String> headers) {
