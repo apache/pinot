@@ -52,6 +52,7 @@ import org.apache.pinot.common.metrics.MetricsHelper;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -124,6 +125,7 @@ public class ControllerStarter {
 
   public ControllerStarter(ControllerConf conf) {
     _config = conf;
+    inferHostnameIfNeeded(_config);
     setupHelixSystemProperties();
 
     _controllerMode = conf.getControllerMode();
@@ -149,6 +151,20 @@ public class ControllerStarter {
       _helixResourceManager = new PinotHelixResourceManager(_config);
       _executorService =
           Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("restapi-multiget-thread-%d").build());
+    }
+  }
+
+  private void inferHostnameIfNeeded(ControllerConf config) {
+    if (config.getControllerHost() == null) {
+      if (config.getBoolean(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)) {
+        final String inferredHostname = NetUtil.getHostnameOrAddress();
+        if (inferredHostname != null) {
+          config.setControllerHost(inferredHostname);
+        } else {
+          throw new RuntimeException(
+              "Failed to infer controller hostname, please set controller instanceId explicitly in config file.");
+        }
+      }
     }
   }
 

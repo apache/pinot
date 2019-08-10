@@ -102,6 +102,7 @@ public class CommonConstants {
         return ServerType.REALTIME;
       }
     }
+    public static final String SET_INSTANCE_ID_TO_HOSTNAME_KEY = "pinot.set.instance.id.to.hostname";
 
     public static final String KEY_OF_SERVER_NETTY_PORT = "pinot.server.netty.port";
     public static final int DEFAULT_SERVER_NETTY_PORT = 8098;
