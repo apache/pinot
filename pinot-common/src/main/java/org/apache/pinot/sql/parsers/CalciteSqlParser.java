@@ -44,21 +44,21 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.ImmutableMap;
+
 
 public class CalciteSqlParser {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
 
-  private static final Map<String, String> FUNC_NAME_MAP;
-
   // Calcite Sqlkind name to pinot operator name map
-  static {
-    FUNC_NAME_MAP = new HashMap<String, String>();
-    FUNC_NAME_MAP.put("PLUS", "ADD");
-    FUNC_NAME_MAP.put("MINUS", "SUB");
-    FUNC_NAME_MAP.put("TIMES", "MULT");
-    FUNC_NAME_MAP.put("DIVIDE", "DIV");
-  }
+  private static final Map<String, String> CALCITE_TO_PINOT_FUNC_NAME_MAP =
+      new ImmutableMap.Builder<String, String>()
+        .put("PLUS", "ADD")
+        .put("MINUS", "SUB")
+        .put("TIMES", "MULT")
+        .put("DIVIDE", "DIV")
+        .build();
 
   /** Lexical policy similar to MySQL with ANSI_QUOTES option enabled. (To be
    * precise: MySQL on Windows; MySQL on Linux uses case-sensitive matching,
@@ -269,7 +269,7 @@ public class CalciteSqlParser {
         if (funcSqlNode.getOperator().getKind() == SqlKind.OTHER_FUNCTION) {
           funcName = funcSqlNode.getOperator().getName();
         }
-        funcName = FUNC_NAME_MAP.getOrDefault(funcName, funcName);
+        funcName = CALCITE_TO_PINOT_FUNC_NAME_MAP.getOrDefault(funcName, funcName);
         final Expression funcExpr = RequestUtils.getFunctionExpression(funcName);
         for (SqlNode child : funcSqlNode.getOperands()) {
           if (child instanceof SqlNodeList) {
