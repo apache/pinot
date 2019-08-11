@@ -39,6 +39,10 @@ import org.slf4j.LoggerFactory;
 public class CombinePlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(CombinePlanNode.class);
 
+  /**
+   * MAX_PLAN_THREADS should be >= 1.
+   * Runtime.getRuntime().availableProcessors() may return value < 2 in container based environment, e.g. Kubernetes.
+   */
   private static final int MAX_PLAN_THREADS =
       Math.max(1, Math.min(10, (int) (Runtime.getRuntime().availableProcessors() * .5)));
   private static final int MIN_TASKS_PER_THREAD = 10;
