@@ -39,6 +39,8 @@ public class CommonConstants {
     public static final String BROKER_RESOURCE_INSTANCE = "brokerResource";
     public static final String LEAD_CONTROLLER_RESOURCE_NAME = "leadControllerResource";
 
+    public static final String LEAD_CONTROLLER_RESOURCE_ENABLED_KEY = "RESOURCE_ENABLED";
+
     // More information on why these numbers are set can be found in the following doc:
     // https://cwiki.apache.org/confluence/display/PINOT/Controller+Separation+between+Helix+and+Pinot
     public static final int NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE = 24;
@@ -332,7 +334,7 @@ public class CommonConstants {
        */
       public enum CompletionMode {
         DEFAULT, // default behavior - if the in memory segment in the non-winner server is equivalent to the committed segment, then build and replace, else download
-        DOWNLOAD // non-winner servers always download the segment, never build it
+        DOWNLOAD // non-winner servers always download the segment, never build it.
       }
 
       public static final String STATUS = "segment.realtime.status";

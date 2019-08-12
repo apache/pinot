@@ -31,14 +31,14 @@ import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY;
 import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
-import static org.apache.pinot.common.utils.CommonConstants.Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE;
 
 
 public class LeadControllerManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerManager.class);
 
-  private final Set<Integer> _partitionIndexCache;
+  private final Set<Integer> _partitionIdCache;
   private final String _instanceId;
   private final HelixManager _helixManager;
   private volatile boolean _isLeadControllerResourceEnabled = false;
@@ -48,7 +48,7 @@ public class LeadControllerManager {
   public LeadControllerManager(HelixManager helixManager) {
     _helixManager = helixManager;
     _instanceId = helixManager.getInstanceName();
-    _partitionIndexCache = ConcurrentHashMap.newKeySet();
+    _partitionIdCache = ConcurrentHashMap.newKeySet();
   }
 
   /**
@@ -59,9 +59,8 @@ public class LeadControllerManager {
   public boolean isLeaderForTable(String tableName) {
     if (_isLeadControllerResourceEnabled) {
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-      int partitionIndex =
-          LeadControllerUtils.getPartitionIdForTable(rawTableName, NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
-      return _partitionIndexCache.contains(partitionIndex);
+      int partitionId = LeadControllerUtils.getPartitionIdForTable(rawTableName);
+      return _partitionIdCache.contains(partitionId);
     } else {
       // Checks if it's Helix leader if lead controller resource is disabled.
       return _amIHelixLeader;
@@ -69,23 +68,23 @@ public class LeadControllerManager {
   }
 
   /**
-   * Given a partition name, marks current controller as lead controller for this partition by caching the partition index to current controller.
+   * Given a partition name, marks current controller as lead controller for this partition by caching the partition id to current controller.
    * @param partitionName partition name in lead controller resource, e.g. leadControllerResource_0.
    */
   public synchronized void addPartitionLeader(String partitionName) {
     LOGGER.info("Add Partition: {} to LeadControllerManager", partitionName);
-    int partitionIndex = LeadControllerUtils.extractPartitionIndex(partitionName);
-    _partitionIndexCache.add(partitionIndex);
+    int partitionId = LeadControllerUtils.extractPartitionId(partitionName);
+    _partitionIdCache.add(partitionId);
   }
 
   /**
-   * Given a partition name, removes current controller as lead controller for this partition by removing the partition index from current controller.
+   * Given a partition name, removes current controller as lead controller for this partition by removing the partition id from current controller.
    * @param partitionName partition name in lead controller resource, e.g. leadControllerResource_0.
    */
   public synchronized void removePartitionLeader(String partitionName) {
     LOGGER.info("Remove Partition: {} from LeadControllerManager", partitionName);
-    int partitionIndex = LeadControllerUtils.extractPartitionIndex(partitionName);
-    _partitionIndexCache.remove(partitionIndex);
+    int partitionId = LeadControllerUtils.extractPartitionId(partitionName);
+    _partitionIdCache.remove(partitionId);
   }
 
   /**
@@ -106,7 +105,7 @@ public class LeadControllerManager {
     HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
     PropertyKey propertyKey = helixDataAccessor.keyBuilder().resourceConfig(LEAD_CONTROLLER_RESOURCE_NAME);
     ResourceConfig resourceConfig = helixDataAccessor.getProperty(propertyKey);
-    String enableResource = resourceConfig.getSimpleConfig(LeadControllerUtils.RESOURCE_ENABLED);
+    String enableResource = resourceConfig.getSimpleConfig(LEAD_CONTROLLER_RESOURCE_ENABLED_KEY);
     return Boolean.parseBoolean(enableResource);
   }
 
@@ -116,7 +115,7 @@ public class LeadControllerManager {
    * to make sure that {@link HelixManager} won't be closed when the callback changes happened.
    */
   public synchronized void stop() {
-    _partitionIndexCache.clear();
+    _partitionIdCache.clear();
     _isShuttingDown = true;
   }
 

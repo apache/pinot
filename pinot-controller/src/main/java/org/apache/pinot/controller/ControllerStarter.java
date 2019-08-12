@@ -80,8 +80,6 @@ import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
-
 
 public class ControllerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerStarter.class);
@@ -489,7 +487,8 @@ public class ControllerStarter {
       helixParticipantManager.addResourceConfigChangeListener(
           (resourceConfigList, changeContext) -> _leadControllerManager.onResourceConfigChange());
     } catch (Exception e) {
-      throw new RuntimeException("Error registering resource config listener for " + LEAD_CONTROLLER_RESOURCE_NAME, e);
+      throw new RuntimeException(
+          "Error registering resource config listener for " + CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME, e);
     }
   }
 

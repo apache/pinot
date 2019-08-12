@@ -51,7 +51,6 @@ import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.TenantRole;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
@@ -425,7 +424,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
         Map<String, String> stateMap = leadControllerResourceExternalView.getStateMap(partition);
         Map.Entry<String, String> entry = stateMap.entrySet().iterator().next();
         boolean result =
-            (LeadControllerUtils.generateControllerParticipantId(LOCAL_HOST, Integer.toString(_controllerPort)))
+            (LeadControllerUtils.generateControllerInstanceId(LOCAL_HOST, Integer.toString(_controllerPort)))
                 .equals(entry.getKey());
         result &= MasterSlaveSMD.States.MASTER.name().equals(entry.getValue());
         if (!result) {
@@ -443,7 +442,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
       List<String> instanceNames = new ArrayList<>(nInstances);
       List<Integer> ports = new ArrayList<>(nInstances);
       for (int i = 0; i < nInstances; i++) {
-        instanceNames.add(LeadControllerUtils.generateControllerParticipantId(LOCAL_HOST, Integer.toString(i)));
+        instanceNames.add(LeadControllerUtils.generateControllerInstanceId(LOCAL_HOST, Integer.toString(i)));
         ports.add(i);
       }
 

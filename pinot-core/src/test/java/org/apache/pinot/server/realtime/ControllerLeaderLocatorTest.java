@@ -34,7 +34,6 @@ import org.apache.zookeeper.data.Stat;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyString;
@@ -210,9 +209,8 @@ public class ControllerLeaderLocatorTest {
     Assert.assertNull(controllerLeaderLocator.getControllerLeader(testTable));
 
     // Adding one host as master, should return the correct host-port pair.
-    partitionSet.add(LeadControllerUtils.generatePartitionName(
-        LeadControllerUtils.getPartitionIdForTable(testTable, NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE)));
-    partitionStateMap.put(LeadControllerUtils.generateControllerParticipantId(leaderHost, leaderPort + ""), "MASTER");
+    partitionSet.add(LeadControllerUtils.generatePartitionName(LeadControllerUtils.getPartitionIdForTable(testTable)));
+    partitionStateMap.put(LeadControllerUtils.generateControllerInstanceId(leaderHost, leaderPort + ""), "MASTER");
 
     Assert.assertEquals(controllerLeaderLocator.getControllerLeader(testTable).getFirst(),
         expectedLeaderLocation.getFirst());
@@ -220,7 +218,7 @@ public class ControllerLeaderLocatorTest {
         expectedLeaderLocation.getSecond());
 
     // The participant host is in offline state, should return null.
-    partitionStateMap.put(LeadControllerUtils.generateControllerParticipantId(leaderHost, leaderPort + ""), "OFFLINE");
+    partitionStateMap.put(LeadControllerUtils.generateControllerInstanceId(leaderHost, leaderPort + ""), "OFFLINE");
 
     // The leader is still valid since the leader is just updated within 30 seconds.
     Assert.assertNotNull(controllerLeaderLocator.getControllerLeader(testTable));

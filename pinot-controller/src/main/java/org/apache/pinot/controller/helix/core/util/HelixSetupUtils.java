@@ -192,8 +192,8 @@ public class HelixSetupUtils {
       resourceConfig = new ResourceConfig(LEAD_CONTROLLER_RESOURCE_NAME);
     }
     // Set RESOURCE_ENABLED to false if it's absent in resource config
-    if (resourceConfig.getSimpleConfig(LeadControllerUtils.RESOURCE_ENABLED) == null) {
-      resourceConfig.putSimpleConfig(LeadControllerUtils.RESOURCE_ENABLED, Boolean.FALSE.toString());
+    if (resourceConfig.getSimpleConfig(LEAD_CONTROLLER_RESOURCE_ENABLED_KEY) == null) {
+      resourceConfig.putSimpleConfig(LEAD_CONTROLLER_RESOURCE_ENABLED_KEY, Boolean.FALSE.toString());
     }
     configAccessor.setResourceConfig(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, resourceConfig);
   }

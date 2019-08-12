@@ -25,6 +25,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -37,9 +38,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
-import static org.apache.pinot.common.utils.CommonConstants.Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE;
 
 
 public class PinotControllerModeTest extends ControllerTest {
@@ -70,10 +68,10 @@ public class PinotControllerModeTest extends ControllerTest {
     startController(firstDualModeControllerConfig);
 
     // Disable delay rebalance feature
-    IdealState idealState = _helixResourceManager.getTableIdealState(LEAD_CONTROLLER_RESOURCE_NAME);
+    IdealState idealState = _helixResourceManager.getTableIdealState(Helix.LEAD_CONTROLLER_RESOURCE_NAME);
     idealState.setDelayRebalanceEnabled(false);
     idealState.setMinActiveReplicas(1);
-    _helixAdmin.updateIdealState(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, idealState);
+    _helixAdmin.updateIdealState(getHelixClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME, idealState);
 
     TestUtils.waitForCondition(aVoid -> _helixManager.isConnected(), TIMEOUT_IN_MS,
         "Failed to start the first dual-mode controller");
@@ -84,9 +82,8 @@ public class PinotControllerModeTest extends ControllerTest {
     String firstTableName = "firstTableName";
     String secondTableName = "secondTableName";
 
-    Assert.assertNotEquals(
-        LeadControllerUtils.getPartitionIdForTable(firstTableName, NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE),
-        LeadControllerUtils.getPartitionIdForTable(secondTableName, NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE));
+    Assert.assertNotEquals(LeadControllerUtils.getPartitionIdForTable(firstTableName),
+        LeadControllerUtils.getPartitionIdForTable(secondTableName));
 
     // The first controller should be the leader for both tables, which is the Helix leader, before the resource is enabled.
     Assert.assertTrue(firstLeadControllerManager.isLeaderForTable(firstTableName));
@@ -230,7 +227,7 @@ public class PinotControllerModeTest extends ControllerTest {
     firstPinotOnlyController.stop();
     TestUtils.waitForCondition(aVoid -> {
       ExternalView leadControllerResourceExternalView =
-          helixAdmin.getResourceExternalView(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME);
+          helixAdmin.getResourceExternalView(getHelixClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME);
       return leadControllerResourceExternalView.getPartitionSet().isEmpty();
     }, TIMEOUT_IN_MS, "Without live instance, there should be no partition in the external view");
 
@@ -242,9 +239,9 @@ public class PinotControllerModeTest extends ControllerTest {
     String expectedInstanceState = "MASTER";
     TestUtils.waitForCondition(aVoid -> {
       ExternalView leadControllerResourceExternalView =
-          helixAdmin.getResourceExternalView(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME);
+          helixAdmin.getResourceExternalView(getHelixClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME);
       Set<String> partitionSet = leadControllerResourceExternalView.getPartitionSet();
-      if (partitionSet.size() != NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE) {
+      if (partitionSet.size() != Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE) {
         return false;
       }
       for (String partition : partitionSet) {

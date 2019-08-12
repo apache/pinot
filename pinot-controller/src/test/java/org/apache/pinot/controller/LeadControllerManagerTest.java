@@ -28,7 +28,6 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -38,8 +37,6 @@ import static org.mockito.Mockito.when;
 public class LeadControllerManagerTest {
   private static String controllerHost = "localhost";
   private static String controllerPort = "18998";
-  private static String instanceId =
-      LeadControllerUtils.generateControllerParticipantId(controllerHost, controllerPort);
   private HelixManager _helixManager;
   private LiveInstance _liveInstance;
   private ResourceConfig _resourceConfig;
@@ -62,14 +59,16 @@ public class LeadControllerManagerTest {
     when(keyBuilder.resourceConfig(any())).thenReturn(resourceConfigPropertyKey);
     _resourceConfig = mock(ResourceConfig.class);
     when(helixDataAccessor.getProperty(resourceConfigPropertyKey)).thenReturn(_resourceConfig);
+
+    String instanceId = LeadControllerUtils.generateControllerInstanceId(controllerHost, controllerPort);
+    when(_helixManager.getInstanceName()).thenReturn(instanceId);
   }
 
   @Test
   public void testLeadControllerManager() {
     LeadControllerManager leadControllerManager = new LeadControllerManager(_helixManager);
     String tableName = "testTable";
-    int expectedPartitionIndex =
-        LeadControllerUtils.getPartitionIdForTable(tableName, NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
+    int expectedPartitionIndex = LeadControllerUtils.getPartitionIdForTable(tableName);
     String partitionName = LeadControllerUtils.generatePartitionName(expectedPartitionIndex);
 
     becomeHelixLeader(false);
