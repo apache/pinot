@@ -420,7 +420,7 @@ public class SelectionOperatorUtils {
   @Nonnull
   public static SelectionResults renderSelectionResultsWithoutOrdering(@Nonnull List<Serializable[]> rows,
       @Nonnull DataSchema dataSchema, @Nonnull List<String> selectionColumns) {
-    int[] columnIndices = getColumnIndicesWithoutOrdering(selectionColumns, dataSchema);
+    int[] columnIndices = getColumnIndices(selectionColumns, dataSchema);
     int numRows = rows.size();
     for (int i = 0; i < numRows; i++) {
       rows.set(i, extractColumns(rows.get(i), columnIndices));
@@ -429,34 +429,12 @@ public class SelectionOperatorUtils {
   }
 
   /**
-   * Helper method to compute column indices from selection columns and the data schema for selection queries without
-   * <code>ORDER BY</code>.
+   * Helper method to compute column indices from selection columns and the data schema for selection queries
    * @param selectionColumns selection columns.
    * @param dataSchema data schema.
    * @return column indices
    */
-  public static int[] getColumnIndicesWithoutOrdering(@Nonnull List<String> selectionColumns,
-      @Nonnull DataSchema dataSchema) {
-    int numSelectionColumns = selectionColumns.size();
-    int[] columnIndices = new int[numSelectionColumns];
-    Map<String, Integer> dataSchemaIndices = new HashMap<>(numSelectionColumns);
-    for (int i = 0; i < numSelectionColumns; i++) {
-      dataSchemaIndices.put(dataSchema.getColumnName(i), i);
-    }
-    for (int i = 0; i < numSelectionColumns; i++) {
-      columnIndices[i] = dataSchemaIndices.get(selectionColumns.get(i));
-    }
-    return columnIndices;
-  }
-
-  /**
-   * Helper method to compute column indices from selection columns and the data schema for selection queries with
-   * <code>ORDER BY</code>.
-   * @param selectionColumns selection columns.
-   * @param dataSchema data schema.
-   * @return column indices
-   */
-  public static int[] getColumnIndicesWithOrdering(@Nonnull List<String> selectionColumns,
+  public static int[] getColumnIndices(@Nonnull List<String> selectionColumns,
       @Nonnull DataSchema dataSchema) {
     int numSelectionColumns = selectionColumns.size();
     int[] columnIndices = new int[numSelectionColumns];
@@ -470,6 +448,8 @@ public class SelectionOperatorUtils {
     }
     return columnIndices;
   }
+
+
 
   /**
    * Extract columns from the row based on the given column indices.
