@@ -196,7 +196,12 @@ export default Component.extend({
    * Anomaly detect rule
    * @type {string}
    */
-  detectRule: reads('anomaly.attributes.detectorComponentName'),
+  detectRule: computed('anomaly', function () {
+    var component = get(this, 'anomaly').attributes.detectorComponentName.toString();
+    var rule = component.split(":");
+    return rule[0];
+  }),
+
 
 
   /**
