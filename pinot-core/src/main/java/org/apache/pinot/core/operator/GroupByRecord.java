@@ -19,40 +19,46 @@
 package org.apache.pinot.core.operator;
 
 import com.google.common.base.Joiner;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 
 
-public class GroupByRow {
+public class GroupByRecord {
   private String _stringKey;
   private String[] _arrayKey;
   private Object[] _aggregationResults;
 
-  public GroupByRow(String stringKey, Object[] aggregationResults) {
+  private static String SEPARATOR = "\t";
+
+  public GroupByRecord(@Nonnull String stringKey, @Nonnull Object[] aggregationResults) {
     _stringKey = stringKey;
-    _arrayKey = stringKey.split("\t");
+    _arrayKey = stringKey.split(SEPARATOR);
     _aggregationResults = aggregationResults;
   }
 
-  public GroupByRow(String[] arrayKey, Object[] aggregationResults) {
-    _stringKey = Joiner.on("\t").join(arrayKey);
+  public GroupByRecord(@Nonnull String[] arrayKey, @Nonnull Object[] aggregationResults) {
+    _stringKey = Joiner.on(SEPARATOR).join(arrayKey);
     _arrayKey = arrayKey;
     _aggregationResults = aggregationResults;
   }
 
+  @Nonnull
   public String[] getArrayKey() {
     return _arrayKey;
   }
 
+  @Nonnull
   public Object[] getAggregationResults() {
     return _aggregationResults;
   }
 
+  @Nonnull
   public String getStringKey() {
     return _stringKey;
   }
 
-  public void merge(GroupByRow rowToMerge, AggregationFunction[] aggregationFunctions, int numAggregationFunctions) {
+  public void merge(GroupByRecord rowToMerge, AggregationFunction[] aggregationFunctions, int numAggregationFunctions) {
     Object[] resultToMerge = rowToMerge.getAggregationResults();
     for (int i = 0; i < numAggregationFunctions; i++) {
       _aggregationResults[i] = aggregationFunctions[i].merge(_aggregationResults[i], resultToMerge[i]);
@@ -69,7 +75,7 @@ public class GroupByRow {
       return false;
     }
 
-    GroupByRow that = (GroupByRow) o;
+    GroupByRecord that = (GroupByRecord) o;
 
     return EqualityUtils.isEqual(_stringKey, that._stringKey) && EqualityUtils.isEqual(_aggregationResults,
         that._aggregationResults);

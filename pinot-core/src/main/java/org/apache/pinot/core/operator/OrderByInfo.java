@@ -32,14 +32,14 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import static org.apache.pinot.common.utils.DataSchema.*;
 
 
-public class OrderByDefn {
+public class OrderByInfo {
 
   private OrderType _orderType; // from group by key, or from aggregation results
   private int _index; // the index, among all the group by keys or aggregation results
   private boolean _ascending;
   private ColumnDataType _columnDataType;
 
-  public OrderByDefn(OrderType orderType, int index, boolean ascending, ColumnDataType columnDataType) {
+  public OrderByInfo(OrderType orderType, int index, boolean ascending, ColumnDataType columnDataType) {
     _orderType = orderType;
     _index = index;
     _ascending = ascending;
@@ -72,7 +72,7 @@ public class OrderByDefn {
       return false;
     }
 
-    OrderByDefn that = (OrderByDefn) o;
+    OrderByInfo that = (OrderByInfo) o;
 
     return EqualityUtils.isEqual(_index, that._index) && EqualityUtils.isEqual(_orderType, that._orderType)
         && EqualityUtils.isEqual(_ascending, that._ascending) && EqualityUtils.isEqual(_columnDataType,
@@ -88,13 +88,9 @@ public class OrderByDefn {
     return result;
   }
 
-  public static boolean isAggregationsInOrderBy(List<OrderByDefn> orderByDefns) {
-    return orderByDefns.stream().anyMatch(v -> v.getOrderType().equals(OrderType.AGGREGATION_VALUE));
-  }
-
-  public static List<OrderByDefn> getOrderByDefnsFromBrokerRequest(List<SelectionSort> orderByClause, GroupBy groupBy,
+  public static List<OrderByInfo> getOrderByInfoFromBrokerRequest(List<SelectionSort> orderByClause, GroupBy groupBy,
       List<AggregationInfo> aggregationInfos, DataSchema dataSchema) {
-    List<OrderByDefn> orderByDefns = new ArrayList<>(orderByClause.size());
+    List<OrderByInfo> orderByInfos = new ArrayList<>(orderByClause.size());
 
     Map<String, Integer> groupByColumnToIndex = new HashMap<>(groupBy.getExpressionsSize());
     int index = 0;
@@ -120,17 +116,17 @@ public class OrderByDefn {
       String column = orderBy.getColumn();
       ColumnDataType columnDataType = columnDataTypeMap.get(column);
       if (groupByColumnToIndex.containsKey(column)) {
-        orderByDefns.add(
-            new OrderByDefn(OrderType.GROUP_BY_KEY, groupByColumnToIndex.get(column), isAsc, columnDataType));
+        orderByInfos.add(
+            new OrderByInfo(OrderType.GROUP_BY_KEY, groupByColumnToIndex.get(column), isAsc, columnDataType));
       } else if (aggregationColumnToIndex.containsKey(column)) {
-        orderByDefns.add(
-            new OrderByDefn(OrderType.AGGREGATION_VALUE, aggregationColumnToIndex.get(column), isAsc, columnDataType));
+        orderByInfos.add(
+            new OrderByInfo(OrderType.AGGREGATION_VALUE, aggregationColumnToIndex.get(column), isAsc, columnDataType));
       } else {
         throw new UnsupportedOperationException(
             "Currently only support order by on group by columns or aggregations, already in query");
       }
     }
 
-    return orderByDefns;
+    return orderByInfos;
   }
 }

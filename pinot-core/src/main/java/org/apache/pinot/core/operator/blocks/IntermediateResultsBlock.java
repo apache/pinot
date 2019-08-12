@@ -36,7 +36,7 @@ import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableImplV2;
-import org.apache.pinot.core.operator.GroupByRow;
+import org.apache.pinot.core.operator.GroupByRecord;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -53,7 +53,7 @@ public class IntermediateResultsBlock implements Block {
   private List<Object> _aggregationResult;
   private AggregationGroupByResult _aggregationGroupByResult;
   private List<Map<String, Object>> _combinedAggregationGroupByResult;
-  private List<GroupByRow> _groupByOrderByResult;
+  private List<GroupByRecord> _groupByOrderByResult;
   private List<ProcessingException> _processingExceptions;
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
@@ -92,24 +92,13 @@ public class IntermediateResultsBlock implements Block {
    * Constructor for aggregation group by order by result.
    */
   @SuppressWarnings("unchecked")
-  public IntermediateResultsBlock(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
-      @Nonnull List aggregationResult, DataSchema dataSchema) {
-    _aggregationFunctionContexts = aggregationFunctionContexts;
+  public IntermediateResultsBlock(@Nonnull List aggregationResult, DataSchema dataSchema) {
     _groupByOrderByResult = aggregationResult;
     _orderByDataSchema = dataSchema;
   }
 
   /**
    * Constructor for aggregation group-by result with {@link AggregationGroupByResult}.
-   */
-  public IntermediateResultsBlock(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
-      @Nullable AggregationGroupByResult aggregationGroupByResults) {
-    _aggregationFunctionContexts = aggregationFunctionContexts;
-    _aggregationGroupByResult = aggregationGroupByResults;
-  }
-
-  /**
-   * Constructor for aggregation group-by order-by result with {@link AggregationGroupByResult}.
    */
   public IntermediateResultsBlock(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
       @Nullable AggregationGroupByResult aggregationGroupByResults, DataSchema orderByDataSchema) {
@@ -308,11 +297,10 @@ public class IntermediateResultsBlock implements Block {
     // Build the data table.
     DataTableBuilder dataTableBuilder = new DataTableBuilder(_orderByDataSchema);
 
-
-    for (GroupByRow groupByRow : _groupByOrderByResult) {
+    for (GroupByRecord groupByRecord : _groupByOrderByResult) {
       dataTableBuilder.startRow();
-      Object[] aggregationResults = groupByRow.getAggregationResults();
-      String[] groupKey = groupByRow.getArrayKey();
+      Object[] aggregationResults = groupByRecord.getAggregationResults();
+      String[] groupKey = groupByRecord.getArrayKey();
       int i = 0;
       for (String key : groupKey) {
         dataTableBuilder.setColumn(i++, key);

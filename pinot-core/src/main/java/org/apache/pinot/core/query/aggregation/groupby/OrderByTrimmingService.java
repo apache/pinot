@@ -19,30 +19,22 @@
 package org.apache.pinot.core.query.aggregation.groupby;
 
 import com.google.common.collect.Lists;
-import com.google.common.collect.MinMaxPriorityQueue;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.PriorityQueue;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.PriorityBlockingQueue;
-import org.apache.pinot.core.operator.GroupByRow;
-import org.apache.pinot.core.operator.OrderByDefn;
-import org.apache.pinot.core.operator.OrderByExecutor;
+import org.apache.pinot.core.operator.GroupByRecord;
 
 
-public class TrimmingService {
+public class OrderByTrimmingService {
 
   private int _trimSize;
   private int _trimThreshold;
 
-  public TrimmingService(int interSegmentNumGroupsLimit, long topN) {
+  public OrderByTrimmingService(int interSegmentNumGroupsLimit, long topN) {
     _trimSize = Math.max(Math.min(interSegmentNumGroupsLimit, (int) topN) * 5, 5000);
     _trimThreshold = _trimSize * 4;
   }
 
-  public List<GroupByRow> trim(PriorityBlockingQueue<GroupByRow> priorityQueue) {
+  public List<GroupByRecord> trim(PriorityBlockingQueue<GroupByRecord> priorityQueue) {
 
     // within threshold, no need to trim
     if (priorityQueue.size() <= _trimThreshold) {

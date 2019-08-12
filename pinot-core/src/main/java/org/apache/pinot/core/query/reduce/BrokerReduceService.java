@@ -53,8 +53,8 @@ import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.operator.GroupByRow;
-import org.apache.pinot.core.operator.OrderByDefn;
+import org.apache.pinot.core.operator.GroupByRecord;
+import org.apache.pinot.core.operator.OrderByInfo;
 import org.apache.pinot.core.operator.OrderByExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
@@ -423,7 +423,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       @Nonnull AggregationFunction[] aggregationFunctions, @Nonnull Map<ServerInstance, DataTable> dataTableMap,
       List<AggregationInfo> aggregationInfos, List<SelectionSort> orderByClause, GroupBy groupBy, boolean preserveType) {
 
-    Map<String, GroupByRow> groupByRowsMap = new HashMap<>();
+    Map<String, GroupByRecord> groupByRowsMap = new HashMap<>();
     DataSchema dataSchema = null;
     for (DataTable dataTable : dataTableMap.values()) {
       if (dataSchema == null) {
@@ -438,28 +438,28 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           groupKey[i] = dataTable.getString(rowId, index++);
         }
         for (int i = 0; i < aggregationFunctions.length; i ++) {
-          results[i] = dataTable.getObject(rowId, index++);
+          results[i] = aggregationFunctions[i].extractFinalResult(dataTable.getObject(rowId, index++));
         }
-        GroupByRow groupByRow = new GroupByRow(groupKey, results);
+        GroupByRecord groupByRecord = new GroupByRecord(groupKey, results);
 
-        groupByRowsMap.compute(groupByRow.getStringKey(), (key, value) -> {
+        groupByRowsMap.compute(groupByRecord.getStringKey(), (key, value) -> {
           if (value == null) {
-            return groupByRow;
+            return groupByRecord;
           } else {
-            value.merge(groupByRow, aggregationFunctions, aggregationFunctions.length);
+            value.merge(groupByRecord, aggregationFunctions, aggregationFunctions.length);
             return value;
           }
         });
       }
     }
-    List<GroupByRow> groupByRows = new ArrayList<>(groupByRowsMap.values());
+    List<GroupByRecord> groupByRecords = new ArrayList<>(groupByRowsMap.values());
 
     OrderByExecutor orderByExecutor = new OrderByExecutor();
-    List<OrderByDefn> orderByDefns =
-        OrderByDefn.getOrderByDefnsFromBrokerRequest(orderByClause, groupBy, aggregationInfos, dataSchema);
-    orderByExecutor.sort(groupByRows, orderByDefns);
+    List<OrderByInfo> orderByInfos =
+        OrderByInfo.getOrderByInfoFromBrokerRequest(orderByClause, groupBy, aggregationInfos, dataSchema);
+    orderByExecutor.sort(groupByRecords, orderByInfos);
 
-    int numRows = Math.min((int) groupBy.getTopN(), groupByRows.size());
+    int numRows = Math.min((int) groupBy.getTopN(), groupByRecords.size());
     List<String> columns = new ArrayList<>();
     for (SelectionSort orderBy : orderByClause) {
       columns.add(orderBy.getColumn());
@@ -468,15 +468,12 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     List<String[]> groupByKeys = new ArrayList<>();
     List<Serializable[]> results = new ArrayList<>();
     for (int i = 0; i < numRows; i ++) {
-      GroupByRow groupByRow = groupByRows.get(i);
-      groupByKeys.add(groupByRow.getArrayKey());
-      Object[] aggregationResults = groupByRow.getAggregationResults();
+      GroupByRecord groupByRecord = groupByRecords.get(i);
+      groupByKeys.add(groupByRecord.getArrayKey());
+      Object[] aggregationResults = groupByRecord.getAggregationResults();
       Serializable[] result = new Serializable[aggregationResults.length];
       for (int j = 0; j < aggregationResults.length; j++) {
-        Object aggregationResult = aggregationResults[j];
-        Number aggregationNumber = (Number) aggregationResult;
-        double v = aggregationNumber.doubleValue();
-        result[j] = v;
+        result[j] = AggregationFunctionUtils.getSerializableValue(aggregationResults[j]);
       }
       results.add(result);
     }
