@@ -98,6 +98,20 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
+  public PinotDataBuffer getPresenceVectorBufferFor(String column)
+      throws IOException {
+    IndexKey key = new IndexKey(column, ColumnIndexType.PRESENCE_VECTOR);
+    return getReadBufferFor(key);
+  }
+
+  @Override
+  public PinotDataBuffer newPresenceVectorBuffer(String column, long sizeBytes)
+      throws IOException {
+    IndexKey key = new IndexKey(column, ColumnIndexType.PRESENCE_VECTOR);
+    return getWriteBufferFor(key, sizeBytes);
+  }
+
+  @Override
   public boolean hasIndexFor(String column, ColumnIndexType type) {
     File indexFile = getFileFor(column, type);
     return indexFile.exists();

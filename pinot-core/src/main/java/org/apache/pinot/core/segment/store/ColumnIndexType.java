@@ -22,7 +22,8 @@ public enum ColumnIndexType {
   DICTIONARY("dictionary"),
   FORWARD_INDEX("forward_index"),
   INVERTED_INDEX("inverted_index"),
-  BLOOM_FILTER("bloom_filter");
+  BLOOM_FILTER("bloom_filter"),
+  PRESENCE_VECTOR("presence_vector");
 
   private final String indexName;
 

@@ -114,6 +114,12 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
+  public PinotDataBuffer getPresenceVectorBufferFor(String column)
+      throws IOException {
+    return checkAndGetIndexBuffer(column, ColumnIndexType.PRESENCE_VECTOR);
+  }
+
+  @Override
   public boolean hasIndexFor(String column, ColumnIndexType type) {
     IndexKey key = new IndexKey(column, type);
     return columnEntries.containsKey(key);
@@ -141,6 +147,12 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   public PinotDataBuffer newBloomFilterBuffer(String column, long sizeBytes)
       throws IOException {
     return allocNewBufferInternal(column, ColumnIndexType.BLOOM_FILTER, sizeBytes, "bloom_filter.create");
+  }
+
+  @Override
+  public PinotDataBuffer newPresenceVectorBuffer(String column, long sizeBytes)
+      throws IOException {
+    return allocNewBufferInternal(column, ColumnIndexType.PRESENCE_VECTOR, sizeBytes, "presence_vector.create");
   }
 
   private PinotDataBuffer checkAndGetIndexBuffer(String column, ColumnIndexType type) {
