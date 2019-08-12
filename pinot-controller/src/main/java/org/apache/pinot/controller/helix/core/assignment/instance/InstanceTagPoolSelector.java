@@ -26,8 +26,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.config.Instance;
 import org.apache.pinot.common.config.instance.InstanceTagPoolConfig;
-import org.apache.pinot.controller.api.pojos.Instance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

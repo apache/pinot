@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.helix.model.IdealState;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.config.Instance;
+import org.apache.pinot.common.utils.CommonConstants.Helix.InstanceType;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -38,9 +39,9 @@ import static org.testng.Assert.assertEquals;
  */
 // TODO: clean up this test
 public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRefreshDeleteIntegrationTest {
-  private final String serverTenant = "DefaultTenant_OFFLINE";
-  private final String hostName = "1.2.3.4";
-  private final int basePort = 1234;
+  private static final String HOST = "1.2.3.4";
+  private static final int BASE_PORT = 1234;
+  private static final String SERVER_TAG = "DefaultTenant_OFFLINE";
 
   @BeforeClass
   public void setUp()
@@ -49,12 +50,9 @@ public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRe
 
     // Create eight dummy server instances
     for (int i = 0; i < 8; ++i) {
-      ObjectNode serverInstance = JsonUtils.newObjectNode();
-      serverInstance.put("host", hostName);
-      serverInstance.put("port", Integer.toString(basePort + i));
-      serverInstance.put("tag", serverTenant);
-      serverInstance.put("type", "server");
-      sendPostRequest(_controllerRequestURLBuilder.forInstanceCreate(), serverInstance.toString());
+      Instance serverInstance =
+          new Instance(HOST, BASE_PORT + i, InstanceType.SERVER, Collections.singletonList(SERVER_TAG), null);
+      sendPostRequest(_controllerRequestURLBuilder.forInstanceCreate(), serverInstance.toJsonString());
     }
   }
 
@@ -100,7 +98,7 @@ public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRe
   @Test(dataProvider = "tableNameProvider")
   public void testNoAssignmentToDisabledInstances(String tableName, SegmentVersion version)
       throws Exception {
-    List<String> instances = _helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), serverTenant);
+    List<String> instances = _helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), SERVER_TAG);
     List<String> disabledInstances = new ArrayList<>();
     // disable 6 instances
     assertEquals(instances.size(), 9);

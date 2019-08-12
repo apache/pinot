@@ -187,7 +187,7 @@ public abstract class ClusterTest extends ControllerTest {
       for (int i = 0; i < minionCount; i++) {
         Configuration config = new PropertiesConfiguration();
         config.setProperty(Helix.Instance.INSTANCE_ID_KEY,
-            Minion.INSTANCE_PREFIX + "minion" + i + "_" + (Minion.DEFAULT_HELIX_PORT + i));
+            Helix.PREFIX_OF_MINION_INSTANCE + "minion" + i + "_" + (Minion.DEFAULT_HELIX_PORT + i));
         config.setProperty(Helix.Instance.DATA_DIR_KEY, Minion.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
         MinionStarter minionStarter = new MinionStarter(ZkStarter.DEFAULT_ZK_STR, getHelixClusterName(), config);
 
@@ -405,11 +405,11 @@ public abstract class ClusterTest extends ControllerTest {
       String kafkaTopic, int realtimeSegmentFlushRows, File avroFile, String timeColumnName, String timeType,
       String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
       List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
-      TableTaskConfig taskConfig, String streamConsumerFactoryName) throws Exception {
-    addRealtimeTable(tableName, useLlc, kafkaBrokerList, kafkaZkUrl, kafkaTopic, realtimeSegmentFlushRows,
-        avroFile, timeColumnName, timeType, schemaName, brokerTenant, serverTenant, loadMode, sortedColumn,
-        invertedIndexColumns, bloomFilterColumns, noDictionaryColumns, taskConfig, streamConsumerFactoryName,
-        1);
+      TableTaskConfig taskConfig, String streamConsumerFactoryName)
+      throws Exception {
+    addRealtimeTable(tableName, useLlc, kafkaBrokerList, kafkaZkUrl, kafkaTopic, realtimeSegmentFlushRows, avroFile,
+        timeColumnName, timeType, schemaName, brokerTenant, serverTenant, loadMode, sortedColumn, invertedIndexColumns,
+        bloomFilterColumns, noDictionaryColumns, taskConfig, streamConsumerFactoryName, 1);
   }
 
   protected void addRealtimeTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,

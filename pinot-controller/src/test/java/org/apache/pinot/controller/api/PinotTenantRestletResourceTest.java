@@ -19,9 +19,9 @@
 package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.config.TagNameUtils;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.testng.annotations.AfterClass;
@@ -31,76 +31,40 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Test for table to tenant mapping. Real working test is inside offline cluster integration test because it requires
- * segment upload.
- */
 public class PinotTenantRestletResourceTest extends ControllerTest {
-  private final TableConfig.Builder _offlineBuilder = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE);
-  private static final int NUM_BROKER_INSTANCES = 2;
-  private static final int NUM_SERVER_INSTANCES = 6;
+  private static final int NUM_BROKER_INSTANCES = 1;
+  private static final int NUM_SERVER_INSTANCES = 3;
 
   @BeforeClass
-  public void setUp() {
+  public void setUp()
+      throws Exception {
     startZk();
     startController();
+    addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
+    addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
   }
 
   @Test
   public void testTableListForTenant()
       throws Exception {
-    // Create untagged broker and server instances
-    ObjectNode brokerInstance =
-        (ObjectNode) JsonUtils.stringToJsonNode("{\"host\":\"1.2.3.4\", \"type\":\"broker\", \"port\":\"1234\"}");
-    sendPostRequest(_controllerRequestURLBuilder.forInstanceCreate(), brokerInstance.toString());
-
-    ObjectNode serverInstance =
-        (ObjectNode) JsonUtils.stringToJsonNode("{\"host\":\"1.2.3.4\", \"type\":\"server\", \"port\":\"2345\"}");
-    sendPostRequest(_controllerRequestURLBuilder.forInstanceCreate(), serverInstance.toString());
-
-    // Create tagged broker and server instances
-    brokerInstance.put("tag", "someTag");
-    brokerInstance.put("host", "2.3.4.5");
-    sendPostRequest(_controllerRequestURLBuilder.forInstanceCreate(), brokerInstance.toString());
-
-    serverInstance.put("tag", "server_REALTIME");
-    serverInstance.put("host", "2.3.4.5");
-    sendPostRequest(_controllerRequestURLBuilder.forInstanceCreate(), serverInstance.toString());
-
     // Check that no tables on tenant works
-    JsonNode tableList =
-        JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forTablesFromTenant("server_REALTIME")));
-    assertEquals(tableList.get("tables").size(), 0, "Expected no tables");
+    String listTablesUrl = _controllerRequestURLBuilder.forTablesFromTenant(TagNameUtils.DEFAULT_TENANT_NAME);
+    JsonNode tableList = JsonUtils.stringToJsonNode(sendGetRequest(listTablesUrl));
+    assertEquals(tableList.get("tables").size(), 0);
 
-    // Try to make sure both kinds of tags work
-    tableList = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forTablesFromTenant("server")));
-    assertEquals(tableList.get("tables").size(), 0, "Expected no tables");
+    // Add a table
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(),
+        new TableConfig.Builder(TableType.OFFLINE).setTableName("testTable").build().toJsonConfigString());
 
-    // Add a table to the server
-    String createTableUrl = _controllerRequestURLBuilder.forTableCreate();
-
-    addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
-    addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
-
-    _offlineBuilder.setTableName("testOfflineTable").setTimeColumnName("timeColumn").setTimeType("DAYS")
-        .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5").setServerTenant("DefaultTenant");
-
-    TableConfig offlineTableConfig = _offlineBuilder.build();
-    offlineTableConfig.setTableName("mytable_OFFLINE");
-    String offlineTableJSONConfigString = offlineTableConfig.toJsonConfigString();
-    sendPostRequest(createTableUrl, offlineTableJSONConfigString);
-
-    // Try to make sure both kinds of tags work
-    tableList =
-        JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forTablesFromTenant("DefaultTenant")));
-    assertEquals(tableList.get("tables").size(), 1, "Expected 1 table");
-    assertEquals(tableList.get("tables").get(0).asText(), "mytable_OFFLINE");
-
-    stopFakeInstances();
+    // There should be 1 table on the tenant
+    tableList = JsonUtils.stringToJsonNode(sendGetRequest(listTablesUrl));
+    assertEquals(tableList.get("tables").size(), 1);
+    assertEquals(tableList.get("tables").get(0).asText(), "testTable_OFFLINE");
   }
 
   @AfterClass
   public void tearDown() {
+    stopFakeInstances();
     stopController();
     stopZk();
   }
