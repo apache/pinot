@@ -28,7 +28,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
-import org.apache.pinot.core.query.utils.Pair;
+import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,13 +89,13 @@ public class ControllerLeaderLocator {
       return _controllerLeaderHostPort;
     }
 
-    String leaderForTable = getLeaderForTable(rawTableName);
+    Pair<String, Integer> leaderForTable = getLeaderForTable(rawTableName);
     if (leaderForTable == null) {
       LOGGER.warn("Failed to find a leader for Table: {}", rawTableName);
       _cachedControllerLeaderInvalid = true;
       return null;
     } else {
-      _controllerLeaderHostPort = generateControllerLeaderHostPortPair(leaderForTable);
+      _controllerLeaderHostPort = leaderForTable;
       _cachedControllerLeaderInvalid = false;
       LOGGER.info("Setting controller leader to be {}:{}", _controllerLeaderHostPort.getFirst(),
           _controllerLeaderHostPort.getSecond());
@@ -110,7 +110,7 @@ public class ControllerLeaderLocator {
    * @param rawTableName table name without type.
    * @return the controller leader id with hostname and port for this table, e.g. localhost_9000
    */
-  private String getLeaderForTable(String rawTableName) {
+  private Pair<String, Integer> getLeaderForTable(String rawTableName) {
     // Checks whether lead controller resource has been enabled or not.
     if (isLeadControllerResourceEnabled()) {
       // Gets leader from lead controller resource.
@@ -140,12 +140,12 @@ public class ControllerLeaderLocator {
   /**
    * Gets leader from lead controller resource. Null if there is no leader.
    * @param rawTableName raw table name.
-   * @return instance id of Helix cluster leader, e.g. localhost_9000.
+   * @return pair of instance hostname and port of Helix cluster leader, e.g. {localhost, 9000}.
    */
-  private String getLeaderFromLeadControllerResource(String rawTableName) {
-    String leadControllerInstance = getLeadControllerInstanceIdForTable(rawTableName);
-    if (leadControllerInstance != null) {
-      return leadControllerInstance;
+  private Pair<String, Integer> getLeaderFromLeadControllerResource(String rawTableName) {
+    Pair<String, Integer> leaderHostAndPortPair = getLeadControllerInstanceIdForTable(rawTableName);
+    if (leaderHostAndPortPair != null) {
+      return leaderHostAndPortPair;
     } else {
       LOGGER.warn("Could not locate leader for table: {}", rawTableName);
       return null;
@@ -156,7 +156,7 @@ public class ControllerLeaderLocator {
    * Gets Helix leader in the cluster. Null if there is no leader.
    * @return instance id of Helix cluster leader, e.g. localhost_9000.
    */
-  private String getHelixClusterLeader() {
+  private Pair<String, Integer> getHelixClusterLeader() {
     BaseDataAccessor<ZNRecord> dataAccessor = _helixManager.getHelixDataAccessor().getBaseDataAccessor();
     Stat stat = new Stat();
     try {
@@ -165,7 +165,11 @@ public class ControllerLeaderLocator {
       String helixLeader = znRecord.getId();
       LOGGER.info("Getting Helix leader: {} as per znode version {}, mtime {}", helixLeader, stat.getVersion(),
           stat.getMtime());
-      return helixLeader;
+
+      int index = helixLeader.lastIndexOf('_');
+      String leaderHost = helixLeader.substring(0, index);
+      int leaderPort = Integer.valueOf(helixLeader.substring(index + 1));
+      return new Pair<>(leaderHost, leaderPort);
     } catch (Exception e) {
       LOGGER.warn("Could not locate Helix leader!", e);
       return null;
@@ -178,7 +182,7 @@ public class ControllerLeaderLocator {
    * @param rawTableName table name without type
    * @return Helix controller instance id for partition leader, e.g. localhost_9000. Null if not found or resource is disabled.
    */
-  private String getLeadControllerInstanceIdForTable(String rawTableName) {
+  private Pair<String, Integer> getLeadControllerInstanceIdForTable(String rawTableName) {
     try {
       ExternalView leadControllerResourceExternalView = _helixManager.getClusterManagmentTool()
           .getResourceExternalView(_helixManager.getClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
@@ -196,7 +200,7 @@ public class ControllerLeaderLocator {
           // Found the controller in master state.
           // Converts participant id (with Prefix "Controller_") to controller id and assigns it as the leader,
           // since realtime segment completion protocol doesn't need the prefix in controller instance id.
-          return LeadControllerUtils.convertParticipantInstanceIdToHelixControllerInstanceId(entry.getKey());
+          return LeadControllerUtils.convertToHostAndPortPair(entry.getKey());
         }
       }
       LOGGER
@@ -205,17 +209,6 @@ public class ControllerLeaderLocator {
       LOGGER.warn("Caught exception when getting lead controller instance Id for table: {}", rawTableName, e);
     }
     return null;
-  }
-
-  /**
-   * Generates a pair of hostname and port given a controller leader id.
-   * @param controllerLeaderId controller leader id, e.g. localhost_9000
-   */
-  private Pair<String, Integer> generateControllerLeaderHostPortPair(String controllerLeaderId) {
-    int index = controllerLeaderId.lastIndexOf('_');
-    String leaderHost = controllerLeaderId.substring(0, index);
-    int leaderPort = Integer.valueOf(controllerLeaderId.substring(index + 1));
-    return new Pair<>(leaderHost, leaderPort);
   }
 
   /**

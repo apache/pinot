@@ -21,12 +21,10 @@ package org.apache.pinot.common.utils.helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.StringUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.pinot.pql.parsers.utils.Pair;
 
 
 public class LeadControllerUtils {
-  public static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerUtils.class);
 
   /**
    * Given a raw table name and number of partitions, returns the partition id in lead controller resource.
@@ -42,16 +40,24 @@ public class LeadControllerUtils {
   }
 
   /**
-   * Converts participant instance id (e.g. Controller_localhost_9000) to Helix controller instance id (e.g. localhost_9000).
+   * Generates a pair of hostname and port given a participant instance id (e.g. Controller_localhost_9000).
+   * @param participantInstanceId participant instance Id, e.g. Controller_localhost_9000
    */
-  public static String convertParticipantInstanceIdToHelixControllerInstanceId(String participantInstanceId) {
-    return participantInstanceId.substring(participantInstanceId.indexOf("_") + 1);
+  public static Pair<String, Integer> convertToHostAndPortPair(String participantInstanceId) {
+    // Converts participant id (with Prefix "Controller_") to controller id and assigns it as the leader,
+    // since realtime segment completion protocol doesn't need the prefix in controller instance id.
+    String controllerLeaderId = participantInstanceId.substring(participantInstanceId.indexOf("_") + 1);
+
+    int index = controllerLeaderId.lastIndexOf('_');
+    String leaderHost = controllerLeaderId.substring(0, index);
+    int leaderPort = Integer.valueOf(controllerLeaderId.substring(index + 1));
+    return new Pair<>(leaderHost, leaderPort);
   }
 
   /**
-   * Generates controller participant id, e.g. returns Controller_localhost_9000 given localhost as hostname and 9000 as port.
+   * Generates participant instance id, e.g. returns Controller_localhost_9000 given localhost as hostname and 9000 as port.
    */
-  public static String generateControllerInstanceId(String controllerHost, String controllerPort) {
+  public static String generateParticipantInstanceId(String controllerHost, String controllerPort) {
     return Helix.PREFIX_OF_CONTROLLER_INSTANCE + controllerHost + "_" + controllerPort;
   }
 

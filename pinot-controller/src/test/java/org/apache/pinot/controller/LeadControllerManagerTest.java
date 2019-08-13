@@ -60,7 +60,7 @@ public class LeadControllerManagerTest {
     _resourceConfig = mock(ResourceConfig.class);
     when(helixDataAccessor.getProperty(resourceConfigPropertyKey)).thenReturn(_resourceConfig);
 
-    String instanceId = LeadControllerUtils.generateControllerInstanceId(controllerHost, controllerPort);
+    String instanceId = LeadControllerUtils.generateParticipantInstanceId(controllerHost, controllerPort);
     when(_helixManager.getInstanceName()).thenReturn(instanceId);
   }
 

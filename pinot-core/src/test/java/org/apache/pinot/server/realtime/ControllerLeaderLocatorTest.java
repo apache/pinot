@@ -210,7 +210,7 @@ public class ControllerLeaderLocatorTest {
 
     // Adding one host as master, should return the correct host-port pair.
     partitionSet.add(LeadControllerUtils.generatePartitionName(LeadControllerUtils.getPartitionIdForTable(testTable)));
-    partitionStateMap.put(LeadControllerUtils.generateControllerInstanceId(leaderHost, leaderPort + ""), "MASTER");
+    partitionStateMap.put(LeadControllerUtils.generateParticipantInstanceId(leaderHost, leaderPort + ""), "MASTER");
 
     Assert.assertEquals(controllerLeaderLocator.getControllerLeader(testTable).getFirst(),
         expectedLeaderLocation.getFirst());
@@ -218,7 +218,7 @@ public class ControllerLeaderLocatorTest {
         expectedLeaderLocation.getSecond());
 
     // The participant host is in offline state, should return null.
-    partitionStateMap.put(LeadControllerUtils.generateControllerInstanceId(leaderHost, leaderPort + ""), "OFFLINE");
+    partitionStateMap.put(LeadControllerUtils.generateParticipantInstanceId(leaderHost, leaderPort + ""), "OFFLINE");
 
     // The leader is still valid since the leader is just updated within 30 seconds.
     Assert.assertNotNull(controllerLeaderLocator.getControllerLeader(testTable));

@@ -30,7 +30,7 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.core.query.utils.Pair;
+import org.apache.pinot.pql.parsers.utils.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,6 +41,7 @@ import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentComple
  * A class that handles sending segment completion protocol requests to the controller and getting
  * back responses
  */
+// TODO: Use exception based code to handle different types of exceptions.
 public class ServerSegmentCompletionProtocolHandler {
   private static Logger LOGGER = LoggerFactory.getLogger(ServerSegmentCompletionProtocolHandler.class);
   private static final String HTTPS_PROTOCOL = "https";
