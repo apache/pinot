@@ -159,7 +159,7 @@ public class SelectionOperatorServiceTest {
     Assert.assertTrue(Arrays.deepEquals(resultRows.get(1), expectedRow2));
 
     int[] columnIndices =
-        SelectionOperatorUtils.getColumnIndicesWithoutOrdering(selectionResults.getColumns(), _dataSchema);
+        SelectionOperatorUtils.getColumnIndices(selectionResults.getColumns(), _dataSchema);
 
     // TODO: use "formatRowsWithoutOrdering" after server updated to the latest code.
     resultRows = SelectionOperatorUtils.formatRowsWithOrdering(resultRows, columnIndices, _upgradedDataSchema);
@@ -192,7 +192,7 @@ public class SelectionOperatorServiceTest {
     Assert.assertTrue(Arrays.deepEquals(resultRows.get(1), expectedRow2));
 
     int[] columnIndices =
-        SelectionOperatorUtils.getColumnIndicesWithOrdering(selectionResults.getColumns(), _dataSchema);
+        SelectionOperatorUtils.getColumnIndices(selectionResults.getColumns(), _dataSchema);
     resultRows = SelectionOperatorUtils.formatRowsWithOrdering(resultRows, columnIndices, _upgradedDataSchema);
 
     Serializable[] expectedFormattedRow1 =
