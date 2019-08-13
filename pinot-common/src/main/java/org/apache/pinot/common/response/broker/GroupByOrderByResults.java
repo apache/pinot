@@ -25,28 +25,32 @@ import java.io.Serializable;
 import java.util.List;
 
 
-@JsonPropertyOrder({"columns", "groupByKeys", "results"})
+/**
+ * This class holds the results of group by order by query which is set into the {@link BrokerResponseNative}
+ */
+@JsonPropertyOrder({"orderBy", "groupByKeys", "aggregationResults"})
 public class GroupByOrderByResults {
-  private List<String> _columns;
-  private List<String[]>_groupByKeys;
-  private List<Serializable[]> _rows;
+  private List<String> _orderBy;
+  private List<String[]> _groupByKeys;
+  private List<Serializable[]> _aggregationResults;
 
   @JsonCreator
-  public GroupByOrderByResults(@JsonProperty("columns") List<String> columns,
-      @JsonProperty("groupByKeys") List<String[]> groupByKeys, @JsonProperty("results") List<Serializable[]> results) {
-    _columns = columns;
+  public GroupByOrderByResults(@JsonProperty("orderBy") List<String> orderBy,
+      @JsonProperty("groupByKeys") List<String[]> groupByKeys,
+      @JsonProperty("aggregationResults") List<Serializable[]> aggregationResults) {
+    _orderBy = orderBy;
     _groupByKeys = groupByKeys;
-    _rows = results;
+    _aggregationResults = aggregationResults;
   }
 
-  @JsonProperty("columns")
-  public List<String> getColumns() {
-    return _columns;
+  @JsonProperty("orderBy")
+  public List<String> getOrderBy() {
+    return _orderBy;
   }
 
-  @JsonProperty("columns")
-  public void setColumns(List<String> columns) {
-    _columns = columns;
+  @JsonProperty("orderBy")
+  public void setOrderBy(List<String> orderBy) {
+    _orderBy = orderBy;
   }
 
   @JsonProperty("groupByKeys")
@@ -59,13 +63,13 @@ public class GroupByOrderByResults {
     _groupByKeys = groupByKeys;
   }
 
-  @JsonProperty("results")
-  public List<Serializable[]> getRows() {
-    return _rows;
+  @JsonProperty("aggregationResults")
+  public List<Serializable[]> getAggregationResults() {
+    return _aggregationResults;
   }
 
-  @JsonProperty("results")
-  public void setRows(List<Serializable[]> rows) {
-    _rows = rows;
+  @JsonProperty("aggregationResults")
+  public void setAggregationResults(List<Serializable[]> aggregationResults) {
+    _aggregationResults = aggregationResults;
   }
 }

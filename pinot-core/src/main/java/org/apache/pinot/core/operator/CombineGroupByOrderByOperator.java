@@ -54,11 +54,14 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The <code>CombineGroupByOperator</code> class is the operator to combine aggregation group-by results.
+ * The {@link CombineGroupByOrderByOperator} class is the operator to combine and order aggregation group-by results.
  */
+// TODO: this class has a lot of duplication with {@link CombineGroupByOperator}.
+// These 2 classes can be combined into one
+// For the first iteration of Order By support, these will be separate
 public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(CombineGroupByOrderByOperator.class);
-  private static final String OPERATOR_NAME = "CombineGroupByOperator";
+  private static final String OPERATOR_NAME = "CombineGroupByOrderByOperator";
 
   // Use a higher limit for groups stored across segments. For most cases, most groups from each segment should be the
   // same, thus the total number of groups across segments should be equal or slightly higher than the number of groups
@@ -98,12 +101,11 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
    * result block.
    * <ul>
    *   <li>
-   *     Concurrently merge group-by results form multiple result blocks into a map from group key to group results
+   *     Concurrently merge group-by results from multiple result blocks into a map from group key to group results
    *   </li>
    *   <li>
    *     Sort and trim the results map based on {@code TOP N} in the request
-   *     <p>Results map will be converted from {@code Map<String, Object[]>} to {@code List<Map<String, Object>>} which
-   *     is expected by the broker
+   *     <p>Results will be converted to List<GroupByRecord> which is expected by the broker
    *   </li>
    *   <li>
    *     Set all exceptions encountered during execution into the merged result block
@@ -152,14 +154,12 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
             try {
               if (_dataSchema == null) {
                 _dataSchema = dataSchema;
-              } else {
-                //TODO: check compatibility of _dataSchema and dataSchema
               }
             } finally {
               _initLock.unlock();
             }
 
-            // TODO: priority queue based
+            // TODO: priority queue + map based approach for on the fly ordering and trimming
             // Merge aggregation group-by result
             aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
             if (aggregationGroupByResult != null) {
@@ -169,6 +169,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
                 GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
                 resultsMap.compute(groupKey._stringKey, (key, value) -> {
                   if (value == null) {
+                    // TODO: smarter trimming strategies
                     if (numGroups.getAndIncrement() < _interSegmentNumGroupsLimit) {
                       Object[] resultToInsert = new Object[numAggregationFunctions];
                       for (int i = 0; i < numAggregationFunctions; i++) {
@@ -206,6 +207,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
         return new IntermediateResultsBlock(new TimeoutException(errorMessage));
       }
 
+      // order and trim top N
       OrderByTrimmingService orderByTrimmingService =
           new OrderByTrimmingService(_brokerRequest.getAggregationsInfo(), _brokerRequest.getGroupBy(),
               _brokerRequest.getOrderBy(), _dataSchema);

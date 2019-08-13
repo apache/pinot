@@ -18,7 +18,13 @@
  */
 package org.apache.pinot.core.operator;
 
+/**
+ * Given a query "select agg1, agg2.. from table group by key1, key2..",
+ * order by can have any combination of agg1, agg2.., key1, key2..
+ * The <code>OrderType</code> enum helps distinguish between an order by on an aggregation result or a group by key
+ */
 public enum OrderType {
   GROUP_BY_KEY,
   AGGREGATION_VALUE
+  // TODO: add support for order by any expressions formed out of the aggregations and group by keys
 }

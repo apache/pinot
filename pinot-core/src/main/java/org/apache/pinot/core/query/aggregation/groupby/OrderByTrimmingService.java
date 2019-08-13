@@ -29,6 +29,9 @@ import org.apache.pinot.core.operator.GroupByRecord;
 import org.apache.pinot.core.operator.OrderByUtils;
 
 
+/**
+ * Service for ordering and trimming results of {@link GroupByRecord}
+ */
 public class OrderByTrimmingService {
 
   private int _topN;
@@ -49,9 +52,27 @@ public class OrderByTrimmingService {
     Preconditions.checkArgument(_topN > 0);
   }
 
+  /**
+   * Order and trim intermediate results at the instance level
+   *
+   * TODO: These below strategies for trimming are naive and have been borrowed from the existing classes:
+   * {@link AggregationGroupByTrimmingService} - trims off based on top at the server level
+   * {@link org.apache.pinot.core.operator.CombineGroupByOperator} - starts dropping keys after interSegmentNumGroupsLimit, without consideration for ordering
+   * {@link org.apache.pinot.core.operator.query.AggregationGroupByOperator} - starts dropping keys after innerSegmentNumGroupsLimit, without consideration for ordering
+   *
+   * Smarter trimming strategies will be introduced in future iterations of order by
+   * These could include
+   * 1) on the fly ordering and trimming at the {@link org.apache.pinot.core.operator.query.AggregationGroupByOperator} level based , using Priority Queue and Map
+   * 2) on the fly ordering and trimming at the {@link org.apache.pinot.core.operator.CombineGroupByOrderByOperator} level during merge, using PriorityQueue and Map
+   * 3) Priority Queue based approaches for ordering and trimming post merge
+   *
+   */
   public List<GroupByRecord> orderAndTrimIntermediate(List<GroupByRecord> groupByRecords) {
-    // TODO: explain these trimmings
+
+    // To keep the precision, _trimSize is the larger of (_groupByTopN * 5) or 5000
     int trimSize = Math.max(_topN * 5, 5000);
+
+    // To trigger the trimming, number of groups should be larger than _trimThreshold which is (_trimSize * 4)
     int trimThreshold = trimSize * 4;
 
     // within threshold, no need to trim
@@ -60,23 +81,24 @@ public class OrderByTrimmingService {
     }
 
     // order
-    OrderByUtils orderByUtils = new OrderByUtils();
     Comparator<GroupByRecord> comparator =
-        orderByUtils.getIntermediateComparator(_aggregationInfos, _groupBy, _orderBy, _dataSchema);
-    // TODO: priority queue based approaches
+        OrderByUtils.getIntermediateComparator(_aggregationInfos, _groupBy, _orderBy, _dataSchema);
+    // TODO: priority queue based approaches to avoid sorting all records
     groupByRecords.sort(comparator);
 
     // trim
     return groupByRecords.subList(0, trimSize);
   }
 
+  /**
+   * Order and trim final results at the broker side
+   */
   public List<GroupByRecord> orderAndTrimFinal(List<GroupByRecord> groupByRecords) {
 
     // order
-    OrderByUtils orderByUtils = new OrderByUtils();
     Comparator<GroupByRecord> comparator =
-        orderByUtils.getFinalComparator(_aggregationInfos, _groupBy, _orderBy, _dataSchema);
-    // TODO: priority queue based approaches
+        OrderByUtils.getFinalComparator(_aggregationInfos, _groupBy, _orderBy, _dataSchema);
+    // TODO: priority queue based approaches to avoid sorting all records
     groupByRecords.sort(comparator);
 
     // trim

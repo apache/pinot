@@ -37,29 +37,41 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import static org.apache.pinot.common.utils.DataSchema.*;
 
 
+/**
+ * Helper methods to perform order by of list of {@link GroupByRecord}
+ */
 public class OrderByUtils {
 
-  public Comparator<GroupByRecord> getIntermediateComparator(List<AggregationInfo> aggregationInfos, GroupBy groupBy,
+  /**
+   * Constructs the comparator to order the intermediate results
+   */
+  public static Comparator<GroupByRecord> getIntermediateComparator(List<AggregationInfo> aggregationInfos, GroupBy groupBy,
       List<SelectionSort> orderBy, DataSchema dataSchema) {
     List<OrderByInfo> orderByInfos = constructOrderByInfo(aggregationInfos, groupBy, orderBy, dataSchema);
     return getComparator(orderByInfos, true);
   }
 
-  public Comparator<GroupByRecord> getFinalComparator(List<AggregationInfo> aggregationInfos, GroupBy groupBy,
+  /**
+   * Constructs the comparator to order the final results
+   */
+  public static Comparator<GroupByRecord> getFinalComparator(List<AggregationInfo> aggregationInfos, GroupBy groupBy,
       List<SelectionSort> orderBy, DataSchema dataSchema) {
     List<OrderByInfo> orderByInfos = constructOrderByInfo(aggregationInfos, groupBy, orderBy, dataSchema);
     return getComparator(orderByInfos, false);
   }
 
-  private Comparator<GroupByRecord> getComparator(List<OrderByInfo> orderByInfos, boolean isIntermediate) {
+  /**
+   * Constructs a comparator given all the {@link OrderByInfo} for the order by clause
+   */
+  private static Comparator<GroupByRecord> getComparator(List<OrderByInfo> orderByInfos, boolean isIntermediate) {
     Comparator<GroupByRecord> globalComparator = null;
     for (OrderByInfo orderByInfo : orderByInfos) {
       OrderType orderType = orderByInfo.getOrderType();
 
-      Comparator<GroupByRecord> comparator = null;
+      Comparator<GroupByRecord> comparator;
       if (orderType.equals(OrderType.AGGREGATION_VALUE)) {
         comparator = getAggregationComparator(orderByInfo, isIntermediate);
-      } else if (orderType.equals(OrderType.GROUP_BY_KEY)) {
+      } else {
         comparator = getGroupByKeyComparator(orderByInfo);
       }
       if (globalComparator == null) {
@@ -71,7 +83,13 @@ public class OrderByUtils {
     return globalComparator;
   }
 
-  private Comparator<GroupByRecord> getAggregationComparator(OrderByInfo orderByInfo, boolean isIntermediate) {
+  /**
+   * Constructs the comparator for ordering by an aggregation result
+   *
+   * When ordering intermediate results, check if the intermediate results are comparable.
+   * If they are not, extract final result for doing the comparison
+   */
+  private static Comparator<GroupByRecord> getAggregationComparator(OrderByInfo orderByInfo, boolean isIntermediate) {
     int index = orderByInfo.getIndex();
     AggregationFunction aggregationFunction = orderByInfo.getAggregationFunction();
     boolean ascending = orderByInfo.isAscending();
@@ -102,7 +120,10 @@ public class OrderByUtils {
     return comparator;
   }
 
-  private Comparator<GroupByRecord> getGroupByKeyComparator(OrderByInfo orderByInfo) {
+  /**
+   * Constructs the comparator for ordering by a group by key
+   */
+  private static Comparator<GroupByRecord> getGroupByKeyComparator(OrderByInfo orderByInfo) {
     int index = orderByInfo.getIndex();
     ColumnDataType columnDataType = orderByInfo.getColumnDataType();
     boolean ascending = orderByInfo.isAscending();
@@ -112,62 +133,65 @@ public class OrderByUtils {
     switch (columnDataType) {
       case INT:
         if (ascending) {
-          comparator =
-              Comparator.comparing(GroupByRecord::getArrayKey, Comparator.comparingInt(v -> Integer.valueOf(v[index])));
+          comparator = Comparator.comparing(GroupByRecord::getGroupByKey,
+              Comparator.comparingInt(v -> Integer.valueOf(v[index])));
         } else {
-          comparator = Comparator.comparing(GroupByRecord::getArrayKey,
+          comparator = Comparator.comparing(GroupByRecord::getGroupByKey,
               (v1, v2) -> Integer.compare(Integer.valueOf(v2[index]), Integer.valueOf(v1[index])));
         }
         break;
       case LONG:
         if (ascending) {
           comparator =
-              Comparator.comparing(GroupByRecord::getArrayKey, Comparator.comparingLong(v -> Long.valueOf(v[index])));
+              Comparator.comparing(GroupByRecord::getGroupByKey, Comparator.comparingLong(v -> Long.valueOf(v[index])));
         } else {
-          comparator = Comparator.comparing(GroupByRecord::getArrayKey,
+          comparator = Comparator.comparing(GroupByRecord::getGroupByKey,
               (v1, v2) -> Long.compare(Long.valueOf(v2[index]), Long.valueOf(v1[index])));
         }
         break;
       case FLOAT:
         if (ascending) {
           comparator =
-              Comparator.comparing(GroupByRecord::getArrayKey, Comparator.comparing(v -> Float.valueOf(v[index])));
+              Comparator.comparing(GroupByRecord::getGroupByKey, Comparator.comparing(v -> Float.valueOf(v[index])));
         } else {
-          comparator = Comparator.comparing(GroupByRecord::getArrayKey,
+          comparator = Comparator.comparing(GroupByRecord::getGroupByKey,
               (v1, v2) -> Float.valueOf(v2[index]).compareTo(Float.valueOf(v1[index])));
         }
         break;
       case DOUBLE:
         if (ascending) {
-          comparator = Comparator.comparing(GroupByRecord::getArrayKey,
+          comparator = Comparator.comparing(GroupByRecord::getGroupByKey,
               Comparator.comparingDouble(v -> Double.valueOf(v[index])));
         } else {
-          comparator = Comparator.comparing(GroupByRecord::getArrayKey,
+          comparator = Comparator.comparing(GroupByRecord::getGroupByKey,
               (v1, v2) -> Double.compare(Double.valueOf(v2[index]), Double.valueOf(v1[index])));
         }
         break;
       case BYTES:
         if (ascending) {
-          comparator = (v1, v2) -> ByteArray.compare(BytesUtils.toBytes(v1.getArrayKey()[index]),
-              BytesUtils.toBytes(v2.getArrayKey()[index]));
+          comparator = (v1, v2) -> ByteArray.compare(BytesUtils.toBytes(v1.getGroupByKey()[index]),
+              BytesUtils.toBytes(v2.getGroupByKey()[index]));
         } else {
           comparator =
-              (v1, v2) -> ByteArray.compare(v2.getArrayKey()[index].getBytes(), v1.getArrayKey()[index].getBytes());
+              (v1, v2) -> ByteArray.compare(v2.getGroupByKey()[index].getBytes(), v1.getGroupByKey()[index].getBytes());
         }
         break;
       case STRING:
       default:
         if (ascending) {
-          comparator = Comparator.comparing(GroupByRecord::getArrayKey, Comparator.comparing(v -> v[index]));
+          comparator = Comparator.comparing(GroupByRecord::getGroupByKey, Comparator.comparing(v -> v[index]));
         } else {
-          comparator = Comparator.comparing(GroupByRecord::getArrayKey, (v1, v2) -> v2[index].compareTo(v1[index]));
+          comparator = Comparator.comparing(GroupByRecord::getGroupByKey, (v1, v2) -> v2[index].compareTo(v1[index]));
         }
         break;
     }
     return comparator;
   }
 
-  private List<OrderByInfo> constructOrderByInfo(List<AggregationInfo> aggregationInfos, GroupBy groupBy,
+  /**
+   * Construct the list of {@link OrderByInfo} given the {@link AggregationInfo}, {@link GroupBy}, {@link SelectionSort} and {@link DataSchema}
+   */
+  private static List<OrderByInfo> constructOrderByInfo(List<AggregationInfo> aggregationInfos, GroupBy groupBy,
       List<SelectionSort> orderByClause, DataSchema dataSchema) {
     List<OrderByInfo> orderByInfos = new ArrayList<>(orderByClause.size());
 

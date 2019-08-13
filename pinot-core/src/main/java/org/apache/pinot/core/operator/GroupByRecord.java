@@ -24,23 +24,24 @@ import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 
 
+/**
+ * The <code>GroupByRecord</code> class represents one record of a group by query result
+ */
 public class GroupByRecord {
-  private String _stringKey;
-  private String[] _arrayKey;
+  private String[] _groupByKey;
   private Object[] _aggregationResults;
+  // TODO: could just 1 array be used to store both keys and values?
 
   private static String SEPARATOR = "\t";
 
-  // TODO: can this be just 1 array
   public GroupByRecord(@Nonnull String stringKey, @Nonnull Object[] aggregationResults) {
-    _stringKey = stringKey;
-    _arrayKey = stringKey.split(SEPARATOR);
+    _groupByKey = stringKey.split(SEPARATOR);
     _aggregationResults = aggregationResults;
   }
 
   @Nonnull
-  public String[] getArrayKey() {
-    return _arrayKey;
+  public String[] getGroupByKey() {
+    return _groupByKey;
   }
 
   @Nonnull
@@ -48,19 +49,20 @@ public class GroupByRecord {
     return _aggregationResults;
   }
 
-  @Nonnull
-  public String getStringKey() {
-    return _stringKey;
-  }
-
+  /**
+   * Merges the given aggregation results into the existing <code>GroupByRecord</code>
+   */
   public void merge(Object[] resultToMerge, AggregationFunction[] aggregationFunctions, int numAggregationFunctions) {
     for (int i = 0; i < numAggregationFunctions; i++) {
       _aggregationResults[i] = aggregationFunctions[i].merge(_aggregationResults[i], resultToMerge[i]);
     }
   }
 
-  public static String getGroupByKey(String[] groupByArray) {
-    return Joiner.on(SEPARATOR).join(groupByArray);
+  /**
+   * Given an array of group by keys, constructs the concatenated string equivalent key
+   */
+  public static String constructGroupByKey(String[] groupByKeys) {
+    return Joiner.on(SEPARATOR).join(groupByKeys);
   }
 
   @Override
@@ -75,13 +77,13 @@ public class GroupByRecord {
 
     GroupByRecord that = (GroupByRecord) o;
 
-    return EqualityUtils.isEqual(_stringKey, that._stringKey) && EqualityUtils.isEqual(_aggregationResults,
+    return EqualityUtils.isEqual(_groupByKey, that._groupByKey) && EqualityUtils.isEqual(_aggregationResults,
         that._aggregationResults);
   }
 
   @Override
   public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(_stringKey);
+    int result = EqualityUtils.hashCodeOf(_groupByKey);
     result = EqualityUtils.hashCodeOf(result, _aggregationResults);
     return result;
   }

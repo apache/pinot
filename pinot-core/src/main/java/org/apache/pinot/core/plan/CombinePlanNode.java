@@ -146,7 +146,6 @@ public class CombinePlanNode implements PlanNode {
           return new CombineGroupByOrderByOperator(operators, _brokerRequest, _executorService, _timeOutMs,
               _numGroupsLimit);
         } else {
-          // Aggregation group-by query
           return new CombineGroupByOperator(operators, _brokerRequest, _executorService, _timeOutMs, _numGroupsLimit);
         }
       }

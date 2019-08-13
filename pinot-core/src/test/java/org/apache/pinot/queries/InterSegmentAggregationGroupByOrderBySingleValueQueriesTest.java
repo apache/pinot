@@ -21,30 +21,18 @@ package org.apache.pinot.queries;
 import com.google.common.collect.Lists;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.function.Function;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByOrderByResults;
-import org.apache.pinot.common.utils.BytesUtils;
-import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
-import org.apache.pinot.core.startree.hll.HllUtil;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
 
-
+/**
+ * Tests order by queries
+ */
 public class InterSegmentAggregationGroupByOrderBySingleValueQueriesTest extends BaseSingleValueQueriesTest {
-
-  @Test
-  public void testDummy() {
-    String orderByQuery =
-        "select distinctcount(column11) from testTable group by column12 top 100 order by distinctcount(column11)";
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(orderByQuery);
-    GroupByOrderByResults expectedGroupByOrderBy = new GroupByOrderByResults(null, null, null);
-  }
 
   @Test(dataProvider = "orderByDataProvider")
   public void testAggregationGroupByOrderByResults(String query, List<String> expectedColumns,

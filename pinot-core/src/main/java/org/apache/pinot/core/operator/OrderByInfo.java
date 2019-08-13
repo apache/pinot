@@ -24,10 +24,21 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import static org.apache.pinot.common.utils.DataSchema.*;
 
 
+/**
+ * The <code>OrderByInfo</code> class contains all information needed to execute an order by, given a list of {@link GroupByRecord}
+ * An <code>OrderByInfo</code> will be constructed per expression in the order by clause
+ */
 public class OrderByInfo {
 
-  private OrderType _orderType; // from group by key, or from aggregation results
-  private int _index; // the index, among all the group by keys or aggregation results
+  /**
+   * Given a {@link GroupByRecord} and {@link OrderType},
+   * the index will indicate the position in the array this order by column holds.
+   *
+   * {@link OrderType::GROUP_BY_KEY} means we order by "index" position of groupByKeys[] array in the {@link GroupByRecord}
+   * {@link OrderType::AGGREGATION_VALUE} means we order by "index" position of aggregationResults[] array in the {@link GroupByRecord}
+   */
+  private OrderType _orderType;
+  private int _index;
   private boolean _ascending;
   private ColumnDataType _columnDataType;
   private AggregationFunction _aggregationFunction;

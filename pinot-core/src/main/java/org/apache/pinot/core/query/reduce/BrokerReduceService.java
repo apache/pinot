@@ -218,7 +218,6 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     if (dataTableMap.isEmpty()) {
       // For empty data table map, construct empty result using the cached data schema.
 
-      // This will only happen to selection query.
       if (brokerRequest.isSetSelections()) {
         if (cachedDataSchema != null) {
           List<String> selectionColumns =
@@ -274,16 +273,25 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         } else {
           // Aggregation group-by query.
 
-          // group by order by
-          if (brokerRequest.isSetOrderBy()) {
+          if (brokerRequest.isSetOrderBy()) { // group by order by
+
             setOrderByGroupByResults(brokerResponseNative, aggregationFunctions, dataTableMap,
                 brokerRequest.getAggregationsInfo(), brokerRequest.getOrderBy(), brokerRequest.getGroupBy(), true);
+
+            if (brokerMetrics != null && !brokerResponseNative.getGroupByOrderByResults()
+                .getAggregationResults()
+                .isEmpty()) {
+              brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.GROUP_BY_SIZE,
+                  brokerResponseNative.getGroupByOrderByResults().getAggregationResults().size());
+            }
           } else { // group by, no order by
+
             boolean[] aggregationFunctionSelectStatus =
                 AggregationFunctionUtils.getAggregationFunctionsSelectStatus(brokerRequest.getAggregationsInfo());
             setGroupByHavingResults(brokerResponseNative, aggregationFunctions, aggregationFunctionSelectStatus,
                 brokerRequest.getGroupBy(), dataTableMap, brokerRequest.getHavingFilterQuery(),
                 brokerRequest.getHavingFilterSubQueryMap(), preserveType);
+
             if (brokerMetrics != null && (!brokerResponseNative.getAggregationResults().isEmpty())) {
               // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the same.
               // Thus, we can just emit the one from the 1st result.
@@ -442,7 +450,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         for (int i = 0; i < aggregationFunctions.length; i++) {
           results[i] = dataTable.getObject(rowId, index++);
         }
-        String groupKeyString = GroupByRecord.getGroupByKey(groupKey);
+        String groupKeyString = GroupByRecord.constructGroupByKey(groupKey);
 
         groupByRecordsMap.compute(groupKeyString, (key, value) -> {
           if (value == null) {
@@ -478,7 +486,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     List<String[]> groupByKeys = new ArrayList<>();
     List<Serializable[]> results = new ArrayList<>();
     for (GroupByRecord groupByRecord : finalGroupByRecords) {
-      groupByKeys.add(groupByRecord.getArrayKey());
+      groupByKeys.add(groupByRecord.getGroupByKey());
       Object[] aggregationResults = groupByRecord.getAggregationResults();
       Serializable[] result = new Serializable[aggregationResults.length];
       for (int j = 0; j < aggregationResults.length; j++) {

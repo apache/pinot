@@ -129,13 +129,13 @@ public class QueriesTestUtils {
     Assert.assertEquals(brokerResponse.getTotalDocs(), expectedNumTotalDocs);
 
     GroupByOrderByResults groupByOrderByResults = brokerResponse.getGroupByOrderByResults();
-    List<String> actualColumns = groupByOrderByResults.getColumns();
+    List<String> actualColumns = groupByOrderByResults.getOrderBy();
     List<String[]> actualGroupByKeys = groupByOrderByResults.getGroupByKeys();
-    List<Serializable[]> actualResults = groupByOrderByResults.getRows();
+    List<Serializable[]> actualResults = groupByOrderByResults.getAggregationResults();
 
-    List<String> expectedColumns = expectedGroupByOrderByResults.getColumns();
+    List<String> expectedColumns = expectedGroupByOrderByResults.getOrderBy();
     List<String[]> expectedGroupByKeys = expectedGroupByOrderByResults.getGroupByKeys();
-    List<Serializable[]> expectedResults = expectedGroupByOrderByResults.getRows();
+    List<Serializable[]> expectedResults = expectedGroupByOrderByResults.getAggregationResults();
 
     Assert.assertEquals(actualColumns, expectedColumns);
     Assert.assertEquals(actualGroupByKeys.size(), expectedGroupByKeys.size());

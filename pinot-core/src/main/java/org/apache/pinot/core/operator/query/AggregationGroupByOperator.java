@@ -74,6 +74,7 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
           _transformOperator.getResultMetadata(transformExpression).getDataType(), true));
     }
 
+    // extract column names and data types for group by keys
     int index = 0;
     for (String groupByColumn : groupBy.getExpressions()) {
       columnNames[index] = groupByColumn;
@@ -81,6 +82,7 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
       index++;
     }
 
+    // extract column names and data types for aggregations
     for (AggregationFunctionContext functionContext : functionContexts) {
       columnNames[index] = functionContext.getAggregationFunction().getType().toString().toLowerCase() + "("
           + functionContext.getColumn() + ")";

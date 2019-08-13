@@ -92,8 +92,8 @@ public class IntermediateResultsBlock implements Block {
    * Constructor for aggregation group by order by result.
    */
   @SuppressWarnings("unchecked")
-  public IntermediateResultsBlock(@Nonnull List aggregationResult, DataSchema dataSchema) {
-    _groupByOrderByResult = aggregationResult;
+  public IntermediateResultsBlock(@Nonnull List groupByOrderByResults, DataSchema dataSchema) {
+    _groupByOrderByResult = groupByOrderByResults;
     _orderByDataSchema = dataSchema;
   }
 
@@ -294,17 +294,16 @@ public class IntermediateResultsBlock implements Block {
   @Nonnull
   private DataTable getAggregationGroupByOrderByResultDataTable() throws Exception {
 
-    // Build the data table.
     DataTableBuilder dataTableBuilder = new DataTableBuilder(_orderByDataSchema);
 
     for (GroupByRecord groupByRecord : _groupByOrderByResult) {
       dataTableBuilder.startRow();
-      Object[] aggregationResults = groupByRecord.getAggregationResults();
-      String[] groupKey = groupByRecord.getArrayKey();
+      String[] groupKey = groupByRecord.getGroupByKey();
       int i = 0;
       for (String key : groupKey) {
         dataTableBuilder.setColumn(i++, key);
       }
+      Object[] aggregationResults = groupByRecord.getAggregationResults();
       for (Object value : aggregationResults) {
         dataTableBuilder.setColumn(i++, value);
       }
