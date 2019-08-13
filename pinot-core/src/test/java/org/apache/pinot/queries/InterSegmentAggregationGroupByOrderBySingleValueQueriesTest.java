@@ -40,7 +40,8 @@ public class InterSegmentAggregationGroupByOrderBySingleValueQueriesTest extends
 
   @Test
   public void testDummy() {
-    String orderByQuery = "select count(*) from testTable group by sub(column1, 100000) top 100 order by sub(column1, 100000)";
+    String orderByQuery =
+        "select distinctcount(column11) from testTable group by column12 top 100 order by distinctcount(column11)";
     BrokerResponseNative brokerResponse = getBrokerResponseForQuery(orderByQuery);
     GroupByOrderByResults expectedGroupByOrderBy = new GroupByOrderByResults(null, null, null);
   }
@@ -246,10 +247,10 @@ public class InterSegmentAggregationGroupByOrderBySingleValueQueriesTest extends
         new String[]{"402773817"}, new String[]{"423049234"}, new String[]{"561673250"}, new String[]{"635942547"},
         new String[]{"638936844"}, new String[]{"939479517"}, new String[]{"984091268"}, new String[]{"1230252339"},
         new String[]{"1284373442"}, new String[]{"1555255521"}, new String[]{"1618904660"}, new String[]{"1670085862"});
-    results = Lists.newArrayList(new Serializable[]{2924.0}, new Serializable[]{3892.0}, new Serializable[]{6564.0},
-        new Serializable[]{7304.0}, new Serializable[]{6556.0}, new Serializable[]{7420.0}, new Serializable[]{3308.0},
-        new Serializable[]{3816.0}, new Serializable[]{3116.0}, new Serializable[]{3824.0}, new Serializable[]{5620.0},
-        new Serializable[]{7428.0}, new Serializable[]{2900.0}, new Serializable[]{2744.0}, new Serializable[]{3388.0});
+    results = Lists.newArrayList(new Serializable[]{2924L}, new Serializable[]{3892L}, new Serializable[]{6564L},
+        new Serializable[]{7304L}, new Serializable[]{6556L}, new Serializable[]{7420L}, new Serializable[]{3308L},
+        new Serializable[]{3816L}, new Serializable[]{3116L}, new Serializable[]{3824L}, new Serializable[]{5620L},
+        new Serializable[]{7428L}, new Serializable[]{2900L}, new Serializable[]{2744L}, new Serializable[]{3388L});
     numEntriesScannedPostFilter = 120000;
     data.add(new Object[]{query, columns, groupByKeys, results, numDocsScanned, numEntriesScannedInFilter,
         numEntriesScannedPostFilter, numTotalDocs});
@@ -257,9 +258,8 @@ public class InterSegmentAggregationGroupByOrderBySingleValueQueriesTest extends
     // group by UDF order by UDF
     query = "SELECT COUNT(*) FROM testTable GROUP BY sub(column1, 100000) TOP 3 ORDER BY sub(column1, 100000)";
     columns = Lists.newArrayList("sub(column1,'100000')");
-    groupByKeys = Lists.newArrayList(new String[]{"140528.0"}, new String[]{"194355.0"},
-        new String[]{"532157.0"});
-    results = Lists.newArrayList(new Serializable[]{28.0}, new Serializable[]{12.0}, new Serializable[]{12.0});
+    groupByKeys = Lists.newArrayList(new String[]{"140528.0"}, new String[]{"194355.0"}, new String[]{"532157.0"});
+    results = Lists.newArrayList(new Serializable[]{28L}, new Serializable[]{12L}, new Serializable[]{12L});
     numEntriesScannedPostFilter = 120000;
     data.add(new Object[]{query, columns, groupByKeys, results, numDocsScanned, numEntriesScannedInFilter,
         numEntriesScannedPostFilter, numTotalDocs});
@@ -267,10 +267,58 @@ public class InterSegmentAggregationGroupByOrderBySingleValueQueriesTest extends
     // spaces in UDF
     query = "SELECT COUNT(*) FROM testTable GROUP BY sub(column1, 100000) TOP 3 ORDER BY SUB(   column1, 100000 )";
     columns = Lists.newArrayList("sub(column1,'100000')");
-    groupByKeys = Lists.newArrayList(new String[]{"140528.0"}, new String[]{"194355.0"},
-        new String[]{"532157.0"});
-    results = Lists.newArrayList(new Serializable[]{28.0}, new Serializable[]{12.0}, new Serializable[]{12.0});
+    groupByKeys = Lists.newArrayList(new String[]{"140528.0"}, new String[]{"194355.0"}, new String[]{"532157.0"});
+    results = Lists.newArrayList(new Serializable[]{28L}, new Serializable[]{12L}, new Serializable[]{12L});
     numEntriesScannedPostFilter = 120000;
+    data.add(new Object[]{query, columns, groupByKeys, results, numDocsScanned, numEntriesScannedInFilter,
+        numEntriesScannedPostFilter, numTotalDocs});
+
+    // Object type aggregation - comparable intermediate results (AVG, MINMAXRANGE)
+    query = "SELECT AVG(column6) FROM testTable GROUP BY column11  ORDER BY column11";
+    columns = Lists.newArrayList("column11");
+    groupByKeys = Lists.newArrayList(new String[]{""}, new String[]{"P"}, new String[]{"gFuH"}, new String[]{"o"},
+        new String[]{"t"});
+    results = Lists.newArrayList(new Serializable[]{296467636.0}, new Serializable[]{909380310.3521485},
+        new Serializable[]{296467636.0}, new Serializable[]{296467636.0}, new Serializable[]{526245333.3900426});
+    numEntriesScannedPostFilter = 240000;
+    data.add(new Object[]{query, columns, groupByKeys, results, numDocsScanned, numEntriesScannedInFilter,
+        numEntriesScannedPostFilter, numTotalDocs});
+
+    query = "SELECT AVG(column6) FROM testTable GROUP BY column11 ORDER BY AVG(column6), column11 DESC";
+    columns = Lists.newArrayList("avg(column6)", "column11");
+    groupByKeys = Lists.newArrayList(new String[]{"o"}, new String[]{"gFuH"}, new String[]{""}, new String[]{"t"},
+        new String[]{"P"});
+    results = Lists.newArrayList(new Serializable[]{296467636.0}, new Serializable[]{296467636.0},
+        new Serializable[]{296467636.0}, new Serializable[]{526245333.3900426}, new Serializable[]{909380310.3521485});
+    numEntriesScannedPostFilter = 240000;
+    data.add(new Object[]{query, columns, groupByKeys, results, numDocsScanned, numEntriesScannedInFilter,
+        numEntriesScannedPostFilter, numTotalDocs});
+
+    // Object type aggregation - non comparable intermediate results (DISTINCTCOUNT)
+    query = "SELECT DISTINCTCOUNT(column11) FROM testTable GROUP BY column12 ORDER BY column12";
+    columns = Lists.newArrayList("column12");
+    groupByKeys = Lists.newArrayList(new String[]{"HEuxNvH"}, new String[]{"KrNxpdycSiwoRohEiTIlLqDHnx"},
+        new String[]{"MaztCmmxxgguBUxPti"}, new String[]{"TTltMtFiRqUjvOG"}, new String[]{"XcBNHe"},
+        new String[]{"dJWwFk"}, new String[]{"fykKFqiw"}, new String[]{"gFuH"}, new String[]{"oZgnrlDEtjjVpUoFLol"});
+    results =
+        Lists.newArrayList(new Serializable[]{5}, new Serializable[]{5}, new Serializable[]{5}, new Serializable[]{3},
+            new Serializable[]{2}, new Serializable[]{4}, new Serializable[]{3}, new Serializable[]{3},
+            new Serializable[]{4});
+    numEntriesScannedPostFilter = 240000;
+    data.add(new Object[]{query, columns, groupByKeys, results, numDocsScanned, numEntriesScannedInFilter,
+        numEntriesScannedPostFilter, numTotalDocs});
+
+    query =
+        "SELECT DISTINCTCOUNT(column11) FROM testTable GROUP BY column12 ORDER BY DISTINCTCOUNT(column11), column12 DESC";
+    columns = Lists.newArrayList("distinctcount(column11)", "column12");
+    groupByKeys = Lists.newArrayList(new String[]{"XcBNHe"}, new String[]{"gFuH"}, new String[]{"fykKFqiw"},
+        new String[]{"TTltMtFiRqUjvOG"}, new String[]{"oZgnrlDEtjjVpUoFLol"}, new String[]{"dJWwFk"},
+        new String[]{"MaztCmmxxgguBUxPti"}, new String[]{"KrNxpdycSiwoRohEiTIlLqDHnx"}, new String[]{"HEuxNvH"});
+    results =
+        Lists.newArrayList(new Serializable[]{2}, new Serializable[]{3}, new Serializable[]{3}, new Serializable[]{3},
+            new Serializable[]{4}, new Serializable[]{4}, new Serializable[]{5}, new Serializable[]{5},
+            new Serializable[]{5});
+    numEntriesScannedPostFilter = 240000;
     data.add(new Object[]{query, columns, groupByKeys, results, numDocsScanned, numEntriesScannedInFilter,
         numEntriesScannedPostFilter, numTotalDocs});
 
@@ -284,9 +332,6 @@ public class InterSegmentAggregationGroupByOrderBySingleValueQueriesTest extends
     numEntriesScannedPostFilter = 0;
     data.add(new Object[]{query, columns, groupByKeys, results, numDocsScanned, numEntriesScannedInFilter,
         numEntriesScannedPostFilter, numTotalDocs});
-
-
-    // TODO: handle non Number aggregations (AVG, DISTINCTCOUNTHLL etc) once implementation
 
     return data.toArray(new Object[data.size()][]);
   }

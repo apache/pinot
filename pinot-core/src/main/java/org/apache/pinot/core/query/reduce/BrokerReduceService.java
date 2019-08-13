@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import com.google.common.collect.Lists;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -54,11 +55,10 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.operator.GroupByRecord;
-import org.apache.pinot.core.operator.OrderByInfo;
-import org.apache.pinot.core.operator.OrderByExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
+import org.apache.pinot.core.query.aggregation.groupby.OrderByTrimmingService;
 import org.apache.pinot.core.query.selection.SelectionOperatorService;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.slf4j.Logger;
@@ -153,7 +153,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
       String minConsumingFreshnessTimeMsString = metadata.get(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS);
       if (minConsumingFreshnessTimeMsString != null) {
-          minConsumingFreshnessTimeMs = Math.min(Long.parseLong(minConsumingFreshnessTimeMsString), minConsumingFreshnessTimeMs);
+        minConsumingFreshnessTimeMs =
+            Math.min(Long.parseLong(minConsumingFreshnessTimeMsString), minConsumingFreshnessTimeMs);
       }
 
       String numTotalRawDocsString = metadata.get(DataTable.TOTAL_DOCS_METADATA_KEY);
@@ -198,10 +199,10 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     if (brokerMetrics != null) {
       brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.DOCUMENTS_SCANNED, numDocsScanned);
-      brokerMetrics
-          .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
-      brokerMetrics
-          .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER,
+          numEntriesScannedInFilter);
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER,
+          numEntriesScannedPostFilter);
 
       if (numConsumingSegmentsProcessed > 0 && minConsumingFreshnessTimeMs > 0) {
         brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
@@ -256,8 +257,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
             if (brokerMetrics != null) {
               brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1L);
             }
-            brokerResponseNative
-                .addToExceptions(new QueryProcessingException(QueryException.MERGE_RESPONSE_ERROR_CODE, errorMessage));
+            brokerResponseNative.addToExceptions(
+                new QueryProcessingException(QueryException.MERGE_RESPONSE_ERROR_CODE, errorMessage));
           }
         }
         setSelectionResults(brokerResponseNative, brokerRequest.getSelections(), dataTableMap, masterDataSchema,
@@ -407,8 +408,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     // Extract final results and set them into the broker response.
     List<AggregationResult> reducedAggregationResults = new ArrayList<>(numAggregationFunctions);
     for (int i = 0; i < numAggregationFunctions; i++) {
-      Serializable resultValue = AggregationFunctionUtils
-          .getSerializableValue(aggregationFunctions[i].extractFinalResult(intermediateResults[i]));
+      Serializable resultValue = AggregationFunctionUtils.getSerializableValue(
+          aggregationFunctions[i].extractFinalResult(intermediateResults[i]));
 
       // Format the value into string if required
       if (!preserveType) {
@@ -421,45 +422,54 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
   private void setOrderByGroupByResults(@Nonnull BrokerResponseNative brokerResponseNative,
       @Nonnull AggregationFunction[] aggregationFunctions, @Nonnull Map<ServerInstance, DataTable> dataTableMap,
-      List<AggregationInfo> aggregationInfos, List<SelectionSort> orderByClause, GroupBy groupBy, boolean preserveType) {
+      List<AggregationInfo> aggregationInfos, List<SelectionSort> orderByClause, GroupBy groupBy,
+      boolean preserveType) {
 
-    Map<String, GroupByRecord> groupByRowsMap = new HashMap<>();
+    Map<String, GroupByRecord> groupByRecordsMap = new HashMap<>();
     DataSchema dataSchema = null;
     for (DataTable dataTable : dataTableMap.values()) {
       if (dataSchema == null) {
         dataSchema = dataTable.getDataSchema();
       }
-      for (int rowId = 0; rowId < dataTable.getNumberOfRows(); rowId ++) {
+      for (int rowId = 0; rowId < dataTable.getNumberOfRows(); rowId++) {
         String[] groupKey = new String[groupBy.getExpressionsSize()];
         Object[] results = new Object[aggregationFunctions.length];
 
         int index = 0;
-        for (int i = 0; i < groupBy.getExpressionsSize(); i ++) {
+        for (int i = 0; i < groupBy.getExpressionsSize(); i++) {
           groupKey[i] = dataTable.getString(rowId, index++);
         }
-        for (int i = 0; i < aggregationFunctions.length; i ++) {
-          results[i] = aggregationFunctions[i].extractFinalResult(dataTable.getObject(rowId, index++));
+        for (int i = 0; i < aggregationFunctions.length; i++) {
+          results[i] = dataTable.getObject(rowId, index++);
         }
-        GroupByRecord groupByRecord = new GroupByRecord(groupKey, results);
+        String groupKeyString = GroupByRecord.getGroupByKey(groupKey);
 
-        groupByRowsMap.compute(groupByRecord.getStringKey(), (key, value) -> {
+        groupByRecordsMap.compute(groupKeyString, (key, value) -> {
           if (value == null) {
-            return groupByRecord;
+            value = new GroupByRecord(groupKeyString, results);
           } else {
-            value.merge(groupByRecord, aggregationFunctions, aggregationFunctions.length);
-            return value;
+            value.merge(results, aggregationFunctions, aggregationFunctions.length);
           }
+          return value;
         });
       }
     }
-    List<GroupByRecord> groupByRecords = new ArrayList<>(groupByRowsMap.values());
 
-    OrderByExecutor orderByExecutor = new OrderByExecutor();
-    List<OrderByInfo> orderByInfos =
-        OrderByInfo.getOrderByInfoFromBrokerRequest(orderByClause, groupBy, aggregationInfos, dataSchema);
-    orderByExecutor.sort(groupByRecords, orderByInfos);
+    // extract final results
+    for (GroupByRecord groupByRecord : groupByRecordsMap.values()) {
+      Object[] aggregationResults = groupByRecord.getAggregationResults();
+      for (int i = 0; i < aggregationResults.length; i ++) {
+        aggregationResults[i] = aggregationFunctions[i].extractFinalResult(aggregationResults[i]);
+      }
+    }
 
-    int numRows = Math.min((int) groupBy.getTopN(), groupByRecords.size());
+    // order and trim
+    OrderByTrimmingService orderByTrimmingService =
+        new OrderByTrimmingService(aggregationInfos, groupBy, orderByClause, dataSchema);
+    List<GroupByRecord> finalGroupByRecords =
+        orderByTrimmingService.orderAndTrimFinal(Lists.newArrayList(groupByRecordsMap.values()));
+
+    // create GroupByOrderByResults and set in broker response
     List<String> columns = new ArrayList<>();
     for (SelectionSort orderBy : orderByClause) {
       columns.add(orderBy.getColumn());
@@ -467,8 +477,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
     List<String[]> groupByKeys = new ArrayList<>();
     List<Serializable[]> results = new ArrayList<>();
-    for (int i = 0; i < numRows; i ++) {
-      GroupByRecord groupByRecord = groupByRecords.get(i);
+    for (GroupByRecord groupByRecord : finalGroupByRecords) {
       groupByKeys.add(groupByRecord.getArrayKey());
       Object[] aggregationResults = groupByRecord.getAggregationResults();
       Serializable[] result = new Serializable[aggregationResults.length];
@@ -514,8 +523,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
             Object intermediateResultToMerge = entry.getValue();
             if (mergedIntermediateResultMap.containsKey(groupKey)) {
               Object mergedIntermediateResult = mergedIntermediateResultMap.get(groupKey);
-              mergedIntermediateResultMap
-                  .put(groupKey, aggregationFunctions[i].merge(mergedIntermediateResult, intermediateResultToMerge));
+              mergedIntermediateResultMap.put(groupKey,
+                  aggregationFunctions[i].merge(mergedIntermediateResult, intermediateResultToMerge));
             } else {
               mergedIntermediateResultMap.put(groupKey, intermediateResultToMerge);
             }

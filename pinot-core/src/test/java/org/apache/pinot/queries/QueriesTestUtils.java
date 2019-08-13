@@ -144,7 +144,6 @@ public class QueriesTestUtils {
     for (int i = 0; i < actualGroupByKeys.size(); i++) {
       Assert.assertEquals(Arrays.asList(actualGroupByKeys.get(i)), Arrays.asList(expectedGroupByKeys.get(i)));
       Assert.assertEquals(Arrays.asList(actualResults.get(i)), Arrays.asList(expectedResults.get(i)));
-
     }
   }
 }

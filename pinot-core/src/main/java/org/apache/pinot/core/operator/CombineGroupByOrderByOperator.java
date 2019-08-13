@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import io.netty.util.internal.ConcurrentSet;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -32,6 +33,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.pinot.common.exception.QueryException;
@@ -71,17 +73,9 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
   // Limit on number of groups stored, beyond which no new group will be created
   private final int _innerSegmentNumGroupsLimit;
   private final int _interSegmentNumGroupsLimit;
-  private final int _allowedPriorityQueueSize;
 
-  private List<OrderByInfo> _orderByInfos;
-  private OrderByExecutor _orderByExecutor;
-  private OrderByTrimmingService _orderByTrimmingService;
-
-  private Comparator<GroupByRecord> _orderByComparator;
   private DataSchema _dataSchema;
-  private PriorityBlockingQueue<GroupByRecord> _priorityQueue;
   private Lock _initLock = new ReentrantLock();
-  private Lock _queueLock = new ReentrantLock();
 
   public CombineGroupByOrderByOperator(List<Operator> operators, BrokerRequest brokerRequest,
       ExecutorService executorService, long timeOutMs, int innerSegmentNumGroupsLimit) {
@@ -95,10 +89,6 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
     _innerSegmentNumGroupsLimit = innerSegmentNumGroupsLimit;
     _interSegmentNumGroupsLimit =
         (int) Math.min((long) innerSegmentNumGroupsLimit * INTER_SEGMENT_NUM_GROUPS_LIMIT_FACTOR, Integer.MAX_VALUE);
-    // Add 10% buffer to priority queue size until we begin to evict
-    _allowedPriorityQueueSize = (int) (_interSegmentNumGroupsLimit + _interSegmentNumGroupsLimit * 0.1);
-    _orderByExecutor = new OrderByExecutor();
-    _orderByTrimmingService = new OrderByTrimmingService(_interSegmentNumGroupsLimit, _brokerRequest.getGroupBy().getTopN());
   }
 
   /**
@@ -126,7 +116,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
     CountDownLatch operatorLatch = new CountDownLatch(numOperators);
     ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
     ConcurrentHashMap<String, GroupByRecord> resultsMap = new ConcurrentHashMap<>();
-    ConcurrentSet<String> discardedGroups = new ConcurrentSet<>();
+    AtomicInteger numGroups = new AtomicInteger();
 
     AggregationFunctionContext[] aggregationFunctionContexts =
         AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest.getAggregationsInfo(), null);
@@ -162,10 +152,6 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
             try {
               if (_dataSchema == null) {
                 _dataSchema = dataSchema;
-                _orderByInfos = OrderByInfo.getOrderByInfoFromBrokerRequest(_brokerRequest.getOrderBy(),
-                    _brokerRequest.getGroupBy(), _brokerRequest.getAggregationsInfo(), dataSchema);
-                _orderByComparator = _orderByExecutor.getComparator(_orderByInfos);
-                _priorityQueue = new PriorityBlockingQueue<>(10, _orderByComparator);
               } else {
                 //TODO: check compatibility of _dataSchema and dataSchema
               }
@@ -173,6 +159,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
               _initLock.unlock();
             }
 
+            // TODO: priority queue based
             // Merge aggregation group-by result
             aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
             if (aggregationGroupByResult != null) {
@@ -180,41 +167,24 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
 
               while (groupKeyIterator.hasNext()) {
                 GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-                if (discardedGroups.contains(groupKey._stringKey)) {
-                  continue;
-                }
                 resultsMap.compute(groupKey._stringKey, (key, value) -> {
                   if (value == null) {
-                    Object[] resultToInsert = new Object[numAggregationFunctions];
-                    for (int i = 0; i < numAggregationFunctions; i++) {
-                      resultToInsert[i] = aggregationGroupByResult.getResultForKey(groupKey, i);
+                    if (numGroups.getAndIncrement() < _interSegmentNumGroupsLimit) {
+                      Object[] resultToInsert = new Object[numAggregationFunctions];
+                      for (int i = 0; i < numAggregationFunctions; i++) {
+                        resultToInsert[i] = aggregationGroupByResult.getResultForKey(groupKey, i);
+                      }
+                      value = new GroupByRecord(groupKey._stringKey, resultToInsert);
                     }
-                    GroupByRecord rowToAdd = new GroupByRecord(groupKey._stringKey, resultToInsert);
-                    _priorityQueue.offer(rowToAdd);
-                    return rowToAdd;
                   } else {
-                    _priorityQueue.remove(value);
                     Object[] resultToMerge = new Object[numAggregationFunctions];
                     for (int i = 0; i < numAggregationFunctions; i++) {
                       resultToMerge[i] = aggregationGroupByResult.getResultForKey(groupKey, i);
                     }
-                    GroupByRecord rowToMerge = new GroupByRecord(groupKey._stringKey, resultToMerge);
-                    value.merge(rowToMerge, aggregationFunctions, numAggregationFunctions);
-                    _priorityQueue.offer(value);
-                    return value;
+                    value.merge(resultToMerge, aggregationFunctions, numAggregationFunctions);
                   }
+                  return value;
                 });
-
-                _queueLock.lock();
-                try {
-                  while (_priorityQueue.size() > _allowedPriorityQueueSize) {
-                    String keyToRemove = _priorityQueue.poll().getStringKey();
-                    resultsMap.remove(keyToRemove);
-                    discardedGroups.add(keyToRemove);
-                  }
-                } finally {
-                  _queueLock.unlock();
-                }
               }
             }
           } catch (Exception e) {
@@ -236,7 +206,11 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
         return new IntermediateResultsBlock(new TimeoutException(errorMessage));
       }
 
-      List<GroupByRecord> trimmedRows = _orderByTrimmingService.trim(_priorityQueue);
+      OrderByTrimmingService orderByTrimmingService =
+          new OrderByTrimmingService(_brokerRequest.getAggregationsInfo(), _brokerRequest.getGroupBy(),
+              _brokerRequest.getOrderBy(), _dataSchema);
+      List<GroupByRecord> trimmedRows =
+          orderByTrimmingService.orderAndTrimIntermediate(Lists.newArrayList(resultsMap.values()));
       IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(trimmedRows, _dataSchema);
 
       // Set the processing exceptions.

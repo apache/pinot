@@ -18,32 +18,69 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
-import com.google.common.collect.Lists;
+import com.google.common.base.Preconditions;
+import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.PriorityBlockingQueue;
+import org.apache.pinot.common.request.AggregationInfo;
+import org.apache.pinot.common.request.GroupBy;
+import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.GroupByRecord;
+import org.apache.pinot.core.operator.OrderByUtils;
 
 
 public class OrderByTrimmingService {
 
-  private int _trimSize;
-  private int _trimThreshold;
+  private int _topN;
 
-  public OrderByTrimmingService(int interSegmentNumGroupsLimit, long topN) {
-    _trimSize = Math.max(Math.min(interSegmentNumGroupsLimit, (int) topN) * 5, 5000);
-    _trimThreshold = _trimSize * 4;
+  private List<AggregationInfo> _aggregationInfos;
+  private List<SelectionSort> _orderBy;
+  private GroupBy _groupBy;
+  private DataSchema _dataSchema;
+
+  public OrderByTrimmingService(List<AggregationInfo> aggregationInfos, GroupBy groupBy, List<SelectionSort> orderBy,
+      DataSchema dataSchema) {
+    _aggregationInfos = aggregationInfos;
+    _groupBy = groupBy;
+    _orderBy = orderBy;
+    _dataSchema = dataSchema;
+
+    _topN = (int) groupBy.getTopN();
+    Preconditions.checkArgument(_topN > 0);
   }
 
-  public List<GroupByRecord> trim(PriorityBlockingQueue<GroupByRecord> priorityQueue) {
+  public List<GroupByRecord> orderAndTrimIntermediate(List<GroupByRecord> groupByRecords) {
+    // TODO: explain these trimmings
+    int trimSize = Math.max(_topN * 5, 5000);
+    int trimThreshold = trimSize * 4;
 
     // within threshold, no need to trim
-    if (priorityQueue.size() <= _trimThreshold) {
-      return Lists.newArrayList(priorityQueue);
+    if (groupByRecords.size() <= trimThreshold) {
+      return groupByRecords;
     }
 
-    while (priorityQueue.size() > _trimSize) {
-      priorityQueue.remove();
-    }
-    return Lists.newArrayList(priorityQueue);
+    // order
+    OrderByUtils orderByUtils = new OrderByUtils();
+    Comparator<GroupByRecord> comparator =
+        orderByUtils.getIntermediateComparator(_aggregationInfos, _groupBy, _orderBy, _dataSchema);
+    // TODO: priority queue based approaches
+    groupByRecords.sort(comparator);
+
+    // trim
+    return groupByRecords.subList(0, trimSize);
+  }
+
+  public List<GroupByRecord> orderAndTrimFinal(List<GroupByRecord> groupByRecords) {
+
+    // order
+    OrderByUtils orderByUtils = new OrderByUtils();
+    Comparator<GroupByRecord> comparator =
+        orderByUtils.getFinalComparator(_aggregationInfos, _groupBy, _orderBy, _dataSchema);
+    // TODO: priority queue based approaches
+    groupByRecords.sort(comparator);
+
+    // trim
+    int size = Math.min(_topN, groupByRecords.size());
+    return groupByRecords.subList(0, size);
   }
 }

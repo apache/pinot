@@ -31,15 +31,10 @@ public class GroupByRecord {
 
   private static String SEPARATOR = "\t";
 
+  // TODO: can this be just 1 array
   public GroupByRecord(@Nonnull String stringKey, @Nonnull Object[] aggregationResults) {
     _stringKey = stringKey;
     _arrayKey = stringKey.split(SEPARATOR);
-    _aggregationResults = aggregationResults;
-  }
-
-  public GroupByRecord(@Nonnull String[] arrayKey, @Nonnull Object[] aggregationResults) {
-    _stringKey = Joiner.on(SEPARATOR).join(arrayKey);
-    _arrayKey = arrayKey;
     _aggregationResults = aggregationResults;
   }
 
@@ -58,11 +53,14 @@ public class GroupByRecord {
     return _stringKey;
   }
 
-  public void merge(GroupByRecord rowToMerge, AggregationFunction[] aggregationFunctions, int numAggregationFunctions) {
-    Object[] resultToMerge = rowToMerge.getAggregationResults();
+  public void merge(Object[] resultToMerge, AggregationFunction[] aggregationFunctions, int numAggregationFunctions) {
     for (int i = 0; i < numAggregationFunctions; i++) {
       _aggregationResults[i] = aggregationFunctions[i].merge(_aggregationResults[i], resultToMerge[i]);
     }
+  }
+
+  public static String getGroupByKey(String[] groupByArray) {
+    return Joiner.on(SEPARATOR).join(groupByArray);
   }
 
   @Override

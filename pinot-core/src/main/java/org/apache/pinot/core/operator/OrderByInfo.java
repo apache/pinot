@@ -18,16 +18,8 @@
  */
 package org.apache.pinot.core.operator;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import org.apache.pinot.common.request.AggregationInfo;
-import org.apache.pinot.common.request.GroupBy;
-import org.apache.pinot.common.request.SelectionSort;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.EqualityUtils;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 
 import static org.apache.pinot.common.utils.DataSchema.*;
 
@@ -38,12 +30,15 @@ public class OrderByInfo {
   private int _index; // the index, among all the group by keys or aggregation results
   private boolean _ascending;
   private ColumnDataType _columnDataType;
+  private AggregationFunction _aggregationFunction;
 
-  public OrderByInfo(OrderType orderType, int index, boolean ascending, ColumnDataType columnDataType) {
+  public OrderByInfo(OrderType orderType, int index, boolean ascending, ColumnDataType columnDataType,
+      AggregationFunction aggregationFunction) {
     _orderType = orderType;
     _index = index;
     _ascending = ascending;
     _columnDataType = columnDataType;
+    _aggregationFunction = aggregationFunction;
   }
 
   public OrderType getOrderType() {
@@ -62,6 +57,10 @@ public class OrderByInfo {
     return _columnDataType;
   }
 
+  public AggregationFunction getAggregationFunction() {
+    return _aggregationFunction;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (EqualityUtils.isSameReference(this, o)) {
@@ -76,7 +75,7 @@ public class OrderByInfo {
 
     return EqualityUtils.isEqual(_index, that._index) && EqualityUtils.isEqual(_orderType, that._orderType)
         && EqualityUtils.isEqual(_ascending, that._ascending) && EqualityUtils.isEqual(_columnDataType,
-        that._columnDataType);
+        that._columnDataType) && EqualityUtils.isEqual(_aggregationFunction, that._aggregationFunction);
   }
 
   @Override
@@ -85,48 +84,7 @@ public class OrderByInfo {
     result = EqualityUtils.hashCodeOf(result, _index);
     result = EqualityUtils.hashCodeOf(result, _ascending);
     result = EqualityUtils.hashCodeOf(result, _columnDataType);
+    result = EqualityUtils.hashCodeOf(result, _aggregationFunction);
     return result;
-  }
-
-  public static List<OrderByInfo> getOrderByInfoFromBrokerRequest(List<SelectionSort> orderByClause, GroupBy groupBy,
-      List<AggregationInfo> aggregationInfos, DataSchema dataSchema) {
-    List<OrderByInfo> orderByInfos = new ArrayList<>(orderByClause.size());
-
-    Map<String, Integer> groupByColumnToIndex = new HashMap<>(groupBy.getExpressionsSize());
-    int index = 0;
-    for (String groupByColumn : groupBy.getExpressions()) {
-      groupByColumnToIndex.put(groupByColumn, index++);
-    }
-
-    Map<String, Integer> aggregationColumnToIndex = new HashMap<>(aggregationInfos.size());
-    index = 0;
-    for (AggregationInfo aggregationInfo : aggregationInfos) {
-      aggregationColumnToIndex.put(
-          aggregationInfo.getAggregationType().toLowerCase() + "(" + AggregationFunctionUtils.getColumn(aggregationInfo)
-              + ")", index++);
-    }
-
-    Map<String, ColumnDataType> columnDataTypeMap = new HashMap<>(dataSchema.size());
-    for (int i = 0; i < dataSchema.size(); i++) {
-      columnDataTypeMap.put(dataSchema.getColumnName(i), dataSchema.getColumnDataType(i));
-    }
-
-    for (SelectionSort orderBy : orderByClause) {
-      boolean isAsc = orderBy.isIsAsc();
-      String column = orderBy.getColumn();
-      ColumnDataType columnDataType = columnDataTypeMap.get(column);
-      if (groupByColumnToIndex.containsKey(column)) {
-        orderByInfos.add(
-            new OrderByInfo(OrderType.GROUP_BY_KEY, groupByColumnToIndex.get(column), isAsc, columnDataType));
-      } else if (aggregationColumnToIndex.containsKey(column)) {
-        orderByInfos.add(
-            new OrderByInfo(OrderType.AGGREGATION_VALUE, aggregationColumnToIndex.get(column), isAsc, columnDataType));
-      } else {
-        throw new UnsupportedOperationException(
-            "Currently only support order by on group by columns or aggregations, already in query");
-      }
-    }
-
-    return orderByInfos;
   }
 }
