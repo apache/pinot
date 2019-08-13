@@ -193,6 +193,16 @@ export default Component.extend({
   metricGranularity: reads('anomaly.attributes.metricGranularity.firstObject'),
 
   /**
+   * Anomaly detect rule
+   * @type {string}
+   */
+  detectRule: computed('anomaly', function () {
+    var component = get(this, 'anomaly').attributes.detectorComponentName.toString();
+    var rule = component.split(":");
+    return rule[0];
+  }),
+
+  /**
    * Anomaly unique identifier
    * @type {string}
    */
