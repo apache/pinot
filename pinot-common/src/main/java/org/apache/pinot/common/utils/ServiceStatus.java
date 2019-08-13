@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -209,6 +210,7 @@ public class ServiceStatus {
           getResourceListAsString(), _instanceName);
     }
 
+    @Nullable
     protected abstract T getState(String resourceName);
 
     protected abstract Map<String, String> getPartitionStateMap(T state);
@@ -381,12 +383,21 @@ public class ServiceStatus {
       super(helixManager, clusterName, instanceName, resourcesToMonitor, minResourcesStartPercent);
     }
 
+    /**
+     * Returns the current state for the given resource, or {@code null} if instance is not live or current state does
+     * not exist.
+     */
+    @Nullable
     @Override
     protected CurrentState getState(String resourceName) {
       PropertyKey.Builder keyBuilder = _helixDataAccessor.keyBuilder();
       LiveInstance liveInstance = _helixDataAccessor.getProperty(keyBuilder.liveInstance(_instanceName));
-      String sessionId = liveInstance.getSessionId();
-      return _helixDataAccessor.getProperty(keyBuilder.currentState(_instanceName, sessionId, resourceName));
+      if (liveInstance == null) {
+        return null;
+      } else {
+        String sessionId = liveInstance.getSessionId();
+        return _helixDataAccessor.getProperty(keyBuilder.currentState(_instanceName, sessionId, resourceName));
+      }
     }
 
     @Override
