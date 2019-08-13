@@ -20,10 +20,13 @@ package org.apache.pinot.controller.helix.core.assignment;
 
 import java.util.Collections;
 import java.util.List;
+import javax.annotation.Nullable;
+import org.I0Itec.zkclient.exception.ZkException;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.HelixPropertyStore;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.TagNameUtils;
@@ -45,14 +48,23 @@ public class InstancePartitionsUtils {
   public static InstancePartitions fetchOrComputeInstancePartitions(HelixManager helixManager, TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
     String tableNameWithType = tableConfig.getTableName();
-    String instancePartitionsName =
-        instancePartitionsType.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableNameWithType));
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    String instancePartitionsName = instancePartitionsType.getInstancePartitionsName(rawTableName);
 
     // Fetch the instance partitions from property store if exists
-    String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(instancePartitionsName);
-    ZNRecord znRecord = helixManager.getHelixPropertyStore().get(path, null, AccessOption.PERSISTENT);
-    if (znRecord != null) {
-      return InstancePartitions.fromZNRecord(znRecord);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = helixManager.getHelixPropertyStore();
+    InstancePartitions instancePartitions = fetchInstancePartitions(propertyStore, instancePartitionsName);
+    if (instancePartitions != null) {
+      return instancePartitions;
+    }
+
+    // Use the CONSUMING instance partitions for COMPLETED segments if exists
+    if (instancePartitionsType == InstancePartitionsType.COMPLETED) {
+      InstancePartitions consumingInstancePartitions = fetchInstancePartitions(propertyStore,
+          InstancePartitionsType.CONSUMING.getInstancePartitionsName(rawTableName));
+      if (consumingInstancePartitions != null) {
+        return consumingInstancePartitions;
+      }
     }
 
     // Compute the instance partitions (for backward compatible)
@@ -64,19 +76,41 @@ public class InstancePartitionsUtils {
     instances.sort(null);
     int numInstances = instances.size();
     Collections.rotate(instances, -(Math.abs(tableNameWithType.hashCode()) % numInstances));
-    InstancePartitions instancePartitions = new InstancePartitions(instancePartitionsName);
+    instancePartitions = new InstancePartitions(instancePartitionsName);
     instancePartitions.setInstances(0, 0, instances);
     return instancePartitions;
   }
 
   /**
-   * Persists the instance partitions to Helix property store.
-   *
-   * @return true if the instance partitions was successfully persisted, false otherwise
+   * Fetches the instance partitions from Helix property store.
    */
-  public static boolean persistInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
+  @Nullable
+  public static InstancePartitions fetchInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
+      String instancePartitionsName) {
+    String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(instancePartitionsName);
+    ZNRecord znRecord = propertyStore.get(path, null, AccessOption.PERSISTENT);
+    return znRecord != null ? InstancePartitions.fromZNRecord(znRecord) : null;
+  }
+
+  /**
+   * Persists the instance partitions to Helix property store.
+   */
+  public static void persistInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
       InstancePartitions instancePartitions) {
     String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(instancePartitions.getName());
-    return propertyStore.set(path, instancePartitions.toZNRecord(), AccessOption.PERSISTENT);
+    if (!propertyStore.set(path, instancePartitions.toZNRecord(), AccessOption.PERSISTENT)) {
+      throw new ZkException("Failed to persist instance partitions: " + instancePartitions.getName());
+    }
+  }
+
+  /**
+   * Removes the instance partitions from Helix property store.
+   */
+  public static void removeInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
+      String instancePartitionsName) {
+    String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(instancePartitionsName);
+    if (!propertyStore.remove(path, AccessOption.PERSISTENT)) {
+      throw new ZkException("Failed to remove instance partitions: " + instancePartitionsName);
+    }
   }
 }
