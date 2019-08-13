@@ -276,7 +276,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           if (brokerRequest.isSetOrderBy()) { // group by order by
 
             setOrderByGroupByResults(brokerResponseNative, aggregationFunctions, dataTableMap,
-                brokerRequest.getAggregationsInfo(), brokerRequest.getOrderBy(), brokerRequest.getGroupBy(), true);
+                brokerRequest.getAggregationsInfo(), brokerRequest.getOrderBy(), brokerRequest.getGroupBy(), preserveType);
 
             if (brokerMetrics != null && !brokerResponseNative.getGroupByOrderByResults()
                 .getAggregationResults()
@@ -491,6 +491,9 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       Serializable[] result = new Serializable[aggregationResults.length];
       for (int j = 0; j < aggregationResults.length; j++) {
         result[j] = AggregationFunctionUtils.getSerializableValue(aggregationResults[j]);
+        if (preserveType) {
+          result[j] = AggregationFunctionUtils.formatValue(result[j]);
+        }
       }
       results.add(result);
     }
