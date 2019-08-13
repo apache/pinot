@@ -165,11 +165,7 @@ public class ControllerLeaderLocator {
       String helixLeader = znRecord.getId();
       LOGGER.info("Getting Helix leader: {} as per znode version {}, mtime {}", helixLeader, stat.getVersion(),
           stat.getMtime());
-
-      int index = helixLeader.lastIndexOf('_');
-      String leaderHost = helixLeader.substring(0, index);
-      int leaderPort = Integer.valueOf(helixLeader.substring(index + 1));
-      return new Pair<>(leaderHost, leaderPort);
+      return convertToHostAndPortPair(helixLeader);
     } catch (Exception e) {
       LOGGER.warn("Could not locate Helix leader!", e);
       return null;
@@ -200,7 +196,9 @@ public class ControllerLeaderLocator {
           // Found the controller in master state.
           // Converts participant id (with Prefix "Controller_") to controller id and assigns it as the leader,
           // since realtime segment completion protocol doesn't need the prefix in controller instance id.
-          return LeadControllerUtils.convertToHostAndPortPair(entry.getKey());
+          String participantInstanceId = entry.getKey();
+          String controllerInstanceId = participantInstanceId.substring(participantInstanceId.indexOf('_') + 1);
+          return convertToHostAndPortPair(controllerInstanceId);
         }
       }
       LOGGER
@@ -209,6 +207,17 @@ public class ControllerLeaderLocator {
       LOGGER.warn("Caught exception when getting lead controller instance Id for table: {}", rawTableName, e);
     }
     return null;
+  }
+
+  /**
+   * Converts instance id to a pair of hostname and port.
+   * @param instanceId instance id without any prefix, e.g. localhost_9000
+   * */
+  private Pair<String, Integer> convertToHostAndPortPair(String instanceId) {
+    int index = instanceId.lastIndexOf('_');
+    String leaderHost = instanceId.substring(0, index);
+    int leaderPort = Integer.valueOf(instanceId.substring(index + 1));
+    return new Pair<>(leaderHost, leaderPort);
   }
 
   /**

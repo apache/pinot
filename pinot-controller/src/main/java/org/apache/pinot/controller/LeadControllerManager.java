@@ -26,6 +26,8 @@ import org.apache.helix.PropertyKey;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metrics.ControllerMeter;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.slf4j.Logger;
@@ -37,18 +39,58 @@ import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLE
 
 public class LeadControllerManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerManager.class);
+  private static final long CONTROLLER_LEADERSHIP_FETCH_INTERVAL = 60_000L;
 
   private final Set<Integer> _partitionIdCache;
   private final String _instanceId;
   private final HelixManager _helixManager;
+  private final ControllerMetrics _controllerMetrics;
+  private final Thread _controllerLeadershipFetchingThread;
+
   private volatile boolean _isLeadControllerResourceEnabled = false;
   private volatile boolean _amIHelixLeader = false;
   private volatile boolean _isShuttingDown = false;
 
-  public LeadControllerManager(HelixManager helixManager) {
+  public LeadControllerManager(HelixManager helixManager, ControllerMetrics controllerMetrics) {
     _helixManager = helixManager;
+    _controllerMetrics = controllerMetrics;
     _instanceId = helixManager.getInstanceName();
     _partitionIdCache = ConcurrentHashMap.newKeySet();
+
+    // Create a thread to periodically fetch controller leadership as a work-around of Helix callback delay
+    _controllerLeadershipFetchingThread = new Thread("ControllerLeadershipFetchingThread") {
+      @Override
+      public void run() {
+        while (true) {
+          try {
+            synchronized (LeadControllerManager.this) {
+              if (_isShuttingDown) {
+                return;
+              }
+              if (isHelixLeader()) {
+                if (!_amIHelixLeader) {
+                  _amIHelixLeader = true;
+                  LOGGER.warn("Becoming leader without getting Helix change callback");
+                  _controllerMetrics
+                      .addMeteredGlobalValue(ControllerMeter.CONTROLLER_LEADERSHIP_CHANGE_WITHOUT_CALLBACK, 1L);
+                }
+              } else {
+                if (_amIHelixLeader) {
+                  _amIHelixLeader = false;
+                  LOGGER.warn("Losing leadership without getting Helix change callback");
+                  _controllerMetrics
+                      .addMeteredGlobalValue(ControllerMeter.CONTROLLER_LEADERSHIP_CHANGE_WITHOUT_CALLBACK, 1L);
+                }
+              }
+              LeadControllerManager.this.wait(CONTROLLER_LEADERSHIP_FETCH_INTERVAL);
+            }
+          } catch (Exception e) {
+            // Ignore all exceptions. The thread keeps running until LeadControllerManager.stop() is invoked.
+            LOGGER.error("Caught exception within controller leadership fetching thread", e);
+          }
+        }
+      }
+    };
   }
 
   /**
@@ -110,13 +152,30 @@ public class LeadControllerManager {
   }
 
   /**
+   * Starts the fetching thread to actively fetch helix leadership and resource config of lead controller resource.
+   */
+  public synchronized void start() {
+    _controllerLeadershipFetchingThread.start();
+  }
+
+  /**
    * Marks the cached indices invalid and isShuttingDown to be true.
    * Adding the synchronized block here and in the following callback methods
    * to make sure that {@link HelixManager} won't be closed when the callback changes happened.
    */
-  public synchronized void stop() {
+  public void stop() {
+    synchronized (this) {
+      _isShuttingDown = true;
+      notify();
+    }
     _partitionIdCache.clear();
-    _isShuttingDown = true;
+
+    try {
+      _controllerLeadershipFetchingThread.join();
+    } catch (InterruptedException e) {
+      LOGGER.error("Caught InterruptedException while waiting for controller leadership fetching thread to die");
+      Thread.currentThread().interrupt();
+    }
   }
 
   /**

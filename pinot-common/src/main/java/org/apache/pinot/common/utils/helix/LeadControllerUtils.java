@@ -21,7 +21,6 @@ package org.apache.pinot.common.utils.helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.pql.parsers.utils.Pair;
 
 
 public class LeadControllerUtils {
@@ -40,24 +39,9 @@ public class LeadControllerUtils {
   }
 
   /**
-   * Generates a pair of hostname and port given a participant instance id (e.g. Controller_localhost_9000).
-   * @param participantInstanceId participant instance Id, e.g. Controller_localhost_9000
-   */
-  public static Pair<String, Integer> convertToHostAndPortPair(String participantInstanceId) {
-    // Converts participant id (with Prefix "Controller_") to controller id and assigns it as the leader,
-    // since realtime segment completion protocol doesn't need the prefix in controller instance id.
-    String controllerLeaderId = participantInstanceId.substring(participantInstanceId.indexOf("_") + 1);
-
-    int index = controllerLeaderId.lastIndexOf('_');
-    String leaderHost = controllerLeaderId.substring(0, index);
-    int leaderPort = Integer.valueOf(controllerLeaderId.substring(index + 1));
-    return new Pair<>(leaderHost, leaderPort);
-  }
-
-  /**
    * Generates participant instance id, e.g. returns Controller_localhost_9000 given localhost as hostname and 9000 as port.
    */
-  public static String generateParticipantInstanceId(String controllerHost, String controllerPort) {
+  public static String generateParticipantInstanceId(String controllerHost, int controllerPort) {
     return Helix.PREFIX_OF_CONTROLLER_INSTANCE + controllerHost + "_" + controllerPort;
   }
 
@@ -72,6 +56,6 @@ public class LeadControllerUtils {
    * Extracts partition index from partition name, e.g. returns 0 given leadControllerResource_0 as partition name.
    */
   public static int extractPartitionId(String partitionName) {
-    return Integer.parseInt(partitionName.substring(partitionName.lastIndexOf("_") + 1));
+    return Integer.parseInt(partitionName.substring(partitionName.lastIndexOf('_') + 1));
   }
 }

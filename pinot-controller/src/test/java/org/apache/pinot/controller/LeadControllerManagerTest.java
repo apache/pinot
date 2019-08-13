@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.controller;
 
+import com.yammer.metrics.core.MetricsRegistry;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.ResourceConfig;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -35,14 +37,17 @@ import static org.mockito.Mockito.when;
 
 
 public class LeadControllerManagerTest {
-  private static String controllerHost = "localhost";
-  private static String controllerPort = "18998";
+  private static final String CONTROLLER_HOST = "localhost";
+  private static final int CONTROLLER_PORT = 18998;
+
   private HelixManager _helixManager;
+  private ControllerMetrics _controllerMetrics;
   private LiveInstance _liveInstance;
   private ResourceConfig _resourceConfig;
 
   @BeforeMethod
   public void setup() {
+    _controllerMetrics =  new ControllerMetrics(new MetricsRegistry());
     _helixManager = mock(HelixManager.class);
     HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
     when(_helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
@@ -60,13 +65,13 @@ public class LeadControllerManagerTest {
     _resourceConfig = mock(ResourceConfig.class);
     when(helixDataAccessor.getProperty(resourceConfigPropertyKey)).thenReturn(_resourceConfig);
 
-    String instanceId = LeadControllerUtils.generateParticipantInstanceId(controllerHost, controllerPort);
+    String instanceId = LeadControllerUtils.generateParticipantInstanceId(CONTROLLER_HOST, CONTROLLER_PORT);
     when(_helixManager.getInstanceName()).thenReturn(instanceId);
   }
 
   @Test
   public void testLeadControllerManager() {
-    LeadControllerManager leadControllerManager = new LeadControllerManager(_helixManager);
+    LeadControllerManager leadControllerManager = new LeadControllerManager(_helixManager, _controllerMetrics);
     String tableName = "testTable";
     int expectedPartitionIndex = LeadControllerUtils.getPartitionIdForTable(tableName);
     String partitionName = LeadControllerUtils.generatePartitionName(expectedPartitionIndex);
@@ -110,7 +115,7 @@ public class LeadControllerManagerTest {
 
   private void becomeHelixLeader(boolean becomeHelixLeader) {
     if (becomeHelixLeader) {
-      when(_liveInstance.getInstanceName()).thenReturn(controllerHost + "_" + controllerPort);
+      when(_liveInstance.getInstanceName()).thenReturn(CONTROLLER_HOST + "_" + CONTROLLER_PORT);
     }
   }
 

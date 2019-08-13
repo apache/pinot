@@ -424,8 +424,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
         Map<String, String> stateMap = leadControllerResourceExternalView.getStateMap(partition);
         Map.Entry<String, String> entry = stateMap.entrySet().iterator().next();
         boolean result =
-            (LeadControllerUtils.generateParticipantInstanceId(LOCAL_HOST, Integer.toString(_controllerPort)))
-                .equals(entry.getKey());
+            (LeadControllerUtils.generateParticipantInstanceId(LOCAL_HOST, _controllerPort)).equals(entry.getKey());
         result &= MasterSlaveSMD.States.MASTER.name().equals(entry.getValue());
         if (!result) {
           return false;
@@ -442,7 +441,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
       List<String> instanceNames = new ArrayList<>(nInstances);
       List<Integer> ports = new ArrayList<>(nInstances);
       for (int i = 0; i < nInstances; i++) {
-        instanceNames.add(LeadControllerUtils.generateParticipantInstanceId(LOCAL_HOST, Integer.toString(i)));
+        instanceNames.add(LeadControllerUtils.generateParticipantInstanceId(LOCAL_HOST, i));
         ports.add(i);
       }
 

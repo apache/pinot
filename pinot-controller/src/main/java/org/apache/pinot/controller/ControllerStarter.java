@@ -19,7 +19,6 @@
 package org.apache.pinot.controller;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -53,6 +52,7 @@ import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
@@ -133,8 +133,10 @@ public class ControllerStarter {
     // Helix related settings.
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
     _helixClusterName = _config.getHelixClusterName();
-    _helixControllerInstanceId = conf.getControllerHost() + "_" + conf.getControllerPort();
-    _helixParticipantInstanceId = CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + _helixControllerInstanceId;
+    String host = conf.getControllerHost();
+    int port = Integer.parseInt(conf.getControllerPort());
+    _helixControllerInstanceId = host + "_" + port;
+    _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(host, port);
     _isUpdateStateModel = _config.isUpdateSegmentStateModel();
     _enableBatchMessageMode = _config.getEnableBatchMessageMode();
 
@@ -271,20 +273,18 @@ public class ControllerStarter {
     initPinotCrypterFactory();
 
     LOGGER.info("Initializing Helix participant manager");
-    _helixParticipantManager = initHelixParticipantManager();
+    _helixParticipantManager = HelixManagerFactory
+        .getZKHelixManager(_helixClusterName, _helixParticipantInstanceId, InstanceType.PARTICIPANT, _helixZkURL);
 
     // LeadControllerManager needs to be initialized before registering as Helix participant.
     LOGGER.info("Starting lead controller manager");
-    _leadControllerManager = new LeadControllerManager(_helixParticipantManager);
+    _leadControllerManager = new LeadControllerManager(_helixParticipantManager, _controllerMetrics);
 
-    LOGGER.info("Registering Helix participant manager as Helix Participant role");
+    LOGGER.info("Registering and connecting Helix participant manager as Helix Participant role");
     registerAndConnectAsHelixParticipant();
 
     LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
     _helixResourceManager.start(_helixParticipantManager);
-
-    // Register listeners.
-    registerListeners(_helixParticipantManager);
 
     LOGGER.info("Starting task resource manager");
     _helixTaskResourceManager = new PinotHelixTaskResourceManager(new TaskDriver(_helixParticipantManager));
@@ -450,20 +450,15 @@ public class ControllerStarter {
     }
   }
 
-  private HelixManager initHelixParticipantManager() {
-    return HelixManagerFactory
-        .getZKHelixManager(_helixClusterName, _helixParticipantInstanceId, InstanceType.PARTICIPANT, _helixZkURL);
-  }
-
   /**
-   * Register and connect to Helix cluster as PARTICIPANT role.
+   * Registers, connects to Helix cluster as PARTICIPANT role, and adds listeners.
    */
   private void registerAndConnectAsHelixParticipant() {
-    Preconditions.checkArgument(_helixParticipantManager != null, "HelixZkManager should not be null!");
-    // Registers Master-Slave state model to state machine engine, which is for calculating participant assignment in lead controller resource.
+    // Registers customized Master-Slave state model to state machine engine, which is for calculating participant assignment in lead controller resource.
     _helixParticipantManager.getStateMachineEngine().registerStateModelFactory(MasterSlaveSMD.name,
-        new LeadControllerResourceMasterSlaveStateModelFactory(_helixParticipantInstanceId, _leadControllerManager));
+        new LeadControllerResourceMasterSlaveStateModelFactory(_leadControllerManager));
 
+    // Connects to cluster.
     try {
       _helixParticipantManager.connect();
     } catch (Exception e) {
@@ -472,19 +467,17 @@ public class ControllerStarter {
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg);
     }
-  }
 
-  private void registerListeners(HelixManager helixParticipantManager) {
+    LOGGER.info("Registering helix controller listener");
     // This registration is not needed when the leadControllerResource is enabled.
     // However, the resource can be disabled sometime while the cluster is in operation, so we keep it here. Plus, it does not add much overhead.
     // At some point in future when we stop supporting the disabled resource, we will remove this line altogether and the logic that goes with it.
-    LOGGER.info("Registering helix controller listener");
-    helixParticipantManager.addControllerListener(
+    _helixParticipantManager.addControllerListener(
         (ControllerChangeListener) changeContext -> _leadControllerManager.onHelixControllerChange());
 
     LOGGER.info("Registering resource config listener");
     try {
-      helixParticipantManager.addResourceConfigChangeListener(
+      _helixParticipantManager.addResourceConfigChangeListener(
           (resourceConfigList, changeContext) -> _leadControllerManager.onResourceConfigChange());
     } catch (Exception e) {
       throw new RuntimeException(
@@ -544,7 +537,7 @@ public class ControllerStarter {
   }
 
   private void stopHelixController() {
-    LOGGER.info("Disconnecting helix zk manager");
+    LOGGER.info("Disconnecting helix controller zk manager");
     _helixControllerManager.disconnect();
   }
 
@@ -575,6 +568,9 @@ public class ControllerStarter {
 
       LOGGER.info("Stopping resource manager");
       _helixResourceManager.stop();
+
+      LOGGER.info("Disconnecting helix participant zk manager");
+      _helixParticipantManager.disconnect();
 
       LOGGER.info("Shutting down executor service");
       _executorService.shutdownNow();

@@ -30,91 +30,55 @@ import org.slf4j.LoggerFactory;
 
 
 public class LeadControllerResourceMasterSlaveStateModelFactory extends StateModelFactory<StateModel> {
-  private static int TRANSITION_DELAY = 10;
   private final LeadControllerManager _leadControllerManager;
-  private final String _instanceName;
 
-  public LeadControllerResourceMasterSlaveStateModelFactory(String instanceName,
-      LeadControllerManager leadControllerManager) {
-    _instanceName = instanceName;
+  public LeadControllerResourceMasterSlaveStateModelFactory(LeadControllerManager leadControllerManager) {
     _leadControllerManager = leadControllerManager;
-  }
-
-  public String getStateModelName() {
-    return "LeadControllerResourceMasterSlaveStateModel";
   }
 
   @Override
   public StateModel createNewStateModel(String resourceName, String partitionName) {
-    LeadControllerResourceMasterSlaveStateModel stateModel = new LeadControllerResourceMasterSlaveStateModel();
-    stateModel.setPartitionName(partitionName);
-    stateModel.setDelay(TRANSITION_DELAY);
-    return stateModel;
+    return new LeadControllerResourceMasterSlaveStateModel(_leadControllerManager, partitionName);
   }
 
   @StateModelInfo(states = "{'MASTER','SLAVE', 'OFFLINE', 'DROPPED'}", initialState = "OFFLINE")
-  public class LeadControllerResourceMasterSlaveStateModel extends StateModel {
-    private final Logger _logger = LoggerFactory.getLogger(_instanceName + " - " + getClass().getName());
-    private String _partitionName;
-    private long _transDelay;
+  public static class LeadControllerResourceMasterSlaveStateModel extends StateModel {
+    private static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerResourceMasterSlaveStateModel.class);
 
-    public String getPartitionName() {
-      return _partitionName;
-    }
+    private final LeadControllerManager _leadControllerManager;
+    private final String _partitionName;
 
-    public void setPartitionName(String partitionName) {
+    private LeadControllerResourceMasterSlaveStateModel(LeadControllerManager leadControllerManager,
+        String partitionName) {
+      _leadControllerManager = leadControllerManager;
       _partitionName = partitionName;
-    }
-
-    public void setDelay(int delay) {
-      _transDelay = delay > 0 ? delay : 0;
-    }
-
-    private void sleep() {
-      try {
-        Thread.sleep(_transDelay);
-      } catch (Exception e) {
-        e.printStackTrace();
-      }
     }
 
     @Transition(from = "OFFLINE", to = "SLAVE")
     public void onBecomeSlaveFromOffline(Message message, NotificationContext context) {
-      _logger.info("{}: transitioning from {} to {} for {}", getStateModelName(), message.getFromState(),
-          message.getToState(), _partitionName);
-      sleep();
-    }
-
-    @Transition(from = "MASTER", to = "SLAVE")
-    public void onBecomeSlaveFromMaster(Message message, NotificationContext context) {
-      _logger.info("{}: transitioning from {} to {} for {}", getStateModelName(), message.getFromState(),
-          message.getToState(), _partitionName);
-      String partitionName = message.getPartitionName();
-      _leadControllerManager.removePartitionLeader(partitionName);
-      sleep();
+      LOGGER.info("Got state transition from OFFLINE to SLAVE for partition: {}", _partitionName);
     }
 
     @Transition(from = "SLAVE", to = "MASTER")
     public void onBecomeMasterFromSlave(Message message, NotificationContext context) {
-      _logger.info("{}: transitioning from {} to {} for {}", getStateModelName(), message.getFromState(),
-          message.getToState(), _partitionName);
-      String partitionName = message.getPartitionName();
-      _leadControllerManager.addPartitionLeader(partitionName);
-      sleep();
+      LOGGER.info("Got state transition from SLAVE to MASTER for partition: {}", _partitionName);
+      _leadControllerManager.addPartitionLeader(_partitionName);
+    }
+
+    @Transition(from = "MASTER", to = "SLAVE")
+    public void onBecomeSlaveFromMaster(Message message, NotificationContext context) {
+      LOGGER.info("Got state transition from MASTER to SLAVE for partition: {}", _partitionName);
+      _leadControllerManager.removePartitionLeader(_partitionName);
     }
 
     @Transition(from = "SLAVE", to = "OFFLINE")
     public void onBecomeOfflineFromSlave(Message message, NotificationContext context) {
-      _logger.info("{}: transitioning from {} to {} for {}", getStateModelName(), message.getFromState(),
-          message.getToState(), _partitionName);
-      sleep();
+      LOGGER.info("Got state transition from SLAVE to OFFLINE for partition: {}", _partitionName);
     }
 
-    @Transition(from = "OFFLINE", to = "MASTER")
+    @Transition(from = "OFFLINE", to = "DROPPED")
     public void onBecomeDroppedFromOffline(Message message, NotificationContext context) {
-      _logger.info("{}: transitioning from {} to {} for {}", getStateModelName(), message.getFromState(),
-          message.getToState(), _partitionName);
-      sleep();
+      LOGGER.info("Got state transition from OFFLINE to DROPPED for partition: {}", _partitionName);
     }
   }
 }

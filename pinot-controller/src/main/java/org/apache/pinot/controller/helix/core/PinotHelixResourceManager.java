@@ -191,7 +191,6 @@ public class PinotHelixResourceManager {
    */
   public synchronized void stop() {
     _segmentDeletionManager.stop();
-    _helixZkManager.disconnect();
   }
 
   /**
