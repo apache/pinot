@@ -31,13 +31,10 @@ public class CommonConstants {
 
     public static final String INSTANCE_CONNECTED_METRIC_NAME = "helix.connected";
 
-    public static final String PREFIX_OF_SERVER_INSTANCE = "Server_";
-    public static final String PREFIX_OF_BROKER_INSTANCE = "Broker_";
     public static final String PREFIX_OF_CONTROLLER_INSTANCE = "Controller_";
-
-    public static final String SERVER_INSTANCE_TYPE = "server";
-    public static final String BROKER_INSTANCE_TYPE = "broker";
-    public static final String CONTROLLER_INSTANCE_TYPE = "controller";
+    public static final String PREFIX_OF_BROKER_INSTANCE = "Broker_";
+    public static final String PREFIX_OF_SERVER_INSTANCE = "Server_";
+    public static final String PREFIX_OF_MINION_INSTANCE = "Minion_";
 
     public static final String BROKER_RESOURCE_INSTANCE = "brokerResource";
     public static final String LEAD_CONTROLLER_RESOURCE_NAME = "leadControllerResource";
@@ -49,8 +46,11 @@ public class CommonConstants {
     public static final int MIN_ACTIVE_REPLICAS = 0;
     public static final int REBALANCE_DELAY_MS = 300_000; // 5 minutes.
 
-    public static final String UNTAGGED_SERVER_INSTANCE = "server_untagged";
+    // Instance tags
+    public static final String CONTROLLER_INSTANCE = "controller";
     public static final String UNTAGGED_BROKER_INSTANCE = "broker_untagged";
+    public static final String UNTAGGED_SERVER_INSTANCE = "server_untagged";
+    public static final String UNTAGGED_MINION_INSTANCE = "minion_untagged";
 
     public static class StateModel {
       public static class SegmentOnlineOfflineStateModel {
@@ -90,6 +90,10 @@ public class CommonConstants {
       public static final String INSTANCE_ID_KEY = "instanceId";
       public static final String DATA_DIR_KEY = "dataDir";
       public static final String ADMIN_PORT_KEY = "adminPort";
+    }
+
+    public enum InstanceType {
+      CONTROLLER, BROKER, SERVER, MINION
     }
 
     public enum TableType {
@@ -299,9 +303,6 @@ public class CommonConstants {
   }
 
   public static class Minion {
-    public static final String INSTANCE_PREFIX = "Minion_";
-    public static final String INSTANCE_TYPE = "minion";
-    public static final String UNTAGGED_INSTANCE = "minion_untagged";
     public static final String CONFIG_OF_METRICS_PREFIX = "pinot.minion.";
     public static final String METADATA_EVENT_OBSERVER_PREFIX = "metadata.event.notifier";
 
@@ -318,14 +319,6 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "segment.fetcher";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "segment.uploader";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "crypter";
-  }
-
-  public static class Metric {
-    public static class Server {
-      public static final String CURRENT_NUMBER_OF_SEGMENTS = "currentNumberOfSegments";
-      public static final String CURRENT_NUMBER_OF_DOCUMENTS = "currentNumberOfDocuments";
-      public static final String NUMBER_OF_DELETED_SEGMENTS = "numberOfDeletedSegments";
-    }
   }
 
   public static class Segment {
