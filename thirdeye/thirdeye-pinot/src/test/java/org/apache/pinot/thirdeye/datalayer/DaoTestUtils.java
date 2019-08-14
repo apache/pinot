@@ -17,8 +17,15 @@
 package org.apache.pinot.thirdeye.datalayer;
 
 import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.IOUtils;
 import org.apache.pinot.thirdeye.alert.commons.AnomalyFeedConfig;
 import org.apache.pinot.thirdeye.alert.commons.AnomalyFetcherConfig;
 import org.apache.pinot.thirdeye.alert.commons.AnomalyNotifiedStatus;
@@ -33,6 +40,7 @@ import org.apache.pinot.thirdeye.anomalydetection.performanceEvaluation.Performa
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.common.metric.MetricType;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertSnapshotDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -41,6 +49,8 @@ import org.apache.pinot.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.ConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionStatusDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.JobDTO;
@@ -51,20 +61,48 @@ import org.apache.pinot.thirdeye.datalayer.dto.OverrideConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.RootcauseSessionDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
+import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
+import org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator;
+import org.apache.pinot.thirdeye.detection.yaml.translator.SubscriptionConfigTranslator;
 import org.apache.pinot.thirdeye.detector.email.filter.AlphaBetaAlertFilter;
 import org.apache.pinot.thirdeye.detector.metric.transfer.ScalingFactor;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 
 
 public class DaoTestUtils {
+
+  public static DetectionConfigDTO getTestDetectionConfig(DataProvider provider, String detectionConfigFile) throws IOException {
+    String yamlConfig = IOUtils.toString(DaoTestUtils.class.getResourceAsStream(detectionConfigFile));
+
+    // Translate
+    DetectionConfigTranslator translator = new DetectionConfigTranslator(yamlConfig, provider);
+    DetectionConfigDTO detectionConfig = translator.translate();
+
+    Map<String, Object> properties = detectionConfig.getProperties();
+    properties.put("timezone", "UTC");
+    detectionConfig.setProperties(properties);
+    detectionConfig.setCron("0/10 * * * * ?");
+
+    DetectionConfigValidator validator = new DetectionConfigValidator(provider);
+    validator.validateConfig(detectionConfig);
+
+    detectionConfig.setLastTimestamp(DateTime.now().minusDays(2).getMillis());
+    return detectionConfig;
+  }
+
+  public static DetectionAlertConfigDTO getTestDetectionAlertConfig(DetectionConfigManager detectionConfigManager, String alertConfigFile) throws IOException {
+
+    String yamlConfig = IOUtils.toString(DaoTestUtils.class.getResourceAsStream(alertConfigFile));
+
+    DetectionAlertConfigDTO alertConfig = new SubscriptionConfigTranslator(
+        detectionConfigManager, yamlConfig).translate();
+    alertConfig.setCronExpression("0/10 * * * * ?");
+    return alertConfig;
+  }
+
   public static AnomalyFunctionDTO getTestFunctionSpec(String metricName, String collection) {
     AnomalyFunctionDTO functionSpec = new AnomalyFunctionDTO();
     functionSpec.setFunctionName("integration test function 1");
@@ -157,7 +195,7 @@ public class DaoTestUtils {
   public static DatasetConfigDTO getTestDatasetConfig(String collection) {
     DatasetConfigDTO datasetConfigDTO = new DatasetConfigDTO();
     datasetConfigDTO.setDataset(collection);
-    datasetConfigDTO.setDimensions(Lists.newArrayList("country", "browser", "environment"));
+    datasetConfigDTO.setDimensions(new ArrayList<>());
     datasetConfigDTO.setTimeColumn("time");
     datasetConfigDTO.setTimeDuration(1);
     datasetConfigDTO.setTimeUnit(TimeUnit.HOURS);
