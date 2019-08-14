@@ -54,6 +54,7 @@ import org.apache.pinot.broker.requesthandler.PinotQueryParserFactory;
 import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
 import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.JsonUtils;
@@ -657,9 +658,17 @@ public class ClusterIntegrationTestUtils {
       ResultSet h2ResultSet = h2statement.getResultSet();
       ResultSetMetaData h2MetaData = h2ResultSet.getMetaData();
 
-      List<SelectionSort> sortSequence =
-          PinotQueryParserFactory.get(CommonConstants.Broker.Request.PQL).compileToBrokerRequest(pinotQuery)
-              .getSelections().getSelectionSortSequence();
+      // pinotResponse will have "selectionResults" in case of DISTINCT query too
+      // so here we need to check if selection is null or not
+      List<SelectionSort> sortSequence;
+      BrokerRequest brokerRequest =
+          PinotQueryParserFactory.get(CommonConstants.Broker.Request.PQL).compileToBrokerRequest(pinotQuery);
+      if (brokerRequest.isSetSelections()) {
+        sortSequence = brokerRequest.getSelections().getSelectionSortSequence();
+      } else {
+        sortSequence = new ArrayList<>();
+      }
+
       Set<String> orderByColumns;
       if (sortSequence == null) {
         orderByColumns = Collections.emptySet();

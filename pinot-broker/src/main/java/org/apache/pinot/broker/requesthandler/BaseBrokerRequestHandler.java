@@ -377,16 +377,19 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * </ul>
    */
   private void validateRequest(BrokerRequest brokerRequest) {
-    if (brokerRequest.isSetAggregationsInfo()) {
-      if (brokerRequest.isSetGroupBy()) {
-        long topN = brokerRequest.getGroupBy().getTopN();
-        if (topN > _queryResponseLimit) {
-          throw new RuntimeException(
-              "Value for 'TOP' (" + topN + ") exceeds maximum allowed value of " + _queryResponseLimit);
-        }
+    if (brokerRequest.isSetAggregationsInfo() && brokerRequest.isSetGroupBy()) {
+      // aggregation with group by query
+      long topN = brokerRequest.getGroupBy().getTopN();
+      if (topN > _queryResponseLimit) {
+        throw new RuntimeException(
+            "Value for 'TOP' (" + topN + ") exceeds maximum allowed value of " + _queryResponseLimit);
       }
     } else {
-      int limit = brokerRequest.getSelections().getSize();
+      // selection query or aggregation only query
+      // LIMIT is applicable to selection query or DISTINCT query (which is a selection query from user's
+      // point of view) but we treat it as an aggregation query.
+      // the limit is also stored in broker request so use it for validation
+      int limit = brokerRequest.getLimit();
       if (limit > _queryResponseLimit) {
         throw new RuntimeException(
             "Value for 'LIMIT' (" + limit + ") exceeds maximum allowed value of " + _queryResponseLimit);

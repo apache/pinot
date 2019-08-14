@@ -19,9 +19,8 @@
 package org.apache.pinot.core.plan;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.request.AggregationInfo;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
@@ -46,14 +45,14 @@ public class DictionaryBasedAggregationPlanNode implements PlanNode {
    * Constructor for the class.
    *
    * @param indexSegment Segment to process
-   * @param aggregationInfos List of aggregation context info.
+   * @param brokerRequest Broker request
    */
-  public DictionaryBasedAggregationPlanNode(IndexSegment indexSegment, List<AggregationInfo> aggregationInfos) {
+  public DictionaryBasedAggregationPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     _indexSegment = indexSegment;
     _dictionaryMap = new HashMap<>();
 
     _aggregationFunctionContexts =
-        AggregationFunctionUtils.getAggregationFunctionContexts(aggregationInfos, indexSegment.getSegmentMetadata());
+        AggregationFunctionUtils.getAggregationFunctionContexts(brokerRequest, indexSegment.getSegmentMetadata());
 
     for (AggregationFunctionContext aggregationFunctionContext : _aggregationFunctionContexts) {
       String column = aggregationFunctionContext.getColumn();

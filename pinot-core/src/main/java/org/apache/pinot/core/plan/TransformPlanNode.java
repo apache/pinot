@@ -31,6 +31,7 @@ import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +61,19 @@ public class TransformPlanNode implements PlanNode {
   private void extractColumnsAndTransforms(BrokerRequest brokerRequest, IndexSegment indexSegment) {
     if (brokerRequest.isSetAggregationsInfo()) {
       for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
-        if (!aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
+        if (aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
+          // handle DISTINCT (col1, col2 ...) as an aggregate function
+          String multiColumnExpression = AggregationFunctionUtils.getColumn(aggregationInfo);
+          String[] distinctColumnExpressions =
+              multiColumnExpression.split(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR);
+          for (String distinctColumnExpr : distinctColumnExpressions) {
+            TransformExpressionTree transformExpressionTree =
+                TransformExpressionTree.compileToExpressionTree(distinctColumnExpr);
+            transformExpressionTree.getColumns(_projectionColumns);
+            _expressions.add(transformExpressionTree);
+          }
+        } else if (!aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
+          // handle all other aggregate functions (except count(*))
           String expression = AggregationFunctionUtils.getColumn(aggregationInfo);
           TransformExpressionTree transformExpressionTree = TransformExpressionTree.compileToExpressionTree(expression);
           transformExpressionTree.getColumns(_projectionColumns);

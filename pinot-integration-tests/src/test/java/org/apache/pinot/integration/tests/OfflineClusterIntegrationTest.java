@@ -41,6 +41,7 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -787,6 +788,34 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Check if '/CONFIGS/PARTICIPANT/<serverName>' has been erased correctly
     String configPath = "/" + getHelixClusterName() + "/CONFIGS/PARTICIPANT/" + serverName;
     assertFalse(_propertyStore.exists(configPath, 0));
+  }
+
+  /**
+   * Test for DISTINCT clause. Run the PQL query against Pinot
+   * execution engine and compare with the output of corresponding
+   * SQL query run against H2
+   * @throws Exception
+   */
+  @Test
+  public void testDistinctQuery()
+      throws Exception {
+    Pql2Compiler.ENABLE_DISTINCT = true;
+    // by default 10 rows will be returned, so use high limit
+    String pql = "SELECT DISTINCT(Carrier) FROM mytable LIMIT 1000000";
+    String sql = "SELECT DISTINCT Carrier FROM mytable";
+    testQuery(pql, Collections.singletonList(sql));
+
+    pql = "SELECT DISTINCT(Carrier, DestAirportID) FROM mytable LIMIT 1000000";
+    sql = "SELECT DISTINCT Carrier, DestAirportID FROM mytable";
+    testQuery(pql, Collections.singletonList(sql));
+
+    pql = "SELECT DISTINCT(Carrier, DestAirportID, DestStateName) FROM mytable LIMIT 1000000";
+    sql = "SELECT DISTINCT Carrier, DestAirportID, DestStateName FROM mytable";
+    testQuery(pql, Collections.singletonList(sql));
+
+    pql = "SELECT DISTINCT(Carrier, DestAirportID, DestCityName) FROM mytable LIMIT 1000000";
+    sql = "SELECT DISTINCT Carrier, DestAirportID, DestCityName FROM mytable";
+    testQuery(pql, Collections.singletonList(sql));
   }
 
   @Override

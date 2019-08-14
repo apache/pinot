@@ -38,7 +38,6 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.apache.commons.lang.math.NumberUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
@@ -71,6 +70,8 @@ public class Pql2Compiler implements AbstractCompiler {
       Boolean.valueOf(System.getProperty("pinot.query.converter.validate", "false"));
   public static boolean FAIL_ON_CONVERSION_ERROR =
       Boolean.valueOf(System.getProperty("pinot.query.converter.fail_on_error", "false"));
+  public static String ENABLE_DISTINCT_KEY = "pinot.distinct.enabled";
+  public static boolean ENABLE_DISTINCT = Boolean.valueOf(System.getProperty(ENABLE_DISTINCT_KEY, "false"));
 
   private static class ErrorListener extends BaseErrorListener {
 

@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.core.query.aggregation.DistinctTable;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
 import org.apache.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 import org.apache.pinot.core.query.aggregation.function.customobject.QuantileDigest;
@@ -58,7 +59,8 @@ public class ObjectSerDeUtils {
     QuantileDigest(7),
     Map(8),
     IntSet(9),
-    TDigest(10);
+    TDigest(10),
+    DistinctTable(11);
 
     private int _value;
 
@@ -93,6 +95,8 @@ public class ObjectSerDeUtils {
         return ObjectType.IntSet;
       } else if (value instanceof TDigest) {
         return ObjectType.TDigest;
+      } else if (value instanceof DistinctTable) {
+        return ObjectType.DistinctTable;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -277,6 +281,36 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<DistinctTable> DISTINCT_TABLE_SER_DE = new ObjectSerDe<DistinctTable>() {
+
+    @Override
+    public byte[] serialize(DistinctTable distinctTable) {
+      try {
+        return distinctTable.toBytes();
+      } catch (IOException e) {
+        throw new IllegalStateException("Caught exception while serializing DistinctTable", e);
+      }
+    }
+
+    @Override
+    public DistinctTable deserialize(byte[] bytes) {
+      try {
+        return new DistinctTable(ByteBuffer.wrap(bytes));
+      } catch (IOException e) {
+        throw new IllegalStateException("Caught exception while de-serializing DistinctTable", e);
+      }
+    }
+
+    @Override
+    public DistinctTable deserialize(ByteBuffer byteBuffer) {
+      try {
+        return new DistinctTable(byteBuffer);
+      } catch (IOException e) {
+        throw new IllegalStateException("Caught exception while de-serializing DistinctTable", e);
+      }
+    }
+  };
+
   public static final ObjectSerDe<QuantileDigest> QUANTILE_DIGEST_SER_DE = new ObjectSerDe<QuantileDigest>() {
 
     @Override
@@ -425,8 +459,22 @@ public class ObjectSerDeUtils {
   };
 
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
-  private static final ObjectSerDe[] SER_DES =
-      {STRING_SER_DE, LONG_SER_DE, DOUBLE_SER_DE, DOUBLE_ARRAY_LIST_SER_DE, AVG_PAIR_SER_DE, MIN_MAX_RANGE_PAIR_SER_DE, HYPER_LOG_LOG_SER_DE, QUANTILE_DIGEST_SER_DE, MAP_SER_DE, INT_SET_SER_DE, TDIGEST_SER_DE};
+  //@formatter:off
+  private static final ObjectSerDe[] SER_DES = {
+      STRING_SER_DE,
+      LONG_SER_DE,
+      DOUBLE_SER_DE,
+      DOUBLE_ARRAY_LIST_SER_DE,
+      AVG_PAIR_SER_DE,
+      MIN_MAX_RANGE_PAIR_SER_DE,
+      HYPER_LOG_LOG_SER_DE,
+      QUANTILE_DIGEST_SER_DE,
+      MAP_SER_DE,
+      INT_SET_SER_DE,
+      TDIGEST_SER_DE,
+      DISTINCT_TABLE_SER_DE
+  };
+  //@formatter:on
 
   public static byte[] serialize(Object value) {
     return serialize(value, ObjectType.getObjectType(value)._value);

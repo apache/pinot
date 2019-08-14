@@ -63,7 +63,7 @@ public class AggregationGroupByPlanNode implements PlanNode {
     _numGroupsLimit = numGroupsLimit;
     _aggregationInfos = brokerRequest.getAggregationsInfo();
     _functionContexts =
-        AggregationFunctionUtils.getAggregationFunctionContexts(_aggregationInfos, indexSegment.getSegmentMetadata());
+        AggregationFunctionUtils.getAggregationFunctionContexts(brokerRequest, indexSegment.getSegmentMetadata());
     _groupBy = brokerRequest.getGroupBy();
 
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
