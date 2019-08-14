@@ -319,7 +319,7 @@ public class SelectionOperatorService {
   public SelectionResults renderSelectionResultsWithOrdering() {
     LinkedList<Serializable[]> rowsInSelectionResults = new LinkedList<>();
 
-    int[] columnIndices = SelectionOperatorUtils.getColumnIndicesWithOrdering(_selectionColumns, _dataSchema);
+    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(_selectionColumns, _dataSchema);
     while (_rows.size() > _selectionOffset) {
       rowsInSelectionResults.addFirst(SelectionOperatorUtils.extractColumns(_rows.poll(), columnIndices));
     }

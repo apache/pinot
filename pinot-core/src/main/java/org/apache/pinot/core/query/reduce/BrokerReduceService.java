@@ -317,12 +317,12 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       SelectionOperatorService selectionService = new SelectionOperatorService(selection, dataSchema);
       selectionService.reduceWithOrdering(dataTableMap);
       selectionResults = selectionService.renderSelectionResultsWithOrdering();
-      columnIndices = SelectionOperatorUtils.getColumnIndicesWithOrdering(selectionColumns, dataSchema);
+      columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, dataSchema);
     } else {
       // Selection only.
       selectionResults = SelectionOperatorUtils.renderSelectionResultsWithoutOrdering(
           SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap, selectionSize), dataSchema, selectionColumns);
-      columnIndices = SelectionOperatorUtils.getColumnIndicesWithoutOrdering(selectionColumns, dataSchema);
+      columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, dataSchema);
     }
 
     // TODO: use "formatRowsWithoutOrdering", "formatRowsWithOrdering" properly for selection when the server is updated
