@@ -36,7 +36,7 @@ Looking for the ThirdEye anomaly detection and root-cause analysis platform? Che
 ## Key Features
 
 - A column-oriented database with various compression schemes such as Run Length, Fixed Bit Length
-- Pluggable indexing technologies - Sorted Index, Bitmap Index, Inverted Index
+- Pluggable indexing technologies - Sorted Index, Bitmap Index, Inverted Index, Star-Tree Index
 - Ability to optimize query/execution plan based on query and segment metadata
 - Near real time ingestion from Kafka and batch ingestion from Hadoop
 - SQL like language that supports _selection, aggregation, filtering, group by, order by, distinct_ queries on fact data
