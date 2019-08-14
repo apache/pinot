@@ -170,7 +170,7 @@ public class HelixSetupUtils {
       idealStateBuilder.enableDelayRebalance();
       // Set instance group tag
       IdealState idealState = idealStateBuilder.build();
-      idealState.setInstanceGroupTag(CONTROLLER_INSTANCE_TYPE);
+      idealState.setInstanceGroupTag(CONTROLLER_INSTANCE);
       // Set batch message mode
       idealState.setBatchMessageMode(enableBatchMessageMode);
       // Explicitly disable this resource when creating this new resource.

@@ -55,7 +55,6 @@ import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
-import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -407,7 +406,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     Assert.assertTrue(leadControllerResourceIdealState.isValid());
     Assert.assertTrue(leadControllerResourceIdealState.isEnabled());
     Assert.assertEquals(leadControllerResourceIdealState.getInstanceGroupTag(),
-        CommonConstants.Helix.CONTROLLER_INSTANCE_TYPE);
+        CommonConstants.Helix.CONTROLLER_INSTANCE);
     Assert.assertEquals(leadControllerResourceIdealState.getNumPartitions(),
         CommonConstants.Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
     Assert.assertEquals(leadControllerResourceIdealState.getReplicas(),

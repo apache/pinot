@@ -22,8 +22,11 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import javax.annotation.Nonnull;
@@ -38,12 +41,16 @@ import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.readers.RecordReaderUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class AvroUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(AvroUtils.class);
+  public static final String MAP_KEY_COLUMN_SUFFIX = "__KEYS";
+  public static final String MAP_VALUE_COLUMN_SUFFIX = "__VALUES";
 
   private AvroUtils() {
   }
@@ -294,6 +301,34 @@ public class AvroUtils {
       return extractSupportedSchema(recordFields.get(0).schema());
     } else {
       return fieldSchema;
+    }
+  }
+
+  public static void extractField(FieldSpec fieldSpec, GenericRecord from, GenericRow to) {
+    String fieldName = fieldSpec.getName();
+    //Handle MAP types
+    if (fieldName.toUpperCase().endsWith(MAP_KEY_COLUMN_SUFFIX)) {
+      String avroFieldName = fieldName.replaceAll(MAP_KEY_COLUMN_SUFFIX, "");
+      Object o = from.get(avroFieldName);
+      if (o instanceof Map) {
+        Map map = (Map) o;
+        TreeSet sortedKeySet = new TreeSet(map.keySet());
+        to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, sortedKeySet));
+      }
+    } else if (fieldName.toUpperCase().endsWith(MAP_VALUE_COLUMN_SUFFIX)) {
+      String avroFieldName = fieldName.replaceAll(MAP_VALUE_COLUMN_SUFFIX, "");
+      Object o = from.get(avroFieldName);
+      if (o instanceof Map) {
+        Map map = (Map) o;
+        TreeSet sortedKeySet = new TreeSet(map.keySet());
+        List values = new ArrayList(map.size());
+        for (Object key : sortedKeySet) {
+          values.add(map.get(key));
+        }
+        to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, values));
+      }
+    } else {
+      to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, from.get(fieldName)));
     }
   }
 }

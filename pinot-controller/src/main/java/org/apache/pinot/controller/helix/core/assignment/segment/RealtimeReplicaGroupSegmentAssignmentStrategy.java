@@ -149,8 +149,8 @@ public class RealtimeReplicaGroupSegmentAssignmentStrategy implements SegmentAss
    * <p>E.g. (within a replica, 3 servers, 6 partitions)
    * <pre>
    *   "0_0": [i0, i1, i2]
-   *           p0, p1, p2
-   *           p3, p4, p5
+   *           p0  p1  p2
+   *           p3  p4  p5
    * </pre>
    */
   private List<String> getInstances(InstancePartitions instancePartitions, int partitionId) {

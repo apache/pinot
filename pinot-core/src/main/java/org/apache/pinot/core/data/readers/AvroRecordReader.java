@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
@@ -82,7 +83,7 @@ public class AvroRecordReader implements RecordReader {
       Object value = _reusableAvroRecord.get(fieldName);
       // Allow default value for non-time columns
       if (value != null || fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
-        reuse.putField(fieldName, RecordReaderUtils.convert(fieldSpec, value));
+        AvroUtils.extractField(fieldSpec, _reusableAvroRecord, reuse);
       }
     }
     return reuse;

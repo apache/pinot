@@ -361,7 +361,7 @@ public class TableConfigTest {
       InstanceReplicaPartitionConfig replicaPartitionConfig = new InstanceReplicaPartitionConfig();
       replicaPartitionConfig.setReplicaGroupBased(true);
       replicaPartitionConfig.setNumReplicas(3);
-      replicaPartitionConfig.setNumServersPerReplica(5);
+      replicaPartitionConfig.setNumInstancesPerReplica(5);
       instanceAssignmentConfig.setReplicaPartitionConfig(replicaPartitionConfig);
 
       TableConfig tableConfig = tableConfigBuilder.setInstanceAssignmentConfigMap(
@@ -462,10 +462,10 @@ public class TableConfigTest {
 
     InstanceReplicaPartitionConfig replicaPartitionConfig = instanceAssignmentConfig.getReplicaPartitionConfig();
     assertTrue(replicaPartitionConfig.isReplicaGroupBased());
-    assertEquals(replicaPartitionConfig.getNumServers(), 0);
+    assertEquals(replicaPartitionConfig.getNumInstances(), 0);
     assertEquals(replicaPartitionConfig.getNumReplicas(), 3);
-    assertEquals(replicaPartitionConfig.getNumServersPerReplica(), 5);
+    assertEquals(replicaPartitionConfig.getNumInstancesPerReplica(), 5);
     assertEquals(replicaPartitionConfig.getNumPartitions(), 0);
-    assertEquals(replicaPartitionConfig.getNumServersPerPartition(), 0);
+    assertEquals(replicaPartitionConfig.getNumInstancesPerPartition(), 0);
   }
 }

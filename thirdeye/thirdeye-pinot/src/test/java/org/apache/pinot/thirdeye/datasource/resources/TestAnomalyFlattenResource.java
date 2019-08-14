@@ -19,19 +19,19 @@
 
 package org.apache.pinot.thirdeye.datasource.resources;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.dashboard.resources.AnomalyFlattenResource;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.TestMergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
-import org.joda.time.DateTime;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -42,7 +42,6 @@ import static org.apache.pinot.thirdeye.dashboard.resources.AnomalyFlattenResour
 
 public class TestAnomalyFlattenResource {
   private DAOTestBase testDAOProvider;
-  public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private DetectionConfigManager detectionConfigDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
@@ -65,37 +64,40 @@ public class TestAnomalyFlattenResource {
   }
 
   @Test
-  public void testFlatAnomalyResults() throws Exception {
-    Map<String, Object> jsonMap = new HashMap<String, Object>() {
-      {
-        put(FUNCTION_ID, detectionConfigId);
-        put(WINDOW_START, new DateTime(2019, 1, 1, 0, 0).getMillis());
-        put(WINDOW_END, new DateTime(2019, 1, 3, 0, 0).getMillis());
-      }
-    };
-    AnomalyFlattenResource resource = new AnomalyFlattenResource();
-    List<Map<String, String>> actualResults = resource.flatAnomalyResults(OBJECT_MAPPER.writeValueAsString(jsonMap));
-    List<Map<String, String>> expectedResults = Arrays.asList(
-        new HashMap<String, String>() {
+  public void testReformatDataFrameAndAnomalies() {
+    Map<String, DataFrame> metricDataFrame = new HashMap<String, DataFrame>() {{
+      put("metric", mockDataFrame());
+    }};
+
+    List<MergedAnomalyResultDTO> anomalies = TestMergedAnomalyResultManager.mockAnomalies(detectionConfigId);
+    for (int i = 0; i < anomalies.size(); i++) {
+      anomalies.get(i).setId((long) i + 1);
+    }
+    List<Map<String, Object>> actualResults = AnomalyFlattenResource.reformatDataFrameAndAnomalies(metricDataFrame,
+        anomalies, Arrays.asList("what", "where", "when", "how"));
+    List<Map<String, Object>> expectedResults = Arrays.asList(
+        new HashMap<String, Object>() {
           {
-            put(ANOMALY_ID, Long.toString(2));
             put("what", "a");
             put("where", "b");
             put("when", "c");
             put("how", "d");
-            put("metric", Double.toString(0d));
-            put(ANOMALY_COMMENT, "");
+            put("metric", 0.1d);
+            put(ANOMALY_COMMENT, new HashMap<Long, String>(){{
+              put(1l, "#1 is Not Reviewed Yet");
+            }});
           }
         },
-        new HashMap<String, String>() {
+        new HashMap<String, Object>() {
           {
-            put(ANOMALY_ID, Long.toString(3));
             put("what", "e");
             put("where", "f");
             put("when", "g");
             put("how", "h");
-            put("metric", Double.toString(0d));
-            put(ANOMALY_COMMENT, "");
+            put("metric", 0.2d);
+            put(ANOMALY_COMMENT, new HashMap<Long, String>(){{
+              put(2l, "#2 is Not Reviewed Yet");
+            }});
           }
         }
     );
@@ -103,22 +105,40 @@ public class TestAnomalyFlattenResource {
   }
 
   @Test
-  public void testFlatAnomalyResult() {
+  public void testExtractComments() {
     List<MergedAnomalyResultDTO> anomalies = TestMergedAnomalyResultManager.mockAnomalies(detectionConfigId);
-    MergedAnomalyResultDTO anomaly = anomalies.get(0);
-    anomaly.setId(1l);
-    Map<String, String> actualMap = AnomalyFlattenResource.flatAnomalyResult(anomaly, null);
-    Map<String, String> expectMap = new HashMap<String, String>() {
+    for (int i = 0; i < anomalies.size(); i++) {
+      anomalies.get(i).setId((long) i + 1);
+    }
+    Map<DimensionMap, Map<Long, String>> actualMap = AnomalyFlattenResource.extractComments(anomalies);
+    Map<DimensionMap, Map<Long, String>> expectMap = new HashMap<DimensionMap, Map<Long, String>>() {
       {
-        put(ANOMALY_ID, Long.toString(anomaly.getId()));
-        put("what", "a");
-        put("where", "b");
-        put("when", "c");
-        put("how", "d");
-        put("metric", Double.toString(0d));
-        put(ANOMALY_COMMENT, "");
+        DimensionMap dm = new DimensionMap();
+        dm.put("what", "a");
+        dm.put("where", "b");
+        dm.put("when", "c");
+        dm.put("how", "d");
+        put(dm, new HashMap<Long, String>(){
+          {
+            put(1l, "#1 is Not Reviewed Yet");
+          }});
+
+        dm = new DimensionMap();
+        dm.put("what", "e");
+        dm.put("where", "f");
+        dm.put("when", "g");
+        dm.put("how", "h");
+        put(dm, new HashMap<Long, String>(){
+          {
+            put(2l, "#2 is Not Reviewed Yet");
+          }});
       }
     };
     Assert.assertEquals(actualMap, expectMap);
+  }
+
+  private DataFrame mockDataFrame() {
+    return DataFrame.builder("what", "where", "when", "how", "value")
+        .append("a", "b", "c", "d", 0.1d).append("e", "f", "g", "h", 0.2d).build();
   }
 }

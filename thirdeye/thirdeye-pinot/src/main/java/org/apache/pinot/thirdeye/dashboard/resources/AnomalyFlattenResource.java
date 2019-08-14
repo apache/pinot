@@ -19,125 +19,210 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
+import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import java.io.IOException;
+import io.swagger.annotations.ApiParam;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import javax.validation.constraints.NotNull;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import org.apache.commons.collections4.map.ListOrderedMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
+import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
 
 
 /**
- * Flatten the anomaly results for UI purpose.
- * Convert a list of anomalies to rows of columns so that UI can directly convert the anomalies to table
+ * Provide a table combining metrics data and anomaly feedback for UI representation
  */
 @Path("thirdeye/table")
+@Api(tags = {Constants.ANOMALY_TAG})
 public class AnomalyFlattenResource {
-  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
-  private MergedAnomalyResultManager mergedAnomalyResultDAO;
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private final MergedAnomalyResultManager mergedAnomalyResultDAO;
+  private final MetricConfigManager metricConfigDAO;
+  private final DatasetConfigManager datasetConfgDAO;
 
-  public static final String ANOMALY_ID = "anomalyId";
+  private final ExecutorService executor;
+
   public static final String ANOMALY_COMMENT = "comment";
-  public static final String FUNCTION_ID = "functionId";
-  public static final String WINDOW_START = "start";
-  public static final String WINDOW_END = "end";
-  private static final String DIMENSION_KEYS  = "keys";
+  private static final String DATAFRAME_VALUE = "value";
+  private static final String DEFAULT_COMMENT_FORMAT = "#%d is %s";
+  private static final int DEFAULT_THREAD_POOLS_SIZE = 5;
+  private static final long DEFAULT_TIME_OUT_IN_MINUTES = 1;
 
-  private static final List<String> REQUIRED_JSON_KEYS =Arrays.asList(FUNCTION_ID, WINDOW_START, WINDOW_END);
-  private static final String DEFAULT_DELIMINATOR = ",";
-
-  public AnomalyFlattenResource() {
-    this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+  public AnomalyFlattenResource(MergedAnomalyResultManager mergedAnomalyResultDAO, DatasetConfigManager datasetConfgDAO,
+      MetricConfigManager metricConfigDAO) {
+    this.mergedAnomalyResultDAO = mergedAnomalyResultDAO;
+    this.datasetConfgDAO = datasetConfgDAO;
+    this.metricConfigDAO = metricConfigDAO;
+    this.executor = Executors.newFixedThreadPool(DEFAULT_THREAD_POOLS_SIZE);
   }
 
-  public AnomalyFlattenResource(MergedAnomalyResultManager mergedAnomalyResultDAO) {
-    this.mergedAnomalyResultDAO = mergedAnomalyResultDAO;
+
+  /**
+   * Returns a list of formatted metric values and anomaly comments for UI to generate a table
+   * @param metricIds a list of metric ids
+   * @param start start time in epoc milliseconds
+   * @param end end time in epoc milliseconds
+   * @param dimensionKeys a list of keys in dimensions
+   * @return a list of formatted metric info and anomaly comments
+   */
+  @GET
+  @ApiOperation(value = "View a collection of metrics and anonalies feedback in a list of maps")
+  @Produces("Application/json")
+  public List<Map<String, Object>> listDimensionValues(
+      @ApiParam("metric config id") @NotNull @QueryParam("metricIds") List<Long> metricIds,
+      @ApiParam("start time for anomalies") @QueryParam("start") long start,
+      @ApiParam("end time for anomalies") @QueryParam("end") long end,
+      @ApiParam("dimension keys") @NotNull @QueryParam("dimensionKeys") List<String> dimensionKeys) throws Exception {
+    Preconditions.checkArgument(!metricIds.isEmpty());
+    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
+    List<MetricConfigDTO> metrics = new ArrayList<>();
+    for (long id : metricIds) {
+      metrics.add(metricConfigDAO.findById(id));
+      anomalies.addAll(mergedAnomalyResultDAO.findAnomaliesByMetricIdAndTimeRange(id, start, end));
+    }
+
+    Map<String, DataFrame> metricDataFrame = new HashMap<>();
+
+    AggregationLoader aggregationLoader =
+        new DefaultAggregationLoader(metricConfigDAO, datasetConfgDAO,
+            ThirdEyeCacheRegistry.getInstance().getQueryCache(),
+            ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
+
+    Map<String, Future<DataFrame>> futureMap = new HashMap<String, Future<DataFrame>>() {{
+      for (MetricConfigDTO metricDTO : metrics) {
+        Future<DataFrame> future = fetchAggregatedMetric(aggregationLoader, metricDTO.getId(), start, end,
+            dimensionKeys);
+        put(metricDTO.getName(), future);
+      }
+    }};
+    for (String metric : futureMap.keySet()) {
+      Future<DataFrame> future = futureMap.get(metric);
+      metricDataFrame.put(metric, future.get(DEFAULT_TIME_OUT_IN_MINUTES, TimeUnit.MINUTES));
+    }
+
+    return reformatDataFrameAndAnomalies(metricDataFrame, anomalies, dimensionKeys);
   }
 
   /**
-   * Flatten a list of anomaly results to a list of map
-   * @param jsonPayload a json string; the jsonPayload should include keys: [functionId, start, end].
-   *                    start and end are in the format of epoch time
-   * @return a list of map
-   * @throws IOException
+   * Return a Future thread with aggregated metric value as return
+   * @param aggregationLoader an aggregation loader
+   * @param metricId the metric id
+   * @param start the start time in epoch time
+   * @param end the end time in epoch time
+   * @param dimensionKeys the list of dimension keys
+   * @return a Future thread with aggregated metric value
    */
-  @GET
-  @ApiOperation(value = "View a flatted merged anomalies for collection")
-  public List<Map<String, String>> flatAnomalyResults(String jsonPayload) throws IOException {
-    if (StringUtils.isBlank(jsonPayload)) {
-      throw new IllegalArgumentException("jsonPayload cannot be null or empty");
-    }
-    Map<String, Object> inputMap = OBJECT_MAPPER.readValue(jsonPayload, Map.class);
+  private Future<DataFrame> fetchAggregatedMetric(AggregationLoader aggregationLoader, long metricId, long start,
+      long end, List<String> dimensionKeys) {
+    return executor.submit(() -> {
+      MetricSlice metricSlice = MetricSlice.from(metricId, start, end);
+      DataFrame resultDataFrame = null;
+      try {
+        resultDataFrame = aggregationLoader.loadAggregate(metricSlice, dimensionKeys, -1);
+      } catch (Exception e) {
+        throw new ExecutionException(e);
+      }
+      return resultDataFrame;
+    });
+  }
 
-    // Assert if reuired keys are in the map
-    for (String requiredKey : REQUIRED_JSON_KEYS) {
-      if (!inputMap.containsKey(requiredKey)) {
-        throw new IllegalArgumentException(String.format("Miss %s in input json String; %s are required", requiredKey,
-            REQUIRED_JSON_KEYS.toString()));
+  /**
+   * Reformat the rows in data frame and anomaly information into a list of map
+   * @param metricDataFrame a map from metric name to dataframe with aggregated time series
+   * @param anomalies a list of anomalies within the same time interval as dataframe
+   * @param dimensions a list of dimensions
+   * @return a list of maps with dataframe and anomaly information
+   */
+  public static List<Map<String, Object>> reformatDataFrameAndAnomalies(Map<String, DataFrame> metricDataFrame,
+      List<MergedAnomalyResultDTO> anomalies, List<String> dimensions) {
+    List<Map<String, Object>> resultList = new ArrayList<>();
+    Map<DimensionMap, Map<Long, String>> anomalyCommentMap = extractComments(anomalies);
+    List<String> metrics = new ArrayList<>(metricDataFrame.keySet());
+    Map<DimensionMap, Map<String, Double>> metricValues = new HashMap<>();
+    for (String metric : metrics) {
+      DataFrame dataFrame = metricDataFrame.get(metric);
+      for (int i = 0; i < dataFrame.size(); i++) {
+        DimensionMap dimensionMap = new DimensionMap();
+        for (String dimensionKey : dimensions) {
+          String dimensionValue = dataFrame.getString(dimensionKey, i);
+          dimensionMap.put(dimensionKey, dimensionValue);
+        }
+        if (!metricValues.containsKey(dimensionMap)) {
+          metricValues.put(dimensionMap, new HashMap<>());
+        }
+        metricValues.get(dimensionMap).put(metric, dataFrame.getDouble(DATAFRAME_VALUE, i));
       }
     }
 
-    // Retrieve anomalies
-    long functionId = Long.valueOf(inputMap.get(FUNCTION_ID).toString());
-    long start = Long.valueOf(inputMap.get(WINDOW_START).toString());
-    long end = Long.valueOf(inputMap.get(WINDOW_END).toString());
-    List<MergedAnomalyResultDTO> anomalies = mergedAnomalyResultDAO.
-        findByStartTimeInRangeAndDetectionConfigId(start, end, functionId);
-
-    // flatten anomaly result information
-    List<String> tableKeys = null;
-    if (inputMap.containsKey(DIMENSION_KEYS)){
-      Object dimensionKeysObj = inputMap.get(DIMENSION_KEYS);
-      if (dimensionKeysObj instanceof List) {
-        tableKeys = (List<String>) dimensionKeysObj;
-      } else {
-        tableKeys = Arrays.asList(dimensionKeysObj.toString().split(DEFAULT_DELIMINATOR));
+    for (DimensionMap dimensionMap : metricValues.keySet()) {
+      Map<String, Object> resultMap = new ListOrderedMap<>();
+      for (String key : dimensionMap.keySet()) {
+        resultMap.put(key, dimensionMap.get(key));
       }
+      for (String metric : metrics) {
+        resultMap.put(metric, metricValues.getOrDefault(dimensionMap, Collections.emptyMap()).getOrDefault(metric, Double.NaN));
+      }
+      Map<Long, String> comment = Collections.emptyMap();
+      if (anomalyCommentMap.containsKey(dimensionMap)) {
+        comment = anomalyCommentMap.get(dimensionMap);
+      }
+      resultMap.put(ANOMALY_COMMENT, comment);
+
+      resultList.add(resultMap);
     }
-    List<Map<String, String>> resultList = new ArrayList<>();
-    for (MergedAnomalyResultDTO result : anomalies) {
-      resultList.add(flatAnomalyResult(result, tableKeys));
-    }
+
     return resultList;
   }
 
   /**
-   * Flat an anomaly to a flat map structure
-   * @param anomalyResult an instance of MergedAnomalyResultDTO
-   * @param tableKeys a list of keys in dimensions; if null, use all keys in dimension
-   * @return a map of information in the anomaly result with the required keys
+   * Extract comments from anomalies and format it as a map
+   * @param anomalies a list of merged anomaly results
+   * @return a map from dimension map to a map of anomaly id to its comment
    */
-  public static Map<String, String> flatAnomalyResult(MergedAnomalyResultDTO anomalyResult,
-      List<String> tableKeys) {
-    Preconditions.checkNotNull(anomalyResult);
-    Map<String, String> flatMap = new HashMap<>();
-    flatMap.put(ANOMALY_ID, Long.toString(anomalyResult.getId()));
-    DimensionMap dimension = anomalyResult.getDimensions();
-    if (tableKeys == null) {
-      tableKeys = new ArrayList<>(dimension.keySet());
+  public static Map<DimensionMap, Map<Long, String>> extractComments (List<MergedAnomalyResultDTO> anomalies) {
+    Map<DimensionMap, Map<Long, String>> resultMap = new HashMap<>();
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      DimensionMap dimensions = anomaly.getDimensions();
+      if (!resultMap.containsKey(dimensions)) {
+        resultMap.put(dimensions, new HashMap<>());
+      }
+      long anomalyId = anomaly.getId();
+      String comment = String.format(DEFAULT_COMMENT_FORMAT, anomalyId, "Not Reviewed Yet");
+      AnomalyFeedback feedback = anomaly.getFeedback();
+      if (feedback != null) {
+        if (StringUtils.isNoneBlank(feedback.getComment())) {
+          comment = feedback.getComment();
+        } else {
+          comment = String.format(DEFAULT_COMMENT_FORMAT, anomalyId, feedback.getFeedbackType().toString());
+        }
+      }
+      resultMap.get(dimensions).put(anomalyId, comment);
     }
-    for (String key : tableKeys) {
-      flatMap.put(key, dimension.containsKey(key)? dimension.get(key) : "");
-    }
-    AnomalyFeedback feedback = anomalyResult.getFeedback();
-    if (feedback != null) {
-      flatMap.put(ANOMALY_COMMENT, feedback.getComment());
-    } else {
-      flatMap.put(ANOMALY_COMMENT, "");
-    }
-    flatMap.put(anomalyResult.getMetric(), Double.toString(anomalyResult.getAvgCurrentVal()));
-    return flatMap;
+    return resultMap;
   }
 }

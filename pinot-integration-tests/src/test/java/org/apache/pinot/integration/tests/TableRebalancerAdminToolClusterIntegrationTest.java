@@ -19,11 +19,9 @@
 package org.apache.pinot.integration.tests;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import jdk.nashorn.internal.ir.annotations.Ignore;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -47,7 +45,6 @@ import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.core.TableRebalancer;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.starter.helix.SegmentOnlineOfflineStateModelFactory;
 import org.apache.pinot.tools.PinotTableRebalancer;
 import org.testng.Assert;
@@ -203,9 +200,9 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       // as part of rebalancing, host2 lost segment1 and host3
       // lost segment2 -- so 2 transitions from ON to OFF and
       // OFF to DROP
-      // TODO: fix the flakey test behavior and re-enable these assertions
-      // Assert.assertEquals(_segmentStateTransitionStats.offFromOn, 2);
-      // Assert.assertEquals(_segmentStateTransitionStats.dropFromOff, 2);
+      // HELIX-818: https://issues.apache.org/jira/browse/HELIX-818
+      // Assert.assertEquals(_segmentStateTransitionStats.offFromOn.get(), 2);
+      // Assert.assertEquals(_segmentStateTransitionStats.dropFromOff.get(), 2);
     } finally {
       stopFakeServers();
     }
@@ -322,9 +319,9 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       // as part of rebalancing, host2 lost segment1 and segment3,
       // host1 and host3 lost segment2 and segment4 -- so 6
       // transitions from ON to OFF and OFF to DROP
-      // TODO: fix the flakey test behavior and re-enable these assertions
-      // Assert.assertEquals(_segmentStateTransitionStats.offFromOn, 6);
-      // Assert.assertEquals(_segmentStateTransitionStats.dropFromOff, 6);
+      // HELIX-818: https://issues.apache.org/jira/browse/HELIX-818
+      // Assert.assertEquals(_segmentStateTransitionStats.offFromOn.get(), 6);
+      // Assert.assertEquals(_segmentStateTransitionStats.dropFromOff.get(), 6);
     } finally {
       stopFakeServers();
     }
@@ -458,9 +455,9 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       // and segment4. similarly, host4 lost segment1, segment3
       // and segment4 -- total 6 transitions from ONLINE to OFFLINE
       // and OFFLINE to DROPPED
-      // TODO: fix the flakey test behavior and re-enable these assertions
-      // Assert.assertEquals(_segmentStateTransitionStats.offFromOn, 6);
-      // Assert.assertEquals(_segmentStateTransitionStats.dropFromOff, 6);
+      // HELIX-818: https://issues.apache.org/jira/browse/HELIX-818
+      // Assert.assertEquals(_segmentStateTransitionStats.offFromOn.get(), 6);
+      // Assert.assertEquals(_segmentStateTransitionStats.dropFromOff.get(), 6);
     } finally {
       stopFakeServers();
     }
@@ -593,9 +590,9 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       // as part of rebalancing, host2 lost segment1 and segment3,
       // host1 and host3 lost segment2 and segment4 -- so 6
       // transitions from ON to OFF and OFF to DROP
-      // TODO: fix the flakey test behavior and re-enable these assertions
-      // Assert.assertEquals(_segmentStateTransitionStats.offFromOn, 3);
-      // Assert.assertEquals(_segmentStateTransitionStats.dropFromOff, 3);
+      // HELIX-818: https://issues.apache.org/jira/browse/HELIX-818
+      // Assert.assertEquals(_segmentStateTransitionStats.offFromOn.get(), 3);
+      // Assert.assertEquals(_segmentStateTransitionStats.dropFromOff.get(), 3);
     } finally {
       stopFakeServers();
     }
@@ -669,9 +666,9 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       // as part of rebalancing, host2 lost segment1 and segment3,
       // host1 and host3 lost segment2 and segment4 -- so 6
       // transitions from ON to OFF and OFF to DROP
-      // TODO: fix the flakey test behavior and re-enable these assertions
-      // Assert.assertEquals(_segmentStateTransitionStats.offFromOn, 3);
-      // Assert.assertEquals(_segmentStateTransitionStats.dropFromOff, 3);
+      // HELIX-818: https://issues.apache.org/jira/browse/HELIX-818
+      // Assert.assertEquals(_segmentStateTransitionStats.offFromOn.get(), 3);
+      // Assert.assertEquals(_segmentStateTransitionStats.dropFromOff.get(), 3);
     } finally {
       stopFakeServers();
     }
@@ -730,9 +727,8 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       Assert.assertEquals(stats.getIncrementalUpdatesToSegmentInstanceMap(), 0);
       Assert.assertEquals(stats.getNumSegmentMoves(), 0);
 
-      // TODO: fix the flakey test behavior and re-enable these assertions
-      // Assert.assertEquals(_segmentStateTransitionStats.offFromOn, 0);
-      // Assert.assertEquals(_segmentStateTransitionStats.dropFromOff, 0);
+      Assert.assertEquals(_segmentStateTransitionStats.offFromOn.get(), 0);
+      Assert.assertEquals(_segmentStateTransitionStats.dropFromOff.get(), 0);
     } finally {
       stopFakeServers();
     }
@@ -841,14 +837,14 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
       @Transition(from = "ONLINE", to = "OFFLINE")
       public void onBecomeOfflineFromOnline(Message message, NotificationContext context) {
         if (_segmentStateTransitionStats != null) {
-          ++_segmentStateTransitionStats.offFromOn;
+          _segmentStateTransitionStats.offFromOn.incrementAndGet();
         }
       }
 
       @Transition(from = "OFFLINE", to = "DROPPED")
       public void onBecomeDroppedFromOffline(Message message, NotificationContext context) {
         if (_segmentStateTransitionStats != null) {
-          ++_segmentStateTransitionStats.dropFromOff;
+          _segmentStateTransitionStats.dropFromOff.incrementAndGet();
         }
       }
 
@@ -859,8 +855,8 @@ public class TableRebalancerAdminToolClusterIntegrationTest extends BaseClusterI
   }
 
   private static class SegmentStateTransitionStats {
-    private int offFromOn = 0;
-    private int dropFromOff = 0;
+    private AtomicInteger offFromOn = new AtomicInteger();
+    private AtomicInteger dropFromOff = new AtomicInteger();
   }
 
   @Override

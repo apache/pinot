@@ -510,11 +510,11 @@ public class TableRebalancer {
 
     boolean stable = true;
     for (String segment : mapFieldsIS.keySet()) {
-      Map<String, String> mapIS = mapFieldsIS.get(segment);
-      Map<String, String> mapEV = mapFieldsEV.get(segment);
+      Map<String, String> hostAndStatesInIdealState = mapFieldsIS.get(segment);
+      Map<String, String> hostAndStatesInExternalView = mapFieldsEV.get(segment);
       boolean converged = true;
 
-      if (mapEV == null) {
+      if (hostAndStatesInExternalView == null) {
         LOGGER.info("Host-state mapping of segment {} not yet available in external view", segment);
         // we have found that external view hasn't yet converged to ideal state.
         // still go on to check for other segments just so that we can dump debug
@@ -527,27 +527,27 @@ public class TableRebalancer {
 
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Hosts and states for segment {} in ideal state", segment);
-        prettyPrintMap(mapIS, Level.DEBUG);
+        prettyPrintMap(hostAndStatesInIdealState, Level.DEBUG);
         LOGGER.debug("Hosts and states for segment {} in external view", segment);
-        prettyPrintMap(mapEV, Level.DEBUG);
+        prettyPrintMap(hostAndStatesInExternalView, Level.DEBUG);
       }
 
-      for (String server : mapIS.keySet()) {
-        if (!mapEV.containsKey(server)) {
+      for (String server : hostAndStatesInIdealState.keySet()) {
+        if (!hostAndStatesInExternalView.containsKey(server)) {
           LOGGER.info("Host-state mapping of segment {} doesn't yet have server {} in external view",
               segment, server);
           // external view not yet converged
           stable = false;
           converged = false;
-        } else if (mapEV.get(server).equalsIgnoreCase("error")) {
+        } else if (hostAndStatesInExternalView.get(server).equalsIgnoreCase("error")) {
           LOGGER.error("Detected error state for segment {} for server {}", segment, server);
-          prettyPrintMap(mapIS, Level.ERROR);
-          prettyPrintMap(mapEV, Level.ERROR);
+          prettyPrintMap(hostAndStatesInIdealState, Level.ERROR);
+          prettyPrintMap(hostAndStatesInExternalView, Level.ERROR);
           throw new IllegalStateException("External view reports error state for segment " + segment + " for host " + server,
               new ExternalViewErrored());
         } else {
-          final String stateInIdealState = mapIS.get(server);
-          final String stateInExternalView = mapEV.get(server);
+          final String stateInIdealState = hostAndStatesInIdealState.get(server);
+          final String stateInExternalView = hostAndStatesInExternalView.get(server);
           if (!stateInIdealState.equalsIgnoreCase(stateInExternalView)) {
             LOGGER.info("Host-state mapping of segment {} has state {} in external view and state {} in ideal state",
                 segment, stateInExternalView, stateInIdealState);
@@ -561,10 +561,22 @@ public class TableRebalancer {
       if (!converged) {
         segmentsNotConverged++;
       }
+
+      // now do the reverse comparison
+      // if a server had lost a segment as part of rebalancing (implying ideal state no
+      // longer has that server for the particular segment) then the server should
+      // no longer present for that segment in external view as well
+      for (String server : hostAndStatesInExternalView.keySet()) {
+        if (!hostAndStatesInIdealState.containsKey(server)) {
+            stable = false;
+            LOGGER.info("Server {} for segment {} should not be present in external view", server, segment);
+          }
+      }
     }
 
     LOGGER.info("{} of total {} segments from ideal state don't yet have external view converged",
         segmentsNotConverged, mapFieldsIS.size());
+
     return stable;
   }
 
@@ -610,9 +622,9 @@ public class TableRebalancer {
           LOGGER.info("Waiting for externalView to match idealstate for table:" + resourceName);
           Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
           wait += EXTERNAL_VIEW_CHECK_INTERVAL_MS;
-          }
         }
-      } catch (InterruptedException e) {
+      }
+    } catch (InterruptedException e) {
       LOGGER.error("Rebalancer got interrupted while waiting for external view to converge");
       Thread.currentThread().interrupt();
     }
