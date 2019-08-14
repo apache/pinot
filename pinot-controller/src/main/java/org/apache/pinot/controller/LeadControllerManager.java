@@ -20,6 +20,7 @@ package org.apache.pinot.controller;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
@@ -28,20 +29,20 @@ import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY;
-import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
-
-
+/**
+ * Class for handling lead controller assignments given the table names. This should be created at controller startup.
+ */
+@ThreadSafe
 public class LeadControllerManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerManager.class);
-  private static final long CONTROLLER_LEADERSHIP_FETCH_INTERVAL = 60_000L;
+  private static final long CONTROLLER_LEADERSHIP_FETCH_INTERVAL_MS = 60_000L;
 
-  private final Set<Integer> _partitionIdCache;
+  private final Set<Integer> _leadForPartitions;
   private final String _instanceId;
   private final HelixManager _helixManager;
   private final ControllerMetrics _controllerMetrics;
@@ -51,11 +52,11 @@ public class LeadControllerManager {
   private volatile boolean _amIHelixLeader = false;
   private volatile boolean _isShuttingDown = false;
 
-  public LeadControllerManager(HelixManager helixManager, ControllerMetrics controllerMetrics) {
-    _helixManager = helixManager;
+  public LeadControllerManager(HelixManager helixParticipantManager, ControllerMetrics controllerMetrics) {
+    _helixManager = helixParticipantManager;
     _controllerMetrics = controllerMetrics;
-    _instanceId = helixManager.getInstanceName();
-    _partitionIdCache = ConcurrentHashMap.newKeySet();
+    _instanceId = helixParticipantManager.getInstanceName();
+    _leadForPartitions = ConcurrentHashMap.newKeySet();
 
     // Create a thread to periodically fetch controller leadership as a work-around of Helix callback delay
     _controllerLeadershipFetchingThread = new Thread("ControllerLeadershipFetchingThread") {
@@ -82,7 +83,7 @@ public class LeadControllerManager {
                       .addMeteredGlobalValue(ControllerMeter.CONTROLLER_LEADERSHIP_CHANGE_WITHOUT_CALLBACK, 1L);
                 }
               }
-              LeadControllerManager.this.wait(CONTROLLER_LEADERSHIP_FETCH_INTERVAL);
+              LeadControllerManager.this.wait(CONTROLLER_LEADERSHIP_FETCH_INTERVAL_MS);
             }
           } catch (Exception e) {
             // Ignore all exceptions. The thread keeps running until LeadControllerManager.stop() is invoked.
@@ -102,7 +103,7 @@ public class LeadControllerManager {
     if (_isLeadControllerResourceEnabled) {
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       int partitionId = LeadControllerUtils.getPartitionIdForTable(rawTableName);
-      return _partitionIdCache.contains(partitionId);
+      return _leadForPartitions.contains(partitionId);
     } else {
       // Checks if it's Helix leader if lead controller resource is disabled.
       return _amIHelixLeader;
@@ -116,7 +117,7 @@ public class LeadControllerManager {
   public synchronized void addPartitionLeader(String partitionName) {
     LOGGER.info("Add Partition: {} to LeadControllerManager", partitionName);
     int partitionId = LeadControllerUtils.extractPartitionId(partitionName);
-    _partitionIdCache.add(partitionId);
+    _leadForPartitions.add(partitionId);
   }
 
   /**
@@ -126,7 +127,7 @@ public class LeadControllerManager {
   public synchronized void removePartitionLeader(String partitionName) {
     LOGGER.info("Remove Partition: {} from LeadControllerManager", partitionName);
     int partitionId = LeadControllerUtils.extractPartitionId(partitionName);
-    _partitionIdCache.remove(partitionId);
+    _leadForPartitions.remove(partitionId);
   }
 
   /**
@@ -136,8 +137,14 @@ public class LeadControllerManager {
     HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
     PropertyKey propertyKey = helixDataAccessor.keyBuilder().controllerLeader();
     LiveInstance liveInstance = helixDataAccessor.getProperty(propertyKey);
+    if (liveInstance == null) {
+      LOGGER.warn("Helix leader ZNode is missing");
+      return false;
+    }
     String helixLeaderInstanceId = liveInstance.getInstanceName();
-    return _instanceId.equals(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + helixLeaderInstanceId);
+    // The instance name from Helix leader ZNode is without controller prefix.
+    // It is essential to convert to participant id for fair comparison.
+    return _instanceId.equals(Helix.PREFIX_OF_CONTROLLER_INSTANCE + helixLeaderInstanceId);
   }
 
   /**
@@ -145,9 +152,9 @@ public class LeadControllerManager {
    */
   public boolean isLeadControllerResourceEnabled() {
     HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
-    PropertyKey propertyKey = helixDataAccessor.keyBuilder().resourceConfig(LEAD_CONTROLLER_RESOURCE_NAME);
+    PropertyKey propertyKey = helixDataAccessor.keyBuilder().resourceConfig(Helix.LEAD_CONTROLLER_RESOURCE_NAME);
     ResourceConfig resourceConfig = helixDataAccessor.getProperty(propertyKey);
-    String enableResource = resourceConfig.getSimpleConfig(LEAD_CONTROLLER_RESOURCE_ENABLED_KEY);
+    String enableResource = resourceConfig.getSimpleConfig(Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY);
     return Boolean.parseBoolean(enableResource);
   }
 
@@ -168,7 +175,7 @@ public class LeadControllerManager {
       _isShuttingDown = true;
       notify();
     }
-    _partitionIdCache.clear();
+    _leadForPartitions.clear();
 
     try {
       _controllerLeadershipFetchingThread.join();

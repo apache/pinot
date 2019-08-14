@@ -150,9 +150,6 @@ public class ControllerStarter {
     } else {
       _adminApp =
           new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), _config.getQueryConsoleUseHttps());
-      // Helix instance type should be explicitly set to PARTICIPANT ONLY in {@link ControllerStarter}.
-      // Other places like {@link PerfBenchmarkDriver} which directly call {@link PinotHelixResourceManager} should NOT register as PARTICIPANT,
-      // which would be put to lead controller resource and mess up the leadership assignment. Those places should use ADMINISTRATOR other than PARTICIPANT.
       // Do not use this before the invocation of {@link PinotHelixResourceManager::start()}, which happens in {@link ControllerStarter::start()}
       _helixResourceManager = new PinotHelixResourceManager(_config);
       _executorService =
@@ -264,7 +261,7 @@ public class ControllerStarter {
   }
 
   private void setUpPinotController() {
-    // Set up Pinot cluster in Helix
+    // Set up Pinot cluster in Helix if needed
     HelixSetupUtils.setupPinotCluster(_helixClusterName, _helixZkURL, _isUpdateStateModel, _enableBatchMessageMode);
 
     // Start all components
@@ -277,11 +274,16 @@ public class ControllerStarter {
         .getZKHelixManager(_helixClusterName, _helixParticipantInstanceId, InstanceType.PARTICIPANT, _helixZkURL);
 
     // LeadControllerManager needs to be initialized before registering as Helix participant.
-    LOGGER.info("Starting lead controller manager");
+    LOGGER.info("Initializing lead controller manager");
     _leadControllerManager = new LeadControllerManager(_helixParticipantManager, _controllerMetrics);
 
     LOGGER.info("Registering and connecting Helix participant manager as Helix Participant role");
     registerAndConnectAsHelixParticipant();
+
+    // LeadControllerManager needs to be started after the connection
+    // as it can check Helix leadership and resource config only after connecting to Helix cluster.
+    LOGGER.info("Starting lead controller manager");
+    _leadControllerManager.start();
 
     LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
     _helixResourceManager.start(_helixParticipantManager);
