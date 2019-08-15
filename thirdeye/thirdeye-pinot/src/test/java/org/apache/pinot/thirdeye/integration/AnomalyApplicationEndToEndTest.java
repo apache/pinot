@@ -280,7 +280,7 @@ public class AnomalyApplicationEndToEndTest {
     startWorker();
 
     // check for change in task status to COMPLETED
-    Thread.sleep(10000);
+    Thread.sleep(30000);
     tasks = taskDAO.findAll();
     Assert.assertTrue(tasks.stream().anyMatch(x -> x.getStatus() == TaskStatus.COMPLETED));
 
