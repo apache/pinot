@@ -453,5 +453,19 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getLongValue(), 5L);
 
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("select (a * ((b - c) / d) + e) from baseballStats");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "ADD");
+    Expression leftExpr = pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0);
+    Expression rightExpr = pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1);
+    Assert.assertEquals(rightExpr.getIdentifier().getName(), "e");
+    Assert.assertEquals(leftExpr.getFunctionCall().getOperator(), "MULT");
+    Assert.assertEquals(leftExpr.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "a");
+    rightExpr = leftExpr.getFunctionCall().getOperands().get(1);
+    Assert.assertEquals(rightExpr.getFunctionCall().getOperator(), "DIV");
+    Assert.assertEquals(rightExpr.getFunctionCall().getOperands().get(1).getIdentifier().getName(), "d");
+    leftExpr = rightExpr.getFunctionCall().getOperands().get(0);
+    Assert.assertEquals(leftExpr.getFunctionCall().getOperator(), "SUB");
+    Assert.assertEquals(leftExpr.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "b");
+    Assert.assertEquals(leftExpr.getFunctionCall().getOperands().get(1).getIdentifier().getName(), "c");
   }
 }
