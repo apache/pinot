@@ -46,14 +46,13 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
  * The <code>IntermediateResultsBlock</code> class is the holder of the server side inter-segment results.
  */
 public class IntermediateResultsBlock implements Block {
-  private DataSchema _selectionDataSchema;
-  private DataSchema _orderByDataSchema;
+  private DataSchema _resultDataSchema;
   private Collection<Serializable[]> _selectionResult;
   private AggregationFunctionContext[] _aggregationFunctionContexts;
   private List<Object> _aggregationResult;
   private AggregationGroupByResult _aggregationGroupByResult;
   private List<Map<String, Object>> _combinedAggregationGroupByResult;
-  private List<GroupByRecord> _groupByOrderByResult;
+  private List<GroupByRecord> _orderedGroupByResult;
   private List<ProcessingException> _processingExceptions;
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
@@ -68,7 +67,7 @@ public class IntermediateResultsBlock implements Block {
    */
   public IntermediateResultsBlock(@Nonnull DataSchema selectionDataSchema,
       @Nonnull Collection<Serializable[]> selectionResult) {
-    _selectionDataSchema = selectionDataSchema;
+    _resultDataSchema = selectionDataSchema;
     _selectionResult = selectionResult;
   }
 
@@ -92,19 +91,19 @@ public class IntermediateResultsBlock implements Block {
    * Constructor for aggregation group by order by result.
    */
   @SuppressWarnings("unchecked")
-  public IntermediateResultsBlock(@Nonnull List groupByOrderByResults, DataSchema dataSchema) {
-    _groupByOrderByResult = groupByOrderByResults;
-    _orderByDataSchema = dataSchema;
+  public IntermediateResultsBlock(@Nonnull List orderedGroupByResults, DataSchema orderedGroupByDataSchema) {
+    _orderedGroupByResult = orderedGroupByResults;
+    _resultDataSchema = orderedGroupByDataSchema;
   }
 
   /**
    * Constructor for aggregation group-by result with {@link AggregationGroupByResult}.
    */
   public IntermediateResultsBlock(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
-      @Nullable AggregationGroupByResult aggregationGroupByResults, DataSchema orderByDataSchema) {
+      @Nullable AggregationGroupByResult aggregationGroupByResults, DataSchema orderedGroupByDataSchema) {
     _aggregationFunctionContexts = aggregationFunctionContexts;
     _aggregationGroupByResult = aggregationGroupByResults;
-    _orderByDataSchema = orderByDataSchema;
+    _resultDataSchema = orderedGroupByDataSchema;
   }
 
   /**
@@ -123,17 +122,12 @@ public class IntermediateResultsBlock implements Block {
   }
 
   @Nullable
-  public DataSchema getSelectionDataSchema() {
-    return _selectionDataSchema;
-  }
-
-  @Nullable
-  public DataSchema getOrderByDataSchema() {
-    return _orderByDataSchema;
+  public DataSchema getResultDataSchema() {
+    return _resultDataSchema;
   }
 
   public void setSelectionDataSchema(@Nullable DataSchema dataSchema) {
-    _selectionDataSchema = dataSchema;
+    _resultDataSchema = dataSchema;
   }
 
   @Nullable
@@ -235,8 +229,8 @@ public class IntermediateResultsBlock implements Block {
       return getAggregationGroupByResultDataTable();
     }
 
-    if (_groupByOrderByResult != null) {
-      return getAggregationGroupByOrderByResultDataTable();
+    if (_orderedGroupByResult != null) {
+      return getAggregationOrderedGroupByResultDataTable();
     }
 
     if (_processingExceptions != null && _processingExceptions.size() > 0) {
@@ -250,7 +244,7 @@ public class IntermediateResultsBlock implements Block {
   private DataTable getSelectionResultDataTable()
       throws Exception {
     return attachMetadataToDataTable(
-        SelectionOperatorUtils.getDataTableFromRows(_selectionResult, _selectionDataSchema));
+        SelectionOperatorUtils.getDataTableFromRows(_selectionResult, _resultDataSchema));
   }
 
   @Nonnull
@@ -292,11 +286,11 @@ public class IntermediateResultsBlock implements Block {
   }
 
   @Nonnull
-  private DataTable getAggregationGroupByOrderByResultDataTable() throws Exception {
+  private DataTable getAggregationOrderedGroupByResultDataTable() throws Exception {
 
-    DataTableBuilder dataTableBuilder = new DataTableBuilder(_orderByDataSchema);
+    DataTableBuilder dataTableBuilder = new DataTableBuilder(_resultDataSchema);
 
-    for (GroupByRecord groupByRecord : _groupByOrderByResult) {
+    for (GroupByRecord groupByRecord : _orderedGroupByResult) {
       dataTableBuilder.startRow();
       String[] groupKey = groupByRecord.getGroupByKey();
       int i = 0;

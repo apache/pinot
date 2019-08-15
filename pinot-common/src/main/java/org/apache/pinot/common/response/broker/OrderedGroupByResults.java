@@ -28,39 +28,26 @@ import java.util.List;
 /**
  * This class holds the results of group by order by query which is set into the {@link BrokerResponseNative}
  */
-@JsonPropertyOrder({"orderBy", "groupByKeys", "aggregationResults"})
-public class GroupByOrderByResults {
-  private List<String> _orderBy;
-  private List<String[]> _groupByKeys;
+@JsonPropertyOrder({"groupBy", "aggregationResults"})
+public class OrderedGroupByResults {
+  private List<String[]> _groupBy;
   private List<Serializable[]> _aggregationResults;
 
   @JsonCreator
-  public GroupByOrderByResults(@JsonProperty("orderBy") List<String> orderBy,
-      @JsonProperty("groupByKeys") List<String[]> groupByKeys,
+  public OrderedGroupByResults(@JsonProperty("groupBy") List<String[]> groupBy,
       @JsonProperty("aggregationResults") List<Serializable[]> aggregationResults) {
-    _orderBy = orderBy;
-    _groupByKeys = groupByKeys;
+    _groupBy = groupBy;
     _aggregationResults = aggregationResults;
   }
 
-  @JsonProperty("orderBy")
-  public List<String> getOrderBy() {
-    return _orderBy;
+  @JsonProperty("groupBy")
+  public List<String[]> getGroupBy() {
+    return _groupBy;
   }
 
-  @JsonProperty("orderBy")
-  public void setOrderBy(List<String> orderBy) {
-    _orderBy = orderBy;
-  }
-
-  @JsonProperty("groupByKeys")
-  public List<String[]> getGroupByKeys() {
-    return _groupByKeys;
-  }
-
-  @JsonProperty("groupByKeys")
-  public void setGroupByKeys(List<String[]> groupByKeys) {
-    _groupByKeys = groupByKeys;
+  @JsonProperty("groupBy")
+  public void setGroupBy(List<String[]> groupBy) {
+    _groupBy = groupBy;
   }
 
   @JsonProperty("aggregationResults")

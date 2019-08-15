@@ -47,7 +47,7 @@ import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.GroupByOrderByResults;
+import org.apache.pinot.common.response.broker.OrderedGroupByResults;
 import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.SelectionResults;
@@ -58,7 +58,7 @@ import org.apache.pinot.core.operator.GroupByRecord;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
-import org.apache.pinot.core.query.aggregation.groupby.OrderByTrimmingService;
+import org.apache.pinot.core.query.aggregation.groupby.OrderByTrimming;
 import org.apache.pinot.core.query.selection.SelectionOperatorService;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.slf4j.Logger;
@@ -225,12 +225,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
                   cachedDataSchema);
           brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, new ArrayList<>(0)));
         } else if (brokerRequest.isSetOrderBy()) {
-          List<String> columns = new ArrayList<>();
-          for (SelectionSort orderBy : brokerRequest.getOrderBy()) {
-            columns.add(orderBy.getColumn());
-          }
-          brokerResponseNative.setGroupByOrderByResults(
-              new GroupByOrderByResults(columns, new ArrayList<>(0), new ArrayList<>(0)));
+          brokerResponseNative.setOrderedGroupByResults(
+              new OrderedGroupByResults(new ArrayList<>(0), new ArrayList<>(0)));
         }
       }
     } else {
@@ -271,14 +267,14 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
           if (brokerRequest.isSetOrderBy()) { // group by order by
 
-            setOrderByGroupByResults(brokerResponseNative, aggregationFunctions, dataTableMap,
+            setOrderedGroupByResults(brokerResponseNative, aggregationFunctions, dataTableMap,
                 brokerRequest.getAggregationsInfo(), brokerRequest.getOrderBy(), brokerRequest.getGroupBy(), preserveType);
 
-            if (brokerMetrics != null && !brokerResponseNative.getGroupByOrderByResults()
+            if (brokerMetrics != null && !brokerResponseNative.getOrderedGroupByResults()
                 .getAggregationResults()
                 .isEmpty()) {
               brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.GROUP_BY_SIZE,
-                  brokerResponseNative.getGroupByOrderByResults().getAggregationResults().size());
+                  brokerResponseNative.getOrderedGroupByResults().getAggregationResults().size());
             }
           } else { // group by, no order by
 
@@ -424,7 +420,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     brokerResponseNative.setAggregationResults(reducedAggregationResults);
   }
 
-  private void setOrderByGroupByResults(@Nonnull BrokerResponseNative brokerResponseNative,
+  private void setOrderedGroupByResults(@Nonnull BrokerResponseNative brokerResponseNative,
       @Nonnull AggregationFunction[] aggregationFunctions, @Nonnull Map<ServerInstance, DataTable> dataTableMap,
       List<AggregationInfo> aggregationInfos, List<SelectionSort> orderByClause, GroupBy groupBy,
       boolean preserveType) {
@@ -468,17 +464,11 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     }
 
     // order and trim
-    OrderByTrimmingService orderByTrimmingService =
-        new OrderByTrimmingService(aggregationInfos, groupBy, orderByClause, dataSchema);
+    OrderByTrimming orderByTrimming = new OrderByTrimming(aggregationInfos, groupBy, orderByClause, dataSchema);
     List<GroupByRecord> finalGroupByRecords =
-        orderByTrimmingService.orderAndTrimFinal(Lists.newArrayList(groupByRecordsMap.values()));
+        orderByTrimming.orderAndTrimFinal(Lists.newArrayList(groupByRecordsMap.values()));
 
-    // create GroupByOrderByResults and set in broker response
-    List<String> columns = new ArrayList<>();
-    for (SelectionSort orderBy : orderByClause) {
-      columns.add(orderBy.getColumn());
-    }
-
+    // create OrderedGroupByResults and set in broker response
     List<String[]> groupByKeys = new ArrayList<>();
     List<Serializable[]> results = new ArrayList<>();
     for (GroupByRecord groupByRecord : finalGroupByRecords) {
@@ -493,8 +483,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       }
       results.add(result);
     }
-    GroupByOrderByResults groupByOrderByResults = new GroupByOrderByResults(columns, groupByKeys, results);
-    brokerResponseNative.setGroupByOrderByResults(groupByOrderByResults);
+    OrderedGroupByResults orderedGroupByResults = new OrderedGroupByResults(groupByKeys, results);
+    brokerResponseNative.setOrderedGroupByResults(orderedGroupByResults);
   }
 
   /**

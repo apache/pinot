@@ -22,6 +22,7 @@ import com.google.common.base.Joiner;
 import javax.annotation.Nonnull;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 
 
 /**
@@ -32,10 +33,8 @@ public class GroupByRecord {
   private Object[] _aggregationResults;
   // TODO: could just 1 array be used to store both keys and values?
 
-  private static String SEPARATOR = "\t";
-
   public GroupByRecord(@Nonnull String stringKey, @Nonnull Object[] aggregationResults) {
-    _groupByKey = stringKey.split(SEPARATOR);
+    _groupByKey = stringKey.split(GroupKeyGenerator.DELIMITER);
     _aggregationResults = aggregationResults;
   }
 
@@ -62,7 +61,7 @@ public class GroupByRecord {
    * Given an array of group by keys, constructs the concatenated string equivalent key
    */
   public static String constructGroupByKey(String[] groupByKeys) {
-    return Joiner.on(SEPARATOR).join(groupByKeys);
+    return Joiner.on(GroupKeyGenerator.DELIMITER).join(groupByKeys);
   }
 
   @Override

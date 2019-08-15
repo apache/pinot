@@ -29,6 +29,8 @@ import org.apache.pinot.core.operator.blocks.TransformBlock;
 public interface GroupKeyGenerator {
   int INVALID_ID = -1;
 
+  public static final String DELIMITER = "\t";
+
   /**
    * Get the global upper bound of the group key. All group keys generated or will be generated should be less than this
    * value. This interface can be called before generating group keys to determine the type and size of the value result

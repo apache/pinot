@@ -32,7 +32,7 @@ import org.apache.pinot.core.operator.OrderByUtils;
 /**
  * Service for ordering and trimming results of {@link GroupByRecord}
  */
-public class OrderByTrimmingService {
+public class OrderByTrimming {
 
   private int _topN;
 
@@ -41,7 +41,7 @@ public class OrderByTrimmingService {
   private GroupBy _groupBy;
   private DataSchema _dataSchema;
 
-  public OrderByTrimmingService(List<AggregationInfo> aggregationInfos, GroupBy groupBy, List<SelectionSort> orderBy,
+  public OrderByTrimming(List<AggregationInfo> aggregationInfos, GroupBy groupBy, List<SelectionSort> orderBy,
       DataSchema dataSchema) {
     _aggregationInfos = aggregationInfos;
     _groupBy = groupBy;

@@ -44,7 +44,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
-import org.apache.pinot.core.query.aggregation.groupby.OrderByTrimmingService;
+import org.apache.pinot.core.query.aggregation.groupby.OrderByTrimming;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -146,7 +146,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
             }
 
             // Get the data schema
-            DataSchema dataSchema = intermediateResultsBlock.getOrderByDataSchema();
+            DataSchema dataSchema = intermediateResultsBlock.getResultDataSchema();
             _initLock.lock();
             try {
               if (_dataSchema == null) {
@@ -205,11 +205,11 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
       }
 
       // order and trim top N
-      OrderByTrimmingService orderByTrimmingService =
-          new OrderByTrimmingService(_brokerRequest.getAggregationsInfo(), _brokerRequest.getGroupBy(),
+      OrderByTrimming orderByTrimming =
+          new OrderByTrimming(_brokerRequest.getAggregationsInfo(), _brokerRequest.getGroupBy(),
               _brokerRequest.getOrderBy(), _dataSchema);
       List<GroupByRecord> trimmedRows =
-          orderByTrimmingService.orderAndTrimIntermediate(Lists.newArrayList(resultsMap.values()));
+          orderByTrimming.orderAndTrimIntermediate(Lists.newArrayList(resultsMap.values()));
       IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(trimmedRows, _dataSchema);
 
       // Set the processing exceptions.
