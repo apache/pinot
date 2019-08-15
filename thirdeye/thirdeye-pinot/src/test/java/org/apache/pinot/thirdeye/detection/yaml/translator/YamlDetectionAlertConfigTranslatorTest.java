@@ -12,6 +12,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
+import org.apache.pinot.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
 import org.apache.pinot.thirdeye.detection.validators.SubscriptionConfigValidator;
 import org.testng.Assert;
@@ -115,7 +116,9 @@ public class YamlDetectionAlertConfigTranslatorTest {
     detectionConfigDTO.setName("test_pipeline_1");
     detectionConfigManager.save(detectionConfigDTO);
 
-    DetectionAlertRegistry.getInstance().registerAlertFilter("DEFAULT_ALERTER_PIPELINE", "RECIPIENTClass");
+    DetectionAlertRegistry.getInstance().registerAlertFilter("DEFAULT_ALERTER_PIPELINE",
+        ToAllRecipientsDetectionAlertFilter.class.getName());
+
   }
 
   @AfterMethod(alwaysRun = true)

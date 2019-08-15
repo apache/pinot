@@ -118,6 +118,9 @@ public class AnomalyApplicationEndToEndTest {
 
   @BeforeClass
   void beforeClass() {
+    // make sure the database is created again
+    testDAOProvider = DAOTestBase.getInstance();
+    testDAOProvider.cleanup();
     testDAOProvider = DAOTestBase.getInstance();
     daoRegistry = DAORegistry.getInstance();
     Assert.assertNotNull(daoRegistry.getJobDAO());
@@ -132,7 +135,6 @@ public class AnomalyApplicationEndToEndTest {
 
 
   void initDao() {
-    testDAOProvider = DAOTestBase.getInstance();
     daoRegistry = DAORegistry.getInstance();
     metricDAO = daoRegistry.getMetricConfigDAO();
     datasetDAO = daoRegistry.getDatasetConfigDAO();
