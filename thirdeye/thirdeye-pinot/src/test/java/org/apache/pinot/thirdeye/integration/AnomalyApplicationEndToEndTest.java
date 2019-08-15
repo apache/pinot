@@ -119,9 +119,7 @@ public class AnomalyApplicationEndToEndTest {
   @BeforeClass
   void beforeClass() {
     // make sure the database is created again
-    testDAOProvider = DAOTestBase.getInstance();
-    testDAOProvider.cleanup();
-    testDAOProvider = DAOTestBase.getInstance();
+    testDAOProvider = DAOTestBase.getInstance("/persistence-local-integration-test.yml");
     daoRegistry = DAORegistry.getInstance();
     Assert.assertNotNull(daoRegistry.getJobDAO());
     initDao();
