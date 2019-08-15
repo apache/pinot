@@ -20,9 +20,13 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Preconditions;
 
 import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.PQL;
+import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.QUERY;
+import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.QUERY_FORMAT;
 import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.SQL;
+import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.TRACE;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -77,15 +81,11 @@ public class PinotQueryResource {
   public String postQuery(String requestJsonStr, @Context HttpHeaders httpHeaders) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
-      String query = requestJson.get("query").asText();
-      String traceEnabled = "false";
-      if (requestJson.has("trace")) {
-        traceEnabled = requestJson.get("trace").toString();
-      }
-      String queryFormat = "pql";
-      if (requestJson.has("queryFormat")) {
-        queryFormat = requestJson.get("queryFormat").asText();
-      }
+      String query = requestJson.get(QUERY).asText();
+      String traceEnabled = requestJson.has(TRACE) ? requestJson.get(TRACE).toString() : "false";
+      String queryFormat = requestJson.has(QUERY_FORMAT) ? requestJson.get(QUERY_FORMAT).asText() : PQL;
+      Preconditions.checkArgument(queryFormat.equals(PQL) || queryFormat.equals(SQL),
+          "queryFormat should be 'pql' or 'sql'");
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, query);
       return getQueryResponse(query, traceEnabled, httpHeaders, queryFormat);
     } catch (Exception e) {
@@ -96,17 +96,28 @@ public class PinotQueryResource {
 
   @POST
   @Path("pql")
-  @Deprecated
-  public String post(String requestJsonStr, @Context HttpHeaders httpHeaders) {
+  public String postPql(String requestJsonStr, @Context HttpHeaders httpHeaders) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
-      String pqlQuery = requestJson.get("pql").asText();
-      String traceEnabled = "false";
-      if (requestJson.has("trace")) {
-        traceEnabled = requestJson.get("trace").toString();
-      }
+      String pqlQuery = requestJson.get(PQL).asText();
+      String traceEnabled = requestJson.has(TRACE) ? requestJson.get(TRACE).toString() : "false";
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, pqlQuery);
-      return getQueryResponse(pqlQuery, traceEnabled, httpHeaders, "pql");
+      return getQueryResponse(pqlQuery, traceEnabled, httpHeaders, PQL);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while processing post request", e);
+      return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
+    }
+  }
+
+  @POST
+  @Path("sql")
+  public String postSql(String requestJsonStr, @Context HttpHeaders httpHeaders) {
+    try {
+      JsonNode requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
+      String sqlQuery = requestJson.get(SQL).asText();
+      String traceEnabled = requestJson.has(TRACE) ? requestJson.get(TRACE).toString() : "false";
+      LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
+      return getQueryResponse(sqlQuery, traceEnabled, httpHeaders, SQL);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing post request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -119,7 +130,7 @@ public class PinotQueryResource {
       @Context HttpHeaders httpHeaders) {
     try {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, pqlQuery);
-      return getQueryResponse(pqlQuery, traceEnabled, httpHeaders, "pql");
+      return getQueryResponse(pqlQuery, traceEnabled, httpHeaders, PQL);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -129,7 +140,7 @@ public class PinotQueryResource {
   public String getQueryResponse(String query, String traceEnabled,
 		  HttpHeaders httpHeaders, String queryFormat) {
     // Get resource table name.
-    BrokerRequest brokerRequest;
+    BrokerRequest brokerRequest = null;
     try {
       switch (queryFormat) {
         case PQL:
@@ -138,8 +149,6 @@ public class PinotQueryResource {
         case SQL:
           brokerRequest = SQL_COMPILER.compileToBrokerRequest(query);
           break;
-        default:
-          throw new UnsupportedOperationException("Unknown query format - " + queryFormat);
       }
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling {} query: {}, {}", queryFormat, query, e.getMessage());
