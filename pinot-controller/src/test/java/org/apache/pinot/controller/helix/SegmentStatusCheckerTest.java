@@ -35,10 +35,12 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -46,6 +48,7 @@ import static org.mockito.Mockito.when;
 public class SegmentStatusCheckerTest {
   private SegmentStatusChecker segmentStatusChecker;
   private PinotHelixResourceManager helixResourceManager;
+  private LeadControllerManager leadControllerManager;
   private MetricsRegistry metricsRegistry;
   private ControllerMetrics controllerMetrics;
   private ControllerConf config;
@@ -84,9 +87,14 @@ public class SegmentStatusCheckerTest {
       when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
       when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
     }
+    {
+      leadControllerManager = mock(LeadControllerManager.class);
+      when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    segmentStatusChecker =
+        new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);
     segmentStatusChecker.start();
     segmentStatusChecker.run();
     Assert.assertEquals(
@@ -146,9 +154,14 @@ public class SegmentStatusCheckerTest {
       when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
       when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
     }
+    {
+      leadControllerManager = mock(LeadControllerManager.class);
+      when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    segmentStatusChecker =
+        new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);
     segmentStatusChecker.start();
     segmentStatusChecker.run();
     Assert.assertEquals(
@@ -222,9 +235,14 @@ public class SegmentStatusCheckerTest {
       when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
       when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(0);
     }
+    {
+      leadControllerManager = mock(LeadControllerManager.class);
+      when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    segmentStatusChecker =
+        new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);
     segmentStatusChecker.start();
     segmentStatusChecker.run();
     Assert.assertEquals(
@@ -264,9 +282,14 @@ public class SegmentStatusCheckerTest {
       when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
       when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
     }
+    {
+      leadControllerManager = mock(LeadControllerManager.class);
+      when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    segmentStatusChecker =
+        new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);
     segmentStatusChecker.start();
     segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
@@ -291,9 +314,14 @@ public class SegmentStatusCheckerTest {
       when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
       when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
     }
+    {
+      leadControllerManager = mock(LeadControllerManager.class);
+      when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    segmentStatusChecker =
+        new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);
     segmentStatusChecker.start();
     segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE),
@@ -349,9 +377,14 @@ public class SegmentStatusCheckerTest {
       when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
       when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
     }
+    {
+      leadControllerManager = mock(LeadControllerManager.class);
+      when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    segmentStatusChecker =
+        new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);
     segmentStatusChecker.start();
     segmentStatusChecker.run();
     Assert.assertEquals(
@@ -390,9 +423,14 @@ public class SegmentStatusCheckerTest {
       when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
       when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
     }
+    {
+      leadControllerManager = mock(LeadControllerManager.class);
+      when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    segmentStatusChecker =
+        new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);
     segmentStatusChecker.start();
     segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
@@ -429,9 +467,14 @@ public class SegmentStatusCheckerTest {
       when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
       when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
     }
+    {
+      leadControllerManager = mock(LeadControllerManager.class);
+      when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    segmentStatusChecker =
+        new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);
     // verify state before test
     Assert.assertEquals(controllerMetrics.getValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT), 0);
     // update metrics
@@ -463,9 +506,14 @@ public class SegmentStatusCheckerTest {
       when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
       when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
     }
+    {
+      leadControllerManager = mock(LeadControllerManager.class);
+      when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    segmentStatusChecker =
+        new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);
     // verify state before test
     Assert.assertEquals(controllerMetrics.getValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT), 0);
     // update metrics
@@ -508,9 +556,14 @@ public class SegmentStatusCheckerTest {
       when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
       when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
     }
+    {
+      leadControllerManager = mock(LeadControllerManager.class);
+      when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    segmentStatusChecker =
+        new SegmentStatusChecker(helixResourceManager, leadControllerManager, config, controllerMetrics);
     segmentStatusChecker.start();
     segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE),

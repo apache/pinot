@@ -16,20 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller;
+package org.apache.pinot.integration.tests;
 
-/**
- * Interface for a subscriber to the {@link ControllerLeadershipManager}
- */
-public interface LeadershipChangeSubscriber {
+import org.apache.pinot.controller.ControllerConf;
 
-  /**
-   * Callback to invoke on becoming leader
-   */
-  void onBecomingLeader();
 
-  /**
-   * Callback to invoke on losing leadership
-   */
-  void onBecomingNonLeader();
+public class LLCRealtimeClusterWithEnabledLeadControllerResourceIntegrationTest extends LLCRealtimeClusterIntegrationTest {
+  @Override
+  public void startController() {
+    ControllerConf controllerConfig = getDefaultControllerConfiguration();
+    startController(controllerConfig);
+    enableResourceConfigForLeadControllerResource(true);
+  }
 }

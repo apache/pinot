@@ -28,8 +28,6 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.DataSize;
-import org.apache.pinot.controller.ControllerLeadershipManager;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,17 +43,14 @@ public class StorageQuotaChecker {
   private final TableSizeReader _tableSizeReader;
   private final TableConfig _tableConfig;
   private final ControllerMetrics _controllerMetrics;
-  private final PinotHelixResourceManager _pinotHelixResourceManager;
-  private final ControllerLeadershipManager _controllerLeadershipManager;
+  private final boolean _isLeaderForTable;
 
   public StorageQuotaChecker(TableConfig tableConfig, TableSizeReader tableSizeReader,
-      ControllerMetrics controllerMetrics, PinotHelixResourceManager pinotHelixResourceManager,
-      ControllerLeadershipManager controllerLeadershipManager) {
+      ControllerMetrics controllerMetrics, boolean isLeaderForTable) {
     _tableConfig = tableConfig;
     _tableSizeReader = tableSizeReader;
     _controllerMetrics = controllerMetrics;
-    _pinotHelixResourceManager = pinotHelixResourceManager;
-    _controllerLeadershipManager = controllerLeadershipManager;
+    _isLeaderForTable = isLeaderForTable;
   }
 
   public static class QuotaCheckerResponse {
@@ -157,7 +152,7 @@ public class StorageQuotaChecker {
         tableNameWithType, tableSubtypeSize.estimatedSizeInBytes, tableSubtypeSize.reportedSizeInBytes);
 
     // Only emit the real percentage of storage quota usage by lead controller, otherwise emit 0L.
-    if (isLeader()) {
+    if (_isLeaderForTable) {
       long existingStorageQuotaUtilization = tableSubtypeSize.estimatedSizeInBytes * 100 / allowedStorageBytes;
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_QUOTA_UTILIZATION,
           existingStorageQuotaUtilization);
@@ -211,9 +206,5 @@ public class StorageQuotaChecker {
       LOGGER.warn(message);
       return failure(message);
     }
-  }
-
-  protected boolean isLeader() {
-    return _controllerLeadershipManager.isLeader();
   }
 }

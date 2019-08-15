@@ -161,7 +161,10 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Create Helix cluster if needed, and then start a Pinot controller instance.
+   * Starts a Pinot controller instance.
+   * Note: Helix instance type should be explicitly set to PARTICIPANT ONLY in ControllerStarter.
+   * Other places like PerfBenchmarkDriver which directly call {@link PinotHelixResourceManager} should NOT register as PARTICIPANT,
+   * which would be put to lead controller resource and mess up the leadership assignment. Those places should use SPECTATOR other than PARTICIPANT.
    */
   public synchronized void start(HelixManager helixZkManager) {
     _helixZkManager = helixZkManager;
@@ -191,7 +194,6 @@ public class PinotHelixResourceManager {
    */
   public synchronized void stop() {
     _segmentDeletionManager.stop();
-    _helixZkManager.disconnect();
   }
 
   /**

@@ -34,12 +34,14 @@ import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.pinot.common.config.RealtimeTagConfig;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -48,6 +50,7 @@ public class RealtimeSegmentRelocatorTest {
 
   private TestRealtimeSegmentRelocator _realtimeSegmentRelocator;
   private HelixManager _mockHelixManager;
+  private LeadControllerManager _leadControllerManager;
 
   private String[] serverNames;
   private String[] consumingServerNames;
@@ -69,10 +72,13 @@ public class RealtimeSegmentRelocatorTest {
     PinotHelixResourceManager mockPinotHelixResourceManager = mock(PinotHelixResourceManager.class);
     _mockHelixManager = mock(HelixManager.class);
     when(mockPinotHelixResourceManager.getHelixZkManager()).thenReturn(_mockHelixManager);
+    LeadControllerManager mockLeadControllerManager = mock(LeadControllerManager.class);
+    when(mockLeadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     ControllerConf controllerConfig = new ControllerConf();
     ControllerMetrics controllerMetrics = new ControllerMetrics(new MetricsRegistry());
     _realtimeSegmentRelocator =
-        new TestRealtimeSegmentRelocator(mockPinotHelixResourceManager, controllerConfig, controllerMetrics);
+        new TestRealtimeSegmentRelocator(mockPinotHelixResourceManager, mockLeadControllerManager, controllerConfig,
+            controllerMetrics);
 
     final int maxInstances = 20;
     serverNames = new String[maxInstances];
@@ -268,9 +274,9 @@ public class RealtimeSegmentRelocatorTest {
 
     private Map<String, List<String>> tagToInstances;
 
-    public TestRealtimeSegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config,
-        ControllerMetrics controllerMetrics) {
-      super(pinotHelixResourceManager, config, controllerMetrics);
+    public TestRealtimeSegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager,
+        LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics) {
+      super(pinotHelixResourceManager, leadControllerManager, config, controllerMetrics);
       tagToInstances = new HashedMap();
     }
 
