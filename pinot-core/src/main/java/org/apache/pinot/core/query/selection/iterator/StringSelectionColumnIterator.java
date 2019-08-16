@@ -45,12 +45,6 @@ public class StringSelectionColumnIterator implements SelectionColumnIterator {
   @Override
   public Serializable getValue(int docId) {
     bvIter.skipTo(docId);
-
-    if (_dataType.equals(FieldSpec.DataType.BYTES)) {
-      // byte[] is converted to equivalent Hex String for selection queries.
-      return BytesUtils.toHexString(bvIter.nextBytesVal());
-    } else {
-      return bvIter.nextStringVal();
-    }
+    return bvIter.nextStringVal();
   }
 }

@@ -199,9 +199,6 @@ class DictionaryBasedSVValueFetcher implements Fetcher {
   }
 
   public Serializable getValue(int docId) {
-    if (_dataType.equals(FieldSpec.DataType.BYTES)) {
-      return BytesUtils.toHexString(_dictionary.getBytesValue(_dictionaryIds[docId]));
-    }
     return (Serializable) _dictionary.get(_dictionaryIds[docId]);
   }
 }
