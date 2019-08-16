@@ -29,8 +29,8 @@ import org.apache.pinot.common.config.ReplicaGroupStrategyConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TagNameUtils;
-import org.apache.pinot.common.config.TagOverrideConfig;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
+import org.apache.pinot.common.config.instance.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.config.instance.InstanceReplicaPartitionConfig;
 import org.apache.pinot.common.config.instance.InstanceTagPoolConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
@@ -40,6 +40,7 @@ import org.apache.pinot.controller.helix.core.assignment.InstancePartitions;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.fail;
 
 
@@ -47,32 +48,7 @@ public class InstanceAssignmentTest {
   private static final String RAW_TABLE_NAME = "myTable";
   private static final String TENANT_NAME = "tenant";
   private static final String OFFLINE_TAG = TagNameUtils.getOfflineTagForTenant(TENANT_NAME);
-  private static final String REALTIME_TAG = TagNameUtils.getRealtimeTagForTenant(TENANT_NAME);
   private static final String SERVER_INSTANCE_ID_PREFIX = "Server_localhost_";
-
-  @Test
-  public void testDefaultOfflineNonReplicaGroup() {
-    TableConfig tableConfig =
-        new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setServerTenant(TENANT_NAME).build();
-    InstanceAssignmentDriver driver = new InstanceAssignmentDriver(tableConfig);
-    int numInstances = 10;
-    List<InstanceConfig> instanceConfigs = new ArrayList<>(numInstances);
-    for (int i = 0; i < numInstances; i++) {
-      InstanceConfig instanceConfig = new InstanceConfig(SERVER_INSTANCE_ID_PREFIX + i);
-      instanceConfig.addTag(OFFLINE_TAG);
-      instanceConfigs.add(instanceConfig);
-    }
-
-    // All instances should be assigned as replica 0 partition 0
-    InstancePartitions instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs);
-    assertEquals(instancePartitions.getNumReplicas(), 1);
-    assertEquals(instancePartitions.getNumPartitions(), 1);
-    List<String> expectedInstances = new ArrayList<>(numInstances);
-    for (int i = 0; i < numInstances; i++) {
-      expectedInstances.add(SERVER_INSTANCE_ID_PREFIX + i);
-    }
-    assertEquals(instancePartitions.getInstances(0, 0), expectedInstances);
-  }
 
   @Test
   public void testDefaultOfflineReplicaGroup() {
@@ -146,53 +122,6 @@ public class InstanceAssignmentTest {
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 0, SERVER_INSTANCE_ID_PREFIX + 3));
     assertEquals(instancePartitions.getInstances(1, 2),
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 0, SERVER_INSTANCE_ID_PREFIX + 6));
-  }
-
-  @Test
-  public void testRealtimeTagOverride() {
-    // Override COMPLETED tag to use OFFLINE tag
-    TagOverrideConfig tagOverrideConfig = new TagOverrideConfig();
-    tagOverrideConfig.setRealtimeConsuming(REALTIME_TAG);
-    tagOverrideConfig.setRealtimeCompleted(OFFLINE_TAG);
-    TableConfig tableConfig =
-        new TableConfig.Builder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTagOverrideConfig(tagOverrideConfig)
-            .build();
-    InstanceAssignmentDriver driver = new InstanceAssignmentDriver(tableConfig);
-    int numInstances = 10;
-    List<InstanceConfig> instanceConfigs = new ArrayList<>(numInstances);
-    for (int i = 0; i < numInstances; i++) {
-      InstanceConfig instanceConfig = new InstanceConfig(SERVER_INSTANCE_ID_PREFIX + i);
-      if (i % 2 == 0) {
-        instanceConfig.addTag(REALTIME_TAG);
-      } else {
-        instanceConfig.addTag(OFFLINE_TAG);
-      }
-      instanceConfigs.add(instanceConfig);
-    }
-
-    // All instances with REALTIME tag should be assigned as replica 0 partition 0 for CONSUMING instance partitions
-    InstancePartitions instancePartitions = driver.assignInstances(InstancePartitionsType.CONSUMING, instanceConfigs);
-    assertEquals(instancePartitions.getNumReplicas(), 1);
-    assertEquals(instancePartitions.getNumPartitions(), 1);
-    List<String> expectedInstances = new ArrayList<>(numInstances);
-    for (int i = 0; i < numInstances; i++) {
-      if (i % 2 == 0) {
-        expectedInstances.add(SERVER_INSTANCE_ID_PREFIX + i);
-      }
-    }
-    assertEquals(instancePartitions.getInstances(0, 0), expectedInstances);
-
-    // All instances with OFFLINE tag should be assigned as replica 0 partition 0 for COMPLETED instance partitions
-    instancePartitions = driver.assignInstances(InstancePartitionsType.COMPLETED, instanceConfigs);
-    assertEquals(instancePartitions.getNumReplicas(), 1);
-    assertEquals(instancePartitions.getNumPartitions(), 1);
-    expectedInstances = new ArrayList<>(numInstances);
-    for (int i = 0; i < numInstances; i++) {
-      if (i % 2 != 0) {
-        expectedInstances.add(SERVER_INSTANCE_ID_PREFIX + i);
-      }
-    }
-    assertEquals(instancePartitions.getInstances(0, 0), expectedInstances);
   }
 
   @Test
@@ -329,10 +258,7 @@ public class InstanceAssignmentTest {
 
   @Test
   public void testIllegalConfig() {
-    InstanceAssignmentConfig assignmentConfig = new InstanceAssignmentConfig();
-    TableConfig tableConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setInstanceAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.OFFLINE, assignmentConfig))
-        .build();
+    TableConfig tableConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     InstanceAssignmentDriver driver = new InstanceAssignmentDriver(tableConfig);
 
     int numInstances = 10;
@@ -341,6 +267,19 @@ public class InstanceAssignmentTest {
       InstanceConfig instanceConfig = new InstanceConfig(SERVER_INSTANCE_ID_PREFIX + i);
       instanceConfigs.add(instanceConfig);
     }
+
+    // No instance assignment config
+    assertFalse(InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, InstancePartitionsType.OFFLINE));
+    try {
+      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "Instance assignment is not allowed for the given table config");
+    }
+
+    InstanceAssignmentConfig assignmentConfig = new InstanceAssignmentConfig();
+    tableConfig
+        .setInstanceAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.OFFLINE, assignmentConfig));
 
     // No instance tag/pool config
     try {

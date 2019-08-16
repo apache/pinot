@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.controller.helix.core.assignment;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -32,6 +35,7 @@ import org.apache.helix.ZNRecord;
  * list of server instances, and is persisted under the ZK path: {@code <cluster>/PROPERTYSTORE/INSTANCE_PARTITIONS}.
  * <p>The segment assignment will be based on the instance partitions of the table.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class InstancePartitions {
   private static final char PARTITION_REPLICA_SEPARATOR = '_';
 
@@ -46,7 +50,9 @@ public class InstancePartitions {
     _partitionToInstancesMap = new TreeMap<>();
   }
 
-  private InstancePartitions(String name, Map<String, List<String>> partitionToInstancesMap) {
+  @JsonCreator
+  private InstancePartitions(@JsonProperty(value = "name", required = true) String name,
+      @JsonProperty(value = "partitionToInstancesMap", required = true) Map<String, List<String>> partitionToInstancesMap) {
     _name = name;
     _partitionToInstancesMap = partitionToInstancesMap;
     for (String key : partitionToInstancesMap.keySet()) {

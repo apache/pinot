@@ -51,7 +51,8 @@ public class InstanceReplicaPartitionSelector {
    * Selects instances based on the replica and partition config, and stores the result into the given instance
    * partitions.
    */
-  public InstancePartitions selectInstances(Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap) {
+  public void selectInstances(Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap,
+      InstancePartitions instancePartitions) {
     int numPools = poolToInstanceConfigsMap.size();
     Preconditions.checkState(numPools != 0, "No pool qualified for selection");
 
@@ -60,8 +61,6 @@ public class InstanceReplicaPartitionSelector {
     pools.sort(null);
     LOGGER.info("Starting instance replica/partition selection for table: {} with hash: {} from pools: {}",
         _tableNameWithType, tableNameHash, pools);
-
-    InstancePartitions instancePartitions = new InstancePartitions(_tableNameWithType);
 
     if (_replicaPartitionConfig.isReplicaGroupBased()) {
       // Replica-group based selection
@@ -183,7 +182,5 @@ public class InstanceReplicaPartitionSelector {
       // Set the instances as partition 0 replica 0
       instancePartitions.setInstances(0, 0, instancesToSelect);
     }
-
-    return instancePartitions;
   }
 }

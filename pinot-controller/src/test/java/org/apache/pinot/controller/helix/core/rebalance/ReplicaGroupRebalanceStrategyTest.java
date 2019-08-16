@@ -217,9 +217,11 @@ public class ReplicaGroupRebalanceStrategyTest extends ControllerTest {
     }
 
     // Test removing a replica group
+    // NOTE: ReplicaGroupRebalanceSegmentStrategy is able to remove a replica-group only when all the instances in the
+    //       replica are removed
     _helixAdmin.removeInstanceTag(getHelixClusterName(), "Server_localhost_0", OFFLINE_TENENT_NAME);
-    _helixAdmin.removeInstanceTag(getHelixClusterName(), "Server_localhost_1", OFFLINE_TENENT_NAME);
     _helixAdmin.removeInstanceTag(getHelixClusterName(), "Server_localhost_2", OFFLINE_TENENT_NAME);
+    _helixAdmin.removeInstanceTag(getHelixClusterName(), "Server_localhost_4", OFFLINE_TENENT_NAME);
 
     targetNumInstancePerPartition = 3;
     targetNumReplicaGroup = 2;

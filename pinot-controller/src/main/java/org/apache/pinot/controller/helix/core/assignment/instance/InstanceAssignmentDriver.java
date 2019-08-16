@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.config.instance.InstanceConstraintConfig;
@@ -80,6 +81,9 @@ public class InstanceAssignmentDriver {
     Preconditions.checkState(replicaPartitionConfig != null, "Instance replica/partition config is missing");
     InstanceReplicaPartitionSelector replicaPartitionSelector =
         new InstanceReplicaPartitionSelector(replicaPartitionConfig, tableNameWithType);
-    return replicaPartitionSelector.selectInstances(poolToInstanceConfigsMap);
+    InstancePartitions instancePartitions = new InstancePartitions(
+        instancePartitionsType.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableNameWithType)));
+    replicaPartitionSelector.selectInstances(poolToInstanceConfigsMap, instancePartitions);
+    return instancePartitions;
   }
 }

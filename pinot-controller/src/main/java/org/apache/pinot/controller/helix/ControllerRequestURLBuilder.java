@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.controller.helix;
 
-import org.apache.avro.reflect.Nullable;
+import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.common.utils.InstancePartitionsType;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.URIUtils;
 
@@ -201,5 +202,40 @@ public class ControllerRequestURLBuilder {
 
   public String forSegmentListAPI(String tableName) {
     return StringUtil.join("/", _baseUrl, "segments", tableName);
+  }
+
+  public String forInstancePartitions(String tableName, @Nullable InstancePartitionsType instancePartitionsType) {
+    String url = StringUtil.join("/", _baseUrl, "tables", tableName, "instancePartitions");
+    if (instancePartitionsType != null) {
+      url += "?type=" + instancePartitionsType;
+    }
+    return url;
+  }
+
+  public String forInstanceAssign(String tableName, @Nullable InstancePartitionsType instancePartitionsType,
+      boolean dryRun) {
+    String url = StringUtil.join("/", _baseUrl, "tables", tableName, "assignInstances");
+    if (instancePartitionsType != null) {
+      url += "?type=" + instancePartitionsType;
+      if (dryRun) {
+        url += "&dryRun=true";
+      }
+    } else {
+      if (dryRun) {
+        url += "?dryRun=true";
+      }
+    }
+    return url;
+  }
+
+  public String forInstanceReplace(String tableName, @Nullable InstancePartitionsType instancePartitionsType,
+      String oldInstanceId, String newInstanceId) {
+    String url =
+        StringUtil.join("/", _baseUrl, "tables", tableName, "replaceInstance") + "?oldInstanceId=" + oldInstanceId
+            + "&newInstanceId=" + newInstanceId;
+    if (instancePartitionsType != null) {
+      url += "&type=" + instancePartitionsType;
+    }
+    return url;
   }
 }

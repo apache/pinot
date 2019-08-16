@@ -72,6 +72,7 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.config.Tenant;
 import org.apache.pinot.common.config.TenantConfig;
+import org.apache.pinot.common.config.instance.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.TableNotFoundException;
@@ -83,14 +84,14 @@ import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignment;
-import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
 import org.apache.pinot.common.restlet.resources.RebalanceResult;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerOnlineOfflineStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.common.utils.InstancePartitionsType;
+import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
@@ -98,16 +99,17 @@ import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.apache.pinot.common.utils.retry.RetryPolicy;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.resources.StateType;
+import org.apache.pinot.controller.helix.core.assignment.InstancePartitions;
+import org.apache.pinot.controller.helix.core.assignment.InstancePartitionsUtils;
+import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategyFactory;
 import org.apache.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy;
-import org.apache.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyEnum;
 import org.apache.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyFactory;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
-import org.apache.pinot.core.util.ReplicationUtils;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1024,8 +1026,9 @@ public class PinotHelixResourceManager {
     validateTableTenantConfig(tableConfig);
 
     String tableNameWithType = tableConfig.getTableName();
-    TableType tableType = tableConfig.getTableType();
     SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
+
+    TableType tableType = tableConfig.getTableType();
     switch (tableType) {
       case OFFLINE:
         // existing tooling relies on this check not existing for realtime table (to migrate to LLC)
@@ -1040,14 +1043,16 @@ public class PinotHelixResourceManager {
                 _enableBatchMessageMode);
         LOGGER.info("adding table via the admin");
         _helixAdmin.addResource(_helixClusterName, tableNameWithType, offlineIdealState);
-        LOGGER.info("successfully added the table : " + tableNameWithType + " to the cluster");
 
         // lets add table configs
         ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableNameWithType, tableConfig.toZNRecord());
 
-        // Update replica group partition assignment to the property store if applicable
-        updateReplicaGroupPartitionAssignment(tableConfig);
+        // Assign instances
+        assignInstances(tableConfig, true);
+
+        LOGGER.info("Successfully added table: {}", tableNameWithType);
         break;
+
       case REALTIME:
         IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
         verifyIndexingConfig(tableNameWithType, indexingConfig);
@@ -1067,11 +1072,6 @@ public class PinotHelixResourceManager {
         // lets add table configs
         ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithType, tableConfig.toZNRecord());
 
-        // Update replica group partition assignment to the property store if applicable
-        if (ReplicationUtils.setupRealtimeReplicaGroups(tableConfig)) {
-          updateReplicaGroupPartitionAssignment(tableConfig);
-        }
-
         /*
          * PinotRealtimeSegmentManager sets up watches on table and segment path. When a table gets created,
          * it expects the INSTANCE path in propertystore to be set up so that it can get the group ID and
@@ -1086,10 +1086,14 @@ public class PinotHelixResourceManager {
          */
         ensureRealtimeClusterIsSetUp(tableConfig, tableNameWithType, indexingConfig);
 
+        // Assign instances
+        assignInstances(tableConfig, true);
+
         LOGGER.info("Successfully added or updated the table {} ", tableNameWithType);
         break;
+
       default:
-        throw new InvalidTableConfigException("UnSupported table type: " + tableType);
+        throw new InvalidTableConfigException("Unsupported table type: " + tableType);
     }
 
     String brokerTenantName = TagNameUtils.getBrokerTagForTenant(tableConfig.getTenantConfig().getBroker());
@@ -1128,43 +1132,6 @@ public class PinotHelixResourceManager {
       if (getInstancesWithTag(tag).isEmpty()) {
         throw new InvalidTableConfigException(
             "Failed to find instances with tag: " + tag + " for table: " + tableNameWithType);
-      }
-    }
-  }
-
-  /**
-   * Update replica group partition assignment in the property store
-   *
-   * @param tableConfig a table config
-   */
-  private void updateReplicaGroupPartitionAssignment(TableConfig tableConfig) {
-    String tableNameWithType = tableConfig.getTableName();
-    String assignmentStrategy = tableConfig.getValidationConfig().getSegmentAssignmentStrategy();
-    // We create replica group partition assignment and write to property store if new table config
-    // has the replica group config.
-    if (assignmentStrategy != null && SegmentAssignmentStrategyEnum.valueOf(assignmentStrategy)
-        == SegmentAssignmentStrategyEnum.ReplicaGroupSegmentAssignmentStrategy) {
-      ReplicaGroupPartitionAssignmentGenerator partitionAssignmentGenerator =
-          new ReplicaGroupPartitionAssignmentGenerator(_propertyStore);
-
-      // Create the new replica group partition assignment if there is none in the property store.
-      // This will create the replica group partition assignment and write to the property store in 2 cases:
-      // 1. when we create the table with replica group segment assignment
-      // 2. when we update the table config with replica group segment assignment from another assignment strategy
-      if (partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType) == null) {
-        TableType tableType = tableConfig.getTableType();
-        List<String> servers;
-        if (tableType.equals(TableType.OFFLINE)) {
-          OfflineTagConfig offlineTagConfig = new OfflineTagConfig(tableConfig);
-          servers = getInstancesWithTag(offlineTagConfig.getOfflineServerTag());
-        } else {
-          RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig);
-          servers = getInstancesWithTag(realtimeTagConfig.getConsumingServerTag());
-        }
-        int numReplicas = ReplicationUtils.getReplication(tableConfig);
-        ReplicaGroupPartitionAssignment partitionAssignment = partitionAssignmentGenerator
-            .buildReplicaGroupPartitionAssignment(tableNameWithType, tableConfig, numReplicas, servers);
-        partitionAssignmentGenerator.writeReplicaGroupPartitionAssignment(partitionAssignment);
       }
     }
   }
@@ -1268,6 +1235,35 @@ public class PinotHelixResourceManager {
     }
   }
 
+  private void assignInstances(TableConfig tableConfig, boolean override)
+      throws IOException {
+    String tableNameWithType = tableConfig.getTableName();
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+
+    List<InstancePartitionsType> instancePartitionsTypesToAssign = new ArrayList<>();
+    for (InstancePartitionsType instancePartitionsType : InstancePartitionsType.values()) {
+      if (InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, instancePartitionsType)) {
+        if (override || InstancePartitionsUtils
+            .fetchInstancePartitions(_propertyStore, instancePartitionsType.getInstancePartitionsName(rawTableName))
+            == null) {
+          instancePartitionsTypesToAssign.add(instancePartitionsType);
+        }
+      }
+    }
+
+    if (!instancePartitionsTypesToAssign.isEmpty()) {
+      LOGGER.info("Assigning {} instances to table: {}", instancePartitionsTypesToAssign, tableNameWithType);
+      InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
+      List<InstanceConfig> instanceConfigs = getAllHelixInstanceConfigs();
+      for (InstancePartitionsType instancePartitionsType : instancePartitionsTypesToAssign) {
+        InstancePartitions instancePartitions =
+            instanceAssignmentDriver.assignInstances(instancePartitionsType, instanceConfigs);
+        InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
+        LOGGER.info("Persisted instance partitions: {}", JsonUtils.objectToString(instancePartitions));
+      }
+    }
+  }
+
   /**
    * Validate the table config and update it
    * @throws IOException
@@ -1284,34 +1280,42 @@ public class PinotHelixResourceManager {
   public void setExistingTableConfig(TableConfig tableConfig)
       throws IOException {
     String tableNameWithType = tableConfig.getTableName();
-    TableType tableType = tableConfig.getTableType();
-    if (tableType == TableType.REALTIME) {
-      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-      verifyIndexingConfig(tableNameWithType, indexingConfig);
-      // Update replica group partition assignment to the property store if applicable
-      if (ReplicationUtils.setupRealtimeReplicaGroups(tableConfig)) {
-        updateReplicaGroupPartitionAssignment(tableConfig);
-      }
-      ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithType, tableConfig.toZNRecord());
-      ensureRealtimeClusterIsSetUp(tableConfig, tableNameWithType, indexingConfig);
-    } else if (tableType == TableType.OFFLINE) {
-      // Update replica group partition assignment to the property store if applicable
-      updateReplicaGroupPartitionAssignment(tableConfig);
+    SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
 
-      ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableNameWithType, tableConfig.toZNRecord());
-      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
-      final String configReplication = tableConfig.getValidationConfig().getReplication();
-      if (configReplication != null && !tableConfig.getValidationConfig().getReplication()
-          .equals(idealState.getReplicas())) {
-        HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, new Function<IdealState, IdealState>() {
-          @Nullable
-          @Override
-          public IdealState apply(@Nullable IdealState idealState) {
-            idealState.setReplicas(configReplication);
-            return idealState;
-          }
-        }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
-      }
+    TableType tableType = tableConfig.getTableType();
+    switch (tableType) {
+      case OFFLINE:
+        ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableNameWithType, tableConfig.toZNRecord());
+
+        // Update IdealState replication
+        IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
+        String replicationConfigured = segmentsConfig.getReplication();
+        if (!idealState.getReplicas().equals(replicationConfigured)) {
+          HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, is -> {
+            assert is != null;
+            is.setReplicas(replicationConfigured);
+            return is;
+          }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
+        }
+
+        // Assign instances
+        assignInstances(tableConfig, false);
+
+        break;
+
+      case REALTIME:
+        IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+        verifyIndexingConfig(tableNameWithType, indexingConfig);
+        ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithType, tableConfig.toZNRecord());
+        ensureRealtimeClusterIsSetUp(tableConfig, tableNameWithType, indexingConfig);
+
+        // Assign instances
+        assignInstances(tableConfig, false);
+
+        break;
+
+      default:
+        throw new InvalidTableConfigException("Unsupported table type: " + tableType);
     }
   }
 
@@ -1396,9 +1400,11 @@ public class PinotHelixResourceManager {
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, offlineTableName);
     LOGGER.info("Deleting table {}: Removed table config", offlineTableName);
 
-    // Remove replica group partition assignment
-    ZKMetadataProvider.removeInstancePartitionAssignmentFromPropertyStore(_propertyStore, offlineTableName);
-    LOGGER.info("Deleting table {}: Removed replica group partition assignment", offlineTableName);
+    // Remove instance partitions
+    InstancePartitionsUtils.removeInstancePartitions(_propertyStore,
+        InstancePartitionsType.OFFLINE.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableName)));
+    LOGGER.info("Deleting table {}: Removed instance partitions", offlineTableName);
+
     LOGGER.info("Deleting table {}: Finish", offlineTableName);
   }
 
@@ -1430,11 +1436,15 @@ public class PinotHelixResourceManager {
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, realtimeTableName);
     LOGGER.info("Deleting table {}: Removed table config", realtimeTableName);
 
-    // Remove replica group partition assignment
-    ZKMetadataProvider.removeInstancePartitionAssignmentFromPropertyStore(_propertyStore, realtimeTableName);
-    LOGGER.info("Deleting table {}: Removed replica group partition assignment", realtimeTableName);
+    // Remove instance partitions
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    InstancePartitionsUtils.removeInstancePartitions(_propertyStore,
+        InstancePartitionsType.CONSUMING.getInstancePartitionsName(rawTableName));
+    InstancePartitionsUtils.removeInstancePartitions(_propertyStore,
+        InstancePartitionsType.COMPLETED.getInstancePartitionsName(rawTableName));
+    LOGGER.info("Deleting table {}: Removed instance partitions", realtimeTableName);
 
-    // Remove groupId/PartitionId mapping for HLC table
+    // Remove groupId/partitionId mapping for HLC table
     if (instancesForTable != null) {
       for (String instance : instancesForTable) {
         InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(_propertyStore, instance);
@@ -1444,7 +1454,8 @@ public class PinotHelixResourceManager {
         }
       }
     }
-    LOGGER.info("Deleting table {}: Removed replica group partition assignment", realtimeTableName);
+    LOGGER.info("Deleting table {}: Removed groupId/partitionId mapping for HLC table", realtimeTableName);
+
     LOGGER.info("Deleting table {}: Finish", realtimeTableName);
   }
 
