@@ -164,6 +164,8 @@ public class CommonConstants {
       public static final String SQL = "sql";
       public static final String TRACE = "trace";
       public static final String DEBUG_OPTIONS = "debugOptions";
+      public static final String QUERY = "query";
+      public static final String QUERY_FORMAT = "queryFormat";
 
       public static class QueryOptionKey {
         public static final String PRESERVE_TYPE = "preserveType";
