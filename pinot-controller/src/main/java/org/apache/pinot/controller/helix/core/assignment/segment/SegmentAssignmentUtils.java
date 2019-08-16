@@ -27,15 +27,11 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.TreeMap;
-import org.apache.helix.HelixManager;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
-import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
-import org.apache.pinot.common.utils.InstancePartitionsType;
 import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.controller.helix.core.assignment.InstancePartitions;
-import org.apache.pinot.controller.helix.core.assignment.InstancePartitionsUtils;
 
 
 /**
@@ -73,23 +69,23 @@ class SegmentAssignmentUtils {
   }
 
   /**
-   * Returns the instances for the balance number segment assignment strategy.
+   * Returns instances for non-replica-group based assignment.
    */
-  static List<String> getInstancesForBalanceNumStrategy(HelixManager helixManager, TableConfig tableConfig,
-      int replication, InstancePartitionsType instancePartitionsType) {
-    InstancePartitions instancePartitions =
-        InstancePartitionsUtils.fetchOrComputeInstancePartitions(helixManager, tableConfig, instancePartitionsType);
-    Preconditions.checkArgument(instancePartitions.getNumPartitions() == 1 && instancePartitions.getNumReplicas() == 1,
-        "The instance partitions: %s should contain only 1 partition and 1 replica", instancePartitions.getName());
+  static List<String> getInstancesForNonReplicaGroupBasedAssignment(InstancePartitions instancePartitions,
+      int replication) {
+    Preconditions.checkState(instancePartitions.getNumReplicas() == 1 && instancePartitions.getNumPartitions() == 1,
+        "Instance partitions: %s should contain 1 replica and 1 partition for non-replica-group based assignment",
+        instancePartitions.getName());
     List<String> instances = instancePartitions.getInstances(0, 0);
-    Preconditions.checkState(instances.size() >= replication,
-        "There are less instances: %d than the replication: %d for table: %s", instances.size(), replication,
-        tableConfig.getTableName());
+    int numInstances = instances.size();
+    Preconditions.checkState(numInstances >= replication,
+        "There are less instances: %s in instance partitions: %s than the table replication: %s", numInstances,
+        instancePartitions.getName(), replication);
     return instances;
   }
 
   /**
-   * Rebalances the table with Helix AutoRebalanceStrategy for the balance number segment assignment strategy.
+   * Rebalances the table with Helix AutoRebalanceStrategy.
    */
   static Map<String, Map<String, String>> rebalanceTableWithHelixAutoRebalanceStrategy(
       Map<String, Map<String, String>> currentAssignment, List<String> instances, int replication) {

@@ -283,7 +283,7 @@ public class PinotInstanceAssignmentRestletResourceTest extends ControllerTest {
     // Post the CONSUMING instance partitions
     instancePartitionsMap = deserializeInstancePartitionsMap(
         sendPutRequest(_controllerRequestURLBuilder.forInstancePartitions(RAW_TABLE_NAME, null),
-            JsonUtils.objectToString(consumingInstancePartitions)));
+            consumingInstancePartitions.toJsonString()));
     assertEquals(instancePartitionsMap.size(), 1);
     assertEquals(instancePartitionsMap.get(InstancePartitionsType.CONSUMING).getInstances(0, 0),
         Collections.singletonList(realtimeInstanceId));

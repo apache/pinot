@@ -22,10 +22,12 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.helix.ZNRecord;
+import org.apache.pinot.common.utils.JsonUtils;
 
 
 /**
@@ -64,10 +66,12 @@ public class InstancePartitions {
     }
   }
 
+  @JsonProperty
   public String getName() {
     return _name;
   }
 
+  @JsonProperty
   public Map<String, List<String>> getPartitionToInstancesMap() {
     return _partitionToInstancesMap;
   }
@@ -101,5 +105,18 @@ public class InstancePartitions {
     ZNRecord znRecord = new ZNRecord(_name);
     znRecord.setListFields(_partitionToInstancesMap);
     return znRecord;
+  }
+
+  public String toJsonString() {
+    try {
+      return JsonUtils.objectToString(this);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  @Override
+  public String toString() {
+    return toJsonString();
   }
 }

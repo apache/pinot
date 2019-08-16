@@ -51,7 +51,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-public class OfflineReplicaGroupSegmentAssignmentStrategyTest {
+public class OfflineReplicaGroupSegmentAssignmentTest {
   private static final int NUM_REPLICAS = 3;
   private static final String SEGMENT_NAME_PREFIX = "segment_";
   private static final int NUM_SEGMENTS = 90;
@@ -72,11 +72,20 @@ public class OfflineReplicaGroupSegmentAssignmentStrategyTest {
   private static final String PARTITION_COLUMN = "partitionColumn";
   private static final int NUM_PARTITIONS = 3;
 
-  private SegmentAssignmentStrategy _strategyWithoutPartition;
-  private SegmentAssignmentStrategy _strategyWithPartition;
+  private SegmentAssignment _segmentAssignmentWithoutPartition;
+  private Map<InstancePartitionsType, InstancePartitions> _instancePartitionsMapWithoutPartition;
+  private SegmentAssignment _segmentAssignmentWithPartition;
+  private Map<InstancePartitionsType, InstancePartitions> _instancePartitionsMapWithPartition;
 
   @BeforeClass
   public void setUp() {
+    TableConfig tableConfigWithoutPartitions =
+        new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITHOUT_PARTITION)
+            .setNumReplicas(NUM_REPLICAS)
+            .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY).build();
+    _segmentAssignmentWithoutPartition =
+        SegmentAssignmentFactory.getSegmentAssignment(null, tableConfigWithoutPartitions);
+
     // {
     //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5],
     //   0_1=[instance_6, instance_7, instance_8, instance_9, instance_10, instance_11],
@@ -93,54 +102,12 @@ public class OfflineReplicaGroupSegmentAssignmentStrategyTest {
       }
       instancePartitionsWithoutPartition.setInstances(0, replicaId, instancesForReplica);
     }
-
-    // Mock HelixManager
-    @SuppressWarnings("unchecked")
-    ZkHelixPropertyStore<ZNRecord> propertyStoreWithoutPartitions = mock(ZkHelixPropertyStore.class);
-    when(propertyStoreWithoutPartitions.get(eq(ZKMetadataProvider
-        .constructPropertyStorePathForInstancePartitions(INSTANCE_PARTITIONS_NAME_WITHOUT_PARTITION)), any(), anyInt()))
-        .thenReturn(instancePartitionsWithoutPartition.toZNRecord());
-    HelixManager helixManagerWithoutPartitions = mock(HelixManager.class);
-    when(helixManagerWithoutPartitions.getHelixPropertyStore()).thenReturn(propertyStoreWithoutPartitions);
-
-    TableConfig tableConfigWithoutPartitions =
-        new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITHOUT_PARTITION)
-            .setNumReplicas(NUM_REPLICAS)
-            .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY).build();
-    _strategyWithoutPartition = SegmentAssignmentStrategyFactory
-        .getSegmentAssignmentStrategy(helixManagerWithoutPartitions, tableConfigWithoutPartitions);
-
-    // {
-    //   0_0=[instance_0, instance_1],
-    //   0_1=[instance_6, instance_7],
-    //   0_2=[instance_12, instance_13],
-    //   1_0=[instance_2, instance_3],
-    //   1_1=[instance_8, instance_9],
-    //   1_2=[instance_14, instance_15],
-    //   2_0=[instance_4, instance_5],
-    //   2_1=[instance_10, instance_11],
-    //   2_2=[instance_16, instance_17]
-    // }
-    InstancePartitions instancePartitionsWithPartition =
-        new InstancePartitions(INSTANCE_PARTITIONS_NAME_WITH_PARTITION);
-    int numInstancesPerPartition = numInstancesPerReplica / NUM_REPLICAS;
-    instanceIdToAdd = 0;
-    for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
-      for (int partitionId = 0; partitionId < NUM_PARTITIONS; partitionId++) {
-        List<String> instancesForPartition = new ArrayList<>(numInstancesPerPartition);
-        for (int i = 0; i < numInstancesPerPartition; i++) {
-          instancesForPartition.add(INSTANCES.get(instanceIdToAdd++));
-        }
-        instancePartitionsWithPartition.setInstances(partitionId, replicaId, instancesForPartition);
-      }
-    }
+    _instancePartitionsMapWithoutPartition =
+        Collections.singletonMap(InstancePartitionsType.OFFLINE, instancePartitionsWithoutPartition);
 
     // Mock HelixManager
     @SuppressWarnings("unchecked")
     ZkHelixPropertyStore<ZNRecord> propertyStoreWithPartitions = mock(ZkHelixPropertyStore.class);
-    when(propertyStoreWithPartitions.get(
-        eq(ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(INSTANCE_PARTITIONS_NAME_WITH_PARTITION)),
-        any(), anyInt())).thenReturn(instancePartitionsWithPartition.toZNRecord());
     List<ZNRecord> segmentZKMetadataZNRecords = new ArrayList<>(NUM_SEGMENTS);
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       String segmentName = SEGMENTS.get(segmentId);
@@ -168,14 +135,41 @@ public class OfflineReplicaGroupSegmentAssignmentStrategyTest {
             .setNumReplicas(NUM_REPLICAS)
             .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY).build();
     tableConfigWithPartitions.getValidationConfig().setReplicaGroupStrategyConfig(strategyConfig);
-    _strategyWithPartition = SegmentAssignmentStrategyFactory
-        .getSegmentAssignmentStrategy(helixManagerWithPartitions, tableConfigWithPartitions);
+    _segmentAssignmentWithPartition =
+        SegmentAssignmentFactory.getSegmentAssignment(helixManagerWithPartitions, tableConfigWithPartitions);
+
+    // {
+    //   0_0=[instance_0, instance_1],
+    //   0_1=[instance_6, instance_7],
+    //   0_2=[instance_12, instance_13],
+    //   1_0=[instance_2, instance_3],
+    //   1_1=[instance_8, instance_9],
+    //   1_2=[instance_14, instance_15],
+    //   2_0=[instance_4, instance_5],
+    //   2_1=[instance_10, instance_11],
+    //   2_2=[instance_16, instance_17]
+    // }
+    InstancePartitions instancePartitionsWithPartition =
+        new InstancePartitions(INSTANCE_PARTITIONS_NAME_WITH_PARTITION);
+    int numInstancesPerPartition = numInstancesPerReplica / NUM_REPLICAS;
+    instanceIdToAdd = 0;
+    for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
+      for (int partitionId = 0; partitionId < NUM_PARTITIONS; partitionId++) {
+        List<String> instancesForPartition = new ArrayList<>(numInstancesPerPartition);
+        for (int i = 0; i < numInstancesPerPartition; i++) {
+          instancesForPartition.add(INSTANCES.get(instanceIdToAdd++));
+        }
+        instancePartitionsWithPartition.setInstances(partitionId, replicaId, instancesForPartition);
+      }
+    }
+    _instancePartitionsMapWithPartition =
+        Collections.singletonMap(InstancePartitionsType.OFFLINE, instancePartitionsWithPartition);
   }
 
   @Test
   public void testFactory() {
-    assertTrue(_strategyWithoutPartition instanceof OfflineReplicaGroupSegmentAssignmentStrategy);
-    assertTrue(_strategyWithPartition instanceof OfflineReplicaGroupSegmentAssignmentStrategy);
+    assertTrue(_segmentAssignmentWithoutPartition instanceof OfflineSegmentAssignment);
+    assertTrue(_segmentAssignmentWithPartition instanceof OfflineSegmentAssignment);
   }
 
   @Test
@@ -184,7 +178,8 @@ public class OfflineReplicaGroupSegmentAssignmentStrategyTest {
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       String segmentName = SEGMENTS.get(segmentId);
-      List<String> instancesAssigned = _strategyWithoutPartition.assignSegment(segmentName, currentAssignment);
+      List<String> instancesAssigned = _segmentAssignmentWithoutPartition
+          .assignSegment(segmentName, currentAssignment, _instancePartitionsMapWithoutPartition);
       assertEquals(instancesAssigned.size(), NUM_REPLICAS);
       for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
 
@@ -212,7 +207,8 @@ public class OfflineReplicaGroupSegmentAssignmentStrategyTest {
     int numInstancesPerPartition = numInstancesPerReplica / NUM_PARTITIONS;
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       String segmentName = SEGMENTS.get(segmentId);
-      List<String> instancesAssigned = _strategyWithPartition.assignSegment(segmentName, currentAssignment);
+      List<String> instancesAssigned = _segmentAssignmentWithPartition
+          .assignSegment(segmentName, currentAssignment, _instancePartitionsMapWithPartition);
       assertEquals(instancesAssigned.size(), NUM_REPLICAS);
       int partitionId = segmentId % NUM_PARTITIONS;
       for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
@@ -240,7 +236,8 @@ public class OfflineReplicaGroupSegmentAssignmentStrategyTest {
   public void testTableBalancedWithoutPartition() {
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     for (String segmentName : SEGMENTS) {
-      List<String> instancesAssigned = _strategyWithoutPartition.assignSegment(segmentName, currentAssignment);
+      List<String> instancesAssigned = _segmentAssignmentWithoutPartition
+          .assignSegment(segmentName, currentAssignment, _instancePartitionsMapWithoutPartition);
       currentAssignment.put(segmentName,
           SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentOnlineOfflineStateModel.ONLINE));
     }
@@ -259,14 +256,16 @@ public class OfflineReplicaGroupSegmentAssignmentStrategyTest {
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
-    assertEquals(_strategyWithoutPartition.rebalanceTable(currentAssignment, null), currentAssignment);
+    assertEquals(_segmentAssignmentWithoutPartition
+        .rebalanceTable(currentAssignment, _instancePartitionsMapWithoutPartition, null), currentAssignment);
   }
 
   @Test
   public void testTableBalancedWithPartition() {
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     for (String segmentName : SEGMENTS) {
-      List<String> instancesAssigned = _strategyWithPartition.assignSegment(segmentName, currentAssignment);
+      List<String> instancesAssigned = _segmentAssignmentWithPartition
+          .assignSegment(segmentName, currentAssignment, _instancePartitionsMapWithPartition);
       currentAssignment.put(segmentName,
           SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentOnlineOfflineStateModel.ONLINE));
     }
@@ -285,6 +284,8 @@ public class OfflineReplicaGroupSegmentAssignmentStrategyTest {
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
-    assertEquals(_strategyWithPartition.rebalanceTable(currentAssignment, null), currentAssignment);
+    assertEquals(
+        _segmentAssignmentWithPartition.rebalanceTable(currentAssignment, _instancePartitionsMapWithPartition, null),
+        currentAssignment);
   }
 }
