@@ -67,6 +67,11 @@ import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineScheduler;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertScheduler;
+import org.apache.pinot.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter;
+import org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
+import org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector;
 import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
@@ -75,6 +80,8 @@ import org.mockito.Matchers;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 import org.quartz.SchedulerException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -88,6 +95,8 @@ import static org.apache.pinot.thirdeye.datalayer.DaoTestUtils.*;
  *
  */
 public class AnomalyApplicationEndToEndTest {
+  private static final Logger LOG = LoggerFactory.getLogger(AnomalyApplicationEndToEndTest.class);
+
   private DetectionPipelineScheduler detectionJobScheduler = null;
   private TaskDriver taskDriver = null;
   private MonitorJobScheduler monitorJobScheduler = null;
@@ -118,13 +127,11 @@ public class AnomalyApplicationEndToEndTest {
 
   @BeforeClass
   void beforeClass() {
-    // make sure the database is created again
-    testDAOProvider = DAOTestBase.getInstance();
-    testDAOProvider.cleanup();
     testDAOProvider = DAOTestBase.getInstance();
     daoRegistry = DAORegistry.getInstance();
     Assert.assertNotNull(daoRegistry.getJobDAO());
     initDao();
+    initRegistries();
   }
 
   @AfterClass(alwaysRun = true)
@@ -133,6 +140,12 @@ public class AnomalyApplicationEndToEndTest {
     testDAOProvider.cleanup();
   }
 
+  void initRegistries() {
+    DetectionRegistry.registerComponent(ThresholdRuleDetector.class.getName(), "THRESHOLD");
+    DetectionAlertRegistry.getInstance().registerAlertScheme("EMAIL", DetectionEmailAlerter.class.getName());
+    DetectionAlertRegistry.getInstance().registerAlertFilter("DEFAULT_ALERTER_PIPELINE",
+        ToAllRecipientsDetectionAlertFilter.class.getName() );
+  }
 
   void initDao() {
     daoRegistry = DAORegistry.getInstance();
@@ -157,12 +170,6 @@ public class AnomalyApplicationEndToEndTest {
     }
     if (taskDriver != null) {
       taskDriver.shutdown();
-    }
-    if (dataCompletenessScheduler != null) {
-      dataCompletenessScheduler.shutdown();
-    }
-    if (classificationJobScheduler != null) {
-      classificationJobScheduler.shutdown();
     }
   }
 
