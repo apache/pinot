@@ -33,23 +33,18 @@ public class DAOTestBase {
 //  protected DAORegistry daoRegistry;
   DataSource ds;
   String dbUrlId;
-  private final static String defaultResourceFile = "/persistence-local.yml";
 
-  private DAOTestBase(String resourceFile){
-    init(resourceFile);
+  private DAOTestBase(){
+    init();
   }
 
   public static DAOTestBase getInstance(){
-    return new DAOTestBase(defaultResourceFile);
+    return new DAOTestBase();
   }
 
-  public static DAOTestBase getInstance(String resourceFile){
-    return new DAOTestBase(resourceFile);
-  }
-
-  protected void init(String resourceFile) {
+  protected void init() {
     try {
-      URL url = DAOTestBase.class.getResource(resourceFile);
+      URL url = DAOTestBase.class.getResource("/persistence-local.yml");
       File configFile = new File(url.toURI());
       PersistenceConfig configuration = DaoProviderUtil.createConfiguration(configFile);
       initializeDs(configuration);
