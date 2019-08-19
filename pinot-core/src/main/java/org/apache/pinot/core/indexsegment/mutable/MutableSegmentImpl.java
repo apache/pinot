@@ -371,10 +371,10 @@ public class MutableSegmentImpl implements MutableSegment {
           indexReaderWriter.setLong(docId, (Long) value + indexReaderWriter.getLong(docId));
           break;
         case FLOAT:
-          indexReaderWriter.setFloat(docId, indexReaderWriter.getFloat(docId) + indexReaderWriter.getFloat(docId));
+          indexReaderWriter.setFloat(docId, (Float) value + indexReaderWriter.getFloat(docId));
           break;
         case DOUBLE:
-          indexReaderWriter.setDouble(docId, indexReaderWriter.getDouble(docId) + indexReaderWriter.getDouble(docId));
+          indexReaderWriter.setDouble(docId, (Double) value + indexReaderWriter.getDouble(docId));
           break;
         default:
           throw new UnsupportedOperationException(
