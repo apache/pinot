@@ -278,15 +278,15 @@ public class AnomalyApplicationEndToEndTest {
     // start alert scheduler
     startAlertScheduler();
 
+    // start task drivers
+    startWorker();
+
     // check for number of entries in tasks and jobs
     Thread.sleep(10000);
     List<TaskDTO> tasks = taskDAO.findAll();
     Assert.assertTrue(tasks.size() > 0);
     Assert.assertTrue(tasks.stream().anyMatch(x -> x.getTaskType() == TaskConstants.TaskType.DETECTION));
     Assert.assertTrue(tasks.stream().anyMatch(x -> x.getTaskType() == TaskConstants.TaskType.DETECTION_ALERT));
-
-    // start task drivers
-    startWorker();
 
     // check for change in task status to COMPLETED
     Thread.sleep(30000);
