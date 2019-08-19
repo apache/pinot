@@ -73,14 +73,15 @@ class SegmentAssignmentUtils {
    */
   static List<String> getInstancesForNonReplicaGroupBasedAssignment(InstancePartitions instancePartitions,
       int replication) {
-    Preconditions.checkState(instancePartitions.getNumReplicas() == 1 && instancePartitions.getNumPartitions() == 1,
-        "Instance partitions: %s should contain 1 replica and 1 partition for non-replica-group based assignment",
-        instancePartitions.getName());
+    Preconditions
+        .checkState(instancePartitions.getNumReplicaGroups() == 1 && instancePartitions.getNumPartitions() == 1,
+            "Instance partitions: %s should contain 1 replica and 1 partition for non-replica-group based assignment",
+            instancePartitions.getInstancePartitionsName());
     List<String> instances = instancePartitions.getInstances(0, 0);
     int numInstances = instances.size();
     Preconditions.checkState(numInstances >= replication,
         "There are less instances: %s in instance partitions: %s than the table replication: %s", numInstances,
-        instancePartitions.getName(), replication);
+        instancePartitions.getInstancePartitionsName(), replication);
     return instances;
   }
 
@@ -129,25 +130,25 @@ class SegmentAssignmentUtils {
    * Rebalances one partition of the table for the replica-group based segment assignment strategy.
    * <ul>
    *   <li>
-   *     1. Calculate the target number of segments on each server
+   *     1. Calculate the target number of segments on each instance
    *   </li>
    *   <li>
-   *     2. Loop over all the segments and keep the assignment if target number of segments for the server has not been
-   *     reached and track the not assigned segments
+   *     2. Loop over all the segments and keep the assignment if target number of segments for the instance has not
+   *     been reached and track the not assigned segments
    *   </li>
    *   <li>
-   *     3. Assign the left-over segments to the servers with the least segments, or the smallest index if there is a
+   *     3. Assign the left-over segments to the instances with the least segments, or the smallest index if there is a
    *     tie
    *   </li>
    *   <li>
-   *     4. Mirror the assignment to other replicas
+   *     4. Mirror the assignment to other replica-groups
    *   </li>
    * </ul>
    */
   static void rebalanceReplicaGroupBasedPartition(Map<String, Map<String, String>> currentAssignment,
       InstancePartitions instancePartitions, int partitionId, Set<String> segments,
       Map<String, Map<String, String>> newAssignment) {
-    // Fetch instances in replica 0
+    // Fetch instances in replica-group 0
     List<String> instances = instancePartitions.getInstances(partitionId, 0);
     Map<String, Integer> instanceNameToIdMap = SegmentAssignmentUtils.getInstanceNameToIdMap(instances);
 
@@ -204,9 +205,9 @@ class SegmentAssignmentUtils {
   private static Map<String, String> getReplicaGroupBasedInstanceStateMap(InstancePartitions instancePartitions,
       int partitionId, int instanceId) {
     Map<String, String> instanceStateMap = new TreeMap<>();
-    int numReplicas = instancePartitions.getNumReplicas();
-    for (int replicaId = 0; replicaId < numReplicas; replicaId++) {
-      instanceStateMap.put(instancePartitions.getInstances(partitionId, replicaId).get(instanceId),
+    int numReplicaGroups = instancePartitions.getNumReplicaGroups();
+    for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
+      instanceStateMap.put(instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceId),
           SegmentOnlineOfflineStateModel.ONLINE);
     }
     return instanceStateMap;

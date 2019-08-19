@@ -97,9 +97,10 @@ public class InstancePartitionsUtils {
    */
   public static void persistInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
       InstancePartitions instancePartitions) {
-    String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(instancePartitions.getName());
+    String path = ZKMetadataProvider
+        .constructPropertyStorePathForInstancePartitions(instancePartitions.getInstancePartitionsName());
     if (!propertyStore.set(path, instancePartitions.toZNRecord(), AccessOption.PERSISTENT)) {
-      throw new ZkException("Failed to persist instance partitions: " + instancePartitions.getName());
+      throw new ZkException("Failed to persist instance partitions: " + instancePartitions);
     }
   }
 

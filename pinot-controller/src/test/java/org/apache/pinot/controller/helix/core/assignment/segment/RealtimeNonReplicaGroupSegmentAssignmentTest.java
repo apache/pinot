@@ -105,19 +105,20 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
       List<String> instancesAssigned =
           _segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
       assertEquals(instancesAssigned.size(), NUM_REPLICAS);
-      for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
 
-        // Segment 0 (partition 0) should be assigned to instance 0, 1, 2
-        // Segment 1 (partition 1) should be assigned to instance 3, 4, 5
-        // Segment 2 (partition 2) should be assigned to instance 6, 7, 8
-        // Segment 3 (partition 3) should be assigned to instance 0, 1, 2
-        // Segment 4 (partition 0) should be assigned to instance 0, 1, 2
-        // Segment 5 (partition 1) should be assigned to instance 3, 4, 5
-        // ...
-        int partitionId = segmentId % NUM_PARTITIONS;
+      // Segment 0 (partition 0) should be assigned to instance 0, 1, 2
+      // Segment 1 (partition 1) should be assigned to instance 3, 4, 5
+      // Segment 2 (partition 2) should be assigned to instance 6, 7, 8
+      // Segment 3 (partition 3) should be assigned to instance 0, 1, 2
+      // Segment 4 (partition 0) should be assigned to instance 0, 1, 2
+      // Segment 5 (partition 1) should be assigned to instance 3, 4, 5
+      // ...
+      int partitionId = segmentId % NUM_PARTITIONS;
+      for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
         int expectedAssignedInstanceId = (partitionId * NUM_REPLICAS + replicaId) % NUM_CONSUMING_INSTANCES;
         assertEquals(instancesAssigned.get(replicaId), CONSUMING_INSTANCES.get(expectedAssignedInstanceId));
       }
+
       addToAssignment(currentAssignment, segmentId, instancesAssigned);
     }
   }

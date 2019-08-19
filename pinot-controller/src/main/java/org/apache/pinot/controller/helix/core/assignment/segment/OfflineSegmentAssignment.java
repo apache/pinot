@@ -45,21 +45,22 @@ import org.slf4j.LoggerFactory;
  * Segment assignment for offline table.
  * <ul>
  *   <li>
- *     Non-replica-group based assignment (only 1 replica in instance partitions):
+ *     Non-replica-group based assignment (only 1 replica-group in instance partitions):
  *     <p>Assign the segment to the instance with the least number of segments. In case of a tie, assign the segment to
  *     the instance with the smallest index in the list. Use Helix AutoRebalanceStrategy to rebalance the table.
  *   </li>
  *   <li>
- *     Replica-group based assignment (more than 1 replicas in instance partitions):
- *     <p>Among replicas, always mirror the assignment (pick the same index of the instance).
- *     <p>Within each partition, assign the segment to the servers with the least segments already assigned. In case of
- *     a tie, assign to the server with the smallest index in the list. Do this for one replica and mirror the
- *     assignment to other replicas.
- *     <p>To rebalance a table, within each partition, first calculate the number of segments on each server, loop over
- *     all the segments and keep the assignment if number of segments for the server has not been reached and track the
- *     not assigned segments, then assign the left-over segments to the servers with the least segments, or the smallest
- *     index if there is a tie. Repeat the process for all the partitions in one replica, and mirror the assignment to
- *     other replicas. With this greedy algorithm, the result is deterministic and with minimum segment moves.
+ *     Replica-group based assignment (more than 1 replica-groups in instance partitions):
+ *     <p>Among replica-groups, always mirror the assignment (pick the same index of the instance).
+ *     <p>Within each partition, assign the segment to the instances with the least segments already assigned. In case
+ *     of a tie, assign to the instance with the smallest index in the list. Do this for one replica-group and mirror
+ *     the assignment to other replica-groups.
+ *     <p>To rebalance a table, within each partition, first calculate the number of segments on each instance, loop
+ *     over all the segments and keep the assignment if number of segments for the instance has not been reached and
+ *     track the not assigned segments, then assign the left-over segments to the instances with the least segments, or
+ *     the smallest index if there is a tie. Repeat the process for all the partitions in one replica-group, and mirror
+ *     the assignment to other replica-groups. With this greedy algorithm, the result is deterministic and with minimum
+ *     segment moves.
  *   </li>
  * </ul>
  */
@@ -76,8 +77,9 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
     _helixManager = helixManager;
     _offlineTableName = tableConfig.getTableName();
     _replication = tableConfig.getValidationConfig().getReplicationNumber();
-    ReplicaGroupStrategyConfig strategyConfig = tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
-    _partitionColumn = strategyConfig != null ? strategyConfig.getPartitionColumn() : null;
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
+        tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
+    _partitionColumn = replicaGroupStrategyConfig != null ? replicaGroupStrategyConfig.getPartitionColumn() : null;
 
     if (_partitionColumn == null) {
       LOGGER.info("Initialized OfflineSegmentAssignment with replication: {} without partition column for table: {} ",
@@ -98,7 +100,7 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
         _offlineTableName);
 
     List<String> instancesAssigned;
-    if (instancePartitions.getNumReplicas() == 1) {
+    if (instancePartitions.getNumReplicaGroups() == 1) {
       // Non-replica-group based assignment
 
       // Assign the segment to the instance with the least segments, or the smallest id if there is a tie
@@ -118,11 +120,12 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
     } else {
       // Replica-group based assignment
 
-      int numReplicas = instancePartitions.getNumReplicas();
-      if (numReplicas != _replication) {
+      int numReplicaGroups = instancePartitions.getNumReplicaGroups();
+      if (numReplicaGroups != _replication) {
         LOGGER.warn(
-            "Number of replicas in instance partitions {}: {} does not match replication in table config: {} for table: {}, use: {}",
-            instancePartitions.getName(), numReplicas, _replication, _offlineTableName, numReplicas);
+            "Number of replica-groups in instance partitions {}: {} does not match replication in table config: {} for table: {}, use: {}",
+            instancePartitions.getInstancePartitionsName(), numReplicaGroups, _replication, _offlineTableName,
+            numReplicaGroups);
       }
 
       // Fetch partition id from segment ZK metadata if partition column is configured
@@ -132,7 +135,7 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
 
         Preconditions.checkState(instancePartitions.getNumPartitions() == 1,
             "Instance partitions: %s should contain 1 partition without partition column",
-            instancePartitions.getName());
+            instancePartitions.getInstancePartitionsName());
         partitionId = 0;
       } else {
         LOGGER.info("Assigning segment: {} with partition column: {} for table: {}", segmentName, _partitionColumn,
@@ -152,7 +155,7 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
             segmentPartitionId, partitionId, numPartitions, _offlineTableName);
       }
 
-      // First assign the segment to replica 0
+      // First assign the segment to replica-group 0
       List<String> instances = instancePartitions.getInstances(partitionId, 0);
       int[] numSegmentsAssignedPerInstance =
           SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(currentAssignment, instances);
@@ -166,11 +169,11 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
         }
       }
 
-      // Mirror the assignment to all replicas
-      instancesAssigned = new ArrayList<>(numReplicas);
-      for (int replicaId = 0; replicaId < numReplicas; replicaId++) {
+      // Mirror the assignment to all replica-groups
+      instancesAssigned = new ArrayList<>(numReplicaGroups);
+      for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
         instancesAssigned
-            .add(instancePartitions.getInstances(partitionId, replicaId).get(instanceIdWithLeastSegmentsAssigned));
+            .add(instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceIdWithLeastSegmentsAssigned));
       }
     }
 
@@ -188,7 +191,7 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
     LOGGER.info("Rebalancing table: {} with instance partitions: {}", _offlineTableName, instancePartitions);
 
     Map<String, Map<String, String>> newAssignment;
-    if (instancePartitions.getNumReplicas() == 1) {
+    if (instancePartitions.getNumReplicaGroups() == 1) {
       // Non-replica-group based assignment
 
       List<String> instances =
@@ -198,18 +201,19 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
     } else {
       // Replica-group based assignment
 
-      int numReplicas = instancePartitions.getNumReplicas();
-      if (numReplicas != _replication) {
+      int numReplicaGroups = instancePartitions.getNumReplicaGroups();
+      if (numReplicaGroups != _replication) {
         LOGGER.warn(
-            "Number of replicas in instance partitions {}: {} does not match replication in table config: {} for table: {}, use: {}",
-            instancePartitions.getName(), numReplicas, _replication, _offlineTableName, numReplicas);
+            "Number of replica-groups in instance partitions {}: {} does not match replication in table config: {} for table: {}, use: {}",
+            instancePartitions.getInstancePartitionsName(), numReplicaGroups, _replication, _offlineTableName,
+            numReplicaGroups);
       }
 
       if (_partitionColumn == null) {
         LOGGER.info("Rebalancing table: {} without partition column", _offlineTableName);
         Preconditions.checkState(instancePartitions.getNumPartitions() == 1,
             "Instance partitions: %s should contain 1 partition without partition column",
-            instancePartitions.getName());
+            instancePartitions.getInstancePartitionsName());
         newAssignment = new TreeMap<>();
         SegmentAssignmentUtils
             .rebalanceReplicaGroupBasedPartition(currentAssignment, instancePartitions, 0, currentAssignment.keySet(),

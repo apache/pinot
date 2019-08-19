@@ -38,10 +38,10 @@ public class InstanceAssignmentConfig {
   @NestedConfig
   private InstanceConstraintConfig _constraintConfig;
 
-  @ConfigKey("replicaPartitionConfig")
-  @ConfigDoc(value = "Configuration for the instance replica and partition of the instance assignment", mandatory = true)
+  @ConfigKey("replicaGroupPartitionConfig")
+  @ConfigDoc(value = "Configuration for the instance replica-group and partition of the instance assignment", mandatory = true)
   @NestedConfig
-  private InstanceReplicaPartitionConfig _replicaPartitionConfig;
+  private InstanceReplicaGroupPartitionConfig _replicaGroupPartitionConfig;
 
   @JsonProperty
   public InstanceTagPoolConfig getTagPoolConfig() {
@@ -64,12 +64,12 @@ public class InstanceAssignmentConfig {
   }
 
   @JsonProperty
-  public InstanceReplicaPartitionConfig getReplicaPartitionConfig() {
-    return _replicaPartitionConfig;
+  public InstanceReplicaGroupPartitionConfig getReplicaGroupPartitionConfig() {
+    return _replicaGroupPartitionConfig;
   }
 
   @JsonProperty
-  public void setReplicaPartitionConfig(InstanceReplicaPartitionConfig replicaPartitionConfig) {
-    _replicaPartitionConfig = replicaPartitionConfig;
+  public void setReplicaGroupPartitionConfig(InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig) {
+    _replicaGroupPartitionConfig = replicaGroupPartitionConfig;
   }
 }

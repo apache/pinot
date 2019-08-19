@@ -42,14 +42,14 @@ public class InstanceAssignmentConfigUtils {
     Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap =
         tableConfig.getInstanceAssignmentConfigMap();
     switch (instancePartitionsType) {
-      // Allow OFFLINE instance assignment if the OFFLINE table has it configured or (for backward-compatibility) is
+      // Allow OFFLINE instance assignment if the offline table has it configured or (for backward-compatibility) is
       // using replica-group segment assignment
       case OFFLINE:
         return tableType == TableType.OFFLINE && ((instanceAssignmentConfigMap != null && instanceAssignmentConfigMap
             .containsKey(InstancePartitionsType.OFFLINE))
             || AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY
             .equalsIgnoreCase(tableConfig.getValidationConfig().getSegmentAssignmentStrategy()));
-      // Allow CONSUMING/COMPLETED instance assignment if the REALTIME table has it configured
+      // Allow CONSUMING/COMPLETED instance assignment if the real-time table has it configured
       case CONSUMING:
       case COMPLETED:
         return tableType == TableType.REALTIME && (instanceAssignmentConfigMap != null && instanceAssignmentConfigMap
@@ -77,17 +77,17 @@ public class InstanceAssignmentConfigUtils {
     }
 
     // Generate default instance assignment config if it does not exist
-    // Only allow default config for OFFLINE table with replica-group segment assignment for backward-compatibility
+    // Only allow default config for offline table with replica-group segment assignment for backward-compatibility
     InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig();
 
     InstanceTagPoolConfig tagPoolConfig = new InstanceTagPoolConfig();
     tagPoolConfig.setTag(TagNameUtils.getOfflineTagForTenant(tableConfig.getTenantConfig().getServer()));
     instanceAssignmentConfig.setTagPoolConfig(tagPoolConfig);
 
-    InstanceReplicaPartitionConfig replicaPartitionConfig = new InstanceReplicaPartitionConfig();
-    replicaPartitionConfig.setReplicaGroupBased(true);
+    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig = new InstanceReplicaGroupPartitionConfig();
+    replicaGroupPartitionConfig.setReplicaGroupBased(true);
     SegmentsValidationAndRetentionConfig segmentConfig = tableConfig.getValidationConfig();
-    replicaPartitionConfig.setNumReplicas(segmentConfig.getReplicationNumber());
+    replicaGroupPartitionConfig.setNumReplicaGroups(segmentConfig.getReplicationNumber());
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig = segmentConfig.getReplicaGroupStrategyConfig();
     Preconditions.checkState(replicaGroupStrategyConfig != null, "Failed to find the replica-group strategy config");
     String partitionColumn = replicaGroupStrategyConfig.getPartitionColumn();
@@ -95,14 +95,15 @@ public class InstanceAssignmentConfigUtils {
       int numPartitions = tableConfig.getIndexingConfig().getSegmentPartitionConfig().getNumPartitions(partitionColumn);
       Preconditions.checkState(numPartitions > 0, "Number of partitions for column: %s is not properly configured",
           partitionColumn);
-      replicaPartitionConfig.setNumPartitions(numPartitions);
-      replicaPartitionConfig.setNumInstancesPerPartition(replicaGroupStrategyConfig.getNumInstancesPerPartition());
+      replicaGroupPartitionConfig.setNumPartitions(numPartitions);
+      replicaGroupPartitionConfig.setNumInstancesPerPartition(replicaGroupStrategyConfig.getNumInstancesPerPartition());
     } else {
       // If partition column is not configured, use replicaGroupStrategyConfig.getNumInstancesPerPartition() as
-      // number of instances per replica for backward-compatibility
-      replicaPartitionConfig.setNumInstancesPerReplica(replicaGroupStrategyConfig.getNumInstancesPerPartition());
+      // number of instances per replica-group for backward-compatibility
+      replicaGroupPartitionConfig
+          .setNumInstancesPerReplicaGroup(replicaGroupStrategyConfig.getNumInstancesPerPartition());
     }
-    instanceAssignmentConfig.setReplicaPartitionConfig(replicaPartitionConfig);
+    instanceAssignmentConfig.setReplicaGroupPartitionConfig(replicaGroupPartitionConfig);
 
     return instanceAssignmentConfig;
   }

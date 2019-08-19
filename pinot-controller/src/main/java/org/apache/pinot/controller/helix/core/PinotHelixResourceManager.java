@@ -91,7 +91,6 @@ import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerOnli
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.InstancePartitionsType;
-import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
@@ -1235,8 +1234,7 @@ public class PinotHelixResourceManager {
     }
   }
 
-  private void assignInstances(TableConfig tableConfig, boolean override)
-      throws IOException {
+  private void assignInstances(TableConfig tableConfig, boolean override) {
     String tableNameWithType = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
 
@@ -1258,8 +1256,8 @@ public class PinotHelixResourceManager {
       for (InstancePartitionsType instancePartitionsType : instancePartitionsTypesToAssign) {
         InstancePartitions instancePartitions =
             instanceAssignmentDriver.assignInstances(instancePartitionsType, instanceConfigs);
+        LOGGER.info("Persisting instance partitions: {}", instancePartitions);
         InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
-        LOGGER.info("Persisted instance partitions: {}", JsonUtils.objectToString(instancePartitions));
       }
     }
   }
