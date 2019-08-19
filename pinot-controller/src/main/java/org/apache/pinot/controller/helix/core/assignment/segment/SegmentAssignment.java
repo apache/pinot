@@ -23,15 +23,21 @@ import java.util.Map;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.utils.InstancePartitionsType;
+import org.apache.pinot.controller.helix.core.assignment.InstancePartitions;
 
 
 /**
- * Strategy to assign segment to instances or rebalance all segments in a table.
+ * Interface for segment assignment and table rebalance.
+ * <p>
+ * TODO: Add SegmentAssignmentStrategy interface and support custom segment assignment strategy (e.g. cost based segment
+ *       assignment). SegmentAssignmentStrategy should not be coupled with SegmentAssignment, and SegmentAssignment
+ *       should be able to choose the segment assignment strategy based on the configuration.
  */
-public interface SegmentAssignmentStrategy {
+public interface SegmentAssignment {
 
   /**
-   * Initializes the segment assignment strategy.
+   * Initializes the segment assignment.
    *
    * @param helixManager Helix manager
    * @param tableConfig Table config
@@ -39,21 +45,24 @@ public interface SegmentAssignmentStrategy {
   void init(HelixManager helixManager, TableConfig tableConfig);
 
   /**
-   * Assigns a new segment.
+   * Assigns segment to instances.
    *
    * @param segmentName Name of the segment to be assigned
    * @param currentAssignment Current segment assignment of the table (map from segment name to instance state map)
-   * @return List of servers to assign the segment to
+   * @param instancePartitionsMap Map from type (OFFLINE|CONSUMING|COMPLETED) to instance partitions
+   * @return List of instances to assign the segment to
    */
-  List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment);
+  List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap);
 
   /**
-   * Rebalances the segments for a table.
+   * Rebalances the segment assignment for a table.
    *
    * @param currentAssignment Current segment assignment of the table (map from segment name to instance state map)
+   * @param instancePartitionsMap Map from type (OFFLINE|CONSUMING|COMPLETED) to instance partitions
    * @param config Configuration for the rebalance
-   * @return the rebalanced assignment for the segments
+   * @return Rebalanced assignment for the segments
    */
   Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
-      Configuration config);
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, Configuration config);
 }

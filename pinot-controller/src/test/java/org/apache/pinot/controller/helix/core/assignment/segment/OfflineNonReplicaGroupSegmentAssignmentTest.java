@@ -19,14 +19,11 @@
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import org.apache.helix.HelixManager;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.InstancePartitionsType;
@@ -34,16 +31,11 @@ import org.apache.pinot.controller.helix.core.assignment.InstancePartitions;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-public class OfflineBalanceNumSegmentAssignmentStrategyTest {
+public class OfflineNonReplicaGroupSegmentAssignmentTest {
   private static final int NUM_REPLICAS = 3;
   private static final String SEGMENT_NAME_PREFIX = "segment_";
   private static final int NUM_SEGMENTS = 100;
@@ -57,33 +49,26 @@ public class OfflineBalanceNumSegmentAssignmentStrategyTest {
   private static final String INSTANCE_PARTITIONS_NAME =
       InstancePartitionsType.OFFLINE.getInstancePartitionsName(RAW_TABLE_NAME);
 
-  private SegmentAssignmentStrategy _strategy;
+  private SegmentAssignment _segmentAssignment;
+  private Map<InstancePartitionsType, InstancePartitions> _instancePartitionsMap;
 
   @BeforeClass
   public void setUp() {
+    TableConfig tableConfig =
+        new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
+    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfig);
+
     // {
     //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7, instance_8, instance_9]
     // }
     InstancePartitions instancePartitions = new InstancePartitions(INSTANCE_PARTITIONS_NAME);
     instancePartitions.setInstances(0, 0, INSTANCES);
-
-    // Mock HelixManager
-    @SuppressWarnings("unchecked")
-    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
-    when(propertyStore
-        .get(eq(ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(INSTANCE_PARTITIONS_NAME)), any(),
-            anyInt())).thenReturn(instancePartitions.toZNRecord());
-    HelixManager helixManager = mock(HelixManager.class);
-    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
-
-    TableConfig tableConfig =
-        new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
-    _strategy = SegmentAssignmentStrategyFactory.getSegmentAssignmentStrategy(helixManager, tableConfig);
+    _instancePartitionsMap = Collections.singletonMap(InstancePartitionsType.OFFLINE, instancePartitions);
   }
 
   @Test
   public void testFactory() {
-    assertTrue(_strategy instanceof OfflineBalanceNumSegmentAssignmentStrategy);
+    assertTrue(_segmentAssignment instanceof OfflineSegmentAssignment);
   }
 
   @Test
@@ -98,7 +83,8 @@ public class OfflineBalanceNumSegmentAssignmentStrategyTest {
     // ...
     int expectedAssignedInstanceId = 0;
     for (String segmentName : SEGMENTS) {
-      List<String> instancesAssigned = _strategy.assignSegment(segmentName, currentAssignment);
+      List<String> instancesAssigned =
+          _segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
       assertEquals(instancesAssigned.size(), NUM_REPLICAS);
       for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
         assertEquals(instancesAssigned.get(replicaId), INSTANCES.get(expectedAssignedInstanceId));
@@ -113,7 +99,8 @@ public class OfflineBalanceNumSegmentAssignmentStrategyTest {
   public void testTableBalanced() {
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     for (String segmentName : SEGMENTS) {
-      List<String> instancesAssigned = _strategy.assignSegment(segmentName, currentAssignment);
+      List<String> instancesAssigned =
+          _segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
       currentAssignment.put(segmentName,
           SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentOnlineOfflineStateModel.ONLINE));
     }
@@ -132,6 +119,6 @@ public class OfflineBalanceNumSegmentAssignmentStrategyTest {
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
-    assertEquals(_strategy.rebalanceTable(currentAssignment, null), currentAssignment);
+    assertEquals(_segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null), currentAssignment);
   }
 }
