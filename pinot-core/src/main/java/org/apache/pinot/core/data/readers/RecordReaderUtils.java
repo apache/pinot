@@ -29,6 +29,7 @@ import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -192,9 +193,18 @@ public class RecordReaderUtils {
       Object[] array = new Object[numValues];
       int index = 0;
       for (Object value : values) {
-        array[index++] = convertSingleValue(fieldSpec, value);
+        Object convertedValue = convertSingleValue(fieldSpec, value);
+        if (convertedValue != null) {
+          array[index++] = convertedValue;
+        }
       }
-      return array;
+      if (index == numValues) {
+        return array;
+      } else if (index == 0) {
+        return null;
+      } else {
+        return Arrays.copyOf(array, index);
+      }
     }
   }
 
@@ -207,10 +217,20 @@ public class RecordReaderUtils {
     } else {
       int numValues = stringValues.length;
       Object[] array = new Object[numValues];
-      for (int i = 0; i < numValues; i++) {
-        array[i] = convertSingleValue(fieldSpec, stringValues[i]);
+      int index = 0;
+      for (String stringValue : stringValues) {
+        Object convertedValue = convertSingleValue(fieldSpec, stringValue);
+        if (convertedValue != null) {
+          array[index++] = convertedValue;
+        }
       }
-      return array;
+      if (index == numValues) {
+        return array;
+      } else if (index == 0) {
+        return null;
+      } else {
+        return Arrays.copyOf(array, index);
+      }
     }
   }
 
