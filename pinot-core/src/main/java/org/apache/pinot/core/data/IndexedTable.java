@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.core.data;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.EqualityUtils;
 
 
 /**
@@ -47,5 +49,37 @@ public interface IndexedTable {
   class TableRecord {
     Object[] _keys;
     Object[] _values;
+
+    public TableRecord(Object[] keys, Object[] values) {
+      _keys = keys;
+      _values = values;
+    }
+
+    public Object[] getKeys() {
+      return _keys;
+    }
+
+    public Object[] getValues() {
+      return _values;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (EqualityUtils.isSameReference(this, o)) {
+        return true;
+      }
+
+      if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+        return false;
+      }
+
+      TableRecord that = (TableRecord) o;
+      return Arrays.deepEquals(_keys, that._keys);
+    }
+
+    @Override
+    public int hashCode() {
+      return Arrays.deepHashCode(_keys);
+    }
   }
 }

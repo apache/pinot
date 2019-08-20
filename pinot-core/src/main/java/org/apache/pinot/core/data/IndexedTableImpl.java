@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.core.data;
 
 import com.google.common.base.Preconditions;
@@ -28,7 +46,7 @@ public class IndexedTableImpl implements IndexedTable {
   private static final double EVICTION_FACTOR = 1.1;
 
   private List<TableRecord> _records = new ArrayList<>();
-  private ConcurrentMap<Object[], Integer> _lookupTable;
+  private ConcurrentMap<TableRecord, Integer> _lookupTable;
   private ReentrantReadWriteLock _readWriteLock;
 
   private DataSchema _dataSchema;
@@ -50,6 +68,7 @@ public class IndexedTableImpl implements IndexedTable {
     _bufferedCapacity = (int) (maxCapacity * BUFFER_FACTOR);
     // after eviction, bring down size to 10% more than max capacity
     _evictCapacity = (int) (maxCapacity * EVICTION_FACTOR);
+
     _lookupTable = new ConcurrentHashMap<>(_bufferedCapacity);
     _readWriteLock = new ReentrantReadWriteLock();
 
@@ -68,7 +87,7 @@ public class IndexedTableImpl implements IndexedTable {
     Object[] keys = newRecord._keys;
     Preconditions.checkNotNull(keys, "Cannot upsert record with null keys");
 
-    if (size() >= _bufferedCapacity && !_lookupTable.containsKey(keys)) {
+    if (size() >= _bufferedCapacity && !_lookupTable.containsKey(newRecord)) {
       _readWriteLock.writeLock().lock();
       try {
         if (size() >= _bufferedCapacity) {
@@ -83,7 +102,7 @@ public class IndexedTableImpl implements IndexedTable {
 
     _readWriteLock.readLock().lock();
     try {
-      _lookupTable.compute(keys, (k, index) -> {
+      _lookupTable.compute(newRecord, (k, index) -> {
         if (index == null) {
           index = size();
           _records.add(newRecord);
@@ -111,7 +130,7 @@ public class IndexedTableImpl implements IndexedTable {
   private void rebuildLookupTable() {
     _lookupTable.clear();
     for (int i = 0; i < _records.size(); i++) {
-      _lookupTable.put(_records.get(i)._keys, i);
+      _lookupTable.put(_records.get(i), i);
     }
   }
 
