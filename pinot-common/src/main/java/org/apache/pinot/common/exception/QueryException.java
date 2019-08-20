@@ -61,6 +61,7 @@ public class QueryException {
   public static final int COMBINE_GROUP_BY_EXCEPTION_ERROR_CODE = 600;
   public static final int QUERY_VALIDATION_ERROR_CODE = 700;
   public static final int UNKNOWN_ERROR_CODE = 1000;
+  // NOTE: update isClientError() method appropriately when new codes are added
 
   public static final ProcessingException JSON_PARSING_ERROR = new ProcessingException(JSON_PARSING_ERROR_CODE);
   public static final ProcessingException JSON_COMPILATION_ERROR = new ProcessingException(JSON_COMPILATION_ERROR_CODE);
@@ -146,5 +147,28 @@ public class QueryException {
     ProcessingException copiedProcessingException = processingException.deepCopy();
     copiedProcessingException.setMessage(errorType + ":\n" + errorMessage);
     return copiedProcessingException;
+  }
+
+  /**
+   * Determines if a query-exception-error-code represents an error on the client side.
+   * @param errorCode  the error code from processing the query
+   * @return whether the code indicates client error or not
+   */
+  public static boolean isClientError(int errorCode) {
+    switch (errorCode) {
+      // NOTE: QueryException.BROKER_RESOURCE_MISSING_ERROR can be triggered either due to
+      // client error (incorrect table name) or due to issues with EV updates. For cases where
+      // access to tables is controlled via ACLs, for an incorrect table name we expect ACCESS_DENIED_ERROR to be
+      // thrown. Hence, we currently don't treat BROKER_RESOURCE_MISSING_ERROR as client error.
+      case QueryException.ACCESS_DENIED_ERROR_CODE:
+      case QueryException.JSON_COMPILATION_ERROR_CODE:
+      case QueryException.JSON_PARSING_ERROR_CODE:
+      case QueryException.QUERY_VALIDATION_ERROR_CODE:
+      case QueryException.PQL_PARSING_ERROR_CODE:
+      case QueryException.TOO_MANY_REQUESTS_ERROR_CODE:
+        return true;
+      default:
+        return false;
+    }
   }
 }
