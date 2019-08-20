@@ -29,7 +29,7 @@ import org.apache.pinot.common.response.BrokerResponse;
  */
 public class RequestStatistics {
 
-  public static final String DEFAULT_TABLE_NAME = "NotYetParsed";
+  private static final String DEFAULT_TABLE_NAME = "NotYetParsed";
 
   private int _errorCode = 0;
   private String _pql;
@@ -191,5 +191,9 @@ public class RequestStatistics {
 
   public int getNumExceptions() {
     return _numExceptions;
+  }
+
+  public boolean hasValidTableName() {
+    return ! DEFAULT_TABLE_NAME.equals(_tableName);
   }
 }

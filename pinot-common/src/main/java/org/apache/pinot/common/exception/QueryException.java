@@ -156,14 +156,17 @@ public class QueryException {
    */
   public static boolean isClientError(int errorCode) {
     switch (errorCode) {
+      // NOTE: QueryException.BROKER_RESOURCE_MISSING_ERROR can be triggered either due to
+      // client error (incorrect table name) or due to issues with EV updates. For cases where
+      // access to tables is controlled via ACLs, for an incorrect table name we expect ACCESS_DENIED_ERROR to be
+      // thrown. Hence, we currently don't treat BROKER_RESOURCE_MISSING_ERROR as client error.
       case QueryException.ACCESS_DENIED_ERROR_CODE:
       case QueryException.JSON_COMPILATION_ERROR_CODE:
       case QueryException.JSON_PARSING_ERROR_CODE:
       case QueryException.QUERY_VALIDATION_ERROR_CODE:
       case QueryException.PQL_PARSING_ERROR_CODE:
-      case QueryException.TOO_MANY_REQUESTS_ERROR_CODE: {
+      case QueryException.TOO_MANY_REQUESTS_ERROR_CODE:
         return true;
-      }
       default:
         return false;
     }
