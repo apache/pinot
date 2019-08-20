@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.selection;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -70,6 +71,7 @@ import org.apache.pinot.core.query.selection.comparator.CompositeDocIdValCompara
 public class SelectionOperatorService {
   private final List<String> _selectionColumns;
   private final List<SelectionSort> _sortSequence;
+  private final List<Integer> _sortColumnIdx;
   private final DataSchema _dataSchema;
   private final int _selectionOffset;
   private final int _maxNumRows;
@@ -86,11 +88,20 @@ public class SelectionOperatorService {
   public SelectionOperatorService(@Nonnull Selection selection, @Nonnull IndexSegment indexSegment) {
     _selectionColumns = SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), indexSegment);
     _sortSequence = getSortSequence(selection.getSelectionSortSequence());
+    _sortColumnIdx = getSortColumnIdx(_sortSequence, _selectionColumns);
     _dataSchema = SelectionOperatorUtils.extractDataSchema(_sortSequence, _selectionColumns, indexSegment);
     // Select rows from offset to offset + size.
     _selectionOffset = selection.getOffset();
     _maxNumRows = _selectionOffset + selection.getSize();
     _rows = new PriorityQueue<>(_maxNumRows, getStrictComparator());
+  }
+
+  private List<Integer> getSortColumnIdx(List<SelectionSort> sortSequence, List<String> selectionColumns) {
+    List<Integer> sortColumnIdx = new ArrayList<>();
+    for (SelectionSort seq: sortSequence) {
+      sortColumnIdx.add(selectionColumns.indexOf(seq.column));
+    }
+    return sortColumnIdx;
   }
 
   /**
@@ -102,6 +113,7 @@ public class SelectionOperatorService {
   public SelectionOperatorService(@Nonnull Selection selection, @Nonnull DataSchema dataSchema) {
     _selectionColumns = SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), dataSchema);
     _sortSequence = getSortSequence(selection.getSelectionSortSequence());
+    _sortColumnIdx = getSortColumnIdx(_sortSequence, _selectionColumns);
     _dataSchema = dataSchema;
     // Select rows from offset to offset + size.
     _selectionOffset = selection.getOffset();
@@ -211,8 +223,9 @@ public class SelectionOperatorService {
         for (int i = 0; i < numSortColumns; i++) {
           int ret = 0;
           SelectionSort selectionSort = _sortSequence.get(i);
-          Serializable v1 = o1[i];
-          Serializable v2 = o2[i];
+          int colIdx = _sortColumnIdx.get(i);
+          Serializable v1 = o1[colIdx];
+          Serializable v2 = o2[colIdx];
 
           // Only compare single-value columns.
           if (v1 instanceof Number) {
