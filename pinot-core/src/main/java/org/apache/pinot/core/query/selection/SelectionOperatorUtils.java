@@ -67,14 +67,13 @@ import org.apache.pinot.core.indexsegment.IndexSegment;
  * </ul>
  */
 public class SelectionOperatorUtils {
-  private SelectionOperatorUtils() {
-  }
-
   private static final String INT_PATTERN = "##########";
   private static final String LONG_PATTERN = "####################";
   private static final String FLOAT_PATTERN = "#########0.0####";
   private static final String DOUBLE_PATTERN = "###################0.0#########";
   private static final DecimalFormatSymbols DECIMAL_FORMAT_SYMBOLS = DecimalFormatSymbols.getInstance(Locale.US);
+  private SelectionOperatorUtils() {
+  }
 
   /**
    * Expand <code>'SELECT *'</code> to select all columns with {@link IndexSegment}, order all columns alphabetically.
@@ -437,8 +436,7 @@ public class SelectionOperatorUtils {
    * @param dataSchema data schema.
    * @return column indices
    */
-  public static int[] getColumnIndices(@Nonnull List<String> selectionColumns,
-      @Nonnull DataSchema dataSchema) {
+  public static int[] getColumnIndices(@Nonnull List<String> selectionColumns, @Nonnull DataSchema dataSchema) {
     int numSelectionColumns = selectionColumns.size();
     int[] columnIndices = new int[numSelectionColumns];
     int numColumnsInDataSchema = dataSchema.size();
@@ -451,8 +449,6 @@ public class SelectionOperatorUtils {
     }
     return columnIndices;
   }
-
-
 
   /**
    * Extract columns from the row based on the given column indices.
@@ -678,5 +674,13 @@ public class SelectionOperatorUtils {
       queue.poll();
       queue.offer(value);
     }
+  }
+
+  public static List<String> extractSortColumns(List<SelectionSort> sortSequence) {
+    List<String> columns = new ArrayList<>();
+    for (SelectionSort s : sortSequence) {
+      columns.add(s.column);
+    }
+    return columns;
   }
 }
