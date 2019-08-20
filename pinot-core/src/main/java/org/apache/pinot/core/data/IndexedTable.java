@@ -20,6 +20,7 @@ package org.apache.pinot.core.data;
 
 import java.util.Iterator;
 import java.util.List;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
@@ -30,12 +31,12 @@ import org.apache.pinot.common.utils.DataSchema;
  */
 public interface IndexedTable {
 
-  void init(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
+  void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
       int maxCapacity);
 
-  boolean upsert(TableRecord record);
+  boolean upsert(@Nonnull TableRecord record);
 
-  boolean merge(IndexedTable table);
+  boolean merge(@Nonnull IndexedTable table);
 
   int size();
 
