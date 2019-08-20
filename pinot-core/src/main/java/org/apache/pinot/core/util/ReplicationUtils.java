@@ -20,6 +20,7 @@ package org.apache.pinot.core.util;
 
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 
@@ -36,7 +37,8 @@ public class ReplicationUtils {
 
     TableType tableType = tableConfig.getTableType();
     if (tableType.equals(TableType.REALTIME)) {
-      StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+      StreamConfig streamConfig = new StreamConfig(tableConfig.getTableName(),
+          tableConfig.getIndexingConfig().getStreamConfigs());
       return streamConfig.hasHighLevelConsumerType();
     }
     return true;
@@ -49,7 +51,8 @@ public class ReplicationUtils {
 
     TableType tableType = tableConfig.getTableType();
     if (tableType.equals(TableType.REALTIME)) {
-      StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+      StreamConfig streamConfig = new StreamConfig(tableConfig.getTableName(),
+          tableConfig.getIndexingConfig().getStreamConfigs());
       return streamConfig.hasLowLevelConsumerType();
     }
     return false;

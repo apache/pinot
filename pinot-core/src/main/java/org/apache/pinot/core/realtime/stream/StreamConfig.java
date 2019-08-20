@@ -73,12 +73,14 @@ public class StreamConfig {
 
   final private String _groupId;
 
+  final private String _tableNameWithType;
+
   final private Map<String, String> _streamConfigMap = new HashMap<>();
 
   /**
    * Initializes a StreamConfig using the map of stream configs from the table config
    */
-  public StreamConfig(Map<String, String> streamConfigMap) {
+  public StreamConfig(String tableNameWithType, Map<String, String> streamConfigMap) {
 
     _type = streamConfigMap.get(StreamConfigProperties.STREAM_TYPE);
     Preconditions.checkNotNull(_type, "Stream type cannot be null");
@@ -87,6 +89,8 @@ public class StreamConfig {
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_TOPIC_NAME);
     _topicName = streamConfigMap.get(topicNameKey);
     Preconditions.checkNotNull(_topicName, "Stream topic name " + topicNameKey + " cannot be null");
+
+    _tableNameWithType = tableNameWithType;
 
     String consumerTypesKey =
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONSUMER_TYPES);
@@ -302,6 +306,10 @@ public class StreamConfig {
     return _groupId;
   }
 
+  public String getTableNameWithType() {
+    return _tableNameWithType;
+  }
+
   public Map<String, String> getStreamConfigsMap() {
     return _streamConfigMap;
   }
@@ -314,7 +322,8 @@ public class StreamConfig {
         + _fetchTimeoutMillis + ", _flushThresholdRows=" + _flushThresholdRows + ", _flushThresholdTimeMillis="
         + _flushThresholdTimeMillis + ", _flushSegmentDesiredSizeBytes=" + _flushSegmentDesiredSizeBytes
         + ", _flushAutotuneInitialRows=" + _flushAutotuneInitialRows + ", _decoderClass='" + _decoderClass
-        + '\'' + ", _decoderProperties=" + _decoderProperties + ", _groupId='" + _groupId + '}';
+        + '\'' + ", _decoderProperties=" + _decoderProperties + ", _groupId='" + _groupId
+        + ", _tableNameWithType='" + _tableNameWithType + '}';
   }
 
   @Override
@@ -340,7 +349,8 @@ public class StreamConfig {
         .isEqual(_consumerFactoryClassName, that._consumerFactoryClassName) && EqualityUtils
         .isEqual(_offsetCriteria, that._offsetCriteria) && EqualityUtils.isEqual(_decoderClass, that._decoderClass)
         && EqualityUtils.isEqual(_decoderProperties, that._decoderProperties) && EqualityUtils
-        .isEqual(_groupId, that._groupId) && EqualityUtils.isEqual(_streamConfigMap, that._streamConfigMap);
+        .isEqual(_groupId, that._groupId) && EqualityUtils.isEqual(_tableNameWithType, that._tableNameWithType)
+        && EqualityUtils.isEqual(_streamConfigMap, that._streamConfigMap);
   }
 
   @Override
@@ -360,6 +370,7 @@ public class StreamConfig {
     result = EqualityUtils.hashCodeOf(result, _decoderProperties);
     result = EqualityUtils.hashCodeOf(result, _groupId);
     result = EqualityUtils.hashCodeOf(result, _streamConfigMap);
+    result = EqualityUtils.hashCodeOf(result, _tableNameWithType);
     return result;
   }
 }

@@ -38,6 +38,7 @@ import org.testng.Assert;
  * TODO: make input tar file and pinot schema configurable
  */
 public class FakeStreamConfigUtils {
+  private static final String TABLE_NAME_WITH_TYPE = "fake_tableName_REALTIME";
   private static final String AVRO_TAR_FILE = "fake_stream_avro_data.tar.gz";
   // This avro schema file must be in sync with the avro data
   private static final String AVRO_SCHEMA_FILE = "fake_stream_avro_schema.avsc";
@@ -126,7 +127,7 @@ public class FakeStreamConfigUtils {
         StreamConfigProperties.constructStreamProperty(STREAM_TYPE, NUM_PARTITIONS_KEY),
         String.valueOf(numPartitions));
 
-    return new StreamConfig(streamConfigMap);
+    return new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
   }
 
   /**
@@ -145,7 +146,7 @@ public class FakeStreamConfigUtils {
         StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_CONSUMER_TYPES),
         StreamConfig.ConsumerType.HIGHLEVEL.toString());
 
-    return new StreamConfig(streamConfigMap);
+    return new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
   }
 
   private static Map<String, String> getDefaultStreamConfigs() {

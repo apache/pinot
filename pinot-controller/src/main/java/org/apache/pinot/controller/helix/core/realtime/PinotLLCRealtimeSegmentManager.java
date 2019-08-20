@@ -196,7 +196,9 @@ public class PinotLLCRealtimeSegmentManager {
    */
   public void setupNewTable(TableConfig tableConfig, IdealState emptyIdealState)
       throws InvalidConfigException {
-    final StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+    final StreamConfig streamConfig = new StreamConfig(
+        tableConfig.getTableName(),
+        tableConfig.getIndexingConfig().getStreamConfigs());
     int partitionCount = getPartitionCount(streamConfig);
     List<String> currentSegments = getExistingSegments(tableConfig.getTableName());
     // Make sure that there are no low-level segments existing.
@@ -887,7 +889,7 @@ public class PinotLLCRealtimeSegmentManager {
    */
   public void ensureAllPartitionsConsuming(final TableConfig tableConfig) {
     final String tableNameWithType = tableConfig.getTableName();
-    final StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+    final StreamConfig streamConfig = new StreamConfig(tableNameWithType, tableConfig.getIndexingConfig().getStreamConfigs());
     final int partitionCount = getPartitionCount(streamConfig);
     HelixHelper.updateIdealState(_helixManager, tableNameWithType, new Function<IdealState, IdealState>() {
       @Nullable
@@ -945,7 +947,8 @@ public class PinotLLCRealtimeSegmentManager {
       LOGGER.info("Skipping validation for disabled table {}", tableNameWithType);
       return idealState;
     }
-    final StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+    final StreamConfig streamConfig = new StreamConfig(tableConfig.getTableName(),
+        tableConfig.getIndexingConfig().getStreamConfigs());
     final long now = getCurrentTimeMs();
 
     PartitionAssignment partitionAssignment =
@@ -1045,7 +1048,7 @@ public class PinotLLCRealtimeSegmentManager {
   protected IdealState ensureAllPartitionsConsuming(final TableConfig tableConfig, IdealState idealState,
       final int partitionCount) {
     final String tableNameWithType = tableConfig.getTableName();
-    final StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+    final StreamConfig streamConfig = new StreamConfig(tableNameWithType, tableConfig.getIndexingConfig().getStreamConfigs());
     if (!idealState.isEnabled()) {
       LOGGER.info("Skipping validation for disabled table {}", tableNameWithType);
       return idealState;

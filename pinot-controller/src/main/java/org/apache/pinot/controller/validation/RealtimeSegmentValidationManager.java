@@ -96,7 +96,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       }
 
       Map<String, String> streamConfigMap = tableConfig.getIndexingConfig().getStreamConfigs();
-      StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+      StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
       if (streamConfig.hasLowLevelConsumerType()) {
         _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig);
       }
@@ -108,7 +108,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     List<RealtimeSegmentZKMetadata> metadataList =
         _pinotHelixResourceManager.getRealtimeSegmentMetadata(realtimeTableName);
     boolean countHLCSegments = true;  // false if this table has ONLY LLC segments (i.e. fully migrated)
-    StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+    StreamConfig streamConfig = new StreamConfig(realtimeTableName, tableConfig.getIndexingConfig().getStreamConfigs());
     if (streamConfig.hasLowLevelConsumerType() && !streamConfig.hasHighLevelConsumerType()) {
       countHLCSegments = false;
     }

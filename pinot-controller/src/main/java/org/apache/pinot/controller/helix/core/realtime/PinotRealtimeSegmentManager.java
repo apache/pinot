@@ -129,7 +129,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
         continue;
       }
 
-      StreamConfig metadata = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+      StreamConfig metadata = new StreamConfig(realtimeTableName, tableConfig.getIndexingConfig().getStreamConfigs());
       if (metadata.hasHighLevelConsumerType()) {
         idealStateMap.put(realtimeTableName, _pinotHelixResourceManager.getHelixAdmin()
             .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), realtimeTableName));
@@ -333,7 +333,8 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
         String znRecordId = tableConfigZnRecord.getId();
         if (TableNameBuilder.getTableTypeFromTableName(znRecordId) == TableType.REALTIME) {
           TableConfig tableConfig = TableConfig.fromZnRecord(tableConfigZnRecord);
-          StreamConfig metadata = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+          StreamConfig metadata = new StreamConfig(tableConfig.getTableName(),
+              tableConfig.getIndexingConfig().getStreamConfigs());
           if (metadata.hasHighLevelConsumerType()) {
             String realtimeTable = tableConfig.getTableName();
             String realtimeSegmentsPathForTable = _propertyStorePath + SEGMENTS_PATH + "/" + realtimeTable;

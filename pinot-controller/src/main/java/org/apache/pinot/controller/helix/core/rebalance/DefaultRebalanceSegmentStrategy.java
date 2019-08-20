@@ -90,7 +90,8 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
     PartitionAssignment newPartitionAssignment = new PartitionAssignment(tableNameWithType);
 
     if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
-      StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+      StreamConfig streamConfig = new StreamConfig(tableNameWithType,
+          tableConfig.getIndexingConfig().getStreamConfigs());
       if (!streamConfig.hasLowLevelConsumerType()) {
         LOGGER.info("Table {} does not have LLC and will have no partition assignment", tableNameWithType);
         return newPartitionAssignment;
@@ -140,7 +141,8 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
     int targetNumReplicas;
     if (tableType.equals(CommonConstants.Helix.TableType.REALTIME)) {
       if (tableConfig.getIndexingConfig().getStreamConfigs() != null) {
-        StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+        StreamConfig streamConfig = new StreamConfig(tableNameWithType,
+            tableConfig.getIndexingConfig().getStreamConfigs());
         if (!streamConfig.hasLowLevelConsumerType()) {
           LOGGER.info("Table {} does not have LLC and therefore no change for rebalanced ideal state", tableNameWithType);
           return idealState;
