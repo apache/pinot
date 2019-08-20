@@ -19,35 +19,31 @@
 package org.apache.pinot.core.data.recordtransformer;
 
 import java.util.Collection;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 
 
 public class NullValueTransformer implements RecordTransformer {
-
   private final Collection<FieldSpec> _fieldSpecs;
-  private Schema _schema;
 
   public NullValueTransformer(Schema schema) {
-    _schema = schema;
-    _fieldSpecs = _schema.getAllFieldSpecs();
+    _fieldSpecs = schema.getAllFieldSpecs();
   }
 
   @Override
-  public GenericRow transform(GenericRow row) {
+  public GenericRow transform(GenericRow record) {
     for (FieldSpec fieldSpec : _fieldSpecs) {
       String fieldName = fieldSpec.getName();
       // Do not allow default value for time column
-      if (row.getValue(fieldName) == null && fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
+      if (record.getValue(fieldName) == null && fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
         if (fieldSpec.isSingleValueField()) {
-          row.putField(fieldName, fieldSpec.getDefaultNullValue());
+          record.putField(fieldName, fieldSpec.getDefaultNullValue());
         } else {
-          row.putField(fieldName, new Object[]{fieldSpec.getDefaultNullValue()});
+          record.putField(fieldName, new Object[]{fieldSpec.getDefaultNullValue()});
         }
       }
     }
-    return row;
+    return record;
   }
 }
