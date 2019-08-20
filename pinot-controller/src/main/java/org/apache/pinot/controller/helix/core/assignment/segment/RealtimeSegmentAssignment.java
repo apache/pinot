@@ -45,9 +45,9 @@ import org.slf4j.LoggerFactory;
  *     differences:
  *     <ul>
  *       <li>
- *         1. Within a replica, all segments of the same partition (steam partition) are always assigned to exactly one
- *         server, and because of that we can directly assign or rebalance the CONSUMING segments to the servers based
- *         on the partition id
+ *         1. Within a replica-group, all segments of the same partition (steam partition) are always assigned to the
+ *         same exactly one instance, and because of that we can directly assign or rebalance the CONSUMING segments to
+ *         the instances based on the partition id
  *       </li>
  *       <li>
  *         2. Partition id for an instance is derived from the index of the instance (within the replica-group for
@@ -83,7 +83,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
         _realtimeTableName);
     Preconditions
         .checkState(instancePartitions.getNumPartitions() == 1, "Instance partitions: %s should contain 1 partition",
-            instancePartitions.getName());
+            instancePartitions.getInstancePartitionsName());
     LOGGER.info("Assigning segment: {} with instance partitions: {} for table: {}", segmentName, instancePartitions,
         _realtimeTableName);
 
@@ -99,10 +99,10 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
   private List<String> assignSegment(String segmentName, InstancePartitions instancePartitions) {
     int partitionId = new LLCSegmentName(segmentName).getPartitionId();
 
-    if (instancePartitions.getNumReplicas() == 1) {
+    if (instancePartitions.getNumReplicaGroups() == 1) {
       // Non-replica-group based assignment:
       // Uniformly spray the partitions and replicas across the instances.
-      // E.g. (6 servers, 3 partitions, 4 replicas)
+      // E.g. (6 instances, 3 partitions, 4 replicas)
       // "0_0": [i0,  i1,  i2,  i3,  i4,  i5  ]
       //         p0r0 p0r1 p0r2 p1r3 p1r0 p1r1
       //         p1r2 p1r3 p2r0 p2r1 p2r2 p2r3
@@ -117,22 +117,23 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
       return instancesAssigned;
     } else {
       // Replica-group based assignment:
-      // Within a replica, uniformly spray the partitions across the instances.
-      // E.g. (within a replica, 3 servers, 6 partitions)
+      // Within a replica-group, uniformly spray the partitions across the instances.
+      // E.g. (within a replica-group, 3 instances, 6 partitions)
       // "0_0": [i0, i1, i2]
       //         p0  p1  p2
       //         p3  p4  p5
 
-      int numReplicas = instancePartitions.getNumReplicas();
-      if (numReplicas != _replication) {
+      int numReplicaGroups = instancePartitions.getNumReplicaGroups();
+      if (numReplicaGroups != _replication) {
         LOGGER.warn(
-            "Number of replicas in instance partitions {}: {} does not match replication in table config: {} for table: {}, use: {}",
-            instancePartitions.getName(), numReplicas, _replication, _realtimeTableName, numReplicas);
+            "Number of replica-groups in instance partitions {}: {} does not match replication in table config: {} for table: {}, use: {}",
+            instancePartitions.getInstancePartitionsName(), numReplicaGroups, _replication, _realtimeTableName,
+            numReplicaGroups);
       }
 
-      List<String> instancesAssigned = new ArrayList<>(numReplicas);
-      for (int replicaId = 0; replicaId < numReplicas; replicaId++) {
-        List<String> instances = instancePartitions.getInstances(0, replicaId);
+      List<String> instancesAssigned = new ArrayList<>(numReplicaGroups);
+      for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
+        List<String> instances = instancePartitions.getInstances(0, replicaGroupId);
         instancesAssigned.add(instances.get(partitionId % instances.size()));
       }
       return instancesAssigned;
@@ -156,7 +157,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
         completedInstancePartitions);
 
     Map<String, Map<String, String>> newAssignment;
-    if (completedInstancePartitions.getNumReplicas() == 1) {
+    if (completedInstancePartitions.getNumReplicaGroups() == 1) {
       // Non-replica-group based assignment
 
       List<String> instances = SegmentAssignmentUtils
@@ -166,11 +167,12 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
     } else {
       // Replica-group based assignment
 
-      int numReplicas = completedInstancePartitions.getNumReplicas();
-      if (numReplicas != _replication) {
+      int numReplicaGroups = completedInstancePartitions.getNumReplicaGroups();
+      if (numReplicaGroups != _replication) {
         LOGGER.warn(
-            "Number of replicas in instance partitions {}: {} does not match replication in table config: {} for table: {}, use: {}",
-            completedInstancePartitions.getName(), numReplicas, _replication, _realtimeTableName, numReplicas);
+            "Number of replica-groups in instance partitions {}: {} does not match replication in table config: {} for table: {}, use: {}",
+            completedInstancePartitions.getInstancePartitionsName(), numReplicaGroups, _replication, _realtimeTableName,
+            numReplicaGroups);
       }
 
       Map<Integer, Set<String>> partitionIdToSegmentsMap = new HashMap<>();
@@ -193,7 +195,8 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
           .checkState(consumingInstancePartitions != null, "Failed to find CONSUMING instance partitions for table: %s",
               _realtimeTableName);
       Preconditions.checkState(consumingInstancePartitions.getNumPartitions() == 1,
-          "Instance partitions: %s should contain 1 partition", consumingInstancePartitions.getName());
+          "Instance partitions: %s should contain 1 partition",
+          consumingInstancePartitions.getInstancePartitionsName());
       LOGGER.info("Rebalancing CONSUMING segments for table: {} with instance partitions: {}", _realtimeTableName,
           consumingInstancePartitions);
 

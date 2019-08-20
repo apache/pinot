@@ -31,44 +31,57 @@ import org.apache.pinot.common.utils.JsonUtils;
 
 
 /**
- * Instance (server) partitions for the table.
+ * Instance partitions for the table.
  *
- * <p>The instance partitions is stored as a map from partition of the format: {@code <partitionId>_<replicaId>} to
- * list of server instances, and is persisted under the ZK path: {@code <cluster>/PROPERTYSTORE/INSTANCE_PARTITIONS}.
+ * <p>The instance partitions is stored as a map from partition of the format: {@code <partitionId>_<replicaGroupId>} to
+ * list of instances, and is persisted under the ZK path: {@code <cluster>/PROPERTYSTORE/INSTANCE_PARTITIONS}.
+ * <ul>
+ *   <li>
+ *     Partition: a set of instances that contains the segments of the same partition (value partition for offline
+ *     table, or stream partition for real-time table)
+ *   </li>
+ *   <li>
+ *     Replica-group: a set of instances that contains one replica of all the segments
+ *   </li>
+ * </ul>
+ * <p>The instance partitions name is of the format {@code <rawTableName>_<instancePartitionsType>}, e.g.
+ * {@code table_OFFLINE}, {@code table_CONSUMING}, {@code table_COMPLETED}.
+ * <p>When partition is not enabled, all instances will be stored as partition 0.
+ * <p>When replica-group is not enabled, all instances will be stored as replica-group 0.
  * <p>The segment assignment will be based on the instance partitions of the table.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class InstancePartitions {
-  private static final char PARTITION_REPLICA_SEPARATOR = '_';
+  private static final char PARTITION_REPLICA_GROUP_SEPARATOR = '_';
 
-  // Name will be of the format "<rawTableName>_<type>", e.g. "table_OFFLINE", "table_CONSUMING", "table_COMPLETED"
-  private final String _name;
+  private final String _instancePartitionsName;
   private final Map<String, List<String>> _partitionToInstancesMap;
   private int _numPartitions;
-  private int _numReplicas;
+  private int _numReplicaGroups;
 
-  public InstancePartitions(String name) {
-    _name = name;
+  public InstancePartitions(String instancePartitionsName) {
+    _instancePartitionsName = instancePartitionsName;
     _partitionToInstancesMap = new TreeMap<>();
   }
 
   @JsonCreator
-  private InstancePartitions(@JsonProperty(value = "name", required = true) String name,
+  private InstancePartitions(
+      @JsonProperty(value = "instancePartitionsName", required = true) String instancePartitionsName,
       @JsonProperty(value = "partitionToInstancesMap", required = true) Map<String, List<String>> partitionToInstancesMap) {
-    _name = name;
+    _instancePartitionsName = instancePartitionsName;
     _partitionToInstancesMap = partitionToInstancesMap;
     for (String key : partitionToInstancesMap.keySet()) {
-      int splitterIndex = key.indexOf(PARTITION_REPLICA_SEPARATOR);
-      int partition = Integer.parseInt(key.substring(0, splitterIndex));
-      int replica = Integer.parseInt(key.substring(splitterIndex + 1));
-      _numPartitions = Integer.max(_numPartitions, partition + 1);
-      _numReplicas = Integer.max(_numReplicas, replica + 1);
+      int separatorIndex = key.indexOf(PARTITION_REPLICA_GROUP_SEPARATOR);
+      int partitionId = Integer.parseInt(key.substring(0, separatorIndex));
+      int replicaGroupId = Integer.parseInt(key.substring(separatorIndex + 1));
+      _numPartitions = Integer.max(_numPartitions, partitionId + 1);
+      _numReplicaGroups = Integer.max(_numReplicaGroups, replicaGroupId + 1);
     }
   }
 
   @JsonProperty
-  public String getName() {
-    return _name;
+  public String getInstancePartitionsName() {
+    return _instancePartitionsName;
   }
 
   @JsonProperty
@@ -82,19 +95,20 @@ public class InstancePartitions {
   }
 
   @JsonIgnore
-  public int getNumReplicas() {
-    return _numReplicas;
+  public int getNumReplicaGroups() {
+    return _numReplicaGroups;
   }
 
-  public List<String> getInstances(int partitionId, int replicaId) {
-    return _partitionToInstancesMap.get(Integer.toString(partitionId) + PARTITION_REPLICA_SEPARATOR + replicaId);
+  public List<String> getInstances(int partitionId, int replicaGroupId) {
+    return _partitionToInstancesMap
+        .get(Integer.toString(partitionId) + PARTITION_REPLICA_GROUP_SEPARATOR + replicaGroupId);
   }
 
-  public void setInstances(int partitionId, int replicaId, List<String> instances) {
-    String key = Integer.toString(partitionId) + PARTITION_REPLICA_SEPARATOR + replicaId;
+  public void setInstances(int partitionId, int replicaGroupId, List<String> instances) {
+    String key = Integer.toString(partitionId) + PARTITION_REPLICA_GROUP_SEPARATOR + replicaGroupId;
     _partitionToInstancesMap.put(key, instances);
     _numPartitions = Integer.max(_numPartitions, partitionId + 1);
-    _numReplicas = Integer.max(_numReplicas, replicaId + 1);
+    _numReplicaGroups = Integer.max(_numReplicaGroups, replicaGroupId + 1);
   }
 
   public static InstancePartitions fromZNRecord(ZNRecord znRecord) {
@@ -102,7 +116,7 @@ public class InstancePartitions {
   }
 
   public ZNRecord toZNRecord() {
-    ZNRecord znRecord = new ZNRecord(_name);
+    ZNRecord znRecord = new ZNRecord(_instancePartitionsName);
     znRecord.setListFields(_partitionToInstancesMap);
     return znRecord;
   }

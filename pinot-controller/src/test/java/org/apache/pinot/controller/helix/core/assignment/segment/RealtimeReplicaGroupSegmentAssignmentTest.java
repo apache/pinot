@@ -85,14 +85,14 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
     //        p0          p1          p2
     //        p3
     InstancePartitions consumingInstancePartitions = new InstancePartitions(CONSUMING_INSTANCE_PARTITIONS_NAME);
-    int numConsumingInstancesPerReplica = NUM_CONSUMING_INSTANCES / NUM_REPLICAS;
+    int numConsumingInstancesPerReplicaGroup = NUM_CONSUMING_INSTANCES / NUM_REPLICAS;
     int consumingInstanceIdToAdd = 0;
-    for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
-      List<String> consumingInstancesForReplica = new ArrayList<>(numConsumingInstancesPerReplica);
-      for (int i = 0; i < numConsumingInstancesPerReplica; i++) {
-        consumingInstancesForReplica.add(CONSUMING_INSTANCES.get(consumingInstanceIdToAdd++));
+    for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
+      List<String> consumingInstancesForReplicaGroup = new ArrayList<>(numConsumingInstancesPerReplicaGroup);
+      for (int i = 0; i < numConsumingInstancesPerReplicaGroup; i++) {
+        consumingInstancesForReplicaGroup.add(CONSUMING_INSTANCES.get(consumingInstanceIdToAdd++));
       }
-      consumingInstancePartitions.setInstances(0, replicaId, consumingInstancesForReplica);
+      consumingInstancePartitions.setInstances(0, replicaGroupId, consumingInstancesForReplicaGroup);
     }
     _instancePartitionsMap.put(InstancePartitionsType.CONSUMING, consumingInstancePartitions);
 
@@ -103,14 +103,14 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
     //   0_2=[instance_8, instance_9, instance_10, instance_11]
     // }
     InstancePartitions completedInstancePartitions = new InstancePartitions(COMPLETED_INSTANCE_PARTITIONS_NAME);
-    int numCompletedInstancesPerReplica = NUM_COMPLETED_INSTANCES / NUM_REPLICAS;
+    int numCompletedInstancesPerReplicaGroup = NUM_COMPLETED_INSTANCES / NUM_REPLICAS;
     int completedInstanceIdToAdd = 0;
-    for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
-      List<String> completedInstancesForReplica = new ArrayList<>(numCompletedInstancesPerReplica);
-      for (int i = 0; i < numCompletedInstancesPerReplica; i++) {
-        completedInstancesForReplica.add(COMPLETED_INSTANCES.get(completedInstanceIdToAdd++));
+    for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
+      List<String> completedInstancesForReplicaGroup = new ArrayList<>(numCompletedInstancesPerReplicaGroup);
+      for (int i = 0; i < numCompletedInstancesPerReplicaGroup; i++) {
+        completedInstancesForReplicaGroup.add(COMPLETED_INSTANCES.get(completedInstanceIdToAdd++));
       }
-      completedInstancePartitions.setInstances(0, replicaId, completedInstancesForReplica);
+      completedInstancePartitions.setInstances(0, replicaGroupId, completedInstancesForReplicaGroup);
     }
     _instancePartitionsMap.put(InstancePartitionsType.COMPLETED, completedInstancePartitions);
   }
@@ -122,26 +122,28 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
 
   @Test
   public void testAssignSegment() {
-    int numInstancesPerReplica = NUM_CONSUMING_INSTANCES / NUM_REPLICAS;
+    int numInstancesPerReplicaGroup = NUM_CONSUMING_INSTANCES / NUM_REPLICAS;
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       String segmentName = _segments.get(segmentId);
       List<String> instancesAssigned =
           _segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
       assertEquals(instancesAssigned.size(), NUM_REPLICAS);
-      for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
 
-        // Segment 0 (partition 0) should be assigned to instance 0, 3, 6
-        // Segment 1 (partition 1) should be assigned to instance 1, 4, 7
-        // Segment 2 (partition 2) should be assigned to instance 2, 5, 8
-        // Segment 3 (partition 3) should be assigned to instance 0, 3, 6
-        // Segment 4 (partition 0) should be assigned to instance 0, 3, 6
-        // Segment 5 (partition 1) should be assigned to instance 1, 4, 7
-        // ...
+      // Segment 0 (partition 0) should be assigned to instance 0, 3, 6
+      // Segment 1 (partition 1) should be assigned to instance 1, 4, 7
+      // Segment 2 (partition 2) should be assigned to instance 2, 5, 8
+      // Segment 3 (partition 3) should be assigned to instance 0, 3, 6
+      // Segment 4 (partition 0) should be assigned to instance 0, 3, 6
+      // Segment 5 (partition 1) should be assigned to instance 1, 4, 7
+      // ...
+      for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
         int partitionId = segmentId % NUM_PARTITIONS;
-        int expectedAssignedInstanceId = partitionId % numInstancesPerReplica + replicaId * numInstancesPerReplica;
-        assertEquals(instancesAssigned.get(replicaId), CONSUMING_INSTANCES.get(expectedAssignedInstanceId));
+        int expectedAssignedInstanceId =
+            partitionId % numInstancesPerReplicaGroup + replicaGroupId * numInstancesPerReplicaGroup;
+        assertEquals(instancesAssigned.get(replicaGroupId), CONSUMING_INSTANCES.get(expectedAssignedInstanceId));
       }
+
       addToAssignment(currentAssignment, segmentId, instancesAssigned);
     }
   }

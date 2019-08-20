@@ -25,7 +25,7 @@ import org.apache.pinot.common.config.ConfigKey;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class InstanceReplicaPartitionConfig {
+public class InstanceReplicaGroupPartitionConfig {
 
   @ConfigKey("replicaGroupBased")
   @ConfigDoc("Whether to use replica-group based selection, false by default")
@@ -35,20 +35,20 @@ public class InstanceReplicaPartitionConfig {
   @ConfigDoc("Number of instances to select for non-replica-group based selection, select all instances if not specified")
   private int _numInstances;
 
-  @ConfigKey("numReplicas")
-  @ConfigDoc("Number of replicas (replica-groups) for replica-group based selection")
-  private int _numReplicas;
+  @ConfigKey("numReplicaGroups")
+  @ConfigDoc("Number of replica-groups for replica-group based selection")
+  private int _numReplicaGroups;
 
-  @ConfigKey("numServersPerReplica")
-  @ConfigDoc("Number of instances per replica for replica-group based selection, select as many instances as possible if not specified")
-  private int _numInstancesPerReplica;
+  @ConfigKey("numServersPerReplicaGroup")
+  @ConfigDoc("Number of instances per replica-group for replica-group based selection, select as many instances as possible if not specified")
+  private int _numInstancesPerReplicaGroup;
 
   @ConfigKey("numPartitions")
   @ConfigDoc("Number of partitions for replica-group based selection, do not partition the replica-group (1 partition) if not specified")
   private int _numPartitions;
 
   @ConfigKey("numServersPerPartition")
-  @ConfigDoc("Number of instances per partition (within a replica) for replica-group based selection, select all instances if not specified")
+  @ConfigDoc("Number of instances per partition (within a replica-group) for replica-group based selection, select all instances if not specified")
   private int _numInstancesPerPartition;
 
   @JsonProperty
@@ -72,23 +72,23 @@ public class InstanceReplicaPartitionConfig {
   }
 
   @JsonProperty
-  public int getNumReplicas() {
-    return _numReplicas;
+  public int getNumReplicaGroups() {
+    return _numReplicaGroups;
   }
 
   @JsonProperty
-  public void setNumReplicas(int numReplicas) {
-    _numReplicas = numReplicas;
+  public void setNumReplicaGroups(int numReplicaGroups) {
+    _numReplicaGroups = numReplicaGroups;
   }
 
   @JsonProperty
-  public int getNumInstancesPerReplica() {
-    return _numInstancesPerReplica;
+  public int getNumInstancesPerReplicaGroup() {
+    return _numInstancesPerReplicaGroup;
   }
 
   @JsonProperty
-  public void setNumInstancesPerReplica(int numInstancesPerReplica) {
-    _numInstancesPerReplica = numInstancesPerReplica;
+  public void setNumInstancesPerReplicaGroup(int numInstancesPerReplicaGroup) {
+    _numInstancesPerReplicaGroup = numInstancesPerReplicaGroup;
   }
 
   @JsonProperty

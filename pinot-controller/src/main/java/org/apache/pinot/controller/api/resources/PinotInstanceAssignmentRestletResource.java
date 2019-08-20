@@ -187,7 +187,7 @@ public class PinotInstanceAssignmentRestletResource {
 
   private void persistInstancePartitionsHelper(InstancePartitions instancePartitions) {
     try {
-      LOGGER.info("Persisting instance partitions: {} to the property store", instancePartitions.getName());
+      LOGGER.info("Persisting instance partitions: {}", instancePartitions);
       InstancePartitionsUtils.persistInstancePartitions(_resourceManager.getPropertyStore(), instancePartitions);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Caught Exception while persisting the instance partitions",
@@ -209,7 +209,7 @@ public class PinotInstanceAssignmentRestletResource {
           Response.Status.BAD_REQUEST);
     }
 
-    String instancePartitionsName = instancePartitions.getName();
+    String instancePartitionsName = instancePartitions.getInstancePartitionsName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType != TableType.REALTIME) {
@@ -259,7 +259,7 @@ public class PinotInstanceAssignmentRestletResource {
 
   private void removeInstancePartitionsHelper(String instancePartitionsName) {
     try {
-      LOGGER.info("Removing instance partitions: {} from the property store", instancePartitionsName);
+      LOGGER.info("Removing instance partitions: {}", instancePartitionsName);
       InstancePartitionsUtils.removeInstancePartitions(_resourceManager.getPropertyStore(), instancePartitionsName);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Caught Exception while removing the instance partitions",

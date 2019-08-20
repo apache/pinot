@@ -26,7 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
 import org.apache.pinot.common.config.instance.InstanceConstraintConfig;
-import org.apache.pinot.common.config.instance.InstanceReplicaPartitionConfig;
+import org.apache.pinot.common.config.instance.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.common.config.instance.InstanceTagPoolConfig;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
@@ -358,11 +358,11 @@ public class TableConfigTest {
       constraintConfig.setConstraints(Arrays.asList("constraint1", "constraint2"));
       instanceAssignmentConfig.setConstraintConfig(constraintConfig);
 
-      InstanceReplicaPartitionConfig replicaPartitionConfig = new InstanceReplicaPartitionConfig();
-      replicaPartitionConfig.setReplicaGroupBased(true);
-      replicaPartitionConfig.setNumReplicas(3);
-      replicaPartitionConfig.setNumInstancesPerReplica(5);
-      instanceAssignmentConfig.setReplicaPartitionConfig(replicaPartitionConfig);
+      InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig = new InstanceReplicaGroupPartitionConfig();
+      replicaGroupPartitionConfig.setReplicaGroupBased(true);
+      replicaGroupPartitionConfig.setNumReplicaGroups(3);
+      replicaGroupPartitionConfig.setNumInstancesPerReplicaGroup(5);
+      instanceAssignmentConfig.setReplicaGroupPartitionConfig(replicaGroupPartitionConfig);
 
       TableConfig tableConfig = tableConfigBuilder.setInstanceAssignmentConfigMap(
           Collections.singletonMap(InstancePartitionsType.OFFLINE, instanceAssignmentConfig)).build();
@@ -460,12 +460,13 @@ public class TableConfigTest {
     InstanceConstraintConfig constraintConfig = instanceAssignmentConfig.getConstraintConfig();
     assertEquals(constraintConfig.getConstraints(), Arrays.asList("constraint1", "constraint2"));
 
-    InstanceReplicaPartitionConfig replicaPartitionConfig = instanceAssignmentConfig.getReplicaPartitionConfig();
-    assertTrue(replicaPartitionConfig.isReplicaGroupBased());
-    assertEquals(replicaPartitionConfig.getNumInstances(), 0);
-    assertEquals(replicaPartitionConfig.getNumReplicas(), 3);
-    assertEquals(replicaPartitionConfig.getNumInstancesPerReplica(), 5);
-    assertEquals(replicaPartitionConfig.getNumPartitions(), 0);
-    assertEquals(replicaPartitionConfig.getNumInstancesPerPartition(), 0);
+    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+        instanceAssignmentConfig.getReplicaGroupPartitionConfig();
+    assertTrue(replicaGroupPartitionConfig.isReplicaGroupBased());
+    assertEquals(replicaGroupPartitionConfig.getNumInstances(), 0);
+    assertEquals(replicaGroupPartitionConfig.getNumReplicaGroups(), 3);
+    assertEquals(replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup(), 5);
+    assertEquals(replicaGroupPartitionConfig.getNumPartitions(), 0);
+    assertEquals(replicaGroupPartitionConfig.getNumInstancesPerPartition(), 0);
   }
 }

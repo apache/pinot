@@ -93,14 +93,14 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     // }
     InstancePartitions instancePartitionsWithoutPartition =
         new InstancePartitions(INSTANCE_PARTITIONS_NAME_WITHOUT_PARTITION);
-    int numInstancesPerReplica = NUM_INSTANCES / NUM_REPLICAS;
+    int numInstancesPerReplicaGroup = NUM_INSTANCES / NUM_REPLICAS;
     int instanceIdToAdd = 0;
-    for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
-      List<String> instancesForReplica = new ArrayList<>(numInstancesPerReplica);
-      for (int i = 0; i < numInstancesPerReplica; i++) {
-        instancesForReplica.add(INSTANCES.get(instanceIdToAdd++));
+    for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
+      List<String> instancesForReplicaGroup = new ArrayList<>(numInstancesPerReplicaGroup);
+      for (int i = 0; i < numInstancesPerReplicaGroup; i++) {
+        instancesForReplicaGroup.add(INSTANCES.get(instanceIdToAdd++));
       }
-      instancePartitionsWithoutPartition.setInstances(0, replicaId, instancesForReplica);
+      instancePartitionsWithoutPartition.setInstances(0, replicaGroupId, instancesForReplicaGroup);
     }
     _instancePartitionsMapWithoutPartition =
         Collections.singletonMap(InstancePartitionsType.OFFLINE, instancePartitionsWithoutPartition);
@@ -128,13 +128,13 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     HelixManager helixManagerWithPartitions = mock(HelixManager.class);
     when(helixManagerWithPartitions.getHelixPropertyStore()).thenReturn(propertyStoreWithPartitions);
 
-    ReplicaGroupStrategyConfig strategyConfig = new ReplicaGroupStrategyConfig();
-    strategyConfig.setPartitionColumn(PARTITION_COLUMN);
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig();
+    replicaGroupStrategyConfig.setPartitionColumn(PARTITION_COLUMN);
     TableConfig tableConfigWithPartitions =
         new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITH_PARTITION)
             .setNumReplicas(NUM_REPLICAS)
             .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY).build();
-    tableConfigWithPartitions.getValidationConfig().setReplicaGroupStrategyConfig(strategyConfig);
+    tableConfigWithPartitions.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
     _segmentAssignmentWithPartition =
         SegmentAssignmentFactory.getSegmentAssignment(helixManagerWithPartitions, tableConfigWithPartitions);
 
@@ -151,15 +151,15 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     // }
     InstancePartitions instancePartitionsWithPartition =
         new InstancePartitions(INSTANCE_PARTITIONS_NAME_WITH_PARTITION);
-    int numInstancesPerPartition = numInstancesPerReplica / NUM_REPLICAS;
+    int numInstancesPerPartition = numInstancesPerReplicaGroup / NUM_REPLICAS;
     instanceIdToAdd = 0;
-    for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
+    for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
       for (int partitionId = 0; partitionId < NUM_PARTITIONS; partitionId++) {
         List<String> instancesForPartition = new ArrayList<>(numInstancesPerPartition);
         for (int i = 0; i < numInstancesPerPartition; i++) {
           instancesForPartition.add(INSTANCES.get(instanceIdToAdd++));
         }
-        instancePartitionsWithPartition.setInstances(partitionId, replicaId, instancesForPartition);
+        instancePartitionsWithPartition.setInstances(partitionId, replicaGroupId, instancesForPartition);
       }
     }
     _instancePartitionsMapWithPartition =
@@ -174,27 +174,29 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
 
   @Test
   public void testAssignSegmentWithoutPartition() {
-    int numInstancesPerReplica = NUM_INSTANCES / NUM_REPLICAS;
+    int numInstancesPerReplicaGroup = NUM_INSTANCES / NUM_REPLICAS;
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       String segmentName = SEGMENTS.get(segmentId);
       List<String> instancesAssigned = _segmentAssignmentWithoutPartition
           .assignSegment(segmentName, currentAssignment, _instancePartitionsMapWithoutPartition);
       assertEquals(instancesAssigned.size(), NUM_REPLICAS);
-      for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
 
-        // Segment 0 should be assigned to instance 0, 6, 12
-        // Segment 1 should be assigned to instance 1, 7, 13
-        // Segment 2 should be assigned to instance 2, 8, 14
-        // Segment 3 should be assigned to instance 3, 9, 15
-        // Segment 4 should be assigned to instance 4, 10, 16
-        // Segment 5 should be assigned to instance 5, 11, 17
-        // Segment 6 should be assigned to instance 0, 6, 12
-        // Segment 7 should be assigned to instance 1, 7, 13
-        // ...
-        int expectedAssignedInstanceId = segmentId % numInstancesPerReplica + replicaId * numInstancesPerReplica;
-        assertEquals(instancesAssigned.get(replicaId), INSTANCES.get(expectedAssignedInstanceId));
+      // Segment 0 should be assigned to instance 0, 6, 12
+      // Segment 1 should be assigned to instance 1, 7, 13
+      // Segment 2 should be assigned to instance 2, 8, 14
+      // Segment 3 should be assigned to instance 3, 9, 15
+      // Segment 4 should be assigned to instance 4, 10, 16
+      // Segment 5 should be assigned to instance 5, 11, 17
+      // Segment 6 should be assigned to instance 0, 6, 12
+      // Segment 7 should be assigned to instance 1, 7, 13
+      // ...
+      for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
+        int expectedAssignedInstanceId =
+            segmentId % numInstancesPerReplicaGroup + replicaGroupId * numInstancesPerReplicaGroup;
+        assertEquals(instancesAssigned.get(replicaGroupId), INSTANCES.get(expectedAssignedInstanceId));
       }
+
       currentAssignment.put(segmentName,
           SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentOnlineOfflineStateModel.ONLINE));
     }
@@ -202,31 +204,32 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
 
   @Test
   public void testAssignSegmentWithPartition() {
-    int numInstancesPerReplica = NUM_INSTANCES / NUM_REPLICAS;
+    int numInstancesPerReplicaGroup = NUM_INSTANCES / NUM_REPLICAS;
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
-    int numInstancesPerPartition = numInstancesPerReplica / NUM_PARTITIONS;
+    int numInstancesPerPartition = numInstancesPerReplicaGroup / NUM_PARTITIONS;
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       String segmentName = SEGMENTS.get(segmentId);
       List<String> instancesAssigned = _segmentAssignmentWithPartition
           .assignSegment(segmentName, currentAssignment, _instancePartitionsMapWithPartition);
       assertEquals(instancesAssigned.size(), NUM_REPLICAS);
-      int partitionId = segmentId % NUM_PARTITIONS;
-      for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
 
-        // Segment 0 (partition 0) should be assigned to instance 0, 6, 12
-        // Segment 1 (partition 1) should be assigned to instance 2, 8, 14
-        // Segment 2 (partition 2) should be assigned to instance 4, 10, 16
-        // Segment 3 (partition 0) should be assigned to instance 1, 7, 13
-        // Segment 4 (partition 1) should be assigned to instance 3, 9, 15
-        // Segment 5 (partition 2) should be assigned to instance 5, 11, 17
-        // Segment 6 (partition 0) should be assigned to instance 0, 6, 12
-        // Segment 7 (partition 1) should be assigned to instance 2, 8, 14
-        // ...
+      // Segment 0 (partition 0) should be assigned to instance 0, 6, 12
+      // Segment 1 (partition 1) should be assigned to instance 2, 8, 14
+      // Segment 2 (partition 2) should be assigned to instance 4, 10, 16
+      // Segment 3 (partition 0) should be assigned to instance 1, 7, 13
+      // Segment 4 (partition 1) should be assigned to instance 3, 9, 15
+      // Segment 5 (partition 2) should be assigned to instance 5, 11, 17
+      // Segment 6 (partition 0) should be assigned to instance 0, 6, 12
+      // Segment 7 (partition 1) should be assigned to instance 2, 8, 14
+      // ...
+      int partitionId = segmentId % NUM_PARTITIONS;
+      for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
         int expectedAssignedInstanceId =
-            (segmentId % numInstancesPerReplica) / NUM_PARTITIONS + partitionId * numInstancesPerPartition
-                + replicaId * numInstancesPerReplica;
-        assertEquals(instancesAssigned.get(replicaId), INSTANCES.get(expectedAssignedInstanceId));
+            (segmentId % numInstancesPerReplicaGroup) / NUM_PARTITIONS + partitionId * numInstancesPerPartition
+                + replicaGroupId * numInstancesPerReplicaGroup;
+        assertEquals(instancesAssigned.get(replicaGroupId), INSTANCES.get(expectedAssignedInstanceId));
       }
+
       currentAssignment.put(segmentName,
           SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentOnlineOfflineStateModel.ONLINE));
     }
