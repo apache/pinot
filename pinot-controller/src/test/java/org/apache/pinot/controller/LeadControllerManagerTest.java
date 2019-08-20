@@ -87,7 +87,7 @@ public class LeadControllerManagerTest {
 
     // Even resource config is enabled, leadControllerManager should return false because no index is cached yet.
     Assert.assertFalse(leadControllerManager.isLeaderForTable(tableName));
-    Assert.assertTrue(leadControllerManager.isLeadControllerResourceEnabled());
+    Assert.assertTrue(LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager));
 
     // After the target partition index is cached, leadControllerManager should return true.
     leadControllerManager.addPartitionLeader(partitionName);
@@ -102,7 +102,7 @@ public class LeadControllerManagerTest {
     enableResourceConfig(false);
     leadControllerManager.onResourceConfigChange();
 
-    Assert.assertFalse(leadControllerManager.isLeadControllerResourceEnabled());
+    Assert.assertFalse(LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager));
     Assert.assertFalse(leadControllerManager.isLeaderForTable(tableName));
     leadControllerManager.addPartitionLeader(partitionName);
     Assert.assertFalse(leadControllerManager.isLeaderForTable(tableName));

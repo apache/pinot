@@ -18,12 +18,19 @@
  */
 package org.apache.pinot.common.utils.helix;
 
+import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.StringUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class LeadControllerUtils {
+  public static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerUtils.class);
 
   /**
    * Given a raw table name and number of partitions, returns the partition id in lead controller resource.
@@ -57,5 +64,16 @@ public class LeadControllerUtils {
    */
   public static int extractPartitionId(String partitionName) {
     return Integer.parseInt(partitionName.substring(partitionName.lastIndexOf('_') + 1));
+  }
+
+  /**
+   * Checks from ZK if resource config of leadControllerResource is enabled.
+   */
+  public static boolean isLeadControllerResourceEnabled(HelixManager helixManager) {
+    HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
+    PropertyKey propertyKey = helixDataAccessor.keyBuilder().resourceConfig(Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+    ResourceConfig resourceConfig = helixDataAccessor.getProperty(propertyKey);
+    String enableResource = resourceConfig.getSimpleConfig(Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY);
+    return Boolean.parseBoolean(enableResource);
   }
 }

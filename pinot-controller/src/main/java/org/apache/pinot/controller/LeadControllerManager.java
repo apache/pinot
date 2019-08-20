@@ -154,17 +154,6 @@ public class LeadControllerManager {
   }
 
   /**
-   * Checks from ZK if resource config of leadControllerResource is enabled.
-   */
-  public boolean isLeadControllerResourceEnabled() {
-    HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
-    PropertyKey propertyKey = helixDataAccessor.keyBuilder().resourceConfig(Helix.LEAD_CONTROLLER_RESOURCE_NAME);
-    ResourceConfig resourceConfig = helixDataAccessor.getProperty(propertyKey);
-    String enableResource = resourceConfig.getSimpleConfig(Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY);
-    return Boolean.parseBoolean(enableResource);
-  }
-
-  /**
    * Starts the fetching thread to actively fetch helix leadership and resource config of lead controller resource.
    */
   public synchronized void start() {
@@ -226,7 +215,7 @@ public class LeadControllerManager {
     if (_isShuttingDown) {
       return;
     }
-    if (isLeadControllerResourceEnabled()) {
+    if (LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager)) {
       LOGGER.info("Lead controller resource is enabled.");
       _isLeadControllerResourceEnabled = true;
       _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_LEAD_CONTROLLER_RESOURCE_ENABLED, 1L);
