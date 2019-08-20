@@ -176,7 +176,7 @@ public class PinotTableIdealStateBuilder {
 
   private static String getGroupIdFromRealtimeDataTable(String realtimeTableName, Map<String, String> streamConfigMap) {
     String groupId = StringUtil.join("_", realtimeTableName, System.currentTimeMillis() + "");
-    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+    StreamConfig streamConfig = new StreamConfig(realtimeTableName, streamConfigMap);
     String streamConfigGroupId = streamConfig.getGroupId();
     if (streamConfigGroupId != null && !streamConfigGroupId.isEmpty()) {
       groupId = streamConfigGroupId;

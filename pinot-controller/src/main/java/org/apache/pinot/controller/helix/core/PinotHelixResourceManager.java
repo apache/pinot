@@ -1169,7 +1169,7 @@ public class PinotHelixResourceManager {
 
   private void verifyIndexingConfig(String tableNameWithType, IndexingConfig indexingConfig) {
     // Check if HLC table is allowed.
-    StreamConfig streamConfig = new StreamConfig(indexingConfig.getStreamConfigs());
+    StreamConfig streamConfig = new StreamConfig(tableNameWithType, indexingConfig.getStreamConfigs());
     if (streamConfig.hasHighLevelConsumerType() && !_allowHLCTables) {
       throw new InvalidTableConfigException(
           "Creating HLC realtime table is not allowed for Table: " + tableNameWithType);
@@ -1178,7 +1178,7 @@ public class PinotHelixResourceManager {
 
   private void ensureRealtimeClusterIsSetUp(TableConfig config, String realtimeTableName,
       IndexingConfig indexingConfig) {
-    StreamConfig streamConfig = new StreamConfig(indexingConfig.getStreamConfigs());
+    StreamConfig streamConfig = new StreamConfig(realtimeTableName, indexingConfig.getStreamConfigs());
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, realtimeTableName);
 
     if (streamConfig.hasHighLevelConsumerType()) {

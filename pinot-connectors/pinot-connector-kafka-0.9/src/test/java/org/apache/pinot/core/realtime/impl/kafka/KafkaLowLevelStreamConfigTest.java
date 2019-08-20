@@ -66,7 +66,7 @@ public class KafkaLowLevelStreamConfigTest {
     if (fetcherMinBytes != null) {
       streamConfigMap.put("stream.kafka.fetcher.minBytes", fetcherMinBytes);
     }
-    return new KafkaLowLevelStreamConfig(new StreamConfig(streamConfigMap));
+    return new KafkaLowLevelStreamConfig(new StreamConfig("fakeTable_REALTIME", streamConfigMap));
   }
 
   @Test

@@ -43,7 +43,7 @@ public class FlushThresholdUpdateManager {
   public FlushThresholdUpdater getFlushThresholdUpdater(TableConfig realtimeTableConfig) {
     final String tableName = realtimeTableConfig.getTableName();
     PartitionLevelStreamConfig streamConfig =
-        new PartitionLevelStreamConfig(realtimeTableConfig.getIndexingConfig().getStreamConfigs());
+        new PartitionLevelStreamConfig(tableName, realtimeTableConfig.getIndexingConfig().getStreamConfigs());
 
     final int tableFlushSize = streamConfig.getFlushThresholdRows();
 

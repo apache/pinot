@@ -105,6 +105,7 @@ public class KafkaPartitionLevelConsumerTest {
     String streamKafkaBrokerList = "127.0.0.1:" + kafkaCluster.getKafkaServerPort(0);
     String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
+    String tableNameWithType = "tableName_REALTIME";
 
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", streamType);
@@ -115,7 +116,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     streamConfigMap.put("stream.kafka.fetcher.size", "10000");
     streamConfigMap.put("stream.kafka.fetcher.minBytes", "20000");
-    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
     KafkaStreamMetadataProvider streamMetadataProvider =
         new KafkaStreamMetadataProvider(clientId, streamConfig);
@@ -139,7 +140,7 @@ public class KafkaPartitionLevelConsumerTest {
     // test user defined values
     streamConfigMap.put("stream.kafka.buffer.size", "100");
     streamConfigMap.put("stream.kafka.socket.timeout", "1000");
-    streamConfig = new StreamConfig(streamConfigMap);
+    streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
     kafkaSimpleStreamConsumer = new KafkaPartitionLevelConsumer(clientId, streamConfig, 0);
     kafkaSimpleStreamConsumer.fetchMessages(12345L, 23456L, 10000);
     Assert.assertEquals(100, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaBufferSize());
@@ -152,6 +153,7 @@ public class KafkaPartitionLevelConsumerTest {
     String streamKafkaBrokerList = "127.0.0.1:" + kafkaCluster.getKafkaServerPort(0);
     String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
+    String tableNameWithType = "tableName_REALTIME";
 
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", streamType);
@@ -160,7 +162,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
-    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
     KafkaStreamMetadataProvider streamMetadataProvider =
         new KafkaStreamMetadataProvider(clientId, streamConfig);
@@ -173,7 +175,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
-    streamConfig = new StreamConfig(streamConfigMap);
+    streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
     streamMetadataProvider = new KafkaStreamMetadataProvider(clientId, streamConfig);
     Assert.assertEquals(streamMetadataProvider.fetchPartitionCount(10000L), 2);
@@ -187,6 +189,7 @@ public class KafkaPartitionLevelConsumerTest {
     String streamKafkaBrokerList = "127.0.0.1:" + kafkaCluster.getKafkaServerPort(0);
     String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
+    String tableNameWithType = "tableName_REALTIME";
 
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", streamType);
@@ -195,7 +198,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
-    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
     int partition = 0;
     KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer =
@@ -216,6 +219,7 @@ public class KafkaPartitionLevelConsumerTest {
     String streamKafkaBrokerList = "127.0.0.1:" + kafkaCluster.getKafkaServerPort(0);
     String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
+    String tableNameWithType = "tableName_REALTIME";
 
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", streamType);
@@ -224,7 +228,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
-    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
     int numPartitions =
         new KafkaStreamMetadataProvider(clientId, streamConfig).fetchPartitionCount(10000);
@@ -251,6 +255,7 @@ public class KafkaPartitionLevelConsumerTest {
     String streamKafkaBrokerList = "127.0.0.1:" + kafkaCluster.getKafkaServerPort(0);
     String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
+    String tableNameWithType = "tableName_REALTIME";
 
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", streamType);
@@ -259,7 +264,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
-    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
     final StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     int numPartitions =

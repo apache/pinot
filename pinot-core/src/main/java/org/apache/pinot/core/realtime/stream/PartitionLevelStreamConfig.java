@@ -38,10 +38,9 @@ public class PartitionLevelStreamConfig extends StreamConfig {
   /**
    * Initializes a partition level stream config using the map of stream configs from the table config
    * This overrides some properties for low level consumer
-   * @param streamConfigMap
    */
-  public PartitionLevelStreamConfig(Map<String, String> streamConfigMap) {
-    super(streamConfigMap);
+  public PartitionLevelStreamConfig(String tableNameWithType, Map<String, String> streamConfigMap) {
+    super(tableNameWithType, streamConfigMap);
 
     int flushThresholdRows = super.getFlushThresholdRows();
     String flushThresholdRowsKey =
