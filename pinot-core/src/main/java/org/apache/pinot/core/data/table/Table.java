@@ -27,20 +27,37 @@ import org.apache.pinot.common.utils.DataSchema;
 
 
 /**
- * Table of data records to pass data between operators
+ * Table to host {@link Record}s which will be passed between operators
  */
 public interface Table {
 
+  /**
+   * Initializes the Table for use
+   * @param dataSchema the schema of the columns in the {@link Record}
+   * @param aggregationInfos the aggregation info for the values if applicable
+   * @param orderBy the order by information if applicable
+   * @param maxCapacity the max capacity the table should have
+   */
   void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
       int maxCapacity);
 
+  /**
+   * Update the table with the given record
+   */
   boolean upsert(@Nonnull Record record);
 
+  /**
+   * Merge all records from given table
+   */
   boolean merge(@Nonnull Table table);
 
+  /**
+   * Returns the size of the table
+   */
   int size();
 
-  void close();
-
+  /**
+   * An iterator for the {@link Record}s in the table
+   */
   Iterator<Record> iterator();
 }

@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nonnull;
 import org.apache.commons.collections.CollectionUtils;
@@ -52,6 +53,7 @@ public class IndexedTable implements Table {
   private List<Record> _records;
   private ConcurrentMap<Record, Integer> _lookupTable;
   private ReentrantReadWriteLock _readWriteLock;
+  private AtomicInteger _numRecords = new AtomicInteger();
 
   private DataSchema _dataSchema;
   private List<AggregationInfo> _aggregationInfos;
@@ -101,8 +103,8 @@ public class IndexedTable implements Table {
       _readWriteLock.readLock().lock();
       try {
         if (index == null) {
-          index = size();
-          _records.add(newRecord);
+          index = _numRecords.getAndIncrement();
+          _records.add(index, newRecord);
         } else {
           Record existingRecord = _records.get(index);
           aggregate(existingRecord, newRecord);
@@ -134,7 +136,7 @@ public class IndexedTable implements Table {
 
   @Override
   public int size() {
-    return _records.size();
+    return _numRecords.get();
   }
 
   @Override
@@ -143,21 +145,21 @@ public class IndexedTable implements Table {
   }
 
   private void resize() {
+    // sort
     if (CollectionUtils.isNotEmpty(_orderBy)) {
       Comparator<Record> comparator;
       comparator = OrderByUtils.getKeysAndValuesComparator(_dataSchema, _orderBy, _aggregationInfos);
       _records.sort(comparator);
     }
 
+    // evict lowest
     _records = new ArrayList<>(_records.subList(0, _evictCapacity));
+    _numRecords.set(_records.size());
 
+    // rebuild lookup table
     _lookupTable.clear();
     for (int i = 0; i < _records.size(); i++) {
       _lookupTable.put(_records.get(i), i);
     }
-  }
-
-  @Override
-  public void close() {
   }
 }
