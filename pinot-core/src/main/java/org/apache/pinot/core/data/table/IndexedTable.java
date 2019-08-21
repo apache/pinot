@@ -41,6 +41,9 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
  */
 public class IndexedTable implements Table {
 
+  // When table reaches max capacity, we will allow 20% more records to get inserted (bufferedCapacity)
+  // If records beyond bufferedCapacity are received, the table will undergo sort and evict upto evictCapacity (10% more than capacity)
+  // This is to ensure that for a small number beyond capacity, a fair chance is given to all records which have the potential to climb up the order
   /** Factor used to add buffer to maxCapacity of the Collection used **/
   private static final double BUFFER_FACTOR = 1.2;
   /** Factor used to decide eviction threshold **/
@@ -64,9 +67,6 @@ public class IndexedTable implements Table {
     _aggregationInfos = aggregationInfos;
     _orderBy = orderBy;
 
-    // When table reaches max capacity, we will allow 20% more records to get inserted (bufferedCapacity)
-    // If records beyond bufferedCapacity are received, the table will undergo sort and evict upto evictCapacity (10% more than capacity)
-    // This is to ensure that for a small number beyond capacity, a fair chance is given to all records which have the potential to climb up the order
     _bufferedCapacity = (int) (maxCapacity * BUFFER_FACTOR);
     _evictCapacity = (int) (maxCapacity * EVICTION_FACTOR);
 
@@ -74,12 +74,10 @@ public class IndexedTable implements Table {
     _lookupTable = new ConcurrentHashMap<>(_bufferedCapacity);
     _readWriteLock = new ReentrantReadWriteLock();
 
-    if (CollectionUtils.isNotEmpty(aggregationInfos)) {
-      _aggregationFunctions = new ArrayList<>(aggregationInfos.size());
-      for (AggregationInfo aggregationInfo : aggregationInfos) {
-        _aggregationFunctions.add(
-            AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction());
-      }
+    _aggregationFunctions = new ArrayList<>(aggregationInfos.size());
+    for (AggregationInfo aggregationInfo : aggregationInfos) {
+      _aggregationFunctions.add(
+          AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction());
     }
   }
 
@@ -89,36 +87,34 @@ public class IndexedTable implements Table {
     Object[] keys = newRecord.getKeys();
     Preconditions.checkNotNull(keys, "Cannot upsert record with null keys");
 
-    if (size() >= _bufferedCapacity && !_lookupTable.containsKey(newRecord)) {
-      _readWriteLock.writeLock().lock();
-      try {
-        if (size() >= _bufferedCapacity) {
-          sort();
-          _records = _records.subList(0, _evictCapacity);
-          rebuildLookupTable();
+    _lookupTable.compute(newRecord, (k, index) -> {
+      if (index == null && size() >= _bufferedCapacity) {
+        _readWriteLock.writeLock().lock();
+        try {
+          if (size() >= _bufferedCapacity) {
+            sort();
+            _records = _records.subList(0, _evictCapacity);
+            rebuildLookupTable();
+          }
+        } finally {
+          _readWriteLock.writeLock().unlock();
         }
-      } finally {
-        _readWriteLock.writeLock().unlock();
       }
-    }
-
-    _readWriteLock.readLock().lock();
-    try {
-      _lookupTable.compute(newRecord, (k, index) -> {
+      _readWriteLock.readLock().lock();
+      try {
         if (index == null) {
           index = size();
           _records.add(newRecord);
         } else {
-          if (CollectionUtils.isNotEmpty(_aggregationFunctions)) {
-            Record existingRecord = _records.get(index);
-            aggregate(existingRecord, newRecord);
-          }
+
+          Record existingRecord = _records.get(index);
+          aggregate(existingRecord, newRecord);
         }
-        return index;
-      });
-    } finally {
-      _readWriteLock.readLock().unlock();
-    }
+      } finally {
+        _readWriteLock.readLock().unlock();
+      }
+      return index;
+    });
 
     return true;
   }
@@ -159,11 +155,7 @@ public class IndexedTable implements Table {
   public boolean sort() {
     if (CollectionUtils.isNotEmpty(_orderBy)) {
       Comparator<Record> comparator;
-      if (CollectionUtils.isNotEmpty(_aggregationInfos)) {
-        comparator = OrderByUtils.getKeysAndValuesComparator(_dataSchema, _orderBy, _aggregationInfos);
-      } else {
-        comparator = OrderByUtils.getKeysComparator(_dataSchema, _orderBy);
-      }
+      comparator = OrderByUtils.getKeysAndValuesComparator(_dataSchema, _orderBy, _aggregationInfos);
       _records.sort(comparator);
     }
     return true;
@@ -171,6 +163,5 @@ public class IndexedTable implements Table {
 
   @Override
   public void close() {
-
   }
 }
