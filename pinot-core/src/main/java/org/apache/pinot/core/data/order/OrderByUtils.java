@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data;
+package org.apache.pinot.core.data.order;
 
 import java.util.Comparator;
 import java.util.HashMap;
@@ -28,6 +28,8 @@ import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.primitive.ByteArray;
+import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 
@@ -35,14 +37,14 @@ import static org.apache.pinot.common.utils.DataSchema.*;
 
 
 /**
- * Helper methods to perform order by of list of {@link IndexedTable.TableRecord}
+ * Helper methods to perform order by of list of {@link Record}
  */
 public class OrderByUtils {
 
   /**
    * Constructs a comparator for ordering by the keys in the TableRecord::keys
    */
-  public static Comparator<IndexedTable.TableRecord> getKeysComparator(DataSchema dataSchema,
+  public static Comparator<Record> getKeysComparator(DataSchema dataSchema,
       List<SelectionSort> orderBy) {
 
     Map<String, Integer> columnIndexMap = new HashMap<>();
@@ -52,7 +54,7 @@ public class OrderByUtils {
       columnDataTypeMap.put(dataSchema.getColumnName(i), dataSchema.getColumnDataType(i));
     }
 
-    Comparator<IndexedTable.TableRecord> globalComparator = null;
+    Comparator<Record> globalComparator = null;
 
     for (SelectionSort orderByInfo : orderBy) {
       String column = orderByInfo.getColumn();
@@ -60,7 +62,7 @@ public class OrderByUtils {
       int index = columnIndexMap.get(column);
       ColumnDataType columnDataType = columnDataTypeMap.get(column);
 
-      Comparator<IndexedTable.TableRecord> comparator = getKeysComparator(ascending, index, columnDataType);
+      Comparator<Record> comparator = getKeysComparator(ascending, index, columnDataType);
       if (globalComparator == null) {
         globalComparator = comparator;
       } else {
@@ -71,9 +73,9 @@ public class OrderByUtils {
   }
 
   /**
-   * Constructs a comparator for ordering by the non-aggregation values in the TableRecord::values
+   * Constructs a comparator for ordering by the non-aggregation values in the Record::values
    */
-  public static Comparator<IndexedTable.TableRecord> getValuesComparator(DataSchema dataSchema,
+  public static Comparator<Record> getValuesComparator(DataSchema dataSchema,
       List<SelectionSort> orderBy) {
 
     Map<String, Integer> columnIndexMap = new HashMap<>();
@@ -83,7 +85,7 @@ public class OrderByUtils {
       columnDataTypeMap.put(dataSchema.getColumnName(i), dataSchema.getColumnDataType(i));
     }
 
-    Comparator<IndexedTable.TableRecord> globalComparator = null;
+    Comparator<Record> globalComparator = null;
 
     for (SelectionSort orderByInfo : orderBy) {
       String column = orderByInfo.getColumn();
@@ -91,7 +93,7 @@ public class OrderByUtils {
       int index = columnIndexMap.get(column);
       ColumnDataType columnDataType = columnDataTypeMap.get(column);
 
-      Comparator<IndexedTable.TableRecord> comparator = getValuesComparator(ascending, index, columnDataType);
+      Comparator<Record> comparator = getValuesComparator(ascending, index, columnDataType);
       if (globalComparator == null) {
         globalComparator = comparator;
       } else {
@@ -102,10 +104,10 @@ public class OrderByUtils {
   }
 
   /**
-   * Constructs the comparator for ordering by a combination of keys from {@link org.apache.pinot.core.data.IndexedTable.TableRecord::_keys}
-   * and aggregation values from {@link org.apache.pinot.core.data.IndexedTable.TableRecord::values}
+   * Constructs the comparator for ordering by a combination of keys from {@link Record::_keys}
+   * and aggregation values from {@link Record::values}
    */
-  public static Comparator<IndexedTable.TableRecord> getKeysAndValuesComparator(DataSchema dataSchema,
+  public static Comparator<Record> getKeysAndValuesComparator(DataSchema dataSchema,
       List<SelectionSort> orderBy, List<AggregationInfo> aggregationInfos) {
 
     int numKeys = dataSchema.size() - aggregationInfos.size();
@@ -127,10 +129,10 @@ public class OrderByUtils {
       aggregationColumnToInfo.put(aggregationColumn, aggregationInfo);
     }
 
-    Comparator<IndexedTable.TableRecord> globalComparator = null;
+    Comparator<Record> globalComparator = null;
 
     for (SelectionSort orderByInfo : orderBy) {
-      Comparator<IndexedTable.TableRecord> comparator;
+      Comparator<Record> comparator;
 
       String column = orderByInfo.getColumn();
       boolean ascending = orderByInfo.isIsAsc();
@@ -139,14 +141,12 @@ public class OrderByUtils {
         int index = keyIndexMap.get(column);
         ColumnDataType columnDataType = keyColumnDataTypeMap.get(column);
         comparator = OrderByUtils.getKeysComparator(ascending, index, columnDataType);
-
       } else if (aggregationColumnToIndex.containsKey(column)) {
         int index = aggregationColumnToIndex.get(column);
         AggregationFunction aggregationFunction =
             AggregationFunctionUtils.getAggregationFunctionContext(aggregationColumnToInfo.get(column))
                 .getAggregationFunction();
         comparator = getAggregationComparator(ascending, index, aggregationFunction);
-
       } else {
         throw new UnsupportedOperationException(
             "Currently only support order by on group by columns or aggregations, already in query");
@@ -161,125 +161,125 @@ public class OrderByUtils {
     return globalComparator;
   }
 
-  private static Comparator<IndexedTable.TableRecord> getKeysComparator(boolean ascending, int index,
+  private static Comparator<Record> getKeysComparator(boolean ascending, int index,
       ColumnDataType columnDataType) {
-    Comparator<IndexedTable.TableRecord> comparator;
+    Comparator<Record> comparator;
     switch (columnDataType) {
       case INT:
         if (ascending) {
-          comparator = Comparator.comparingInt(o -> (Integer) o._keys[index]);
+          comparator = Comparator.comparingInt(o -> (Integer) o.getKeys()[index]);
         } else {
-          comparator = (o1, o2) -> Integer.compare((Integer) o2._keys[index], (Integer) o1._keys[index]);
+          comparator = (o1, o2) -> Integer.compare((Integer) o2.getKeys()[index], (Integer) o1.getKeys()[index]);
         }
         break;
       case LONG:
         if (ascending) {
-          comparator = Comparator.comparingLong(o -> (Long) o._keys[index]);
+          comparator = Comparator.comparingLong(o -> (Long) o.getKeys()[index]);
         } else {
-          comparator = (o1, o2) -> Long.compare((Long) o2._keys[index], (Long) o1._keys[index]);
+          comparator = (o1, o2) -> Long.compare((Long) o2.getKeys()[index], (Long) o1.getKeys()[index]);
         }
         break;
       case FLOAT:
         if (ascending) {
-          comparator = (o1, o2) -> Float.compare((Float) o1._keys[index], (Float) o2._keys[index]);
+          comparator = (o1, o2) -> Float.compare((Float) o1.getKeys()[index], (Float) o2.getKeys()[index]);
         } else {
-          comparator = (o1, o2) -> Float.compare((Float) o2._keys[index], (Float) o1._keys[index]);
+          comparator = (o1, o2) -> Float.compare((Float) o2.getKeys()[index], (Float) o1.getKeys()[index]);
         }
         break;
       case DOUBLE:
         if (ascending) {
-          comparator = Comparator.comparingDouble(o -> (Double) o._keys[index]);
+          comparator = Comparator.comparingDouble(o -> (Double) o.getKeys()[index]);
         } else {
-          comparator = (o1, o2) -> Double.compare((Double) o2._keys[index], (Double) o1._keys[index]);
+          comparator = (o1, o2) -> Double.compare((Double) o2.getKeys()[index], (Double) o1.getKeys()[index]);
         }
         break;
       case BYTES:
         if (ascending) {
-          comparator =
-              (o1, o2) -> ByteArray.compare(BytesUtils.toBytes(o1._keys[index]), BytesUtils.toBytes(o2._keys[index]));
+          comparator = (o1, o2) -> ByteArray.compare(BytesUtils.toBytes(o1.getKeys()[index]),
+              BytesUtils.toBytes(o2.getKeys()[index]));
         } else {
-          comparator =
-              (o1, o2) -> ByteArray.compare(BytesUtils.toBytes(o2._keys[index]), BytesUtils.toBytes(o1._keys[index]));
+          comparator = (o1, o2) -> ByteArray.compare(BytesUtils.toBytes(o2.getKeys()[index]),
+              BytesUtils.toBytes(o1.getKeys()[index]));
         }
         break;
       case STRING:
       default:
         if (ascending) {
-          comparator = Comparator.comparing(o -> (String) o._keys[index]);
+          comparator = Comparator.comparing(o -> (String) o.getKeys()[index]);
         } else {
-          comparator = (o1, o2) -> ((String) o2._keys[index]).compareTo((String) o1._keys[index]);
+          comparator = (o1, o2) -> ((String) o2.getKeys()[index]).compareTo((String) o1.getKeys()[index]);
         }
         break;
     }
     return comparator;
   }
 
-  private static Comparator<IndexedTable.TableRecord> getValuesComparator(boolean ascending, int index,
+  private static Comparator<Record> getValuesComparator(boolean ascending, int index,
       ColumnDataType columnDataType) {
-    Comparator<IndexedTable.TableRecord> comparator;
+    Comparator<Record> comparator;
     switch (columnDataType) {
       case INT:
         if (ascending) {
-          comparator = Comparator.comparingInt(o -> (Integer) o._values[index]);
+          comparator = Comparator.comparingInt(o -> (Integer) o.getValues()[index]);
         } else {
-          comparator = (o1, o2) -> Integer.compare((Integer) o2._values[index], (Integer) o1._values[index]);
+          comparator = (o1, o2) -> Integer.compare((Integer) o2.getValues()[index], (Integer) o1.getValues()[index]);
         }
         break;
       case LONG:
         if (ascending) {
-          comparator = Comparator.comparingLong(o -> (Long) o._values[index]);
+          comparator = Comparator.comparingLong(o -> (Long) o.getValues()[index]);
         } else {
-          comparator = (o1, o2) -> Long.compare((Long) o2._values[index], (Long) o1._values[index]);
+          comparator = (o1, o2) -> Long.compare((Long) o2.getValues()[index], (Long) o1.getValues()[index]);
         }
         break;
       case FLOAT:
         if (ascending) {
-          comparator = (o1, o2) -> Float.compare((Float) o1._values[index], (Float) o2._values[index]);
+          comparator = (o1, o2) -> Float.compare((Float) o1.getValues()[index], (Float) o2.getValues()[index]);
         } else {
-          comparator = (o1, o2) -> Float.compare((Float) o2._values[index], (Float) o1._values[index]);
+          comparator = (o1, o2) -> Float.compare((Float) o2.getValues()[index], (Float) o1.getValues()[index]);
         }
         break;
       case DOUBLE:
         if (ascending) {
-          comparator = Comparator.comparingDouble(o -> (Double) o._values[index]);
+          comparator = Comparator.comparingDouble(o -> (Double) o.getValues()[index]);
         } else {
-          comparator = (o1, o2) -> Double.compare((Double) o2._values[index], (Double) o1._values[index]);
+          comparator = (o1, o2) -> Double.compare((Double) o2.getValues()[index], (Double) o1.getValues()[index]);
         }
         break;
       case BYTES:
         if (ascending) {
-          comparator = (o1, o2) -> ByteArray.compare(BytesUtils.toBytes(o1._values[index]),
-              BytesUtils.toBytes(o2._values[index]));
+          comparator = (o1, o2) -> ByteArray.compare(BytesUtils.toBytes(o1.getValues()[index]),
+              BytesUtils.toBytes(o2.getValues()[index]));
         } else {
-          comparator = (o1, o2) -> ByteArray.compare(BytesUtils.toBytes(o2._values[index]),
-              BytesUtils.toBytes(o1._values[index]));
+          comparator = (o1, o2) -> ByteArray.compare(BytesUtils.toBytes(o2.getValues()[index]),
+              BytesUtils.toBytes(o1.getValues()[index]));
         }
         break;
       case STRING:
       default:
         if (ascending) {
-          comparator = Comparator.comparing(o -> (String) o._values[index]);
+          comparator = Comparator.comparing(o -> (String) o.getValues()[index]);
         } else {
-          comparator = (o1, o2) -> ((String) o2._values[index]).compareTo((String) o1._values[index]);
+          comparator = (o1, o2) -> ((String) o2.getValues()[index]).compareTo((String) o1.getValues()[index]);
         }
         break;
     }
     return comparator;
   }
 
-  private static Comparator<IndexedTable.TableRecord> getAggregationComparator(boolean ascending, int index,
+  private static Comparator<Record> getAggregationComparator(boolean ascending, int index,
       AggregationFunction aggregationFunction) {
 
-    Comparator<IndexedTable.TableRecord> comparator;
+    Comparator<Record> comparator;
 
     if (ascending) {
       comparator = (v1, v2) -> ComparableComparator.getInstance()
-          .compare(aggregationFunction.extractFinalResult(v1._values[index]),
-              aggregationFunction.extractFinalResult(v2._values[index]));
+          .compare(aggregationFunction.extractFinalResult(v1.getValues()[index]),
+              aggregationFunction.extractFinalResult(v2.getValues()[index]));
     } else {
       comparator = (v1, v2) -> ComparableComparator.getInstance()
-          .compare(aggregationFunction.extractFinalResult(v2._values[index]),
-              aggregationFunction.extractFinalResult(v1._values[index]));
+          .compare(aggregationFunction.extractFinalResult(v2.getValues()[index]),
+              aggregationFunction.extractFinalResult(v1.getValues()[index]));
     }
     return comparator;
   }

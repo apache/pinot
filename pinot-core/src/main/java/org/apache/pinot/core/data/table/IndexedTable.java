@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data;
+package org.apache.pinot.core.data.table;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -31,22 +31,23 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.data.order.OrderByUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 
 
 /**
- * {@link IndexedTable} implementation for aggregating TableRecords based on combination of keys
+ * {@link Table} implementation for aggregating TableRecords based on combination of keys
  */
-public class IndexedTableImpl implements IndexedTable {
+public class IndexedTable implements Table {
 
   /** Factor used to add buffer to maxCapacity of the Collection used **/
   private static final double BUFFER_FACTOR = 1.2;
   /** Factor used to decide eviction threshold **/
   private static final double EVICTION_FACTOR = 1.1;
 
-  private List<TableRecord> _records = new ArrayList<>();
-  private ConcurrentMap<TableRecord, Integer> _lookupTable;
+  private List<Record> _records;
+  private ConcurrentMap<Record, Integer> _lookupTable;
   private ReentrantReadWriteLock _readWriteLock;
 
   private DataSchema _dataSchema;
@@ -63,12 +64,13 @@ public class IndexedTableImpl implements IndexedTable {
     _aggregationInfos = aggregationInfos;
     _orderBy = orderBy;
 
-    // maintain a buffer size 20% more than max capacity
-    // this is to ensure bottom records get a fair chance
+    // When table reaches max capacity, we will allow 20% more records to get inserted (bufferedCapacity)
+    // If records beyond bufferedCapacity are received, the table will undergo sort and evict upto evictCapacity (10% more than capacity)
+    // This is to ensure that for a small number beyond capacity, a fair chance is given to all records which have the potential to climb up the order
     _bufferedCapacity = (int) (maxCapacity * BUFFER_FACTOR);
-    // after eviction, bring down size to 10% more than max capacity
     _evictCapacity = (int) (maxCapacity * EVICTION_FACTOR);
 
+    _records = new ArrayList<>(_bufferedCapacity);
     _lookupTable = new ConcurrentHashMap<>(_bufferedCapacity);
     _readWriteLock = new ReentrantReadWriteLock();
 
@@ -82,9 +84,9 @@ public class IndexedTableImpl implements IndexedTable {
   }
 
   @Override
-  public boolean upsert(@Nonnull TableRecord newRecord) {
+  public boolean upsert(@Nonnull Record newRecord) {
 
-    Object[] keys = newRecord._keys;
+    Object[] keys = newRecord.getKeys();
     Preconditions.checkNotNull(keys, "Cannot upsert record with null keys");
 
     if (size() >= _bufferedCapacity && !_lookupTable.containsKey(newRecord)) {
@@ -108,7 +110,7 @@ public class IndexedTableImpl implements IndexedTable {
           _records.add(newRecord);
         } else {
           if (CollectionUtils.isNotEmpty(_aggregationFunctions)) {
-            TableRecord existingRecord = _records.get(index);
+            Record existingRecord = _records.get(index);
             aggregate(existingRecord, newRecord);
           }
         }
@@ -121,9 +123,10 @@ public class IndexedTableImpl implements IndexedTable {
     return true;
   }
 
-  private void aggregate(TableRecord existingRecord, TableRecord newRecord) {
+  private void aggregate(Record existingRecord, Record newRecord) {
     for (int i = 0; i < _aggregationFunctions.size(); i++) {
-      existingRecord._values[i] = _aggregationFunctions.get(i).merge(existingRecord._values[i], newRecord._values[i]);
+      existingRecord.getValues()[i] =
+          _aggregationFunctions.get(i).merge(existingRecord.getValues()[i], newRecord.getValues()[i]);
     }
   }
 
@@ -135,8 +138,8 @@ public class IndexedTableImpl implements IndexedTable {
   }
 
   @Override
-  public boolean merge(@Nonnull IndexedTable table) {
-    Iterator<TableRecord> iterator = table.iterator();
+  public boolean merge(@Nonnull Table table) {
+    Iterator<Record> iterator = table.iterator();
     while (iterator.hasNext()) {
       upsert(iterator.next());
     }
@@ -149,14 +152,13 @@ public class IndexedTableImpl implements IndexedTable {
   }
 
   @Override
-  public Iterator<TableRecord> iterator() {
+  public Iterator<Record> iterator() {
     return _records.iterator();
   }
 
-  @Override
   public boolean sort() {
     if (CollectionUtils.isNotEmpty(_orderBy)) {
-      Comparator<TableRecord> comparator;
+      Comparator<Record> comparator;
       if (CollectionUtils.isNotEmpty(_aggregationInfos)) {
         comparator = OrderByUtils.getKeysAndValuesComparator(_dataSchema, _orderBy, _aggregationInfos);
       } else {
@@ -165,5 +167,10 @@ public class IndexedTableImpl implements IndexedTable {
       _records.sort(comparator);
     }
     return true;
+  }
+
+  @Override
+  public void close() {
+
   }
 }
