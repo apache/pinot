@@ -93,7 +93,7 @@ public class IndexedTable implements Table {
         try {
           if (size() >= _bufferedCapacity) {
             sort();
-            _records = _records.subList(0, _evictCapacity);
+            _records = new ArrayList<>(_records.subList(0, _evictCapacity));
             rebuildLookupTable();
           }
         } finally {
@@ -106,7 +106,6 @@ public class IndexedTable implements Table {
           index = size();
           _records.add(newRecord);
         } else {
-
           Record existingRecord = _records.get(index);
           aggregate(existingRecord, newRecord);
         }
