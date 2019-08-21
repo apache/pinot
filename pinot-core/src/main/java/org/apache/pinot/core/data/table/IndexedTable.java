@@ -92,9 +92,7 @@ public class IndexedTable implements Table {
         _readWriteLock.writeLock().lock();
         try {
           if (size() >= _bufferedCapacity) {
-            sort();
-            _records = new ArrayList<>(_records.subList(0, _evictCapacity));
-            rebuildLookupTable();
+            resize();
           }
         } finally {
           _readWriteLock.writeLock().unlock();
@@ -125,13 +123,6 @@ public class IndexedTable implements Table {
     }
   }
 
-  private void rebuildLookupTable() {
-    _lookupTable.clear();
-    for (int i = 0; i < _records.size(); i++) {
-      _lookupTable.put(_records.get(i), i);
-    }
-  }
-
   @Override
   public boolean merge(@Nonnull Table table) {
     Iterator<Record> iterator = table.iterator();
@@ -151,13 +142,19 @@ public class IndexedTable implements Table {
     return _records.iterator();
   }
 
-  public boolean sort() {
+  private void resize() {
     if (CollectionUtils.isNotEmpty(_orderBy)) {
       Comparator<Record> comparator;
       comparator = OrderByUtils.getKeysAndValuesComparator(_dataSchema, _orderBy, _aggregationInfos);
       _records.sort(comparator);
     }
-    return true;
+
+    _records = new ArrayList<>(_records.subList(0, _evictCapacity));
+
+    _lookupTable.clear();
+    for (int i = 0; i < _records.size(); i++) {
+      _lookupTable.put(_records.get(i), i);
+    }
   }
 
   @Override
