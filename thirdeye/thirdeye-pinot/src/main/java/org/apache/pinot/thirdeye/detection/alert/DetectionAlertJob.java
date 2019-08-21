@@ -22,9 +22,10 @@ package org.apache.pinot.thirdeye.detection.alert;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
-import java.util.Random;
+import java.util.Map;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
@@ -46,10 +47,12 @@ public class DetectionAlertJob implements Job {
   private DetectionAlertConfigManager alertConfigDAO;
   private TaskManager taskDAO;
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private MergedAnomalyResultManager anomalyDAO;
 
   public DetectionAlertJob() {
     this.alertConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
     this.taskDAO = DAORegistry.getInstance().getTaskDAO();
+    this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
   }
 
   @Override
@@ -79,6 +82,11 @@ public class DetectionAlertJob implements Job {
       return;
     }
 
+    if (configDTO != null && !needNotification(configDTO)) {
+      LOG.info("Skip scheduling subscription task {}. No anomaly to notify.", jobName);
+      return;
+    }
+
     String taskInfoJson = null;
     try {
       taskInfoJson = OBJECT_MAPPER.writeValueAsString(taskInfo);
@@ -94,6 +102,26 @@ public class DetectionAlertJob implements Job {
 
     long taskId = taskDAO.save(taskDTO);
     LOG.info("Created subscription task {} with settings {}", taskId, taskDTO);
+  }
+
+  /**
+   * Check if we need to create a notification task.
+   * If there is no anomaly generated between last notification time till now then no need to create this task.
+   *
+   * @param configDTO The DetectionAlert Configuration.
+   * @return true if it needs notification task. false otherwise.
+   */
+  private boolean needNotification(DetectionAlertConfigDTO configDTO) {
+    Map<Long, Long> vectorLocks = configDTO.getVectorClocks();
+    for (Map.Entry<Long, Long> vectorLock : vectorLocks.entrySet()) {
+      long configId = vectorLock.getKey();
+      long lastNotifiedTime = vectorLock.getValue();
+      if (anomalyDAO.findByStartTimeInRangeAndDetectionConfigId(lastNotifiedTime, System.currentTimeMillis(), configId)
+          .stream().anyMatch(x -> !x.isChild())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private Long getIdFromJobKey(String jobKey) {
