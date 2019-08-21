@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
+import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -48,14 +49,33 @@ public class AdditionTransformFunction extends BaseTransformFunction {
       throw new IllegalArgumentException("At least 2 arguments are required for ADD transform function");
     }
 
-    for (TransformFunction argument : arguments) {
-      if (argument instanceof LiteralTransformFunction) {
-        _literalSum += Double.parseDouble(((LiteralTransformFunction) argument).getLiteral());
-      } else {
-        if (!argument.getResultMetadata().isSingleValue()) {
-          throw new IllegalArgumentException("All the arguments of ADD transform function must be single-valued");
+    checkOperands(arguments);
+  }
+
+  private void checkOperands(List<TransformFunction> operands) {
+    for (TransformFunction operand : operands) {
+      if (operand instanceof MapValueTransformFunction) {
+        throw new IllegalArgumentException("ADD transform function not supported to work with MAP as inner transform function");
+      }
+
+      if (operand instanceof LiteralTransformFunction) {
+        try {
+          _literalSum += Double.parseDouble(((LiteralTransformFunction) operand).getLiteral());
+        } catch (NumberFormatException ne) {
+          throw new IllegalArgumentException("ADD transform function not supported on non-numeric literals");
         }
-        _transformFunctions.add(argument);
+      } else {
+        final TransformResultMetadata resultMetadata = operand.getResultMetadata();
+
+        if (resultMetadata.getDataType() == FieldSpec.DataType.STRING) {
+          throw new IllegalArgumentException("ADD transform function not supported on non-numeric types");
+        }
+
+        if (!resultMetadata.isSingleValue()) {
+          throw new IllegalArgumentException("ADD transform function must have single-valued arguments");
+        }
+
+        _transformFunctions.add(operand);
       }
     }
   }

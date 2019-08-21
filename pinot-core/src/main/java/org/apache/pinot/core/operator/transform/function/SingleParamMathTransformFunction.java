@@ -24,6 +24,7 @@ import java.util.Map;
 
 import javax.annotation.Nonnull;
 
+import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -49,14 +50,28 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
       throw new IllegalArgumentException("Exactly 1 arguments are required for " + getName() + " transform function");
     }
 
-    TransformFunction firstArgument = arguments.get(0);
-    if (firstArgument instanceof LiteralTransformFunction) {
+    checkOperands(arguments.get(0));
+  }
+
+  private void checkOperands(TransformFunction operand) {
+    if (operand instanceof MapValueTransformFunction) {
+      throw new IllegalArgumentException(getName() + " transform function not supported to work with MAP as inner transform function");
+    }
+
+    if (operand instanceof LiteralTransformFunction) {
       throw new IllegalArgumentException("Argument of " + getName() + " should not be literal");
     } else {
-      if (!firstArgument.getResultMetadata().isSingleValue()) {
+      final TransformResultMetadata resultMetadata = operand.getResultMetadata();
+
+      if (resultMetadata.getDataType() == FieldSpec.DataType.STRING) {
+        throw new IllegalArgumentException(getName() + " transform function not supported on non-numeric types");
+      }
+
+      if (!resultMetadata.isSingleValue()) {
         throw new IllegalArgumentException("First argument of " + getName() + " transform function must be single-valued");
       }
-      _transformFunction = firstArgument;
+
+      _transformFunction = operand;
     }
   }
 

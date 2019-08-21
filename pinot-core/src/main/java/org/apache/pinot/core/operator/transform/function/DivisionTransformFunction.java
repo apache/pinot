@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
+import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -50,24 +51,52 @@ public class DivisionTransformFunction extends BaseTransformFunction {
       throw new IllegalArgumentException("Exactly 2 arguments are required for DIV transform function");
     }
 
-    TransformFunction firstArgument = arguments.get(0);
-    if (firstArgument instanceof LiteralTransformFunction) {
-      _firstLiteral = Double.parseDouble(((LiteralTransformFunction) firstArgument).getLiteral());
-    } else {
-      if (!firstArgument.getResultMetadata().isSingleValue()) {
-        throw new IllegalArgumentException("First argument of DIV transform function must be single-valued");
-      }
-      _firstTransformFunction = firstArgument;
+    checkOperands(arguments.get(0), arguments.get(1));
+  }
+
+  private void checkOperands(TransformFunction operand1, TransformFunction operand2) {
+    if (operand1 instanceof MapValueTransformFunction || operand2 instanceof MapValueTransformFunction) {
+      throw new IllegalArgumentException("DIV transform function not supported to work with MAP as inner transform function");
     }
 
-    TransformFunction secondArgument = arguments.get(1);
-    if (secondArgument instanceof LiteralTransformFunction) {
-      _secondLiteral = Double.parseDouble(((LiteralTransformFunction) secondArgument).getLiteral());
-    } else {
-      if (!secondArgument.getResultMetadata().isSingleValue()) {
-        throw new IllegalArgumentException("Second argument of DIV transform function must be single-valued");
+    if (operand1 instanceof LiteralTransformFunction) {
+      try {
+        _firstLiteral = Double.parseDouble(((LiteralTransformFunction) operand1).getLiteral());
+      } catch (NumberFormatException ne) {
+        throw new IllegalArgumentException("DIV transform function not supported on non-numeric literals");
       }
-      _secondTransformFunction = secondArgument;
+    } else {
+      final TransformResultMetadata resultMetadata = operand1.getResultMetadata();
+
+      if (resultMetadata.getDataType() == FieldSpec.DataType.STRING) {
+        throw new IllegalArgumentException("DIV transform function not supported on non-numeric types");
+      }
+
+      if (!resultMetadata.isSingleValue()) {
+        throw new IllegalArgumentException("DIV transform function must have single-valued arguments");
+      }
+
+      _firstTransformFunction = operand1;
+    }
+
+    if (operand2 instanceof LiteralTransformFunction) {
+      try {
+        _secondLiteral = Double.parseDouble(((LiteralTransformFunction) operand2).getLiteral());
+      } catch (NumberFormatException ne) {
+        throw new RuntimeException("DIV transform function not supported on non-numeric literals");
+      }
+    } else {
+      final TransformResultMetadata resultMetadata = operand2.getResultMetadata();
+
+      if (resultMetadata.getDataType() == FieldSpec.DataType.STRING) {
+        throw new IllegalArgumentException("SUB transform function not supported on non-numeric types");
+      }
+
+      if (!resultMetadata.isSingleValue()) {
+        throw new IllegalArgumentException("SUB transform function must have single-valued arguments");
+      }
+
+      _secondTransformFunction = operand2;
     }
   }
 
