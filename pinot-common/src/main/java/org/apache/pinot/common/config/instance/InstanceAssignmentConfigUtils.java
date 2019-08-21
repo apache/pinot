@@ -20,13 +20,13 @@ package org.apache.pinot.common.config.instance;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.config.ReplicaGroupStrategyConfig;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.CommonConstants.Segment.AssignmentStrategy;
-import org.apache.pinot.common.utils.InstancePartitionsType;
 
 
 public class InstanceAssignmentConfigUtils {

@@ -21,17 +21,25 @@ package org.apache.pinot.controller.helix.core.rebalance;
 /**
  * Constants for rebalance user config properties
  */
-public class RebalanceUserConfigConstants {
+public class RebalanceConfigConstants {
+  // Whether to run rebalancer in dry-run mode
+  public static final String DRY_RUN = "dryRun";
+  public static final boolean DEFAULT_DRY_RUN = false;
 
-  public static final String DRYRUN = "dryRun";
-  /** Whether consuming segments should also be rebalanced or not */
+  // Whether to reassign instances
+  public static final String REASSIGN_INSTANCES = "reassignInstances";
+  public static final boolean DEFAULT_REASSIGN_INSTANCES = false;
+
+  // Whether to rebalance CONSUMING segments
   public static final String INCLUDE_CONSUMING = "includeConsuming";
-  /** Whether rebalance can have downtime */
-  public static final String DOWNTIME = "downtime";
-  public static final String MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME = "minReplicasToKeepUpForNoDowntime";
-
-  public static final boolean DEFAULT_DRY_RUN = true;
   public static final boolean DEFAULT_INCLUDE_CONSUMING = false;
+
+  // Whether to rebalance in with-downtime mode or no-downtime mode
+  public static final String DOWNTIME = "downtime";
   public static final boolean DEFAULT_DOWNTIME = false;
-  public static final int DEFAULT_MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME = 1;
+
+  // Minimum replicas to keep up for no-downtime mode, use negative number to represent the maximum replicas allowed to
+  // be unavailable
+  public static final String MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME = "minReplicasToKeepUpForNoDowntime";
+  public static final int DEFAULT_MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME = 1;
 }

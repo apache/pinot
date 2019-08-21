@@ -28,16 +28,16 @@ import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.TreeMap;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
+import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
 import org.apache.pinot.common.utils.Pairs;
-import org.apache.pinot.controller.helix.core.assignment.InstancePartitions;
 
 
 /**
  * Utility class for segment assignment.
  */
-class SegmentAssignmentUtils {
+public class SegmentAssignmentUtils {
   private SegmentAssignmentUtils() {
   }
 
@@ -216,7 +216,7 @@ class SegmentAssignmentUtils {
   /**
    * Returns the map from instance name to Helix partition state, which can be put into the segment assignment.
    */
-  static Map<String, String> getInstanceStateMap(List<String> instances, String state) {
+  public static Map<String, String> getInstanceStateMap(List<String> instances, String state) {
     Map<String, String> instanceStateMap = new TreeMap<>();
     for (String instanceName : instances) {
       instanceStateMap.put(instanceName, state);
@@ -227,7 +227,7 @@ class SegmentAssignmentUtils {
   /**
    * Returns a map from instance name to number of segments to be moved to it.
    */
-  static Map<String, Integer> getNumSegmentsToBeMovedPerInstance(Map<String, Map<String, String>> oldAssignment,
+  public static Map<String, Integer> getNumSegmentsToBeMovedPerInstance(Map<String, Map<String, String>> oldAssignment,
       Map<String, Map<String, String>> newAssignment) {
     Map<String, Integer> numSegmentsToBeMovedPerInstance = new TreeMap<>();
     for (Map.Entry<String, Map<String, String>> entry : newAssignment.entrySet()) {
