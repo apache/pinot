@@ -20,10 +20,12 @@ package org.apache.pinot.core.data.table;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -72,7 +74,7 @@ public class IndexedTable implements Table {
     _bufferedCapacity = (int) (maxCapacity * BUFFER_FACTOR);
     _evictCapacity = (int) (maxCapacity * EVICTION_FACTOR);
 
-    _records = new ArrayList<>(_bufferedCapacity);
+    _records = Collections.synchronizedList(new ArrayList<>(_bufferedCapacity));
     _lookupTable = new ConcurrentHashMap<>(_bufferedCapacity);
     _readWriteLock = new ReentrantReadWriteLock();
 
@@ -91,6 +93,12 @@ public class IndexedTable implements Table {
 
     _lookupTable.compute(newRecord, (k, index) -> {
       if (index == null && size() >= _bufferedCapacity) {
+        // It is possible that the table has more records than _bufferedCapacity momentarily
+        // For eg. if capacity = 10, and current size = 9.
+        // Multiple threads reach this check, they all see size() < _bufferedCapacity, and they all add new elements
+        // This is okay, because when the next new element is received, the table will be resized.
+        // Momentarily, we will have extra elements, but they will never exceed num parallel threads (which is very low)
+        // In order to avoid this, each new upsert needs to acquire the write lock, and we will pay a performance penalty
         _readWriteLock.writeLock().lock();
         try {
           if (size() >= _bufferedCapacity) {
@@ -100,6 +108,7 @@ public class IndexedTable implements Table {
           _readWriteLock.writeLock().unlock();
         }
       }
+
       _readWriteLock.readLock().lock();
       try {
         if (index == null) {
@@ -153,7 +162,7 @@ public class IndexedTable implements Table {
     }
 
     // evict lowest
-    _records = new ArrayList<>(_records.subList(0, _evictCapacity));
+    _records = Collections.synchronizedList(new ArrayList<>(_records.subList(0, _evictCapacity)));
     _numRecords.set(_records.size());
 
     // rebuild lookup table

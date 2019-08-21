@@ -29,7 +29,6 @@ import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 
@@ -41,11 +40,13 @@ import static org.apache.pinot.common.utils.DataSchema.*;
  */
 public class OrderByUtils {
 
+  private OrderByUtils() {
+  }
+
   /**
    * Constructs a comparator for ordering by the keys in the TableRecord::keys
    */
-  public static Comparator<Record> getKeysComparator(DataSchema dataSchema,
-      List<SelectionSort> orderBy) {
+  public static Comparator<Record> getKeysComparator(DataSchema dataSchema, List<SelectionSort> orderBy) {
 
     Map<String, Integer> columnIndexMap = new HashMap<>();
     Map<String, ColumnDataType> columnDataTypeMap = new HashMap<>();
@@ -75,8 +76,7 @@ public class OrderByUtils {
   /**
    * Constructs a comparator for ordering by the non-aggregation values in the Record::values
    */
-  public static Comparator<Record> getValuesComparator(DataSchema dataSchema,
-      List<SelectionSort> orderBy) {
+  public static Comparator<Record> getValuesComparator(DataSchema dataSchema, List<SelectionSort> orderBy) {
 
     Map<String, Integer> columnIndexMap = new HashMap<>();
     Map<String, ColumnDataType> columnDataTypeMap = new HashMap<>();
@@ -107,8 +107,8 @@ public class OrderByUtils {
    * Constructs the comparator for ordering by a combination of keys from {@link Record::_keys}
    * and aggregation values from {@link Record::values}
    */
-  public static Comparator<Record> getKeysAndValuesComparator(DataSchema dataSchema,
-      List<SelectionSort> orderBy, List<AggregationInfo> aggregationInfos) {
+  public static Comparator<Record> getKeysAndValuesComparator(DataSchema dataSchema, List<SelectionSort> orderBy,
+      List<AggregationInfo> aggregationInfos) {
 
     int numKeys = dataSchema.size() - aggregationInfos.size();
     Map<String, Integer> keyIndexMap = new HashMap<>();
@@ -161,8 +161,7 @@ public class OrderByUtils {
     return globalComparator;
   }
 
-  private static Comparator<Record> getKeysComparator(boolean ascending, int index,
-      ColumnDataType columnDataType) {
+  private static Comparator<Record> getKeysComparator(boolean ascending, int index, ColumnDataType columnDataType) {
     Comparator<Record> comparator;
     switch (columnDataType) {
       case INT:
@@ -214,8 +213,7 @@ public class OrderByUtils {
     return comparator;
   }
 
-  private static Comparator<Record> getValuesComparator(boolean ascending, int index,
-      ColumnDataType columnDataType) {
+  private static Comparator<Record> getValuesComparator(boolean ascending, int index, ColumnDataType columnDataType) {
     Comparator<Record> comparator;
     switch (columnDataType) {
       case INT:
