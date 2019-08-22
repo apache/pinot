@@ -49,6 +49,7 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.LazyOutputFormat;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.pinot.common.config.ColumnPartitionConfig;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
@@ -65,17 +66,12 @@ import org.apache.pinot.hadoop.utils.PushLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.mapreduce.MRJobConfig.*;
-import static org.apache.hadoop.security.UserGroupInformation.*;
-
 
 /**
  * A Hadoop job which provides partitioning, sorting, and resizing against the input files, which is raw data in Avro format.
  * Thus, the output files are partitioned, sorted, resized after this job.
  * In order to run this job, the following configs need to be specified in job properties:
  * * enable.preprocessing: false by default. Enables preprocessing job.
- * * preprocess.num.files: null by default. Number of files output.
- * * partition.max.records.per.file: null by default. The output file will be split into multiple files if the number of records exceeds this number.
  */
 public class SegmentPreprocessingJob extends BaseSegmentJob {
   private static final Logger _logger = LoggerFactory.getLogger(SegmentPreprocessingJob.class);
@@ -381,17 +377,18 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     fieldSet.add(hashCodeField);
   }
 
-  private void setTableConfigAndSchema() {
+  private void setTableConfigAndSchema() throws IOException {
     // If push locations, table config, and schema are not configured, this does not necessarily mean that segments
     // cannot be created. We should allow the user to go to the next step rather than failing the job.
     if (_pushLocations.isEmpty()) {
       _logger.error("Push locations cannot be empty. "
           + "They are needed to get the table config and schema needed for this step. Skipping pre-processing");
-      return;
+      throw new RuntimeException("Push locations cannot be empty.");
     }
-    ControllerRestApi controllerRestApi = new DefaultControllerRestApi(_pushLocations, _rawTableName);
-    _tableConfig = controllerRestApi.getTableConfig();
-    _pinotTableSchema = controllerRestApi.getSchema();
+    try(ControllerRestApi controllerRestApi = new DefaultControllerRestApi(_pushLocations, _rawTableName)) {
+      _tableConfig = controllerRestApi.getTableConfig();
+      _pinotTableSchema = controllerRestApi.getSchema();
+    }
 
     if (_tableConfig == null) {
       _logger.error("Table config cannot be null. Skipping pre-processing");
@@ -431,9 +428,9 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
 
     job.setJarByClass(SegmentPreprocessingJob.class);
 
-    String hadoopTokenFileLocation = System.getenv(HADOOP_TOKEN_FILE_LOCATION);
+    String hadoopTokenFileLocation = System.getenv(UserGroupInformation.HADOOP_TOKEN_FILE_LOCATION);
     if (hadoopTokenFileLocation != null) {
-      job.getConfiguration().set(MAPREDUCE_JOB_CREDENTIALS_BINARY, hadoopTokenFileLocation);
+      job.getConfiguration().set(MRJobConfig.MAPREDUCE_JOB_CREDENTIALS_BINARY, hadoopTokenFileLocation);
     }
 
     // Mapper configs.
