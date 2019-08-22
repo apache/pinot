@@ -330,7 +330,8 @@ public class ClusterIntegrationTestUtils {
     properties.put("request.required.acks", "1");
     properties.put("partitioner.class", "kafka.producer.ByteArrayPartitioner");
 
-    StreamDataProducer producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
+    StreamDataProducer producer =
+        StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
 
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
       for (File avroFile : avroFiles) {
@@ -348,7 +349,7 @@ public class ClusterIntegrationTestUtils {
             byte[] keyBytes = (partitionColumn == null) ? Longs.toByteArray(System.currentTimeMillis())
                 : (genericRecord.get(partitionColumn)).toString().getBytes();
             byte[] bytes = outputStream.toByteArray();
-            producer.produce(kafkaTopic,keyBytes,bytes);
+            producer.produce(kafkaTopic, keyBytes, bytes);
           }
         }
       }
@@ -378,7 +379,8 @@ public class ClusterIntegrationTestUtils {
     properties.put("request.required.acks", "1");
     properties.put("partitioner.class", "kafka.producer.ByteArrayPartitioner");
 
-    StreamDataProducer producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
+    StreamDataProducer producer =
+        StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
         BinaryEncoder binaryEncoder = new EncoderFactory().directBinaryEncoder(outputStream, null);
@@ -400,7 +402,7 @@ public class ClusterIntegrationTestUtils {
               : (genericRecord.get(partitionColumn)).toString().getBytes();
           byte[] bytes = outputStream.toByteArray();
 
-          producer.produce(kafkaTopic,keyBytes,bytes);
+          producer.produce(kafkaTopic, keyBytes, bytes);
           numKafkaMessagesToPush--;
         }
       }
@@ -657,7 +659,11 @@ public class ClusterIntegrationTestUtils {
       ResultSet h2ResultSet = h2statement.getResultSet();
       ResultSetMetaData h2MetaData = h2ResultSet.getMetaData();
 
-      List<String> expectedValues = new ArrayList<>();
+      List<String> orderByColumns = SelectionOperatorUtils.extractSortColumns(
+          PinotQueryParserFactory.get("pql").compileToBrokerRequest(pinotQuery).getSelections()
+              .getSelectionSortSequence());
+      Set<String> expectedValues = new HashSet<>();
+      List<String> expectedOrderByValues = new ArrayList<>();
       Map<String, String> reusableExpectedValueMap = new HashMap<>();
       Map<String, List<String>> reusableMultiValuesMap = new HashMap<>();
       List<String> reusableColumnOrder = new ArrayList<>();
@@ -708,11 +714,15 @@ public class ClusterIntegrationTestUtils {
 
         // Build expected value String
         StringBuilder expectedValue = new StringBuilder();
+        StringBuilder expectedOrderByValue = new StringBuilder();
         for (String column : reusableColumnOrder) {
           expectedValue.append(column).append(':').append(reusableExpectedValueMap.get(column)).append(' ');
+          if (orderByColumns.contains(column)) {
+            expectedOrderByValue.append(column).append(':').append(reusableExpectedValueMap.get(column)).append(' ');
+          }
         }
-
         expectedValues.add(expectedValue.toString());
+        expectedOrderByValues.add(expectedOrderByValue.toString());
       }
 
       org.apache.pinot.client.ResultSet pinotSelectionResultSet = pinotResultSetGroup.getResultSet(0);
@@ -745,6 +755,7 @@ public class ClusterIntegrationTestUtils {
         for (int rowIndex = 0; rowIndex < pinotNumRows; rowIndex++) {
           // Build actual value String.
           StringBuilder actualValueBuilder = new StringBuilder();
+          StringBuilder actualOrderByValueBuilder = new StringBuilder();
           for (int columnIndex = 0; columnIndex < numColumns; columnIndex++) {
             // Convert column name to all uppercase to make it compatible with H2
             String columnName = pinotSelectionResultSet.getColumnName(columnIndex).toUpperCase();
@@ -765,29 +776,31 @@ public class ClusterIntegrationTestUtils {
               }
               Collections.sort(multiValue);
               actualValueBuilder.append(columnName).append(':').append(multiValue.toString()).append(' ');
+              if (orderByColumns.contains(columnName)) {
+                actualOrderByValueBuilder.append(columnName).append(':').append(columnResult).append(' ');
+              }
             } else {
               // Single-value column
               actualValueBuilder.append(columnName).append(':').append(columnResult).append(' ');
+              if (orderByColumns.contains(columnName)) {
+                actualOrderByValueBuilder.append(columnName).append(':').append(columnResult).append(' ');
+              }
             }
           }
           String actualValue = actualValueBuilder.toString();
-
-          final BrokerRequest brokerRequest = PinotQueryParserFactory.get("pql").compileToBrokerRequest(pinotQuery);
-          final List<String> selectionColumns = brokerRequest.getSelections().getSelectionColumns();
-          final Set<String> orderByColumns = getOrderByColumns(brokerRequest.getOrderBy());
-
-          final List<SelectionSort> orderBy = brokerRequest.getOrderBy();
-          if ((orderBy != null) && (!orderBy.isEmpty()) && selectionColumns.containsAll(orderByColumns))  {
-            // Check actual value in expected values set
-            if (!expectedValues.get(rowIndex).equals(actualValue)) {
-              String failureMessage = String.format("Selection Order by result at row index: %d in Pinot: [ %s ] is different than result in H2: [ %s ].", rowIndex, actualValue, expectedValues.get(rowIndex));
-              failure(pinotQuery, sqlQueries, failureMessage);
-              return;
-            }
-          } else {
-            // Check actual value in expected values set
-            if (!expectedValues.contains(actualValue)) {
-              String failureMessage = "Selection result returned in Pinot but not in H2: " + actualValue;
+          String actualOrderByValue = actualOrderByValueBuilder.toString();
+          // Check actual value in expected values set
+          if (!expectedValues.contains(actualValue)) {
+            String failureMessage = "Selection result returned in Pinot but not in H2: " + actualValue;
+            failure(pinotQuery, sqlQueries, failureMessage);
+            return;
+          }
+          if (!orderByColumns.isEmpty()) {
+            // Check actual group value is the same as expected group value in the same order.
+            if (!expectedOrderByValues.get(rowIndex).equals(actualOrderByValue)) {
+              String failureMessage = String.format(
+                  "Selection Order by result at row index: %d in Pinot: [ %s ] is different than result in H2: [ %s ].",
+                  rowIndex, actualOrderByValue, expectedOrderByValues.get(rowIndex));
               failure(pinotQuery, sqlQueries, failureMessage);
               return;
             }
@@ -799,16 +812,6 @@ public class ClusterIntegrationTestUtils {
       String failureMessage = "No aggregation or selection results found for query: " + pinotQuery;
       failure(pinotQuery, sqlQueries, failureMessage);
     }
-  }
-
-  private static Set<String> getOrderByColumns(List<SelectionSort> orderBy) {
-    Set<String> res = new HashSet<>();
-    if (orderBy != null) {
-      for (SelectionSort sort : orderBy) {
-        res.add(sort.column);
-      }
-    }
-    return res;
   }
 
   /**

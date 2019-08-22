@@ -72,6 +72,7 @@ public class SelectionOperatorUtils {
   private static final String FLOAT_PATTERN = "#########0.0####";
   private static final String DOUBLE_PATTERN = "###################0.0#########";
   private static final DecimalFormatSymbols DECIMAL_FORMAT_SYMBOLS = DecimalFormatSymbols.getInstance(Locale.US);
+
   private SelectionOperatorUtils() {
   }
 
@@ -678,8 +679,10 @@ public class SelectionOperatorUtils {
 
   public static List<String> extractSortColumns(List<SelectionSort> sortSequence) {
     List<String> columns = new ArrayList<>();
-    for (SelectionSort s : sortSequence) {
-      columns.add(s.column);
+    if (sortSequence != null) {
+      for (SelectionSort s : sortSequence) {
+        columns.add(s.column);
+      }
     }
     return columns;
   }
