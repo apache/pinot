@@ -49,19 +49,25 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
+import org.apache.pinot.broker.requesthandler.PinotQueryParserFactory;
 import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
 import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.realtime.stream.StreamDataProducer;
 import org.apache.pinot.core.realtime.stream.StreamDataProvider;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.core.util.AvroUtils;
+import org.apache.pinot.pql.parsers.PQL2Parser;
 import org.apache.pinot.server.util.SegmentTestUtils;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.testng.Assert;
@@ -651,7 +657,7 @@ public class ClusterIntegrationTestUtils {
       ResultSet h2ResultSet = h2statement.getResultSet();
       ResultSetMetaData h2MetaData = h2ResultSet.getMetaData();
 
-      Set<String> expectedValues = new HashSet<>();
+      List<String> expectedValues = new ArrayList<>();
       Map<String, String> reusableExpectedValueMap = new HashMap<>();
       Map<String, List<String>> reusableMultiValuesMap = new HashMap<>();
       List<String> reusableColumnOrder = new ArrayList<>();
@@ -766,11 +772,25 @@ public class ClusterIntegrationTestUtils {
           }
           String actualValue = actualValueBuilder.toString();
 
-          // Check actual value in expected values set
-          if (!expectedValues.contains(actualValue)) {
-            String failureMessage = "Selection result returned in Pinot but not in H2: " + actualValue;
-            failure(pinotQuery, sqlQueries, failureMessage);
-            return;
+          final BrokerRequest brokerRequest = PinotQueryParserFactory.get("pql").compileToBrokerRequest(pinotQuery);
+          final List<String> selectionColumns = brokerRequest.getSelections().getSelectionColumns();
+          final Set<String> orderByColumns = getOrderByColumns(brokerRequest.getOrderBy());
+
+          final List<SelectionSort> orderBy = brokerRequest.getOrderBy();
+          if ((orderBy != null) && (!orderBy.isEmpty()) && selectionColumns.containsAll(orderByColumns))  {
+            // Check actual value in expected values set
+            if (!expectedValues.get(rowIndex).equals(actualValue)) {
+              String failureMessage = String.format("Selection Order by result at row index: %d in Pinot: [ %s ] is different than result in H2: [ %s ].", rowIndex, actualValue, expectedValues.get(rowIndex));
+              failure(pinotQuery, sqlQueries, failureMessage);
+              return;
+            }
+          } else {
+            // Check actual value in expected values set
+            if (!expectedValues.contains(actualValue)) {
+              String failureMessage = "Selection result returned in Pinot but not in H2: " + actualValue;
+              failure(pinotQuery, sqlQueries, failureMessage);
+              return;
+            }
           }
         }
       }
@@ -779,6 +799,16 @@ public class ClusterIntegrationTestUtils {
       String failureMessage = "No aggregation or selection results found for query: " + pinotQuery;
       failure(pinotQuery, sqlQueries, failureMessage);
     }
+  }
+
+  private static Set<String> getOrderByColumns(List<SelectionSort> orderBy) {
+    Set<String> res = new HashSet<>();
+    if (orderBy != null) {
+      for (SelectionSort sort : orderBy) {
+        res.add(sort.column);
+      }
+    }
+    return res;
   }
 
   /**
