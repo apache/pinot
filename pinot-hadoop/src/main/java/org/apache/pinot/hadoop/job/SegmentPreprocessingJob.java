@@ -67,18 +67,15 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.mapreduce.MRJobConfig.*;
 import static org.apache.hadoop.security.UserGroupInformation.*;
-import static org.apache.pinot.hadoop.job.InternalConfigConstants.*;
 
 
 /**
  * A Hadoop job which provides partitioning, sorting, and resizing against the input files, which is raw data in Avro format.
  * Thus, the output files are partitioned, sorted, resized after this job.
  * In order to run this job, the following configs need to be specified in job properties:
- * * enable.partitioning: false by default. If enabled, this job will fetch the partition config from table config.
- * * enable.sorting: false by default. If enabled, the job will fetch sorted column from table config.
- * * enable.resizing: false by default. If partitioning is enabled, this is force to be disabled. If enabled, min.num.output.files is required.
- * * min.num.output.files: null by default. It's required if resizing is enabled.
- * * max.num.records: null by default. The output file will be split into multiple files if the number of records exceeded max.num.records.
+ * * enable.preprocessing: false by default. Enables preprocessing job.
+ * * preprocess.num.files: null by default. Number of files output.
+ * * partition.max.records.per.file: null by default. The output file will be split into multiple files if the number of records exceeds this number.
  */
 public class SegmentPreprocessingJob extends BaseSegmentJob {
   private static final Logger _logger = LoggerFactory.getLogger(SegmentPreprocessingJob.class);
@@ -188,13 +185,13 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     // Partition configs.
     int numReduceTasks = (_numberOfPartitions != 0) ? _numberOfPartitions : inputDataPaths.size();
     if (_partitionColumn != null) {
-      job.getConfiguration().set(ENABLE_PARTITIONING, "true");
+      job.getConfiguration().set(InternalConfigConstants.ENABLE_PARTITIONING, "true");
       job.setPartitionerClass(GenericPartitioner.class);
-      job.getConfiguration().set(PARTITION_COLUMN_CONFIG, _partitionColumn);
+      job.getConfiguration().set(InternalConfigConstants.PARTITION_COLUMN_CONFIG, _partitionColumn);
       if (_partitionFunction != null) {
-        job.getConfiguration().set(PARTITION_FUNCTION_CONFIG, _partitionFunction);
+        job.getConfiguration().set(InternalConfigConstants.PARTITION_FUNCTION_CONFIG, _partitionFunction);
       }
-      job.getConfiguration().set(NUM_PARTITIONS_CONFIG, Integer.toString(numReduceTasks));
+      job.getConfiguration().set(InternalConfigConstants.NUM_PARTITIONS_CONFIG, Integer.toString(numReduceTasks));
       setMaxNumRecordsConfigIfSpecified(job);
     } else {
       if (_numberOfOutputFiles > 0) {
@@ -212,7 +209,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     // Sort config.
     if (_sortedColumn != null) {
       _logger.info("Adding sorted column: {} to job config", _sortedColumn);
-      job.getConfiguration().set(SORTED_COLUMN_CONFIG, _sortedColumn);
+      job.getConfiguration().set(InternalConfigConstants.SORTED_COLUMN_CONFIG, _sortedColumn);
 
       addSortedColumnField(avroSchema, fieldSet);
     } else {
@@ -285,9 +282,9 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       return;
     }
     Map<String, String> customConfigsMap = tableCustomConfig.getCustomConfigs();
-    if (customConfigsMap != null && customConfigsMap.containsKey("min.num.output.files")) {
-      _numberOfOutputFiles = Integer.parseInt(customConfigsMap.get("min.num.output.files"));
-      Preconditions.checkArgument(_numberOfOutputFiles > 0, String.format("The value of min.num.output.files should be positive! Current value: %s", customConfigsMap.get("min.num.output.files")));
+    if (customConfigsMap != null && customConfigsMap.containsKey(InternalConfigConstants.PREPROCESS_NUM_FILES)) {
+      _numberOfOutputFiles = Integer.parseInt(customConfigsMap.get(InternalConfigConstants.PREPROCESS_NUM_FILES));
+      Preconditions.checkArgument(_numberOfOutputFiles > 0, String.format("The value of %s should be positive! Current value: %s", InternalConfigConstants.PREPROCESS_NUM_FILES, customConfigsMap.get(InternalConfigConstants.PREPROCESS_NUM_FILES)));
     } else {
       _numberOfOutputFiles = 0;
     }
@@ -299,11 +296,11 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       return;
     }
     Map<String, String> customConfigsMap = tableCustomConfig.getCustomConfigs();
-    if (customConfigsMap != null && customConfigsMap.containsKey("max.num.records")) {
-      int maxNumRecords = Integer.parseInt(customConfigsMap.get("max.num.records"));
-      Preconditions.checkArgument(maxNumRecords > 0, "The value of max.num.records should be positive. Current value: " + customConfigsMap.get("max.num.records"));
-      _logger.info("Setting max.num.records to {}", maxNumRecords);
-      job.getConfiguration().set("max.num.records", Integer.toString(maxNumRecords));
+    if (customConfigsMap != null && customConfigsMap.containsKey(InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE)) {
+      int maxNumRecords = Integer.parseInt(customConfigsMap.get(InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE));
+      Preconditions.checkArgument(maxNumRecords > 0, "The value of " + InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE + " should be positive. Current value: " + customConfigsMap.get(InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE));
+      _logger.info("Setting {} to {}", InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE, maxNumRecords);
+      job.getConfiguration().set(InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE, Integer.toString(maxNumRecords));
     }
   }
 
@@ -414,14 +411,14 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     // the job should be disabled, as we should not resize for these use cases. Therefore, setting the time column name
     // and value
     if (validationConfig.getSegmentPushType().equalsIgnoreCase("APPEND")) {
-      job.getConfiguration().set(IS_APPEND, "true");
+      job.getConfiguration().set(InternalConfigConstants.IS_APPEND, "true");
       String timeColumnName = _pinotTableSchema.getTimeFieldSpec().getName();
-      job.getConfiguration().set(TIME_COLUMN_CONFIG, timeColumnName);
-      job.getConfiguration().set(SEGMENT_TIME_TYPE, validationConfig.getTimeType().toString());
-      job.getConfiguration().set(SEGMENT_TIME_FORMAT, _pinotTableSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeFormat());
-      job.getConfiguration().set(SEGMENT_PUSH_FREQUENCY, validationConfig.getSegmentPushFrequency());
+      job.getConfiguration().set(InternalConfigConstants.TIME_COLUMN_CONFIG, timeColumnName);
+      job.getConfiguration().set(InternalConfigConstants.SEGMENT_TIME_TYPE, validationConfig.getTimeType().toString());
+      job.getConfiguration().set(InternalConfigConstants.SEGMENT_TIME_FORMAT, _pinotTableSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeFormat());
+      job.getConfiguration().set(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY, validationConfig.getSegmentPushFrequency());
       _dataStreamReader = getAvroReader(path);
-      job.getConfiguration().set(TIME_COLUMN_VALUE, (String) _dataStreamReader.next().get(timeColumnName));
+      job.getConfiguration().set(InternalConfigConstants.TIME_COLUMN_VALUE, (String) _dataStreamReader.next().get(timeColumnName));
     }
   }
 

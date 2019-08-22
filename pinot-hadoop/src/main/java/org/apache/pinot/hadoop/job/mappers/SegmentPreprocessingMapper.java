@@ -43,7 +43,7 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
   private String _timeColumn = null;
   private Schema _outputKeySchema;
   private Schema _outputSchema;
-  private boolean _enablePartitioning = false;
+  private boolean _enablePartitioning;
   private String _sampleNormalizedTimeColumnValue = null;
   private NormalizedDateSegmentNameGenerator _normalizedDateSegmentNameGenerator = null;
   private boolean _isAppend = false;
@@ -78,7 +78,7 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
     }
     _outputKeySchema = AvroJob.getMapOutputKeySchema(configuration);
     _outputSchema = AvroJob.getMapOutputValueSchema(configuration);
-    _enablePartitioning = Boolean.parseBoolean(configuration.get(ENABLE_PARTITIONING));
+    _enablePartitioning = Boolean.parseBoolean(configuration.get(ENABLE_PARTITIONING, "false"));
   }
 
   @Override

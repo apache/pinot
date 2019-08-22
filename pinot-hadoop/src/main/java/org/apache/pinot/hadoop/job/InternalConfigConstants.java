@@ -37,4 +37,9 @@ public class InternalConfigConstants {
 
   public static final String SORTED_COLUMN_CONFIG = "sorted.column";
   public static final String ENABLE_PARTITIONING = "enable.partitioning";
+
+  // max records per file in each partition
+  public static final String PARTITION_MAX_RECORDS_PER_FILE = "partition.max.records.per.file";
+
+  public static final String PREPROCESS_NUM_FILES = "preprocess.num.files";
 }
