@@ -24,6 +24,13 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
@@ -38,8 +45,98 @@ import org.testng.annotations.Test;
 public class IndexedTableTest {
 
   @Test
-  public void testIndexedTable() {
+  public void testConcurrentIndexedTable() throws InterruptedException, TimeoutException, ExecutionException {
     Table indexedTable = new ConcurrentIndexedTable();
+
+    DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE,
+            ColumnDataType.DOUBLE});
+
+    AggregationInfo agg1 = new AggregationInfo();
+    Map<String, String> params1 = new HashMap<>();
+    params1.put("column", "m1");
+    agg1.setAggregationParams(params1);
+    agg1.setAggregationType("sum");
+    AggregationInfo agg2 = new AggregationInfo();
+    Map<String, String> params2 = new HashMap<>();
+    params2.put("column", "m2");
+    agg2.setAggregationParams(params2);
+    agg2.setAggregationType("max");
+    List<AggregationInfo> aggregationInfos = Lists.newArrayList(agg1, agg2);
+
+    SelectionSort sel = new SelectionSort();
+    sel.setColumn("sum(m1)");
+    sel.setIsAsc(true);
+    List<SelectionSort> orderBy = Lists.newArrayList(sel);
+
+    // max capacity 10, evict at 12, evict until 11
+    indexedTable.init(dataSchema, aggregationInfos, orderBy, 10);
+
+    // 3 threads upsert together
+    // a inserted 6 times (60), b inserted 5 times (50), d inserted 2 times (20)
+    // buffered capacity 12.
+    // inserting 14 unique records
+    // c (10000) and f (20000) should be trimmed out before size()
+    // a (60) and i (500) trimmed out after size()
+
+    ExecutorService executorService = Executors.newFixedThreadPool(10);
+    try {
+      Callable<Void> c1 = () -> {
+        indexedTable.upsert(new Record(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
+        indexedTable.upsert(new Record(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
+        indexedTable.upsert(new Record(new Object[]{"c", 3, 30d}, new Object[]{10000d, 300d})); // eviction candidate
+        indexedTable.upsert(new Record(new Object[]{"d", 4, 40d}, new Object[]{10d, 400d}));
+        indexedTable.upsert(new Record(new Object[]{"d", 4, 40d}, new Object[]{10d, 400d}));
+        indexedTable.upsert(new Record(new Object[]{"e", 5, 50d}, new Object[]{10d, 500d}));
+        return null;
+      };
+
+      Callable<Void> c2 = () -> {
+        indexedTable.upsert(new Record(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
+        indexedTable.upsert(new Record(new Object[]{"f", 6, 60d}, new Object[]{20000d, 600d})); // eviction candidate
+        indexedTable.upsert(new Record(new Object[]{"g", 7, 70d}, new Object[]{10d, 700d}));
+        indexedTable.upsert(new Record(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
+        indexedTable.upsert(new Record(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
+        indexedTable.upsert(new Record(new Object[]{"h", 8, 80d}, new Object[]{10d, 800d}));
+        indexedTable.upsert(new Record(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
+        indexedTable.upsert(new Record(new Object[]{"i", 9, 90d}, new Object[]{500d, 900d}));
+        return null;
+      };
+
+      Callable<Void> c3 = () -> {
+        indexedTable.upsert(new Record(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
+        indexedTable.upsert(new Record(new Object[]{"j", 10, 100d}, new Object[]{10d, 1000d}));
+        indexedTable.upsert(new Record(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
+        indexedTable.upsert(new Record(new Object[]{"k", 11, 110d}, new Object[]{10d, 1100d}));
+        indexedTable.upsert(new Record(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
+        indexedTable.upsert(new Record(new Object[]{"l", 12, 120d}, new Object[]{10d, 1200d}));
+        indexedTable.upsert(new Record(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d})); // trimming candidate
+        indexedTable.upsert(new Record(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
+        indexedTable.upsert(new Record(new Object[]{"m", 13, 130d}, new Object[]{10d, 1300d}));
+        indexedTable.upsert(new Record(new Object[]{"n", 14, 140d}, new Object[]{10d, 1400d}));
+        return null;
+      };
+
+      List<Future<Void>> futures = executorService.invokeAll(Lists.newArrayList(c1, c2, c3));
+      for (Future future : futures) {
+        future.get(10, TimeUnit.SECONDS);
+      }
+      Assert.assertEquals(indexedTable.size(), 12);
+
+      indexedTable.finish();
+      Assert.assertEquals(indexedTable.size(), 10);
+      checkSurvivors(indexedTable, "a", "i", "c", "f");
+      checkAggregations(indexedTable, Lists.newArrayList(10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d, 20d, 50d));
+
+    } finally {
+      executorService.shutdown();
+    }
+  }
+
+
+  @Test
+  public void testSimpleIndexedTable() {
+    Table indexedTable = new SimpleIndexedTable();
 
     DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"},
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE,
@@ -138,6 +235,10 @@ public class IndexedTableTest {
 
     // check aggregations
     checkAggregations(indexedTable, Lists.newArrayList(10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d));
+
+    // finish
+    indexedTable.finish();
+    Assert.assertEquals(indexedTable.size(), 10);
   }
 
   private void checkAggregations(Table indexedTable, List<Double> expectedAgg) {
