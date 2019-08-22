@@ -37,7 +37,7 @@ public class StringSelectionColumnIterator implements SelectionColumnIterator {
   public StringSelectionColumnIterator(Block block) {
     _dataType = block.getMetadata().getDataType();
     Preconditions
-        .checkArgument(_dataType.equals(FieldSpec.DataType.STRING) || _dataType.equals(FieldSpec.DataType.BYTES),
+        .checkArgument(_dataType.equals(FieldSpec.DataType.STRING),
             "Illegal data type for StringSelectionColumnIterator: " + _dataType);
     bvIter = (BlockSingleValIterator) block.getBlockValueSet().iterator();
   }
@@ -45,12 +45,6 @@ public class StringSelectionColumnIterator implements SelectionColumnIterator {
   @Override
   public Serializable getValue(int docId) {
     bvIter.skipTo(docId);
-
-    if (_dataType.equals(FieldSpec.DataType.BYTES)) {
-      // byte[] is converted to equivalent Hex String for selection queries.
-      return BytesUtils.toHexString(bvIter.nextBytesVal());
-    } else {
-      return bvIter.nextStringVal();
-    }
+    return bvIter.nextStringVal();
   }
 }

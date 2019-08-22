@@ -18,32 +18,33 @@
  */
 package org.apache.pinot.core.query.selection.iterator;
 
+import com.clearspring.analytics.util.Preconditions;
 import java.io.Serializable;
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockSingleValIterator;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
-import org.apache.pinot.common.utils.BytesUtils;
 
 
 /**
- * Iterator on single-value column with dictionary for selection query.
+ * Iterator on bytes no dictionary column selection query.
  *
  */
-public class SelectionSingleValueColumnWithDictIterator implements SelectionColumnIterator {
-  protected BlockSingleValIterator _blockSingleValIterator;
-  protected Dictionary _dictionary;
+public class BytesSelectionColumnIterator implements SelectionColumnIterator {
   private final FieldSpec.DataType _dataType;
+  protected BlockSingleValIterator bvIter;
 
-  public SelectionSingleValueColumnWithDictIterator(Block block) {
-    _blockSingleValIterator = (BlockSingleValIterator) block.getBlockValueSet().iterator();
+  public BytesSelectionColumnIterator(Block block) {
     _dataType = block.getMetadata().getDataType();
-    _dictionary = block.getMetadata().getDictionary();
+    Preconditions
+        .checkArgument(_dataType.equals(FieldSpec.DataType.BYTES),
+            "Illegal data type for BytesSelectionColumnIterator: " + _dataType);
+    bvIter = (BlockSingleValIterator) block.getBlockValueSet().iterator();
   }
 
   @Override
   public Serializable getValue(int docId) {
-    _blockSingleValIterator.skipTo(docId);
-    return (Serializable) _dictionary.get(_blockSingleValIterator.nextIntVal());
+    bvIter.skipTo(docId);
+    return bvIter.nextBytesVal();
   }
 }

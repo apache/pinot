@@ -39,6 +39,7 @@ import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.response.broker.SelectionResults;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.DataSourceMetadata;
@@ -248,8 +249,10 @@ public class SelectionOperatorUtils {
             dataTableBuilder.setColumn(i, ((Number) columnValue).doubleValue());
             break;
           case STRING:
-          case BYTES: // BYTES are already converted to String for Selection, before reaching this layer.
             dataTableBuilder.setColumn(i, ((String) columnValue));
+            break;
+          case BYTES:
+            dataTableBuilder.setColumn(i, BytesUtils.toHexString((byte[]) columnValue));
             break;
 
           // Multi-value column.
@@ -649,6 +652,10 @@ public class SelectionOperatorUtils {
             formattedValue[i] = doubleFormat(doubles[i]);
           }
           return formattedValue;
+        }
+      case BYTES:
+        if (value instanceof byte[]) {
+          return BytesUtils.toHexString((byte[]) value);
         }
       default:
         // For STRING and STRING_ARRAY, no need to format.
