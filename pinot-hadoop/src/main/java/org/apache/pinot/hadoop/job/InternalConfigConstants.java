@@ -36,4 +36,5 @@ public class InternalConfigConstants {
   public static final String PARTITION_FUNCTION_CONFIG = "partition.function";
 
   public static final String SORTED_COLUMN_CONFIG = "sorted.column";
+  public static final String ENABLE_PARTITIONING = "enable.partitioning";
 }

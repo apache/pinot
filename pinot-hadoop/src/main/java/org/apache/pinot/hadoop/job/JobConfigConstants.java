@@ -54,9 +54,7 @@ public class JobConfigConstants {
   // The path to the record reader to be configured
   public static final String RECORD_READER_PATH = "record.reader.path";
 
-  public static final String ENABLE_PARTITIONING = "enable.partitioning";
-  public static final String ENABLE_SORTING = "enable.sorting";
-  public static final String ENABLE_RESIZING = "enable.resizing";
+  public static final String ENABLE_PREPROCESSING = "enable.preprocessing";
 
   // This setting should be used if you will generate less # of segments after
   // push. In preprocessing, this is likely because we resize segments.

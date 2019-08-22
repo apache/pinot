@@ -35,7 +35,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.hadoop.job.InternalConfigConstants.*;
-import static org.apache.pinot.hadoop.job.JobConfigConstants.*;
 
 
 public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, NullWritable, AvroKey<GenericRecord>, AvroValue<GenericRecord>> {
@@ -44,7 +43,7 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
   private String _timeColumn = null;
   private Schema _outputKeySchema;
   private Schema _outputSchema;
-  private boolean _enablePartition = false;
+  private boolean _enablePartitioning = false;
   private String _sampleNormalizedTimeColumnValue = null;
   private NormalizedDateSegmentNameGenerator _normalizedDateSegmentNameGenerator = null;
   private boolean _isAppend = false;
@@ -79,8 +78,7 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
     }
     _outputKeySchema = AvroJob.getMapOutputKeySchema(configuration);
     _outputSchema = AvroJob.getMapOutputValueSchema(configuration);
-    _enablePartition = Boolean.parseBoolean(configuration.get(ENABLE_PARTITIONING));
-    LOGGER.info("Enable partitioning? " + _enablePartition);
+    _enablePartitioning = Boolean.parseBoolean(configuration.get(ENABLE_PARTITIONING));
   }
 
   @Override
@@ -107,7 +105,7 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
     GenericRecord outputKey = new GenericData.Record(_outputKeySchema);
     if (_sortedColumn == null) {
       outputKey.put("hashcode", inputRecord.hashCode());
-    } else if (_enablePartition) {
+    } else if (_enablePartitioning) {
       outputKey.put(_sortedColumn, inputRecord.get(_sortedColumn));
     } else {
       outputKey.put(_sortedColumn, inputRecord.get(_sortedColumn));
