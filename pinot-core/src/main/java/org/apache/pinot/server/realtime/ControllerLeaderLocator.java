@@ -37,20 +37,20 @@ public class ControllerLeaderLocator {
   private static ControllerLeaderLocator _instance = null;
   public static final Logger LOGGER = LoggerFactory.getLogger(ControllerLeaderLocator.class);
 
-  private final HelixManager _helixManager;
-
-  // Co-ordinates of the last known controller leader.
-  private Pair<String, Integer> _controllerLeaderHostPort = null;
-
-  // Indicates whether cached controller leader value is invalid
-  private volatile boolean _cachedControllerLeaderInvalid = true;
-  // Time in millis when cache invalidate was last set
-  private volatile long _lastCacheInvalidateMillis = 0;
   // Minimum millis which must elapse between consecutive invalidation of cache
   private static final long MILLIS_BETWEEN_INVALIDATE = 30_000;
 
+  private final HelixManager _helixManager;
+
+  // Indicates whether cached controller leader value is valid. If so, caches the host-port pair as the last known controller leader.
+  private final Map<String, Pair<String, Integer>> _cachedValidControllerLeaderMap;
+
+  // Time in millis when cache invalidate was last set
+  private volatile long _lastCacheInvalidateMillis = 0;
+
   ControllerLeaderLocator(HelixManager helixManager) {
     _helixManager = helixManager;
+    _cachedValidControllerLeaderMap = new ConcurrentHashMap<>();
   }
 
   /**
@@ -76,26 +76,27 @@ public class ControllerLeaderLocator {
 
   /**
    * Locates the controller leader so that we can send LLC segment completion requests to it.
-   * Checks the {@link ControllerLeaderLocator::_cachedControllerLeaderInvalid} flag and fetches the leader from helix if cached value is invalid
+   * Checks the {@link ControllerLeaderLocator::_cachedValidControllerLeaderMap} and fetches the leader from helix if cached value is invalid or missing.
    * @param rawTableName table name without type.
    * @return The host-port pair of the current controller leader.
    */
   public synchronized Pair<String, Integer> getControllerLeader(String rawTableName) {
-    if (!_cachedControllerLeaderInvalid) {
-      return _controllerLeaderHostPort;
+    Pair<String, Integer> leaderPairForTable = _cachedValidControllerLeaderMap.get(rawTableName);
+    if (leaderPairForTable != null) {
+      return leaderPairForTable;
     }
 
-    Pair<String, Integer> leaderForTable = getLeaderForTable(rawTableName);
-    if (leaderForTable == null) {
+    // No controller leader cached, fetches a fresh one for given table.
+    leaderPairForTable = getLeaderForTable(rawTableName);
+    if (leaderPairForTable == null) {
       LOGGER.warn("Failed to find a leader for Table: {}", rawTableName);
-      _cachedControllerLeaderInvalid = true;
+      _cachedValidControllerLeaderMap.remove(rawTableName);
       return null;
     } else {
-      _controllerLeaderHostPort = leaderForTable;
-      _cachedControllerLeaderInvalid = false;
-      LOGGER.info("Setting controller leader to be {}:{}", _controllerLeaderHostPort.getFirst(),
-          _controllerLeaderHostPort.getSecond());
-      return _controllerLeaderHostPort;
+      _cachedValidControllerLeaderMap.put(rawTableName, leaderPairForTable);
+      LOGGER.info("Setting controller leader to be {}:{} for Table: {}", leaderPairForTable.getFirst(),
+          leaderPairForTable.getSecond(), rawTableName);
+      return leaderPairForTable;
     }
   }
 
@@ -135,7 +136,7 @@ public class ControllerLeaderLocator {
     if (leaderHostAndPortPair != null) {
       return leaderHostAndPortPair;
     } else {
-      LOGGER.warn("Could not locate leader for table: {}", rawTableName);
+      LOGGER.warn("Could not locate leader for Table: {}", rawTableName);
       return null;
     }
   }
@@ -181,7 +182,7 @@ public class ControllerLeaderLocator {
       LOGGER
           .warn("There is no controller in MASTER state for partition: {} in lead controller resource", partitionName);
     } catch (Exception e) {
-      LOGGER.warn("Caught exception when getting lead controller instance Id for table: {}", rawTableName, e);
+      LOGGER.warn("Caught exception when getting lead controller instance Id for Table: {}", rawTableName, e);
     }
     return null;
   }
@@ -202,30 +203,31 @@ public class ControllerLeaderLocator {
   }
 
   /**
-   * Invalidates the cached controller leader value by setting the {@link ControllerLeaderLocator::_cacheControllerLeadeInvalid} flag.
+   * Invalidates the cached controller leader value by removing the existing pair from {@link ControllerLeaderLocator::_cachedValidControllerLeaderMap}.
    * This flag is always checked first by {@link ControllerLeaderLocator::getControllerLeader()} method before returning the leader. If set, leader is fetched from helix, else cached leader value is returned.
    *
    * Invalidates are not allowed more frequently than {@link ControllerLeaderLocator::MILLIS_BETWEEN_INVALIDATE} millis.
    * The cache is invalidated whenever server gets NOT_LEADER or NOT_SENT response. A NOT_LEADER response definitely needs a cache refresh. However, a NOT_SENT response could also happen for reasons other than controller not being leader.
    * Thus the frequency limiting is done to guard against frequent cache refreshes, in cases where we might be getting too many NOT_SENT responses due to some other errors.
+   * @param rawTableName raw table name.
    */
-  public synchronized void invalidateCachedControllerLeader() {
+  public synchronized void invalidateCachedControllerLeader(String rawTableName) {
     long now = System.currentTimeMillis();
     long millisSinceLastInvalidate = now - _lastCacheInvalidateMillis;
     if (millisSinceLastInvalidate < MILLIS_BETWEEN_INVALIDATE) {
       LOGGER.info(
-          "Millis since last controller cache value invalidate {} is less than allowed frequency {}. Skipping invalidate.",
-          millisSinceLastInvalidate, MILLIS_BETWEEN_INVALIDATE);
+          "Millis since last controller cache value invalidate {} is less than allowed frequency {}. Skipping invalidate for Table: {}.",
+          millisSinceLastInvalidate, MILLIS_BETWEEN_INVALIDATE, rawTableName);
     } else {
-      LOGGER.info("Invalidating cached controller leader value");
-      _cachedControllerLeaderInvalid = true;
+      LOGGER.info("Invalidating cached controller leader value for Table: {}", rawTableName);
+      _cachedValidControllerLeaderMap.remove(rawTableName);
       _lastCacheInvalidateMillis = now;
     }
   }
 
   @VisibleForTesting
-  protected boolean isCachedControllerLeaderInvalid() {
-    return _cachedControllerLeaderInvalid;
+  protected boolean isCachedControllerLeaderInvalid(String rawTableName) {
+    return !_cachedValidControllerLeaderMap.containsKey(rawTableName);
   }
 
   @VisibleForTesting
@@ -239,7 +241,7 @@ public class ControllerLeaderLocator {
   }
 
   @VisibleForTesting
-  protected void setLastCacheInvalidateMillis(long lastCacheInvalidateMillis) {
+  public void setLastCacheInvalidateMillis(long lastCacheInvalidateMillis) {
     _lastCacheInvalidateMillis = lastCacheInvalidateMillis;
   }
 }
