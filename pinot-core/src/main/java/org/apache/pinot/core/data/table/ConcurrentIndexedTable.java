@@ -25,7 +25,6 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -42,7 +41,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 /**
  * {@link Table} implementation for aggregating TableRecords based on combination of keys
  */
-public class IndexedTable implements Table {
+public class ConcurrentIndexedTable implements Table {
 
   // When table reaches max capacity, we will allow 20% more records to get inserted (bufferedCapacity)
   // If records beyond bufferedCapacity are received, the table will undergo sort and evict upto evictCapacity (10% more than capacity)
@@ -61,6 +60,7 @@ public class IndexedTable implements Table {
   private List<AggregationInfo> _aggregationInfos;
   private List<AggregationFunction> _aggregationFunctions;
   private List<SelectionSort> _orderBy;
+  private int _maxCapacity;
   private int _evictCapacity;
   private int _bufferedCapacity;
 
@@ -71,6 +71,7 @@ public class IndexedTable implements Table {
     _aggregationInfos = aggregationInfos;
     _orderBy = orderBy;
 
+    _maxCapacity = maxCapacity;
     _bufferedCapacity = (int) (maxCapacity * BUFFER_FACTOR);
     _evictCapacity = (int) (maxCapacity * EVICTION_FACTOR);
 
@@ -102,7 +103,7 @@ public class IndexedTable implements Table {
         _readWriteLock.writeLock().lock();
         try {
           if (size() >= _bufferedCapacity) {
-            resize();
+            resize(_evictCapacity);
           }
         } finally {
           _readWriteLock.writeLock().unlock();
@@ -153,7 +154,7 @@ public class IndexedTable implements Table {
     return _records.iterator();
   }
 
-  private void resize() {
+  private void resize(int size) {
     // sort
     if (CollectionUtils.isNotEmpty(_orderBy)) {
       Comparator<Record> comparator;
@@ -162,7 +163,9 @@ public class IndexedTable implements Table {
     }
 
     // evict lowest
-    _records = Collections.synchronizedList(new ArrayList<>(_records.subList(0, _evictCapacity)));
+    if (_records.size() > size) {
+      _records = Collections.synchronizedList(new ArrayList<>(_records.subList(0, size)));
+    }
     _numRecords.set(_records.size());
 
     // rebuild lookup table
@@ -170,5 +173,10 @@ public class IndexedTable implements Table {
     for (int i = 0; i < _records.size(); i++) {
       _lookupTable.put(_records.get(i), i);
     }
+  }
+
+  @Override
+  public void finish() {
+    resize(_maxCapacity);
   }
 }

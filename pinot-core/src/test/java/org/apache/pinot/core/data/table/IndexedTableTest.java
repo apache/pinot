@@ -39,7 +39,7 @@ public class IndexedTableTest {
 
   @Test
   public void testIndexedTable() {
-    Table indexedTable = new IndexedTable();
+    Table indexedTable = new ConcurrentIndexedTable();
 
     DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"},
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE,
@@ -117,7 +117,7 @@ public class IndexedTableTest {
     checkAggregations(indexedTable, Lists.newArrayList(10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d, 20d, 10d));
 
     // merge table
-    Table mergeTable = new IndexedTable();
+    Table mergeTable = new ConcurrentIndexedTable();
     mergeTable.init(dataSchema, aggregationInfos, orderBy, 10);
     // repeat record j
     mergeTable.upsert(new Record(new Object[]{"j", 10, 100d}, new Object[]{10d, 1000d}));

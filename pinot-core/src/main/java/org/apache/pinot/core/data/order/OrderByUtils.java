@@ -38,7 +38,7 @@ import static org.apache.pinot.common.utils.DataSchema.*;
 /**
  * Helper methods to perform order by of list of {@link Record}
  */
-public class OrderByUtils {
+public final class OrderByUtils {
 
   private OrderByUtils() {
   }

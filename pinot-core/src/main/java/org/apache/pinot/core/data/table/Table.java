@@ -60,4 +60,9 @@ public interface Table {
    * An iterator for the {@link Record}s in the table
    */
   Iterator<Record> iterator();
+
+  /**
+   * Finish any pre exit processing
+   */
+  public void finish();
 }
