@@ -16,16 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.helix.core.sharding;
+package org.apache.pinot.common.assignment;
 
 /**
- * Supported SegmentAssignmentStrategies.
- *
- *
+ * The type of the instance partitions.
+ * <p>
+ *   The instance partitions name will be of the format {@code <rawTableName>_<instancePartitionsType>}, e.g.
+ *   {@code table_OFFLINE}, {@code table_CONSUMING}, {@code table_COMPLETED}.
  */
-public enum SegmentAssignmentStrategyEnum {
-  RandomAssignmentStrategy,
-  BalanceNumSegmentAssignmentStrategy,
-  BucketizedSegmentAssignmentStrategy,
-  ReplicaGroupSegmentAssignmentStrategy
+public enum InstancePartitionsType {
+  OFFLINE,    // For (ONLINE) segments from offline table
+  CONSUMING,  // For consuming (CONSUMING) segments from LLC real-time table
+  COMPLETED;  // For completed (ONLINE) segments from LLC real-time table
+
+  public static final char TYPE_SUFFIX_SEPARATOR = '_';
+
+  public String getInstancePartitionsName(String rawTableName) {
+    return rawTableName + TYPE_SUFFIX_SEPARATOR + name();
+  }
 }

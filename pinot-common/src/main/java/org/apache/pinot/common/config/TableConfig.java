@@ -30,11 +30,11 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.helix.ZNRecord;
+import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfigMapChildKeyHandler;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.EqualityUtils;
-import org.apache.pinot.common.utils.InstancePartitionsType;
 import org.apache.pinot.common.utils.JsonUtils;
 
 

@@ -27,6 +27,7 @@ import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.testng.Assert;
@@ -44,6 +45,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   // NOTE: to add HLC realtime table, number of Server instances must be multiple of number of replicas
   private static final int NUM_SERVER_INSTANCES = 6;
 
+  private static final String OFFLINE_TABLE_NAME = "testOfflineTable";
   private static final String REALTIME_TABLE_NAME = "testRealtimeTable";
   private final TableConfig.Builder _offlineBuilder = new TableConfig.Builder(TableType.OFFLINE);
   private final TableConfig.Builder _realtimeBuilder = new TableConfig.Builder(TableType.REALTIME);
@@ -61,7 +63,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
 
-    _offlineBuilder.setTableName("testOfflineTable").setTimeColumnName("timeColumn").setTimeType("DAYS")
+    _offlineBuilder.setTableName(OFFLINE_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS")
         .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5");
 
     // add schema for realtime table
@@ -253,51 +255,22 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   }
 
   @Test(expectedExceptions = FileNotFoundException.class)
-  public void rebalanceNonExistentOfflineTable()
-      throws IOException {
-    String tableName = "nonExistentTable";
-    // should result in file not found exception
-    sendPostRequest(_controllerRequestURLBuilder.forTableRebalance(tableName, "offline"), null);
-  }
-
-  @Test(expectedExceptions = FileNotFoundException.class)
-  public void rebalanceNonExistentRealtimeTable()
-      throws IOException {
-    String tableName = "nonExistentTable";
-    // should result in file not found exception
-    sendPostRequest(_controllerRequestURLBuilder.forTableRebalance(tableName, "realtime"), null);
+  public void rebalanceNonExistentTable()
+      throws Exception {
+    sendPostRequest(_controllerRequestURLBuilder.forTableRebalance(OFFLINE_TABLE_NAME, "realtime"), null);
   }
 
   @Test
-  public void rebalanceOfflineTable() {
-    String tableName = "testOfflineTable";
-    _offlineBuilder.setTableName(tableName);
-    // create the table
-    try {
-      TableConfig offlineTableConfig = _offlineBuilder.build();
-      sendPostRequest(_createTableUrl, offlineTableConfig.toJsonConfigString());
-    } catch (Exception e) {
-      Assert.fail("Failed to create offline table " + tableName + "Error: " + e.getMessage());
-    }
+  public void rebalanceTableWithoutSegments()
+      throws Exception {
+    // Create the table
+    sendPostRequest(_createTableUrl, _offlineBuilder.build().toJsonConfigString());
 
-    // rebalance should not throw exception
-    try {
-      sendPostRequest(_controllerRequestURLBuilder.forTableRebalance(tableName, "offline"), null);
-    } catch (Exception e) {
-      Assert.fail("Failed to rebalance existing offline table " + tableName);
-    }
-
-    // rebalance should throw exception because realtime table does not exist
-    try {
-      sendPostRequest(_controllerRequestURLBuilder.forTableRebalance(tableName, "realtime"), null);
-    } catch (Exception e) {
-      if (!(e instanceof FileNotFoundException)) {
-        Assert.fail("Did not fail to create non existent realtime table " + tableName);
-      } else {
-        return;
-      }
-    }
-    Assert.fail("Did not fail to create non existent realtime table " + tableName);
+    // Rebalance should return status NO_OP
+    RebalanceResult rebalanceResult = JsonUtils.stringToObject(
+        sendPostRequest(_controllerRequestURLBuilder.forTableRebalance(OFFLINE_TABLE_NAME, "offline"), null),
+        RebalanceResult.class);
+    Assert.assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
   }
 
   @AfterClass

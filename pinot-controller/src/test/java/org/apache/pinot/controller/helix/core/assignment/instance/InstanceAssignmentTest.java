@@ -23,6 +23,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.config.ColumnPartitionConfig;
 import org.apache.pinot.common.config.Instance;
 import org.apache.pinot.common.config.ReplicaGroupStrategyConfig;
@@ -35,8 +37,6 @@ import org.apache.pinot.common.config.instance.InstanceReplicaGroupPartitionConf
 import org.apache.pinot.common.config.instance.InstanceTagPoolConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.CommonConstants.Segment.AssignmentStrategy;
-import org.apache.pinot.common.utils.InstancePartitionsType;
-import org.apache.pinot.controller.helix.core.assignment.InstancePartitions;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;

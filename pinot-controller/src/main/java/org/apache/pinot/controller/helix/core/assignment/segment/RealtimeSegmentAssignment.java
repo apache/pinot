@@ -27,12 +27,12 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
-import org.apache.pinot.common.utils.InstancePartitionsType;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.controller.helix.core.assignment.InstancePartitions;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -188,8 +188,8 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
     // Rebalance CONSUMING segments if configured
     Map<String, Map<String, String>> consumingSegmentAssignment =
         completedConsumingOfflineSegmentAssignment.getConsumingSegmentAssignment();
-    if (config.getBoolean(RebalanceUserConfigConstants.INCLUDE_CONSUMING,
-        RebalanceUserConfigConstants.DEFAULT_INCLUDE_CONSUMING)) {
+    if (config
+        .getBoolean(RebalanceConfigConstants.INCLUDE_CONSUMING, RebalanceConfigConstants.DEFAULT_INCLUDE_CONSUMING)) {
       InstancePartitions consumingInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.CONSUMING);
       Preconditions
           .checkState(consumingInstancePartitions != null, "Failed to find CONSUMING instance partitions for table: %s",

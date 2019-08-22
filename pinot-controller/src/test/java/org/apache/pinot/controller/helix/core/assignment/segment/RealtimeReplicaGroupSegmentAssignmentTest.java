@@ -24,14 +24,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.configuration.BaseConfiguration;
+import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.CommonConstants.Segment.AssignmentStrategy;
-import org.apache.pinot.common.utils.InstancePartitionsType;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.controller.helix.core.assignment.InstancePartitions;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -196,7 +196,7 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
 
     // Rebalance all segments (including CONSUMING) should give the same assignment
     BaseConfiguration config = new BaseConfiguration();
-    config.setProperty(RebalanceUserConfigConstants.INCLUDE_CONSUMING, true);
+    config.setProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, true);
     assertEquals(_segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, config), newAssignment);
 
     // Rebalance should not change the assignment for the OFFLINE segments

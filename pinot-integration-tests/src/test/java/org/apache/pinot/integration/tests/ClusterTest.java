@@ -347,7 +347,7 @@ public abstract class ClusterTest extends ControllerTest {
       List<String> invertedIndexColumns, List<String> bloomFilterColumns, TableTaskConfig taskConfig,
       SegmentPartitionConfig segmentPartitionConfig, String sortedColumn) {
     return new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName).setTimeColumnName(timeColumnName)
-        .setTimeType(timeType).setNumReplicas(3).setBrokerTenant(brokerTenant).setServerTenant(serverTenant)
+        .setTimeType(timeType).setNumReplicas(1).setBrokerTenant(brokerTenant).setServerTenant(serverTenant)
         .setLoadMode(loadMode).setSegmentVersion(segmentVersion.toString())
         .setInvertedIndexColumns(invertedIndexColumns).setBloomFilterColumns(bloomFilterColumns)
         .setTaskConfig(taskConfig).setSegmentPartitionConfig(segmentPartitionConfig).setSortedColumn(sortedColumn)
