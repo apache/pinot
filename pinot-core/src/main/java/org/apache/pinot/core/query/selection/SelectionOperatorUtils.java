@@ -437,8 +437,7 @@ public class SelectionOperatorUtils {
    * @param dataSchema data schema.
    * @return column indices
    */
-  public static int[] getColumnIndices(@Nonnull List<String> selectionColumns,
-      @Nonnull DataSchema dataSchema) {
+  public static int[] getColumnIndices(@Nonnull List<String> selectionColumns, @Nonnull DataSchema dataSchema) {
     int numSelectionColumns = selectionColumns.size();
     int[] columnIndices = new int[numSelectionColumns];
     int numColumnsInDataSchema = dataSchema.size();
@@ -451,8 +450,6 @@ public class SelectionOperatorUtils {
     }
     return columnIndices;
   }
-
-
 
   /**
    * Extract columns from the row based on the given column indices.
@@ -678,5 +675,15 @@ public class SelectionOperatorUtils {
       queue.poll();
       queue.offer(value);
     }
+  }
+
+  public static List<String> extractSortColumns(List<SelectionSort> sortSequence) {
+    List<String> columns = new ArrayList<>();
+    if (sortSequence != null) {
+      for (SelectionSort s : sortSequence) {
+        columns.add(s.column);
+      }
+    }
+    return columns;
   }
 }
