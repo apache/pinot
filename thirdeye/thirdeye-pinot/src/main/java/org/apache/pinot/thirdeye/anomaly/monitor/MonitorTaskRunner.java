@@ -166,6 +166,14 @@ public class MonitorTaskRunner implements TaskRunner {
     } catch (Exception e) {
       LOG.error("Exception when expiring raw anomalies.", e);
     }
+
+    // Delete old evaluations (30 days by default)
+    try {
+      int deletedEvaluations = DAO_REGISTRY.getEvaluationManager().deleteRecordsOlderThanDays(monitorTaskInfo.getDefaultRetentionDays());
+      LOG.info("Deleted {} evaluations that are older than {} days.", deletedEvaluations, monitorTaskInfo.getDefaultRetentionDays());
+    } catch (Exception e) {
+      LOG.error("Exception when deleting old evaluations.", e);
+    }
   }
 
   private Map<Long, JobDTO> findScheduledJobsWithinDays(int days) {

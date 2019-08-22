@@ -122,12 +122,12 @@ public class LegacyDimensionWrapperTest {
     this.dimensionWrapper.run();
 
     Assert.assertEquals(this.runs.size(), 6);
-    Assert.assertEquals(this.runs.get(0), makePipeline("thirdeye:metric:2:a%3D1:b%3D1"));
-    Assert.assertEquals(this.runs.get(1), makePipeline("thirdeye:metric:2:a%3D1:b%3D2"));
-    Assert.assertEquals(this.runs.get(2), makePipeline("thirdeye:metric:2:a%3D1:b%3D3"));
-    Assert.assertEquals(this.runs.get(3), makePipeline("thirdeye:metric:2:a%3D2:b%3D1"));
-    Assert.assertEquals(this.runs.get(4), makePipeline("thirdeye:metric:2:a%3D2:b%3D2"));
-    Assert.assertEquals(this.runs.get(5), makePipeline("thirdeye:metric:2:a%3D2:b%3D3"));
+    Assert.assertEquals(this.runs.get(5), makePipeline("thirdeye:metric:2:a%3D1:b%3D1"));
+    Assert.assertEquals(this.runs.get(3), makePipeline("thirdeye:metric:2:a%3D1:b%3D2"));
+    Assert.assertEquals(this.runs.get(4), makePipeline("thirdeye:metric:2:a%3D1:b%3D3"));
+    Assert.assertEquals(this.runs.get(1), makePipeline("thirdeye:metric:2:a%3D2:b%3D1"));
+    Assert.assertEquals(this.runs.get(0), makePipeline("thirdeye:metric:2:a%3D2:b%3D2"));
+    Assert.assertEquals(this.runs.get(2), makePipeline("thirdeye:metric:2:a%3D2:b%3D3"));
   }
 
   private DetectionConfigDTO makeConfig(String metricUrn) {
