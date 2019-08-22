@@ -21,6 +21,7 @@ package org.apache.pinot.core.indexsegment.mutable;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrays;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -131,7 +132,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _memoryManager = config.getMemoryManager();
     _statsHistory = config.getStatsHistory();
     _segmentPartitionConfig = config.getSegmentPartitionConfig();
-    _numKeyColumns = _schema.getDimensionNames().size() + 1;
+    _numKeyColumns = computeNumKeyColumns();
 
     _logger =
         LoggerFactory.getLogger(MutableSegmentImpl.class.getName() + "_" + _segmentName + "_" + config.getStreamName());
@@ -144,6 +145,9 @@ public class MutableSegmentImpl implements MutableSegment {
     // Initialize for each column
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();
+      if (_schema.isVirtualColumn(column)) {
+        continue;
+      }
       _maxNumValuesMap.put(column, 0);
 
       // Check whether to generate raw index for the column while consuming
@@ -197,7 +201,18 @@ public class MutableSegmentImpl implements MutableSegment {
 
     // Metric aggregation can be enabled only if config is specified, and all dimensions have dictionary,
     // and no metrics have dictionary. If not enabled, the map returned is null.
-    _recordIdMap = enableMetricsAggregationIfPossible(config, _schema, noDictionaryColumns);
+    _recordIdMap = enableMetricsAggregationIfPossible(config, noDictionaryColumns);
+  }
+
+  private int computeNumKeyColumns() {
+    int numKeyColumns = 1;
+    Collection<String> dimensionColumns = _schema.getDimensionNames();
+    for (String column: dimensionColumns) {
+      if (!_schema.isVirtualColumn(column)) {
+        numKeyColumns++;
+      }
+    }
+    return numKeyColumns;
   }
 
   public SegmentPartitionConfig getSegmentPartitionConfig() {
@@ -252,6 +267,9 @@ public class MutableSegmentImpl implements MutableSegment {
     Map<String, Object> dictIdMap = new HashMap<>();
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();
+      if (_schema.isVirtualColumn(column)) {
+        continue;
+      }
       Object value = row.getValue(column);
       MutableDictionary dictionary = _dictionaryMap.get(column);
       if (dictionary != null) {
@@ -296,6 +314,9 @@ public class MutableSegmentImpl implements MutableSegment {
     // Store dictionary Id(s) for columns with dictionary
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();
+      if (_schema.isVirtualColumn(column)) {
+        continue;
+      }
       Object value = row.getValue(column);
       if (fieldSpec.isSingleValueField()) {
         FixedByteSingleColumnSingleValueReaderWriter indexReaderWriter =
@@ -338,6 +359,9 @@ public class MutableSegmentImpl implements MutableSegment {
     // queryable
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();
+      if (_schema.isVirtualColumn(column)) {
+        continue;
+      }
       RealtimeInvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
       if (invertedIndex != null) {
         if (fieldSpec.isSingleValueField()) {
@@ -355,6 +379,9 @@ public class MutableSegmentImpl implements MutableSegment {
   private boolean aggregateMetrics(GenericRow row, int docId) {
     for (FieldSpec metricSpec : _schema.getMetricFieldSpecs()) {
       String column = metricSpec.getName();
+      if (_schema.isVirtualColumn(column)) {
+        continue;
+      }
       Object value = row.getValue(column);
       Preconditions.checkState(metricSpec.isSingleValueField(), "Multivalued metrics cannot be updated.");
       FixedByteSingleColumnSingleValueReaderWriter indexReaderWriter =
@@ -401,6 +428,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
   @Override
   public Set<String> getColumnNames() {
+    // Return all column names, virtual and physical.
     return _schema.getColumnNames();
   }
 
@@ -442,13 +470,20 @@ public class MutableSegmentImpl implements MutableSegment {
     return null;
   }
 
-  @Override
+  /**
+   * Returns a record that contains only physical columns
+   * @param docId document ID
+   * @param reuse a GenericRow object that will be re-used if provided. Otherwise, this method will allocate a new one
+   * @return Generic row with physical columns of the specified row.
+   */
   public GenericRow getRecord(int docId, GenericRow reuse) {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();
-      reuse.putField(column, IndexSegmentUtils
-          .getValue(docId, fieldSpec, _indexReaderWriterMap.get(column), _dictionaryMap.get(column),
-              _maxNumValuesMap.getOrDefault(column, 0)));
+      if (!_schema.isVirtualColumn(column)) {
+        reuse.putField(column,
+            IndexSegmentUtils.getValue(docId, fieldSpec, _indexReaderWriterMap.get(column), _dictionaryMap.get(column),
+                _maxNumValuesMap.getOrDefault(column, 0)));
+      }
     }
     return reuse;
   }
@@ -574,7 +609,9 @@ public class MutableSegmentImpl implements MutableSegment {
 
     // FIXME: this for loop breaks for multi value dimensions. https://github.com/apache/incubator-pinot/issues/3867
     for (String column : _schema.getDimensionNames()) {
-      dictIds[i++] = (Integer) dictIdMap.get(column);
+      if (!_schema.isVirtualColumn(column)) {
+        dictIds[i++] = (Integer) dictIdMap.get(column);
+      }
     }
 
     String timeColumnName = _schema.getTimeColumnName();
@@ -596,13 +633,11 @@ public class MutableSegmentImpl implements MutableSegment {
    * TODO: Eliminate the requirement on dictionary encoding for dimension and metric columns.
    *
    * @param config Segment config.
-   * @param schema Schema for the table.
    * @param noDictionaryColumns Set of no dictionary columns.
    *
    * @return Map from dictionary id array to doc id, null if metrics aggregation cannot be enabled.
    */
-  private IdMap<FixedIntArray> enableMetricsAggregationIfPossible(RealtimeSegmentConfig config, Schema schema,
-      Set<String> noDictionaryColumns) {
+  private IdMap<FixedIntArray> enableMetricsAggregationIfPossible(RealtimeSegmentConfig config, Set<String> noDictionaryColumns) {
     _aggregateMetrics = config.aggregateMetrics();
     if (!_aggregateMetrics) {
       _logger.info("Metrics aggregation is disabled.");
@@ -611,7 +646,10 @@ public class MutableSegmentImpl implements MutableSegment {
 
     // All metric columns should have no-dictionary index.
     // All metric columns must be single value
-    for (String metric : schema.getMetricNames()) {
+    for (String metric : _schema.getMetricNames()) {
+      if (_schema.isVirtualColumn(metric)) {
+        continue;
+      }
       if (!noDictionaryColumns.contains(metric)) {
         _logger
             .warn("Metrics aggregation cannot be turned ON in presence of dictionary encoded metrics, eg: {}", metric);
@@ -619,7 +657,7 @@ public class MutableSegmentImpl implements MutableSegment {
         break;
       }
       // https://github.com/apache/incubator-pinot/issues/3867
-      if (!schema.getMetricSpec(metric).isSingleValueField()) {
+      if (!_schema.getMetricSpec(metric).isSingleValueField()) {
         _logger
             .warn("Metrics aggregation cannot be turned ON in presence of multi-value metric columns, eg: {}", metric);
         _aggregateMetrics = false;
@@ -629,7 +667,10 @@ public class MutableSegmentImpl implements MutableSegment {
 
     // All dimension columns should be dictionary encoded.
     // All dimension columns must be single value
-    for (String dimension : schema.getDimensionNames()) {
+    for (String dimension : _schema.getDimensionNames()) {
+      if (_schema.isVirtualColumn(dimension)) {
+        continue;
+      }
       if (noDictionaryColumns.contains(dimension)) {
         _logger
             .warn("Metrics aggregation cannot be turned ON in presence of no-dictionary dimensions, eg: {}", dimension);
@@ -637,7 +678,7 @@ public class MutableSegmentImpl implements MutableSegment {
         break;
       }
       // https://github.com/apache/incubator-pinot/issues/3867
-      if (!schema.getDimensionSpec(dimension).isSingleValueField()) {
+      if (!_schema.getDimensionSpec(dimension).isSingleValueField()) {
         _logger.warn("Metrics aggregation cannot be turned ON in presence of multi-value dimension columns, eg: {}",
             dimension);
         _aggregateMetrics = false;
@@ -646,7 +687,7 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     // Time column should be dictionary encoded.
-    String timeColumn = schema.getTimeColumnName();
+    String timeColumn = _schema.getTimeColumnName();
     if (noDictionaryColumns.contains(timeColumn)) {
       _logger
           .warn("Metrics aggregation cannot be turned ON in presence of no-dictionary time column, eg: {}", timeColumn);
