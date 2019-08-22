@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.selection;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -89,7 +88,8 @@ public class SelectionOperatorService {
     _selectionColumns = SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), indexSegment);
     _sortSequence = getSortSequence(selection.getSelectionSortSequence());
     _dataSchema = SelectionOperatorUtils.extractDataSchema(_sortSequence, _selectionColumns, indexSegment);
-    _sortColumnIdx = SelectionOperatorUtils.getColumnIndices(SelectionOperatorUtils.extractSortColumns(_sortSequence), _dataSchema);
+    _sortColumnIdx =
+        SelectionOperatorUtils.getColumnIndices(SelectionOperatorUtils.extractSortColumns(_sortSequence), _dataSchema);
     // Select rows from offset to offset + size.
     _selectionOffset = selection.getOffset();
     _maxNumRows = _selectionOffset + selection.getSize();
@@ -106,7 +106,8 @@ public class SelectionOperatorService {
     _selectionColumns = SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), dataSchema);
     _sortSequence = getSortSequence(selection.getSelectionSortSequence());
     _dataSchema = dataSchema;
-    _sortColumnIdx = SelectionOperatorUtils.getColumnIndices(SelectionOperatorUtils.extractSortColumns(_sortSequence), _dataSchema);
+    _sortColumnIdx =
+        SelectionOperatorUtils.getColumnIndices(SelectionOperatorUtils.extractSortColumns(_sortSequence), _dataSchema);
     // Select rows from offset to offset + size.
     _selectionOffset = selection.getOffset();
     _maxNumRows = _selectionOffset + selection.getSize();

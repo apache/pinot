@@ -67,14 +67,14 @@ import org.apache.pinot.core.indexsegment.IndexSegment;
  * </ul>
  */
 public class SelectionOperatorUtils {
+  private SelectionOperatorUtils() {
+  }
+
   private static final String INT_PATTERN = "##########";
   private static final String LONG_PATTERN = "####################";
   private static final String FLOAT_PATTERN = "#########0.0####";
   private static final String DOUBLE_PATTERN = "###################0.0#########";
   private static final DecimalFormatSymbols DECIMAL_FORMAT_SYMBOLS = DecimalFormatSymbols.getInstance(Locale.US);
-
-  private SelectionOperatorUtils() {
-  }
 
   /**
    * Expand <code>'SELECT *'</code> to select all columns with {@link IndexSegment}, order all columns alphabetically.

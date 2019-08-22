@@ -53,23 +53,19 @@ import org.apache.pinot.broker.requesthandler.PinotQueryParserFactory;
 import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
 import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.Selection;
-import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.apache.pinot.core.realtime.stream.StreamDataProducer;
 import org.apache.pinot.core.realtime.stream.StreamDataProvider;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.core.util.AvroUtils;
-import org.apache.pinot.pql.parsers.PQL2Parser;
 import org.apache.pinot.server.util.SegmentTestUtils;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.testng.Assert;
 
 
@@ -259,7 +255,7 @@ public class ClusterIntegrationTestUtils {
               SegmentTestUtils.getSegmentGeneratorConfig(avroFile, outputDir, TimeUnit.DAYS, tableName, pinotSchema);
 
           // Test segment with space and special character in the file name
-          segmentGeneratorConfig.setSegmentNamePostfix(String.valueOf(segmentIndex) + " %");
+          segmentGeneratorConfig.setSegmentNamePostfix(segmentIndex + " %");
 
           // Cannot build star-tree V1 and V2 at same time
           if (starTreeV2BuilderConfigs != null) {
