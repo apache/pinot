@@ -630,6 +630,7 @@ public class MutableSegmentImpl implements MutableSegment {
    *   <li> All dimensions and time are dictionary encoded. This is because an integer array containing dictionary id's
    *        is used as key for dimensions to record Id map. </li>
    *   <li> None of the metrics are dictionary encoded. </li>
+   *   <li> All columns should be single-valued (see https://github.com/apache/incubator-pinot/issues/3867)</li>
    * </ul>
    *
    * TODO: Eliminate the requirement on dictionary encoding for dimension and metric columns.
@@ -658,7 +659,7 @@ public class MutableSegmentImpl implements MutableSegment {
         _aggregateMetrics = false;
         break;
       }
-      // https://github.com/apache/incubator-pinot/issues/3867
+
       if (!_schema.getMetricSpec(metric).isSingleValueField()) {
         _logger
             .warn("Metrics aggregation cannot be turned ON in presence of multi-value metric columns, eg: {}", metric);
@@ -679,7 +680,7 @@ public class MutableSegmentImpl implements MutableSegment {
         _aggregateMetrics = false;
         break;
       }
-      // https://github.com/apache/incubator-pinot/issues/3867
+      
       if (!_schema.getDimensionSpec(dimension).isSingleValueField()) {
         _logger.warn("Metrics aggregation cannot be turned ON in presence of multi-value dimension columns, eg: {}",
             dimension);
