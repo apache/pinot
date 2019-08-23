@@ -79,16 +79,15 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
   private boolean _enablePreprocessing;
 
   private String _partitionColumn;
-  private int _numberOfPartitions;
+  private int _numPartitions;
   private String _partitionFunction;
   private String _sortedColumn;
-  private int _numberOfOutputFiles;
+  private int _numOutputFiles;
 
   private final Path _inputSegmentDir;
   private final Path _preprocessedOutputDir;
   protected final String _rawTableName;
   protected final List<PushLocation> _pushLocations;
-  private DataFileStream<GenericRecord> _dataStreamReader;
 
   // Optional.
   private final Path _pathToDependencyJar;
@@ -101,7 +100,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
   public SegmentPreprocessingJob(final Properties properties) {
     super(properties);
 
-    _enablePreprocessing = Boolean.parseBoolean(_properties.getProperty(JobConfigConstants.ENABLE_PREPROCESSING, "false"));
+    _enablePreprocessing = Boolean.parseBoolean(_properties.getProperty(JobConfigConstants.ENABLE_PREPROCESSING));
 
     // get input/output paths.
     _inputSegmentDir = Preconditions.checkNotNull(getPathFromProperty(JobConfigConstants.PATH_TO_INPUT));
@@ -147,6 +146,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
 
     _fileSystem = FileSystem.get(_conf);
     final List<Path> inputDataPaths = getDataFilePaths(_inputSegmentDir);
+    Preconditions.checkArgument(inputDataPaths.size() != 0, "No files in the input directory.");
 
     if (_fileSystem.exists(_preprocessedOutputDir)) {
       _logger.warn("Found the output folder {}, deleting it", _preprocessedOutputDir);
@@ -168,7 +168,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     // Avro Schema configs.
     Schema avroSchema = getSchema(sampleAvroPath);
     _logger.info("Schema is: {}", avroSchema.toString(true));
-    setSchemaParams(job, avroSchema, numInputPaths);
+    setSchemaParams(job, avroSchema);
 
     // Set up mapper output key
     Set<Schema.Field> fieldSet = new HashSet<>();
@@ -179,9 +179,10 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     validateConfigsAgainstSchema(avroSchema);
 
     // Partition configs.
-    int numReduceTasks = (_numberOfPartitions != 0) ? _numberOfPartitions : inputDataPaths.size();
+    int numReduceTasks = inputDataPaths.size();
     if (_partitionColumn != null) {
-      job.getConfiguration().set(InternalConfigConstants.ENABLE_PARTITIONING, "true");
+      numReduceTasks = _numPartitions;
+          job.getConfiguration().set(InternalConfigConstants.ENABLE_PARTITIONING, "true");
       job.setPartitionerClass(GenericPartitioner.class);
       job.getConfiguration().set(InternalConfigConstants.PARTITION_COLUMN_CONFIG, _partitionColumn);
       if (_partitionFunction != null) {
@@ -190,8 +191,8 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       job.getConfiguration().set(InternalConfigConstants.NUM_PARTITIONS_CONFIG, Integer.toString(numReduceTasks));
       setMaxNumRecordsConfigIfSpecified(job);
     } else {
-      if (_numberOfOutputFiles > 0) {
-        numReduceTasks = _numberOfOutputFiles;
+      if (_numOutputFiles > 0) {
+        numReduceTasks = _numOutputFiles;
       }
       // Partitioning is disabled. Adding hashcode as one of the fields to mapper output key.
       // so that all the rows can be spread evenly.
@@ -241,7 +242,6 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       throw new RuntimeException("Job failed : " + job);
     }
 
-    cleanup();
     _logger.info("Finished pre-processing job in {}ms", (System.currentTimeMillis() - startTime));
   }
 
@@ -253,7 +253,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       Preconditions.checkArgument(columnPartitionMap.size() <= 1, "There should be at most 1 partition setting in the table.");
       if (columnPartitionMap.size() == 1) {
         _partitionColumn = columnPartitionMap.keySet().iterator().next();
-        _numberOfPartitions = segmentPartitionConfig.getNumPartitions(_partitionColumn);
+        _numPartitions = segmentPartitionConfig.getNumPartitions(_partitionColumn);
         _partitionFunction = segmentPartitionConfig.getFunctionName(_partitionColumn);
       }
     } else {
@@ -274,15 +274,15 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
   private void fetchResizingConfig() {
     TableCustomConfig tableCustomConfig = _tableConfig.getCustomConfig();
     if (tableCustomConfig == null) {
-      _numberOfOutputFiles = 0;
+      _numOutputFiles = 0;
       return;
     }
     Map<String, String> customConfigsMap = tableCustomConfig.getCustomConfigs();
     if (customConfigsMap != null && customConfigsMap.containsKey(InternalConfigConstants.PREPROCESS_NUM_FILES)) {
-      _numberOfOutputFiles = Integer.parseInt(customConfigsMap.get(InternalConfigConstants.PREPROCESS_NUM_FILES));
-      Preconditions.checkArgument(_numberOfOutputFiles > 0, String.format("The value of %s should be positive! Current value: %s", InternalConfigConstants.PREPROCESS_NUM_FILES, customConfigsMap.get(InternalConfigConstants.PREPROCESS_NUM_FILES)));
+      _numOutputFiles = Integer.parseInt(customConfigsMap.get(InternalConfigConstants.PREPROCESS_NUM_FILES));
+      Preconditions.checkArgument(_numOutputFiles > 0, String.format("The value of %s should be positive! Current value: %s", InternalConfigConstants.PREPROCESS_NUM_FILES, _numOutputFiles));
     } else {
-      _numberOfOutputFiles = 0;
+      _numOutputFiles = 0;
     }
   }
 
@@ -294,7 +294,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     Map<String, String> customConfigsMap = tableCustomConfig.getCustomConfigs();
     if (customConfigsMap != null && customConfigsMap.containsKey(InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE)) {
       int maxNumRecords = Integer.parseInt(customConfigsMap.get(InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE));
-      Preconditions.checkArgument(maxNumRecords > 0, "The value of " + InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE + " should be positive. Current value: " + customConfigsMap.get(InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE));
+      Preconditions.checkArgument(maxNumRecords > 0, "The value of " + InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE + " should be positive. Current value: " + maxNumRecords);
       _logger.info("Setting {} to {}", InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE, maxNumRecords);
       job.getConfiguration().set(InternalConfigConstants.PARTITION_MAX_RECORDS_PER_FILE, Integer.toString(maxNumRecords));
     }
@@ -313,7 +313,9 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     for (FileStatus fileStatus : fs.listStatus(inputPathDir)) {
       if (fileStatus.isFile() && fileStatus.getPath().getName().endsWith(".avro")) {
         _logger.info("Extracting schema from " + fileStatus.getPath());
-        avroSchema = _dataStreamReader.getSchema();
+        try (DataFileStream<GenericRecord> dataStreamReader = getAvroReader(inputPathDir)) {
+          avroSchema = dataStreamReader.getSchema();
+        }
         break;
       }
     }
@@ -357,7 +359,8 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     if (_partitionColumn != null) {
       Preconditions.checkArgument(schema.getField(_partitionColumn) != null, String
           .format("Partition column: %s is not found from the schema of input files.", _partitionColumn));
-      Preconditions.checkArgument(_numberOfPartitions > 0, String.format("Number of partitions should be positive. Current value: %s", _numberOfPartitions));
+      Preconditions.checkArgument(_numPartitions > 0, String.format("Number of partitions should be positive. Current value: %s",
+          _numPartitions));
       Preconditions.checkArgument(_partitionFunction != null, "Partition function should not be null!");
       try {
         PartitionFunctionFactory.PartitionFunctionType.fromString(_partitionFunction);
@@ -380,24 +383,14 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
   private void setTableConfigAndSchema() throws IOException {
     // If push locations, table config, and schema are not configured, this does not necessarily mean that segments
     // cannot be created. We should allow the user to go to the next step rather than failing the job.
-    if (_pushLocations.isEmpty()) {
-      _logger.error("Push locations cannot be empty. "
-          + "They are needed to get the table config and schema needed for this step. Skipping pre-processing");
-      throw new RuntimeException("Push locations cannot be empty.");
-    }
+    Preconditions.checkState(!_pushLocations.isEmpty(), "Push locations cannot be empty.");
     try(ControllerRestApi controllerRestApi = new DefaultControllerRestApi(_pushLocations, _rawTableName)) {
       _tableConfig = controllerRestApi.getTableConfig();
       _pinotTableSchema = controllerRestApi.getSchema();
     }
 
-    if (_tableConfig == null) {
-      _logger.error("Table config cannot be null. Skipping pre-processing");
-      return;
-    }
-
-    if (_pinotTableSchema == null) {
-      _logger.error("Schema cannot be null. Skipping pre-processing");
-    }
+    Preconditions.checkState(_tableConfig != null, "Table config cannot be null.");
+    Preconditions.checkState(_pinotTableSchema != null, "Schema cannot be null");
   }
 
   private void setValidationConfigs(Job job, Path path) throws IOException {
@@ -414,8 +407,9 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       job.getConfiguration().set(InternalConfigConstants.SEGMENT_TIME_TYPE, validationConfig.getTimeType().toString());
       job.getConfiguration().set(InternalConfigConstants.SEGMENT_TIME_FORMAT, _pinotTableSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeFormat());
       job.getConfiguration().set(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY, validationConfig.getSegmentPushFrequency());
-      _dataStreamReader = getAvroReader(path);
-      job.getConfiguration().set(InternalConfigConstants.TIME_COLUMN_VALUE, (String) _dataStreamReader.next().get(timeColumnName));
+      try (DataFileStream<GenericRecord> dataStreamReader = getAvroReader(path)) {
+        job.getConfiguration().set(InternalConfigConstants.TIME_COLUMN_VALUE, (String) dataStreamReader.next().get(timeColumnName));
+      }
     }
   }
 
@@ -445,7 +439,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     job.setOutputValueClass(NullWritable.class);
   }
 
-  private void setSchemaParams(Job job, Schema avroSchema, int numInputPaths) throws IOException {
+  private void setSchemaParams(Job job, Schema avroSchema) throws IOException {
     AvroMultipleOutputs.addNamedOutput(job, "avro", AvroKeyOutputFormat.class, avroSchema);
     AvroMultipleOutputs.setCountersEnabled(job, true);
     // Use LazyOutputFormat to avoid creating empty files.
@@ -454,23 +448,11 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     // Input and output paths.
     FileInputFormat.setInputPaths(job, _inputSegmentDir);
     FileOutputFormat.setOutputPath(job, _preprocessedOutputDir);
-    _logger.info("Total number of files to be pre-processed: {}", numInputPaths);
   }
 
   @Override
   protected boolean isDataFile(String fileName) {
     // TODO: support orc format in the future.
     return fileName.endsWith(".avro");
-  }
-
-  void cleanup() throws IOException {
-    _dataStreamReader.close();
-    // TODO: Move this to post-segment creation
-//    _logger.info("Clean up pre-processing output path: {}", _preprocessedOutputDir);
-//    try {
-//      _fileSystem.delete(_preprocessedOutputDir, true);
-//    } catch (IOException e) {
-//      _logger.error("Failed to clean up pre-processing output path: {}", _preprocessedOutputDir);
-//    }
   }
 }

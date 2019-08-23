@@ -31,10 +31,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
+import org.apache.pinot.hadoop.job.InternalConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.hadoop.job.InternalConfigConstants.*;
 
 
 public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, NullWritable, AvroKey<GenericRecord>, AvroValue<GenericRecord>> {
@@ -52,25 +51,25 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
   public void setup(final Context context) {
     Configuration configuration = context.getConfiguration();
 
-    _isAppend = configuration.get(IS_APPEND).equalsIgnoreCase("true");
+    _isAppend = configuration.get(InternalConfigConstants.IS_APPEND).equalsIgnoreCase("true");
 
     if (_isAppend) {
       // Get time column name
-      _timeColumn = configuration.get(TIME_COLUMN_CONFIG);
+      _timeColumn = configuration.get(InternalConfigConstants.TIME_COLUMN_CONFIG);
 
       // Get sample time column value
-      String timeColumnValue = configuration.get(TIME_COLUMN_VALUE);
+      String timeColumnValue = configuration.get(InternalConfigConstants.TIME_COLUMN_VALUE);
 
-      String pushFrequency = configuration.get(SEGMENT_PUSH_FREQUENCY);
-      String timeType = configuration.get(SEGMENT_TIME_TYPE);
-      String timeFormat = configuration.get(SEGMENT_TIME_FORMAT);
+      String pushFrequency = configuration.get(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY);
+      String timeType = configuration.get(InternalConfigConstants.SEGMENT_TIME_TYPE);
+      String timeFormat = configuration.get(InternalConfigConstants.SEGMENT_TIME_FORMAT);
       TimeUnit timeUnit = TimeUnit.valueOf(timeType);
       // Normalize time column value
       _normalizedDateSegmentNameGenerator = new NormalizedDateSegmentNameGenerator(pushFrequency, timeUnit, timeFormat);
       _sampleNormalizedTimeColumnValue = _normalizedDateSegmentNameGenerator.getNormalizedDate(timeColumnValue);
     }
 
-    String sortedColumn = configuration.get(SORTED_COLUMN_CONFIG);
+    String sortedColumn = configuration.get(InternalConfigConstants.SORTED_COLUMN_CONFIG);
     // Logging the configs for the mapper
     LOGGER.info("Sorted Column: " + sortedColumn);
     if (sortedColumn != null) {
@@ -78,7 +77,7 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
     }
     _outputKeySchema = AvroJob.getMapOutputKeySchema(configuration);
     _outputSchema = AvroJob.getMapOutputValueSchema(configuration);
-    _enablePartitioning = Boolean.parseBoolean(configuration.get(ENABLE_PARTITIONING, "false"));
+    _enablePartitioning = Boolean.parseBoolean(configuration.get(InternalConfigConstants.ENABLE_PARTITIONING, "false"));
   }
 
   @Override
