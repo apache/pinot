@@ -91,6 +91,16 @@ public class TaskDriver {
   }
 
   public void start() throws Exception {
+    // Mark all assigned tasks with RUNNING as FAILED
+    List<TaskDTO> leftoverTasks = DAO_REGISTRY.getTaskDAO().findByStatusAndWorkerId(workerId, TaskStatus.RUNNING);
+    if (!leftoverTasks.isEmpty()) {
+      LOG.info("Found {} RUNNING tasks with worker id {} at start", leftoverTasks.size(), workerId);
+      for (TaskDTO task : leftoverTasks) {
+        LOG.info("Update task {} from RUNNING to FAILED", task.getId());
+        DAO_REGISTRY.getTaskDAO().updateStatusAndTaskEndTime(task.getId(), TaskStatus.RUNNING, TaskStatus.FAILED,
+            System.currentTimeMillis(), "FAILED status updated by the worker at start");
+      }
+    }
     for (int i = 0; i < driverConfiguration.getMaxParallelTasks(); i++) {
       Runnable runnable = new Runnable() {
         @Override public void run() {

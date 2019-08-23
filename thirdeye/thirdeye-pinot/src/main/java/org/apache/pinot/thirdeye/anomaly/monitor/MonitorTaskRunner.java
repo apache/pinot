@@ -66,14 +66,14 @@ public class MonitorTaskRunner implements TaskRunner {
     LOG.info("Execute monitor update {}", monitorTaskInfo);
     int jobRetentionDays = monitorTaskInfo.getDefaultRetentionDays();
     try {
-      // Mark expired task as TIMEOUT
+      // Mark expired tasks with RUNNING states as TIMEOUT
       List<TaskDTO> timeoutTasks = DAO_REGISTRY.getTaskDAO().findTimeoutTasksWithinDays(jobRetentionDays, MAX_TASK_TIME);
       if (!timeoutTasks.isEmpty()) {
         for (TaskDTO task : timeoutTasks) {
           DAO_REGISTRY.getTaskDAO().updateStatusAndTaskEndTime(task.getId(), TaskStatus.RUNNING, TaskStatus.TIMEOUT,
-              System.currentTimeMillis(), "TIMEOUT status updated by MonitorTask");
+              System.currentTimeMillis(), "TIMEOUT status updated by MonitorTaskRunner");
         }
-        LOG.info("TIMEOUT tasks {}", timeoutTasks);
+        LOG.warn("TIMEOUT tasks {}", timeoutTasks);
       }
 
       // Find all jobs in SCHEDULED status
