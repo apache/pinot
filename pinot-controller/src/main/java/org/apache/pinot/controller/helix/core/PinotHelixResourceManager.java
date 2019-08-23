@@ -2144,14 +2144,14 @@ public class PinotHelixResourceManager {
    * @param timeOutInSeconds: Time-out for setting ideal-state.
    * @return
    */
-  public PinotResourceManagerResponse toggleInstance(String instanceName, boolean toggle, int timeOutInSeconds) {
+  private PinotResourceManagerResponse toggleInstance(String instanceName, boolean toggle, int timeOutInSeconds) {
     if (!instanceExists(instanceName)) {
       return PinotResourceManagerResponse.failure("Instance " + instanceName + " not found");
     }
 
     _helixAdmin.enableInstance(_helixClusterName, instanceName, toggle);
     long deadline = System.currentTimeMillis() + 1000 * timeOutInSeconds;
-    boolean toggleSucceed = false;
+    boolean toggleSucceed;
     String beforeToggleStates =
         (toggle) ? SegmentOnlineOfflineStateModel.OFFLINE : SegmentOnlineOfflineStateModel.ONLINE;
 
@@ -2159,33 +2159,37 @@ public class PinotHelixResourceManager {
       toggleSucceed = true;
       PropertyKey liveInstanceKey = _keyBuilder.liveInstance(instanceName);
       LiveInstance liveInstance = _helixDataAccessor.getProperty(liveInstanceKey);
-      if (liveInstance == null) {
-        return toggle ? PinotResourceManagerResponse.FAILURE : PinotResourceManagerResponse.SUCCESS;
-      }
-      PropertyKey instanceCurrentStatesKey = _keyBuilder.currentStates(instanceName, liveInstance.getSessionId());
-      List<CurrentState> instanceCurrentStates = _helixDataAccessor.getChildValues(instanceCurrentStatesKey);
-      if (instanceCurrentStates == null) {
-        return PinotResourceManagerResponse.SUCCESS;
-      } else {
-        for (CurrentState currentState : instanceCurrentStates) {
-          for (String state : currentState.getPartitionStateMap().values()) {
-            if (beforeToggleStates.equals(state)) {
-              toggleSucceed = false;
+      if (liveInstance != null) {
+        // Checks all the current states fall into the target states
+        PropertyKey instanceCurrentStatesKey = _keyBuilder.currentStates(instanceName, liveInstance.getSessionId());
+        List<CurrentState> instanceCurrentStates = _helixDataAccessor.getChildValues(instanceCurrentStatesKey);
+        if (instanceCurrentStates == null) {
+          return PinotResourceManagerResponse.SUCCESS;
+        } else {
+          for (CurrentState currentState : instanceCurrentStates) {
+            for (String state : currentState.getPartitionStateMap().values()) {
+              if (beforeToggleStates.equals(state)) {
+                toggleSucceed = false;
+                break;
+              }
+            }
+            if (!toggleSucceed) {
+              break;
             }
           }
         }
-      }
-      if (toggleSucceed) {
-        return (toggle) ? PinotResourceManagerResponse.success("Instance " + instanceName + " enabled")
-            : PinotResourceManagerResponse.success("Instance " + instanceName + " disabled");
-      } else {
-        try {
-          Thread.sleep(500);
-        } catch (InterruptedException e) {
+        if (toggleSucceed) {
+          return (toggle) ? PinotResourceManagerResponse.success("Instance " + instanceName + " enabled")
+              : PinotResourceManagerResponse.success("Instance " + instanceName + " disabled");
         }
       }
+
+      try {
+        Thread.sleep(500L);
+      } catch (InterruptedException e) {
+      }
     }
-    return PinotResourceManagerResponse.failure("Instance enable/disable failed, timeout");
+    return PinotResourceManagerResponse.failure("Instance " + (toggle ? "enable" : "disable") + " failed, timeout");
   }
 
   public RebalanceResult rebalanceTable(String tableNameWithType, Configuration rebalanceConfig)

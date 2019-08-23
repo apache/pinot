@@ -108,6 +108,7 @@ public class ControllerInstanceToggleTest extends ControllerTest {
   }
 
   private void toggleInstanceState(String instanceName, String state) {
+    // It may take time for an instance to toggle the state.
     TestUtils.waitForCondition(aVoid -> {
       try {
         sendPostRequest(_controllerRequestURLBuilder.forInstanceState(instanceName), state);
