@@ -36,4 +36,11 @@ public class InternalConfigConstants {
   public static final String PARTITION_FUNCTION_CONFIG = "partition.function";
 
   public static final String SORTED_COLUMN_CONFIG = "sorted.column";
+  public static final String ENABLE_PARTITIONING = "enable.partitioning";
+
+  // max records per file in each partition. No effect otherwise.
+  public static final String PARTITION_MAX_RECORDS_PER_FILE = "partition.max.records.per.file";
+
+  // Number of segments we want generated.
+  public static final String PREPROCESS_NUM_FILES = "preprocess.num.files";
 }

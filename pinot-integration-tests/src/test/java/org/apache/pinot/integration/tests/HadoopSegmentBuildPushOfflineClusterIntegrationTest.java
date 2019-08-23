@@ -41,8 +41,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.hadoop.job.JobConfigConstants.*;
-
 
 public class HadoopSegmentBuildPushOfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final Logger LOGGER = LoggerFactory.getLogger(HadoopSegmentBuildPushOfflineClusterIntegrationTest.class);
@@ -170,8 +168,6 @@ public class HadoopSegmentBuildPushOfflineClusterIntegrationTest extends BaseClu
 
     Properties preComputeProperties = new Properties();
     preComputeProperties.putAll(properties);
-    preComputeProperties.setProperty(ENABLE_PARTITIONING, Boolean.TRUE.toString());
-    preComputeProperties.setProperty(ENABLE_SORTING, Boolean.TRUE.toString());
 
     preComputeProperties.setProperty(JobConfigConstants.PATH_TO_INPUT, _avroDir.getPath());
     preComputeProperties.setProperty(JobConfigConstants.PREPROCESS_PATH_TO_OUTPUT, _preprocessingDir.getPath());
