@@ -146,7 +146,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
 
     _fileSystem = FileSystem.get(_conf);
     final List<Path> inputDataPaths = getDataFilePaths(_inputSegmentDir);
-    Preconditions.checkArgument(inputDataPaths.size() != 0, "No files in the input directory.");
+    Preconditions.checkState(inputDataPaths.size() != 0, "No files in the input directory.");
 
     if (_fileSystem.exists(_preprocessedOutputDir)) {
       _logger.warn("Found the output folder {}, deleting it", _preprocessedOutputDir);
@@ -179,10 +179,10 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     validateConfigsAgainstSchema(avroSchema);
 
     // Partition configs.
-    int numReduceTasks = inputDataPaths.size();
+    int numReduceTasks = 0;
     if (_partitionColumn != null) {
       numReduceTasks = _numPartitions;
-          job.getConfiguration().set(InternalConfigConstants.ENABLE_PARTITIONING, "true");
+      job.getConfiguration().set(InternalConfigConstants.ENABLE_PARTITIONING, "true");
       job.setPartitionerClass(GenericPartitioner.class);
       job.getConfiguration().set(InternalConfigConstants.PARTITION_COLUMN_CONFIG, _partitionColumn);
       if (_partitionFunction != null) {
@@ -193,6 +193,9 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     } else {
       if (_numOutputFiles > 0) {
         numReduceTasks = _numOutputFiles;
+      } else {
+        // default number of input paths
+        numReduceTasks = inputDataPaths.size();
       }
       // Partitioning is disabled. Adding hashcode as one of the fields to mapper output key.
       // so that all the rows can be spread evenly.
@@ -280,7 +283,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     Map<String, String> customConfigsMap = tableCustomConfig.getCustomConfigs();
     if (customConfigsMap != null && customConfigsMap.containsKey(InternalConfigConstants.PREPROCESS_NUM_FILES)) {
       _numOutputFiles = Integer.parseInt(customConfigsMap.get(InternalConfigConstants.PREPROCESS_NUM_FILES));
-      Preconditions.checkArgument(_numOutputFiles > 0, String.format("The value of %s should be positive! Current value: %s", InternalConfigConstants.PREPROCESS_NUM_FILES, _numOutputFiles));
+      Preconditions.checkState(_numOutputFiles > 0, String.format("The value of %s should be positive! Current value: %s", InternalConfigConstants.PREPROCESS_NUM_FILES, _numOutputFiles));
     } else {
       _numOutputFiles = 0;
     }
