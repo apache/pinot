@@ -20,6 +20,9 @@
 package org.apache.pinot.thirdeye.anomaly.task;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
 import org.apache.pinot.thirdeye.anomaly.utils.AnomalyUtils;
 import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
@@ -56,6 +59,7 @@ public class TaskDriver {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private ExecutorService taskExecutorService;
+  private ExecutorService taskWatcherExecutorService;
 
   private final TaskManager taskDAO;
   private TaskContext taskContext;
@@ -74,6 +78,9 @@ public class TaskDriver {
     taskExecutorService = Executors.newFixedThreadPool(
             driverConfiguration.getMaxParallelTasks(),
             new ThreadFactoryBuilder().setNameFormat("task-executor-%d").build());
+    taskWatcherExecutorService = Executors.newFixedThreadPool(
+            driverConfiguration.getMaxParallelTasks(),
+            new ThreadFactoryBuilder().setNameFormat("task-watcher-%d").setDaemon(true).build());
     taskContext = new TaskContext();
     taskContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
     taskContext.setThirdEyeAnomalyConfiguration(thirdEyeAnomalyConfiguration);
@@ -85,8 +92,8 @@ public class TaskDriver {
 
   public void start() throws Exception {
     for (int i = 0; i < driverConfiguration.getMaxParallelTasks(); i++) {
-      Callable callable = new Callable() {
-        @Override public Object call() throws Exception {
+      Runnable runnable = new Runnable() {
+        @Override public void run() {
           while (!shutdown) {
             LOG.info("Finding next task to execute");
 
@@ -98,21 +105,33 @@ public class TaskDriver {
               ThirdeyeMetricsUtil.taskCounter.inc();
 
               try {
-                LOG.info("Executing task: {} {}", anomalyTaskSpec.getJobName(),
-                    anomalyTaskSpec.getTaskInfo());
+                LOG.info("Executing task: {} {}", anomalyTaskSpec.getJobName(), anomalyTaskSpec.getTaskInfo());
 
                 // execute the selected task
                 TaskType taskType = anomalyTaskSpec.getTaskType();
                 TaskRunner taskRunner = TaskRunnerFactory.getTaskRunnerFromTaskType(taskType);
                 TaskInfo taskInfo = TaskInfoFactory.getTaskInfoFromTaskType(taskType, anomalyTaskSpec.getTaskInfo());
-
                 updateTaskStartTime(anomalyTaskSpec.getId());
-                List<TaskResult> taskResults = taskRunner.execute(taskInfo, taskContext);
+                Future<List<TaskResult>> future = taskExecutorService.submit(new Callable<List<TaskResult>>() {
+                  @Override
+                  public List<TaskResult> call() throws Exception {
+                    return taskRunner.execute(taskInfo, taskContext);
+                  }
+                });
+                try {
+                  List<TaskResult> taskResults = future.get(driverConfiguration.getMaxTaskRunTimeMillis(), TimeUnit.MILLISECONDS);
+                } catch (TimeoutException e) {
+                  LOG.error("Timeout on executing task", e);
+                  future.cancel(true);
+                  LOG.info("Executor thread gets cancelled successfully: {}", future.isCancelled());
+                  updateStatusAndTaskEndTime(anomalyTaskSpec.getId(),
+                      TaskStatus.RUNNING, TaskStatus.TIMEOUT, e.getMessage());
+                  continue;
+                }
                 LOG.info("DONE Executing task: {}", anomalyTaskSpec.getId());
                 // update status to COMPLETED
                 updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.COMPLETED, "");
                 ThirdeyeMetricsUtil.taskSuccessCounter.inc();
-
               } catch (Exception e) {
                 ThirdeyeMetricsUtil.taskExceptionCounter.inc();
                 LOG.error("Exception in electing and executing task", e);
@@ -133,10 +152,9 @@ public class TaskDriver {
             }
           }
           LOG.info("Thread safely quiting");
-          return 0;
         }
       };
-      taskExecutorService.submit(callable);
+      taskWatcherExecutorService.submit(runnable);
       LOG.info("Starting task driver");
     }
   }
@@ -144,6 +162,7 @@ public class TaskDriver {
   public void shutdown() {
     shutdown = true;
     AnomalyUtils.safelyShutdownExecutionService(taskExecutorService, this.getClass());
+    AnomalyUtils.safelyShutdownExecutionService(taskWatcherExecutorService, this.getClass());
   }
 
   /**

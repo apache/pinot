@@ -25,6 +25,7 @@ public class TaskDriverConfiguration {
   private int randomDelayCapInMillis = 15_000; // 15 seconds
   private int taskFetchSizeCap = 50;
   private int maxParallelTasks = 5;
+  private long maxTaskRunTimeMillis = 6 * 60 * 60_000; // 6 hours
 
   public int getNoTaskDelayInMillis() {
     return noTaskDelayInMillis;
@@ -64,5 +65,13 @@ public class TaskDriverConfiguration {
 
   public void setMaxParallelTasks(int maxParallelTasks) {
     this.maxParallelTasks = maxParallelTasks;
+  }
+
+  public long getMaxTaskRunTimeMillis() {
+    return maxTaskRunTimeMillis;
+  }
+
+  public void setMaxTaskRunTimeMillis(long maxTaskRunTimeMillis) {
+    this.maxTaskRunTimeMillis = maxTaskRunTimeMillis;
   }
 }
