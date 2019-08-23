@@ -21,9 +21,12 @@ package org.apache.pinot.core.indexsegment.mutable;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrays;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -96,6 +99,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private volatile long _minTime = Long.MAX_VALUE;
   private volatile long _maxTime = Long.MIN_VALUE;
   private final int _numKeyColumns;
+  private final Collection<FieldSpec> _physicalColumnFieldSpecs;
 
   // default message metadata
   private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
@@ -134,6 +138,16 @@ public class MutableSegmentImpl implements MutableSegment {
     _segmentPartitionConfig = config.getSegmentPartitionConfig();
     _numKeyColumns = computeNumKeyColumns();
 
+    List<FieldSpec> physicalColumnFieldSpecs = new ArrayList<>(_schema.getAllFieldSpecs());
+    Iterator<FieldSpec> iterator = physicalColumnFieldSpecs.iterator();
+    while (iterator.hasNext()) {
+      FieldSpec fieldSpec = iterator.next();
+      if (_schema.isVirtualColumn(fieldSpec.getName())) {
+        iterator.remove();
+      }
+    }
+    _physicalColumnFieldSpecs = Collections.unmodifiableCollection(physicalColumnFieldSpecs);
+
     _logger =
         LoggerFactory.getLogger(MutableSegmentImpl.class.getName() + "_" + _segmentName + "_" + config.getStreamName());
 
@@ -143,11 +157,8 @@ public class MutableSegmentImpl implements MutableSegment {
     int avgNumMultiValues = config.getAvgNumMultiValues();
 
     // Initialize for each column
-    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
+    for (FieldSpec fieldSpec : _physicalColumnFieldSpecs) {
       String column = fieldSpec.getName();
-      if (_schema.isVirtualColumn(column)) {
-        continue;
-      }
       _maxNumValuesMap.put(column, 0);
 
       // Check whether to generate raw index for the column while consuming
@@ -205,7 +216,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private int computeNumKeyColumns() {
-    int numKeyColumns = 1;
+    int numKeyColumns = 1;  // _schema.getDimensionNames() does not return time column, so start with 1
     Collection<String> dimensionColumns = _schema.getDimensionNames();
     for (String column: dimensionColumns) {
       if (!_schema.isVirtualColumn(column)) {
@@ -265,11 +276,8 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private Map<String, Object> updateDictionary(GenericRow row) {
     Map<String, Object> dictIdMap = new HashMap<>();
-    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
+    for (FieldSpec fieldSpec : _physicalColumnFieldSpecs) {
       String column = fieldSpec.getName();
-      if (_schema.isVirtualColumn(column)) {
-        continue;
-      }
       Object value = row.getValue(column);
       MutableDictionary dictionary = _dictionaryMap.get(column);
       if (dictionary != null) {
@@ -312,11 +320,8 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private void addForwardIndex(GenericRow row, int docId, Map<String, Object> dictIdMap) {
     // Store dictionary Id(s) for columns with dictionary
-    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
+    for (FieldSpec fieldSpec : _physicalColumnFieldSpecs) {
       String column = fieldSpec.getName();
-      if (_schema.isVirtualColumn(column)) {
-        continue;
-      }
       Object value = row.getValue(column);
       if (fieldSpec.isSingleValueField()) {
         FixedByteSingleColumnSingleValueReaderWriter indexReaderWriter =
@@ -357,11 +362,8 @@ public class MutableSegmentImpl implements MutableSegment {
     // Update inverted index at last
     // NOTE: inverted index have to be updated at last because once it gets updated, the latest record will become
     // queryable
-    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
+    for (FieldSpec fieldSpec : _physicalColumnFieldSpecs) {
       String column = fieldSpec.getName();
-      if (_schema.isVirtualColumn(column)) {
-        continue;
-      }
       RealtimeInvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
       if (invertedIndex != null) {
         if (fieldSpec.isSingleValueField()) {

@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
@@ -40,6 +41,7 @@ public class MutableSegmentImplAggregateMetricsTest {
   private static final String DIMENSION_2 = "dim2";
   private static final String METRIC = "metric";
   private static final String METRIC_2 = "metric2";
+  private static final String TIME_COLUMN = "time";
   private static final String KEY_SEPARATOR = "\t\t";
   private static final int NUM_ROWS = 10001;
 
@@ -52,6 +54,7 @@ public class MutableSegmentImplAggregateMetricsTest {
             .addSingleValueDimension(DIMENSION_2, FieldSpec.DataType.STRING)
             .addMetric(METRIC, FieldSpec.DataType.LONG)
             .addMetric(METRIC_2, FieldSpec.DataType.FLOAT)
+            .addTime(TIME_COLUMN, TimeUnit.DAYS, FieldSpec.DataType.INT)
             .build();
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(DIMENSION_1, METRIC, METRIC_2)),
@@ -73,9 +76,11 @@ public class MutableSegmentImplAggregateMetricsTest {
     Map<String, Float> expectedValuesFloat = new HashMap<>();
     StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis());
     for (int i = 0; i < NUM_ROWS; i++) {
+      int daysSinceEpoch = random.nextInt(10);
       GenericRow row = new GenericRow();
       row.putField(DIMENSION_1, random.nextInt(10));
       row.putField(DIMENSION_2, stringValues[random.nextInt(stringValues.length)]);
+      row.putField(TIME_COLUMN, daysSinceEpoch);
       // Generate random int to prevent overflow
       long metricValue = random.nextInt();
       row.putField(METRIC, metricValue);
@@ -106,7 +111,8 @@ public class MutableSegmentImplAggregateMetricsTest {
   }
 
   private String buildKey(GenericRow row) {
-    return String.valueOf(row.getValue(DIMENSION_1)) + KEY_SEPARATOR + row.getValue(DIMENSION_2);
+    return String.valueOf(row.getValue(DIMENSION_1)) + KEY_SEPARATOR +
+        row.getValue(DIMENSION_2) + KEY_SEPARATOR + row.getValue(TIME_COLUMN);
   }
 
   @AfterClass
