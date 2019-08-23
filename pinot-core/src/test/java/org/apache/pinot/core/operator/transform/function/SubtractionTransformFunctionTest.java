@@ -59,30 +59,30 @@ public class SubtractionTransformFunctionTest extends BaseTransformFunctionTest 
     testTransformFunction(transformFunction, expectedValues);
 
     expression = TransformExpressionTree
-        .compileToExpressionTree(String.format("sub(%s,%s)", DOUBLE_SV_COLUMN, STRING_SV_COLUMN));
+        .compileToExpressionTree(String.format("sub(%s,%s)", DOUBLE_SV_COLUMN, INT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof SubtractionTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = _doubleSVValues[i] - Double.parseDouble(_stringSVValues[i]);
+      expectedValues[i] = _doubleSVValues[i] - (double)_intSVValues[i];
     }
     testTransformFunction(transformFunction, expectedValues);
 
     expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("sub(%s,%s)", STRING_SV_COLUMN, INT_SV_COLUMN));
+        TransformExpressionTree.compileToExpressionTree(String.format("sub(%s,%s)", LONG_SV_COLUMN, INT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof SubtractionTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Double.parseDouble(_stringSVValues[i]) - (double) _intSVValues[i];
+      expectedValues[i] = (double)_longSVValues[i] - (double) _intSVValues[i];
     }
     testTransformFunction(transformFunction, expectedValues);
 
     expression = TransformExpressionTree.compileToExpressionTree(String
-        .format("sub(sub(sub(sub(sub(12,%s),%s),sub(sub(%s,%s),0.34)),%s),%s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN,
+        .format("sub(sub(sub(sub(sub(12,%s),%s),sub(sub(%s,%s),0.34)),%s),%s)", INT_SV_COLUMN, DOUBLE_SV_COLUMN,
             FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof SubtractionTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = (((((12d - Double.parseDouble(_stringSVValues[i])) - _doubleSVValues[i]) - (
+      expectedValues[i] = (((((12d - (double)_intSVValues[i]) - _doubleSVValues[i]) - (
           ((double) _floatSVValues[i] - (double) _longSVValues[i]) - 0.34)) - (double) _intSVValues[i])
           - _doubleSVValues[i]);
     }

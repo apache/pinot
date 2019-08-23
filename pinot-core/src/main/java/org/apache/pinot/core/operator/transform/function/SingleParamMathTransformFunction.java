@@ -54,14 +54,10 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
   }
 
   private void checkOperands(TransformFunction operand) {
-    if (operand instanceof MapValueTransformFunction) {
-      throw new IllegalArgumentException(getName() + " transform function not supported to work with MAP as inner transform function");
-    }
-
     if (operand instanceof LiteralTransformFunction) {
       throw new IllegalArgumentException("Argument of " + getName() + " should not be literal");
     } else {
-      final TransformResultMetadata resultMetadata = operand.getResultMetadata();
+      TransformResultMetadata resultMetadata = operand.getResultMetadata();
 
       if (resultMetadata.getDataType() == FieldSpec.DataType.STRING) {
         throw new IllegalArgumentException(getName() + " transform function not supported on non-numeric types");

@@ -67,15 +67,6 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
       expectedValues[i] = Math.abs(_doubleSVValues[i]);
     }
     testTransformFunction(transformFunction, expectedValues);
-
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("abs(%s)", STRING_SV_COLUMN));
-    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof AbsTransformFunction);
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.abs(Double.parseDouble(_stringSVValues[i]));
-    }
-    testTransformFunction(transformFunction, expectedValues);
   }
 
   @Test
@@ -115,15 +106,6 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     Assert.assertTrue(transformFunction instanceof CeilTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = Math.ceil(_doubleSVValues[i]);
-    }
-    testTransformFunction(transformFunction, expectedValues);
-
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("ceil(%s)", STRING_SV_COLUMN));
-    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof CeilTransformFunction);
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.ceil(Double.parseDouble(_stringSVValues[i]));
     }
     testTransformFunction(transformFunction, expectedValues);
   }
@@ -167,17 +149,8 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
       expectedValues[i] = Math.exp(_doubleSVValues[i]);
     }
     testTransformFunction(transformFunction, expectedValues);
-
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("exp(%s)", STRING_SV_COLUMN));
-    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof ExpTransformFunction);
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.exp(Double.parseDouble(_stringSVValues[i]));
-    }
-    testTransformFunction(transformFunction, expectedValues);
   }
-  
+
   @Test
   public void testFloorTransformFunction() {
     TransformExpressionTree expression =
@@ -215,15 +188,6 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     Assert.assertTrue(transformFunction instanceof FloorTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = Math.floor(_doubleSVValues[i]);
-    }
-    testTransformFunction(transformFunction, expectedValues);
-
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("floor(%s)", STRING_SV_COLUMN));
-    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof FloorTransformFunction);
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.floor(Double.parseDouble(_stringSVValues[i]));
     }
     testTransformFunction(transformFunction, expectedValues);
   }
@@ -267,15 +231,6 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
       expectedValues[i] = Math.log(_doubleSVValues[i]);
     }
     testTransformFunction(transformFunction, expectedValues);
-
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("ln(%s)", STRING_SV_COLUMN));
-    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof LnTransformFunction);
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.log(Double.parseDouble(_stringSVValues[i]));
-    }
-    testTransformFunction(transformFunction, expectedValues);
   }
 
   @Test
@@ -315,15 +270,6 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     Assert.assertTrue(transformFunction instanceof SqrtTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = Math.sqrt(_doubleSVValues[i]);
-    }
-    testTransformFunction(transformFunction, expectedValues);
-
-    expression =
-        TransformExpressionTree.compileToExpressionTree(String.format("sqrt(%s)", STRING_SV_COLUMN));
-    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof SqrtTransformFunction);
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.sqrt(Double.parseDouble(_stringSVValues[i]));
     }
     testTransformFunction(transformFunction, expectedValues);
   }

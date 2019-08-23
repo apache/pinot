@@ -57,18 +57,15 @@ public class SubtractionTransformFunction extends BaseTransformFunction {
   }
 
   private void checkOperands(TransformFunction operand1, TransformFunction operand2) {
-    if (operand1 instanceof MapValueTransformFunction || operand2 instanceof MapValueTransformFunction) {
-      throw new IllegalArgumentException("SUB transform function not supported to work with MAP as inner transform function");
-    }
-
     if (operand1 instanceof LiteralTransformFunction) {
+      String literal = ((LiteralTransformFunction) operand1).getLiteral();
       try {
-        _firstLiteral = Double.parseDouble(((LiteralTransformFunction) operand1).getLiteral());
+        _firstLiteral = Double.parseDouble(literal);
       } catch (NumberFormatException ne) {
-        throw new IllegalArgumentException("SUB transform function not supported on non-numeric literals");
+        throw new IllegalArgumentException("SUB transform function not supported on non-numeric literal: " + literal);
       }
     } else {
-      final TransformResultMetadata resultMetadata = operand1.getResultMetadata();
+      TransformResultMetadata resultMetadata = operand1.getResultMetadata();
 
       if (resultMetadata.getDataType() == FieldSpec.DataType.STRING) {
         throw new IllegalArgumentException("SUB transform function not supported on non-numeric types");
@@ -82,13 +79,14 @@ public class SubtractionTransformFunction extends BaseTransformFunction {
     }
 
     if (operand2 instanceof LiteralTransformFunction) {
+      String literal = ((LiteralTransformFunction) operand2).getLiteral();
       try {
-        _secondLiteral = Double.parseDouble(((LiteralTransformFunction) operand2).getLiteral());
+        _secondLiteral = Double.parseDouble(literal);
       } catch (NumberFormatException ne) {
-        throw new RuntimeException("SUB transform function not supported on non-numeric literals");
+        throw new RuntimeException("SUB transform function not supported on non-numeric literal: " + literal);
       }
     } else {
-      final TransformResultMetadata resultMetadata = operand2.getResultMetadata();
+      TransformResultMetadata resultMetadata = operand2.getResultMetadata();
 
       if (resultMetadata.getDataType() == FieldSpec.DataType.STRING) {
         throw new IllegalArgumentException("SUB transform function not supported on non-numeric types");

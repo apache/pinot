@@ -30,26 +30,24 @@ public class AdditionTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
   public void testAdditionTransformFunction() {
     TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(String
-        .format("add(%s,%s,%s,%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN,
-            STRING_SV_COLUMN));
+        .format("add(%s,%s,%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof AdditionTransformFunction);
     Assert.assertEquals(transformFunction.getName(), AdditionTransformFunction.FUNCTION_NAME);
     double[] expectedValues = new double[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] =
-          (double) _intSVValues[i] + (double) _longSVValues[i] + (double) _floatSVValues[i] + _doubleSVValues[i]
-              + Double.parseDouble(_stringSVValues[i]);
+          (double) _intSVValues[i] + (double) _longSVValues[i] + (double) _floatSVValues[i] + _doubleSVValues[i];
     }
     testTransformFunction(transformFunction, expectedValues);
 
     expression = TransformExpressionTree.compileToExpressionTree(String
-        .format("add(add(12,%s),%s,add(add(%s,%s),0.34,%s),%s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN, FLOAT_SV_COLUMN,
+        .format("add(add(12,%s),%s,add(add(%s,%s),0.34,%s),%s)", INT_SV_COLUMN, DOUBLE_SV_COLUMN, FLOAT_SV_COLUMN,
             LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof AdditionTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = ((12d + Double.parseDouble(_stringSVValues[i])) + _doubleSVValues[i] + (
+      expectedValues[i] = ((12d + (double)_intSVValues[i]) + _doubleSVValues[i] + (
           ((double) _floatSVValues[i] + (double) _longSVValues[i]) + 0.34 + (double) _intSVValues[i])
           + _doubleSVValues[i]);
     }

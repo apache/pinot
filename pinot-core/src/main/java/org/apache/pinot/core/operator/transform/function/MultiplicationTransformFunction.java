@@ -54,18 +54,15 @@ public class MultiplicationTransformFunction extends BaseTransformFunction {
 
   private void checkOperands(List<TransformFunction> operands) {
     for (TransformFunction operand : operands) {
-      if (operand instanceof MapValueTransformFunction) {
-        throw new IllegalArgumentException("MUL transform function not supported to work with MAP as inner transform function");
-      }
-
       if (operand instanceof LiteralTransformFunction) {
+        String literal = ((LiteralTransformFunction) operand).getLiteral();
         try {
-          _literalProduct *= Double.parseDouble(((LiteralTransformFunction) operand).getLiteral());
+          _literalProduct *= Double.parseDouble(literal);
         } catch (NumberFormatException ne) {
-          throw new IllegalArgumentException("MUL transform function not supported on non-numeric literals");
+          throw new IllegalArgumentException("MUL transform function not supported on non-numeric literal: " + literal);
         }
       } else {
-        final TransformResultMetadata resultMetadata = operand.getResultMetadata();
+        TransformResultMetadata resultMetadata = operand.getResultMetadata();
 
         if (resultMetadata.getDataType() == FieldSpec.DataType.STRING) {
           throw new IllegalArgumentException("MUL transform function not supported on non-numeric types");
