@@ -27,12 +27,8 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.data.TimeFieldSpec;
-import org.apache.pinot.common.data.TimeGranularitySpec;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.segment.ReadMode;
@@ -55,6 +51,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+
 public class TransformQueriesTest extends BaseQueriesTest {
 
   private static final String D1 = "STRING_COL";
@@ -74,36 +71,20 @@ public class TransformQueriesTest extends BaseQueriesTest {
   private List<SegmentDataManager> _segmentDataManagers;
 
   @BeforeClass
-  public void setup() {
-    _schema = new Schema();
-
-    _schema.setSchemaName(TABLE_NAME);
-
-    final DimensionFieldSpec d1Spec = new DimensionFieldSpec(D1, FieldSpec.DataType.STRING, true);
-    _schema.addField(d1Spec);
-
-    final MetricFieldSpec m1Spec = new MetricFieldSpec(M1, FieldSpec.DataType.INT);
-    _schema.addField(m1Spec);
-
-    final MetricFieldSpec m2Spec = new MetricFieldSpec(M2, FieldSpec.DataType.INT);
-    _schema.addField(m2Spec);
-
-    final MetricFieldSpec m3Spec = new MetricFieldSpec(M3, FieldSpec.DataType.LONG);
-    _schema.addField(m3Spec);
-
-    final MetricFieldSpec m4Spec = new MetricFieldSpec(M4, FieldSpec.DataType.LONG);
-    _schema.addField(m4Spec);
-
-    final TimeFieldSpec tSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME));
-    _schema.addField(tSpec);
+  public void setUp() {
+    _schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
+            .addSingleValueDimension(M1, FieldSpec.DataType.INT).addSingleValueDimension(M2, FieldSpec.DataType.INT)
+            .addSingleValueDimension(M3, FieldSpec.DataType.LONG).addSingleValueDimension(M4, FieldSpec.DataType.LONG)
+            .addTime(TIME, TimeUnit.MILLISECONDS, FieldSpec.DataType.LONG).build();
   }
 
   @AfterClass
-  public void destroy() {
+  public void tearDown() {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  private void delete() {
+  private void destroySegments() {
     for (IndexSegment indexSegment : _indexSegments) {
       if (indexSegment != null) {
         indexSegment.destroy();
@@ -113,95 +94,99 @@ public class TransformQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testTransformWithAvgInnerSegment() throws Exception {
+  public void testTransformWithAvgInnerSegment()
+      throws Exception {
     try {
       final List<GenericRow> rows = createDataSet(10);
+      try (final RecordReader recordReader = new GenericRowRecordReader(rows, _schema)) {
+        createSegment(_schema, recordReader, SEGMENT_NAME_1, TABLE_NAME);
+        final ImmutableSegment segment = loadSegment(SEGMENT_NAME_1);
+        _indexSegments.add(segment);
 
-      final RecordReader recordReader = new GenericRowRecordReader(rows, _schema);
-      createSegment(_schema, recordReader, SEGMENT_NAME_1, TABLE_NAME);
-      final ImmutableSegment segment = loadSegment(SEGMENT_NAME_1);
-      _indexSegments.add(segment);
-
-      String query = "SELECT AVG(SUB(INT_COL1, INT_COL2)) FROM foo";
-      runAndVerifyInnerSegmentQuery(query, -10000.00, 10);
-
-      query = "SELECT AVG(SUB(LONG_COL1, INT_COL1)) FROM foo";
-      runAndVerifyInnerSegmentQuery(query, 4990000.00, 10);
-
-      query = "SELECT AVG(SUB(LONG_COL2, LONG_COL1)) FROM foo";
-      runAndVerifyInnerSegmentQuery(query, 5000000.00, 10);
-
-      query = "SELECT AVG(ADD(INT_COL1, INT_COL2)) FROM foo";
-      runAndVerifyInnerSegmentQuery(query, 30000.00,10);
-
-      query = "SELECT AVG(ADD(INT_COL1, LONG_COL1)) FROM foo";
-      runAndVerifyInnerSegmentQuery(query, 5010000.00,10);
-
-      query = "SELECT AVG(ADD(LONG_COL1, LONG_COL2)) FROM foo";
-      runAndVerifyInnerSegmentQuery(query, 15000000.00,10);
-
-      query = "SELECT AVG(ADD(DIV(INT_COL1, INT_COL2), DIV(LONG_COL1, LONG_COL2))) FROM foo";
-      runAndVerifyInnerSegmentQuery(query, 10.00, 10);
-
-      try {
-        query = "SELECT AVG(SUB(INT_COL1, STRING_COL)) FROM foo";
+        String query = "SELECT AVG(SUB(INT_COL1, INT_COL2)) FROM foo";
         runAndVerifyInnerSegmentQuery(query, -10000.00, 10);
-        Assert.fail("Query should have failed");
-      } catch (Exception e) { }
 
-      try {
-        query = "SELECT AVG(ADD(DIV(INT_COL1, INT_COL2), DIV(LONG_COL1, STRING_COL))) FROM foo";
+        query = "SELECT AVG(SUB(LONG_COL1, INT_COL1)) FROM foo";
+        runAndVerifyInnerSegmentQuery(query, 4990000.00, 10);
+
+        query = "SELECT AVG(SUB(LONG_COL2, LONG_COL1)) FROM foo";
+        runAndVerifyInnerSegmentQuery(query, 5000000.00, 10);
+
+        query = "SELECT AVG(ADD(INT_COL1, INT_COL2)) FROM foo";
+        runAndVerifyInnerSegmentQuery(query, 30000.00, 10);
+
+        query = "SELECT AVG(ADD(INT_COL1, LONG_COL1)) FROM foo";
+        runAndVerifyInnerSegmentQuery(query, 5010000.00, 10);
+
+        query = "SELECT AVG(ADD(LONG_COL1, LONG_COL2)) FROM foo";
+        runAndVerifyInnerSegmentQuery(query, 15000000.00, 10);
+
+        query = "SELECT AVG(ADD(DIV(INT_COL1, INT_COL2), DIV(LONG_COL1, LONG_COL2))) FROM foo";
         runAndVerifyInnerSegmentQuery(query, 10.00, 10);
-        Assert.fail("Query should have failed");
-      } catch (Exception e) { }
+
+        try {
+          query = "SELECT AVG(SUB(INT_COL1, STRING_COL)) FROM foo";
+          runAndVerifyInnerSegmentQuery(query, -10000.00, 10);
+          Assert.fail("Query should have failed");
+        } catch (Exception e) {
+        }
+
+        try {
+          query = "SELECT AVG(ADD(DIV(INT_COL1, INT_COL2), DIV(LONG_COL1, STRING_COL))) FROM foo";
+          runAndVerifyInnerSegmentQuery(query, 10.00, 10);
+          Assert.fail("Query should have failed");
+        } catch (Exception e) {
+        }
+      }
     } finally {
-      delete();
+      destroySegments();
     }
   }
 
   @Test
-  public void testTransformWithAvgInterSegmentInterServer() throws Exception {
+  public void testTransformWithAvgInterSegmentInterServer()
+      throws Exception {
     try {
       final List<GenericRow> segmentOneRows = createDataSet(10);
       final List<GenericRow> segmentTwoRows = createDataSet(10);
 
-      final RecordReader recordReaderOne = new GenericRowRecordReader(segmentOneRows, _schema);
-      final RecordReader recordReaderTwo = new GenericRowRecordReader(segmentTwoRows, _schema);
+      try (final RecordReader recordReaderOne = new GenericRowRecordReader(segmentOneRows, _schema);
+          final RecordReader recordReaderTwo = new GenericRowRecordReader(segmentTwoRows, _schema)) {
+        createSegment(_schema, recordReaderOne, SEGMENT_NAME_1, TABLE_NAME);
+        createSegment(_schema, recordReaderTwo, SEGMENT_NAME_2, TABLE_NAME);
 
-      createSegment(_schema, recordReaderOne, SEGMENT_NAME_1, TABLE_NAME);
-      createSegment(_schema, recordReaderTwo, SEGMENT_NAME_2, TABLE_NAME);
+        final ImmutableSegment segmentOne = loadSegment(SEGMENT_NAME_1);
+        final ImmutableSegment segmentTwo = loadSegment(SEGMENT_NAME_2);
 
-      final ImmutableSegment segmentOne = loadSegment(SEGMENT_NAME_1);
-      final ImmutableSegment segmentTwo = loadSegment(SEGMENT_NAME_2);
+        _indexSegments.add(segmentOne);
+        _indexSegments.add(segmentTwo);
 
-      _indexSegments.add(segmentOne);
-      _indexSegments.add(segmentTwo);
+        _segmentDataManagers =
+            Arrays.asList(new ImmutableSegmentDataManager(segmentOne), new ImmutableSegmentDataManager(segmentTwo));
 
-      _segmentDataManagers = Arrays.asList(new ImmutableSegmentDataManager(segmentOne),
-          new ImmutableSegmentDataManager(segmentTwo));
+        String query = "SELECT AVG(SUB(INT_COL1, INT_COL2)) FROM foo";
+        runAndVerifyInterSegmentQuery(query, "-1000.00000");
 
-      String query = "SELECT AVG(SUB(INT_COL1, INT_COL2)) FROM foo";
-      runAndVerifyInterSegmentQuery(query, "-1000.00000");
+        query = "SELECT AVG(SUB(LONG_COL1, INT_COL1)) FROM foo";
+        runAndVerifyInterSegmentQuery(query, "499000.00000");
 
-      query = "SELECT AVG(SUB(LONG_COL1, INT_COL1)) FROM foo";
-      runAndVerifyInterSegmentQuery(query, "499000.00000");
+        query = "SELECT AVG(SUB(LONG_COL2, LONG_COL1)) FROM foo";
+        runAndVerifyInterSegmentQuery(query, "500000.00000");
 
-      query = "SELECT AVG(SUB(LONG_COL2, LONG_COL1)) FROM foo";
-      runAndVerifyInterSegmentQuery(query, "500000.00000");
+        query = "SELECT AVG(ADD(INT_COL1, INT_COL2)) FROM foo";
+        runAndVerifyInterSegmentQuery(query, "3000.00000");
 
-      query = "SELECT AVG(ADD(INT_COL1, INT_COL2)) FROM foo";
-      runAndVerifyInterSegmentQuery(query, "3000.00000");
+        query = "SELECT AVG(ADD(INT_COL1, LONG_COL1)) FROM foo";
+        runAndVerifyInterSegmentQuery(query, "501000.00000");
 
-      query = "SELECT AVG(ADD(INT_COL1, LONG_COL1)) FROM foo";
-      runAndVerifyInterSegmentQuery(query, "501000.00000");
+        query = "SELECT AVG(ADD(LONG_COL1, LONG_COL2)) FROM foo";
+        runAndVerifyInterSegmentQuery(query, "1500000.00000");
 
-      query = "SELECT AVG(ADD(LONG_COL1, LONG_COL2)) FROM foo";
-      runAndVerifyInterSegmentQuery(query, "1500000.00000");
-
-      query = "SELECT AVG(ADD(DIV(INT_COL1, INT_COL2), DIV(LONG_COL1, LONG_COL2))) FROM foo";
-      runAndVerifyInterSegmentQuery(query, "1.00000");
+        query = "SELECT AVG(ADD(DIV(INT_COL1, INT_COL2), DIV(LONG_COL1, LONG_COL2))) FROM foo";
+        runAndVerifyInterSegmentQuery(query, "1.00000");
+      }
     } finally {
-      delete();
+      destroySegments();
     }
   }
 
@@ -230,7 +215,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
     AggregationOperator aggregationOperator = getOperatorForQuery(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     final List<Object> aggregationResult = resultsBlock.getAggregationResult();
-    AvgPair avgPair = (AvgPair)aggregationResult.get(0);
+    AvgPair avgPair = (AvgPair) aggregationResult.get(0);
     Assert.assertEquals(avgPair.getSum(), sum);
     Assert.assertEquals(avgPair.getCount(), count);
   }
@@ -258,11 +243,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
     return _segmentDataManagers;
   }
 
-  private void createSegment(
-      Schema schema,
-      RecordReader recordReader,
-      String segmentName,
-      String tableName)
+  private void createSegment(Schema schema, RecordReader recordReader, String segmentName, String tableName)
       throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
     segmentGeneratorConfig.setTableName(tableName);
