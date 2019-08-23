@@ -49,10 +49,10 @@ public class AdditionTransformFunction extends BaseTransformFunction {
       throw new IllegalArgumentException("At least 2 arguments are required for ADD transform function");
     }
 
-    checkOperands(arguments);
+    processOperands(arguments);
   }
 
-  private void checkOperands(List<TransformFunction> operands) {
+  private void processOperands(List<TransformFunction> operands) {
     for (TransformFunction operand : operands) {
       if (operand instanceof LiteralTransformFunction) {
         String literal = ((LiteralTransformFunction) operand).getLiteral();

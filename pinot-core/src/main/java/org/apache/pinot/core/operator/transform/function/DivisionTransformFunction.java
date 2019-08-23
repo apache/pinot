@@ -51,10 +51,10 @@ public class DivisionTransformFunction extends BaseTransformFunction {
       throw new IllegalArgumentException("Exactly 2 arguments are required for DIV transform function");
     }
 
-    checkOperands(arguments.get(0), arguments.get(1));
+    processOperands(arguments.get(0), arguments.get(1));
   }
 
-  private void checkOperands(TransformFunction operand1, TransformFunction operand2) {
+  private void processOperands(TransformFunction operand1, TransformFunction operand2) {
     if (operand1 instanceof LiteralTransformFunction) {
       String literal = ((LiteralTransformFunction) operand1).getLiteral();
       try {

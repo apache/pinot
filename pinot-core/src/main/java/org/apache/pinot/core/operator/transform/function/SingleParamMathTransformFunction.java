@@ -50,10 +50,10 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
       throw new IllegalArgumentException("Exactly 1 arguments are required for " + getName() + " transform function");
     }
 
-    checkOperands(arguments.get(0));
+    processOperands(arguments.get(0));
   }
 
-  private void checkOperands(TransformFunction operand) {
+  private void processOperands(TransformFunction operand) {
     if (operand instanceof LiteralTransformFunction) {
       throw new IllegalArgumentException("Argument of " + getName() + " should not be literal");
     } else {

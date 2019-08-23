@@ -39,7 +39,6 @@ public class SubtractionTransformFunction extends BaseTransformFunction {
   private double _secondLiteral;
   private TransformFunction _secondTransformFunction;
   private double[] _differences;
-  private FieldSpec.DataType returnType;
 
   @Override
   public String getName() {
@@ -53,10 +52,10 @@ public class SubtractionTransformFunction extends BaseTransformFunction {
       throw new IllegalArgumentException("Exactly 2 arguments are required for SUB transform function");
     }
 
-    checkOperands(arguments.get(0), arguments.get(1));
+    processOperands(arguments.get(0), arguments.get(1));
   }
 
-  private void checkOperands(TransformFunction operand1, TransformFunction operand2) {
+  private void processOperands(TransformFunction operand1, TransformFunction operand2) {
     if (operand1 instanceof LiteralTransformFunction) {
       String literal = ((LiteralTransformFunction) operand1).getLiteral();
       try {
