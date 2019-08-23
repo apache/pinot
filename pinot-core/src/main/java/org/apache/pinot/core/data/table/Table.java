@@ -64,5 +64,5 @@ public interface Table {
   /**
    * Finish any pre exit processing
    */
-  public void finish();
+  void finish();
 }
