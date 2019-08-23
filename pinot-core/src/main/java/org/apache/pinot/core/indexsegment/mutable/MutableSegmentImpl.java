@@ -479,13 +479,11 @@ public class MutableSegmentImpl implements MutableSegment {
    * @return Generic row with physical columns of the specified row.
    */
   public GenericRow getRecord(int docId, GenericRow reuse) {
-    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
+    for (FieldSpec fieldSpec : _physicalColumnFieldSpecs) {
       String column = fieldSpec.getName();
-      if (!_schema.isVirtualColumn(column)) {
-        reuse.putField(column,
-            IndexSegmentUtils.getValue(docId, fieldSpec, _indexReaderWriterMap.get(column), _dictionaryMap.get(column),
-                _maxNumValuesMap.getOrDefault(column, 0)));
-      }
+      reuse.putField(column,
+          IndexSegmentUtils.getValue(docId, fieldSpec, _indexReaderWriterMap.get(column), _dictionaryMap.get(column),
+              _maxNumValuesMap.getOrDefault(column, 0)));
     }
     return reuse;
   }
@@ -680,7 +678,7 @@ public class MutableSegmentImpl implements MutableSegment {
         _aggregateMetrics = false;
         break;
       }
-      
+
       if (!_schema.getDimensionSpec(dimension).isSingleValueField()) {
         _logger.warn("Metrics aggregation cannot be turned ON in presence of multi-value dimension columns, eg: {}",
             dimension);
