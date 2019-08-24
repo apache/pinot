@@ -100,6 +100,8 @@ public class MutableSegmentImpl implements MutableSegment {
   private volatile long _maxTime = Long.MIN_VALUE;
   private final int _numKeyColumns;
   private final Collection<FieldSpec> _physicalColumnFieldSpecs;
+  private final Collection<FieldSpec> _physicalDimensionsFieldSpecs;
+  private final Collection<FieldSpec> _physicalMetricsFieldSpecs;
 
   // default message metadata
   private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
@@ -136,17 +138,27 @@ public class MutableSegmentImpl implements MutableSegment {
     _memoryManager = config.getMemoryManager();
     _statsHistory = config.getStatsHistory();
     _segmentPartitionConfig = config.getSegmentPartitionConfig();
-    _numKeyColumns = computeNumKeyColumns();
 
     List<FieldSpec> physicalColumnFieldSpecs = new ArrayList<>(_schema.getAllFieldSpecs());
     Iterator<FieldSpec> iterator = physicalColumnFieldSpecs.iterator();
+    List<FieldSpec> physicalMetricsFieldSpecs = new ArrayList<>(_schema.getMetricNames().size());
+    List<FieldSpec> physicalDimensionsFieldSpecs = new ArrayList<>(_schema.getDimensionNames().size());
     while (iterator.hasNext()) {
       FieldSpec fieldSpec = iterator.next();
       if (_schema.isVirtualColumn(fieldSpec.getName())) {
         iterator.remove();
       }
+      if (fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC) {
+        physicalMetricsFieldSpecs.add(fieldSpec);
+      }
+      if (fieldSpec.getFieldType() == FieldSpec.FieldType.DIMENSION) {
+        physicalDimensionsFieldSpecs.add(fieldSpec);
+      }
     }
     _physicalColumnFieldSpecs = Collections.unmodifiableCollection(physicalColumnFieldSpecs);
+    _physicalDimensionsFieldSpecs = Collections.unmodifiableCollection(physicalDimensionsFieldSpecs);
+    _physicalMetricsFieldSpecs = Collections.unmodifiableCollection(physicalMetricsFieldSpecs);
+    _numKeyColumns = _physicalDimensionsFieldSpecs.size() + 1;  // Add 1 for time column
 
     _logger =
         LoggerFactory.getLogger(MutableSegmentImpl.class.getName() + "_" + _segmentName + "_" + config.getStreamName());
@@ -213,17 +225,6 @@ public class MutableSegmentImpl implements MutableSegment {
     // Metric aggregation can be enabled only if config is specified, and all dimensions have dictionary,
     // and no metrics have dictionary. If not enabled, the map returned is null.
     _recordIdMap = enableMetricsAggregationIfPossible(config, noDictionaryColumns);
-  }
-
-  private int computeNumKeyColumns() {
-    int numKeyColumns = 1;  // _schema.getDimensionNames() does not return time column, so start with 1
-    Collection<String> dimensionColumns = _schema.getDimensionNames();
-    for (String column: dimensionColumns) {
-      if (!_schema.isVirtualColumn(column)) {
-        numKeyColumns++;
-      }
-    }
-    return numKeyColumns;
   }
 
   public SegmentPartitionConfig getSegmentPartitionConfig() {
@@ -379,11 +380,8 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private boolean aggregateMetrics(GenericRow row, int docId) {
-    for (FieldSpec metricSpec : _schema.getMetricFieldSpecs()) {
+    for (FieldSpec metricSpec : _physicalMetricsFieldSpecs) {
       String column = metricSpec.getName();
-      if (_schema.isVirtualColumn(column)) {
-        continue;
-      }
       Object value = row.getValue(column);
       Preconditions.checkState(metricSpec.isSingleValueField(), "Multivalued metrics cannot be updated.");
       FixedByteSingleColumnSingleValueReaderWriter indexReaderWriter =
@@ -438,10 +436,8 @@ public class MutableSegmentImpl implements MutableSegment {
   public Set<String> getPhysicalColumnNames() {
     HashSet<String> physicalColumnNames = new HashSet<>();
 
-    for (String columnName : getColumnNames()) {
-      if (!_segmentMetadata.getSchema().isVirtualColumn(columnName)) {
-        physicalColumnNames.add(columnName);
-      }
+    for (FieldSpec fieldSpec : _physicalColumnFieldSpecs) {
+      physicalColumnNames.add(fieldSpec.getName());
     }
 
     return physicalColumnNames;
@@ -608,10 +604,8 @@ public class MutableSegmentImpl implements MutableSegment {
     int[] dictIds = new int[_numKeyColumns]; // dimensions + time column.
 
     // FIXME: this for loop breaks for multi value dimensions. https://github.com/apache/incubator-pinot/issues/3867
-    for (String column : _schema.getDimensionNames()) {
-      if (!_schema.isVirtualColumn(column)) {
-        dictIds[i++] = (Integer) dictIdMap.get(column);
-      }
+    for (FieldSpec fieldSpec : _physicalDimensionsFieldSpecs) {
+      dictIds[i++] = (Integer) dictIdMap.get(fieldSpec.getName());
     }
 
     String timeColumnName = _schema.getTimeColumnName();
@@ -647,10 +641,8 @@ public class MutableSegmentImpl implements MutableSegment {
 
     // All metric columns should have no-dictionary index.
     // All metric columns must be single value
-    for (String metric : _schema.getMetricNames()) {
-      if (_schema.isVirtualColumn(metric)) {
-        continue;
-      }
+    for (FieldSpec fieldSpec : _physicalMetricsFieldSpecs) {
+      String metric = fieldSpec.getName();
       if (!noDictionaryColumns.contains(metric)) {
         _logger
             .warn("Metrics aggregation cannot be turned ON in presence of dictionary encoded metrics, eg: {}", metric);
@@ -658,7 +650,7 @@ public class MutableSegmentImpl implements MutableSegment {
         break;
       }
 
-      if (!_schema.getMetricSpec(metric).isSingleValueField()) {
+      if (!fieldSpec.isSingleValueField()) {
         _logger
             .warn("Metrics aggregation cannot be turned ON in presence of multi-value metric columns, eg: {}", metric);
         _aggregateMetrics = false;
@@ -668,10 +660,8 @@ public class MutableSegmentImpl implements MutableSegment {
 
     // All dimension columns should be dictionary encoded.
     // All dimension columns must be single value
-    for (String dimension : _schema.getDimensionNames()) {
-      if (_schema.isVirtualColumn(dimension)) {
-        continue;
-      }
+    for (FieldSpec fieldSpec : _physicalDimensionsFieldSpecs) {
+      String dimension = fieldSpec.getName();
       if (noDictionaryColumns.contains(dimension)) {
         _logger
             .warn("Metrics aggregation cannot be turned ON in presence of no-dictionary dimensions, eg: {}", dimension);
@@ -679,7 +669,7 @@ public class MutableSegmentImpl implements MutableSegment {
         break;
       }
 
-      if (!_schema.getDimensionSpec(dimension).isSingleValueField()) {
+      if (!fieldSpec.isSingleValueField()) {
         _logger.warn("Metrics aggregation cannot be turned ON in presence of multi-value dimension columns, eg: {}",
             dimension);
         _aggregateMetrics = false;
