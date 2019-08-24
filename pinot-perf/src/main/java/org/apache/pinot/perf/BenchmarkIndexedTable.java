@@ -37,6 +37,7 @@ import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
+import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -121,7 +122,7 @@ public class BenchmarkIndexedTable {
   private Record getNewRecord() {
     Object[] keys = new Object[]{_d1.get(_random.nextInt(_d1.size())), _d2.get(_random.nextInt(_d2.size()))};
     Object[] values = new Object[]{(double) _random.nextInt(1000), (double) _random.nextInt(1000)};
-    return new Record(keys, values);
+    return new Record(new Key(keys), values);
   }
 
   @Benchmark
@@ -157,6 +158,7 @@ public class BenchmarkIndexedTable {
 
     concurrentIndexedTable.finish();
   }
+
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
@@ -203,7 +205,8 @@ public class BenchmarkIndexedTable {
     mergedTable.finish();
   }
 
-  @Benchmark
+
+  /*@Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public void simpleUpsert() {
@@ -215,7 +218,7 @@ public class BenchmarkIndexedTable {
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public void concurrentUpsert() {
 
-  }
+  }*/
 
   public static void main(String[] args) throws Exception {
     ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkIndexedTable.class.getSimpleName())

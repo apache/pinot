@@ -19,16 +19,16 @@
 package org.apache.pinot.core.data.table;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
+import java.util.PriorityQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nonnull;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
@@ -40,20 +40,26 @@ import org.apache.pinot.core.data.order.OrderByUtils;
  */
 public class ConcurrentIndexedTable extends IndexedTable {
 
-  private List<Record> _records;
-  private ConcurrentMap<Record, Integer> _lookupTable;
-
+  private ConcurrentMap<Key, Record> _lookupMap;
+  private Comparator<Record> _minHeapComparator;
   private ReentrantReadWriteLock _readWriteLock;
-  //private AtomicInteger _numRecords = new AtomicInteger();
+  private Lock[] _locks;
+  private static final int NUM_KEYS = 10000;
 
   @Override
   public void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
       int maxCapacity) {
     super.init(dataSchema, aggregationInfos, orderBy, maxCapacity);
 
-    _records = Collections.synchronizedList(new ArrayList<>(_bufferedCapacity));
-    _lookupTable = new ConcurrentHashMap<>(_bufferedCapacity);
+    _minHeapComparator =
+        OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos).reversed();
+    _lookupMap = new ConcurrentHashMap<>();
+
     _readWriteLock = new ReentrantReadWriteLock();
+    _locks = new Lock[NUM_KEYS];
+    for (int i = 0; i < NUM_KEYS; i ++) {
+      _locks[i] = new ReentrantLock();
+    }
   }
 
   /**
@@ -62,20 +68,21 @@ public class ConcurrentIndexedTable extends IndexedTable {
   @Override
   public boolean upsert(@Nonnull Record newRecord) {
 
-    Object[] keys = newRecord.getKeys();
-    Preconditions.checkNotNull(keys, "Cannot upsert record with null keys");
+    Key key = newRecord.getKey();
+    Preconditions.checkNotNull(key, "Cannot upsert record with null keys");
 
-    _lookupTable.compute(newRecord, (k, index) -> {
-      if (index == null && size() >= _bufferedCapacity) {
-        // It is possible that the table has more records than _bufferedCapacity momentarily
-        // For eg. if capacity = 10, and current size = 9.
-        // Multiple threads reach this check, they all see size() < _bufferedCapacity, and they all add new elements
-        // This is okay, because when the next new element is received, the table will be resized.
-        // Momentarily, we will have extra elements, but they will never exceed num parallel threads (which is very low)
-        // In order to avoid this, each new upsert needs to acquire the write lock, and we will pay a performance penalty
+    // synchronize on same key
+    int lockNum = Math.abs(key.hashCode()) % NUM_KEYS;
+    _locks[lockNum].lock();
+
+    Record existingRecord = _lookupMap.get(key);
+    if (existingRecord == null) {
+
+      // resize if exceeds capacity
+      if (_lookupMap.size() >= _bufferedCapacity) {
         _readWriteLock.writeLock().lock();
         try {
-          if (size() >= _bufferedCapacity) {
+          if (_lookupMap.size() >= _bufferedCapacity) {
             resize(_evictCapacity);
           }
         } finally {
@@ -83,27 +90,28 @@ public class ConcurrentIndexedTable extends IndexedTable {
         }
       }
 
+      // insert new record
       _readWriteLock.readLock().lock();
       try {
-        if (index == null) {
-          index = addAndGetIndex(newRecord);
-        } else {
-          Record existingRecord = _records.get(index);
-          aggregate(existingRecord, newRecord);
-        }
+        _lookupMap.put(key, newRecord);
       } finally {
         _readWriteLock.readLock().unlock();
       }
-      return index;
-    });
+
+    } else {
+
+      // update old record
+      _readWriteLock.readLock().lock();
+      try {
+        aggregate(existingRecord, newRecord);
+      } finally {
+        _readWriteLock.readLock().unlock();
+      }
+    }
+
+    _locks[lockNum].unlock();
 
     return true;
-  }
-
-  private synchronized int addAndGetIndex(Record record) {
-    int index = _records.size();
-    _records.add(record);
-    return index;
   }
 
   @Override
@@ -117,31 +125,37 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
   @Override
   public int size() {
-    return _records.size();
+    return _lookupMap.size();
   }
 
   @Override
   public Iterator<Record> iterator() {
-    return _records.iterator();
+    return _lookupMap.values().iterator();
   }
 
-  private void resize(int size) {
-    // sort
-    if (CollectionUtils.isNotEmpty(_orderBy)) {
-      Comparator<Record> comparator;
-      comparator = OrderByUtils.getKeysAndValuesComparator(_dataSchema, _orderBy, _aggregationInfos);
-      _records.sort(comparator);
-    }
+  private void resize(int trimToSize) {
 
-    // evict lowest
-    if (_records.size() > size) {
-      _records = Collections.synchronizedList(new ArrayList<>(_records.subList(0, size)));
-    }
+    if (_lookupMap.size() > trimToSize) {
 
-    // rebuild lookup table
-    _lookupTable.clear();
-    for (int i = 0; i < _records.size(); i++) {
-      _lookupTable.put(_records.get(i), i);
+      // make heap of elements to evict
+      int heapSize = _lookupMap.size() - trimToSize;
+      PriorityQueue<Record> minHeap = new PriorityQueue<>(heapSize, _minHeapComparator);
+
+      for (Record record : _lookupMap.values()) {
+        if (minHeap.size() < heapSize) {
+          minHeap.offer(record);
+        } else {
+          Record peek = minHeap.peek();
+          if (minHeap.comparator().compare(record, peek) < 0) {
+            minHeap.poll();
+            minHeap.offer(record);
+          }
+        }
+      }
+
+      for (Record evictRecord : minHeap) {
+        _lookupMap.remove(evictRecord.getKey());
+      }
     }
   }
 

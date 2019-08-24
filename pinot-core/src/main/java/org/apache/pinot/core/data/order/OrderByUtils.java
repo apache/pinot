@@ -166,47 +166,47 @@ public final class OrderByUtils {
     switch (columnDataType) {
       case INT:
         if (ascending) {
-          comparator = Comparator.comparingInt(o -> (Integer) o.getKeys()[index]);
+          comparator = Comparator.comparingInt(o -> (Integer) o.getKey().getColumns()[index]);
         } else {
-          comparator = (o1, o2) -> Integer.compare((Integer) o2.getKeys()[index], (Integer) o1.getKeys()[index]);
+          comparator = (o1, o2) -> Integer.compare((Integer) o2.getKey().getColumns()[index], (Integer) o1.getKey().getColumns()[index]);
         }
         break;
       case LONG:
         if (ascending) {
-          comparator = Comparator.comparingLong(o -> (Long) o.getKeys()[index]);
+          comparator = Comparator.comparingLong(o -> (Long) o.getKey().getColumns()[index]);
         } else {
-          comparator = (o1, o2) -> Long.compare((Long) o2.getKeys()[index], (Long) o1.getKeys()[index]);
+          comparator = (o1, o2) -> Long.compare((Long) o2.getKey().getColumns()[index], (Long) o1.getKey().getColumns()[index]);
         }
         break;
       case FLOAT:
         if (ascending) {
-          comparator = (o1, o2) -> Float.compare((Float) o1.getKeys()[index], (Float) o2.getKeys()[index]);
+          comparator = (o1, o2) -> Float.compare((Float) o1.getKey().getColumns()[index], (Float) o2.getKey().getColumns()[index]);
         } else {
-          comparator = (o1, o2) -> Float.compare((Float) o2.getKeys()[index], (Float) o1.getKeys()[index]);
+          comparator = (o1, o2) -> Float.compare((Float) o2.getKey().getColumns()[index], (Float) o1.getKey().getColumns()[index]);
         }
         break;
       case DOUBLE:
         if (ascending) {
-          comparator = Comparator.comparingDouble(o -> (Double) o.getKeys()[index]);
+          comparator = Comparator.comparingDouble(o -> (Double) o.getKey().getColumns()[index]);
         } else {
-          comparator = (o1, o2) -> Double.compare((Double) o2.getKeys()[index], (Double) o1.getKeys()[index]);
+          comparator = (o1, o2) -> Double.compare((Double) o2.getKey().getColumns()[index], (Double) o1.getKey().getColumns()[index]);
         }
         break;
       case BYTES:
         if (ascending) {
-          comparator = (o1, o2) -> ByteArray.compare(BytesUtils.toBytes(o1.getKeys()[index]),
-              BytesUtils.toBytes(o2.getKeys()[index]));
+          comparator = (o1, o2) -> ByteArray.compare(BytesUtils.toBytes(o1.getKey().getColumns()[index]),
+              BytesUtils.toBytes(o2.getKey().getColumns()[index]));
         } else {
-          comparator = (o1, o2) -> ByteArray.compare(BytesUtils.toBytes(o2.getKeys()[index]),
-              BytesUtils.toBytes(o1.getKeys()[index]));
+          comparator = (o1, o2) -> ByteArray.compare(BytesUtils.toBytes(o2.getKey().getColumns()[index]),
+              BytesUtils.toBytes(o1.getKey().getColumns()[index]));
         }
         break;
       case STRING:
       default:
         if (ascending) {
-          comparator = Comparator.comparing(o -> (String) o.getKeys()[index]);
+          comparator = Comparator.comparing(o -> (String) o.getKey().getColumns()[index]);
         } else {
-          comparator = (o1, o2) -> ((String) o2.getKeys()[index]).compareTo((String) o1.getKeys()[index]);
+          comparator = (o1, o2) -> ((String) o2.getKey().getColumns()[index]).compareTo((String) o1.getKey().getColumns()[index]);
         }
         break;
     }
@@ -271,9 +271,15 @@ public final class OrderByUtils {
     Comparator<Record> comparator;
 
     if (ascending) {
-      comparator = (v1, v2) -> ComparableComparator.getInstance()
-          .compare(aggregationFunction.extractFinalResult(v1.getValues()[index]),
-              aggregationFunction.extractFinalResult(v2.getValues()[index]));
+      comparator = new Comparator<Record>() {
+        @Override
+        public int compare(Record v1, Record v2) {
+
+          return ComparableComparator.getInstance()
+              .compare(aggregationFunction.extractFinalResult(v1.getValues()[index]),
+                  aggregationFunction.extractFinalResult(v2.getValues()[index]));
+        }
+      };
     } else {
       comparator = (v1, v2) -> ComparableComparator.getInstance()
           .compare(aggregationFunction.extractFinalResult(v2.getValues()[index]),

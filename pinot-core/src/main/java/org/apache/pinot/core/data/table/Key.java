@@ -18,29 +18,44 @@
  */
 package org.apache.pinot.core.data.table;
 
+import java.util.Arrays;
+
+
 /**
- * Defines a single record in Pinot comprising of keys and values
+ * Defines the key component of the record
  */
-public class Record {
-  private Key _key;
-  private Object[] _values;
+public class Key {
+  private Object[] _columns;
 
-  public Record(Key key, Object[] values) {
-    _key = key;
-    _values = values;
+  public Key(Object[] columns) {
+    _columns = columns;
   }
 
-  /**
-   * Gets the key portion of the record
-   */
-  public Key getKey() {
-    return _key;
+  public Object[] getColumns() {
+    return _columns;
   }
 
-  /**
-   * Gets the values portion of the record
-   */
-  public Object[] getValues() {
-    return _values;
+  @Override
+  public boolean equals(Object o) {
+    Key that = (Key) o;
+    return Arrays.deepEquals(_columns, that._columns);
   }
+
+  @Override
+  public int hashCode() {
+    return Arrays.deepHashCode(_columns);
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("[ ");
+    for (Object s : _columns) {
+      sb.append(s);
+      sb.append(", ");
+    }
+    sb.append("]");
+    return sb.toString();
+  }
+
 }

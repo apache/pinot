@@ -41,7 +41,7 @@ import org.apache.pinot.core.data.order.OrderByUtils;
 public class SimpleIndexedTable extends IndexedTable {
 
   private List<Record> _records;
-  private Map<Record, Integer> _lookupTable;
+  private Map<Key, Integer> _lookupTable;
 
   @Override
   public void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
@@ -57,16 +57,16 @@ public class SimpleIndexedTable extends IndexedTable {
    */
   @Override
   public boolean upsert(@Nonnull Record newRecord) {
-    Object[] keys = newRecord.getKeys();
+    Key keys = newRecord.getKey();
     Preconditions.checkNotNull(keys, "Cannot upsert record with null keys");
 
-    Integer index = _lookupTable.get(newRecord);
+    Integer index = _lookupTable.get(keys);
     if (index == null) {
       if (size() >= _bufferedCapacity) {
         resize(_evictCapacity);
       }
       index = size();
-      _lookupTable.put(newRecord, index);
+      _lookupTable.put(keys, index);
       _records.add(index, newRecord);
     } else {
       Record existingRecord = _records.get(index);
@@ -91,7 +91,7 @@ public class SimpleIndexedTable extends IndexedTable {
     // rebuild lookup table
     _lookupTable.clear();
     for (int i = 0; i < _records.size(); i++) {
-      _lookupTable.put(_records.get(i), i);
+      _lookupTable.put(_records.get(i).getKey(), i);
     }
   }
 
