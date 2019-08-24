@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.data;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import javax.annotation.Nullable;
@@ -151,6 +152,11 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
 
   public void setVirtualColumnProvider(String virtualColumnProvider) {
     _virtualColumnProvider = virtualColumnProvider;
+  }
+
+  @JsonIgnore
+  public boolean isVirtualColumn() {
+    return _virtualColumnProvider != null && !_virtualColumnProvider.isEmpty();
   }
 
   public Object getDefaultNullValue() {

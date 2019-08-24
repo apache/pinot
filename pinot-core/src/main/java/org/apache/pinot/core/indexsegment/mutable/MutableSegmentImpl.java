@@ -26,13 +26,14 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
+import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.metadata.RowMetadata;
 import org.apache.pinot.common.segment.SegmentMetadata;
@@ -99,9 +100,11 @@ public class MutableSegmentImpl implements MutableSegment {
   private volatile long _minTime = Long.MAX_VALUE;
   private volatile long _maxTime = Long.MIN_VALUE;
   private final int _numKeyColumns;
-  private final Collection<FieldSpec> _physicalColumnFieldSpecs;
-  private final Collection<FieldSpec> _physicalDimensionsFieldSpecs;
-  private final Collection<FieldSpec> _physicalMetricsFieldSpecs;
+
+  // Cache the physical (non-virtual) field specs
+  private final Collection<FieldSpec> _physicalFieldSpecs;
+  private final Collection<DimensionFieldSpec> _physicalDimensionFieldSpecs;
+  private final Collection<MetricFieldSpec> _physicalMetricFieldSpecs;
 
   // default message metadata
   private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
@@ -139,26 +142,27 @@ public class MutableSegmentImpl implements MutableSegment {
     _statsHistory = config.getStatsHistory();
     _segmentPartitionConfig = config.getSegmentPartitionConfig();
 
-    List<FieldSpec> physicalColumnFieldSpecs = new ArrayList<>(_schema.getAllFieldSpecs());
-    Iterator<FieldSpec> iterator = physicalColumnFieldSpecs.iterator();
-    List<FieldSpec> physicalMetricsFieldSpecs = new ArrayList<>(_schema.getMetricNames().size());
-    List<FieldSpec> physicalDimensionsFieldSpecs = new ArrayList<>(_schema.getDimensionNames().size());
-    while (iterator.hasNext()) {
-      FieldSpec fieldSpec = iterator.next();
-      if (_schema.isVirtualColumn(fieldSpec.getName())) {
-        iterator.remove();
-      }
-      if (fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC) {
-        physicalMetricsFieldSpecs.add(fieldSpec);
-      }
-      if (fieldSpec.getFieldType() == FieldSpec.FieldType.DIMENSION) {
-        physicalDimensionsFieldSpecs.add(fieldSpec);
+    Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
+    List<FieldSpec> physicalFieldSpecs = new ArrayList<>(allFieldSpecs.size());
+    List<DimensionFieldSpec> physicalDimensionFieldSpecs = new ArrayList<>(_schema.getDimensionNames().size());
+    List<MetricFieldSpec> physicalMetricFieldSpecs = new ArrayList<>(_schema.getMetricNames().size());
+
+    for (FieldSpec fieldSpec : allFieldSpecs) {
+      if (!fieldSpec.isVirtualColumn()) {
+        physicalFieldSpecs.add(fieldSpec);
+
+        FieldSpec.FieldType fieldType = fieldSpec.getFieldType();
+        if (fieldType == FieldSpec.FieldType.DIMENSION) {
+          physicalDimensionFieldSpecs.add((DimensionFieldSpec) fieldSpec);
+        } else if (fieldType == FieldSpec.FieldType.METRIC) {
+          physicalMetricFieldSpecs.add((MetricFieldSpec) fieldSpec);
+        }
       }
     }
-    _physicalColumnFieldSpecs = Collections.unmodifiableCollection(physicalColumnFieldSpecs);
-    _physicalDimensionsFieldSpecs = Collections.unmodifiableCollection(physicalDimensionsFieldSpecs);
-    _physicalMetricsFieldSpecs = Collections.unmodifiableCollection(physicalMetricsFieldSpecs);
-    _numKeyColumns = _physicalDimensionsFieldSpecs.size() + 1;  // Add 1 for time column
+    _physicalFieldSpecs = Collections.unmodifiableCollection(physicalFieldSpecs);
+    _physicalDimensionFieldSpecs = Collections.unmodifiableCollection(physicalDimensionFieldSpecs);
+    _physicalMetricFieldSpecs = Collections.unmodifiableCollection(physicalMetricFieldSpecs);
+    _numKeyColumns = _physicalDimensionFieldSpecs.size() + 1;  // Add 1 for time column
 
     _logger =
         LoggerFactory.getLogger(MutableSegmentImpl.class.getName() + "_" + _segmentName + "_" + config.getStreamName());
@@ -169,7 +173,7 @@ public class MutableSegmentImpl implements MutableSegment {
     int avgNumMultiValues = config.getAvgNumMultiValues();
 
     // Initialize for each column
-    for (FieldSpec fieldSpec : _physicalColumnFieldSpecs) {
+    for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       String column = fieldSpec.getName();
       _maxNumValuesMap.put(column, 0);
 
@@ -277,7 +281,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private Map<String, Object> updateDictionary(GenericRow row) {
     Map<String, Object> dictIdMap = new HashMap<>();
-    for (FieldSpec fieldSpec : _physicalColumnFieldSpecs) {
+    for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       String column = fieldSpec.getName();
       Object value = row.getValue(column);
       MutableDictionary dictionary = _dictionaryMap.get(column);
@@ -321,7 +325,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private void addForwardIndex(GenericRow row, int docId, Map<String, Object> dictIdMap) {
     // Store dictionary Id(s) for columns with dictionary
-    for (FieldSpec fieldSpec : _physicalColumnFieldSpecs) {
+    for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       String column = fieldSpec.getName();
       Object value = row.getValue(column);
       if (fieldSpec.isSingleValueField()) {
@@ -363,7 +367,7 @@ public class MutableSegmentImpl implements MutableSegment {
     // Update inverted index at last
     // NOTE: inverted index have to be updated at last because once it gets updated, the latest record will become
     // queryable
-    for (FieldSpec fieldSpec : _physicalColumnFieldSpecs) {
+    for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       String column = fieldSpec.getName();
       RealtimeInvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
       if (invertedIndex != null) {
@@ -380,16 +384,13 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private boolean aggregateMetrics(GenericRow row, int docId) {
-    for (FieldSpec metricSpec : _physicalMetricsFieldSpecs) {
-      String column = metricSpec.getName();
+    for (MetricFieldSpec metricFieldSpec : _physicalMetricFieldSpecs) {
+      String column = metricFieldSpec.getName();
       Object value = row.getValue(column);
-      Preconditions.checkState(metricSpec.isSingleValueField(), "Multivalued metrics cannot be updated.");
       FixedByteSingleColumnSingleValueReaderWriter indexReaderWriter =
           (FixedByteSingleColumnSingleValueReaderWriter) _indexReaderWriterMap.get(column);
-      Preconditions.checkState(_dictionaryMap.get(column) == null, "Updating metrics not supported with dictionary.");
-      FieldSpec.DataType dataType = metricSpec.getDataType();
 
-      // FIXME: this breaks for multi value metrics. https://github.com/apache/incubator-pinot/issues/3867
+      FieldSpec.DataType dataType = metricFieldSpec.getDataType();
       switch (dataType) {
         case INT:
           indexReaderWriter.setInt(docId, (Integer) value + indexReaderWriter.getInt(docId));
@@ -436,7 +437,7 @@ public class MutableSegmentImpl implements MutableSegment {
   public Set<String> getPhysicalColumnNames() {
     HashSet<String> physicalColumnNames = new HashSet<>();
 
-    for (FieldSpec fieldSpec : _physicalColumnFieldSpecs) {
+    for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       physicalColumnNames.add(fieldSpec.getName());
     }
 
@@ -445,22 +446,19 @@ public class MutableSegmentImpl implements MutableSegment {
 
   @Override
   public ColumnDataSource getDataSource(String columnName) {
-    if (!_schema.isVirtualColumn(columnName)) {
-      return new ColumnDataSource(_schema.getFieldSpecFor(columnName), _numDocsIndexed,
-          _maxNumValuesMap.get(columnName), _indexReaderWriterMap.get(columnName), _invertedIndexMap.get(columnName),
-          _dictionaryMap.get(columnName), _bloomFilterMap.get(columnName));
+    FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+    if (fieldSpec.isVirtualColumn()) {
+      VirtualColumnContext virtualColumnContext =
+          new VirtualColumnContext(NetUtil.getHostnameOrAddress(), getSegmentName(), columnName, _numDocsIndexed + 1);
+      VirtualColumnProvider virtualColumnProvider =
+          VirtualColumnProviderFactory.buildProvider(_schema.getFieldSpecFor(columnName).getVirtualColumnProvider());
+      return new ColumnDataSource(virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext),
+          virtualColumnProvider.buildMetadata(virtualColumnContext));
     } else {
-      return getVirtualDataSource(columnName);
+      return new ColumnDataSource(fieldSpec, _numDocsIndexed, _maxNumValuesMap.get(columnName),
+          _indexReaderWriterMap.get(columnName), _invertedIndexMap.get(columnName), _dictionaryMap.get(columnName),
+          _bloomFilterMap.get(columnName));
     }
-  }
-
-  private ColumnDataSource getVirtualDataSource(String column) {
-    VirtualColumnContext virtualColumnContext =
-        new VirtualColumnContext(NetUtil.getHostnameOrAddress(), getSegmentName(), column, _numDocsIndexed + 1);
-    VirtualColumnProvider provider =
-        VirtualColumnProviderFactory.buildProvider(_schema.getFieldSpecFor(column).getVirtualColumnProvider());
-    return new ColumnDataSource(provider.buildColumnIndexContainer(virtualColumnContext),
-        provider.buildMetadata(virtualColumnContext));
   }
 
   @Override
@@ -475,10 +473,10 @@ public class MutableSegmentImpl implements MutableSegment {
    * @return Generic row with physical columns of the specified row.
    */
   public GenericRow getRecord(int docId, GenericRow reuse) {
-    for (FieldSpec fieldSpec : _physicalColumnFieldSpecs) {
+    for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       String column = fieldSpec.getName();
-      reuse.putField(column,
-          IndexSegmentUtils.getValue(docId, fieldSpec, _indexReaderWriterMap.get(column), _dictionaryMap.get(column),
+      reuse.putField(column, IndexSegmentUtils
+          .getValue(docId, fieldSpec, _indexReaderWriterMap.get(column), _dictionaryMap.get(column),
               _maxNumValuesMap.getOrDefault(column, 0)));
     }
     return reuse;
@@ -604,7 +602,7 @@ public class MutableSegmentImpl implements MutableSegment {
     int[] dictIds = new int[_numKeyColumns]; // dimensions + time column.
 
     // FIXME: this for loop breaks for multi value dimensions. https://github.com/apache/incubator-pinot/issues/3867
-    for (FieldSpec fieldSpec : _physicalDimensionsFieldSpecs) {
+    for (FieldSpec fieldSpec : _physicalDimensionFieldSpecs) {
       dictIds[i++] = (Integer) dictIdMap.get(fieldSpec.getName());
     }
 
@@ -632,7 +630,8 @@ public class MutableSegmentImpl implements MutableSegment {
    *
    * @return Map from dictionary id array to doc id, null if metrics aggregation cannot be enabled.
    */
-  private IdMap<FixedIntArray> enableMetricsAggregationIfPossible(RealtimeSegmentConfig config, Set<String> noDictionaryColumns) {
+  private IdMap<FixedIntArray> enableMetricsAggregationIfPossible(RealtimeSegmentConfig config,
+      Set<String> noDictionaryColumns) {
     _aggregateMetrics = config.aggregateMetrics();
     if (!_aggregateMetrics) {
       _logger.info("Metrics aggregation is disabled.");
@@ -641,7 +640,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
     // All metric columns should have no-dictionary index.
     // All metric columns must be single value
-    for (FieldSpec fieldSpec : _physicalMetricsFieldSpecs) {
+    for (FieldSpec fieldSpec : _physicalMetricFieldSpecs) {
       String metric = fieldSpec.getName();
       if (!noDictionaryColumns.contains(metric)) {
         _logger
@@ -660,7 +659,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
     // All dimension columns should be dictionary encoded.
     // All dimension columns must be single value
-    for (FieldSpec fieldSpec : _physicalDimensionsFieldSpecs) {
+    for (FieldSpec fieldSpec : _physicalDimensionFieldSpecs) {
       String dimension = fieldSpec.getName();
       if (noDictionaryColumns.contains(dimension)) {
         _logger

@@ -667,13 +667,13 @@ public class SegmentGeneratorConfig {
   private String getQualifyingFields(FieldType type, boolean excludeVirtualColumns) {
     List<String> fields = new ArrayList<>();
 
-    for (final FieldSpec spec : getSchema().getAllFieldSpecs()) {
-      if (excludeVirtualColumns && getSchema().isVirtualColumn(spec.getName())) {
+    for (FieldSpec fieldSpec : getSchema().getAllFieldSpecs()) {
+      if (excludeVirtualColumns && fieldSpec.isVirtualColumn()) {
         continue;
       }
 
-      if (spec.getFieldType() == type) {
-        fields.add(spec.getName());
+      if (fieldSpec.getFieldType() == type) {
+        fields.add(fieldSpec.getName());
       }
     }
 
