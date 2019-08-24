@@ -43,6 +43,8 @@ public class ControllerLeaderLocator {
   private final HelixManager _helixManager;
 
   // Indicates whether cached controller leader value is valid. If so, caches the host-port pair as the last known controller leader.
+  // In general the number of tables having consuming segments in a host is smaller than the number of partitions in lead controller resource.
+  // Thus, we use raw table name as the key instead of partition name of lead controller resource in the cache.
   private final Map<String, Pair<String, Integer>> _cachedValidControllerLeaderMap;
 
   // Time in millis when cache invalidate was last set
@@ -136,7 +138,7 @@ public class ControllerLeaderLocator {
     if (leaderHostAndPortPair != null) {
       return leaderHostAndPortPair;
     } else {
-      LOGGER.warn("Could not locate leader for Table: {}", rawTableName);
+      LOGGER.warn("Could not locate leader for table: {}", rawTableName);
       return null;
     }
   }
