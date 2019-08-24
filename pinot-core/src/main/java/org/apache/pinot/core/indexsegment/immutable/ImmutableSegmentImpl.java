@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.indexsegment.IndexSegmentUtils;
 import org.apache.pinot.core.io.reader.DataFileReader;
@@ -161,12 +162,15 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Override
   public GenericRow getRecord(int docId, GenericRow reuse) {
-    for (FieldSpec fieldSpec : _segmentMetadata.getSchema().getAllFieldSpecs()) {
+    Schema schema = _segmentMetadata.getSchema();
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();
-      ColumnIndexContainer indexContainer = _indexContainerMap.get(column);
-      reuse.putField(column, IndexSegmentUtils
-          .getValue(docId, fieldSpec, indexContainer.getForwardIndex(), indexContainer.getDictionary(),
-              _segmentMetadata.getColumnMetadataFor(column).getMaxNumberOfMultiValues()));
+      if (!schema.isVirtualColumn(column)) {
+        ColumnIndexContainer indexContainer = _indexContainerMap.get(column);
+        reuse.putField(column, IndexSegmentUtils
+            .getValue(docId, fieldSpec, indexContainer.getForwardIndex(), indexContainer.getDictionary(),
+                _segmentMetadata.getColumnMetadataFor(column).getMaxNumberOfMultiValues()));
+      }
     }
     return reuse;
   }
