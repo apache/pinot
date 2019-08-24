@@ -27,6 +27,7 @@ import org.apache.helix.PropertyKey;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
@@ -75,6 +76,7 @@ public class LeadControllerManager {
                   _controllerMetrics
                       .addMeteredGlobalValue(ControllerMeter.CONTROLLER_LEADERSHIP_CHANGE_WITHOUT_CALLBACK, 1L);
                 }
+                _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_LEADER, 1L);
               } else {
                 if (_amIHelixLeader) {
                   _amIHelixLeader = false;
@@ -82,6 +84,7 @@ public class LeadControllerManager {
                   _controllerMetrics
                       .addMeteredGlobalValue(ControllerMeter.CONTROLLER_LEADERSHIP_CHANGE_WITHOUT_CALLBACK, 1L);
                 }
+                _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_LEADER, 0L);
               }
               LeadControllerManager.this.wait(CONTROLLER_LEADERSHIP_FETCH_INTERVAL_MS);
             }
@@ -118,6 +121,7 @@ public class LeadControllerManager {
     LOGGER.info("Add Partition: {} to LeadControllerManager", partitionName);
     int partitionId = LeadControllerUtils.extractPartitionId(partitionName);
     _leadForPartitions.add(partitionId);
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_PARTITION_LEADER, partitionName, 1L);
   }
 
   /**
@@ -128,6 +132,7 @@ public class LeadControllerManager {
     LOGGER.info("Remove Partition: {} from LeadControllerManager", partitionName);
     int partitionId = LeadControllerUtils.extractPartitionId(partitionName);
     _leadForPartitions.remove(partitionId);
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_PARTITION_LEADER, partitionName, 0L);
   }
 
   /**
@@ -201,6 +206,7 @@ public class LeadControllerManager {
       } else {
         LOGGER.info("Already Helix leader. Duplicate notification");
       }
+      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_LEADER, 1L);
     } else {
       if (_amIHelixLeader) {
         _amIHelixLeader = false;
@@ -208,6 +214,7 @@ public class LeadControllerManager {
       } else {
         LOGGER.info("Already not Helix leader. Duplicate notification");
       }
+      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_LEADER, 0L);
     }
   }
 
@@ -221,9 +228,11 @@ public class LeadControllerManager {
     if (isLeadControllerResourceEnabled()) {
       LOGGER.info("Lead controller resource is enabled.");
       _isLeadControllerResourceEnabled = true;
+      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_LEAD_CONTROLLER_ENABLED, 1L);
     } else {
       LOGGER.info("Lead controller resource is disabled.");
       _isLeadControllerResourceEnabled = false;
+      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_LEAD_CONTROLLER_ENABLED, 0L);
     }
   }
 }
