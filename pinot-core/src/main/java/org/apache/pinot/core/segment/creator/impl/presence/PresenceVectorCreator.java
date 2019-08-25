@@ -27,7 +27,9 @@ import org.apache.pinot.core.bloom.BloomFilter;
 import org.apache.pinot.core.bloom.BloomFilterUtil;
 import org.apache.pinot.core.bloom.SegmentBloomFilterFactory;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.roaringbitmap.ImmutableBitmapDataProvider;
 import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -54,5 +56,10 @@ public class PresenceVectorCreator implements AutoCloseable {
 
   public void setIsNull(int docId) {
     _nullBitmap.add(docId);
+  }
+
+
+  protected ImmutableBitmapDataProvider getRoaringBitmap() {
+    return _nullBitmap;
   }
 }

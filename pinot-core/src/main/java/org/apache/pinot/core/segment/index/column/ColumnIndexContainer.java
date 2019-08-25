@@ -22,7 +22,7 @@ import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
-import org.apache.pinot.core.segment.index.readers.PresenceVectorReader;
+import org.apache.pinot.core.segment.index.readers.PresenceVectorReaderImpl;
 
 
 /**
@@ -55,5 +55,5 @@ public interface ColumnIndexContainer {
    *
    * @return Get the bloom filter for the column if it exists else  {@code null}
    */
-  PresenceVectorReader getPresenceVector();
+  PresenceVectorReaderImpl getPresenceVector();
 }

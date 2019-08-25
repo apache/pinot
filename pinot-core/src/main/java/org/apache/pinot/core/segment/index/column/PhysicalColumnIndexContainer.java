@@ -44,7 +44,7 @@ import org.apache.pinot.core.segment.index.readers.OnHeapFloatDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapIntDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapLongDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapStringDictionary;
-import org.apache.pinot.core.segment.index.readers.PresenceVectorReader;
+import org.apache.pinot.core.segment.index.readers.PresenceVectorReaderImpl;
 import org.apache.pinot.core.segment.index.readers.StringDictionary;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
@@ -60,7 +60,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   private final InvertedIndexReader _invertedIndex;
   private final BaseImmutableDictionary _dictionary;
   private final BloomFilterReader _bloomFilterReader;
-  private final PresenceVectorReader _presenceVectorReader;
+  private final PresenceVectorReaderImpl _presenceVectorReader;
 
   public PhysicalColumnIndexContainer(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
       IndexLoadingConfig indexLoadingConfig)
@@ -77,7 +77,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
 
     if(segmentReader.hasIndexFor(columnName, ColumnIndexType.PRESENCE_VECTOR)) {
       PinotDataBuffer presenceVectorBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.PRESENCE_VECTOR);
-      _presenceVectorReader = new PresenceVectorReader(presenceVectorBuffer);
+      _presenceVectorReader = new PresenceVectorReaderImpl(presenceVectorBuffer);
     } else {
       _presenceVectorReader = null;
     }
@@ -151,7 +151,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   }
 
   @Override
-  public PresenceVectorReader getPresenceVector() {
+  public PresenceVectorReaderImpl getPresenceVector() {
     return _presenceVectorReader;
   }
 

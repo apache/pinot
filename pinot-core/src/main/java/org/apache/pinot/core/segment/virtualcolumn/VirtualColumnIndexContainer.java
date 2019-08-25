@@ -23,7 +23,7 @@ import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
-import org.apache.pinot.core.segment.index.readers.PresenceVectorReader;
+import org.apache.pinot.core.segment.index.readers.PresenceVectorReaderImpl;
 
 
 /**
@@ -62,7 +62,7 @@ public class VirtualColumnIndexContainer implements ColumnIndexContainer {
   }
 
   @Override
-  public PresenceVectorReader getPresenceVector() {
+  public PresenceVectorReaderImpl getPresenceVector() {
     return null;
   }
 }

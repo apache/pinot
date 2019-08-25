@@ -16,20 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.index.readers;
+package org.apache.pinot.core.realtime.impl.presence;
+
+import org.apache.pinot.core.segment.index.readers.PresenceVectorReader;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 /**
- * Reader interface to read from an underlying Presence vector. This is
- * primarily used to check if a particular column value corresponding to
- * a document ID is null or not.
+ * Defines a real-time presence vector to be used in realtime ingestion.
  */
-public interface PresenceVectorReader {
+public class RealtimePresenceVectorReaderWriter implements PresenceVectorReader {
+    private final MutableRoaringBitmap _nullBitmap;
 
-    /**
-     * Check if the given docId is present in the Presence Vector
-     *
-     * @param docId specifies ID to check for presence
-     * @return true if docId is present in underlying Presence Vector. False otherwise
-     */
-    boolean isPresent(int docId);
+    public RealtimePresenceVectorReaderWriter() {
+        _nullBitmap = new MutableRoaringBitmap();
+    }
+
+    public void setIsNull(int docId) {
+        _nullBitmap.add(docId);
+    }
+
+    public boolean isPresent(int docId) {
+        return _nullBitmap.contains(docId);
+    }
 }

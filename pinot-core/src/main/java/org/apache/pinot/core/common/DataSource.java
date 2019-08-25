@@ -19,10 +19,7 @@
 package org.apache.pinot.core.common;
 
 import org.apache.pinot.core.operator.BaseOperator;
-import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
-import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
-import org.apache.pinot.core.segment.index.readers.PresenceVectorReader;
+import org.apache.pinot.core.segment.index.readers.*;
 
 
 public abstract class DataSource extends BaseOperator {

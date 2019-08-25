@@ -22,12 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import java.io.File;
 import java.io.IOException;
-import java.util.Collection;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -59,12 +54,14 @@ import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForward
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.presence.PresenceVectorCreator;
 import org.apache.pinot.startree.hll.HllConfig;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.common.utils.CommonConstants.Segment.NULL_FIELDS;
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.*;
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.StarTree.*;
@@ -82,6 +79,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
   private Map<String, ForwardIndexCreator> _forwardIndexCreatorMap = new HashMap<>();
   private Map<String, InvertedIndexCreator> _invertedIndexCreatorMap = new HashMap<>();
+  private Map<String, PresenceVectorCreator> _presenceVectorCreatorMap = new HashMap<>();
   private String segmentName;
   private Schema schema;
   private File _indexDir;
@@ -190,6 +188,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
             getRawIndexCreatorForColumn(_indexDir, compressionType, columnName, fieldSpec.getDataType(), totalDocs,
                 indexCreationInfo.getLengthOfLongestEntry()));
       }
+
+      // Initialize Presence vector map
+      _presenceVectorCreatorMap.put(columnName, new PresenceVectorCreator(_indexDir, columnName));
     }
   }
 
@@ -255,6 +256,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   @Override
   public void indexRow(GenericRow row) {
+
+    // Determine if we need to process presence vector per row, per column
+    boolean processPresenceVector = false;
+    Set<String> nullFieldsSet = null;
+    if (row.getValue(NULL_FIELDS) != null) {
+      processPresenceVector = true;
+      String nullFieldsStr = (String) row.getValue(NULL_FIELDS);
+      nullFieldsSet = new HashSet<>(Arrays.asList(nullFieldsStr.split(",")));
+    }
+
     for (String columnName : _forwardIndexCreatorMap.keySet()) {
       Object columnValueToIndex = row.getValue(columnName);
       if (columnValueToIndex == null) {
@@ -279,6 +290,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         if (_invertedIndexCreatorMap.containsKey(columnName)) {
           _invertedIndexCreatorMap.get(columnName).add(dictIds, dictIds.length);
         }
+      }
+
+      // If row has null value for given column name, add to presence vector
+      if (processPresenceVector && nullFieldsSet.contains(columnName)) {
+        _presenceVectorCreatorMap.get(columnName).setIsNull(docIdCounter);
       }
     }
     docIdCounter++;
