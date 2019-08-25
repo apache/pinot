@@ -35,6 +35,7 @@ import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Class for handling lead controller assignments given the table names. This should be created at controller startup.
  */
@@ -228,11 +229,11 @@ public class LeadControllerManager {
     if (isLeadControllerResourceEnabled()) {
       LOGGER.info("Lead controller resource is enabled.");
       _isLeadControllerResourceEnabled = true;
-      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_LEAD_CONTROLLER_ENABLED, 1L);
+      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_LEAD_CONTROLLER_RESOURCE_ENABLED, 1L);
     } else {
       LOGGER.info("Lead controller resource is disabled.");
       _isLeadControllerResourceEnabled = false;
-      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_LEAD_CONTROLLER_ENABLED, 0L);
+      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_LEAD_CONTROLLER_RESOURCE_ENABLED, 0L);
     }
   }
 }
