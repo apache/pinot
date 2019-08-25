@@ -154,6 +154,11 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     _virtualColumnProvider = virtualColumnProvider;
   }
 
+  /**
+   * Returns whether the column is virtual. Virtual columns are constructed while loading the segment, thus do not exist
+   * in the record, nor should be persisted to the disk.
+   * <p>Identify a column as virtual if the virtual column provider is configured.
+   */
   @JsonIgnore
   public boolean isVirtualColumn() {
     return _virtualColumnProvider != null && !_virtualColumnProvider.isEmpty();
