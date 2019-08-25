@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.periodictask;
 
+import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ControllerGauge;
@@ -57,7 +58,14 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   protected final void runTask() {
     _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN, 1L);
     try {
-      processTables(_pinotHelixResourceManager.getAllTables());
+      // Process the tables that are managed by this controller
+      List<String> tablesToProcess = new ArrayList<>();
+      for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
+        if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
+          tablesToProcess.add(tableNameWithType);
+        }
+      }
+      processTables(tablesToProcess);
     } catch (Exception e) {
       LOGGER.error("Caught exception while running task: {}", _taskName, e);
       _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR, 1L);
@@ -78,10 +86,6 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
       if (!isStarted()) {
         LOGGER.info("Task: {} is stopped, early terminate the task", _taskName);
         break;
-      }
-      // Check if current controller is the leader for this table.
-      if (!_leadControllerManager.isLeaderForTable(tableNameWithType)) {
-        continue;
       }
       try {
         processTable(tableNameWithType, context);
