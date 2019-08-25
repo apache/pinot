@@ -26,7 +26,9 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.realtime.stream.StreamMessageMetadata;
@@ -51,15 +53,21 @@ public class MutableSegmentImplAggregateMetricsTest {
   public void setUp() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addSingleValueDimension(DIMENSION_1, FieldSpec.DataType.INT)
-            .addSingleValueDimension(DIMENSION_2, FieldSpec.DataType.STRING)
-            .addMetric(METRIC, FieldSpec.DataType.LONG)
-            .addMetric(METRIC_2, FieldSpec.DataType.FLOAT)
-            .addTime(TIME_COLUMN, TimeUnit.DAYS, FieldSpec.DataType.INT)
-            .build();
+        .addSingleValueDimension(DIMENSION_2, FieldSpec.DataType.STRING).addMetric(METRIC, FieldSpec.DataType.LONG)
+        .addMetric(METRIC_2, FieldSpec.DataType.FLOAT).addTime(TIME_COLUMN, TimeUnit.DAYS, FieldSpec.DataType.INT)
+        .build();
+    // Add virtual columns, which should not be aggregated
+    DimensionFieldSpec virtualDimensionFieldSpec =
+        new DimensionFieldSpec("$virtualDimension", FieldSpec.DataType.INT, true, Object.class);
+    schema.addField(virtualDimensionFieldSpec);
+    MetricFieldSpec virtualMetricFieldSpec = new MetricFieldSpec("$virtualMetric", FieldSpec.DataType.INT);
+    virtualMetricFieldSpec.setVirtualColumnProvider("provider.class");
+    schema.addField(virtualMetricFieldSpec);
+
     _mutableSegmentImpl = MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(DIMENSION_1, METRIC, METRIC_2)),
-            new HashSet<>(Arrays.asList(DIMENSION_1)),
-            Collections.singleton(DIMENSION_1), true);
+        .createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(METRIC, METRIC_2)),
+            Collections.singleton(DIMENSION_2), new HashSet<>(Arrays.asList(DIMENSION_1, DIMENSION_2, TIME_COLUMN)),
+            true);
   }
 
   @Test
@@ -111,8 +119,8 @@ public class MutableSegmentImplAggregateMetricsTest {
   }
 
   private String buildKey(GenericRow row) {
-    return String.valueOf(row.getValue(DIMENSION_1)) + KEY_SEPARATOR +
-        row.getValue(DIMENSION_2) + KEY_SEPARATOR + row.getValue(TIME_COLUMN);
+    return row.getValue(DIMENSION_1) + KEY_SEPARATOR + row.getValue(DIMENSION_2) + KEY_SEPARATOR + row
+        .getValue(TIME_COLUMN);
   }
 
   @AfterClass

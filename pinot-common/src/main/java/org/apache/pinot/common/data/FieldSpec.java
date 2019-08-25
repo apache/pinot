@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.data;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import javax.annotation.Nullable;
@@ -151,6 +152,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
 
   public void setVirtualColumnProvider(String virtualColumnProvider) {
     _virtualColumnProvider = virtualColumnProvider;
+  }
+
+  /**
+   * Returns whether the column is virtual. Virtual columns are constructed while loading the segment, thus do not exist
+   * in the record, nor should be persisted to the disk.
+   * <p>Identify a column as virtual if the virtual column provider is configured.
+   */
+  @JsonIgnore
+  public boolean isVirtualColumn() {
+    return _virtualColumnProvider != null && !_virtualColumnProvider.isEmpty();
   }
 
   public Object getDefaultNullValue() {

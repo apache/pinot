@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.data.DimensionFieldSpec;
+import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -104,26 +104,31 @@ public class SegmentInfoProvider {
     }
 
     IndexSegment indexSegment = ImmutableSegmentLoader.load(segmentDir, ReadMode.heap);
-    Schema schema = indexSegment.getSegmentMetadata().getSchema();
 
-    // Add time column if exists.
-    String timeColumn = schema.getTimeColumnName();
-    if (timeColumn != null) {
-      uniqueSingleValueDimensions.add(timeColumn);
-      loadValuesForSingleValueDimension(indexSegment, singleValueDimensionValuesMap, timeColumn);
-    }
+    try {
+      Schema schema = indexSegment.getSegmentMetadata().getSchema();
 
-    // Add all metric columns.
-    uniqueMetrics.addAll(schema.getMetricNames());
+      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+        // Ignore virtual columns and multi-value columns
+        if (fieldSpec.isVirtualColumn() || !fieldSpec.isSingleValueField()) {
+          continue;
+        }
 
-    // Add all single-value dimension columns.
-    for (DimensionFieldSpec fieldSpec : schema.getDimensionFieldSpecs()) {
-      if (!fieldSpec.isSingleValueField() || schema.isVirtualColumn(fieldSpec.getName())) {
-        continue;
+        String columnName = fieldSpec.getName();
+        FieldSpec.FieldType fieldType = fieldSpec.getFieldType();
+        switch (fieldType) {
+          // Treat TIME column as single-value dimension column
+          case DIMENSION:
+          case TIME:
+            uniqueSingleValueDimensions.add(columnName);
+            loadValuesForSingleValueDimension(indexSegment, singleValueDimensionValuesMap, columnName);
+            break;
+          case METRIC:
+            uniqueMetrics.add(columnName);
+        }
       }
-      String column = fieldSpec.getName();
-      uniqueSingleValueDimensions.add(column);
-      loadValuesForSingleValueDimension(indexSegment, singleValueDimensionValuesMap, column);
+    } finally {
+      indexSegment.destroy();
     }
 
     if (tmpDir != null) {
