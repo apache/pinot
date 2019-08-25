@@ -90,11 +90,10 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   public synchronized Map<String, String> scheduleTasks() {
     Map<String, String> tasksScheduled = scheduleTasks(_pinotHelixResourceManager.getAllTables());
 
-    // NOTE: this method might be called from the Rest API instead of the periodic task scheduler on non-leader
-    // controllers, so if the task is stopped (non-leader controller), clean up the task
-    if (!isStarted()) {
-      cleanUpTask();
-    }
+    // Reset the task because this method will be called from the Rest API instead of the periodic task scheduler
+    // TODO: Clean up only the non-leader tables instead of all tables
+    cleanUpTask();
+    setUpTask();
 
     return tasksScheduled;
   }
@@ -105,7 +104,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    * @param tableNamesWithType List of table names with type suffix
    * @return Map from task type to task scheduled
    */
-  private Map<String, String> scheduleTasks(List<String> tableNamesWithType) {
+  private synchronized Map<String, String> scheduleTasks(List<String> tableNamesWithType) {
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
 
     Set<String> taskTypes = _taskGeneratorRegistry.getAllTaskTypes();
