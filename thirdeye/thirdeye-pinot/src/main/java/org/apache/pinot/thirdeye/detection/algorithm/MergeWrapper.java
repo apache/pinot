@@ -68,7 +68,7 @@ public class MergeWrapper extends DetectionPipeline {
       if (res != 0) return res;
 
       // later for end time
-      res = Long.compare(o2.getStartTime(), o1.getStartTime());
+      res = Long.compare(o2.getEndTime(), o1.getEndTime());
       if (res != 0) return res;
 
       // pre-existing
