@@ -18,18 +18,13 @@
  */
 package org.apache.pinot.core.segment.creator.impl.presence;
 
+import java.io.Closeable;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.ObjectOutput;
-import org.apache.pinot.core.bloom.BloomFilter;
-import org.apache.pinot.core.bloom.BloomFilterUtil;
-import org.apache.pinot.core.bloom.SegmentBloomFilterFactory;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.roaringbitmap.ImmutableBitmapDataProvider;
-import org.roaringbitmap.RoaringBitmap;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -37,7 +32,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * Presence Vector Creator
  *
  */
-public class PresenceVectorCreator implements AutoCloseable {
+public class PresenceVectorCreator implements Closeable {
 
   private MutableRoaringBitmap _nullBitmap;
   private File _presenceVectorFile;

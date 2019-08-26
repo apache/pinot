@@ -21,10 +21,15 @@ package org.apache.pinot.core.data.recordtransformer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.FieldSpec.FieldType;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
+
+import static org.apache.pinot.common.utils.CommonConstants.Segment.NULL_FIELDS;
 
 
 public class NullValueTransformer implements RecordTransformer {
@@ -53,6 +58,9 @@ public class NullValueTransformer implements RecordTransformer {
           && ((List) value).isEmpty())) {
         record.putDefaultNullValue(fieldName, entry.getValue());
       }
+    }
+    if (nullFields != null) {
+      record.putField(NULL_FIELDS, nullFields.stream().collect(Collectors.joining(",")));
     }
     return record;
   }
