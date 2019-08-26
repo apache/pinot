@@ -114,12 +114,6 @@ public class DetectionUtils {
       return Collections.emptyList();
     }
 
-    df = df.filter(df.getLongs(COL_TIME).between(slice.getStart(), slice.getEnd())).dropNull(COL_TIME);
-
-    if (df.isEmpty()) {
-      return Collections.emptyList();
-    }
-
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     LongSeries sTime = df.getLongs(COL_TIME);
     BooleanSeries sVal = df.getBooleans(seriesName);

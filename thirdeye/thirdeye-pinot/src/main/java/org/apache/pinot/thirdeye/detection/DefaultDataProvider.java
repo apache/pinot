@@ -373,7 +373,8 @@ public class DefaultDataProvider implements DataProvider {
     }
 
     // align to time buckets and request time zone
-    long timeGranularity = granularity.toMillis();
+    // if granularity is more than 1 day, align to the daily boundary
+    long timeGranularity = Math.min(granularity.toMillis(), TimeUnit.DAYS.toMillis(1));
     long start = (slice.getStart() / timeGranularity) * timeGranularity;
     long end = ((slice.getEnd() + timeGranularity - 1) / timeGranularity) * timeGranularity;
 
