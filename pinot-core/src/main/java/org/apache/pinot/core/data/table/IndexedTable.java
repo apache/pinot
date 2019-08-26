@@ -40,7 +40,7 @@ public abstract class IndexedTable implements Table {
   /** Factor used to decide eviction threshold **/
   private static final double EVICTION_FACTOR = 1.1;
 
-  private List<AggregationFunction> _aggregationFunctions;
+  List<AggregationFunction> _aggregationFunctions;
   DataSchema _dataSchema;
   List<AggregationInfo> _aggregationInfos;
   List<SelectionSort> _orderBy;
@@ -66,12 +66,4 @@ public abstract class IndexedTable implements Table {
     _bufferedCapacity = (int) (maxCapacity * BUFFER_FACTOR);
     _evictCapacity = (int) (maxCapacity * EVICTION_FACTOR);
   }
-
-  void aggregate(Record existingRecord, Record newRecord) {
-    for (int i = 0; i < _aggregationFunctions.size(); i++) {
-      existingRecord.getValues()[i] =
-          _aggregationFunctions.get(i).merge(existingRecord.getValues()[i], newRecord.getValues()[i]);
-    }
-  }
-
 }

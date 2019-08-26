@@ -62,15 +62,19 @@ public class SimpleIndexedTable extends IndexedTable {
 
     Integer index = _lookupTable.get(keys);
     if (index == null) {
-      if (size() >= _bufferedCapacity) {
-        resize(_evictCapacity);
-      }
       index = size();
       _lookupTable.put(keys, index);
       _records.add(index, newRecord);
     } else {
       Record existingRecord = _records.get(index);
-      aggregate(existingRecord, newRecord);
+      for (int i = 0; i < _aggregationFunctions.size(); i++) {
+        existingRecord.getValues()[i] =
+            _aggregationFunctions.get(i).merge(existingRecord.getValues()[i], newRecord.getValues()[i]);
+      }
+    }
+
+    if (size() >= _bufferedCapacity) {
+      resize(_evictCapacity);
     }
     return true;
   }

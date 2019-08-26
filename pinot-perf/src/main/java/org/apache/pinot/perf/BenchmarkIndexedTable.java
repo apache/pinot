@@ -205,21 +205,6 @@ public class BenchmarkIndexedTable {
     mergedTable.finish();
   }
 
-
-  /*@Benchmark
-  @BenchmarkMode(Mode.AverageTime)
-  @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public void simpleUpsert() {
-
-  }
-
-  @Benchmark
-  @BenchmarkMode(Mode.AverageTime)
-  @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public void concurrentUpsert() {
-
-  }*/
-
   public static void main(String[] args) throws Exception {
     ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkIndexedTable.class.getSimpleName())
         .warmupTime(TimeValue.seconds(10))

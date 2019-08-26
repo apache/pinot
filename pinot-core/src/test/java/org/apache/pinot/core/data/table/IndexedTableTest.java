@@ -19,7 +19,6 @@
 package org.apache.pinot.core.data.table;
 
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -186,10 +185,8 @@ public class IndexedTableTest {
 
     // repeat row a
     indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
+    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
     Assert.assertEquals(indexedTable.size(), 2);
-
-    // check aggregations
-    checkAggregations(indexedTable, Sets.newHashSet(20d, 10d));
 
     indexedTable.upsert(getRecord(new Object[]{"c", 3, 30d}, new Object[]{10d, 300d}));
     indexedTable.upsert(getRecord(new Object[]{"d", 4, 40d}, new Object[]{10d, 400d}));
@@ -210,30 +207,25 @@ public class IndexedTableTest {
     // insert 2 more rows to reach buffer limit
     indexedTable.upsert(getRecord(new Object[]{"k", 11, 110d}, new Object[]{10d, 1100d}));
     indexedTable.upsert(getRecord(new Object[]{"l", 12, 120d}, new Object[]{10d, 1200d}));
-    Assert.assertEquals(indexedTable.size(), 12);
+    // resized to evict capacity (evict a)
+    Assert.assertEquals(indexedTable.size(), 11);
+    checkSurvivors(indexedTable, "a");
+    checkAggregations(indexedTable, 30d);
 
     // repeat row b
     indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
-    Assert.assertEquals(indexedTable.size(), 12);
+    Assert.assertEquals(indexedTable.size(), 11);
 
-    // check aggregations
-    checkAggregations(indexedTable, Sets.newHashSet(20d, 30d, 10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d));
-
-    // new row, reorder and evict lowest 1 record
+    // new row, reorder and evict lowest 1 record (b)
     indexedTable.upsert(getRecord(new Object[]{"m", 13, 130d}, new Object[]{10d, 1300d}));
-    Assert.assertEquals(indexedTable.size(), 12);
-
-    // check the survivors, b should have been evicted
+    Assert.assertEquals(indexedTable.size(), 11);
     checkSurvivors(indexedTable, "b");
-
-    // check aggregations
-    checkAggregations(indexedTable, Sets.newHashSet(10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d, 20d, 10d));
-
+    checkAggregations(indexedTable, 30d);
 
     // repeat record j
     mergeTable.upsert(getRecord(new Object[]{"j", 10, 100d}, new Object[]{10d, 1000d}));
-    // repeat record a
-    mergeTable.upsert(getRecord(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
+    // repeat record c
+    mergeTable.upsert(getRecord(new Object[]{"c", 3, 30d}, new Object[]{10d, 300d}));
     // insert evicted record b
     mergeTable.upsert(getRecord(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
     // insert new record
@@ -242,26 +234,28 @@ public class IndexedTableTest {
 
     // merge with table
     indexedTable.merge(mergeTable);
-    Assert.assertEquals(indexedTable.size(), 12);
+    Assert.assertEquals(indexedTable.size(), 11);
 
     // check survivors, a and j should be evicted
-    checkSurvivors(indexedTable, "a", "j");
+    checkSurvivors(indexedTable, "c", "j");
 
     // check aggregations
-    checkAggregations(indexedTable, Sets.newHashSet(10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d, 10d));
+    checkAggregations(indexedTable, 20d);
 
     // finish
     indexedTable.finish();
     Assert.assertEquals(indexedTable.size(), 10);
   }
 
-  private void checkAggregations(Table indexedTable, Set<Double> expectedAgg) {
+  private void checkAggregations(Table indexedTable, double... evicted) {
     Iterator<Record> iterator = indexedTable.iterator();
     Set<Double> actualAgg = new HashSet<>();
     while (iterator.hasNext()) {
-      actualAgg.add((Double) iterator.next().getValues()[0]);
+      actualAgg.add((double) iterator.next().getValues()[0]);
     }
-    Assert.assertEquals(actualAgg, expectedAgg);
+    for (double d : evicted) {
+      Assert.assertFalse(actualAgg.contains(d));
+    }
   }
 
   private void checkSurvivors(Table indexedTable, String... evicted) {

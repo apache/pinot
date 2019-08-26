@@ -25,8 +25,6 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.AggregationInfo;
@@ -43,23 +41,15 @@ public class ConcurrentIndexedTable extends IndexedTable {
   private ConcurrentMap<Key, Record> _lookupMap;
   private Comparator<Record> _minHeapComparator;
   private ReentrantReadWriteLock _readWriteLock;
-  private Lock[] _locks;
-  private static final int NUM_KEYS = 10000;
 
   @Override
   public void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
       int maxCapacity) {
     super.init(dataSchema, aggregationInfos, orderBy, maxCapacity);
 
-    _minHeapComparator =
-        OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos).reversed();
+    _minHeapComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos).reversed();
     _lookupMap = new ConcurrentHashMap<>();
-
     _readWriteLock = new ReentrantReadWriteLock();
-    _locks = new Lock[NUM_KEYS];
-    for (int i = 0; i < NUM_KEYS; i ++) {
-      _locks[i] = new ReentrantLock();
-    }
   }
 
   /**
@@ -71,46 +61,27 @@ public class ConcurrentIndexedTable extends IndexedTable {
     Key key = newRecord.getKey();
     Preconditions.checkNotNull(key, "Cannot upsert record with null keys");
 
-    // synchronize on same key
-    int lockNum = Math.abs(key.hashCode()) % NUM_KEYS;
-    _locks[lockNum].lock();
-
-    Record existingRecord = _lookupMap.get(key);
-    if (existingRecord == null) {
-
-      // resize if exceeds capacity
-      if (_lookupMap.size() >= _bufferedCapacity) {
-        _readWriteLock.writeLock().lock();
-        try {
-          if (_lookupMap.size() >= _bufferedCapacity) {
-            resize(_evictCapacity);
-          }
-        } finally {
-          _readWriteLock.writeLock().unlock();
+    Record existingRecord = _lookupMap.putIfAbsent(key, newRecord);
+    if (existingRecord != null) {
+      _lookupMap.compute(key, (k, v) -> {
+        for (int i = 0; i < _aggregationFunctions.size(); i++) {
+          v.getValues()[i] = _aggregationFunctions.get(i).merge(v.getValues()[i], newRecord.getValues()[i]);
         }
-      }
-
-      // insert new record
-      _readWriteLock.readLock().lock();
-      try {
-        _lookupMap.put(key, newRecord);
-      } finally {
-        _readWriteLock.readLock().unlock();
-      }
-
-    } else {
-
-      // update old record
-      _readWriteLock.readLock().lock();
-      try {
-        aggregate(existingRecord, newRecord);
-      } finally {
-        _readWriteLock.readLock().unlock();
-      }
+        return v;
+      });
     }
 
-    _locks[lockNum].unlock();
-
+    // resize if exceeds capacity
+    if (_lookupMap.size() >= _bufferedCapacity) {
+      _readWriteLock.writeLock().lock();
+      try {
+        if (_lookupMap.size() >= _bufferedCapacity) {
+          resize(_evictCapacity);
+        }
+      } finally {
+        _readWriteLock.writeLock().unlock();
+      }
+    }
     return true;
   }
 
@@ -137,7 +108,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
     if (_lookupMap.size() > trimToSize) {
 
-      // make heap of elements to evict
+      // make min heap of elements to evict
       int heapSize = _lookupMap.size() - trimToSize;
       PriorityQueue<Record> minHeap = new PriorityQueue<>(heapSize, _minHeapComparator);
 
