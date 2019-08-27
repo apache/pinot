@@ -2152,14 +2152,19 @@ public class PinotHelixResourceManager {
     _helixAdmin.enableInstance(_helixClusterName, instanceName, toggle);
     long deadline = System.currentTimeMillis() + 1000 * timeOutInSeconds;
     boolean toggleSucceed;
-    String beforeToggleStates =
-        (toggle) ? SegmentOnlineOfflineStateModel.OFFLINE : SegmentOnlineOfflineStateModel.ONLINE;
+    String offlineState = SegmentOnlineOfflineStateModel.OFFLINE;
 
     while (System.currentTimeMillis() < deadline) {
       toggleSucceed = true;
       PropertyKey liveInstanceKey = _keyBuilder.liveInstance(instanceName);
       LiveInstance liveInstance = _helixDataAccessor.getProperty(liveInstanceKey);
-      if (liveInstance != null) {
+      if (liveInstance == null) {
+        if (!toggle) {
+          // If we disable the instance, we actually don't care whether live instance being null. Thus, returning success should be good.
+          // Otherwise, wait for at most 10 seconds.
+          return PinotResourceManagerResponse.SUCCESS;
+        }
+      } else {
         // Checks all the current states fall into the target states
         PropertyKey instanceCurrentStatesKey = _keyBuilder.currentStates(instanceName, liveInstance.getSessionId());
         List<CurrentState> instanceCurrentStates = _helixDataAccessor.getChildValues(instanceCurrentStatesKey);
@@ -2168,7 +2173,9 @@ public class PinotHelixResourceManager {
         } else {
           for (CurrentState currentState : instanceCurrentStates) {
             for (String state : currentState.getPartitionStateMap().values()) {
-              if (beforeToggleStates.equals(state)) {
+              // If instance is enabled, all the partitions should not eventually be offline.
+              // If instance is disabled, all the partitions should eventually be offline.
+              if ((toggle && !offlineState.equals(state)) || (!toggle && offlineState.equals(state))) {
                 toggleSucceed = false;
                 break;
               }
