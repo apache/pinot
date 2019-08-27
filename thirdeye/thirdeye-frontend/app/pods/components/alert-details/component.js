@@ -72,6 +72,8 @@ export default Component.extend({
   sortColumnStartUp: true,
   sortColumnChangeUp: false,
   sortColumnFeedbackUp: false,
+  sortColumnModifiedByUp: false,
+  sortColumnRuleUp: false,
   selectedSortMode: 'start:down',
   selectedBaseline: null,
   pageSize: 10,
@@ -541,10 +543,12 @@ export default Component.extend({
             change: change,
             shownChangeRate: change === 'N/A' ? change : humanizeFloat(change),
             anomalyFeedback: a.feedback ? a.feedback.feedbackType : a.statusClassification,
+            modifiedBy: this.get('_formattedModifiedBy')(a.feedback),
             dimensionList: Object.keys(a.dimensions),
             dimensions: a.dimensions,
             showResponseSaved: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseSaved : false,
-            showResponseFailed: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseFailed: false
+            showResponseFailed: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseFailed: false,
+            rule: this.get('_formattedRule')(a.properties)
           };
           tableData.push(tableRow);
         });
@@ -765,6 +769,30 @@ export default Component.extend({
         selectedBaseline: 'predicted'
       });
     }
+  },
+
+  _formattedModifiedBy(feedback) {
+    let result;
+    if (feedback && typeof feedback === 'object') {
+      if (feedback.updatedBy && feedback.updatedBy !== 'no-auth-user') {
+        result = feedback.updatedBy.split('@')[0];
+      } else {
+        result = '--';
+      }
+    }
+    return result;
+  },
+
+  _formattedRule(properties) {
+    let result;
+    if (properties && typeof properties === 'object') {
+      if (properties.detectorComponentName) {
+        result = properties.detectorComponentName.split(':')[0];
+      } else {
+        result = '--';
+      }
+    }
+    return result;
   },
 
   _formatAnomaly(anomaly) {
