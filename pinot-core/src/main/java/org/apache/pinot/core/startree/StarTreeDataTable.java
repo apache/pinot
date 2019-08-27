@@ -20,10 +20,8 @@ package org.apache.pinot.core.startree;
 
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.Arrays;
-import it.unimi.dsi.fastutil.Swapper;
 import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import it.unimi.dsi.fastutil.ints.IntComparator;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Iterator;
@@ -84,33 +82,22 @@ public class StarTreeDataTable implements Closeable {
       sortedDocIds[i] = i + startDocIdOffset;
     }
 
-    IntComparator comparator = new IntComparator() {
-      @Override
-      public int compare(int i1, int i2) {
-        long offset1 = sortedDocIds[i1] * _docSizeLong;
-        long offset2 = sortedDocIds[i2] * _docSizeLong;
-        for (int index : sortOrder) {
-          int v1 = _dataBuffer.getInt(offset1 + index * Integer.BYTES);
-          int v2 = _dataBuffer.getInt(offset2 + index * Integer.BYTES);
-          if (v1 != v2) {
-            return v1 - v2;
-          }
+    Arrays.quickSort(0, numDocs, (i1, i2) -> {
+      long offset1 = sortedDocIds[i1] * _docSizeLong;
+      long offset2 = sortedDocIds[i2] * _docSizeLong;
+      for (int index : sortOrder) {
+        int v1 = _dataBuffer.getInt(offset1 + index * Integer.BYTES);
+        int v2 = _dataBuffer.getInt(offset2 + index * Integer.BYTES);
+        if (v1 != v2) {
+          return v1 - v2;
         }
-        return 0;
       }
-
-      @Override
-      public int compare(Integer o1, Integer o2) {
-        throw new UnsupportedOperationException();
-      }
-    };
-
-    Swapper swapper = (i, j) -> {
+      return 0;
+    }, (i, j) -> {
       int temp = sortedDocIds[i];
       sortedDocIds[i] = sortedDocIds[j];
       sortedDocIds[j] = temp;
-    };
-    Arrays.quickSort(0, numDocs, comparator, swapper);
+    });
 
     // Re-arrange documents based on the sorted document ids
     // Each write places a document in it's proper location, so time complexity is O(n)

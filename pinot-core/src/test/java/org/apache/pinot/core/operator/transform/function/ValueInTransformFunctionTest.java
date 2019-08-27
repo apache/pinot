@@ -54,8 +54,6 @@ public class ValueInTransformFunctionTest extends BaseTransformFunctionTest {
         }
       }
       int[] expectedValues = expectedList.toIntArray();
-      // NOTE: need to sort the expected array because we sort the dictionary Ids for multi-valued entries
-      Arrays.sort(expectedValues);
 
       int numValues = expectedValues.length;
       for (int j = 0; j < numValues; j++) {

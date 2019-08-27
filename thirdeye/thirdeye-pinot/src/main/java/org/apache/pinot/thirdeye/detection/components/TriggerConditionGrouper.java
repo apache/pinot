@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.thirdeye.detection.DetectionUtils.*;
 import static org.apache.pinot.thirdeye.detection.ExpressionParser.*;
+import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator.*;
 
 
 /**
@@ -55,7 +56,6 @@ public class TriggerConditionGrouper implements Grouper<TriggerConditionGrouperS
   private Map<String, Object> rightOp;
   private InputDataFetcher dataFetcher;
 
-  static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
   static final String PROP_AND = "and";
   static final String PROP_OR = "or";
   static final String PROP_OPERATOR = "operator";
@@ -140,12 +140,13 @@ public class TriggerConditionGrouper implements Grouper<TriggerConditionGrouperS
   private List<MergedAnomalyResultDTO> groupAnomaliesByOperator(Map<String, Object> operatorNode, List<MergedAnomalyResultDTO> anomalies) {
     Preconditions.checkNotNull(operatorNode);
 
-    // Base condition - If reached leaf node, then return the anomalies corresponding to the entity/metric
+    // Base condition - If reached leaf node of operator tree, then return the anomalies corresponding to the entity/metric
     String value = MapUtils.getString(operatorNode, "value");
     if (value != null) {
       return anomalies.stream().filter(anomaly ->
-          anomaly.getProperties() != null && anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_NAME) != null
-              && anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_NAME).startsWith(value)
+          anomaly.getProperties() != null
+          && anomaly.getProperties().containsKey(PROP_SUB_ENTITY_NAME)
+          && anomaly.getProperties().get(PROP_SUB_ENTITY_NAME).equals(value)
       ).collect(Collectors.toList());
     }
 

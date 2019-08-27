@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.function.FunctionDefinitionRegistry;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -128,7 +129,9 @@ public class PinotQuery2BrokerRequestConverter {
           selection.addToSelectionColumns(expression.getIdentifier().getName());
           break;
         case FUNCTION:
-
+          if (expression.getFunctionCall().getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
+            expression = expression.getFunctionCall().getOperands().get(0);
+          }
           Function functionCall = expression.getFunctionCall();
           String functionName = functionCall.getOperator();
           if (FunctionDefinitionRegistry.isAggFunc(functionName)) {

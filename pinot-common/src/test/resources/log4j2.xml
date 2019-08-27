@@ -23,7 +23,7 @@
   <Appenders>
     <Console name="console" target="SYSTEM_OUT">
       <PatternLayout>
-        <pattern>%c{1} - %m%n</pattern>
+        <pattern>%d{HH:mm:ss.SSS} %c{1} - %m%n</pattern>
       </PatternLayout>
     </Console>
   </Appenders>

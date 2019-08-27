@@ -19,7 +19,6 @@
 package org.apache.pinot.core.startree.v2.builder;
 
 import com.google.common.base.Preconditions;
-import it.unimi.dsi.fastutil.ints.IntComparator;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -217,25 +216,17 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
           offset += Integer.BYTES;
         }
       }
-      it.unimi.dsi.fastutil.Arrays.quickSort(0, numDocs, new IntComparator() {
-        @Override
-        public int compare(int i1, int i2) {
-          long offset1 = (long) sortedDocIds[i1] * _numDimensions * Integer.BYTES;
-          long offset2 = (long) sortedDocIds[i2] * _numDimensions * Integer.BYTES;
-          for (int i = 0; i < _numDimensions; i++) {
-            int dimension1 = dataBuffer.getInt(offset1 + i * Integer.BYTES);
-            int dimension2 = dataBuffer.getInt(offset2 + i * Integer.BYTES);
-            if (dimension1 != dimension2) {
-              return dimension1 - dimension2;
-            }
+      it.unimi.dsi.fastutil.Arrays.quickSort(0, numDocs, (i1, i2) -> {
+        long offset1 = (long) sortedDocIds[i1] * _numDimensions * Integer.BYTES;
+        long offset2 = (long) sortedDocIds[i2] * _numDimensions * Integer.BYTES;
+        for (int i = 0; i < _numDimensions; i++) {
+          int dimension1 = dataBuffer.getInt(offset1 + i * Integer.BYTES);
+          int dimension2 = dataBuffer.getInt(offset2 + i * Integer.BYTES);
+          if (dimension1 != dimension2) {
+            return dimension1 - dimension2;
           }
-          return 0;
         }
-
-        @Override
-        public int compare(Integer o1, Integer o2) {
-          throw new UnsupportedOperationException();
-        }
+        return 0;
       }, (i1, i2) -> {
         int temp = sortedDocIds[i1];
         sortedDocIds[i1] = sortedDocIds[i2];
@@ -288,25 +279,17 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
     for (int i = 0; i < numDocs; i++) {
       sortedDocIds[i] = startDocId + i;
     }
-    it.unimi.dsi.fastutil.Arrays.quickSort(0, numDocs, new IntComparator() {
-      @Override
-      public int compare(int i1, int i2) {
-        long offset1 = _starTreeRecordOffsets.get(sortedDocIds[i1]);
-        long offset2 = _starTreeRecordOffsets.get(sortedDocIds[i2]);
-        for (int i = dimensionId + 1; i < _numDimensions; i++) {
-          int dimension1 = _starTreeRecordBuffer.getInt(offset1 + i * Integer.BYTES);
-          int dimension2 = _starTreeRecordBuffer.getInt(offset2 + i * Integer.BYTES);
-          if (dimension1 != dimension2) {
-            return dimension1 - dimension2;
-          }
+    it.unimi.dsi.fastutil.Arrays.quickSort(0, numDocs, (i1, i2) -> {
+      long offset1 = _starTreeRecordOffsets.get(sortedDocIds[i1]);
+      long offset2 = _starTreeRecordOffsets.get(sortedDocIds[i2]);
+      for (int i = dimensionId + 1; i < _numDimensions; i++) {
+        int dimension1 = _starTreeRecordBuffer.getInt(offset1 + i * Integer.BYTES);
+        int dimension2 = _starTreeRecordBuffer.getInt(offset2 + i * Integer.BYTES);
+        if (dimension1 != dimension2) {
+          return dimension1 - dimension2;
         }
-        return 0;
       }
-
-      @Override
-      public int compare(Integer o1, Integer o2) {
-        throw new UnsupportedOperationException();
-      }
+      return 0;
     }, (i1, i2) -> {
       int temp = sortedDocIds[i1];
       sortedDocIds[i1] = sortedDocIds[i2];

@@ -146,6 +146,9 @@ public class ThirdeyeMetricsUtil {
   public static final Counter cubeExceptionCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "cubeExceptionCounter");
 
+  public static final Counter detectionRetuneCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "detectionRetuneCounter");
+
   public static MetricsRegistry getMetricsRegistry() {
     return metricsRegistry;
   }

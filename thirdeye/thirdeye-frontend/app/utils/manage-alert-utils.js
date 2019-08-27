@@ -158,25 +158,38 @@ export function setUpTimeRangeOptions(datesKeys, duration) {
       [ '2w', ['Last 2 Weeks', 2, 'week'] ],
       [ '1w', ['Last Week', 1, 'week'] ],
       [ '2d', ['Yesterday', 2, 'day'] ],
-      [ '1d', ['Last 24 Hours', 1, 'day'] ],
-      [ '48h', ['Last 48 Hours', 2, 'day'] ],
+      [ '1d', ['Last 24 Hours', 24, 'hour'] ],
+      [ '48h', ['Last 48 Hours', 48, 'hour'] ],
       [ 'today', ['Today'] ]
     ]);
 
   datesKeys.forEach((value) => {
     const currVal = dateKeyMap.get(value);
     const label = currVal[0];
-    let start = moment().subtract(currVal[1], currVal[2]).startOf('day');
+    let start;
+    let end;
     // overrides map above
     switch(label) {
       case 'Today':
         start = moment().startOf('day');
+        end = start.add(1, 'days');
         break;
       case 'Yesterday':
         start = moment().subtract(1, 'day').startOf('day');
+        end = moment().startOf('day');
         break;
+      case 'Last 24 Hours':
+        start = moment().subtract(24, 'hour').startOf('hour');
+        end = moment().startOf('hour');
+        break;
+      case 'Last 48 Hours':
+        start = moment().subtract(48, 'hour').startOf('hour');
+        end = moment().startOf('hour');
+        break;
+      default:
+        start = moment().subtract(currVal[1], currVal[2]).startOf('day');
+        end = moment().startOf('day').add(1, 'days');
     }
-    const end = (label === 'Yesterday') ? moment().startOf('day') : moment().startOf('day').add(1, 'days');
     const isActive = duration === value;
     newRangeArr.push({ name: label, value, start, end, isActive });
   });

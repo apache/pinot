@@ -88,8 +88,8 @@ public abstract class ThirdEyeUtils {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
-  private static final String TWO_DECIMALS_FORMAT = "##.##";
-  private static final String MAX_DECIMALS_FORMAT = "##.#####";
+  private static final String TWO_DECIMALS_FORMAT = "#,###.##";
+  private static final String MAX_DECIMALS_FORMAT = "#,###.#####";
   private static final String DECIMALS_FORMAT_TOKEN = "#";
 
   private static final int DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE = 50;
@@ -338,22 +338,6 @@ public abstract class ThirdEyeUtils {
     return alias;
   }
 
-
-  //By default, query only offline, unless dataset has been marked as realtime
-  public static String computeTableName(String collection) {
-    String dataset = null;
-    try {
-      DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
-      dataset = collection + DatasetConfigBean.DATASET_OFFLINE_PREFIX;
-      if (datasetConfig.isRealtime()) {
-        dataset = collection;
-      }
-    } catch (ExecutionException e) {
-      LOG.error("Exception in getting dataset name {}", collection, e);
-    }
-    return dataset;
-  }
-
   public static Period getbaselineOffsetPeriodByMode(COMPARE_MODE compareMode) {
     int numWeeksAgo = 1;
     switch (compareMode) {
@@ -436,6 +420,7 @@ public abstract class ThirdEyeUtils {
       compareValue = compareValue * 0.1;
     }
     DecimalFormat decimalFormat = new DecimalFormat(decimalFormatBuffer.toString());
+
     return decimalFormat.format(value);
   }
 

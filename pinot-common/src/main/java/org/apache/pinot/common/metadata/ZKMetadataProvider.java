@@ -136,14 +136,6 @@ public class ZKMetadataProvider {
     }
   }
 
-  public static void removeInstancePartitionAssignmentFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String tableNameWithType) {
-    String propertyStorePath = constructPropertyStorePathForInstancePartitions(tableNameWithType);
-    if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
-      propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
-    }
-  }
-
   public static boolean setOfflineSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
       String offlineTableName, OfflineSegmentZKMetadata offlineSegmentZKMetadata, int expectedVersion) {
     // NOTE: Helix will throw ZkBadVersionException if version does not match

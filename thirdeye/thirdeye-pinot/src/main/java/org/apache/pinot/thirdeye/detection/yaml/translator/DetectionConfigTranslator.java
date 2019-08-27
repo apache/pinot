@@ -21,12 +21,10 @@ package org.apache.pinot.thirdeye.detection.yaml.translator;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
-import java.time.Period;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -125,6 +123,8 @@ import static org.apache.pinot.thirdeye.detection.yaml.DetectionConfigTuner.*;
  *
  */
 public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigDTO, DetectionConfigValidator> {
+  public static final String PROP_SUB_ENTITY_NAME = "subEntityName";
+
   private static final String PROP_DIMENSION_EXPLORATION = "dimensionExploration";
   private static final String PROP_DETECTION = "detection";
   private static final String PROP_CRON = "cron";
@@ -133,8 +133,6 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
   private static final String PROP_TYPE = "type";
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_PARAMS = "params";
-  private static final String PROP_METRIC = "metric";
-  private static final String PROP_DATASET = "dataset";
   private static final String PROP_METRIC_URN = "metricUrn";
   private static final String PROP_DIMENSION_FILTER_METRIC = "dimensionFilterMetric";
   private static final String PROP_NESTED_METRIC_URNS = "nestedMetricUrns";
@@ -167,13 +165,6 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
 
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
-  static {
-    // do not tune for alerts migrated from legacy anomaly function.
-    DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibAlertFilter",
-        "MIGRATED_ALGORITHM_FILTER");
-    DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibAnomalyDetector",
-        "MIGRATED_ALGORITHM");
-  }
   private static final Set<String> MOVING_WINDOW_DETECTOR_TYPES = ImmutableSet.of("ALGORITHM", "MIGRATED_ALGORITHM");
 
   private final Map<String, Object> components = new HashMap<>();
@@ -191,6 +182,8 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
   }
 
   private Map<String, Object> translateMetricAlert(Map<String, Object> metricAlertConfigMap) {
+    String subEntityName = MapUtils.getString(metricAlertConfigMap, PROP_NAME);
+
     DatasetConfigDTO datasetConfigDTO = metricAttributesMap.fetchDataset(metricAlertConfigMap);
     Map<String, Collection<String>> dimensionFiltersMap = ConfigUtils.getMap(metricAlertConfigMap.get(PROP_FILTERS));
     String metricUrn = MetricEntity.fromMetric(dimensionFiltersMap, metricAttributesMap.fetchMetric(metricAlertConfigMap).getId()).getUrn();
@@ -202,7 +195,8 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     for (Map<String, Object> ruleYaml : ruleYamls) {
       List<Map<String, Object>> filterYamls = ConfigUtils.getList(ruleYaml.get(PROP_FILTER));
       List<Map<String, Object>> detectionYamls = ConfigUtils.getList(ruleYaml.get(PROP_DETECTION));
-      List<Map<String, Object>> detectionProperties = buildListOfMergeWrapperProperties(metricUrn, detectionYamls, mergerProperties,
+      List<Map<String, Object>> detectionProperties = buildListOfMergeWrapperProperties(
+          subEntityName, metricUrn, detectionYamls, mergerProperties,
           datasetConfigDTO.bucketTimeGranularity());
       if (filterYamls.isEmpty()) {
         nestedPipelines.addAll(detectionProperties);
@@ -227,7 +221,10 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     // Wrap with metric level grouper, restricting to only 1 grouper
     List<Map<String, Object>> grouperYamls = getList(metricAlertConfigMap.get(PROP_GROUPER));
     if (!grouperYamls.isEmpty()) {
-      properties = buildGroupWrapperProperties(metricUrn, grouperYamls.get(0), Collections.singletonList(properties));
+      properties = buildWrapperProperties(
+          ChildKeepingMergeWrapper.class.getName(),
+          Collections.singletonList(buildGroupWrapperProperties(subEntityName, metricUrn, grouperYamls.get(0), Collections.singletonList(properties))),
+          mergerProperties);
     }
 
     return properties;
@@ -235,6 +232,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
 
   private Map<String, Object> translateCompositeAlert(Map<String, Object> compositeAlertConfigMap) {
     Map<String, Object> properties;
+    String subEntityName = MapUtils.getString(compositeAlertConfigMap, PROP_NAME);
 
     // Recursively translate all the sub-alerts
     List<Map<String, Object>> subDetectionYamls = ConfigUtils.getList(compositeAlertConfigMap.get(PROP_ALERTS));
@@ -253,19 +251,15 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     // Wrap the entity level grouper, only 1 grouper is supported now
     List<Map<String, Object>> grouperProps = ConfigUtils.getList(compositeAlertConfigMap.get(PROP_GROUPER));
     if (!grouperProps.isEmpty()) {
-      properties = buildGroupWrapperProperties(grouperProps.get(0), nestedPropertiesList);
-    } else {
-      Map<String, Object> defaultGrouper = new HashMap<>();
-      defaultGrouper.put(PROP_TYPE, "MOCK_GROUPER");
-      defaultGrouper.put(PROP_NAME, "Default grouper");
-      properties = buildGroupWrapperProperties(defaultGrouper, nestedPropertiesList);
+      properties = buildGroupWrapperProperties(subEntityName, grouperProps.get(0), nestedPropertiesList);
+      nestedPropertiesList = Collections.singletonList(properties);
     }
 
     // Wrap the entity level merger
     Map<String, Object> mergerProperties = ConfigUtils.getMap(compositeAlertConfigMap.get(PROP_MERGER));
     properties = buildWrapperProperties(
         ChildKeepingMergeWrapper.class.getName(),
-        Collections.singletonList(properties),
+        nestedPropertiesList,
         mergerProperties);
 
     return properties;
@@ -320,21 +314,22 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     return dimensionWrapperProperties;
   }
 
-  private List<Map<String, Object>> buildListOfMergeWrapperProperties(String metricUrn, List<Map<String, Object>> yamlConfigs,
-      Map<String, Object> mergerProperties, TimeGranularity datasetTimegranularity) {
+  private List<Map<String, Object>> buildListOfMergeWrapperProperties(String subEntityName, String metricUrn,
+      List<Map<String, Object>> yamlConfigs, Map<String, Object> mergerProperties, TimeGranularity datasetTimegranularity) {
     List<Map<String, Object>> properties = new ArrayList<>();
     for (Map<String, Object> yamlConfig : yamlConfigs) {
-      properties.add(buildMergeWrapperProperties(metricUrn, yamlConfig, mergerProperties, datasetTimegranularity));
+      properties.add(buildMergeWrapperProperties(subEntityName, metricUrn, yamlConfig, mergerProperties, datasetTimegranularity));
     }
     return properties;
   }
 
-  private Map<String, Object> buildMergeWrapperProperties(String metricUrn, Map<String, Object> yamlConfig,
+  private Map<String, Object> buildMergeWrapperProperties(String subEntityName, String metricUrn, Map<String, Object> yamlConfig,
       Map<String, Object> mergerProperties, TimeGranularity datasetTimegranularity) {
     String detectorType = MapUtils.getString(yamlConfig, PROP_TYPE);
     String name = MapUtils.getString(yamlConfig, PROP_NAME);
     Map<String, Object> nestedProperties = new HashMap<>();
     nestedProperties.put(PROP_CLASS_NAME, AnomalyDetectorWrapper.class.getName());
+    nestedProperties.put(PROP_SUB_ENTITY_NAME, subEntityName);
     String detectorRefKey = makeComponentRefKey(detectorType, name);
 
     fillInDetectorWrapperProperties(nestedProperties, yamlConfig, detectorType, datasetTimegranularity);
@@ -360,14 +355,16 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     return properties;
   }
 
-  private Map<String, Object> buildGroupWrapperProperties(Map<String, Object> grouperYaml, List<Map<String, Object>> nestedProps) {
-    return buildGroupWrapperProperties(null, grouperYaml, nestedProps);
+  private Map<String, Object> buildGroupWrapperProperties(String entityName, Map<String, Object> grouperYaml, List<Map<String, Object>> nestedProps) {
+    return buildGroupWrapperProperties(entityName, null, grouperYaml, nestedProps);
   }
 
-  private Map<String, Object> buildGroupWrapperProperties(String metricUrn, Map<String, Object> grouperYaml, List<Map<String, Object>> nestedProps) {
+  private Map<String, Object> buildGroupWrapperProperties(String entityName, String metricUrn,
+      Map<String, Object> grouperYaml, List<Map<String, Object>> nestedProps) {
     Map<String, Object> properties = new HashMap<>();
     properties.put(PROP_CLASS_NAME, GrouperWrapper.class.getName());
     properties.put(PROP_NESTED, nestedProps);
+    properties.put(PROP_SUB_ENTITY_NAME, entityName);
 
     String grouperType = MapUtils.getString(grouperYaml, PROP_TYPE);
     String grouperName = MapUtils.getString(grouperYaml, PROP_NAME);

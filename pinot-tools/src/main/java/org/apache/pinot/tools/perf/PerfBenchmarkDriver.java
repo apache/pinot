@@ -28,7 +28,6 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.HashSet;
@@ -38,6 +37,9 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.helix.HelixManager;
+import org.apache.helix.HelixManagerFactory;
+import org.apache.helix.InstanceType;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.tools.ClusterVerifiers.StrictMatchExternalViewVerifier;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
@@ -47,7 +49,6 @@ import org.apache.pinot.common.config.Tenant;
 import org.apache.pinot.common.config.Tenant.TenantBuilder;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.TenantRole;
 import org.apache.pinot.controller.ControllerConf;
@@ -170,7 +171,6 @@ public class PerfBenchmarkDriver {
     startServer();
     startHelixResourceManager();
     configureResources();
-    uploadIndexSegments();
     waitForExternalViewUpdate(_zkAddress, _clusterName, 60 * 1000L);
     postQueries();
   }
@@ -253,7 +253,9 @@ public class PerfBenchmarkDriver {
       ControllerConf controllerConf = getControllerConf();
       controllerConf.setControllerPort(Integer.toString(_conf.getControllerPort() + 1));
       _helixResourceManager = new PinotHelixResourceManager(controllerConf);
-      _helixResourceManager.start();
+      String instanceId = controllerConf.getControllerHost() + "_" + controllerConf.getControllerPort();
+      HelixManager helixManager = registerAndConnectAsHelixSpectator(instanceId);
+      _helixResourceManager.start(helixManager);
     }
 
     // Create server tenants if required
@@ -266,8 +268,27 @@ public class PerfBenchmarkDriver {
 
     // Create broker tenant if required
     if (_conf.shouldStartBroker()) {
-      Tenant brokerTenant = new TenantBuilder(_brokerTenantName).setRole(TenantRole.BROKER).setTotalInstances(1).build();
+      Tenant brokerTenant =
+          new TenantBuilder(_brokerTenantName).setRole(TenantRole.BROKER).setTotalInstances(1).build();
       _helixResourceManager.createBrokerTenant(brokerTenant);
+    }
+  }
+
+  /**
+   * Register and connect to Helix cluster as Spectator role.
+   */
+  private HelixManager registerAndConnectAsHelixSpectator(String instanceId) {
+    HelixManager helixManager =
+        HelixManagerFactory.getZKHelixManager(_clusterName, instanceId, InstanceType.SPECTATOR, _zkAddress);
+
+    try {
+      helixManager.connect();
+      return helixManager;
+    } catch (Exception e) {
+      String errorMsg =
+          String.format("Exception when connecting the instance %s as Spectator role to Helix.", instanceId);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg);
     }
   }
 
@@ -294,24 +315,6 @@ public class PerfBenchmarkDriver {
         .setSegmentVersion(_segmentFormatVersion).setInvertedIndexColumns(invertedIndexColumns)
         .setBloomFilterColumns(bloomFilterColumns).build();
     _helixResourceManager.addTable(tableConfig);
-  }
-
-  private void uploadIndexSegments()
-      throws Exception {
-    if (!_conf.isUploadIndexes()) {
-      LOGGER.info("Skipping upload index segments step.");
-      return;
-    }
-    String indexDirectory = _conf.getIndexDirectory();
-    File[] indexFiles = new File(indexDirectory).listFiles();
-    Preconditions.checkNotNull(indexFiles);
-    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(_controllerHost, _controllerPort);
-      for (File indexFile : indexFiles) {
-        LOGGER.info("Uploading index segment: {}", indexFile.getAbsolutePath());
-        fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, indexFile.getName(), indexFile);
-      }
-    }
   }
 
   /**

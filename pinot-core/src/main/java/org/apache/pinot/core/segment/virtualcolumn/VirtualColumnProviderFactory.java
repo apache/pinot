@@ -29,11 +29,9 @@ import org.apache.pinot.common.data.Schema;
 public class VirtualColumnProviderFactory {
   public static VirtualColumnProvider buildProvider(String virtualColumnProvider) {
     try {
-      Class<? extends VirtualColumnProvider> providerClass =
-          (Class<? extends VirtualColumnProvider>) Class.forName(virtualColumnProvider);
-      return providerClass.newInstance();
+      return (VirtualColumnProvider) Class.forName(virtualColumnProvider).newInstance();
     } catch (ReflectiveOperationException e) {
-      return null;
+      throw new IllegalStateException("Caught exception while creating instance of: " + virtualColumnProvider, e);
     }
   }
 

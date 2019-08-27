@@ -19,9 +19,16 @@
 package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.assignment.InstancePartitionsType;
+import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
+import org.apache.pinot.common.config.instance.InstanceConstraintConfig;
+import org.apache.pinot.common.config.instance.InstanceReplicaGroupPartitionConfig;
+import org.apache.pinot.common.config.instance.InstanceTagPoolConfig;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.startree.hll.HllConfig;
@@ -112,7 +119,7 @@ public class TableConfigTest {
       throws Exception {
     TableConfig.Builder tableConfigBuilder = new TableConfig.Builder(TableType.OFFLINE).setTableName("myTable");
     {
-      // No quota config
+      // Only mandatory configs
       TableConfig tableConfig = tableConfigBuilder.build();
 
       assertEquals(tableConfig.getTableName(), "myTable_OFFLINE");
@@ -252,6 +259,21 @@ public class TableConfigTest {
       checkTableConfigWithAssignmentConfig(tableConfig, tableConfigToCompare);
     }
     {
+      // With completion config
+      CompletionConfig completionConfig = new CompletionConfig();
+      completionConfig.setCompletionMode("DEFAULT");
+
+      TableConfig tableConfig = tableConfigBuilder.build();
+      tableConfig.getValidationConfig().setCompletionConfig(completionConfig);
+
+      // Serialize then de-serialize
+      TableConfig tableConfigToCompare = TableConfig.fromJsonConfig(tableConfig.toJsonConfig());
+      checkTableConfigWithCompletionConfig(tableConfig, tableConfigToCompare);
+
+      tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
+      checkTableConfigWithCompletionConfig(tableConfig, tableConfigToCompare);
+    }
+    {
       // With default StreamConsumptionConfig
       TableConfig tableConfig = tableConfigBuilder.build();
       assertEquals(tableConfig.getIndexingConfig().getStreamConsumptionConfig().getStreamPartitionAssignmentStrategy(),
@@ -322,6 +344,33 @@ public class TableConfigTest {
       tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
       checkTableConfigWithHllConfig(tableConfig, tableConfigToCompare);
     }
+    {
+      // With instance assignment config
+      InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig();
+
+      InstanceTagPoolConfig tagPoolConfig = new InstanceTagPoolConfig();
+      tagPoolConfig.setTag("tenant_OFFLINE");
+      tagPoolConfig.setPoolBased(true);
+      tagPoolConfig.setNumPools(3);
+      instanceAssignmentConfig.setTagPoolConfig(tagPoolConfig);
+
+      InstanceConstraintConfig constraintConfig = new InstanceConstraintConfig();
+      constraintConfig.setConstraints(Arrays.asList("constraint1", "constraint2"));
+      instanceAssignmentConfig.setConstraintConfig(constraintConfig);
+
+      InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig = new InstanceReplicaGroupPartitionConfig();
+      replicaGroupPartitionConfig.setReplicaGroupBased(true);
+      replicaGroupPartitionConfig.setNumReplicaGroups(3);
+      replicaGroupPartitionConfig.setNumInstancesPerReplicaGroup(5);
+      instanceAssignmentConfig.setReplicaGroupPartitionConfig(replicaGroupPartitionConfig);
+
+      TableConfig tableConfig = tableConfigBuilder.setInstanceAssignmentConfigMap(
+          Collections.singletonMap(InstancePartitionsType.OFFLINE, instanceAssignmentConfig)).build();
+
+      // Serialize then de-serialize
+      checkTableConfigWithInstanceAssignmentConfigMap(TableConfig.fromJsonConfig(tableConfig.toJsonConfig()));
+      checkTableConfigWithInstanceAssignmentConfigMap(TableConfig.fromZnRecord(tableConfig.toZNRecord()));
+    }
   }
 
   private void checkTableConfigWithAssignmentConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {
@@ -337,6 +386,18 @@ public class TableConfigTest {
     assertTrue(strategyConfig.getMirrorAssignmentAcrossReplicaGroups());
     assertEquals(strategyConfig.getNumInstancesPerPartition(), 5);
     assertEquals(strategyConfig.getPartitionColumn(), "memberId");
+  }
+
+  private void checkTableConfigWithCompletionConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {
+    // Check that the segment assignment configuration does exist.
+    assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
+    assertNotNull(tableConfigToCompare.getValidationConfig().getCompletionConfig());
+    assertEquals(tableConfigToCompare.getValidationConfig().getCompletionConfig(),
+        tableConfig.getValidationConfig().getCompletionConfig());
+
+    // Check that the configurations are correct.
+    CompletionConfig completionConfig = tableConfigToCompare.getValidationConfig().getCompletionConfig();
+    assertEquals(completionConfig.getCompletionMode(), "DEFAULT");
   }
 
   private void checkTableConfigWithStarTreeConfig(TableConfig tableConfig, TableConfig tableConfigToCompare)
@@ -380,5 +441,32 @@ public class TableConfigTest {
     assertEquals(hllConfig.getColumnsToDeriveHllFields(), columns);
     assertEquals(hllConfig.getHllLog2m(), 9);
     assertEquals(hllConfig.getHllDeriveColumnSuffix(), "suffix");
+  }
+
+  private void checkTableConfigWithInstanceAssignmentConfigMap(TableConfig tableConfig) {
+    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap =
+        tableConfig.getInstanceAssignmentConfigMap();
+    assertNotNull(instanceAssignmentConfigMap);
+    assertEquals(instanceAssignmentConfigMap.size(), 1);
+    assertTrue(instanceAssignmentConfigMap.containsKey(InstancePartitionsType.OFFLINE));
+    InstanceAssignmentConfig instanceAssignmentConfig = instanceAssignmentConfigMap.get(InstancePartitionsType.OFFLINE);
+
+    InstanceTagPoolConfig tagPoolConfig = instanceAssignmentConfig.getTagPoolConfig();
+    assertEquals(tagPoolConfig.getTag(), "tenant_OFFLINE");
+    assertTrue(tagPoolConfig.isPoolBased());
+    assertEquals(tagPoolConfig.getNumPools(), 3);
+    assertNull(tagPoolConfig.getPools());
+
+    InstanceConstraintConfig constraintConfig = instanceAssignmentConfig.getConstraintConfig();
+    assertEquals(constraintConfig.getConstraints(), Arrays.asList("constraint1", "constraint2"));
+
+    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+        instanceAssignmentConfig.getReplicaGroupPartitionConfig();
+    assertTrue(replicaGroupPartitionConfig.isReplicaGroupBased());
+    assertEquals(replicaGroupPartitionConfig.getNumInstances(), 0);
+    assertEquals(replicaGroupPartitionConfig.getNumReplicaGroups(), 3);
+    assertEquals(replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup(), 5);
+    assertEquals(replicaGroupPartitionConfig.getNumPartitions(), 0);
+    assertEquals(replicaGroupPartitionConfig.getNumInstancesPerPartition(), 0);
   }
 }

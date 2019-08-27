@@ -28,14 +28,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URI;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -57,7 +55,6 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -67,14 +64,13 @@ import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.ControllerLeadershipManager;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.upload.SegmentValidator;
-import org.apache.pinot.controller.api.upload.SegmentValidatorResponse;
 import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
@@ -117,7 +113,7 @@ public class PinotSegmentUploadRestletResource {
   AccessControlFactory _accessControlFactory;
 
   @Inject
-  ControllerLeadershipManager _controllerLeadershipManager;
+  LeadControllerManager _leadControllerManager;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -185,13 +181,8 @@ public class PinotSegmentUploadRestletResource {
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
-    try {
-      segmentName = URLDecoder.decode(segmentName, "UTF-8");
-    } catch (UnsupportedEncodingException e) {
-      String errStr = "Could not decode segment name '" + segmentName + "'";
-      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST);
-    }
-    final File dataFile = new File(provider.getBaseDataDir(), StringUtil.join("/", tableName, segmentName));
+    segmentName = URIUtils.decode(segmentName);
+    File dataFile = new File(provider.getBaseDataDir(), String.join(File.separator, tableName, segmentName));
     if (!dataFile.exists()) {
       throw new ControllerApplicationException(LOGGER,
           "Segment " + segmentName + " or table " + tableName + " not found", Response.Status.NOT_FOUND);
@@ -214,12 +205,7 @@ public class PinotSegmentUploadRestletResource {
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type must not be null", Response.Status.BAD_REQUEST);
     }
-    try {
-      segmentName = URLDecoder.decode(segmentName, "UTF-8");
-    } catch (UnsupportedEncodingException e) {
-      String errStr = "Could not decode segment name '" + segmentName + "'";
-      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST);
-    }
+    segmentName = URIUtils.decode(segmentName);
     PinotSegmentRestletResource
         .toggleStateInternal(tableName, StateType.DROP, tableType, segmentName, _pinotHelixResourceManager);
 
@@ -244,31 +230,22 @@ public class PinotSegmentUploadRestletResource {
         "All segments of table " + TableNameBuilder.forType(tableType).tableNameWithType(tableName) + " deleted");
   }
 
-  private SuccessResponse uploadSegment(FormDataMultiPart multiPart, boolean enableParallelPushProtection,
-      HttpHeaders headers, Request request, boolean moveSegmentToFinalLocation) {
+  private SuccessResponse uploadSegment(@Nullable String tableName, FormDataMultiPart multiPart,
+      boolean enableParallelPushProtection, HttpHeaders headers, Request request, boolean moveSegmentToFinalLocation) {
+    String uploadTypeStr = null;
+    String crypterClassName = null;
+    String downloadUri = null;
     if (headers != null) {
-      // TODO: Add these headers into open source hadoop jobs
-      LOGGER.info("HTTP Header {} is {}", CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER,
-          headers.getRequestHeader(CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER));
-      LOGGER.info("HTTP Header {} is {}", CommonConstants.Controller.TABLE_NAME_HTTP_HEADER,
-          headers.getRequestHeader(CommonConstants.Controller.TABLE_NAME_HTTP_HEADER));
+      extractHttpHeader(headers, CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER);
+      extractHttpHeader(headers, CommonConstants.Controller.TABLE_NAME_HTTP_HEADER);
+      uploadTypeStr = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
+      crypterClassName = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.CRYPTER);
+      downloadUri = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
     }
-
-    // Get upload type
-    String uploadTypeStr = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
-    FileUploadDownloadClient.FileUploadType uploadType = getUploadType(uploadTypeStr);
-
-    // Get crypter class
-    String crypterClassHeader = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.CRYPTER);
-
-    // Get URI of current segment location
-    String currentSegmentLocationURI = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
 
     File tempEncryptedFile = null;
     File tempDecryptedFile = null;
     File tempSegmentDir = null;
-    SegmentMetadata segmentMetadata;
-    String zkDownloadUri = null;
     try {
       FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
       String tempFileName = TMP_DIR_PREFIX + System.nanoTime();
@@ -278,8 +255,8 @@ public class PinotSegmentUploadRestletResource {
       // Set default crypter to the noop crypter when no crypter header is sent
       // In this case, the noop crypter will not do any operations, so the encrypted and decrypted file will have the same
       // file path.
-      if (crypterClassHeader == null) {
-        crypterClassHeader = NoOpPinotCrypter.class.getSimpleName();
+      if (crypterClassName == null) {
+        crypterClassName = NoOpPinotCrypter.class.getSimpleName();
         tempEncryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName);
       } else {
         tempEncryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName + ENCRYPTED_SUFFIX);
@@ -288,52 +265,65 @@ public class PinotSegmentUploadRestletResource {
       // TODO: Change when metadata upload added
       String metadataProviderClass = DefaultMetadataExtractor.class.getName();
 
+      SegmentMetadata segmentMetadata;
+      FileUploadDownloadClient.FileUploadType uploadType = getUploadType(uploadTypeStr);
       switch (uploadType) {
         case URI:
           segmentMetadata =
-              getMetadataForURI(crypterClassHeader, currentSegmentLocationURI, tempEncryptedFile, tempDecryptedFile,
-                  tempSegmentDir, metadataProviderClass);
+              getMetadataForURI(crypterClassName, downloadUri, tempEncryptedFile, tempDecryptedFile, tempSegmentDir,
+                  metadataProviderClass);
           break;
         case SEGMENT:
           getFileFromMultipart(multiPart, tempDecryptedFile);
-          segmentMetadata = getSegmentMetadata(crypterClassHeader, tempEncryptedFile, tempDecryptedFile, tempSegmentDir,
+          segmentMetadata = getSegmentMetadata(crypterClassName, tempEncryptedFile, tempDecryptedFile, tempSegmentDir,
               metadataProviderClass);
           break;
         default:
           throw new UnsupportedOperationException("Unsupported upload type: " + uploadType);
       }
 
-      String rawTableName = segmentMetadata.getTableName();
+      // Fetch segment name
+      String segmentName = segmentMetadata.getName();
 
-      // This boolean is here for V1 segment upload, where we keep the segment in the downloadURI sent in the header.
-      // We will deprecate this behavior eventually.
-      if (!moveSegmentToFinalLocation) {
-        LOGGER.info("Setting zkDownloadUri to {} for segment {} of table {}, skipping move", currentSegmentLocationURI,
-            segmentMetadata.getName(), rawTableName);
-        zkDownloadUri = currentSegmentLocationURI;
+      // Fetch table name. Try to derive the table name from the parameter and then from segment metadata
+      String rawTableName;
+      if (tableName != null && !tableName.isEmpty()) {
+        rawTableName = TableNameBuilder.extractRawTableName(tableName);
+        LOGGER.info("Uploading segment {} to table: {}, (Derived from API parameter)", segmentName, tableName);
       } else {
-        zkDownloadUri = getZkDownloadURIForSegmentUpload(rawTableName, segmentMetadata, provider);
+        // TODO: remove this when we completely deprecate the table name from segment metadata
+        rawTableName = segmentMetadata.getTableName();
+        LOGGER.info("Uploading a segment {} to table: {}, (Derived from segment metadata)", segmentName, tableName);
       }
 
-      String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
-      String segmentName = segmentMetadata.getName();
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+      String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
       LOGGER
           .info("Processing upload request for segment: {} of table: {} from client: {}", segmentName, offlineTableName,
               clientAddress);
 
       // Validate segment
-      SegmentValidatorResponse segmentValidatorResponse =
-          new SegmentValidator(_pinotHelixResourceManager, _controllerConf, _executor, _connectionManager,
-              _controllerMetrics, _controllerLeadershipManager)
-              .validateSegment(rawTableName, segmentMetadata, tempSegmentDir);
+      new SegmentValidator(_pinotHelixResourceManager, _controllerConf, _executor, _connectionManager,
+          _controllerMetrics, _leadControllerManager.isLeaderForTable(offlineTableName))
+          .validateOfflineSegment(offlineTableName, segmentMetadata, tempSegmentDir);
+
+      String zkDownloadUri;
+      // This boolean is here for V1 segment upload, where we keep the segment in the downloadURI sent in the header.
+      // We will deprecate this behavior eventually.
+      if (!moveSegmentToFinalLocation) {
+        LOGGER
+            .info("Setting zkDownloadUri: to {} for segment: {} of table: {}, skipping move", downloadUri, segmentName,
+                offlineTableName);
+        zkDownloadUri = downloadUri;
+      } else {
+        zkDownloadUri = getZkDownloadURIForSegmentUpload(provider, rawTableName, segmentName);
+      }
 
       // Zk operations
       completeZkOperations(enableParallelPushProtection, headers, tempEncryptedFile, provider, rawTableName,
-          segmentMetadata, segmentName, zkDownloadUri, moveSegmentToFinalLocation, segmentValidatorResponse);
+          segmentMetadata, segmentName, zkDownloadUri, moveSegmentToFinalLocation);
 
-      return new SuccessResponse(
-          "Successfully uploaded segment: " + segmentMetadata.getName() + " of table: " + rawTableName);
+      return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + rawTableName);
     } catch (WebApplicationException e) {
       throw e;
     } catch (Exception e) {
@@ -347,17 +337,25 @@ public class PinotSegmentUploadRestletResource {
     }
   }
 
-  private String getZkDownloadURIForSegmentUpload(String rawTableName, SegmentMetadata segmentMetadata,
-      FileUploadPathProvider provider)
-      throws UnsupportedEncodingException {
-    if (provider.getBaseDataDirURI().getScheme().equalsIgnoreCase(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
-      return ControllerConf.constructDownloadUrl(rawTableName, segmentMetadata.getName(), provider.getVip());
+  @Nullable
+  private String extractHttpHeader(HttpHeaders headers, String name) {
+    String value = headers.getHeaderString(name);
+    if (value != null) {
+      LOGGER.info("HTTP Header: {} is: {}", name, value);
+    }
+    return value;
+  }
+
+  private String getZkDownloadURIForSegmentUpload(FileUploadPathProvider provider, String rawTableName,
+      String segmentName) {
+    URI baseDataDirURI = provider.getBaseDataDirURI();
+    if (baseDataDirURI.getScheme().equalsIgnoreCase(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
+      return URIUtils.constructDownloadUrl(provider.getVip(), rawTableName, segmentName);
     } else {
       // Receiving .tar.gz segment upload for pluggable storage
-      LOGGER.info("Using configured data dir {} for segment {} of table {}", _controllerConf.getDataDir(),
-          segmentMetadata.getName(), rawTableName);
-      return StringUtil.join("/", provider.getBaseDataDirURI().toString(), rawTableName,
-          URLEncoder.encode(segmentMetadata.getName(), "UTF-8"));
+      LOGGER.info("Using configured data dir {} for segment {} of table {}", _controllerConf.getDataDir(), segmentName,
+          rawTableName);
+      return URIUtils.constructDownloadUrl(baseDataDirURI.toString(), rawTableName, segmentName);
     }
   }
 
@@ -388,15 +386,14 @@ public class PinotSegmentUploadRestletResource {
   }
 
   private void completeZkOperations(boolean enableParallelPushProtection, HttpHeaders headers, File tempDecryptedFile,
-      FileUploadPathProvider provider, String rawTableName, SegmentMetadata segmentMetadata, String segmentName, String zkDownloadURI,
-      boolean moveSegmentToFinalLocation, SegmentValidatorResponse segmentValidatorResponse)
+      FileUploadPathProvider provider, String rawTableName, SegmentMetadata segmentMetadata, String segmentName,
+      String zkDownloadURI, boolean moveSegmentToFinalLocation)
       throws Exception {
-    String finalSegmentPath = StringUtil
-        .join("/", provider.getBaseDataDirURI().toString(), rawTableName, URLEncoder.encode(segmentName, "UTF-8"));
-    URI finalSegmentLocationURI = new URI(finalSegmentPath);
+    URI finalSegmentLocationURI =
+        URIUtils.getUri(provider.getBaseDataDirURI().toString(), rawTableName, URIUtils.encode(segmentName));
     ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
     zkOperator.completeSegmentOperations(rawTableName, segmentMetadata, finalSegmentLocationURI, tempDecryptedFile,
-        enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation, segmentValidatorResponse);
+        enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation);
   }
 
   private void decryptFile(String crypterClassHeader, File tempEncryptedFile, File tempDecryptedFile) {
@@ -415,10 +412,11 @@ public class PinotSegmentUploadRestletResource {
   // request if a multipart object is not sent. This endpoint does not move the segment to its final location;
   // it keeps it at the downloadURI header that is set. We will not support this endpoint going forward.
   public void uploadSegmentAsJson(String segmentJsonStr,
+      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME) String tableName,
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
-      asyncResponse.resume(uploadSegment(null, enableParallelPushProtection, headers, request, false));
+      asyncResponse.resume(uploadSegment(tableName, null, enableParallelPushProtection, headers, request, false));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -432,10 +430,11 @@ public class PinotSegmentUploadRestletResource {
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
   // For the multipart endpoint, we will always move segment to final location regardless of the segment endpoint.
   public void uploadSegmentAsMultiPart(FormDataMultiPart multiPart,
+      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME) String tableName,
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
-      asyncResponse.resume(uploadSegment(multiPart, enableParallelPushProtection, headers, request, true));
+      asyncResponse.resume(uploadSegment(tableName, multiPart, enableParallelPushProtection, headers, request, true));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -451,10 +450,11 @@ public class PinotSegmentUploadRestletResource {
   // request if a multipart object is not sent. This endpoint is recommended for use. It differs from the first
   // endpoint in how it moves the segment to a Pinot-determined final directory.
   public void uploadSegmentAsJsonV2(String segmentJsonStr,
+      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME) String tableName,
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
-      asyncResponse.resume(uploadSegment(null, enableParallelPushProtection, headers, request, true));
+      asyncResponse.resume(uploadSegment(tableName, null, enableParallelPushProtection, headers, request, true));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -468,10 +468,11 @@ public class PinotSegmentUploadRestletResource {
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
   // This behavior does not differ from v1 of the same endpoint.
   public void uploadSegmentAsMultiPartV2(FormDataMultiPart multiPart,
+      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME) String tableName,
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
-      asyncResponse.resume(uploadSegment(multiPart, enableParallelPushProtection, headers, request, true));
+      asyncResponse.resume(uploadSegment(tableName, multiPart, enableParallelPushProtection, headers, request, true));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }

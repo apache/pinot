@@ -34,13 +34,14 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nonnull;
-import kafka.server.KafkaServerStartable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
+import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.query.comparison.QueryComparison;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.ITestResult;
@@ -187,7 +188,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
     private List<File> _realtimeAvroFiles;
     private File _queryFile;
     private File _responseFile;
-    private KafkaServerStartable _kafkaStarter;
+    private StreamDataServerStartable _kafkaStarter;
     private long _countStarResult;
 
     public CustomHybridClusterIntegrationTest() {
@@ -261,7 +262,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
           KafkaStarterUtils.getDefaultKafkaConfiguration());
 
       // Create Kafka topic
-      KafkaStarterUtils.createTopic(getKafkaTopic(), KAFKA_ZK_STR, getNumKafkaPartitions());
+      _kafkaStarter.createTopic(getKafkaTopic(), KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
 
       // Start the Pinot cluster
       ControllerConf config = getDefaultControllerConfiguration();
@@ -295,10 +296,10 @@ public class HybridClusterIntegrationTestCommandLineRunner {
       String timeType = outgoingTimeUnit.toString();
       addHybridTable(_tableName, _useLlc, KAFKA_BROKER, KAFKA_ZK_STR, getKafkaTopic(), getRealtimeSegmentFlushSize(),
           _realtimeAvroFiles.get(0), timeColumnName, timeType, schemaName, TENANT_NAME, TENANT_NAME, "MMAP",
-          _sortedColumn, _invertedIndexColumns, null, null, null, getStreamConsumerFactoryClassName());
+          _sortedColumn, _invertedIndexColumns, null, null, null, getStreamConsumerFactoryClassName(), null);
 
       // Upload all segments
-      uploadSegments(_tarDir);
+      uploadSegments(getTableName(), _tarDir);
     }
 
     @Test
@@ -338,7 +339,8 @@ public class HybridClusterIntegrationTestCommandLineRunner {
                 @Override
                 public void run() {
                   try {
-                    JsonNode actualResponse = postQuery(currentQuery, "http://localhost:" + BROKER_BASE_PORT);
+                    JsonNode actualResponse =
+                        postQuery(new PinotQueryRequest("pql", currentQuery), "http://localhost:" + BROKER_BASE_PORT);
                     if (QueryComparison.compareWithEmpty(actualResponse, expectedResponse)
                         == QueryComparison.ComparisonStatus.FAILED) {
                       numFailedQueries.getAndIncrement();
@@ -377,7 +379,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
       stopServer();
       stopBroker();
       stopController();
-      KafkaStarterUtils.stopServer(_kafkaStarter);
+      _kafkaStarter.stop();
       stopZk();
 
       FileUtils.deleteDirectory(_tempDir);

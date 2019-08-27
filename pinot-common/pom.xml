@@ -97,6 +97,10 @@
       <artifactId>antlr4-runtime</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.apache.calcite</groupId>
+      <artifactId>calcite-core</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
       <scope>test</scope>
@@ -192,10 +196,6 @@
     <dependency>
       <groupId>net.sf.jopt-simple</groupId>
       <artifactId>jopt-simple</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.scala-lang</groupId>
-      <artifactId>scala-library</artifactId>
     </dependency>
     <dependency>
       <groupId>nl.jqno.equalsverifier</groupId>

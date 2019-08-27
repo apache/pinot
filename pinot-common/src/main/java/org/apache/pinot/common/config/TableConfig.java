@@ -19,6 +19,7 @@
 package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
@@ -29,14 +30,15 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.helix.ZNRecord;
-import org.apache.pinot.common.data.StarTreeIndexSpec;
+import org.apache.pinot.common.assignment.InstancePartitionsType;
+import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
+import org.apache.pinot.common.config.instance.InstanceAssignmentConfigMapChildKeyHandler;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.startree.hll.HllConfig;
 
 
-@SuppressWarnings("unused")
+@SuppressWarnings({"Duplicates", "unused"})
 @ConfigDoc(value = "Configuration for a table", mandatory = true)
 @ConfigKey("table")
 public class TableConfig {
@@ -49,15 +51,16 @@ public class TableConfig {
   public static final String QUOTA_CONFIG_KEY = "quota";
   public static final String TASK_CONFIG_KEY = "task";
   public static final String ROUTING_CONFIG_KEY = "routing";
+  public static final String INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY = "instanceAssignmentConfigMap";
 
   private static final String FIELD_MISSING_MESSAGE_TEMPLATE = "Mandatory field '%s' is missing";
 
   @ConfigKey("name")
-  @ConfigDoc(value = "The name for the table.", mandatory = true, exampleValue = "myTable")
+  @ConfigDoc(value = "The name for the table (with type suffix)", mandatory = true, exampleValue = "myTable_OFFLINE")
   private String _tableName;
 
   @ConfigKey("type")
-  @ConfigDoc(value = "The type of the table, either realtime or offline", mandatory = true)
+  @ConfigDoc(value = "The type of the table (OFFLINE|REALTIME)", mandatory = true)
   private TableType _tableType;
 
   @NestedConfig
@@ -82,6 +85,10 @@ public class TableConfig {
   @NestedConfig
   private RoutingConfig _routingConfig;
 
+  @ConfigKey(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY)
+  @UseChildKeyHandler(InstanceAssignmentConfigMapChildKeyHandler.class)
+  private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
+
   /**
    * NOTE: DO NOT use this constructor, use builder instead. This constructor is for deserializer only.
    */
@@ -93,7 +100,8 @@ public class TableConfig {
 
   private TableConfig(String tableName, TableType tableType, SegmentsValidationAndRetentionConfig validationConfig,
       TenantConfig tenantConfig, IndexingConfig indexingConfig, TableCustomConfig customConfig,
-      @Nullable QuotaConfig quotaConfig, @Nullable TableTaskConfig taskConfig, @Nullable RoutingConfig routingConfig) {
+      @Nullable QuotaConfig quotaConfig, @Nullable TableTaskConfig taskConfig, @Nullable RoutingConfig routingConfig,
+      @Nullable Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
     _tableName = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
     _tableType = tableType;
     _validationConfig = validationConfig;
@@ -103,6 +111,7 @@ public class TableConfig {
     _quotaConfig = quotaConfig;
     _taskConfig = taskConfig;
     _routingConfig = routingConfig;
+    _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
   }
 
   public static TableConfig fromJsonString(String jsonString)
@@ -146,14 +155,19 @@ public class TableConfig {
 
     RoutingConfig routingConfig = extractChildConfig(jsonConfig, ROUTING_CONFIG_KEY, RoutingConfig.class);
 
+    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap =
+        extractChildConfig(jsonConfig, INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY,
+            new TypeReference<Map<InstancePartitionsType, InstanceAssignmentConfig>>() {
+            });
+
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
-        quotaConfig, taskConfig, routingConfig);
+        quotaConfig, taskConfig, routingConfig, instanceAssignmentConfigMap);
   }
 
   /**
    * Extracts the child config from the table config. Returns {@code null} if child config does not exist.
    * <p>
-   * NOTE: for historical reason, we support two kinds of nested config values: normal json and serialized json string
+   * NOTE: For historical reason, we support two kinds of nested config values: normal json and serialized json string
    */
   @Nullable
   private static <T> T extractChildConfig(JsonNode jsonConfig, String childConfigKey, Class<T> childConfigClass)
@@ -166,6 +180,26 @@ public class TableConfig {
       return JsonUtils.jsonNodeToObject(childConfigNode, childConfigClass);
     } else {
       return JsonUtils.stringToObject(childConfigNode.asText(), childConfigClass);
+    }
+  }
+
+  /**
+   * Extracts the child config from the table config. Returns {@code null} if child config does not exist.
+   * <p>
+   * NOTE: For historical reason, we support two kinds of nested config values: normal json and serialized json string
+   */
+  @Nullable
+  private static <T> T extractChildConfig(JsonNode jsonConfig, String childConfigKey,
+      TypeReference<T> childConfigTypeReference)
+      throws IOException {
+    JsonNode childConfigNode = jsonConfig.get(childConfigKey);
+    if (childConfigNode == null || childConfigNode.isNull()) {
+      return null;
+    }
+    if (childConfigNode.isObject()) {
+      return JsonUtils.jsonNodeToObject(childConfigNode, childConfigTypeReference);
+    } else {
+      return JsonUtils.stringToObject(childConfigNode.asText(), childConfigTypeReference);
     }
   }
 
@@ -191,6 +225,9 @@ public class TableConfig {
     }
     if (_routingConfig != null) {
       jsonConfig.set(ROUTING_CONFIG_KEY, JsonUtils.objectToJsonNode(_routingConfig));
+    }
+    if (_instanceAssignmentConfigMap != null) {
+      jsonConfig.set(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY, JsonUtils.objectToJsonNode(_instanceAssignmentConfigMap));
     }
 
     return jsonConfig;
@@ -250,8 +287,16 @@ public class TableConfig {
       routingConfig = JsonUtils.stringToObject(routingConfigString, RoutingConfig.class);
     }
 
+    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap = null;
+    String instanceAssignmentConfigMapString = simpleFields.get(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY);
+    if (instanceAssignmentConfigMapString != null) {
+      instanceAssignmentConfigMap = JsonUtils.stringToObject(instanceAssignmentConfigMapString,
+          new TypeReference<Map<InstancePartitionsType, InstanceAssignmentConfig>>() {
+          });
+    }
+
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
-        quotaConfig, taskConfig, routingConfig);
+        quotaConfig, taskConfig, routingConfig, instanceAssignmentConfigMap);
   }
 
   public ZNRecord toZNRecord()
@@ -277,6 +322,9 @@ public class TableConfig {
     }
     if (_routingConfig != null) {
       simpleFields.put(ROUTING_CONFIG_KEY, JsonUtils.objectToString(_routingConfig));
+    }
+    if (_instanceAssignmentConfigMap != null) {
+      simpleFields.put(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY, JsonUtils.objectToString(_instanceAssignmentConfigMap));
     }
 
     ZNRecord znRecord = new ZNRecord(_tableName);
@@ -372,6 +420,16 @@ public class TableConfig {
     _routingConfig = routingConfig;
   }
 
+  @Nullable
+  public Map<InstancePartitionsType, InstanceAssignmentConfig> getInstanceAssignmentConfigMap() {
+    return _instanceAssignmentConfigMap;
+  }
+
+  public void setInstanceAssignmentConfigMap(
+      Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
+    _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
+  }
+
   @Override
   public String toString() {
     try {
@@ -451,13 +509,13 @@ public class TableConfig {
     private List<String> _bloomFilterColumns;
     private Map<String, String> _streamConfigs;
     private String _streamPartitionAssignmentStrategy = DEFAULT_STREAM_PARTITION_ASSIGNMENT_STRATEGY;
+    private SegmentPartitionConfig _segmentPartitionConfig;
 
     private TableCustomConfig _customConfig;
     private QuotaConfig _quotaConfig;
     private TableTaskConfig _taskConfig;
     private RoutingConfig _routingConfig;
-    private HllConfig _hllConfig;
-    private StarTreeIndexSpec _starTreeIndexSpec;
+    private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
 
     public Builder(TableType tableType) {
       _tableType = tableType;
@@ -563,11 +621,6 @@ public class TableConfig {
       return this;
     }
 
-    public Builder setBloomFilterColumns(List<String> bloomFilterColumns) {
-      _bloomFilterColumns = bloomFilterColumns;
-      return this;
-    }
-
     public Builder setNoDictionaryColumns(List<String> noDictionaryColumns) {
       _noDictionaryColumns = noDictionaryColumns;
       return this;
@@ -578,14 +631,24 @@ public class TableConfig {
       return this;
     }
 
-    public Builder setStreamPartitionAssignmentStrategy(String streamPartitionAssignmentStrategy) {
-      _streamPartitionAssignmentStrategy = streamPartitionAssignmentStrategy;
+    public Builder setBloomFilterColumns(List<String> bloomFilterColumns) {
+      _bloomFilterColumns = bloomFilterColumns;
       return this;
     }
 
     public Builder setStreamConfigs(Map<String, String> streamConfigs) {
       Preconditions.checkState(_tableType == TableType.REALTIME);
       _streamConfigs = streamConfigs;
+      return this;
+    }
+
+    public Builder setStreamPartitionAssignmentStrategy(String streamPartitionAssignmentStrategy) {
+      _streamPartitionAssignmentStrategy = streamPartitionAssignmentStrategy;
+      return this;
+    }
+
+    public Builder setSegmentPartitionConfig(SegmentPartitionConfig segmentPartitionConfig) {
+      _segmentPartitionConfig = segmentPartitionConfig;
       return this;
     }
 
@@ -606,6 +669,12 @@ public class TableConfig {
 
     public Builder setRoutingConfig(RoutingConfig routingConfig) {
       _routingConfig = routingConfig;
+      return this;
+    }
+
+    public Builder setInstanceAssignmentConfigMap(
+        Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
+      _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
       return this;
     }
 
@@ -641,12 +710,12 @@ public class TableConfig {
       indexingConfig.setInvertedIndexColumns(_invertedIndexColumns);
       indexingConfig.setNoDictionaryColumns(_noDictionaryColumns);
       indexingConfig.setOnHeapDictionaryColumns(_onHeapDictionaryColumns);
-      indexingConfig.setStreamConfigs(_streamConfigs);
       indexingConfig.setBloomFilterColumns(_bloomFilterColumns);
+      indexingConfig.setStreamConfigs(_streamConfigs);
       StreamConsumptionConfig streamConsumptionConfig = new StreamConsumptionConfig();
       streamConsumptionConfig.setStreamPartitionAssignmentStrategy(_streamPartitionAssignmentStrategy);
       indexingConfig.setStreamConsumptionConfig(streamConsumptionConfig);
-      // TODO: set SegmentPartitionConfig here
+      indexingConfig.setSegmentPartitionConfig(_segmentPartitionConfig);
 
       if (_customConfig == null) {
         _customConfig = new TableCustomConfig();
@@ -654,7 +723,7 @@ public class TableConfig {
       }
 
       return new TableConfig(_tableName, _tableType, validationConfig, tenantConfig, indexingConfig, _customConfig,
-          _quotaConfig, _taskConfig, _routingConfig);
+          _quotaConfig, _taskConfig, _routingConfig, _instanceAssignmentConfigMap);
     }
   }
 }

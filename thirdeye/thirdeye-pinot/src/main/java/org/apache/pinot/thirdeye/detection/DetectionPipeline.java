@@ -66,11 +66,7 @@ public abstract class DetectionPipeline {
     this.config = config;
     this.startTime = startTime;
     this.endTime = endTime;
-    try {
-      this.initComponents();
-    } catch (Exception e) {
-      throw new IllegalArgumentException("Initialize components failed. Please check rule parameters. " + e.getMessage());
-    }
+    this.initComponents();
   }
 
   /**
@@ -83,9 +79,8 @@ public abstract class DetectionPipeline {
 
   /**
    * Initialize all components in the pipeline
-   * @throws Exception
    */
-  private void initComponents() throws Exception {
+  private void initComponents() {
     InputDataFetcher dataFetcher = new DefaultInputDataFetcher(this.provider, this.config.getId());
     Map<String, BaseComponent> instancesMap = config.getComponents();
     Map<String, Object> componentSpecs = config.getComponentSpecs();
@@ -104,22 +99,32 @@ public abstract class DetectionPipeline {
             componentSpec.put(entry.getKey(), instancesMap.get(DetectionUtils.getComponentKey(entry.getValue().toString())));
           }
         }
+        // Initialize the components
         instancesMap.get(componentKey).init(getComponentSpec(componentSpec), dataFetcher);
       }
     }
     config.setComponents(instancesMap);
   }
 
-  private BaseComponent createComponent(Map<String, Object> componentSpec)
-      throws Exception {
-    Class<BaseComponent> clazz = (Class<BaseComponent>) Class.forName(MapUtils.getString(componentSpec, PROP_CLASS_NAME));
-    return clazz.newInstance();
+  private BaseComponent createComponent(Map<String, Object> componentSpec) {
+    String className = MapUtils.getString(componentSpec, PROP_CLASS_NAME);
+    try {
+      Class<BaseComponent> clazz = (Class<BaseComponent>) Class.forName(className);
+      return clazz.newInstance();
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Failed to create component for " + className, e.getCause());
+    }
   }
 
-  private AbstractSpec getComponentSpec(Map<String, Object> componentSpec) throws Exception {
-    Class clazz = Class.forName(MapUtils.getString(componentSpec, PROP_CLASS_NAME));
-    Class<AbstractSpec> specClazz = (Class<AbstractSpec>) Class.forName(getSpecClassName(clazz));
-    return AbstractSpec.fromProperties(componentSpec, specClazz);
+  private AbstractSpec getComponentSpec(Map<String, Object> componentSpec) {
+    String className = MapUtils.getString(componentSpec, PROP_CLASS_NAME);
+    try {
+      Class clazz = Class.forName(className);
+      Class<AbstractSpec> specClazz = (Class<AbstractSpec>) Class.forName(getSpecClassName(clazz));
+      return AbstractSpec.fromProperties(componentSpec, specClazz);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Failed to get component spec for " + className, e);
+    }
   }
 
   /**

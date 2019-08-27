@@ -3,9 +3,10 @@
 </div>
 <div class="col-xs-12 {{if isEditMode "bottom-margin"}}">
   {{#unless isEditMode}}
-    <label for="select-metric" class="control-label te-label te-label--taller required">Can't find your metric?
+    <label for="select-metric" class="control-label te-label te-label--taller required">Can't find your metric? Import a Metric From
       {{#link-to "self-serve.import-metric" class="thirdeye-link-secondary thirdeye-link-secondary--inside"}}
-        Import a Metric From InGraphs
+        InGraphs{{/link-to}} or {{#link-to "self-serve.import-sql-metric" class="thirdeye-link-secondary thirdeye-link-secondary--inside"}}
+        MySQL/Presto
       {{/link-to}}
     </label>
   {{/unless}}

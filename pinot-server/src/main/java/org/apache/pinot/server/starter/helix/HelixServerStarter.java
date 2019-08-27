@@ -52,6 +52,7 @@ import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
@@ -141,7 +142,10 @@ public class HelixServerStarter {
     if (_serverConf.containsKey(CONFIG_OF_INSTANCE_ID)) {
       _instanceId = _serverConf.getString(CONFIG_OF_INSTANCE_ID);
     } else {
-      String host = _serverConf.getString(KEY_OF_SERVER_NETTY_HOST, NetUtil.getHostAddress());
+      String host = _serverConf.getString(KEY_OF_SERVER_NETTY_HOST,
+          _serverConf.getBoolean(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil
+              .getHostnameOrAddress() : NetUtil.getHostAddress());
+
       int port = _serverConf.getInt(KEY_OF_SERVER_NETTY_PORT, DEFAULT_SERVER_NETTY_PORT);
       _instanceId = PREFIX_OF_SERVER_INSTANCE + host + "_" + port;
       _serverConf.addProperty(CONFIG_OF_INSTANCE_ID, _instanceId);
@@ -300,10 +304,8 @@ public class HelixServerStarter {
     List<String> instanceTags = instanceConfig.getTags();
     if (instanceTags == null || instanceTags.size() == 0) {
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
-        _helixAdmin.addInstanceTag(clusterName, instanceName,
-            TableNameBuilder.OFFLINE.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
-        _helixAdmin.addInstanceTag(clusterName, instanceName,
-            TableNameBuilder.REALTIME.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
+        _helixAdmin.addInstanceTag(clusterName, instanceName, TagNameUtils.getOfflineTagForTenant(null));
+        _helixAdmin.addInstanceTag(clusterName, instanceName, TagNameUtils.getRealtimeTagForTenant(null));
       } else {
         _helixAdmin.addInstanceTag(clusterName, instanceName, UNTAGGED_SERVER_INSTANCE);
       }

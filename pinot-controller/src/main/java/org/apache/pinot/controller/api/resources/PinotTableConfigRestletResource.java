@@ -110,6 +110,8 @@ public class PinotTableConfigRestletResource {
             .type(MediaType.TEXT_PLAIN_TYPE).build();
       }
 
+      // TODO: Fix the bug - when schema is not configured, after deserialization, CombinedConfig will have a non-null
+      //       schema with null schema name
       if (config.getSchema() != null) {
         _resourceManager.addOrUpdateSchema(config.getSchema());
       }
@@ -148,41 +150,40 @@ public class PinotTableConfigRestletResource {
             .type(MediaType.TEXT_PLAIN_TYPE).build();
       }
 
-      if (config.getSchema() != null) {
-        _resourceManager.addOrUpdateSchema(config.getSchema());
+      Schema schema = config.getSchema();
+      if (schema != null) {
+        _resourceManager.addOrUpdateSchema(schema);
       }
 
-      if (config.getOfflineTableConfig() != null) {
-        if (_resourceManager.getAllTables().contains(config.getOfflineTableConfig().getTableName())) {
+      TableConfig offlineTableConfig = config.getOfflineTableConfig();
+      if (offlineTableConfig != null) {
+        String offlineTableName = offlineTableConfig.getTableName();
+        if (_resourceManager.hasTable(offlineTableName)) {
           try {
-            _resourceManager
-                .setExistingTableConfig(config.getOfflineTableConfig(), config.getOfflineTableConfig().getTableName(),
-                    CommonConstants.Helix.TableType.OFFLINE);
+            _resourceManager.setExistingTableConfig(offlineTableConfig);
           } catch (IOException e) {
-            LOGGER.warn("Failed to update the offline table configuration for table {}", e,
-                config.getOfflineTableConfig().getTableName());
+            LOGGER.warn("Failed to update the table config for table: {}", offlineTableName, e);
             return Response.serverError().entity("Failed to update the offline table configuration")
                 .type(MediaType.TEXT_PLAIN_TYPE).build();
           }
         } else {
-          _resourceManager.addTable(config.getOfflineTableConfig());
+          _resourceManager.addTable(offlineTableConfig);
         }
       }
 
-      if (config.getRealtimeTableConfig() != null) {
-        if (_resourceManager.getAllTables().contains(config.getRealtimeTableConfig().getTableName())) {
+      TableConfig realtimeTableConfig = config.getRealtimeTableConfig();
+      if (realtimeTableConfig != null) {
+        String realtimeTableName = realtimeTableConfig.getTableName();
+        if (_resourceManager.hasTable(realtimeTableName)) {
           try {
-            _resourceManager
-                .setExistingTableConfig(config.getRealtimeTableConfig(), config.getRealtimeTableConfig().getTableName(),
-                    CommonConstants.Helix.TableType.REALTIME);
+            _resourceManager.setExistingTableConfig(realtimeTableConfig);
           } catch (IOException e) {
-            LOGGER.warn("Failed to update the realtime table configuration for table {}", e,
-                config.getRealtimeTableConfig().getTableName());
+            LOGGER.warn("Failed to update the table config for table: {}", realtimeTableName, e);
             return Response.serverError().entity("Failed to update the realtime table configuration")
                 .type(MediaType.TEXT_PLAIN_TYPE).build();
           }
         } else {
-          _resourceManager.addTable(config.getRealtimeTableConfig());
+          _resourceManager.addTable(realtimeTableConfig);
         }
       }
 

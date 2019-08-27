@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.pinot.core.common.Predicate;
 
 
@@ -66,7 +67,7 @@ public interface PredicateEvaluator {
    * @param length Number of values in the entry
    * @return Whether the entry matches the predicate
    */
-  boolean applyMV(int[] values, int length);
+  boolean applyMV(int[] values, int length, MutableInt numEntriesScanned);
 
   /**
    * APIs for dictionary based predicate evaluator

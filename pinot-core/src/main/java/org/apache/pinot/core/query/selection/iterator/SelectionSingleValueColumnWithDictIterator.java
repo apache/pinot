@@ -44,11 +44,6 @@ public class SelectionSingleValueColumnWithDictIterator implements SelectionColu
   @Override
   public Serializable getValue(int docId) {
     _blockSingleValIterator.skipTo(docId);
-
-    // For selection, we convert BYTES data type to equivalent HEX string.
-    if (_dataType.equals(FieldSpec.DataType.BYTES)) {
-      return BytesUtils.toHexString(_dictionary.getBytesValue(_blockSingleValIterator.nextIntVal()));
-    }
     return (Serializable) _dictionary.get(_blockSingleValIterator.nextIntVal());
   }
 }

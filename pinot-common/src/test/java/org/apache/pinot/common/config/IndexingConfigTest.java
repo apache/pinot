@@ -54,6 +54,8 @@ public class IndexingConfigTest {
     noDictionaryConfig.put("a", "SNAPPY");
     noDictionaryConfig.put("b", "PASS_THROUGH");
     indexingConfig.setnoDictionaryConfig(noDictionaryConfig);
+    List<String> varLengthDictionaryColumns = Arrays.asList("a", "x", "z");
+    indexingConfig.setVarLengthDictionaryColumns(varLengthDictionaryColumns);
 
     indexingConfig = JsonUtils.stringToObject(JsonUtils.objectToString(indexingConfig), IndexingConfig.class);
 
@@ -64,6 +66,7 @@ public class IndexingConfigTest {
     assertEquals(indexingConfig.getOnHeapDictionaryColumns(), onHeapDictionaryColumns);
     assertEquals(indexingConfig.getBloomFilterColumns(), bloomFilterColumns);
     assertEquals(indexingConfig.getNoDictionaryConfig(), noDictionaryConfig);
+    assertEquals(indexingConfig.getVarLengthDictionaryColumns(), varLengthDictionaryColumns);
   }
 
   @Test

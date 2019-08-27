@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.anomaly.merge;
 
+import java.util.HashSet;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -92,6 +93,7 @@ public abstract class AnomalyTimeBasedSummarizer {
       LOG.info("Current anomaly start =[{}], end = [{}].", currentResult.getStartTime(), currentResult.getEndTime());
       if (mergedAnomaly == null || currentResult.getEndTime() < mergedAnomaly.getStartTime()) {
         mergedAnomaly = new MergedAnomalyResultDTO(currentResult);
+        mergedAnomaly.setChildIds(new HashSet<>());
       } else {
         // compare current with merged and decide whether to merge the current result or create a new one
         MergedAnomalyResultDTO currAnomaly = new MergedAnomalyResultDTO(currentResult);

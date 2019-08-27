@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.detection.yaml.translator;
 
 import com.google.common.base.CaseFormat;
+import com.google.common.base.Preconditions;
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
@@ -37,9 +38,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.detection.validators.SubscriptionConfigValidator;
-import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.Yaml;
-
 
 /**
  * The translator converts the alert yaml config into a detection alert config
@@ -138,13 +136,13 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
   private Map<String,Map<String,Object>>  buildAlertSchemes(Map<String,Object> yamlAlertConfig) {
     List<Map<String, Object>> alertSchemes = ConfigUtils.getList(yamlAlertConfig.get(PROP_ALERT_SCHEMES));
     Map<String, Map<String, Object>> alertSchemesHolder = new HashMap<>();
-    Map<String, Object> alertSchemesParsed = new HashMap<>();
     if (!alertSchemes.isEmpty()) {
       for (Map<String, Object> alertScheme : alertSchemes) {
-        if (alertScheme.get(PROP_TYPE) != null) {
-          alertSchemesParsed.put(PROP_CLASS_NAME,
+        Map<String, Object> alertSchemesParsed = new HashMap<>();
+
+        Preconditions.checkNotNull(alertScheme.get(PROP_TYPE));
+        alertSchemesParsed.put(PROP_CLASS_NAME,
               DETECTION_ALERT_REGISTRY.lookupAlertSchemes(alertScheme.get(PROP_TYPE).toString()));
-        }
 
         if (alertScheme.get(PROP_PARAM) != null) {
           for (Map.Entry<String, Object> params : ((Map<String, Object>) alertScheme.get(PROP_PARAM)).entrySet()) {

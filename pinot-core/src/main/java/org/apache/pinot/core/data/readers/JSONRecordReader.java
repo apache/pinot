@@ -18,11 +18,10 @@
  */
 package org.apache.pinot.core.data.readers;
 
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.MappingIterator;
 import java.io.File;
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.data.FieldSpec;
@@ -36,14 +35,11 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
  * Record reader for JSON file.
  */
 public class JSONRecordReader implements RecordReader {
-  private final JsonFactory _factory = new JsonFactory();
   private final File _dataFile;
   private final Schema _schema;
   private final List<FieldSpec> _fieldSpecs;
 
-  private JsonParser _parser;
-  private Iterator<Map> _iterator;
-
+  private MappingIterator<Map<String, Object>> _iterator;
 
   public JSONRecordReader(File dataFile, Schema schema)
       throws IOException {
@@ -56,18 +52,17 @@ public class JSONRecordReader implements RecordReader {
 
   private void init()
       throws IOException {
-    _parser = _factory.createParser(RecordReaderUtils.getBufferedReader(_dataFile));
     try {
-      _iterator = JsonUtils.DEFAULT_MAPPER.readValues(_parser, Map.class);
+      _iterator = JsonUtils.DEFAULT_READER.forType(new TypeReference<Map<String, Object>>() {
+      }).readValues(_dataFile);
     } catch (Exception e) {
-      _parser.close();
+      _iterator.close();
       throw e;
     }
   }
 
   @Override
   public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
-
   }
 
   @Override
@@ -84,7 +79,7 @@ public class JSONRecordReader implements RecordReader {
   @SuppressWarnings("Duplicates")
   @Override
   public GenericRow next(GenericRow reuse) {
-    Map record = _iterator.next();
+    Map<String, Object> record = _iterator.next();
     for (FieldSpec fieldSpec : _fieldSpecs) {
       String fieldName = fieldSpec.getName();
       Object value = record.get(fieldName);
@@ -99,7 +94,7 @@ public class JSONRecordReader implements RecordReader {
   @Override
   public void rewind()
       throws IOException {
-    _parser.close();
+    _iterator.close();
     init();
   }
 
@@ -111,6 +106,6 @@ public class JSONRecordReader implements RecordReader {
   @Override
   public void close()
       throws IOException {
-    _parser.close();
+    _iterator.close();
   }
 }

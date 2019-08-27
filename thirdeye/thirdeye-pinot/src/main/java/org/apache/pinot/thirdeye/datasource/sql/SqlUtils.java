@@ -87,6 +87,7 @@ public class SqlUtils {
   private static final String PRESTO = "Presto";
   private static final String MYSQL = "MySQL";
   private static final String H2 = "H2";
+  private static final String VERTICA = "Vertica";
 
   /**
    * Insert a table to SQL database, currently only used by H2, that can be read by ThirdEye
@@ -595,6 +596,8 @@ public class SqlUtils {
       return "UNIX_TIMESTAMP(STR_TO_DATE(CAST(" + timeColumn + " AS CHAR), '" + timeFormatToMySQLFormat(timeFormat) + "'))";
     } else if (sourceName.equals(H2)){
       return "TO_UNIXTIME(PARSEDATETIME(CAST(" + timeColumn + " AS VARCHAR), '" + timeFormat + "'))";
+    } else if (sourceName.equals(VERTICA)) {
+      return "EXTRACT(EPOCH FROM to_timestamp(to_char(" + timeColumn + "), '" + timeFormat + "'))";
     }
     return "";
   }

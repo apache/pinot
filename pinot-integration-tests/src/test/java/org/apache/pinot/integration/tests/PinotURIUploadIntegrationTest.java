@@ -23,7 +23,6 @@ import com.google.common.util.concurrent.MoreExecutors;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -44,9 +43,11 @@ import org.apache.commons.io.FileUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -111,7 +112,8 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  private File generateRandomSegment(String segmentName, int rowCount) throws Exception {
+  private File generateRandomSegment(String segmentName, int rowCount)
+      throws Exception {
     ThreadLocalRandom random = ThreadLocalRandom.current();
     Schema schema = new Schema.Parser()
         .parse(new File(TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource("dummy.avsc"))));
@@ -252,9 +254,12 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTestSet
           @Override
           public Integer call()
               throws Exception {
+            List<NameValuePair> parameters = Collections.singletonList(
+                new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, getTableName()));
+
             return fileUploadDownloadClient
                 .sendSegmentUri(FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort),
-                    downloadUri, httpHeaders, null, 60 * 1000).getStatusCode();
+                    downloadUri, httpHeaders, parameters, 60 * 1000).getStatusCode();
           }
         }));
       }
@@ -267,12 +272,12 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  private List<String> getAllSegments(String tablename)
+  private List<String> getAllSegments(String tableName)
       throws IOException {
     List<String> allSegments = new ArrayList<>();
     HttpHost controllerHttpHost = new HttpHost("localhost", _controllerPort);
     HttpClient controllerClient = new DefaultHttpClient();
-    HttpGet req = new HttpGet("/segments/" + URLEncoder.encode(tablename, "UTF-8"));
+    HttpGet req = new HttpGet("/segments/" + tableName);
     HttpResponse res = controllerClient.execute(controllerHttpHost, req);
     try {
       if (res.getStatusLine().getStatusCode() != 200) {

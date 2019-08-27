@@ -71,7 +71,7 @@ public interface IndexSegment {
   List<StarTreeV2> getStarTrees();
 
   /**
-   * Returns the record for the given document Id.
+   * Returns the record for the given document Id. Virtual column values are not returned.
    * <p>NOTE: don't use this method for high performance code.
    *
    * @param docId Document Id

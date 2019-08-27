@@ -21,7 +21,7 @@ package org.apache.pinot.minion.executor;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -30,6 +30,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -132,11 +133,15 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         String resultSegmentName = segmentConversionResults.get(i).getSegmentName();
 
         // Set parameters for upload request
-        List<NameValuePair> parameters = Collections.singletonList(
-            new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION, "true"));
+        NameValuePair enableParallelPushProtectionParameter =
+            new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION, "true");
+        NameValuePair tableNameParameter = new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME,
+            TableNameBuilder.extractRawTableName(tableNameWithType));
+        List<NameValuePair> parameters = Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter);
 
-        SegmentConversionUtils.uploadSegment(configs, null, parameters, tableNameWithType, resultSegmentName, uploadURL,
-            convertedTarredSegmentFile);
+        SegmentConversionUtils
+            .uploadSegment(configs, null, parameters, tableNameWithType, resultSegmentName, uploadURL,
+                convertedTarredSegmentFile);
       }
 
       String outputSegmentNames = segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName)

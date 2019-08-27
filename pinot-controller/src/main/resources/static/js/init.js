@@ -128,6 +128,16 @@ $(document).ready(function() {
         columns: columnList,
         scrollX: true
       });
+
+      new $.fn.dataTable.Buttons(table, {
+        buttons: [
+          'copy', 'excel', 'csv'
+        ]
+      });
+
+      table.buttons().container().prependTo(
+        table.table().container()
+      );
     })
   });
 });
@@ -178,6 +188,8 @@ var HELPERS = {
         "paging": false,
         "info": false
       });
+    }).fail(function() {
+      $(".schema-detail-view").html("Table " + tableName + " schema not found")
     });
   },
 

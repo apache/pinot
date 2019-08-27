@@ -36,7 +36,7 @@ import org.apache.helix.task.TaskDriver;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.task.WorkflowConfig;
 import org.apache.pinot.common.config.PinotTaskConfig;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -175,7 +175,7 @@ public class PinotHelixTaskResourceManager {
   @Nonnull
   public synchronized String submitTask(@Nonnull List<PinotTaskConfig> pinotTaskConfigs,
       int numConcurrentTasksPerInstance) {
-    return submitTask(pinotTaskConfigs, CommonConstants.Minion.UNTAGGED_INSTANCE, numConcurrentTasksPerInstance);
+    return submitTask(pinotTaskConfigs, Helix.UNTAGGED_MINION_INSTANCE, numConcurrentTasksPerInstance);
   }
 
   /**

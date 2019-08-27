@@ -50,6 +50,9 @@ import org.apache.pinot.tools.admin.command.VerifyClusterStateCommand;
 import org.apache.pinot.tools.admin.command.VerifySegmentState;
 import org.apache.pinot.tools.segment.converter.PinotSegmentConvertCommand;
 import org.apache.pinot.tools.segment.converter.SegmentMergeCommand;
+import org.apache.pinot.tools.tuner.CollectMetadataForIndexTuning;
+import org.apache.pinot.tools.tuner.EntriesScannedQuantileReport;
+import org.apache.pinot.tools.tuner.IndexTunerCommand;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
@@ -78,11 +81,45 @@ import org.slf4j.LoggerFactory;
 public class PinotAdministrator {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotAdministrator.class);
 
-  // @formatter:off
+  //@formatter:off
   @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
-  @SubCommands({@SubCommand(name = "GenerateData", impl = GenerateDataCommand.class), @SubCommand(name = "CreateSegment", impl = CreateSegmentCommand.class), @SubCommand(name = "StartZookeeper", impl = StartZookeeperCommand.class), @SubCommand(name = "StartKafka", impl = StartKafkaCommand.class), @SubCommand(name = "StreamAvroIntoKafka", impl = StreamAvroIntoKafkaCommand.class), @SubCommand(name = "StartController", impl = StartControllerCommand.class), @SubCommand(name = "StartBroker", impl = StartBrokerCommand.class), @SubCommand(name = "StartServer", impl = StartServerCommand.class), @SubCommand(name = "AddTable", impl = AddTableCommand.class), @SubCommand(name = "ChangeTableState", impl = ChangeTableState.class), @SubCommand(name = "AddTenant", impl = AddTenantCommand.class), @SubCommand(name = "AddSchema", impl = AddSchemaCommand.class), @SubCommand(name = "UploadSegment", impl = UploadSegmentCommand.class), @SubCommand(name = "PostQuery", impl = PostQueryCommand.class), @SubCommand(name = "StopProcess", impl = StopProcessCommand.class), @SubCommand(name = "DeleteCluster", impl = DeleteClusterCommand.class), @SubCommand(name = "ShowClusterInfo", impl = ShowClusterInfoCommand.class), @SubCommand(name = "AvroSchemaToPinotSchema", impl = AvroSchemaToPinotSchema.class), @SubCommand(name = "RebalanceTable", impl = RebalanceTableCommand.class), @SubCommand(name = "ChangeNumReplicas", impl = ChangeNumReplicasCommand.class), @SubCommand(name = "ValidateConfig", impl = ValidateConfigCommand.class), @SubCommand(name = "VerifySegmentState", impl = VerifySegmentState.class), @SubCommand(name = "ConvertPinotSegment", impl = PinotSegmentConvertCommand.class), @SubCommand(name = "MoveReplicaGroup", impl = MoveReplicaGroup.class), @SubCommand(name = "BackfillSegmentColumn", impl = BackfillDateTimeColumnCommand.class), @SubCommand(name = "VerifyClusterState", impl = VerifyClusterStateCommand.class), @SubCommand(name = "ApplyTableConfig", impl = ApplyTableConfigCommand.class), @SubCommand(name = "RealtimeProvisioningHelper", impl = RealtimeProvisioningHelperCommand.class), @SubCommand(name = "MergeSegments", impl = SegmentMergeCommand.class), @SubCommand(name = "CheckOfflineSegmentIntervals", impl = OfflineSegmentIntervalCheckerCommand.class)})
+  @SubCommands({
+      @SubCommand(name = "GenerateData", impl = GenerateDataCommand.class),
+      @SubCommand(name = "CreateSegment", impl = CreateSegmentCommand.class),
+      @SubCommand(name = "StartZookeeper", impl = StartZookeeperCommand.class),
+      @SubCommand(name = "StartKafka", impl = StartKafkaCommand.class),
+      @SubCommand(name = "StreamAvroIntoKafka", impl = StreamAvroIntoKafkaCommand.class),
+      @SubCommand(name = "StartController", impl = StartControllerCommand.class),
+      @SubCommand(name = "StartBroker", impl = StartBrokerCommand.class),
+      @SubCommand(name = "StartServer", impl = StartServerCommand.class),
+      @SubCommand(name = "AddTable", impl = AddTableCommand.class),
+      @SubCommand(name = "ChangeTableState", impl = ChangeTableState.class),
+      @SubCommand(name = "AddTenant", impl = AddTenantCommand.class),
+      @SubCommand(name = "AddSchema", impl = AddSchemaCommand.class),
+      @SubCommand(name = "UploadSegment", impl = UploadSegmentCommand.class),
+      @SubCommand(name = "PostQuery", impl = PostQueryCommand.class),
+      @SubCommand(name = "StopProcess", impl = StopProcessCommand.class),
+      @SubCommand(name = "DeleteCluster", impl = DeleteClusterCommand.class),
+      @SubCommand(name = "ShowClusterInfo", impl = ShowClusterInfoCommand.class),
+      @SubCommand(name = "AvroSchemaToPinotSchema", impl = AvroSchemaToPinotSchema.class),
+      @SubCommand(name = "RebalanceTable", impl = RebalanceTableCommand.class),
+      @SubCommand(name = "ChangeNumReplicas", impl = ChangeNumReplicasCommand.class),
+      @SubCommand(name = "ValidateConfig", impl = ValidateConfigCommand.class),
+      @SubCommand(name = "VerifySegmentState", impl = VerifySegmentState.class),
+      @SubCommand(name = "ConvertPinotSegment", impl = PinotSegmentConvertCommand.class),
+      @SubCommand(name = "MoveReplicaGroup", impl = MoveReplicaGroup.class),
+      @SubCommand(name = "BackfillSegmentColumn", impl = BackfillDateTimeColumnCommand.class),
+      @SubCommand(name = "VerifyClusterState", impl = VerifyClusterStateCommand.class),
+      @SubCommand(name = "ApplyTableConfig", impl = ApplyTableConfigCommand.class),
+      @SubCommand(name = "RealtimeProvisioningHelper", impl = RealtimeProvisioningHelperCommand.class),
+      @SubCommand(name = "MergeSegments", impl = SegmentMergeCommand.class),
+      @SubCommand(name = "CheckOfflineSegmentIntervals", impl = OfflineSegmentIntervalCheckerCommand.class),
+      @SubCommand(name = "CollectMetadataForIndexTuning", impl = CollectMetadataForIndexTuning.class),
+      @SubCommand(name = "EntriesScannedQuantileReport", impl = EntriesScannedQuantileReport.class),
+      @SubCommand(name = "IndexTuner", impl = IndexTunerCommand.class)
+  })
   Command _subCommand;
-  // @formatter:on
+  //@formatter:on
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   boolean _help = false;

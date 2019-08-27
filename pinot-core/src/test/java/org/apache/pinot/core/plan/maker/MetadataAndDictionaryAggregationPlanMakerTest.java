@@ -94,6 +94,12 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
+    // The segment generation code in SegmentColumnarIndexCreator will throw
+    // exception if start and end time in time column are not in acceptable
+    // range. For this test, we first need to fix the input avro data
+    // to have the time column values in allowed range. Until then, the check
+    // is explicitly disabled
+    segmentGeneratorConfig.setCheckTimeColumnValidityDuringGeneration(false);
     segmentGeneratorConfig
         .setInvertedIndexCreationColumns(Arrays.asList("column6", "column7", "column11", "column17", "column18"));
 
@@ -121,6 +127,12 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME_STARTREE);
     segmentGeneratorConfig.setOutDir(INDEX_DIR_STARTREE.getAbsolutePath());
     segmentGeneratorConfig.enableStarTreeIndex(new StarTreeIndexSpec());
+    // The segment generation code in SegmentColumnarIndexCreator will throw
+    // exception if start and end time in time column are not in acceptable
+    // range. For this test, we first need to fix the input avro data
+    // to have the time column values in allowed range. Until then, the check
+    // is explicitly disabled
+    segmentGeneratorConfig.setCheckTimeColumnValidityDuringGeneration(false);
 
     // Build the index segment.
     driver = new SegmentIndexCreationDriverImpl();

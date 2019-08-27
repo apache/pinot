@@ -82,3 +82,17 @@ body {
   color:black;
   font-size:14px;
 }
+
+.dataTables_filter input {
+  display: inline;
+  width: auto;
+}
+
+.dataTables_length {
+  padding-left: 1em;
+}
+
+.dataTables_length select {
+  width: auto;
+  padding-right: 1.5em;
+}

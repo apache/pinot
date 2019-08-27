@@ -19,11 +19,16 @@
 package org.apache.pinot.server.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Map;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
-import org.apache.pinot.core.query.utils.Pair;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.MasterSlaveSMD;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.helix.LeadControllerUtils;
+import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +42,6 @@ public class ControllerLeaderLocator {
   public static final Logger LOGGER = LoggerFactory.getLogger(ControllerLeaderLocator.class);
 
   private final HelixManager _helixManager;
-  private final String _clusterName;
 
   // Co-ordinates of the last known controller leader.
   private Pair<String, Integer> _controllerLeaderHostPort = null;
@@ -51,7 +55,6 @@ public class ControllerLeaderLocator {
 
   ControllerLeaderLocator(HelixManager helixManager) {
     _helixManager = helixManager;
-    _clusterName = helixManager.getClusterName();
   }
 
   /**
@@ -76,35 +79,145 @@ public class ControllerLeaderLocator {
   }
 
   /**
-   * Locate the controller leader so that we can send LLC segment completion requests to it.
+   * Locates the controller leader so that we can send LLC segment completion requests to it.
    * Checks the {@link ControllerLeaderLocator::_cachedControllerLeaderInvalid} flag and fetches the leader from helix if cached value is invalid
-   *
-   * @return The host:port string of the current controller leader.
+   * @param rawTableName table name without type.
+   * @return The host-port pair of the current controller leader.
    */
-  public synchronized Pair<String, Integer> getControllerLeader() {
+  public synchronized Pair<String, Integer> getControllerLeader(String rawTableName) {
     if (!_cachedControllerLeaderInvalid) {
       return _controllerLeaderHostPort;
     }
 
+    Pair<String, Integer> leaderForTable = getLeaderForTable(rawTableName);
+    if (leaderForTable == null) {
+      LOGGER.warn("Failed to find a leader for Table: {}", rawTableName);
+      _cachedControllerLeaderInvalid = true;
+      return null;
+    } else {
+      _controllerLeaderHostPort = leaderForTable;
+      _cachedControllerLeaderInvalid = false;
+      LOGGER.info("Setting controller leader to be {}:{}", _controllerLeaderHostPort.getFirst(),
+          _controllerLeaderHostPort.getSecond());
+      return _controllerLeaderHostPort;
+    }
+  }
+
+  /**
+   * Firstly checks whether lead controller resource has been enabled or not.
+   * If yes, use this as the leader for realtime segment completion once partition leader exists.
+   * Otherwise, try to use Helix leader.
+   * @param rawTableName table name without type.
+   * @return the controller leader id with hostname and port for this table, e.g. localhost_9000
+   */
+  private Pair<String, Integer> getLeaderForTable(String rawTableName) {
+    // Checks whether lead controller resource has been enabled or not.
+    if (isLeadControllerResourceEnabled()) {
+      // Gets leader from lead controller resource.
+      return getLeaderFromLeadControllerResource(rawTableName);
+    } else {
+      // Gets Helix leader to be the leader to this table, otherwise returns null.
+      return getHelixClusterLeader();
+    }
+  }
+
+  /**
+   * Checks whether lead controller resource is enabled or not. The switch is in resource config.
+   */
+  private boolean isLeadControllerResourceEnabled() {
     BaseDataAccessor<ZNRecord> dataAccessor = _helixManager.getHelixDataAccessor().getBaseDataAccessor();
     Stat stat = new Stat();
     try {
-      ZNRecord znRecord =
-          dataAccessor.get("/" + _clusterName + "/CONTROLLER/LEADER", stat, AccessOption.THROW_EXCEPTION_IFNOTEXIST);
-      String leader = znRecord.getId();
-      int index = leader.lastIndexOf('_');
-      String leaderHost = leader.substring(0, index);
-      int leaderPort = Integer.valueOf(leader.substring(index + 1));
-      _controllerLeaderHostPort = new Pair<>(leaderHost, leaderPort);
-      _cachedControllerLeaderInvalid = false;
-      LOGGER.info("Setting controller leader to be {}:{} as per znode version {}, mtime {}", leaderHost, leaderPort,
-          stat.getVersion(), stat.getMtime());
-      return _controllerLeaderHostPort;
+      ZNRecord znRecord = dataAccessor.get("/" + _helixManager.getClusterName() + "/CONFIGS/RESOURCE/"
+          + CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME, stat, AccessOption.THROW_EXCEPTION_IFNOTEXIST);
+      return Boolean.parseBoolean(znRecord.getSimpleField(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY));
     } catch (Exception e) {
-      LOGGER.warn("Could not locate controller leader, exception", e);
-      _cachedControllerLeaderInvalid = true;
+      LOGGER.warn("Could not get whether lead controller resource is enabled or not.", e);
+      return false;
+    }
+  }
+
+  /**
+   * Gets leader from lead controller resource. Null if there is no leader.
+   * @param rawTableName raw table name.
+   * @return pair of instance hostname and port of Helix cluster leader, e.g. {localhost, 9000}.
+   */
+  private Pair<String, Integer> getLeaderFromLeadControllerResource(String rawTableName) {
+    Pair<String, Integer> leaderHostAndPortPair = getLeadControllerInstanceIdForTable(rawTableName);
+    if (leaderHostAndPortPair != null) {
+      return leaderHostAndPortPair;
+    } else {
+      LOGGER.warn("Could not locate leader for table: {}", rawTableName);
       return null;
     }
+  }
+
+  /**
+   * Gets Helix leader in the cluster. Null if there is no leader.
+   * @return instance id of Helix cluster leader, e.g. localhost_9000.
+   */
+  private Pair<String, Integer> getHelixClusterLeader() {
+    BaseDataAccessor<ZNRecord> dataAccessor = _helixManager.getHelixDataAccessor().getBaseDataAccessor();
+    Stat stat = new Stat();
+    try {
+      ZNRecord znRecord = dataAccessor.get("/" + _helixManager.getClusterName() + "/CONTROLLER/LEADER", stat,
+          AccessOption.THROW_EXCEPTION_IFNOTEXIST);
+      String helixLeader = znRecord.getId();
+      LOGGER.info("Getting Helix leader: {} as per znode version {}, mtime {}", helixLeader, stat.getVersion(),
+          stat.getMtime());
+      return convertToHostAndPortPair(helixLeader);
+    } catch (Exception e) {
+      LOGGER.warn("Could not locate Helix leader!", e);
+      return null;
+    }
+  }
+
+  /**
+   * Gets lead controller participant id for table from lead controller resource.
+   * If the resource is disabled or no controller registered as participant, there is no instance in "MASTER" state.
+   * @param rawTableName table name without type
+   * @return Helix controller instance id for partition leader, e.g. localhost_9000. Null if not found or resource is disabled.
+   */
+  private Pair<String, Integer> getLeadControllerInstanceIdForTable(String rawTableName) {
+    try {
+      ExternalView leadControllerResourceExternalView = _helixManager.getClusterManagmentTool()
+          .getResourceExternalView(_helixManager.getClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+      if (leadControllerResourceExternalView == null) {
+        LOGGER.warn("External view of lead controller resource is null!");
+        return null;
+      }
+      int partitionId = LeadControllerUtils.getPartitionIdForTable(rawTableName);
+      String partitionName = LeadControllerUtils.generatePartitionName(partitionId);
+      Map<String, String> partitionStateMap = leadControllerResourceExternalView.getStateMap(partitionName);
+
+      // Get master host from partition map. Return null if no master found.
+      for (Map.Entry<String, String> entry : partitionStateMap.entrySet()) {
+        if (MasterSlaveSMD.States.MASTER.name().equals(entry.getValue())) {
+          // Found the controller in master state.
+          // Converts participant id (with Prefix "Controller_") to controller id and assigns it as the leader,
+          // since realtime segment completion protocol doesn't need the prefix in controller instance id.
+          String participantInstanceId = entry.getKey();
+          String controllerInstanceId = participantInstanceId.substring(participantInstanceId.indexOf('_') + 1);
+          return convertToHostAndPortPair(controllerInstanceId);
+        }
+      }
+      LOGGER
+          .warn("There is no controller in MASTER state for partition: {} in lead controller resource", partitionName);
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception when getting lead controller instance Id for table: {}", rawTableName, e);
+    }
+    return null;
+  }
+
+  /**
+   * Converts instance id to a pair of hostname and port.
+   * @param instanceId instance id without any prefix, e.g. localhost_9000
+   * */
+  private Pair<String, Integer> convertToHostAndPortPair(String instanceId) {
+    int index = instanceId.lastIndexOf('_');
+    String leaderHost = instanceId.substring(0, index);
+    int leaderPort = Integer.valueOf(instanceId.substring(index + 1));
+    return new Pair<>(leaderHost, leaderPort);
   }
 
   /**

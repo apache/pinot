@@ -47,6 +47,13 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
 
   @Test
   @Override
+  public void testSqlQueriesFromQueryFile()
+      throws Exception {
+    super.testQueriesFromQueryFile();
+  }
+
+  @Test
+  @Override
   public void testGeneratedQueriesWithMultiValues()
       throws Exception {
     super.testGeneratedQueriesWithMultiValues();

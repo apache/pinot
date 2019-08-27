@@ -20,6 +20,7 @@ package org.apache.pinot.core.segment.creator.impl.inv;
 
 import com.google.common.base.Preconditions;
 import java.io.BufferedOutputStream;
+import java.io.Closeable;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -213,10 +214,27 @@ public final class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCre
   @Override
   public void close()
       throws IOException {
-    destroyBuffer(_forwardIndexValueBuffer, _forwardIndexValueBufferFile);
-    destroyBuffer(_forwardIndexLengthBuffer, _forwardIndexLengthBufferFile);
-    destroyBuffer(_invertedIndexValueBuffer, _invertedIndexValueBufferFile);
-    destroyBuffer(_invertedIndexLengthBuffer, _invertedIndexLengthBufferFile);
+    org.apache.pinot.common.utils.FileUtils
+        .close(new DataBufferAndFile(_forwardIndexValueBuffer, _forwardIndexValueBufferFile),
+            new DataBufferAndFile(_forwardIndexLengthBuffer, _forwardIndexLengthBufferFile),
+            new DataBufferAndFile(_invertedIndexValueBuffer, _invertedIndexValueBufferFile),
+            new DataBufferAndFile(_invertedIndexLengthBuffer, _invertedIndexLengthBufferFile));
+  }
+
+  private class DataBufferAndFile implements Closeable {
+    private final PinotDataBuffer _dataBuffer;
+    private final File _file;
+
+    DataBufferAndFile(final PinotDataBuffer buffer, final File file) {
+      _dataBuffer = buffer;
+      _file = file;
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+      destroyBuffer(_dataBuffer, _file);
+    }
   }
 
   private static void putInt(PinotDataBuffer buffer, long index, int value) {

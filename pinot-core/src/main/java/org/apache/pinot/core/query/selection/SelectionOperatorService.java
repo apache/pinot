@@ -70,6 +70,7 @@ import org.apache.pinot.core.query.selection.comparator.CompositeDocIdValCompara
 public class SelectionOperatorService {
   private final List<String> _selectionColumns;
   private final List<SelectionSort> _sortSequence;
+  private final int[] _sortColumnIdx;
   private final DataSchema _dataSchema;
   private final int _selectionOffset;
   private final int _maxNumRows;
@@ -87,6 +88,8 @@ public class SelectionOperatorService {
     _selectionColumns = SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), indexSegment);
     _sortSequence = getSortSequence(selection.getSelectionSortSequence());
     _dataSchema = SelectionOperatorUtils.extractDataSchema(_sortSequence, _selectionColumns, indexSegment);
+    _sortColumnIdx =
+        SelectionOperatorUtils.getColumnIndices(SelectionOperatorUtils.extractSortColumns(_sortSequence), _dataSchema);
     // Select rows from offset to offset + size.
     _selectionOffset = selection.getOffset();
     _maxNumRows = _selectionOffset + selection.getSize();
@@ -103,6 +106,8 @@ public class SelectionOperatorService {
     _selectionColumns = SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), dataSchema);
     _sortSequence = getSortSequence(selection.getSelectionSortSequence());
     _dataSchema = dataSchema;
+    _sortColumnIdx =
+        SelectionOperatorUtils.getColumnIndices(SelectionOperatorUtils.extractSortColumns(_sortSequence), _dataSchema);
     // Select rows from offset to offset + size.
     _selectionOffset = selection.getOffset();
     _maxNumRows = _selectionOffset + selection.getSize();
@@ -211,8 +216,9 @@ public class SelectionOperatorService {
         for (int i = 0; i < numSortColumns; i++) {
           int ret = 0;
           SelectionSort selectionSort = _sortSequence.get(i);
-          Serializable v1 = o1[i];
-          Serializable v2 = o2[i];
+          int colIdx = _sortColumnIdx[i];
+          Serializable v1 = o1[colIdx];
+          Serializable v2 = o2[colIdx];
 
           // Only compare single-value columns.
           if (v1 instanceof Number) {
@@ -319,7 +325,7 @@ public class SelectionOperatorService {
   public SelectionResults renderSelectionResultsWithOrdering() {
     LinkedList<Serializable[]> rowsInSelectionResults = new LinkedList<>();
 
-    int[] columnIndices = SelectionOperatorUtils.getColumnIndicesWithOrdering(_selectionColumns, _dataSchema);
+    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(_selectionColumns, _dataSchema);
     while (_rows.size() > _selectionOffset) {
       rowsInSelectionResults.addFirst(SelectionOperatorUtils.extractColumns(_rows.poll(), columnIndices));
     }

@@ -30,7 +30,6 @@ import org.testng.annotations.Test;
 
 
 public class ControllerPeriodicTaskStarterTest extends ControllerTest {
-  private MockControllerStarter _mockControllerStarter;
 
   @BeforeClass
   public void setup() {
@@ -51,31 +50,12 @@ public class ControllerPeriodicTaskStarterTest extends ControllerTest {
   }
 
   @Override
-  protected void startControllerStarter(ControllerConf config) {
-    _mockControllerStarter = new MockControllerStarter(config);
-    _mockControllerStarter.start();
-    _helixResourceManager = _mockControllerStarter.getHelixResourceManager();
-    _helixManager = _mockControllerStarter.getHelixControllerManager();
+  protected ControllerStarter getControllerStarter(ControllerConf config) {
+    return new MockControllerStarter(config);
   }
 
-  @Override
-  protected void stopControllerStarter() {
-    Assert.assertNotNull(_mockControllerStarter);
-
-    _mockControllerStarter.stop();
-    _mockControllerStarter = null;
-  }
-
-  @Override
-  protected ControllerStarter getControllerStarter() {
-    return _mockControllerStarter;
-  }
-
-  private class MockControllerStarter extends TestOnlyControllerStarter {
-
+  private class MockControllerStarter extends ControllerStarter {
     private static final int NUM_PERIODIC_TASKS = 7;
-
-    private List<PeriodicTask> _controllerPeriodicTasks;
 
     public MockControllerStarter(ControllerConf conf) {
       super(conf);
@@ -90,14 +70,10 @@ public class ControllerPeriodicTaskStarterTest extends ControllerTest {
       Assert.assertNotNull(helixResourceManager.getHelixClusterName());
       Assert.assertNotNull(helixResourceManager.getPropertyStore());
 
-      _controllerPeriodicTasks = super.setupControllerPeriodicTasks();
-      Assert.assertNotNull(_controllerPeriodicTasks);
-      Assert.assertEquals(_controllerPeriodicTasks.size(), NUM_PERIODIC_TASKS);
-      return _controllerPeriodicTasks;
-    }
-
-    List<PeriodicTask> getControllerPeriodicTasks() {
-      return _controllerPeriodicTasks;
+      List<PeriodicTask> controllerPeriodicTasks = super.setupControllerPeriodicTasks();
+      Assert.assertNotNull(controllerPeriodicTasks);
+      Assert.assertEquals(controllerPeriodicTasks.size(), NUM_PERIODIC_TASKS);
+      return controllerPeriodicTasks;
     }
   }
 }

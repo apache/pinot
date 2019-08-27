@@ -27,9 +27,6 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import kafka.javaapi.producer.Producer;
-import kafka.producer.KeyedMessage;
-import kafka.producer.ProducerConfig;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
@@ -38,6 +35,8 @@ import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.TimeFieldSpec;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
+import org.apache.pinot.core.realtime.stream.StreamDataProducer;
+import org.apache.pinot.core.realtime.stream.StreamDataProvider;
 import org.apache.pinot.tools.Quickstart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,12 +50,12 @@ public class AirlineDataStream {
   DataFileStream<GenericRecord> avroDataStream;
   Integer currentTimeValue = 16102;
   boolean keepIndexing = true;
-  private Producer<String, byte[]> producer;
   ExecutorService service;
   int counter = 0;
+  private StreamDataProducer producer;
 
   public AirlineDataStream(Schema pinotSchema, File avroFile)
-      throws FileNotFoundException, IOException {
+      throws Exception {
     this.pinotSchema = pinotSchema;
     this.avroFile = avroFile;
     createStream();
@@ -65,8 +64,8 @@ public class AirlineDataStream {
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
 
-    ProducerConfig producerConfig = new ProducerConfig(properties);
-    producer = new Producer<String, byte[]>(producerConfig);
+    producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
+
     service = Executors.newFixedThreadPool(1);
     Quickstart.printStatus(Quickstart.Color.YELLOW,
         "***** Offine data has max time as 16101, realtime will start consuming from time 16102 and increment time every 3000 events *****");
@@ -97,9 +96,7 @@ public class AirlineDataStream {
       avroDataStream = null;
       return;
     }
-    KeyedMessage<String, byte[]> data =
-        new KeyedMessage<String, byte[]>("airlineStatsEvents", message.toString().getBytes("UTF-8"));
-    producer.send(data);
+    producer.produce("airlineStatsEvents", message.toString().getBytes("UTF-8"));
   }
 
   public void run() {

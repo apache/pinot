@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import javafx.concurrent.Task;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.TaskBean;
@@ -41,6 +42,14 @@ public class DetectionTaskStatus {
   // the health status for the detection tasks
   @JsonProperty
   private final HealthStatus healthStatus;
+
+  // the time stamp of last successfully finishing task
+  @JsonProperty
+  private final Long lastTaskExecutionTime;
+
+  public Long getLastTaskExecutionTime() {
+    return lastTaskExecutionTime;
+  }
 
   // the counting for detection task status
   @JsonProperty
@@ -63,6 +72,11 @@ public class DetectionTaskStatus {
     this.healthStatus = healthStatus;
     this.tasks = tasks;
     this.taskCounts.putAll(counts);
+    this.lastTaskExecutionTime = tasks.stream()
+        .filter(task -> task.getStatus().equals(TaskConstants.TaskStatus.COMPLETED))
+        .map(TaskBean::getEndTime)
+        .findFirst()
+        .orElse(-1L);
   }
 
   public double getTaskSuccessRate() {

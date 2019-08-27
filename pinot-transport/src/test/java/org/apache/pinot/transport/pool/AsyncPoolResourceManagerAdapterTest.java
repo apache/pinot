@@ -19,6 +19,7 @@
 package org.apache.pinot.transport.pool;
 
 import com.google.common.util.concurrent.MoreExecutors;
+import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.transport.common.Callback;
 import org.testng.Assert;
@@ -26,6 +27,7 @@ import org.testng.annotations.Test;
 
 
 public class AsyncPoolResourceManagerAdapterTest {
+  private static final ExecutorService EXECUTOR_SERVICE = MoreExecutors.newDirectExecutorService();
 
   @Test
   public void testCreate() {
@@ -36,7 +38,7 @@ public class AsyncPoolResourceManagerAdapterTest {
       String value = "dummy";
       MyPooledResourceManager rm = new MyPooledResourceManager(true, value);
       AsyncPoolResourceManagerAdapter<String> adapter =
-          new AsyncPoolResourceManagerAdapter<>(key, rm, MoreExecutors.sameThreadExecutor(), null);
+          new AsyncPoolResourceManagerAdapter<>(key, rm, EXECUTOR_SERVICE, null);
       MyCallback callback = new MyCallback();
 
       adapter.create(callback);
@@ -52,7 +54,7 @@ public class AsyncPoolResourceManagerAdapterTest {
       ServerInstance key = new ServerInstance("localhost:8080");
       MyPooledResourceManager rm = new MyPooledResourceManager(true, null);
       AsyncPoolResourceManagerAdapter<String> adapter =
-          new AsyncPoolResourceManagerAdapter<String>(key, rm, MoreExecutors.sameThreadExecutor(), null);
+          new AsyncPoolResourceManagerAdapter<String>(key, rm, EXECUTOR_SERVICE, null);
       MyCallback callback = new MyCallback();
 
       adapter.create(callback);
@@ -72,7 +74,7 @@ public class AsyncPoolResourceManagerAdapterTest {
       String value = "dummy";
       MyPooledResourceManager rm = new MyPooledResourceManager(true, null);
       AsyncPoolResourceManagerAdapter<String> adapter =
-          new AsyncPoolResourceManagerAdapter<>(key, rm, MoreExecutors.sameThreadExecutor(), null);
+          new AsyncPoolResourceManagerAdapter<>(key, rm, EXECUTOR_SERVICE, null);
 
       boolean ret = adapter.validateGet(value);
       Assert.assertTrue(ret, "Validate Return");
@@ -93,7 +95,7 @@ public class AsyncPoolResourceManagerAdapterTest {
       String value = "dummy";
       MyPooledResourceManager rm = new MyPooledResourceManager(false, null);
       AsyncPoolResourceManagerAdapter<String> adapter =
-          new AsyncPoolResourceManagerAdapter<>(key, rm, MoreExecutors.sameThreadExecutor(), null);
+          new AsyncPoolResourceManagerAdapter<>(key, rm, EXECUTOR_SERVICE, null);
 
       boolean ret = adapter.validateGet(value);
       Assert.assertFalse(ret, "Validate Return");
@@ -119,7 +121,7 @@ public class AsyncPoolResourceManagerAdapterTest {
       String value = "dummy";
       MyPooledResourceManager rm = new MyPooledResourceManager(true, null);
       AsyncPoolResourceManagerAdapter<String> adapter =
-          new AsyncPoolResourceManagerAdapter<>(key, rm, MoreExecutors.sameThreadExecutor(), null);
+          new AsyncPoolResourceManagerAdapter<>(key, rm, EXECUTOR_SERVICE, null);
       MyCallback callback = new MyCallback();
 
       adapter.destroy(value, true, callback);
@@ -137,7 +139,7 @@ public class AsyncPoolResourceManagerAdapterTest {
       String value = "dummy";
       MyPooledResourceManager rm = new MyPooledResourceManager(false, null);
       AsyncPoolResourceManagerAdapter<String> adapter =
-          new AsyncPoolResourceManagerAdapter<>(key, rm, MoreExecutors.sameThreadExecutor(), null);
+          new AsyncPoolResourceManagerAdapter<>(key, rm, EXECUTOR_SERVICE, null);
       MyCallback callback = new MyCallback();
 
       adapter.destroy(value, true, callback);

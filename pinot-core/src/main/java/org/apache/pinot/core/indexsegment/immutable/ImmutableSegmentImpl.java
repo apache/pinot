@@ -19,12 +19,12 @@
 package org.apache.pinot.core.indexsegment.immutable;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.indexsegment.IndexSegmentUtils;
 import org.apache.pinot.core.io.reader.DataFileReader;
@@ -99,15 +99,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Override
   public Set<String> getPhysicalColumnNames() {
-    HashSet<String> physicalColumnNames = new HashSet<>();
-
-    for (String columnName : getColumnNames()) {
-      if (!_segmentMetadata.getSchema().isVirtualColumn(columnName)) {
-        physicalColumnNames.add(columnName);
-      }
-    }
-
-    return physicalColumnNames;
+    return _segmentMetadata.getSchema().getPhysicalColumnNames();
   }
 
   @Override
@@ -161,12 +153,15 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Override
   public GenericRow getRecord(int docId, GenericRow reuse) {
-    for (FieldSpec fieldSpec : _segmentMetadata.getSchema().getAllFieldSpecs()) {
-      String column = fieldSpec.getName();
-      ColumnIndexContainer indexContainer = _indexContainerMap.get(column);
-      reuse.putField(column, IndexSegmentUtils
-          .getValue(docId, fieldSpec, indexContainer.getForwardIndex(), indexContainer.getDictionary(),
-              _segmentMetadata.getColumnMetadataFor(column).getMaxNumberOfMultiValues()));
+    Schema schema = _segmentMetadata.getSchema();
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (!fieldSpec.isVirtualColumn()) {
+        String columnName = fieldSpec.getName();
+        ColumnIndexContainer indexContainer = _indexContainerMap.get(columnName);
+        reuse.putField(columnName, IndexSegmentUtils
+            .getValue(docId, fieldSpec, indexContainer.getForwardIndex(), indexContainer.getDictionary(),
+                _segmentMetadata.getColumnMetadataFor(columnName).getMaxNumberOfMultiValues()));
+      }
     }
     return reuse;
   }

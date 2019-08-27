@@ -20,7 +20,7 @@
 -->
 # Apache Pinot (incubating)
 
-[![Build Status](https://api.travis-ci.org/apache/incubator-pinot.svg?branch=master)](https://travis-ci.org/apache/incubator-pinot) [![codecov.io](https://codecov.io/github/linkedin/pinot/branch/master/graph/badge.svg)](https://codecov.io/github/linkedin/pinot) [![Join the chat at https://gitter.im/linkedin/pinot](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/linkedin/pinot?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) [![license](https://img.shields.io/github/license/linkedin/pinot.svg)](LICENSE)
+[![Build Status](https://api.travis-ci.org/apache/incubator-pinot.svg?branch=master)](https://travis-ci.org/apache/incubator-pinot) [![codecov.io](https://codecov.io/github/apache/incubator-pinot/branch/master/graph/badge.svg)](https://codecov.io/github/apache/incubator-pinot) [![Join the chat at https://gitter.im/linkedin/pinot](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/linkedin/pinot?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) [![license](https://img.shields.io/github/license/linkedin/pinot.svg)](LICENSE)
 
 Apache Pinot is a realtime distributed OLAP datastore, which is used to deliver scalable real time analytics with low latency. It can ingest data from offline data sources (such as Hadoop and flat files) as well as online sources (such as Kafka). Pinot is designed to scale horizontally.
 
@@ -36,7 +36,7 @@ Looking for the ThirdEye anomaly detection and root-cause analysis platform? Che
 ## Key Features
 
 - A column-oriented database with various compression schemes such as Run Length, Fixed Bit Length
-- Pluggable indexing technologies - Sorted Index, Bitmap Index, Inverted Index
+- Pluggable indexing technologies - Sorted Index, Bitmap Index, Inverted Index, Star-Tree Index
 - Ability to optimize query/execution plan based on query and segment metadata
 - Near real time ingestion from Kafka and batch ingestion from Hadoop
 - SQL like language that supports _selection, aggregation, filtering, group by, order by, distinct_ queries on fact data
@@ -67,7 +67,7 @@ $ bin/quick-start-offline.sh
 ```
 
 ## Getting Involved
- - Ask questions on [Slack](https://join.slack.com/t/apache-pinot/shared_invite/enQtNDY4NDczOTYyNjk1LTExODVjY2QxYzBkMzJjNTk0ZGQ3NThiYTU2YzdlNjE0MWI5ZjUwYjI2ZTgxNjNiYWJiNmEzYjkxMTIzMzUxNTQ)
+ - Ask questions on [Apache Pinot Slack](https://communityinviter.com/apps/apache-pinot/apache-pinot)
  - Please join Apache Pinot mailing lists  
    dev-subscribe@pinot.apache.org (subscribe to pinot-dev mailing list)  
    dev@pinot.apache.org (posting to pinot-dev mailing list)  

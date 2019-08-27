@@ -21,6 +21,7 @@ package org.apache.pinot.hadoop.job;
 public class JobConfigConstants {
   public static final String PATH_TO_INPUT = "path.to.input";
   public static final String PATH_TO_OUTPUT = "path.to.output";
+  public static final String PREPROCESS_PATH_TO_OUTPUT = "preprocess.path.to.output";
   public static final String PATH_TO_DEPS_JAR = "path.to.deps.jar";
   public static final String PATH_TO_READER_CONFIG = "path.to.reader.config";
   // Leave this for backward compatibility. We prefer to use the schema fetched from the controller.
@@ -52,4 +53,10 @@ public class JobConfigConstants {
 
   // The path to the record reader to be configured
   public static final String RECORD_READER_PATH = "record.reader.path";
+
+  public static final String ENABLE_PREPROCESSING = "enable.preprocessing";
+
+  // This setting should be used if you will generate less # of segments after
+  // push. In preprocessing, this is likely because we resize segments.
+  public static final String DELETE_EXTRA_SEGMENTS = "delete.extra.segments";
 }

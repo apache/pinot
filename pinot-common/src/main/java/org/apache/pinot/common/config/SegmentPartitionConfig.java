@@ -73,7 +73,7 @@ public class SegmentPartitionConfig {
    */
   @JsonIgnore
   public void setNumPartitions(String column, int numPartitions) {
-    ColumnPartitionConfig columnPartitionConfig = _columnPartitionMap.get(column);
+    _columnPartitionMap.get(column).setNumPartitions(numPartitions);
   }
 
   /**

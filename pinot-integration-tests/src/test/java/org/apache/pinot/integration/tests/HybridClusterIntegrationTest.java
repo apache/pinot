@@ -97,7 +97,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     setUpTable(avroFiles.get(0));
 
     // Upload all segments
-    uploadSegments(_tarDir);
+    uploadSegments(getTableName(), _tarDir);
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
@@ -135,7 +135,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     addHybridTable(getTableName(), useLlc(), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
         getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName, TENANT_NAME,
         TENANT_NAME, getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getBloomFilterIndexColumns(),
-        getRawIndexColumns(), getTaskConfig(), getStreamConsumerFactoryClassName());
+        getRawIndexColumns(), getTaskConfig(), getStreamConsumerFactoryClassName(), getSegmentPartitionConfig());
 
     completeTableConfiguration();
   }
@@ -231,6 +231,13 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   @Override
   public void testQueriesFromQueryFile()
+      throws Exception {
+    super.testQueriesFromQueryFile();
+  }
+
+  @Test
+  @Override
+  public void testSqlQueriesFromQueryFile()
       throws Exception {
     super.testQueriesFromQueryFile();
   }

@@ -55,14 +55,13 @@ import org.slf4j.LoggerFactory;
 public class HierarchicalAnomaliesEmailContentFormatter extends BaseEmailContentFormatter{
   private static final Logger LOG = LoggerFactory.getLogger(HierarchicalAnomaliesEmailContentFormatter.class);
 
-  public static final String EMAIL_TEMPLATE = "emailTemplate";
   public static final String USE_LATEST_ANOMALY_INFORMATION = "useLatestAnomaly";
   public static final String PRESENT_SEASONAL_VALUES = "presentSeasonalValues";
 
   public static final String DEFAULT_USE_LATEST_ANOMALY_INFORMATION = "true";
   public static final String DEFAULT_PRESENT_SEASONAL_VALUES = "false";
 
-  public static final String DEFAULT_EMAIL_TEMPLATE = "hierarchical-anomalies-email-template.ftl";
+  public static final String EMAIL_TEMPLATE = "hierarchical-anomalies-email-template.ftl";
 
   private boolean useLatestAnomaly;
   private boolean presentSeasonalValues;
@@ -74,7 +73,7 @@ public class HierarchicalAnomaliesEmailContentFormatter extends BaseEmailContent
   @Override
   public void init(Properties properties, EmailContentFormatterConfiguration configuration) {
     super.init(properties, configuration);
-    this.emailTemplate = properties.getProperty(EMAIL_TEMPLATE, DEFAULT_EMAIL_TEMPLATE);
+    this.emailTemplate = EMAIL_TEMPLATE;
     useLatestAnomaly = Boolean.valueOf(properties.getProperty(USE_LATEST_ANOMALY_INFORMATION, DEFAULT_USE_LATEST_ANOMALY_INFORMATION));
     presentSeasonalValues = Boolean.valueOf(properties.getProperty(PRESENT_SEASONAL_VALUES, DEFAULT_PRESENT_SEASONAL_VALUES));
   }
@@ -82,6 +81,7 @@ public class HierarchicalAnomaliesEmailContentFormatter extends BaseEmailContent
   @Override
   protected void updateTemplateDataByAnomalyResults(Map<String, Object> templateData,
       Collection<AnomalyResult> anomalies, EmailContentFormatterContext context) {
+    enrichMetricInfo(templateData, anomalies);
     List<AnomalyReportEntity> rootAnomalyDetails = new ArrayList<>();
     SortedMap<String, List<AnomalyReportEntity>> leafAnomalyDetails = new TreeMap<>();
     List<String> anomalyIds = new ArrayList<>();
@@ -139,8 +139,8 @@ public class HierarchicalAnomaliesEmailContentFormatter extends BaseEmailContent
     AnomalyReportEntity
         anomalyReport = new AnomalyReportEntity(String.valueOf(anomaly.getId()),
         getAnomalyURL(anomaly, dashboardHost),
-        ThirdEyeUtils.getRoundedValue(anomaly.getAvgBaselineVal()),
-        ThirdEyeUtils.getRoundedValue(anomaly.getAvgCurrentVal()),
+        anomaly.getAvgBaselineVal(),
+        anomaly.getAvgCurrentVal(),
         anomaly.getImpactToGlobal(),
         getDimensionsList(anomaly.getDimensions()),
         getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()), // duration

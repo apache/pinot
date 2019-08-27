@@ -66,6 +66,9 @@ public class SegmentsValidationAndRetentionConfig {
   private ReplicaGroupStrategyConfig replicaGroupStrategyConfig;
 
   @NestedConfig
+  private CompletionConfig _completionConfig;
+
+  @NestedConfig
   private HllConfig hllConfig;
 
   // Number of replicas per partition of low-level consumers. This config is used for realtime tables only.
@@ -160,6 +163,14 @@ public class SegmentsValidationAndRetentionConfig {
     this.replicaGroupStrategyConfig = replicaGroupStrategyConfig;
   }
 
+  public CompletionConfig getCompletionConfig() {
+    return _completionConfig;
+  }
+
+  public void setCompletionConfig(CompletionConfig completionConfig) {
+    _completionConfig = completionConfig;
+  }
+
   public HllConfig getHllConfig() {
     return hllConfig;
   }
@@ -222,15 +233,15 @@ public class SegmentsValidationAndRetentionConfig {
 
     SegmentsValidationAndRetentionConfig that = (SegmentsValidationAndRetentionConfig) o;
 
-    return EqualityUtils.isEqual(retentionTimeUnit, that.retentionTimeUnit) && EqualityUtils
-        .isEqual(retentionTimeValue, that.retentionTimeValue) && EqualityUtils
-        .isEqual(segmentPushFrequency, that.segmentPushFrequency) && EqualityUtils
-        .isEqual(segmentPushType, that.segmentPushType) && EqualityUtils.isEqual(replication, that.replication)
-        && EqualityUtils.isEqual(schemaName, that.schemaName) && EqualityUtils
-        .isEqual(timeColumnName, that.timeColumnName) && EqualityUtils.isEqual(_timeType, that._timeType)
-        && EqualityUtils.isEqual(segmentAssignmentStrategy, that.segmentAssignmentStrategy) && EqualityUtils
-        .isEqual(replicaGroupStrategyConfig, that.replicaGroupStrategyConfig) && EqualityUtils
-        .isEqual(hllConfig, that.hllConfig) && EqualityUtils.isEqual(replicasPerPartition, that.replicasPerPartition);
+    return EqualityUtils.isEqual(retentionTimeUnit, that.retentionTimeUnit) && EqualityUtils.isEqual(retentionTimeValue,
+        that.retentionTimeValue) && EqualityUtils.isEqual(segmentPushFrequency, that.segmentPushFrequency)
+        && EqualityUtils.isEqual(segmentPushType, that.segmentPushType) && EqualityUtils.isEqual(replication,
+        that.replication) && EqualityUtils.isEqual(schemaName, that.schemaName) && EqualityUtils.isEqual(timeColumnName,
+        that.timeColumnName) && EqualityUtils.isEqual(_timeType, that._timeType) && EqualityUtils.isEqual(
+        segmentAssignmentStrategy, that.segmentAssignmentStrategy) && EqualityUtils.isEqual(replicaGroupStrategyConfig,
+        that.replicaGroupStrategyConfig) && EqualityUtils.isEqual(_completionConfig, that._completionConfig)
+        && EqualityUtils.isEqual(hllConfig, that.hllConfig) && EqualityUtils.isEqual(replicasPerPartition,
+        that.replicasPerPartition);
   }
 
   @Override
@@ -245,6 +256,7 @@ public class SegmentsValidationAndRetentionConfig {
     result = EqualityUtils.hashCodeOf(result, _timeType);
     result = EqualityUtils.hashCodeOf(result, segmentAssignmentStrategy);
     result = EqualityUtils.hashCodeOf(result, replicaGroupStrategyConfig);
+    result = EqualityUtils.hashCodeOf(result, _completionConfig);
     result = EqualityUtils.hashCodeOf(result, hllConfig);
     result = EqualityUtils.hashCodeOf(result, replicasPerPartition);
     return result;

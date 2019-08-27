@@ -38,10 +38,14 @@ import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.PredictionResult;
 import org.apache.pinot.thirdeye.detection.spi.components.Grouper;
 
+import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator.*;
+
 
 /**
  * A group wrapper which triggers the configured grouper. The actual grouper
  * must implement the {@link Grouper} interface.
+ *
+ * A grouper must always return grouped (parent) anomalies - no child anomalies
  */
 public class GrouperWrapper extends DetectionPipeline {
   private static final String PROP_NESTED = "nested";
@@ -53,6 +57,7 @@ public class GrouperWrapper extends DetectionPipeline {
 
   private final Grouper grouper;
   private final String grouperName;
+  private final String entityName;
 
   public GrouperWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
       throws Exception {
@@ -65,6 +70,9 @@ public class GrouperWrapper extends DetectionPipeline {
     this.grouperName = DetectionUtils.getComponentKey(MapUtils.getString(config.getProperties(), PROP_GROUPER));
     Preconditions.checkArgument(this.config.getComponents().containsKey(this.grouperName));
     this.grouper = (Grouper) this.config.getComponents().get(this.grouperName);
+
+    Preconditions.checkArgument(this.config.getProperties().containsKey(PROP_SUB_ENTITY_NAME));
+    this.entityName = MapUtils.getString(config.getProperties(), PROP_SUB_ENTITY_NAME);
   }
 
   /**
@@ -109,7 +117,11 @@ public class GrouperWrapper extends DetectionPipeline {
       }
 
       anomaly.setDetectionConfigId(this.config.getId());
+      if (anomaly.getProperties() == null) {
+        anomaly.setProperties(new HashMap<>());
+      }
       anomaly.getProperties().put(PROP_DETECTOR_COMPONENT_NAME, this.grouperName);
+      anomaly.getProperties().put(PROP_SUB_ENTITY_NAME, this.entityName);
     }
 
     return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps),

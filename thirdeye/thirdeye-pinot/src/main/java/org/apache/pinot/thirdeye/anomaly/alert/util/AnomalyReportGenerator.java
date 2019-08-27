@@ -83,7 +83,7 @@ public class AnomalyReportGenerator {
 
   private static final AnomalyReportGenerator INSTANCE = new AnomalyReportGenerator();
   private static final String DATE_PATTERN = "MMM dd, HH:mm";
-  private static final String MULTIPLE_ANOMALIES_EMAIL_TEMPLATE = "holiday-anomaly-report.ftl";
+  private static final String MULTIPLE_ANOMALIES_EMAIL_TEMPLATE = "metric-anomalies-template.ftl";
 
   private static final long EVENT_TIME_TOLERANCE = TimeUnit.DAYS.toMillis(2);
 

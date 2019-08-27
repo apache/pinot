@@ -102,9 +102,13 @@ public class HelixHelper {
 
           // If there are changes to apply, apply them
           if (!EqualityUtils.isEqual(idealState, updatedIdealState) && updatedIdealState != null) {
+            // Update number of partitions
+            Map<String, Map<String, String>> segmentAssignment = updatedIdealState.getRecord().getMapFields();
+            int numPartitions = segmentAssignment.size();
+            updatedIdealState.setNumPartitions(numPartitions);
 
             // If the ideal state is large enough, enable compression
-            if (MAX_PARTITION_COUNT_IN_UNCOMPRESSED_IDEAL_STATE < updatedIdealState.getPartitionSet().size()) {
+            if (MAX_PARTITION_COUNT_IN_UNCOMPRESSED_IDEAL_STATE < numPartitions) {
               updatedIdealState.getRecord().setBooleanField("enableCompression", true);
             }
 
@@ -155,6 +159,11 @@ public class HelixHelper {
     public PermanentUpdaterException(Throwable cause) {
       super(cause);
     }
+  }
+
+  public static void updateIdealState(HelixManager helixManager, String resourceName,
+      Function<IdealState, IdealState> updater) {
+    updateIdealState(helixManager, resourceName, updater, DEFAULT_RETRY_POLICY, false);
   }
 
   public static void updateIdealState(final HelixManager helixManager, final String resourceName,
@@ -386,42 +395,6 @@ public class HelixHelper {
       }
     };
     updateIdealState(helixManager, tableName, updater, DEFAULT_RETRY_POLICY);
-  }
-
-  /**
-   * Add the new specified segment to the idealState of the specified table in the specified cluster.
-   *
-   * @param helixManager The HelixManager object to access the helix cluster.
-   * @param tableNameWithType Name of the table to which the new segment is to be added.
-   * @param segmentName Name of the new segment to be added
-   * @param assignedInstances List of assigned instances
-   */
-  public static void addSegmentToIdealState(HelixManager helixManager, final String tableNameWithType,
-      final String segmentName, final List<String> assignedInstances) {
-
-    Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
-      @Override
-      public IdealState apply(IdealState idealState) {
-        Set<String> partitions = idealState.getPartitionSet();
-        if (partitions.contains(segmentName)) {
-          LOGGER.warn("Segment already exists in the ideal state for segment: {} of table: {}, do not update",
-              segmentName, tableNameWithType);
-        } else {
-          if (assignedInstances.isEmpty()) {
-            LOGGER.warn("No instance assigned for segment: {} of table: {}", segmentName, tableNameWithType);
-          } else {
-            int numPartitions = partitions.size() + 1;
-            for (String instance : assignedInstances) {
-              idealState.setPartitionState(segmentName, instance, ONLINE);
-            }
-            idealState.setNumPartitions(numPartitions);
-          }
-        }
-        return idealState;
-      }
-    };
-
-    updateIdealState(helixManager, tableNameWithType, updater, DEFAULT_RETRY_POLICY);
   }
 
   /**

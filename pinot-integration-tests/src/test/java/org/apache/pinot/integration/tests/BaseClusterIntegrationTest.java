@@ -20,23 +20,31 @@ package org.apache.pinot.integration.tests;
 
 import com.google.common.base.Function;
 import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import kafka.server.KafkaServerStartable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.common.config.ColumnPartitionConfig;
+import org.apache.pinot.common.config.CombinedConfig;
+import org.apache.pinot.common.config.SegmentPartitionConfig;
+import org.apache.pinot.common.config.Serializer;
 import org.apache.pinot.common.config.TableTaskConfig;
 import org.apache.pinot.common.config.TagNameUtils;
+import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
+import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 
@@ -67,9 +75,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
   protected final File _avroDir = new File(_tempDir, "avroDir");
+  protected final File _preprocessingDir = new File(_tempDir, "preprocessingDir");
   protected final File _segmentDir = new File(_tempDir, "segmentDir");
   protected final File _tarDir = new File(_tempDir, "tarDir");
-  protected List<KafkaServerStartable> _kafkaStarters;
+  protected List<StreamDataServerStartable> _kafkaStarters;
 
   private org.apache.pinot.client.Connection _pinotConnection;
   private Connection _h2Connection;
@@ -107,7 +116,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected String getStreamConsumerFactoryClassName() {
-    return KafkaConsumerFactory.class.getName();
+    return KafkaStarterUtils.KAFKA_STREAM_CONSUMER_FACTORY_CLASS_NAME;
   }
 
   protected int getRealtimeSegmentFlushSize() {
@@ -179,13 +188,23 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   @Nullable
-  protected  String getServerTenant() {
+  protected String getServerTenant() {
     return TagNameUtils.DEFAULT_TENANT_NAME;
   }
 
   @Nullable
   protected String getBrokerTenant() {
     return TagNameUtils.DEFAULT_TENANT_NAME;
+  }
+
+  protected SegmentPartitionConfig getSegmentPartitionConfig() {
+
+    ColumnPartitionConfig columnPartitionConfig = new ColumnPartitionConfig("murmur", 2);
+    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
+    columnPartitionConfigMap.put("AirlineID", columnPartitionConfig);
+
+    SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(columnPartitionConfigMap);
+    return segmentPartitionConfig;
   }
 
   /**
@@ -314,15 +333,17 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected void startKafka() {
+
     _kafkaStarters = KafkaStarterUtils
         .startServers(getNumKafkaBrokers(), KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_ZK_STR,
             KafkaStarterUtils.getDefaultKafkaConfiguration());
-    KafkaStarterUtils.createTopic(getKafkaTopic(), KafkaStarterUtils.DEFAULT_ZK_STR, getNumKafkaPartitions());
+    _kafkaStarters.get(0)
+        .createTopic(getKafkaTopic(), KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
   }
 
   protected void stopKafka() {
-    for (KafkaServerStartable kafkaStarter : _kafkaStarters) {
-      KafkaStarterUtils.stopServer(kafkaStarter);
+    for (StreamDataServerStartable kafkaStarter : _kafkaStarters) {
+      kafkaStarter.stop();
     }
   }
 
@@ -369,6 +390,53 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected void testQuery(@Nonnull String pqlQuery, @Nullable List<String> sqlQueries)
       throws Exception {
     ClusterIntegrationTestUtils
-        .testQuery(pqlQuery, _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
+        .testQuery(pqlQuery, "pql", _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
+  }
+
+  /**
+   * Run equivalent Pinot and H2 query and compare the results.
+   *
+   * @param sqlQuery Pinot query
+   * @param sqlQueries H2 query
+   * @throws Exception
+   */
+  protected void testSqlQuery(@Nonnull String sqlQuery, @Nullable List<String> sqlQueries)
+      throws Exception {
+    ClusterIntegrationTestUtils
+        .testQuery(sqlQuery, "sql", _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
+  }
+
+  protected void setUpRealtimeTable(File avroFile,
+      int numReplicas, boolean useLLC, String tableName) throws Exception {
+    File schemaFile = getSchemaFile();
+    Schema schema = Schema.fromFile(schemaFile);
+    String schemaName = schema.getSchemaName();
+    addSchema(schemaFile, schemaName);
+
+    String timeColumnName = schema.getTimeColumnName();
+    Assert.assertNotNull(timeColumnName);
+    TimeUnit outgoingTimeUnit = schema.getOutgoingTimeUnit();
+    Assert.assertNotNull(outgoingTimeUnit);
+    String timeType = outgoingTimeUnit.toString();
+
+    addRealtimeTable(tableName, useLLC, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
+        getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName,
+        getBrokerTenant(), getServerTenant(), getLoadMode(), getSortedColumn(), getInvertedIndexColumns(),
+        getBloomFilterIndexColumns(), getRawIndexColumns(), getTaskConfig(), getStreamConsumerFactoryClassName(),
+        numReplicas);
+
+    completeTableConfiguration();
+  }
+
+  protected void setUpRealtimeTable(File avroFile)
+      throws Exception {
+    setUpRealtimeTable(avroFile, 1, useLlc(), getTableName());
+  }
+
+  protected void completeTableConfiguration() throws IOException {
+    if (isUsingNewConfigFormat()) {
+      CombinedConfig combinedConfig = new CombinedConfig(_offlineTableConfig, _realtimeTableConfig, _schema);
+      sendPostRequest(_controllerRequestURLBuilder.forNewTableCreate(), Serializer.serializeToString(combinedConfig));
+    }
   }
 }

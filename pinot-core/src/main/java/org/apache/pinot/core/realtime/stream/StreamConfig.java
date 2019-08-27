@@ -47,12 +47,13 @@ public class StreamConfig {
   private static final int DEFAULT_FLUSH_THRESHOLD_ROWS = 5_000_000;
   private static final long DEFAULT_FLUSH_THRESHOLD_TIME = TimeUnit.MILLISECONDS.convert(6, TimeUnit.HOURS);
   private static final long DEFAULT_DESIRED_SEGMENT_SIZE_BYTES = 200 * 1024 * 1024; // 200M
+  private static final int DEFAULT_FLUSH_AUTOTUNE_INITIAL_ROWS = 100_000;
   private static final String DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING =
       "org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory";
 
-  protected static final long DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS = 30_000;
-  protected static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS = 5_000;
-  protected static final String SIMPLE_CONSUMER_TYPE_STRING = "simple";
+  static final long DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS = 30_000;
+  static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS = 5_000;
+  private static final String SIMPLE_CONSUMER_TYPE_STRING = "simple";
 
   final private String _type;
   final private String _topicName;
@@ -68,15 +69,18 @@ public class StreamConfig {
   final private int _flushThresholdRows;
   final private long _flushThresholdTimeMillis;
   final private long _flushSegmentDesiredSizeBytes;
+  final private int _flushAutotuneInitialRows; // initial num rows to use for SegmentSizeBasedFlushThresholdUpdater
 
   final private String _groupId;
+
+  final private String _tableNameWithType;
 
   final private Map<String, String> _streamConfigMap = new HashMap<>();
 
   /**
    * Initializes a StreamConfig using the map of stream configs from the table config
    */
-  public StreamConfig(Map<String, String> streamConfigMap) {
+  public StreamConfig(String tableNameWithType, Map<String, String> streamConfigMap) {
 
     _type = streamConfigMap.get(StreamConfigProperties.STREAM_TYPE);
     Preconditions.checkNotNull(_type, "Stream type cannot be null");
@@ -85,6 +89,8 @@ public class StreamConfig {
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_TOPIC_NAME);
     _topicName = streamConfigMap.get(topicNameKey);
     Preconditions.checkNotNull(_topicName, "Stream topic name " + topicNameKey + " cannot be null");
+
+    _tableNameWithType = tableNameWithType;
 
     String consumerTypesKey =
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONSUMER_TYPES);
@@ -135,8 +141,8 @@ public class StreamConfig {
       try {
         connectionTimeoutMillis = Long.parseLong(connectionTimeoutValue);
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while parsing the connection timeout, defaulting to {} ms", e,
-            DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS);
+        LOGGER.warn("Caught exception while parsing the connection timeout, defaulting to {} ms",
+            DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS, e);
       }
     }
     _connectionTimeoutMillis = connectionTimeoutMillis;
@@ -197,6 +203,19 @@ public class StreamConfig {
       _flushSegmentDesiredSizeBytes = DEFAULT_DESIRED_SEGMENT_SIZE_BYTES;
     }
 
+    int autotuneInitialRows = 0;
+    String initialRowsValue = streamConfigMap.get(StreamConfigProperties.SEGMENT_FLUSH_AUTOTUNE_INITIAL_ROWS);
+    if (initialRowsValue != null) {
+      try {
+        autotuneInitialRows = Integer.parseInt(initialRowsValue);
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while parsing {}:{}, defaulting to {}",
+            StreamConfigProperties.SEGMENT_FLUSH_AUTOTUNE_INITIAL_ROWS, initialRowsValue,
+            DEFAULT_FLUSH_AUTOTUNE_INITIAL_ROWS, e);
+      }
+    }
+    _flushAutotuneInitialRows = autotuneInitialRows > 0 ? autotuneInitialRows : DEFAULT_FLUSH_AUTOTUNE_INITIAL_ROWS;
+
     String groupIdKey = StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.GROUP_ID);
     _groupId = streamConfigMap.get(groupIdKey);
 
@@ -227,8 +246,20 @@ public class StreamConfig {
     return _consumerFactoryClassName;
   }
 
+  public static String getDefaultConsumerFactoryClassName() {
+    return DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING;
+  }
+
   public OffsetCriteria getOffsetCriteria() {
     return _offsetCriteria;
+  }
+
+  public String getDecoderClass() {
+    return _decoderClass;
+  }
+
+  public Map<String, String> getDecoderProperties() {
+    return _decoderProperties;
   }
 
   public long getConnectionTimeoutMillis() {
@@ -255,10 +286,6 @@ public class StreamConfig {
     return DEFAULT_FLUSH_THRESHOLD_TIME;
   }
 
-  public static String getDefaultConsumerFactoryClassName() {
-    return DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING;
-  }
-
   public long getFlushSegmentDesiredSizeBytes() {
     return _flushSegmentDesiredSizeBytes;
   }
@@ -267,16 +294,20 @@ public class StreamConfig {
     return DEFAULT_DESIRED_SEGMENT_SIZE_BYTES;
   }
 
-  public String getDecoderClass() {
-    return _decoderClass;
+  public int getFlushAutotuneInitialRows() {
+    return _flushAutotuneInitialRows;
   }
 
-  public Map<String, String> getDecoderProperties() {
-    return _decoderProperties;
+  public static int getDefaultFlushAutotuneInitialRows() {
+    return DEFAULT_FLUSH_AUTOTUNE_INITIAL_ROWS;
   }
 
   public String getGroupId() {
     return _groupId;
+  }
+
+  public String getTableNameWithType() {
+    return _tableNameWithType;
   }
 
   public Map<String, String> getStreamConfigsMap() {
@@ -290,8 +321,9 @@ public class StreamConfig {
         + _offsetCriteria + '\'' + ", _connectionTimeoutMillis=" + _connectionTimeoutMillis + ", _fetchTimeoutMillis="
         + _fetchTimeoutMillis + ", _flushThresholdRows=" + _flushThresholdRows + ", _flushThresholdTimeMillis="
         + _flushThresholdTimeMillis + ", _flushSegmentDesiredSizeBytes=" + _flushSegmentDesiredSizeBytes
-        + ", _decoderClass='" + _decoderClass + '\'' + ", _decoderProperties=" + _decoderProperties + ", _groupId='"
-        + _groupId + '}';
+        + ", _flushAutotuneInitialRows=" + _flushAutotuneInitialRows + ", _decoderClass='" + _decoderClass
+        + '\'' + ", _decoderProperties=" + _decoderProperties + ", _groupId='" + _groupId
+        + ", _tableNameWithType='" + _tableNameWithType + '}';
   }
 
   @Override
@@ -311,12 +343,14 @@ public class StreamConfig {
         .isEqual(_flushThresholdRows, that._flushThresholdRows) && EqualityUtils
         .isEqual(_flushThresholdTimeMillis, that._flushThresholdTimeMillis) && EqualityUtils
         .isEqual(_flushSegmentDesiredSizeBytes, that._flushSegmentDesiredSizeBytes) && EqualityUtils
+        .isEqual(_flushAutotuneInitialRows, that._flushAutotuneInitialRows) && EqualityUtils
         .isEqual(_type, that._type) && EqualityUtils.isEqual(_topicName, that._topicName) && EqualityUtils
         .isEqual(_consumerTypes, that._consumerTypes) && EqualityUtils
         .isEqual(_consumerFactoryClassName, that._consumerFactoryClassName) && EqualityUtils
         .isEqual(_offsetCriteria, that._offsetCriteria) && EqualityUtils.isEqual(_decoderClass, that._decoderClass)
         && EqualityUtils.isEqual(_decoderProperties, that._decoderProperties) && EqualityUtils
-        .isEqual(_groupId, that._groupId) && EqualityUtils.isEqual(_streamConfigMap, that._streamConfigMap);
+        .isEqual(_groupId, that._groupId) && EqualityUtils.isEqual(_tableNameWithType, that._tableNameWithType)
+        && EqualityUtils.isEqual(_streamConfigMap, that._streamConfigMap);
   }
 
   @Override
@@ -331,10 +365,12 @@ public class StreamConfig {
     result = EqualityUtils.hashCodeOf(result, _flushThresholdRows);
     result = EqualityUtils.hashCodeOf(result, _flushThresholdTimeMillis);
     result = EqualityUtils.hashCodeOf(result, _flushSegmentDesiredSizeBytes);
+    result = EqualityUtils.hashCodeOf(result, _flushAutotuneInitialRows);
     result = EqualityUtils.hashCodeOf(result, _decoderClass);
     result = EqualityUtils.hashCodeOf(result, _decoderProperties);
     result = EqualityUtils.hashCodeOf(result, _groupId);
     result = EqualityUtils.hashCodeOf(result, _streamConfigMap);
+    result = EqualityUtils.hashCodeOf(result, _tableNameWithType);
     return result;
   }
 }

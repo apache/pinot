@@ -50,11 +50,11 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-broker</artifactId>
     </dependency>
-    <!-- TODO: figure out a way to avoid explicitly setting the kafka module dependency, and instead inject it, such that any kafka stream implementation can use this -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-connector-kafka-0.9</artifactId>
+      <artifactId>pinot-connector-kafka-${kafka.version}</artifactId>
       <version>${project.version}</version>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -98,7 +98,7 @@
     <dependency>
       <groupId>org.openjdk.jmh</groupId>
       <artifactId>jmh-core</artifactId>
-      <version>1.15</version>
+      <version>1.21</version>
       <exclusions>
         <exclusion>
           <groupId>net.sf.jopt-simple</groupId>
@@ -109,7 +109,7 @@
     <dependency>
       <groupId>org.openjdk.jmh</groupId>
       <artifactId>jmh-generator-annprocess</artifactId>
-      <version>1.15</version>
+      <version>1.21</version>
       <scope>provided</scope>
     </dependency>
     <dependency>

@@ -7,7 +7,7 @@ import { visit, fillIn, click, currentURL, triggerKeyEvent } from '@ember/test-h
 module('Acceptance | import metric', function(hooks) {
   setupApplicationTest(hooks);
 
-  const importLinkText = 'Import a Metric From InGraphs';
+  const importLinkText = 'InGraphs';
   const returnLinkText = 'Back to Create';
   const inGraphsLinkText = 'Go to InGraphs';
   const dashboardToImport = 'thirdeye-all';
@@ -17,7 +17,6 @@ module('Acceptance | import metric', function(hooks) {
 
   test(`visiting alert creation page to navigate to import page`, async (assert) => {
     await visit(`/self-serve/create-alert`);
-
     assert.equal(
       $(selfServeConst.SECONDARY_LINK).get(1).innerText.trim(),
       importLinkText,

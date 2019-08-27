@@ -154,8 +154,9 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
 
         DataSource dataSource = starTreeV2.getDataSource(columnName);
         for (Predicate predicate : predicates) {
-          PredicateEvaluator predicateEvaluator =
-              PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource);
+          PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider
+              .getPredicateEvaluator(predicate, dataSource.getDictionary(),
+                  dataSource.getDataSourceMetadata().getDataType());
           // If predicate is always evaluated false, the result for the filter operator will be empty, early terminate
           if (predicateEvaluator.isAlwaysFalse()) {
             _resultEmpty = true;

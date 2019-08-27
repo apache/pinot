@@ -29,6 +29,7 @@ import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
@@ -58,7 +59,7 @@ public class SegmentConverterTest {
   private static final String T = "t";
 
   private List<File> _segmentIndexDirList;
-  private final long _referenceTimestamp = System.currentTimeMillis();
+  private final long _referenceTimestamp = TimeUtils.getValidMinTimeMillis();
 
   @BeforeClass
   public void setUp()
@@ -142,9 +143,20 @@ public class SegmentConverterTest {
     final BaseDateTimeTransformer dateTimeTransformer =
         DateTimeTransformerFactory.getDateTimeTransformer("1:MILLISECONDS:EPOCH", "1:DAYS:EPOCH", "1:DAYS");
 
+    // The segment generation code in SegmentColumnarIndexCreator will throw
+    // exception if start and end time in time column are not in acceptable
+    // range. For this test, we have explicitly disabled the check since the segment
+    // conversion is happening along with transforming each input record by converting
+    // the time column value (from millis since epoch) into days since epoch. While the
+    // source data is under range, the transformed data (days since epoch) goes out of range
+    // since segment conversion follows the same schema -- it does not create new schema. This
+    // means that time column spec doesn't change and still carries the time unit as milliseconds
+    // for the converted segment even though values we are writing are "days since epoch" and
+    // not "millis since epoch". Thus SegmentColumnarIndexCreator throws exception.
     SegmentConverter segmentConverter =
         new SegmentConverter.Builder().setTableName(TABLE_NAME).setSegmentName("segmentRollupWithTimeConversion")
-            .setInputIndexDirs(_segmentIndexDirList).setWorkingDir(WORKING_DIR).setRecordTransformer((row) -> {
+            .setInputIndexDirs(_segmentIndexDirList).setWorkingDir(WORKING_DIR).setCheckTimeValidityDuringGeneration(false)
+            .setRecordTransformer((row) -> {
           long[] input = new long[1];
           long[] output = new long[1];
           input[0] = (Long) row.getValue(T);

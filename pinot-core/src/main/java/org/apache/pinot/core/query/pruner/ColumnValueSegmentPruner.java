@@ -25,6 +25,7 @@ import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.core.common.predicate.RangePredicate;
 import org.apache.pinot.core.indexsegment.IndexSegment;
@@ -96,6 +97,10 @@ public class ColumnValueSegmentPruner extends AbstractSegmentPruner {
     if (children == null || children.isEmpty()) {
       // Leaf Node
 
+      //skip expressions
+      if(filterQueryTree.getExpression()!= null && !filterQueryTree.getExpression().isColumn()){
+        return false;
+      }
       // Skip operator other than EQUALITY and RANGE
       if ((filterOperator != FilterOperator.EQUALITY) && (filterOperator != FilterOperator.RANGE)) {
         return false;

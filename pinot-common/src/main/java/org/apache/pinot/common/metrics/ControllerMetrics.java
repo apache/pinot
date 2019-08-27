@@ -20,13 +20,20 @@ package org.apache.pinot.common.metrics;
 
 import com.yammer.metrics.core.MetricsRegistry;
 
+import static org.apache.pinot.common.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
+
 
 /**
  * Metrics for the controller.
  */
 public class ControllerMetrics extends AbstractMetrics<AbstractMetrics.QueryPhase, ControllerMeter, ControllerGauge, ControllerTimer> {
+
   public ControllerMetrics(MetricsRegistry metricsRegistry) {
-    super("pinot.controller", metricsRegistry, ControllerMetrics.class);
+    this(DEFAULT_METRICS_PREFIX, metricsRegistry);
+  }
+
+  public ControllerMetrics(String prefix, MetricsRegistry metricsRegistry) {
+    super(prefix, metricsRegistry, ControllerMetrics.class);
   }
 
   @Override

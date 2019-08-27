@@ -39,6 +39,7 @@ import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.response.broker.SelectionResults;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.DataSourceMetadata;
@@ -248,8 +249,10 @@ public class SelectionOperatorUtils {
             dataTableBuilder.setColumn(i, ((Number) columnValue).doubleValue());
             break;
           case STRING:
-          case BYTES: // BYTES are already converted to String for Selection, before reaching this layer.
             dataTableBuilder.setColumn(i, ((String) columnValue));
+            break;
+          case BYTES:
+            dataTableBuilder.setColumn(i, BytesUtils.toHexString((byte[]) columnValue));
             break;
 
           // Multi-value column.
@@ -420,7 +423,7 @@ public class SelectionOperatorUtils {
   @Nonnull
   public static SelectionResults renderSelectionResultsWithoutOrdering(@Nonnull List<Serializable[]> rows,
       @Nonnull DataSchema dataSchema, @Nonnull List<String> selectionColumns) {
-    int[] columnIndices = getColumnIndicesWithoutOrdering(selectionColumns, dataSchema);
+    int[] columnIndices = getColumnIndices(selectionColumns, dataSchema);
     int numRows = rows.size();
     for (int i = 0; i < numRows; i++) {
       rows.set(i, extractColumns(rows.get(i), columnIndices));
@@ -429,35 +432,12 @@ public class SelectionOperatorUtils {
   }
 
   /**
-   * Helper method to compute column indices from selection columns and the data schema for selection queries without
-   * <code>ORDER BY</code>.
+   * Helper method to compute column indices from selection columns and the data schema for selection queries
    * @param selectionColumns selection columns.
    * @param dataSchema data schema.
    * @return column indices
    */
-  public static int[] getColumnIndicesWithoutOrdering(@Nonnull List<String> selectionColumns,
-      @Nonnull DataSchema dataSchema) {
-    int numSelectionColumns = selectionColumns.size();
-    int[] columnIndices = new int[numSelectionColumns];
-    Map<String, Integer> dataSchemaIndices = new HashMap<>(numSelectionColumns);
-    for (int i = 0; i < numSelectionColumns; i++) {
-      dataSchemaIndices.put(dataSchema.getColumnName(i), i);
-    }
-    for (int i = 0; i < numSelectionColumns; i++) {
-      columnIndices[i] = dataSchemaIndices.get(selectionColumns.get(i));
-    }
-    return columnIndices;
-  }
-
-  /**
-   * Helper method to compute column indices from selection columns and the data schema for selection queries with
-   * <code>ORDER BY</code>.
-   * @param selectionColumns selection columns.
-   * @param dataSchema data schema.
-   * @return column indices
-   */
-  public static int[] getColumnIndicesWithOrdering(@Nonnull List<String> selectionColumns,
-      @Nonnull DataSchema dataSchema) {
+  public static int[] getColumnIndices(@Nonnull List<String> selectionColumns, @Nonnull DataSchema dataSchema) {
     int numSelectionColumns = selectionColumns.size();
     int[] columnIndices = new int[numSelectionColumns];
     int numColumnsInDataSchema = dataSchema.size();
@@ -670,6 +650,10 @@ public class SelectionOperatorUtils {
           }
           return formattedValue;
         }
+      case BYTES:
+        if (value instanceof byte[]) {
+          return BytesUtils.toHexString((byte[]) value);
+        }
       default:
         // For STRING and STRING_ARRAY, no need to format.
         return value;
@@ -691,5 +675,15 @@ public class SelectionOperatorUtils {
       queue.poll();
       queue.offer(value);
     }
+  }
+
+  public static List<String> extractSortColumns(List<SelectionSort> sortSequence) {
+    List<String> columns = new ArrayList<>();
+    if (sortSequence != null) {
+      for (SelectionSort s : sortSequence) {
+        columns.add(s.column);
+      }
+    }
+    return columns;
   }
 }

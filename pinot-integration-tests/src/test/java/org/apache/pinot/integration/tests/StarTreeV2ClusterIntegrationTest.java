@@ -119,7 +119,7 @@ public class StarTreeV2ClusterIntegrationTest extends StarTreeClusterIntegration
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
-    uploadSegments(_tarDir);
+    uploadSegments(getTableName(), _tarDir);
   }
 
   private static StarTreeV2BuilderConfig getBuilderConfig(List<String> dimensions, List<String> metrics) {

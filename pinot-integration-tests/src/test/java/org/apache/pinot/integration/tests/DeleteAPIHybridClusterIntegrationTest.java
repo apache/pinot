@@ -46,6 +46,16 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
   private String TABLE_NAME;
   private long nOfflineRows;
 
+  private static void removeValue(JsonNode jsonArray, String value) {
+    Iterator<JsonNode> elements = jsonArray.elements();
+    while (elements.hasNext()) {
+      if (elements.next().asText().equals(value)) {
+        elements.remove();
+        return;
+      }
+    }
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -101,6 +111,10 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
 
   @Override // Leaving this out because it is done in the superclass
   public void testQueriesFromQueryFile() {
+  }
+
+  @Override // Leaving this out because it is done in the superclass
+  public void testSqlQueriesFromQueryFile() {
   }
 
   @Override // Leaving this out because it is done in the superclass
@@ -300,17 +314,7 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
 
   private void repushOfflineSegments()
       throws Exception {
-    uploadSegments(_tarDir);
+    uploadSegments(getTableName(), _tarDir);
     waitForNumRows(nOfflineRows, CommonConstants.Helix.TableType.OFFLINE);
-  }
-
-  private static void removeValue(JsonNode jsonArray, String value) {
-    Iterator<JsonNode> elements = jsonArray.elements();
-    while (elements.hasNext()) {
-      if (elements.next().asText().equals(value)) {
-        elements.remove();
-        return;
-      }
-    }
   }
 }

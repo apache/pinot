@@ -39,14 +39,13 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentSizeBasedFlushThresholdUpdater.class);
 
-  private static final int INITIAL_ROWS_THRESHOLD = 100_000;
-
   private static final double CURRENT_SEGMENT_RATIO_WEIGHT = 0.1;
   private static final double PREVIOUS_SEGMENT_RATIO_WEIGHT = 0.9;
   private static final double ROWS_MULTIPLIER_WHEN_TIME_THRESHOLD_HIT = 1.1;
   private static final int MINIMUM_NUM_ROWS_THRESHOLD = 10_000;
 
   private final long _desiredSegmentSizeBytes;
+  private final int _autotuneInitialRows;
 
   /** Below this size, we double the rows threshold */
   private final double _optimalSegmentSizeBytesMin;
@@ -54,8 +53,8 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
   private final double _optimalSegmentSizeBytesMax;
 
   @VisibleForTesting
-  int getInitialRowsThreshold() {
-    return INITIAL_ROWS_THRESHOLD;
+  int getAutotuneInitialRows() {
+    return _autotuneInitialRows;
   }
 
   @VisibleForTesting
@@ -81,10 +80,11 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
   // num rows to segment size ratio of last committed segment for this table
   private double _latestSegmentRowsToSizeRatio = 0;
 
-  public SegmentSizeBasedFlushThresholdUpdater(long desiredSegmentSizeBytes) {
+  public SegmentSizeBasedFlushThresholdUpdater(long desiredSegmentSizeBytes, int autotuneInitialRows) {
     _desiredSegmentSizeBytes = desiredSegmentSizeBytes;
     _optimalSegmentSizeBytesMin = _desiredSegmentSizeBytes / 2;
     _optimalSegmentSizeBytesMax = _desiredSegmentSizeBytes * 1.5;
+    _autotuneInitialRows = autotuneInitialRows;
   }
 
   // synchronized since this method could be called for multiple partitions of the same table in different threads
@@ -104,8 +104,8 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
         newSegmentZKMetadata.setSizeThresholdToFlushSegment((int) targetSegmentNumRows);
       } else {
         LOGGER.info("Committing segment zk metadata is not available, setting threshold for {} as {}", newSegmentName,
-            INITIAL_ROWS_THRESHOLD);
-        newSegmentZKMetadata.setSizeThresholdToFlushSegment(INITIAL_ROWS_THRESHOLD);
+            _autotuneInitialRows);
+        newSegmentZKMetadata.setSizeThresholdToFlushSegment(_autotuneInitialRows);
       }
       return;
     }

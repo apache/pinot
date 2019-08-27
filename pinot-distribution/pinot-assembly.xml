@@ -83,6 +83,11 @@
     </fileSet>
     <fileSet>
       <useDefaultExcludes>false</useDefaultExcludes>
+      <directory>${pinot.root}/pinot-tools/src/main/resources/sample_data/kafka_${kafka.version}</directory>
+      <outputDirectory>sample_data/</outputDirectory>
+    </fileSet>
+    <fileSet>
+      <useDefaultExcludes>false</useDefaultExcludes>
       <directory>${pinot.root}/pinot-tools/src/main/resources/sample_data</directory>
       <outputDirectory>sample_data/</outputDirectory>
     </fileSet>

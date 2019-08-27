@@ -34,13 +34,13 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private int _startDocId;
   private int _endDocId;
   private PredicateEvaluator _evaluator;
-  private String _datasourceName;
+  private String _operatorName;
   private int _numEntriesScanned = 0;
   private final ValueMatcher _valueMatcher;
 
-  public SVScanDocIdIterator(String datasourceName, BlockValSet blockValSet, BlockMetadata blockMetadata,
+  public SVScanDocIdIterator(String operatorName, BlockValSet blockValSet, BlockMetadata blockMetadata,
       PredicateEvaluator evaluator) {
-    _datasourceName = datasourceName;
+    _operatorName = operatorName;
     _evaluator = evaluator;
     _valueIterator = (BlockSingleValIterator) blockValSet.iterator();
 
@@ -134,7 +134,7 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   @Override
   public String toString() {
-    return SVScanDocIdIterator.class.getSimpleName() + "[" + _datasourceName + "]";
+    return SVScanDocIdIterator.class.getSimpleName() + "[" + _operatorName + "]";
   }
 
   @Override

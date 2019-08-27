@@ -30,6 +30,7 @@ import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -37,6 +38,7 @@ import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.LocalDateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
@@ -56,6 +58,7 @@ public class SegmentGenerationWithTimeColumnTest {
 
   private Random _random = new Random(System.nanoTime());
 
+  private long validMinTime = TimeUtils.getValidMinTimeMillis();
   private long minTime;
   private long maxTime;
   private long startTime = System.currentTimeMillis();
@@ -71,7 +74,7 @@ public class SegmentGenerationWithTimeColumnTest {
   public void testSimpleDateSegmentGeneration()
       throws Exception {
     Schema schema = createSchema(true);
-    File segmentDir = buildSegment(schema, true);
+    File segmentDir = buildSegment(schema, true, false);
     SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
     Assert.assertEquals(metadata.getStartTime(), sdfToMillis(minTime));
     Assert.assertEquals(metadata.getEndTime(), sdfToMillis(maxTime));
@@ -81,10 +84,21 @@ public class SegmentGenerationWithTimeColumnTest {
   public void testEpochDateSegmentGeneration()
       throws Exception {
     Schema schema = createSchema(false);
-    File segmentDir = buildSegment(schema, false);
+    File segmentDir = buildSegment(schema, false, false);
     SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
     Assert.assertEquals(metadata.getStartTime(), minTime);
     Assert.assertEquals(metadata.getEndTime(), maxTime);
+  }
+
+  @Test
+  public void testSegmentGenerationWithInvalidTime() {
+    Schema schema = createSchema(false);
+    try {
+      buildSegment(schema, false, true);
+      Assert.fail("Expecting exception from buildSegment for invalid start/end time of segment");
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage().contains("Invalid start/end time. segment name: testSegment time column name: date"));
+    }
   }
 
   private Schema createSchema(boolean isSimpleDate) {
@@ -98,7 +112,8 @@ public class SegmentGenerationWithTimeColumnTest {
     return schema;
   }
 
-  private File buildSegment(Schema schema, boolean isSimpleDate)
+  private File buildSegment(final Schema schema, final boolean isSimpleDate,
+      final boolean isInvalidDate)
       throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
     config.setRawIndexCreationColumns(schema.getDimensionNames());
@@ -117,7 +132,7 @@ public class SegmentGenerationWithTimeColumnTest {
       for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
         Object value;
 
-        value = getRandomValueForColumn(fieldSpec, isSimpleDate);
+        value = getRandomValueForColumn(fieldSpec, isSimpleDate, isInvalidDate);
         map.put(fieldSpec.getName(), value);
       }
 
@@ -133,18 +148,21 @@ public class SegmentGenerationWithTimeColumnTest {
     return driver.getOutputDirectory();
   }
 
-  private Object getRandomValueForColumn(FieldSpec fieldSpec, boolean isSimpleDate) {
+  private Object getRandomValueForColumn(FieldSpec fieldSpec, boolean isSimpleDate, boolean isInvalidDate) {
     if (fieldSpec.getName().equals(TIME_COL_NAME)) {
-      return getRandomValueForTimeColumn(isSimpleDate);
+      return getRandomValueForTimeColumn(isSimpleDate, isInvalidDate);
     }
     return RawIndexCreatorTest.getRandomValue(_random, fieldSpec.getDataType());
   }
 
-  private Object getRandomValueForTimeColumn(boolean isSimpleDate) {
-    long randomMs = ThreadLocalRandom.current().nextLong(startTime);
+  private Object getRandomValueForTimeColumn(boolean isSimpleDate, boolean isInvalidDate) {
+    long randomMs = ThreadLocalRandom.current().nextLong(validMinTime, startTime);
     long dateColVal = randomMs;
     Object result;
-    if (isSimpleDate) {
+    if (isInvalidDate) {
+      result = new Long(new DateTime(2072, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis());
+      return result;
+    } else if (isSimpleDate) {
       DateTime dateTime = new DateTime(randomMs);
       LocalDateTime localDateTime = dateTime.toLocalDateTime();
       int year = localDateTime.getYear();

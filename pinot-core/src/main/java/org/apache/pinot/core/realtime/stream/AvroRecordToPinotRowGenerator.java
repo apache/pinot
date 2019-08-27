@@ -24,10 +24,11 @@ import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.TimeFieldSpec;
 import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.data.readers.RecordReaderUtils;
+import org.apache.pinot.core.util.AvroUtils;
 
 
 public class AvroRecordToPinotRowGenerator {
+
   private final Schema _schema;
   private final FieldSpec _incomingTimeFieldSpec;
 
@@ -44,8 +45,7 @@ public class AvroRecordToPinotRowGenerator {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       FieldSpec incomingFieldSpec =
           fieldSpec.getFieldType() == FieldSpec.FieldType.TIME ? _incomingTimeFieldSpec : fieldSpec;
-      String fieldName = incomingFieldSpec.getName();
-      to.putField(fieldName, RecordReaderUtils.convert(incomingFieldSpec, from.get(fieldName)));
+      AvroUtils.extractField(incomingFieldSpec, from, to);
     }
     return to;
   }

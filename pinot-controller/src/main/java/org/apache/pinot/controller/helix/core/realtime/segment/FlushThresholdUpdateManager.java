@@ -31,8 +31,6 @@ import org.slf4j.LoggerFactory;
  */
 public class FlushThresholdUpdateManager {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(FlushThresholdUpdateManager.class);
-
   private ConcurrentMap<String, FlushThresholdUpdater> _flushThresholdUpdaterMap = new ConcurrentHashMap<>();
 
   /**
@@ -41,20 +39,19 @@ public class FlushThresholdUpdateManager {
    * If flush size < 0, create a new DefaultFlushThresholdUpdater with default flush size
    * If flush size > 0, create a new DefaultFlushThresholdUpdater with given flush size.
    * If flush size == 0, create new SegmentSizeBasedFlushThresholdUpdater if not already created. Create only 1 per table, because we want to maintain tuning information for the table in the updater
-   * @param realtimeTableConfig
-   * @return
    */
   public FlushThresholdUpdater getFlushThresholdUpdater(TableConfig realtimeTableConfig) {
     final String tableName = realtimeTableConfig.getTableName();
     PartitionLevelStreamConfig streamConfig =
-        new PartitionLevelStreamConfig(realtimeTableConfig.getIndexingConfig().getStreamConfigs());
+        new PartitionLevelStreamConfig(tableName, realtimeTableConfig.getIndexingConfig().getStreamConfigs());
 
     final int tableFlushSize = streamConfig.getFlushThresholdRows();
-    final long desiredSegmentSize = streamConfig.getFlushSegmentDesiredSizeBytes();
 
     if (tableFlushSize == 0) {
-      return _flushThresholdUpdaterMap
-          .computeIfAbsent(tableName, k -> new SegmentSizeBasedFlushThresholdUpdater(desiredSegmentSize));
+      final long desiredSegmentSize = streamConfig.getFlushSegmentDesiredSizeBytes();
+      final int flushAutotuneInitialRows = streamConfig.getFlushAutotuneInitialRows();
+      return _flushThresholdUpdaterMap.computeIfAbsent(tableName,
+          k -> new SegmentSizeBasedFlushThresholdUpdater(desiredSegmentSize, flushAutotuneInitialRows));
     } else {
       _flushThresholdUpdaterMap.remove(tableName);
       return new DefaultFlushThresholdUpdater(tableFlushSize);

@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.selection;
 import java.io.Serializable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.query.selection.iterator.BytesSelectionColumnIterator;
 import org.apache.pinot.core.query.selection.iterator.DoubleArraySelectionColumnIterator;
 import org.apache.pinot.core.query.selection.iterator.DoubleSelectionColumnIterator;
 import org.apache.pinot.core.query.selection.iterator.FloatArraySelectionColumnIterator;
@@ -101,8 +102,10 @@ public class SelectionFetcher {
             _selectionColumnIterators[i] = new DoubleSelectionColumnIterator(block);
             break;
           case STRING:
-          case BYTES:
             _selectionColumnIterators[i] = new StringSelectionColumnIterator(block);
+            break;
+          case BYTES:
+            _selectionColumnIterators[i] = new BytesSelectionColumnIterator(block);
             break;
           // TODO: add multi value support
           default:
