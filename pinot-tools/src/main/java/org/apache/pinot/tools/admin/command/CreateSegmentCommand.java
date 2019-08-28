@@ -56,28 +56,40 @@ import org.slf4j.LoggerFactory;
  */
 public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(CreateSegmentCommand.class);
-  @Option(name = "-enableStarTreeIndex", usage = "Enable Star Tree Index.")
-  boolean _enableStarTreeIndex = false;
+
   @Option(name = "-generatorConfigFile", metaVar = "<string>", usage = "Config file for segment generator.")
   private String _generatorConfigFile;
+
   @Option(name = "-dataDir", metaVar = "<string>", usage = "Directory containing the data.")
   private String _dataDir;
+
   @Option(name = "-format", metaVar = "<AVRO/CSV/JSON>", usage = "Input data format.")
   private FileFormat _format;
+
   @Option(name = "-outDir", metaVar = "<string>", usage = "Name of output directory.")
   private String _outDir;
+
   @Option(name = "-overwrite", usage = "Overwrite existing output directory.")
   private boolean _overwrite = false;
+
   @Option(name = "-tableName", metaVar = "<string>", usage = "Name of the table.")
   private String _tableName;
+
   @Option(name = "-segmentName", metaVar = "<string>", usage = "Name of the segment.")
   private String _segmentName;
+
   @Option(name = "-timeColumnName", metaVar = "<string>", usage = "Primary time column.")
   private String _timeColumnName;
+
   @Option(name = "-schemaFile", metaVar = "<string>", usage = "File containing schema for data.")
   private String _schemaFile;
+
   @Option(name = "-readerConfigFile", metaVar = "<string>", usage = "Config file for record reader.")
   private String _readerConfigFile;
+
+  @Option(name = "-enableStarTreeIndex", usage = "Enable Star Tree Index.")
+  boolean _enableStarTreeIndex = false;
+
   @Option(name = "-starTreeIndexSpecFile", metaVar = "<string>", usage = "Config file for star tree index.")
   private String _starTreeIndexSpecFile;
 
@@ -372,6 +384,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
             config.setInputFilePath(localFile);
             config.setSegmentName(_segmentName + "_" + segCnt);
             config.loadConfigFiles();
+
             final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
             switch (config.getFormat()) {
               case PARQUET:
