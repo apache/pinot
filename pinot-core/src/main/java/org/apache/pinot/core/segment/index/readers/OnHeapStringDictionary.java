@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -46,7 +47,7 @@ public class OnHeapStringDictionary extends OnHeapDictionary {
     _paddingByte = paddingByte;
     byte[] buffer = new byte[numBytesPerValue];
     _unpaddedStrings = new String[length];
-    _unPaddedStringToIdMap = new HashMap<>(length);
+    _unPaddedStringToIdMap = new Object2IntOpenHashMap<>(length);
 
     for (int i = 0; i < length; i++) {
       _unpaddedStrings[i] = getUnpaddedString(i, buffer);
@@ -58,7 +59,7 @@ public class OnHeapStringDictionary extends OnHeapDictionary {
       _paddedStringToIdMap = null;
     } else {
       _paddedStrings = new String[length];
-      _paddedStringToIdMap = new HashMap<>(length);
+      _paddedStringToIdMap = new Object2IntOpenHashMap<>(length);
 
       for (int i = 0; i < length; i++) {
         _paddedStrings[i] = getPaddedString(i, buffer);
