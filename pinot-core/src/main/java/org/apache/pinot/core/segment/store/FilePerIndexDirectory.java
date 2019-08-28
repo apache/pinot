@@ -176,6 +176,9 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
       case BLOOM_FILTER:
         filename = metadata.getBloomFilterFileName(column);
         break;
+      case PRESENCE_VECTOR:
+        filename = metadata.getPresenceVectorFileName(column);
+        break;
       default:
         throw new UnsupportedOperationException("Unknown index type: " + indexType.toString());
     }

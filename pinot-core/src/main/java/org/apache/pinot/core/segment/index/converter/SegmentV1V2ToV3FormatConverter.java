@@ -121,7 +121,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
             PosixFilePermission.OTHERS_READ, PosixFilePermission.OTHERS_EXECUTE);
     try {
       Files.setPosixFilePermissions(v3Directory.toPath(), permissions);
-    } catch(UnsupportedOperationException ex) {
+    } catch (UnsupportedOperationException ex) {
       LOGGER.error("unsupported non-posix filesystem permissions setting");
     }
   }
@@ -143,6 +143,9 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
             copyDictionary(v2DataReader, v3DataWriter, column);
           }
           copyForwardIndex(v2DataReader, v3DataWriter, column);
+          if (v2DataReader.hasIndexFor(column, ColumnIndexType.PRESENCE_VECTOR)) {
+            copyPresenceVector(v2DataReader, v3DataWriter, column);
+          }
         }
 
         // inverted indexes are intentionally stored at the end of the single file
@@ -187,6 +190,11 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   private void copyForwardIndex(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column)
       throws IOException {
     readCopyBuffers(reader, writer, column, ColumnIndexType.FORWARD_INDEX);
+  }
+
+  private void copyPresenceVector(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column)
+      throws IOException {
+    readCopyBuffers(reader, writer, column, ColumnIndexType.PRESENCE_VECTOR);
   }
 
   private void copyExistingInvertedIndex(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column)

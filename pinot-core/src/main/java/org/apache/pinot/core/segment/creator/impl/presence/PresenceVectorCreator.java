@@ -23,8 +23,14 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteOrder;
+import java.util.Arrays;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.index.readers.PresenceVectorReader;
+import org.apache.pinot.core.segment.index.readers.PresenceVectorReaderImpl;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.roaringbitmap.ImmutableBitmapDataProvider;
+import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -39,6 +45,7 @@ public class PresenceVectorCreator implements Closeable {
 
   public PresenceVectorCreator(File indexDir, String columnName) {
     _presenceVectorFile = new File(indexDir, columnName + V1Constants.Indexes.PRESENCE_VECTOR_FILE_EXTENSION);
+    _nullBitmap = new MutableRoaringBitmap();
   }
 
   @Override
@@ -53,8 +60,22 @@ public class PresenceVectorCreator implements Closeable {
     _nullBitmap.add(docId);
   }
 
-
   protected ImmutableBitmapDataProvider getRoaringBitmap() {
     return _nullBitmap;
+  }
+
+  public static void main(String[] args)
+      throws Exception {
+    PresenceVectorCreator creator;
+    File indexDir = new File("/tmp");
+    creator = new PresenceVectorCreator(indexDir, "test");
+    creator.close();
+    MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+    System.out.println("bitmap = " + bitmap.serializedSizeInBytes());
+    System.out.println("bitmap = " + Arrays.toString(bitmap.toArray()));
+    File presenceVectorFile = new File("/tmp/FlightNum.bitmap.presence");
+    PinotDataBuffer pinotDataBuffer =
+        PinotDataBuffer.loadFile(presenceVectorFile, 0, presenceVectorFile.length(), ByteOrder.nativeOrder(), "");
+    PresenceVectorReader reader = new PresenceVectorReaderImpl(pinotDataBuffer);
   }
 }

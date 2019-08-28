@@ -286,6 +286,7 @@ public class ClusterIntegrationTestUtils {
           TarGzCompressionUtils
               .createTarGzOfDirectory(segmentFile.getAbsolutePath(), new File(tarDir, segmentName).getAbsolutePath());
         } catch (Exception e) {
+          e.printStackTrace();
           // Ignored
         }
       });
