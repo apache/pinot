@@ -330,6 +330,11 @@
       "name": "DaysSinceEpoch",
       "dataType": "INT",
       "timeType": "DAYS"
+    },
+    "outgoingGranularitySpec": {
+      "name": "DaysSinceEpoch",
+      "dataType": "INT",
+      "timeType": "DAYS",
     }
   }
 }

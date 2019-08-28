@@ -104,7 +104,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
 
     // get input/output paths.
     _inputSegmentDir = Preconditions.checkNotNull(getPathFromProperty(JobConfigConstants.PATH_TO_INPUT));
-    _preprocessedOutputDir = getPathFromProperty(_properties.getProperty(JobConfigConstants.PREPROCESS_PATH_TO_OUTPUT, getDefaultPreprocessPath()));
+    _preprocessedOutputDir = getPathFromProperty(JobConfigConstants.PREPROCESS_PATH_TO_OUTPUT);
     _rawTableName = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME));
 
     _pathToDependencyJar = getPathFromProperty(JobConfigConstants.PATH_TO_DEPS_JAR);
@@ -131,10 +131,6 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     _logger.info("*********************************************************************");
   }
 
-  private String getDefaultPreprocessPath() {
-    return _inputSegmentDir + "/" + "preprocess";
-  }
-
   public void run()
       throws Exception {
     if (!_enablePreprocessing) {
@@ -148,11 +144,14 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     final List<Path> inputDataPaths = getDataFilePaths(_inputSegmentDir);
     Preconditions.checkState(inputDataPaths.size() != 0, "No files in the input directory.");
 
+    JobPreparationHelper.setDirPermission(_fileSystem, _preprocessedOutputDir, _defaultPermissionsMask);
+
+    System.out.println("output: " + _preprocessedOutputDir);
+    System.out.println("output dir: " + _preprocessedOutputDir.toString());
     if (_fileSystem.exists(_preprocessedOutputDir)) {
       _logger.warn("Found the output folder {}, deleting it", _preprocessedOutputDir);
       _fileSystem.delete(_preprocessedOutputDir, true);
     }
-    JobPreparationHelper.setDirPermission(_fileSystem, _preprocessedOutputDir, _defaultPermissionsMask);
 
     setTableConfigAndSchema();
 
@@ -411,7 +410,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       job.getConfiguration().set(InternalConfigConstants.SEGMENT_TIME_FORMAT, _pinotTableSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeFormat());
       job.getConfiguration().set(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY, validationConfig.getSegmentPushFrequency());
       try (DataFileStream<GenericRecord> dataStreamReader = getAvroReader(path)) {
-        job.getConfiguration().set(InternalConfigConstants.TIME_COLUMN_VALUE, (String) dataStreamReader.next().get(timeColumnName));
+        job.getConfiguration().set(InternalConfigConstants.TIME_COLUMN_VALUE, Integer.toString((int) dataStreamReader.next().get(timeColumnName)));
       }
     }
   }

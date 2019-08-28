@@ -44,7 +44,7 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
   private SimpleDateFormat _inputSDF;
 
   public NormalizedDateSegmentNameGenerator(@Nullable String pushFrequency, @Nullable TimeUnit timeType, @Nullable String timeFormat) {
-    new NormalizedDateSegmentNameGenerator("myTable", null, false, "APPEND", pushFrequency, timeType, timeFormat);
+    this("myTable", null, false, "APPEND", pushFrequency, timeType, timeFormat);
   }
 
   public NormalizedDateSegmentNameGenerator(String tableName, @Nullable String segmentNamePrefix,

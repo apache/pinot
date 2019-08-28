@@ -43,9 +43,11 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
   private Schema _outputKeySchema;
   private Schema _outputSchema;
   private boolean _enablePartitioning;
-  private String _sampleNormalizedTimeColumnValue = null;
-  private NormalizedDateSegmentNameGenerator _normalizedDateSegmentNameGenerator = null;
   private boolean _isAppend = false;
+  private String _timeColumnValue;
+  private String _pushFrequency;
+  private String _timeFormat;
+  private TimeUnit _timeUnit;
 
   @Override
   public void setup(final Context context) {
@@ -58,15 +60,12 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
       _timeColumn = configuration.get(InternalConfigConstants.TIME_COLUMN_CONFIG);
 
       // Get sample time column value
-      String timeColumnValue = configuration.get(InternalConfigConstants.TIME_COLUMN_VALUE);
+      _timeColumnValue = configuration.get(InternalConfigConstants.TIME_COLUMN_VALUE);
 
-      String pushFrequency = configuration.get(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY);
+      _pushFrequency = configuration.get(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY);
       String timeType = configuration.get(InternalConfigConstants.SEGMENT_TIME_TYPE);
-      String timeFormat = configuration.get(InternalConfigConstants.SEGMENT_TIME_FORMAT);
-      TimeUnit timeUnit = TimeUnit.valueOf(timeType);
-      // Normalize time column value
-      _normalizedDateSegmentNameGenerator = new NormalizedDateSegmentNameGenerator(pushFrequency, timeUnit, timeFormat);
-      _sampleNormalizedTimeColumnValue = _normalizedDateSegmentNameGenerator.getNormalizedDate(timeColumnValue);
+      _timeFormat = configuration.get(InternalConfigConstants.SEGMENT_TIME_FORMAT);
+      _timeUnit = TimeUnit.valueOf(timeType);
     }
 
     String sortedColumn = configuration.get(InternalConfigConstants.SORTED_COLUMN_CONFIG);
@@ -85,15 +84,17 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
       throws IOException, InterruptedException {
 
     if (_isAppend) {
+      // Normalize time column value
+      NormalizedDateSegmentNameGenerator normalizedDateSegmentNameGenerator = new NormalizedDateSegmentNameGenerator(_pushFrequency, _timeUnit, _timeFormat);
+      String sampleNormalizedTimeColumnValue = normalizedDateSegmentNameGenerator.getNormalizedDate(_timeColumnValue);
       // Normalize time column value and check against sample value
-      String timeColumnValue = (String) record.datum().get(_timeColumn);
-      String normalizedTimeColumnValue = _normalizedDateSegmentNameGenerator.getNormalizedDate(timeColumnValue);
+      String timeColumnValue = record.datum().get(_timeColumn).toString();
+      String normalizedTimeColumnValue = normalizedDateSegmentNameGenerator.getNormalizedDate(timeColumnValue);
 
-      if (!normalizedTimeColumnValue.equals(_sampleNormalizedTimeColumnValue)) {
+      if (!normalizedTimeColumnValue.equals(sampleNormalizedTimeColumnValue)) {
         // TODO: Create a custom exception and gracefully catch this exception outside, changing what the path to input
         // into segment creation should be
-        throw new IllegalArgumentException("Your segment spans multiple time units. Preprocess is not currently allowed for"
-            + " these use cases");
+        LOGGER.error("This segment contains multiple time units. Sample is {}, current is {}", sampleNormalizedTimeColumnValue, normalizedTimeColumnValue);
       }
     }
 
