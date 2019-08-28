@@ -264,7 +264,7 @@ public class ControllerLeaderLocator {
   }
 
   @VisibleForTesting
-  public void setLastCacheInvalidateMillis(long lastCacheInvalidateMillis) {
+  protected void setLastCacheInvalidateMillis(long lastCacheInvalidateMillis) {
     _lastCacheInvalidateMillis = lastCacheInvalidateMillis;
   }
 }
