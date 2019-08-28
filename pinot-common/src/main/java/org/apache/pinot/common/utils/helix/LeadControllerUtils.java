@@ -73,7 +73,7 @@ public class LeadControllerUtils {
     HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
     PropertyKey propertyKey = helixDataAccessor.keyBuilder().resourceConfig(Helix.LEAD_CONTROLLER_RESOURCE_NAME);
     ResourceConfig resourceConfig = helixDataAccessor.getProperty(propertyKey);
-    String enableResource = resourceConfig.getSimpleConfig(Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY);
-    return Boolean.parseBoolean(enableResource);
+    String resourceEnabled = resourceConfig.getSimpleConfig(Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY);
+    return Boolean.parseBoolean(resourceEnabled);
   }
 }
