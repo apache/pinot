@@ -186,7 +186,7 @@ public class ServerSegmentCompletionProtocolHandler {
       response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
       if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
-        ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader(_rawTableName);
+        ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
       }
     } catch (Exception e) {
       // Catch all exceptions, we want the protocol to handle the case assuming the request was never sent.
@@ -194,7 +194,7 @@ public class ServerSegmentCompletionProtocolHandler {
       LOGGER.error("Could not send request {}", url, e);
       // Invalidate controller leader cache, as exception could be because of leader being down (deployment/failure) and hence unable to send {@link SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER}
       // If cache is not invalidated, we will not recover from exceptions until the controller comes back up
-      ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader(_rawTableName);
+      ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
     }
     raiseSegmentCompletionProtocolResponseMetric(response);
     return response;
@@ -209,7 +209,7 @@ public class ServerSegmentCompletionProtocolHandler {
       response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
       if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
-        ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader(_rawTableName);
+        ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
       }
     } catch (Exception e) {
       // Catch all exceptions, we want the protocol to handle the case assuming the request was never sent.
@@ -217,7 +217,7 @@ public class ServerSegmentCompletionProtocolHandler {
       LOGGER.error("Could not send request {}", url, e);
       // Invalidate controller leader cache, as exception could be because of leader being down (deployment/failure) and hence unable to send {@link SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER}
       // If cache is not invalidated, we will not recover from exceptions until the controller comes back up
-      ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader(_rawTableName);
+      ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
     }
     raiseSegmentCompletionProtocolResponseMetric(response);
     return response;
@@ -233,7 +233,7 @@ public class ServerSegmentCompletionProtocolHandler {
       response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
       if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
-        ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader(_rawTableName);
+        ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
       }
     } catch (Exception e) {
       // Catch all exceptions, we want the protocol to handle the case assuming the request was never sent.
@@ -241,7 +241,7 @@ public class ServerSegmentCompletionProtocolHandler {
       LOGGER.error("Could not send request {}", url, e);
       // Invalidate controller leader cache, as exception could be because of leader being down (deployment/failure) and hence unable to send {@link SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER}
       // If cache is not invalidated, we will not recover from exceptions until the controller comes back up
-      ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader(_rawTableName);
+      ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
     }
     raiseSegmentCompletionProtocolResponseMetric(response);
     return response;

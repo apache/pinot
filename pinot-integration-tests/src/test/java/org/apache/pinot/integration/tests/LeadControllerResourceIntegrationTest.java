@@ -54,7 +54,7 @@ public class LeadControllerResourceIntegrationTest extends ControllerTest {
 
     // Mock the behavior that 40 seconds have passed.
     controllerLeaderLocator.setLastCacheInvalidateMillis(System.currentTimeMillis() - 40_000L);
-    controllerLeaderLocator.invalidateCachedControllerLeader(testTableName1);
+    controllerLeaderLocator.invalidateCachedControllerLeader();
 
     // After resource config is enabled, use the lead controller in the resource
     pair = controllerLeaderLocator.getControllerLeader(testTableName1);
