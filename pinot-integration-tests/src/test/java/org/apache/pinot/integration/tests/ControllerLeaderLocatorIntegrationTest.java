@@ -18,9 +18,19 @@
  */
 package org.apache.pinot.integration.tests;
 
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.MasterSlaveSMD;
+import org.apache.pinot.common.utils.CommonConstants.Helix;
+import org.apache.pinot.common.utils.helix.LeadControllerUtils;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
+import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -28,6 +38,7 @@ import org.testng.annotations.Test;
 
 
 public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
+  private static long TIMEOUT_IN_MS = 10_000L;
 
   @BeforeClass
   public void setUp() {
@@ -39,7 +50,7 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
 
   @Test
   public void testControllerLeaderLocator() {
-    String testTableName1 = "testTable1";
+    String testTableName1 = "testTable";
     String testTableName2 = "testTable2";
     ControllerLeaderLocator controllerLeaderLocator = ControllerLeaderLocator.getInstance();
 
@@ -67,6 +78,71 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
     Assert.assertNotNull(secondPair);
     Assert.assertEquals(pair.getFirst(), secondPair.getFirst());
     Assert.assertEquals(pair.getSecond(), secondPair.getSecond());
+
+    ControllerConf secondControllerConfig = getDefaultControllerConfiguration();
+    secondControllerConfig.setControllerPort(Integer.toString(DEFAULT_CONTROLLER_PORT + 1));
+    ControllerStarter secondControllerStarter = new ControllerStarter(secondControllerConfig);
+    secondControllerStarter.start();
+
+    TestUtils
+        .waitForCondition(aVoid -> secondControllerStarter.getHelixResourceManager().getHelixZkManager().isConnected(),
+            TIMEOUT_IN_MS, "Failed to start the second controller");
+
+    // Generate a table name that the second controller is its new lead controller, which should be different from the first table name.
+    String testTableName3 = generateTableNameUsingSecondController(secondControllerConfig, testTableName1);
+
+    // Mock the behavior that 40 seconds have passed.
+    controllerLeaderLocator.setLastCacheInvalidateMillis(System.currentTimeMillis() - 40_000L);
+    controllerLeaderLocator.invalidateCachedControllerLeader();
+
+    // The second controller should be the lead controller for test table 3, which isn't the helix leader.
+    Pair<String, Integer> thirdPair = controllerLeaderLocator.getControllerLeader(testTableName3);
+    Assert.assertNotNull(thirdPair);
+    Assert.assertEquals(thirdPair.getFirst(), ControllerTest.LOCAL_HOST);
+    Assert.assertEquals((int) thirdPair.getSecond(), (ControllerTest.DEFAULT_CONTROLLER_PORT + 1));
+    Assert.assertNotEquals(pair.getSecond(), thirdPair.getSecond());
+
+    secondControllerStarter.stop();
+  }
+
+  /**
+   * Generates a table name which uses the second controller as its lead controller.
+   */
+  private String generateTableNameUsingSecondController(ControllerConf secondControllerConfig, String testTableName) {
+    String secondParticipantId = LeadControllerUtils
+        .generateParticipantInstanceId(secondControllerConfig.getControllerHost(),
+            Integer.parseInt(secondControllerConfig.getControllerPort()));
+    Set<Integer> partitionIdsForSecondController = new HashSet<>();
+
+    // Find out all the partitionIds that the second controller is assigned to.
+    int partitionId = LeadControllerUtils.getPartitionIdForTable(testTableName);
+    String partitionNameForTable1 = LeadControllerUtils.generatePartitionName(partitionId);
+    ExternalView leadControllerResourceExternalView =
+        _helixAdmin.getResourceExternalView(_helixManager.getClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+    Set<String> partitionNames = leadControllerResourceExternalView.getPartitionSet();
+    for (String partitionName : partitionNames) {
+      Map<String, String> partitionStateMap = leadControllerResourceExternalView.getStateMap(partitionName);
+      // Get master host from partition map. Return null if no master found.
+      for (Map.Entry<String, String> entry : partitionStateMap.entrySet()) {
+        if (!partitionNameForTable1.equals(partitionName) && MasterSlaveSMD.States.MASTER.name()
+            .equals(entry.getValue())) {
+          if (secondParticipantId.equals(entry.getKey())) {
+            partitionIdsForSecondController.add(LeadControllerUtils.extractPartitionId(partitionName));
+          }
+        }
+      }
+    }
+
+    // Try 100 times to find out a table which is using the second controller as lead controller.
+    for (int i = 0; i < 100; i++) {
+      String newTestTableName = testTableName + i;
+      int newPartitionId = LeadControllerUtils.getPartitionIdForTable(newTestTableName);
+      if (partitionIdsForSecondController.contains(newPartitionId)) {
+        return newTestTableName;
+      }
+    }
+    throw new RuntimeException(
+        "Fail to find a table name within 100 times which uses the second controller as lead controller");
   }
 
   @AfterClass
