@@ -157,5 +157,5 @@ of 3 will use only 3 bits for each dictionary ID).
 There is a forward index built for each column and compressed appropriately for efficient memory use.  In addition, optional inverted indices can be
 configured for any set of columns. Inverted indices, while take up more storage, offer better query performance.
 
-Specialized indexes like StartTree index is also supported.
+Specialized indexes like Star-Tree index is also supported.
 
