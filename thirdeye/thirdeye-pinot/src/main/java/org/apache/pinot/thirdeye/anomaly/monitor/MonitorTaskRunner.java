@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
 public class MonitorTaskRunner implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(MonitorJobRunner.class);
-  private static final long MAX_TASK_TIME = TimeUnit.MINUTES.toMillis(30);
+  private static final long MAX_TASK_TIME = TimeUnit.HOURS.toMillis(6);
 
   private DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -64,9 +64,19 @@ public class MonitorTaskRunner implements TaskRunner {
 
   private void executeMonitorUpdate(MonitorTaskInfo monitorTaskInfo) {
     LOG.info("Execute monitor update {}", monitorTaskInfo);
+    int jobRetentionDays = monitorTaskInfo.getDefaultRetentionDays();
     try {
+      // Mark expired tasks with RUNNING states as TIMEOUT
+      List<TaskDTO> timeoutTasks = DAO_REGISTRY.getTaskDAO().findTimeoutTasksWithinDays(jobRetentionDays, MAX_TASK_TIME);
+      if (!timeoutTasks.isEmpty()) {
+        for (TaskDTO task : timeoutTasks) {
+          DAO_REGISTRY.getTaskDAO().updateStatusAndTaskEndTime(task.getId(), TaskStatus.RUNNING, TaskStatus.TIMEOUT,
+              System.currentTimeMillis(), "TIMEOUT status updated by MonitorTaskRunner");
+        }
+        LOG.warn("TIMEOUT tasks {}", timeoutTasks);
+      }
+
       // Find all jobs in SCHEDULED status
-      int jobRetentionDays = monitorTaskInfo.getDefaultRetentionDays();
       Map<Long, JobDTO> scheduledJobs = findScheduledJobsWithinDays(jobRetentionDays);
 
       // Remove SCHEDULED jobs that has WAITING tasks
@@ -199,7 +209,6 @@ public class MonitorTaskRunner implements TaskRunner {
   private Set<Long> findTimeoutJobsWithinDays(int days) {
     Set<Long> timeoutJobs = new HashSet<>();
     List<TaskDTO> timeoutTasks = DAO_REGISTRY.getTaskDAO().findByStatusWithinDays(TaskStatus.TIMEOUT, days);
-    timeoutTasks.addAll(DAO_REGISTRY.getTaskDAO().findTimeoutTasksWithinDays(days, MAX_TASK_TIME));
     for (TaskDTO task : timeoutTasks) {
       timeoutJobs.add(task.getJobId());
     }

@@ -174,6 +174,13 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
   }
 
   @Override
+  public List<TaskDTO> findByStatusAndWorkerId(Long workerId, TaskStatus status) {
+    Predicate statusPredicate = Predicate.EQ("status", status.toString());
+    Predicate workerIdPredicate = Predicate.EQ("workerId", workerId);
+    return findByPredicate(Predicate.AND(statusPredicate, workerIdPredicate));
+  }
+
+  @Override
   public int countWaiting() {
     // NOTE: this aggregation should be supported by genericPojoDAO directly
     // ensure each resource is closed at the end of the statement
