@@ -20,6 +20,7 @@ package org.apache.pinot.perf;
 
 import com.google.common.base.Joiner;
 import java.io.File;
+import java.lang.instrument.Instrumentation;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,7 +41,9 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import sun.instrument.InstrumentationImpl;
 
 
 /**
@@ -115,9 +118,11 @@ public class StringDictionaryPerfTest {
       rows.add(genericRow);
     }
 
+    long start = System.currentTimeMillis();
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, new GenericRowRecordReader(rows, schema));
     driver.build();
+    System.out.println("Total time for building segment: " + (System.currentTimeMillis() - start));
   }
 
   /**
@@ -153,7 +158,13 @@ public class StringDictionaryPerfTest {
    * @throws Exception
    */
   private String[] perfTestGetValues(int numGetValues) throws Exception {
-    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.heap);
+    IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig();
+    defaultIndexLoadingConfig.setReadMode(ReadMode.heap);
+    Set<String> columnNames = new HashSet<>();
+    columnNames.add(COLUMN_NAME);
+    defaultIndexLoadingConfig.setOnHeapDictionaryColumns(columnNames);
+
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(_indexDir, defaultIndexLoadingConfig);
     Dictionary dictionary = immutableSegment.getDictionary(COLUMN_NAME);
 
     Random random = new Random(System.nanoTime());
@@ -168,6 +179,7 @@ public class StringDictionaryPerfTest {
     FileUtils.deleteQuietly(_indexDir);
     long time = System.currentTimeMillis() - start;
     System.out.println("Total time for " + numGetValues + " lookups: " + time + "ms");
+    System.out.println("Memory usage: " + (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()));
     return new String[] {String.valueOf(_statistics.getN()), String.valueOf(time),
         String.valueOf(segmentSize), String.valueOf(numGetValues),
         String.valueOf(_statistics.getMin()), String.valueOf(_statistics.getMax()),
