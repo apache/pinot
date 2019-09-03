@@ -43,6 +43,7 @@ import static org.testng.Assert.assertTrue;
 
 /**
  * Integration test that extends RealtimeClusterIntegrationTest but uses low-level Kafka consumer.
+ * TODO: Add separate module-level tests and remove the randomness of this test
  */
 public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
   private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
@@ -62,7 +63,6 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   @Override
   public void setUp()
       throws Exception {
-    // TODO Avoid printing to stdout. Instead, we need to add the seed to every assert in this (and super-classes)
     System.out.println(String.format(
         "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableSplitCommit: %s, enableLeadControllerResource: %s",
         RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableSplitCommit, _enableLeadControllerResource));
