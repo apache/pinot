@@ -46,7 +46,7 @@ if [[ "$#" -gt 3 ]]
 then
   KAFKA_VERSION=$4
 else
-  KAFKA_VERSION=0.9
+  KAFKA_VERSION=2.0
 fi
 
 echo "Trying to build Pinot docker image from Git URL: [ ${PINOT_GIT_URL} ] on branch: [ ${PINOT_BRANCH} ] and tag it as: [ ${DOCKER_TAG} ]. Kafka Dependencies: [ ${KAFKA_VERSION} ]."

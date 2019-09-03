@@ -22,7 +22,7 @@ FROM openjdk:8
 LABEL MAINTAINER=dev@pinot.apache.org
 
 ARG PINOT_BRANCH=master
-ARG KAFKA_VERSION=0.9
+ARG KAFKA_VERSION=2.0
 ARG PINOT_GIT_URL="https://github.com/apache/incubator-pinot.git"
 RUN echo "Trying to build Pinot from [ ${PINOT_GIT_URL} ] on branch [ ${PINOT_BRANCH} ] with Kafka version [ ${KAFKA_VERSION} ]"
 ENV PINOT_HOME=/opt/pinot
