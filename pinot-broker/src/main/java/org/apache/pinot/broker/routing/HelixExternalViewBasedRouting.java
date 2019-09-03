@@ -592,9 +592,12 @@ public class HelixExternalViewBasedRouting implements ClusterChangeHandler, Rout
       throws Exception {
     ObjectNode ret = JsonUtils.newObjectNode();
     ArrayNode routingTableSnapshot = JsonUtils.newArrayNode();
+    boolean tableNameHasTypeSuffix = TableNameBuilder.getTableTypeFromTableName(tableName) != null;
 
     for (String currentTable : _routingTableBuilderMap.keySet()) {
-      if (tableName == null || tableName.equals(TableNameBuilder.extractRawTableName(currentTable))) {
+      if (tableName == null
+              || (tableNameHasTypeSuffix && tableName.equals(currentTable))
+              || (!tableNameHasTypeSuffix && tableName.equals(TableNameBuilder.extractRawTableName(currentTable)))) {
         ObjectNode tableEntry = JsonUtils.newObjectNode();
         tableEntry.put("tableName", currentTable);
 
