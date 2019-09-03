@@ -124,6 +124,7 @@ public class EntityGroupKeyContentFormatter extends BaseEmailContentFormatter{
       }
     }
 
+    templateData.put("anomalyDetails", whitelistMetricToAnomaliesMap.values());
     templateData.put("whitelistMetricToAnomaliesMap", whitelistMetricToAnomaliesMap.asMap());
     templateData.put("emailHeading", config.getName());
     templateData.put("emailDescription", config.getDescription());
