@@ -1,5 +1,5 @@
 <div class="te-graph-alert {{if isMetricDataPending 'te-graph-alert--pending'}}">
-  {{#if (or isFetchingDimensions isDimensionFetchDone)}}
+  {{#if (and (or isFetchingDimensions isDimensionFetchDone) isTopDimensionsAllowed)}}
     {{#if isDimensionError}}
       <div class="te-form__super-label">... error loading subDimensions for <span class="stronger">{{selectedDimension}}</span></div>
     {{else}}
@@ -18,10 +18,10 @@
         primaryMetric=metricData
         selectedDimensions=selectedDimensions
         dimensions=topDimensions
-        showDimensions=true
+        showDimensions=false
         isLoading=loading
         showSubchart=true
-        showLegend=true
+        showLegend=false
         enableZoom=true
         legendText=legendText
         componentId=componentId

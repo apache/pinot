@@ -6,6 +6,7 @@
 import RSVP from 'rsvp';
 import fetch from 'fetch';
 import moment from 'moment';
+import { later } from '@ember/runloop';
 import { isPresent } from "@ember/utils";
 import Route from '@ember/routing/route';
 import { inject as service } from '@ember/service';
@@ -25,6 +26,7 @@ export default Route.extend({
   },
 
   durationCache: service('services/duration'),
+  session: service(),
 
   beforeModel(transition) {
     const id = transition.params['manage.alert'].alert_id;
@@ -63,8 +65,8 @@ export default Route.extend({
       destination: transition.targetName,
       alertData: fetch(selfServeApiCommon.alertById(id)).then(checkStatus),
       email: fetch(selfServeApiCommon.configGroupByAlertId(id)).then(checkStatus),
-      allConfigGroups: fetch(selfServeApiCommon.allConfigGroups).then(res => res.json()),
-      allAppNames: fetch(selfServeApiCommon.allApplications).then(res => res.json())
+      allConfigGroups: fetch(selfServeApiCommon.allConfigGroups).then(checkStatus),
+      allAppNames: fetch(selfServeApiCommon.allApplications).then(checkStatus)
     });
   },
 
@@ -123,7 +125,6 @@ export default Route.extend({
       isEditModeActive,
       alertData: newAlertData,
       isTransitionDone: true,
-      isOverViewModeActive: !isEditModeActive,
       isReplayPending: isPresent(jobId)
     });
   },
@@ -133,6 +134,11 @@ export default Route.extend({
      * Set loader on start of transition
      */
     willTransition(transition) {
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+
       this.controller.set('isTransitionDone', false);
       if (transition.targetName === 'manage.alert.index') {
         this.refresh();
@@ -144,58 +150,21 @@ export default Route.extend({
      */
     didTransition() {
       this.controller.set('isTransitionDone', true);
+      // This is needed in order to update the links in this parent route,
+      // giving the "currentRouteName" time to resolve
+      later(this, () => {
+        if (this.router.currentRouteName.includes('explore')) {
+          this.controller.set('isEditModeActive', false);
+        }
+      });
     },
 
-    /**
-     * Toggle button modes and handle transition for edit
-     */
-    transitionToEditPage(alertId) {
-      this.controller.setProperties({
-        isOverViewModeActive: false,
-        isEditModeActive: true
-      });
-      this.transitionTo('manage.alert.edit', alertId, { queryParams: { refresh: true }});
-    },
-
-    /**
-     * Toggle button modes and handle transition for Alert Page (overview)
-     * Persist query params as much as possible
-     */
-    transitionToAlertPage(alertId) {
-      const tuneModel = this.modelFor('manage.alert.tune');
-      this.controller.setProperties({
-        isOverViewModeActive: true,
-        isEditModeActive: false
-      });
-      if (tuneModel && tuneModel.duration === 'custom') {
-        const { id, duration, startDate, endDate } = tuneModel;
-        this.transitionTo('manage.alert.explore', id, { queryParams: { duration, startDate, endDate }});
-      } else {
-        this.transitionTo('manage.alert', alertId);
+    // // Sub-route errors will bubble up to this
+    error() {
+      if (this.controller) {
+        this.controller.set('isLoadError', true);
       }
-    },
-
-    /**
-     * Toggle button modes and handle transition for tuning page
-     * Persist query params as much as possible
-     */
-    transitionToTunePage(alertId) {
-      const exploreModel = this.modelFor('manage.alert.explore');
-      this.controller.setProperties({
-        isOverViewModeActive: false,
-        isEditModeActive: true
-      });
-      if (exploreModel && exploreModel.duration === 'custom') {
-        const { id, duration, startDate, endDate } = exploreModel;
-        this.transitionTo('manage.alert.tune', id, { queryParams: { duration, startDate, endDate }});
-      } else {
-        this.transitionTo('manage.alert.tune', alertId);
-      }
-    },
-
-    // Sub-route errors will bubble up to this
-    error(error, transition) {
-      this.controller.set('isLoadError', true);
+      return true;//pass up stream
     }
   }
 

@@ -1,6 +1,7 @@
 .metrics-table {
   &__column {
     vertical-align: middle !important; // override ember-models-table
+
     &--checkbox {
       width: 24px;
     }
@@ -10,8 +11,14 @@
       text-align: right;
     }
 
+    &--text {
+      width: 80px;
+      text-align: left;
+    }
+
     &--large {
       min-width: 200px;
+      text-align: left;
     }
   }
 
@@ -31,5 +38,10 @@
   &__value {
     margin: 0;
     padding: 0;
+
+    &--small {
+      font-size: 10px;
+      color: app-shade(black, 0.60);
+    }
   }
 }

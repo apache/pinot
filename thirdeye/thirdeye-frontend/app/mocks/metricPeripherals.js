@@ -14,4 +14,4 @@ export default {
   filters,
   dimensions,
   granularities
-}
+};

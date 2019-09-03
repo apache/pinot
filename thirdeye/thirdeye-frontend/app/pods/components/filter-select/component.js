@@ -117,6 +117,8 @@ const getSearchResults = (filterOptions, filterToMatch, maxNum) => {
 
 
 export default Component.extend({
+  placeholder: '  Add a filter (Type to search)',
+
   // Maximum filters by filter group
   maxNumFilters: 25,
 
@@ -124,6 +126,7 @@ export default Component.extend({
   maxTotalFilters: 500,
 
   triggerId: '',
+
   noMatchesMessage: '',
 
   classNames: 'filter-select',
@@ -149,15 +152,13 @@ export default Component.extend({
   // Selected Filters Serializer
   selectedFilters: computed('selected', {
     get() {
-      const filters = JSON.parse(this.get('selected'));
+      const selected = this.get('selected') || '{}';
+      const filters = JSON.parse(selected);
 
       return convertHashToFilters(filters);
     },
     set(key, value) {
-      const filters = convertFiltersToHash(value);
-      this.set('selected', filters);
-
-      return value;
+      this.set('selected', value);
     }
   }),
 
@@ -198,10 +199,12 @@ export default Component.extend({
     // Action handler for filter Selection/Deselection
     onFilterChange(filters) {
       const onChangeHandler = this.get('onChange');
-      this.set('selectedFilters', filters);
+
+      const newSelected = convertFiltersToHash(filters);
+      this.set('selected', newSelected);
 
       if (onChangeHandler) {
-        onChangeHandler(this.get('selected'));
+        onChangeHandler(newSelected);
       }
     }
   }

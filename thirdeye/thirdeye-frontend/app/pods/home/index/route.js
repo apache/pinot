@@ -1,14 +1,10 @@
 import Route from '@ember/routing/route';
 import columns from 'thirdeye-frontend/shared/anomaliesTableColumns';
-import fetch from 'fetch';
 import { hash } from 'rsvp';
-import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
-import { setProperties } from '@ember/object';
 import { task } from 'ember-concurrency';
 import RSVP from "rsvp";
 import moment from 'moment';
 import { inject as service } from '@ember/service';
-import _ from 'lodash';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 
 const queryParamsConfig = {
@@ -18,20 +14,23 @@ const queryParamsConfig = {
 
 export default Route.extend(AuthenticatedRouteMixin, {
   anomaliesApiService: service('services/api/anomalies'),
+  session: service(),
 
   queryParams: {
     appName: queryParamsConfig,
     startDate: queryParamsConfig,
     endDate: queryParamsConfig,
     duration: queryParamsConfig,
-    feedbackType: queryParamsConfig
+    feedbackType: queryParamsConfig,
+    subGroup: queryParamsConfig
   },
-  applicationAnomalies: null,
+  anomalies: null,
   appName: null,
-  startDate: moment().subtract(1, 'day').utc().valueOf(), //taylored for Last 24 hours vs Today -> moment().startOf('day').utc().valueOf(),
-  endDate: moment().utc().valueOf(),//taylored for Last 24 hours
-  duration: '1d',//taylored for Last 24 hours
+  startDate: moment().startOf('day').utc().valueOf(), //set default to 0:00 for data consistency
+  endDate: moment().startOf('day').add(1, 'day').utc().valueOf(), //set default to 0:00 for data consistency
+  duration: 'today', //set default to today
   feedbackType: 'All Resolutions',
+  subGroup: null,
 
   /**
    * Returns a mapping of anomalies by metric and functionName (aka alert), performance stats for anomalies by
@@ -50,8 +49,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
    * }
    */
   async model(params) {
-    const { appName, startDate, endDate, duration, feedbackType } = params;//check params
-    const applications = await this.get('anomaliesApiService').queryApplications(appName, startDate);// Get all applicatons available
+    const { appName, startDate, endDate, duration, feedbackType, subGroup } = params;//check params
+    const applications = await this.get('anomaliesApiService').queryApplications();// Get all applicatons available
+    const subscriptionGroups = await this.get('anomaliesApiService').querySubscriptionGroups(); // Get all subscription groups available
 
     return hash({
       appName,
@@ -59,7 +59,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
       endDate,
       duration,
       applications,
-      feedbackType
+      subscriptionGroups,
+      feedbackType,
+      subGroup
     });
   },
 
@@ -70,27 +72,30 @@ export default Route.extend(AuthenticatedRouteMixin, {
     const endDate = Number(model.endDate) || this.get('endDate');
     const duration = model.duration || this.get('duration');
     const feedbackType = model.feedbackType || this.get('feedbackType');
+    const subGroup = model.subGroup || null;
     // Update props
     this.setProperties({
       appName,
       startDate,
       endDate,
       duration,
-      feedbackType
+      feedbackType,
+      subGroup
     });
 
     return new RSVP.Promise(async (resolve, reject) => {
       try {
-        const anomalyMapping = appName ? await this.get('_getAnomalyMapping').perform(model) : [];//DEMO:
-        const anomalyPerformance = appName ? await this.get('anomaliesApiService').queryPerformanceByAppNameUrl(appName, moment(this.get('startDate')).startOf('day').utc().format(), moment(this.get('endDate')).startOf('day').utc().format()) : [];
+        const anomalyMapping = (appName || subGroup) ? await this.get('_getAnomalyMapping').perform(model) : [];
+        const alertsByMetric = (appName || subGroup) ? this.getAlertsByMetric() : [];
         const defaultParams = {
           anomalyMapping,
-          anomalyPerformance,
           appName,
           startDate,
           endDate,
           duration,
-          feedbackType
+          feedbackType,
+          alertsByMetric,
+          subGroup
         };
         // Update model
         resolve(Object.assign(model, { ...defaultParams }));
@@ -100,18 +105,26 @@ export default Route.extend(AuthenticatedRouteMixin, {
     });
   },
 
-  _getAnomalyMapping: task (function * (model) {//TODO: need to add to anomaly util - LH
+  _getAnomalyMapping: task (function * () {//TODO: need to add to anomaly util - LH
     let anomalyMapping = {};
+    let anomalies;
     //fetch the anomalies from the onion wrapper cache.
-    const applicationAnomalies = yield this.get('anomaliesApiService').queryAnomaliesByAppName(this.get('appName'), this.get('startDate'), this.get('endDate'));
+    if (this.get('appName') && this.get('subGroup')) {
+      //this functionality is not provided in the UI, but the user can manually type the params into URL simultaneously
+      anomalies = yield this.get('anomaliesApiService').queryAnomaliesByJoin(this.get('appName'), this.get('subGroup'), this.get('startDate'), this.get('endDate'));
+    } else if (this.get('appName')) {
+      anomalies = yield this.get('anomaliesApiService').queryAnomaliesByAppName(this.get('appName'), this.get('startDate'), this.get('endDate'));
+    } else {
+      anomalies = yield this.get('anomaliesApiService').queryAnomaliesBySubGroup(this.get('subGroup'), this.get('startDate'), this.get('endDate'));
+    }
     const humanizedObject = {
       queryDuration: this.get('duration'),
       queryStart: this.get('startDate'),
       queryEnd: this.get('endDate')
     };
-    this.set('applicationAnomalies', applicationAnomalies);
+    this.set('anomalies', anomalies);
 
-    applicationAnomalies.forEach(anomaly => {
+    anomalies.forEach(anomaly => {
       const metricName = anomaly.get('metricName');
       //Grouping the anomalies of the same metric name
       if (!anomalyMapping[metricName]) {
@@ -126,31 +139,25 @@ export default Route.extend(AuthenticatedRouteMixin, {
   }).drop(),
 
   /**
-   * Retrieves metrics to index anomalies
-   * @return {String[]} - array of strings, each of which is a metric
-   * TODO: not used now. Clean up to follow - lohuynh
+   * Retrieves alerts based on metric name
+   * @return {Object} - associative array of alerts by metric
    */
-  getMetrics() {
-    let metricSet = new Set();
-    this.get('applicationAnomalies').forEach(anomaly => {
-      metricSet.add(anomaly.get('metric'));
+  getAlertsByMetric() {
+    const metricsObj = {};
+    this.get('anomalies').forEach(anomaly => {
+      let functionName = anomaly.get('functionName');
+      let functionId = anomaly.get('functionId');
+      let metricName = anomaly.get('metricName');
+      if (!metricsObj[metricName]) {
+        metricsObj[metricName] = { names: [], selectedIndex: 0, ids: [] };
+      }
+      //let alertIncluded = metricsObj[metricName].find(alert => { alert.id === functionId });
+      if (metricsObj[metricName] && !metricsObj[metricName].names.includes(functionName)) {
+        metricsObj[metricName].names.push(functionName);
+        metricsObj[metricName].ids.push(functionId);
+      }
     });
-    return [...metricSet];
-  },
-
-  /**
-   * Retrieves alerts to index anomalies
-   * @return {String[]} - array of strings, each of which is a alerts
-   */
-  getAlerts() {
-    let alertSet = new Set();
-    const applicationAnomalies = this.get('applicationAnomalies');
-    if (applicationAnomalies) {
-      applicationAnomalies.forEach(anomaly => {
-        alertSet.add(anomaly.get('functionName'));
-      });
-    }
-    return [...alertSet];
+    return metricsObj;
   },
 
   /**
@@ -162,10 +169,24 @@ export default Route.extend(AuthenticatedRouteMixin, {
     controller.setProperties({
       columns,
       appNameSelected: model.applications.findBy('application', this.get('appName')),
-      //metricList: this.getMetrics(),//TODO: clean up - lohuynh
-      // alertList: this.getAlerts(),
       appName: this.get('appName'),
-      anomaliesCount: this.get('applicationAnomalies.content') ? this.get('applicationAnomalies.content').length : 0
+      anomaliesCount: this.get('anomalies.content') ? this.get('anomalies.content').length : 0,
+      subGroupSelected: model.subscriptionGroups.findBy('name', this.get('subGroup')),
+      subGroup: this.get('subGroup'),
+      subscriptionGroups: model.subscriptionGroups
     });
+  },
+
+  actions: {
+    /**
+     * save session url for transition on login
+     * @method willTransition
+     */
+    willTransition(transition) {
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+    }
   }
 });

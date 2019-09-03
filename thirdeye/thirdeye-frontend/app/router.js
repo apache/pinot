@@ -1,7 +1,8 @@
 import EmberRouter from '@ember/routing/router';
 import config from './config/environment';
+import Piwik from 'ember-cli-piwik/mixins/page-view-tracker';
 
-const Router = EmberRouter.extend({
+const Router = EmberRouter.extend(Piwik, {
   location: config.locationType,
   rootURL: config.rootURL
 });
@@ -9,13 +10,17 @@ const Router = EmberRouter.extend({
 Router.map(function() {
   this.route('login');
   this.route('logout');
-  //this.route('error'); disable for now
+  //page not found placeholder - lohuynh
+  //this.route('404', { path: '/*path' });
 
   this.route('home', function() {
     this.route('index', { path: '/' });
     this.route('share-dashboard');
   });
 
+  this.route('aiavailability');
+
+  this.route('anomalies');
 
   this.route('manage', function() {
     this.route('alert', { path: 'alert/:alert_id' }, function() {
@@ -26,21 +31,14 @@ Router.map(function() {
     this.route('alerts', function() {
       this.route('performance');
     });
-  });
-
-  this.route('rca', function() {
-    this.route('details', { path: '/:metric_id' }, function () {
-      this.route('metrics');
-      this.route('events');
-      this.route('dimensions', function() {
-        this.route('heatmap', {path: '/'});
-      });
-    });
+    this.route('explore', { path: 'explore/:alert_id'});
+    this.route('yaml', { path: 'yaml/:alert_id' });
   });
 
   this.route('self-serve', function() {
     this.route('create-alert');
     this.route('import-metric');
+    this.route('import-sql-metric');
   });
 
   this.route('screenshot', { path: 'screenshot/:anomaly_id' });

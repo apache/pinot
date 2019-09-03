@@ -24,43 +24,29 @@ module('Integration | Component | stats cards', function(hooks) {
 
     // Testing titles of all cards
     assert.equal(
-      $title.get(0).innerText,
+      $title.get(0).innerText.trim(),
       stats[0][0],
       'title of 1st card is correct');
     assert.equal(
-      $title.get(1).innerText,
+      $title.get(1).innerText.trim(),
       stats[1][0],
       'title of 2nd card is correct');
     assert.equal(
-      $title.get(2).innerText,
+      $title.get(2).innerText.trim(),
       stats[2][0],
       'title of 3rd card is correct');
 
-    // Testing descriptions of all cards
-    assert.equal(
-      $description.get(0).innerText,
-      stats[0][1],
-      'description of 1st card is correct');
-    assert.equal(
-      $description.get(1).innerText,
-      stats[1][1],
-      'description of 2nd card is correct');
-    assert.equal(
-      $description.get(2).innerText,
-      stats[2][1],
-      'description of 3rd card is correct');
-
     // Testing values of all cards
     assert.equal(
-      $number.get(0).innerText,
+      $number.get(0).innerText.trim(),
       stats[0][2],
       'value of 1st card is correct');
     assert.equal(
-      $number.get(1).innerText,
+      $number.get(1).innerText.trim(),
       stats[1][2],
       'value of 2nd card is correct');
     assert.equal(
-      $number.get(2).innerText,
+      $number.get(2).innerText.trim(),
       stats[2][2],
       'value of 3rd card is correct');
   });

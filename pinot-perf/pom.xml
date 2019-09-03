@@ -1,57 +1,63 @@
 <?xml version="1.0"?>
 <!--
 
-    Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
 
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
+      http://www.apache.org/licenses/LICENSE-2.0
 
-            http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
 
 -->
-<project
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
-  xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
-    <groupId>com.linkedin.pinot</groupId>
-    <version>0.016</version>
+    <groupId>org.apache.pinot</groupId>
+    <version>0.2.0-SNAPSHOT</version>
   </parent>
-  <groupId>com.linkedin.pinot</groupId>
   <artifactId>pinot-perf</artifactId>
-  <version>0.016</version>
-  <name>pinot-perf</name>
-  <url>http://maven.apache.org</url>
+  <name>Pinot Perf</name>
+  <url>https://pinot.apache.org/</url>
   <properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <pinot.root>${basedir}/..</pinot.root>
   </properties>
   <dependencies>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-server</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-controller</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-broker</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-connector-kafka-${kafka.version}</artifactId>
+      <version>${project.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-integration-tests</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
@@ -63,19 +69,19 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-controller</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-broker</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
@@ -92,6 +98,7 @@
     <dependency>
       <groupId>org.openjdk.jmh</groupId>
       <artifactId>jmh-core</artifactId>
+      <version>1.21</version>
       <exclusions>
         <exclusion>
           <groupId>net.sf.jopt-simple</groupId>
@@ -100,13 +107,14 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>net.sf.jopt-simple</groupId>
-      <artifactId>jopt-simple</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.openjdk.jmh</groupId>
       <artifactId>jmh-generator-annprocess</artifactId>
+      <version>1.21</version>
       <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>net.sf.jopt-simple</groupId>
+      <artifactId>jopt-simple</artifactId>
     </dependency>
   </dependencies>
   <build>
@@ -117,12 +125,60 @@
         <configuration>
           <programs>
             <program>
-              <mainClass>com.linkedin.pinot.perf.PerfBenchmarkTest</mainClass>
-              <name>pinot-perfBenchmarkTest</name>
+              <mainClass>org.apache.pinot.perf.BenchmarkDictionary</mainClass>
+              <name>pinot-BenchmarkDictionary</name>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.perf.PerfBenchmarkRunner</mainClass>
-              <name>pinot-perfBenchmarkRunner</name>
+              <mainClass>org.apache.pinot.perf.BenchmarkDictionaryCreation</mainClass>
+              <name>pinot-BenchmarkDictionaryCreation</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkFixedIntArrayOffHeapIdMap</mainClass>
+              <name>pinot-BenchmarkFixedIntArrayOffHeapIdMap</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkOffHeapDictionaryMemory</mainClass>
+              <name>pinot-BenchmarkOffHeapDictionaryMemory</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkOfflineIndexReader</mainClass>
+              <name>pinot-BenchmarkOfflineIndexReader</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkOrDocIdIterator</mainClass>
+              <name>pinot-BenchmarkOrDocIdIterator</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkQueryEngine</mainClass>
+              <name>pinot-BenchmarkQueryEngine</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkRealtimeConsumptionSpeed</mainClass>
+              <name>pinot-BenchmarkRealtimeConsumptionSpeed</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkStringDictionary</mainClass>
+              <name>pinot-BenchmarkStringDictionary</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.DictionaryDumper</mainClass>
+              <name>pinot-DictionaryDumper</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.ForwardIndexWriterBenchmark</mainClass>
+              <name>pinot-ForwardIndexWriterBenchmark</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.RawIndexBenchmark</mainClass>
+              <name>pinot-RawIndexBenchmark</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.RealtimeStressTest</mainClass>
+              <name>pinot-RealtimeStressTest</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.StringDictionaryPerfTest</mainClass>
+              <name>pinot-StringDictionaryPerfTest</name>
             </program>
           </programs>
           <repositoryLayout>flat</repositoryLayout>
@@ -138,12 +194,16 @@
           <includeConfigurationDirectoryInClasspath>false</includeConfigurationDirectoryInClasspath>
           <assembleDirectory>${project.build.directory}/${project.artifactId}-pkg</assembleDirectory>
           <!-- Extra JVM arguments that will be included in the bin scripts -->
-          <extraJvmArguments>-Xms24G -Xmx24G -Dlog4j.configuration=log4j.properties</extraJvmArguments>
+          <extraJvmArguments>-Xms24G -Xmx24G -Dlog4j2.configurationFile=log4j2.xml</extraJvmArguments>
           <!-- Generate bin scripts for windows and unix pr default -->
           <platforms>
             <platform>unix</platform>
           </platforms>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
       </plugin>
     </plugins>
   </build>

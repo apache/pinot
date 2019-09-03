@@ -208,8 +208,8 @@ export default Controller.extend({
           return;
         }
         const detectionConfig = {
-          className: 'com.linkedin.thirdeye.detection.algorithm.DimensionWrapper', nested: [{
-            className: 'com.linkedin.thirdeye.detection.algorithm.MovingWindowAlgorithm',
+          className: 'org.apache.pinot.thirdeye.detection.algorithm.DimensionWrapper', nested: [{
+            className: 'org.apache.pinot.thirdeye.detection.algorithm.MovingWindowAlgorithm',
             baselineWeeks: 4,
             windowSize: '4 weeks',
             changeDuration: '7d',
@@ -242,7 +242,7 @@ export default Controller.extend({
 
       const configResult = {
         "cron": "45 10/15 * * * ? *", "name": get(this, 'detectionConfigName'), "lastTimestamp": 0, "properties": {
-          "className": "com.linkedin.thirdeye.detection.algorithm.MergeWrapper",
+          "className": "org.apache.pinot.thirdeye.detection.algorithm.MergeWrapper",
           "maxGap": 7200000,
           "nested": nestedProperties,
           "datasetName": get(this, 'datasetName')

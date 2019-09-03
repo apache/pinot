@@ -1,7 +1,7 @@
 import Service from '@ember/service';
 import { inject as service } from '@ember/service';
 import { assert } from '@ember/debug';
-import EmberObject, { computed, get } from '@ember/object';
+import EmberObject from '@ember/object';
 
 /**
  * @type {Ember.Service}
@@ -35,7 +35,8 @@ export default Service.extend({
       'baselineStart',  // number: baseline start ISO
       'baselineEnd',    // number: baseline end ISO
       'summarySize',    // number: number of results requested
-      'depth'           // number: nesting levels 1 - 3
+      'depth',          // number: nesting levels 1 - 3
+      'orderType'       // string: manual or auto
     ];
 
     requiredKeys.forEach((key) => {

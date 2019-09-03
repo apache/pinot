@@ -7,9 +7,11 @@ import {
   hasPrefix,
   filterPrefix,
   toMetricLabel,
+  toMetricDataset,
   isInverse,
   toColorDirection,
-  makeSortable
+  makeSortable,
+  isExclusionWarning
 } from 'thirdeye-frontend/utils/rca-utils';
 import {
   humanizeChange,
@@ -66,12 +68,6 @@ export default Component.extend({
   //
   // internal properties
   //
-
-  /**
-   * loading status for component
-   * @type {boolean}
-   */
-  isLoading: false,
 
   /**
    * A mapping of each metric and its url(s)
@@ -134,19 +130,17 @@ export default Component.extend({
             links: links[urn],
             isSelected: selectedUrns.has(urn),
             label: toMetricLabel(urn, entities),
+            dataset: toMetricDataset(urn, entities),
             score: humanizeScore(scores[urn]),
             current: this._makeRecord(urn, 'current', entities, aggregates),
             baseline: this._makeRecord(urn, 'baseline', entities, aggregates),
             wo1w: this._makeRecord(urn, 'wo1w', entities, aggregates),
             wo2w: this._makeRecord(urn, 'wo2w', entities, aggregates),
-            wo3w: this._makeRecord(urn, 'wo3w', entities, aggregates),
-            wo4w: this._makeRecord(urn, 'wo4w', entities, aggregates),
             sortable_current: this._makeChange(urn, 'current', aggregates),
             sortable_baseline: this._makeChange(urn, 'baseline', aggregates),
             sortable_wo1w: this._makeChange(urn, 'wo1w', aggregates),
             sortable_wo2w: this._makeChange(urn, 'wo2w', aggregates),
-            sortable_wo3w: this._makeChange(urn, 'wo3w', aggregates),
-            sortable_wo4w: this._makeChange(urn, 'wo4w', aggregates)
+            isExclusionWarning: isExclusionWarning(urn, entities)
           };
         });
 
@@ -194,7 +188,14 @@ export default Component.extend({
    * Keeps track of items that are selected in the table
    * @type {Array}
    */
-  preselectedItems: [], // FIXME: this is broken across all of RCA and works by accident only
+  preselectedItems: computed({
+    get () {
+      return [];
+    },
+    set () {
+      // ignore
+    }
+  }),
 
   actions: {
     /**

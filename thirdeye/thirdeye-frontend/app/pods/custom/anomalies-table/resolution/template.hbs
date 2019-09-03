@@ -1,28 +1,54 @@
 <div class="anomalies-table__column-cell">
-  {{#if showResponseSaved}}
-    <i class="{{if showResponseSaved "te-anomaly-table__icon--status-no-margin" "te-anomaly-table__icon--hidden"}} glyphicon glyphicon-ok-circle" ></i>
+  {{#if isUserReported}}
+    <div class="te-anomaly-table__text">User Reported</div>
   {{else}}
-    <i class="{{if showResponseFailed "te-anomaly-table__icon--status-no-margin" "te-anomaly-table__icon--hidden"}} glyphicon glyphicon-remove-circle" ></i>
-  {{/if}}
+    <div class="te-anomaly-table__icon-wrapper">
+      {{#if renderStatusIcon}}
+        {{#if showResponseSaved}}
+          <i class="te-anomaly-table__icon--status-no-margin glyphicon glyphicon-ok-circle"></i>
+        {{/if}}
+        {{#if showResponseFailed}}
+          <i class="te-anomaly-table__icon--status-no-margin te-anomaly-table__icon--error glyphicon glyphicon-remove-circle"></i>
+        {{/if}}
+      {{/if}}
+    </div>
 
-  {{#if record.isUserReported}}
-    <span class="te-anomaly-table__text">User Reported</span>
-  {{else}}
-    {{#power-select
-      triggerId=record.anomalyId
-      triggerClass="te-anomaly-table__select te-anomaly-table__select--margin-left"
-      options=anomalyResponseNames
-      searchEnabled=false
-      selected=record.anomalyFeedback
-      onchange=(action "onChangeAnomalyResponse" record)
-      as |response|
-    }}
-      {{response}}
-    {{/power-select}}
+    {{#if (eq record.anomalyFeedback "True anomaly")}}
+      <div class="te-anomaly-table__value-label--down">
+        {{#power-select
+          triggerId=record.anomalyId
+          triggerClass="te-anomaly-table__select te-anomaly-table__select--margin-left"
+          options=anomalyResponseNames
+          searchEnabled=false
+          selected=record.anomalyFeedback
+          onchange=(action "onChangeAnomalyResponse" record)
+          as |response|
+        }}
+          {{response}}
+        {{/power-select}}
+      </div>
+    {{else}}
+      <div>
+        {{#power-select
+          triggerId=record.anomalyId
+          triggerClass="te-anomaly-table__select te-anomaly-table__select--margin-left"
+          options=anomalyResponseNames
+          searchEnabled=false
+          selected=record.anomalyFeedback
+          onchange=(action "onChangeAnomalyResponse" record)
+          as |response|
+        }}
+          {{response}}
+        {{/power-select}}
+      </div>
+    {{/if}}
+  {{/if}}
+  {{#if hasComment}}
+    <div class="te-anomaly-table__comment">
+      <i class="glyphicon glyphicon-th-list"></i>
+      {{#tooltip-on-element class="te-anomaly-table__tooltip"}}
+        {{record.anomaly.comment}}
+      {{/tooltip-on-element}}
+    </div>
   {{/if}}
 </div>
-{{#if record.anomaly.comment}}
-  <div class="te-anomaly-table__comment">
-    comment: {{markdown-to-html record.anomaly.comment}}
-  </div>
-{{/if}}

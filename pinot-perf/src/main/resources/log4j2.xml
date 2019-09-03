@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+
+-->
+<Configuration>
+  <Appenders>
+    <Console name="console" target="SYSTEM_OUT">
+      <PatternLayout>
+        <pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</pattern>
+      </PatternLayout>
+    </Console>
+    <RandomAccessFile name="controllerLog" fileName="pinotController.log" immediateFlush="false">
+      <PatternLayout>
+        <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
+      </PatternLayout>
+    </RandomAccessFile>
+    <RandomAccessFile name="brokerLog" fileName="pinotBroker.log" immediateFlush="false">
+      <PatternLayout>
+        <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
+      </PatternLayout>
+    </RandomAccessFile>
+    <RandomAccessFile name="serverLog" fileName="pinotServer.log" immediateFlush="false">
+      <PatternLayout>
+        <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
+      </PatternLayout>
+    </RandomAccessFile>
+
+  </Appenders>
+  <Loggers>
+    <AsyncRoot level="error" additivity="false">
+      <AppenderRef ref="console"/>
+    </AsyncRoot>
+    <AsyncLogger name="org.apache.pinot" level="info" additivity="false"/>
+    <AsyncLogger name="org.apache.pinot.perf" level="info" additivity="false">
+      <AppenderRef ref="console"/>
+    </AsyncLogger>
+
+    <!-- Direct controller package log to the controller log file -->
+    <AsyncLogger name="org.apache.pinot.controller" level="info" additivity="false">
+      <AppenderRef ref="controllerLog"/>
+    </AsyncLogger>
+
+    <!-- Direct broker package log to the broker log file -->
+    <AsyncLogger name="org.apache.pinot.broker" level="info" additivity="false">
+      <AppenderRef ref="brokerLog"/>
+    </AsyncLogger>
+
+    <!-- Including server related package log to the server log file -->
+    <AsyncLogger name="org.apache.pinot.server" level="info" additivity="false">
+      <AppenderRef ref="serverLog"/>
+    </AsyncLogger>
+    <AsyncLogger name="org.apache.pinot.core.plan" level="info" additivity="false">
+      <AppenderRef ref="serverLog"/>
+    </AsyncLogger>
+    <AsyncLogger name="org.apache.pinot.core.realtime" level="info" additivity="false">
+      <AppenderRef ref="serverLog"/>
+    </AsyncLogger>
+    <AsyncLogger name="org.apache.pinot.core.query" level="info" additivity="false">
+      <AppenderRef ref="serverLog"/>
+    </AsyncLogger>
+  </Loggers>
+</Configuration>

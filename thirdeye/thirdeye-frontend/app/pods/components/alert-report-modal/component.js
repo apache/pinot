@@ -3,26 +3,22 @@
  * @module components/alert-report-modal
  * @property {String} metricName - text for read-only metric field
  * @property {String} alertName  - text for read-only alert field
- * @property {Array} dimensionOptions - options for dimension select field
  * @property {Number} timePickerIncrement - config for time-range-picker
- * @property {String} maxTime - timestamp for loading anomaly graph
  * @property {String} viewRegionStart - range start timestamp
  * @property {String} viewRegionEnd - range end timestamp
  * @property {Object} predefinedRanges - needed for time-range-picker
  * @property {String} uiDateFormat - date format desired for time-range-picker
- * @property {String} graphMessageText - text for graph in loading state
  * @example
   {{alert-report-modal
     metricName="mobile_notification_errors"
     alertName="notification_sessions_mobile"
-    dimensionOptions=['dimension 1', 'dimension 2']
+    selectedDimension='dimension'
+    alertHasDimensions=true
     timePickerIncrement=200
-    maxTime="1513137100914"
     viewRegionStart="2017-10-12 23:59"
     viewRegionEnd="2017-12-11 23:59"
     predefinedRanges=predefinedRanges
     uiDateFormat="MMM D, YYYY hh:mm a"
-    graphMessageText="Loading graph"
     inputAction=(action "onInputMissingAnomaly")
   }}
  * @exports alert-report-modal
@@ -37,19 +33,7 @@ export default Component.extend({
   containerClassNames: 'alert-report-modal',
   isNewTrend: false,
   showTimePicker: true,
-  timePickerIncrement: 30,
-
-  /**
-   * Pre-select all dimensions option if none else available
-   * TODO: use this.get('dimensionOptions.firstObject')
-   */
-  init() {
-    this._super(...arguments);
-    const dimensionOptions = this.get('dimensionOptions');
-    if (dimensionOptions && dimensionOptions.length === 1 && dimensionOptions[0] === 'All Dimensions') {
-      this.set('selectedDimension', dimensionOptions[0]);
-    }
-  },
+  timePickerIncrement: 5,
 
   /**
    * Collects all input data for the post request
@@ -68,12 +52,30 @@ export default Component.extend({
         startTime: moment(this.get('viewAnomalyStart')).utc().valueOf(),
         endTime: moment(this.get('viewAnomalyEnd')).utc().valueOf(),
         feedbackType: this.get('isNewTrend') ? 'ANOMALY_NEW_TREND' : 'ANOMALY',
-        dimension: this.get('selectedDimension') || null,
+        dimension: this.get('showDimension') ? this.get('selectedDimension') || null : null,
         comment: this.get('anomalyComments') || null,
         externalURL: this.get('anomalyLinks') || null
       };
 
       return postObj;
+    }
+  ),
+
+  /**
+   * Collects all input data for the post request
+   * @method reportAnomalyPayload
+   * @return {Object} Post data
+   */
+  showDimension: computed(
+    'alertHasDimensions',
+    'selectedDimension',
+    function() {
+      const {
+        alertHasDimensions,
+        selectedDimension
+      } = this.getProperties('alertHasDimensions', 'selectedDimension');
+
+      return (alertHasDimensions && selectedDimension !== 'Choose a dimension');
     }
   ),
 
@@ -98,9 +100,9 @@ export default Component.extend({
     },
 
     /**
-     * Handle selected dimension filter
-     * @method onSelectDimension
-     * @param {Object} selectedObj - the user-selected dimension to filter by
+     * Handle selected feedback type
+     * @method onFeedbackTypeSelection
+     * @param {Object} selectedObj - the user-selected feedback type
      */
     onFeedbackTypeSelection(trendSelection) {
       this.set('isNewTrend', trendSelection);
@@ -108,11 +110,10 @@ export default Component.extend({
     },
 
     /**
-     * Handle selected dimension filter
-     * @method onFeedbackComments
-     * @param {String} comment field value
+     * Handle changes to anomaly input
+     * @method onAnomalyInput
      */
-    onAnomalyInput(value) {
+    onAnomalyInput() {
       this.bubbleModalInput();
     }
 

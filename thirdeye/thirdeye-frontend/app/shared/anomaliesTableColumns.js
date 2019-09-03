@@ -34,5 +34,5 @@ export default [
     title: 'Investigation',
     className: 'anomalies-table__column anomalies-table__column--small-width',
     disableFiltering: true
-   }
+  }
 ];

@@ -5,15 +5,30 @@ import fetch from 'fetch';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import config from 'thirdeye-frontend/config/environment';
 
+// Prevent a full transition and pushState
+const queryParamsConfig = {
+  refreshModel: false,
+  replace: false
+};
+
 export default Route.extend(ApplicationRouteMixin, {
   moment: service(),
   session: service(),
+  notifications: service('toast'),
+  queryParams: {
+    debug: queryParamsConfig
+  },
 
-  beforeModel() {
+  beforeModel(transition) {
     // calling this._super to trigger ember-simple-auth's hook
     this._super(...arguments);
-    // SM: leaving this here for reference if needed
-    const isProdEnv = config.environment !== 'development';
+
+    // if configured as https only, redirect http to https, unless in debug mode
+    const debug = transition.queryParams.debug || '';
+    if (config.https_only && location.protocol === 'http:' && debug != 'show') {
+      location.href = 'https:' + window.location.href.substring(window.location.protocol.length);
+    }
+
     // invalidates session if cookie expired
     if (this.get('session.isAuthenticated')) {
       fetch('/auth')
@@ -52,7 +67,6 @@ export default Route.extend(ApplicationRouteMixin, {
    */
   sessionAuthenticated() {
     this._super(...arguments);
-
   },
 
   /**
@@ -62,5 +76,35 @@ export default Route.extend(ApplicationRouteMixin, {
    */
   sessionInvalidated() {
     this.transitionTo('login');
+  },
+
+  actions: {
+    /**
+     * @summary You can specify your own global default error handler by overriding the error handler on ApplicationRoute.
+     * we will catch 401 and provide a specific 401 message on the login page. With that, we will also store the last transition attempt
+     * to retry upon successful authentication. Last, we will logout the user to destroy the session and allow the user to login to be authenticated.
+     */
+    error: function(error, /*transition*/) {
+      const isDevEnv = config.environment === 'development';
+
+      const notifications = this.get('notifications');
+      const toastOptions = {
+        timeOut: '4000',
+        positionClass: 'toast-bottom-right'
+      };
+      const toastMsg = 'Something went wrong with a request. Please try again or come back later.';
+      if (error.message === '401' || (error.response && error.response.status === '401')) {
+        this.set('session.store.errorMsg', 'Your session expired. Please login again.');
+        this.transitionTo('logout');
+      } else if (error.message === '500' || (error.response && error.response.status === '500')) {
+        notifications.error(toastMsg, '500 error detected', toastOptions);
+      } else {
+        const errorStatus = error.response ? error.response.status : 'Unknown';
+        notifications.error(toastMsg, `${errorStatus} error detected`, toastOptions);
+      }
+      if (isDevEnv) {
+        throw error;
+      }
+    }
   }
 });

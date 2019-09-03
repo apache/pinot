@@ -36,6 +36,13 @@ module.exports = function(defaults) {
       'bootstrapVersion': 3,
       'importBootstrapFont': true,
       'importBootstrapCSS': false
+    },
+
+    //for ember EDITOR
+    ace: {
+      themes: ['ambiance', 'chaos'],
+      modes: ['yaml'],
+      exts: ['language_tools']
     }
   });
 
@@ -60,6 +67,20 @@ module.exports = function(defaults) {
 
   // jspdf and html2canvas assets for PDF
   app.import('node_modules/jspdf/dist/jspdf.min.js');
+
+  // imports yamljs node module as commonjs
+  app.import('node_modules/yamljs/index.js', {
+    using: [
+      { transformation: 'cjs', as: 'yamljs'}
+    ]
+  });
+
+  // imports yamljs node module as commonjs
+  app.import('node_modules/js-yaml/index.js', {
+    using: [
+      { transformation: 'cjs', as: 'js-yaml'}
+    ]
+  });
 
   // Use `app.import` to add additional libraries to the generated
   // output files.

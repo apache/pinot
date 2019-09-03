@@ -26,6 +26,7 @@
 
 import Component from '@ember/component';
 import moment from 'moment';
+import { get, set } from '@ember/object';
 import { buildDateEod } from 'thirdeye-frontend/utils/utils';
 
 const RANGE_FORMAT = 'YYYY-MM-DD HH:mm';
@@ -43,6 +44,7 @@ export default Component.extend({
   timePickerIncrement: 5,
   activeRangeStart: '',
   activeRangeEnd: '',
+  uiDateFormat: 'MMM D, YYYY',
   serverFormat: RANGE_FORMAT,
 
   /**
@@ -52,6 +54,19 @@ export default Component.extend({
     'Today': [DEFAULT_END_DATE],
     'Last 1 month': [moment().subtract(1, 'months').startOf('day'), DEFAULT_END_DATE],
     'Last 2 months': [moment().subtract(2, 'months').startOf('day'), DEFAULT_END_DATE]
+  },
+
+  /**
+   * Pick a custom date range input class (width) based on the incoming date format
+   */
+  didReceiveAttrs() {
+    this._super(...arguments);
+    const uiDateFormat = get(this, 'uiDateFormat');
+    const pickerClassName = 'range-pill-selectors__range-picker';
+    let dateMode = 'default';
+    if (uiDateFormat.includes('h a')) { dateMode = 'hours' }
+    if (uiDateFormat.includes('hh:mm a')) { dateMode = 'minutes' }
+    set(this, 'inputClassName', `${pickerClassName} ${pickerClassName}--${dateMode}`);
   },
 
   /**

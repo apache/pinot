@@ -1,0 +1,174 @@
+<fieldset class="te-form__section te-form__section--first row">
+  <div class="col-xs-12">
+    <legend class="te-form__section-title">{{alertTitle}}</legend>
+  </div>
+  <div class="col-xs-12 {{if isEditMode "bottom-margin"}}">
+    {{#unless isEditMode}}
+      <label for="select-metric" class="control-label te-label te-label--taller required">Can't find your metric?
+        {{#link-to "self-serve.import-metric" class="thirdeye-link-secondary thirdeye-link-secondary--inside"}}
+          Import a Metric From InGraphs
+        {{/link-to}}
+      </label>
+    {{/unless}}
+    <div class="pull-right">
+      {{bs-button
+        defaultText="Reset"
+        type="outline-primary"
+        buttonType="reset"
+        onClick=(action "resetYAML" "anomaly")
+        class="te-button te-button--link"
+      }}
+      {{bs-button
+        defaultText="View Docs & Examples"
+        type="outline-primary"
+        buttonType="link"
+        onClick=(action "triggerDoc" "Anomaly")
+        class="te-button te-button--cancel"
+      }}
+    </div>
+  </div>
+  <div class="col-xs-12 {{if isEditMode "bottom-margin"}}">
+    {{ember-ace
+      lines=35
+      value=currentYamlAlert
+      suggestCompletions=(action 'yamlSuggestions')
+      enableLiveAutocompletion=true
+      update=(action "onEditingDetectionYamlAction")
+      mode="ace/mode/yaml"
+    }}
+    {{#if isEditMode}}
+      <div class="pull-right">
+        {{bs-button
+          defaultText="Update Alert"
+          type="primary"
+          buttonType="submit"
+          disabled=disableYamlSave
+          onClick=(action "submitAlertEdit")
+          class="te-button te-button--submit"
+        }}
+      </div>
+    {{/if}}
+  </div>
+  <div class="col-xs-12">
+    {{#if isDetectionMsg}}
+      <div class="yaml-editor-msg">
+        <p class="yaml-editor-msg__icon"><i class="yaml-editor-msg__icon--error glyphicon glyphicon-remove-circle"></i>Error in alert yaml</p>
+        <p>Message: {{detectionMsg}}</p>
+      </div>
+    {{/if}}
+  </div>
+  <div class="col-xs-12">
+    {{#bs-accordion onChange=(action "changeAccordion") as |acc|}}
+      {{#acc.item value=preview as |aitem|}}
+        {{#aitem.title}}
+          <section class="dashboard-container__title thirdeye-link-secondary">Preview alert {{if toggleCollapsed "/ Enter YAML configuration to preview alert." ""}}
+            <span class="pull-right"><i class="glyphicon glyphicon-menu-{{if toggleCollapsed "down" "up"}}"></i></span>
+          </section>
+        {{/aitem.title}}
+        {{#aitem.body}}
+          {{#alert-details
+            isPreviewMode=true
+            alertYaml=detectionYaml
+            alertId=alertId
+            dataIsCurrent=alertDataIsCurrent
+          }}
+            {{yield}}
+          {{/alert-details}}
+        {{/aitem.body}}
+      {{/acc.item}}
+    {{/bs-accordion}}
+  </div>
+
+  <div class="col-xs-12">
+    <hr/>
+  </div>
+  {{#if showSettings}}
+    <div class="col-xs-12">
+      <legend class="te-form__section-title">{{alertSettingsTitle}}</legend>
+    </div>
+    <div class="col-xs-4">
+      {{#if isEditMode}}
+        <label class="te-label te-label--small">
+          {{#if noExistingSubscriptionGroup}}
+            Create a subscription group for this alert
+          {{else}}
+            Edit a subscription group already subscribed to this alert
+          {{/if}}</label>
+      {{else}}
+        <label class="te-label te-label--small">Add this alert to a subscription group</label>
+      {{/if}}
+
+      {{!--  subscription group --}}
+      {{#power-select
+        placeholder="Create a new subscription group"
+        options=subscriptionGroupNamesDisplay
+        selected=groupName
+        searchField="name"
+        onchange=(action 'onSubscriptionGroupSelectionAction')
+        as |groupName|
+      }}
+        {{groupName.name}} ({{groupName.id}})
+      {{/power-select}}
+    </div>
+    <div class="col-xs-12">
+      <label for="select-metric" class="control-label te-label te-label--taller required">Can't find your team? Contact
+        <a class="thirdeye-link-secondary" target="_blank" href="mailto:ask_thirdeye@linkedin.com">ask_thirdeye@linkedin.com</a>
+      </label>
+      <div class="pull-right">
+        {{bs-button
+          defaultText="Reset"
+          type="outline-primary"
+          buttonType="reset"
+          onClick=(action "resetYAML" "subscription")
+          class="te-button te-button--link"
+        }}
+        {{bs-button
+          defaultText="View Docs & Examples"
+          type="outline-primary"
+          buttonType="link"
+          onClick=(action "triggerDoc" "subscription")
+          class="te-button te-button--cancel"
+        }}
+      </div>
+    </div>
+    <div class="col-xs-12">
+      {{!-- subscription settings editor --}}
+      {{ember-ace
+        lines=25
+        value=currentSubscriptionYaml
+        update=(action "onEditingSubscriptionYamlAction")
+        mode="ace/mode/yaml"
+      }}
+    </div>
+    <div class="col-xs-12">
+      {{#if isSubscriptionMsg}}
+        <div class="yaml-editor-msg">
+          <p class="yaml-editor-msg__icon"><i class="yaml-editor-msg__icon--error glyphicon glyphicon-remove-circle"></i>Error in the subscription yaml</p>
+          <p>Message: {{subscriptionMsg}}</p>
+        </div>
+      {{/if}}
+    </div>
+  {{/if}}
+</fieldset>
+
+<fieldset class="te-form__section-submit">
+  {{#if isEditMode}}
+    {{bs-button
+        defaultText=subGroupButtonText
+        type="primary"
+        buttonType="submit"
+        disabled=disableSubGroupSave
+        onClick=(action "submitSubscriptionGroup")
+        class="te-button te-button--submit"
+      }}
+  {{else}}
+    {{bs-button
+      defaultText="Create alert"
+      type="primary"
+      buttonType="submit"
+      disabled=disableYamlSave
+      onClick=(action "createAlertYamlAction")
+      class="te-button te-button--submit"
+    }}
+  {{/if}}
+</fieldset>

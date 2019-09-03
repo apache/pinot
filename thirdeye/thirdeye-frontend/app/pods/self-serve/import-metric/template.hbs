@@ -23,6 +23,18 @@
         disabled=isExistingDashFieldDisabled
       }}
     </div>
+    <div class="form-group">
+      <label for="existing-dashboard-name" class="control-label">Fabric Group</label>
+      {{input
+        type="text"
+        id="existing-dashboard-fabric-group"
+        class="form-control required"
+        placeholder="Type inGraph fabric group..."
+        value=importExistingDashboardFabricGroup
+        key-up="clearExistingDashboardFabricGroupError"
+        disabled=isExistingDashFieldDisabled
+      }}
+    </div>
   </fieldset>
 
   <p class="te-form-text">Or</p>

@@ -14,6 +14,7 @@
 @import "shared/variable";
 @import "shared/mixins";
 @import "shared/styles";
+@import "shared/placeholders";
 
 // Wrapper
 @import "wrapper/color";
@@ -51,17 +52,21 @@ body {
 @import 'components/rootcause-metric';
 @import 'components/rootcause-placeholder';
 @import 'components/rootcause-select-comparison-range';
+@import 'components/rootcause-select-metric';
 @import 'components/rootcause-chart';
 @import 'components/rootcause-trend';
 @import 'components/rootcause-dimensions';
+@import 'components/rootcause-callgraph';
 @import 'components/alert-report-modal';
 @import 'components/te-radio';
 @import 'components/metrics-table';
 @import 'components/card-container';
 @import 'components/te-anomaly-table';
 @import 'components/te-toggle';
+@import 'components/timeseries-chart';
 @import 'components/range-pill-selectors';
 @import 'components/shared/common-tabs';
+@import 'components/yaml-editor';
 
 // Pod Pages
 @import 'ember-power-select/themes/bootstrap';
@@ -77,6 +82,5 @@ body {
 @import 'pods/rootcause';
 @import 'pods/preview';
 @import 'pods/home/index/dashboard';
-@import 'pods/home/share-dashboard/share-dashboard';
 @import 'pods/custom/anomalies-table';
 @import 'pods/custom/dimensions-table';

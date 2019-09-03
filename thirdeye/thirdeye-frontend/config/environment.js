@@ -13,9 +13,9 @@ module.exports = function(environment) {
 
     podModulePrefix: 'thirdeye-frontend/pods',
 
-    email: 'ask_thirdeye@linkedin.com',
+    email: 'thirdeye@thirdeye.com',
 
-    devEmail: 'thirdeye-dev@linkedin.com',
+    devEmail: 'thirdeye@thirdeye.com',
 
     rootURL: '/app/',
 
@@ -23,8 +23,21 @@ module.exports = function(environment) {
       directory: 'app/mirage'
     },
 
+    https_only: false,
+
     moment: {
       includeTimezone: 'all'
+    },
+
+    piwik: {
+      sid: 123,
+      url: 'https://your-piwik.endpoint.com'
+    },
+
+    docs: {
+      createAlert: "/link/to/create/alert/wiki",
+      detectionConfig: "/link/to/DetectionConfiguration/wiki",
+      subscriptionConfig: "/link/to/NotificationConfiguration/wiki"
     },
 
     EmberENV: {

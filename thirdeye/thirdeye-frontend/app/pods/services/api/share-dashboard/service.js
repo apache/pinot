@@ -23,7 +23,7 @@ export default Service.extend({
   },
 
   /**
-   * @summary Fetch all share meta data by athe hashkey provided
+   * @summary Fetch all share dashboard meta data (json) by athe hashkey provided
    * @method queryShareMetaById
    * @param {String} id - the shareId/hashKey
    * @return {Ember.RSVP.Promise}
@@ -31,9 +31,10 @@ export default Service.extend({
      usage: `this.get('shareDashboardApiService').queryShareMetaById(${shareId});`
    */
   async queryShareMetaById(shareId) {
-    assert('you must pass shareId param as an required argument.', shareId);
+    assert('You must pass shareId param as an required argument.', shareId);
 
     const queryCache = this.get('queryCache');
+    //share is a modelName (must match your model's name)
     const modelName = 'share';
     const query = { shareId };
     const shareMetaData = await queryCache.query(modelName, query, { reload: false, cacheKey: queryCache.urlForQueryKey(modelName, query) });
@@ -41,14 +42,14 @@ export default Service.extend({
   },
 
   /**
-   * @summary Save the share dashboard data (json)
+   * @summary Save the share dashboard meta data (json)
    * @method saveShareDashboard
    * @param {Object} json - the json data
    * @return {Ember.RSVP.Promise}
    * @example: `this.get('shareDashboardApiService').saveShareDashboard({json})`
    */
   async saveShareDashboard(data) {
-    assert('you must pass data param as an required argument.', data);
+    assert('You must pass data param as an required argument.', data);
 
     const blob = { id: 0, blob: data };//dummy id for now. ember data requires an id on the client side set here or in serializer else an erroris thrown.
     const hashKey = CryptoJS.SHA256(JSON.stringify(blob)).toString();//TODO: store in a service object - lohuynh

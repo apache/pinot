@@ -32,8 +32,15 @@
   &__range-picker {
     display: inline-block;
     color: app-shade(black, 7);
-    min-width: 290px;
     margin: 0;
+
+    &--minutes {
+      min-width: 290px;
+    }
+
+    &--hours {
+      min-width: 250px;
+    }
 
     .daterangepicker-input {
       background: none;
@@ -41,6 +48,7 @@
       box-shadow: none;
       padding: 3px 5px;
       height: auto;
+      margin-right: 15px;
 
       &:hover {
         cursor: pointer;
@@ -53,5 +61,9 @@
     font-weight: 600;
     color: app-shade(black, 7);
     display: inline-block;
+  }
+
+  &__ai {
+    margin-left: 25px;
   }
 }

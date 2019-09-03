@@ -34,6 +34,7 @@
       aggregates=aggregates
       anomalyUrns=context.anomalyUrns
       onFeedback=(action "onFeedback")
+      anomalyRange=context.anomalyRange
     }}
   {{/if}}
 
@@ -49,6 +50,7 @@
             onSelection=(action "onSelection")
             onMouseEnter=(action "onLegendHover")
             onMouseLeave=(action "onLegendHover")
+            onPrimaryChange=(action "onPrimaryChange")
           }}
           <div class="rootcause-wrapper__chart">
             <div class="row rootcause-wrapper__toolbar">
@@ -72,6 +74,8 @@
               focusedUrns=focusedUrns
               context=context
               onHover=(action "chartOnHover")
+              onSelection=(action "onSelection")
+              onPrimaryChange=(action "onPrimaryChange")
             }}
           </div>
         </div>
@@ -135,6 +139,8 @@
         <div class="col-xs-10">
           {{rootcause-select-metric-dimension
             selectedUrn=metricUrn
+            selectedUrns=selectedUrns
+            entities=entities
             onSelection=(action "onPrimaryChange")
           }}
         </div>
@@ -143,9 +149,8 @@
             <a class="thirdeye-link thirdeye-link--settings" {{action "onPrimarySelection"}}>
               + add to chart
               {{#tooltip-on-element
-                class="te-tooltip"
-                isShown=metricUrn}}
-                Click here to load metric
+                class="te-tooltip"}}
+                Click here to add the selected metric to the timeseries chart
               {{/tooltip-on-element}}
             </a>
           {{/if}}
@@ -169,6 +174,7 @@
                 {{#tablist.tab name="dimensions"}}Dimensions{{/tablist.tab}}
                 {{#tablist.tab name="events"}}Events{{/tablist.tab}}
                 {{#tablist.tab name="trend"}}Trend{{/tablist.tab}}
+                {{#tablist.tab name="callgraph"}}CallGraph{{/tablist.tab}}
               {{/tabs.tablist}}
               {{!-- metrics --}}
               {{#tabs.tabpanel name="metrics"}}
@@ -185,6 +191,10 @@
               {{!-- trend --}}
               {{#tabs.tabpanel name="trend"}}
                 {{partial 'partials/rootcause/trend'}}
+              {{/tabs.tabpanel}}
+              {{!-- callgraph --}}
+              {{#tabs.tabpanel name="callgraph"}}
+                {{partial 'partials/rootcause/callgraph'}}
               {{/tabs.tabpanel}}
             {{/shared/common-tabs}}
           </div>

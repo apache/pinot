@@ -1,5 +1,4 @@
 import Component from '@ember/component';
-import moment from 'moment';
 import {
   computed,
   get,
@@ -8,6 +7,7 @@ import {
   setProperties
 } from '@ember/object';
 import translate from 'thirdeye-frontend/utils/translate';
+import { makeTime } from 'thirdeye-frontend/utils/rca-utils';
 
 /**
  * Mapping between translated human-readable granularity values and values that are named on the backend
@@ -36,14 +36,14 @@ export default Component.extend({
   //
   // external (optional)
   //
-  analysisRangeMax: moment().startOf('day').add(1, 'days'),
+  analysisRangeMax: makeTime().add(1, 'day').startOf('day'),
 
   analysisRangePredefined: {
-    'Today': [moment(), moment().startOf('day').add(1, 'days')],
-    'Last 3 days': [moment().subtract(2, 'days').startOf('day'), moment().startOf('day').add(1, 'days')],
-    'Last 7 days': [moment().subtract(6, 'days').startOf('day'), moment().startOf('day').add(1, 'days')],
-    'Last 14 days': [moment().subtract(13, 'days').startOf('day'), moment().startOf('day').add(1, 'days')],
-    'Last 28 days': [moment().subtract(27, 'days').startOf('day'), moment().startOf('day').add(1, 'days')]
+    'Today': [makeTime(), makeTime().startOf('day').add(1, 'days')],
+    'Last 3 days': [makeTime().subtract(2, 'days').startOf('day'), makeTime().startOf('day').add(1, 'days')],
+    'Last 7 days': [makeTime().subtract(6, 'days').startOf('day'), makeTime().startOf('day').add(1, 'days')],
+    'Last 14 days': [makeTime().subtract(13, 'days').startOf('day'), makeTime().startOf('day').add(1, 'days')],
+    'Last 28 days': [makeTime().subtract(27, 'days').startOf('day'), makeTime().startOf('day').add(1, 'days')]
   },
 
   /**
@@ -85,8 +85,8 @@ export default Component.extend({
     const { context } = getProperties(this, 'context');
 
     setProperties(this, {
-      analysisRangeStart: moment(context.analysisRange[0]),
-      analysisRangeEnd: moment(context.analysisRange[1]),
+      analysisRangeStart: makeTime(context.analysisRange[0]),
+      analysisRangeEnd: makeTime(context.analysisRange[1]),
       granularity: context.granularity,
       compareMode: context.compareMode
     });
@@ -98,7 +98,7 @@ export default Component.extend({
         getProperties(this, 'onContext', 'context', 'analysisRangeStart', 'analysisRangeEnd', 'granularity', 'compareMode');
 
       const newContext = Object.assign({}, context, {
-        analysisRange: [moment(analysisRangeStart).valueOf(), moment(analysisRangeEnd).valueOf()],
+        analysisRange: [makeTime(analysisRangeStart).valueOf(), makeTime(analysisRangeEnd).valueOf()],
         granularity,
         compareMode
       });
@@ -112,6 +112,8 @@ export default Component.extend({
     },
 
     onAnalysisRange(start, end) {
+      end = makeTime(end).startOf('day').valueOf();
+      start = makeTime(start).valueOf();
       setProperties(this, { analysisRangeStart: start, analysisRangeEnd: end });
       this.send('onContext');
     },

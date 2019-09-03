@@ -1,6 +1,6 @@
 
-// this wrapper contains te-tooltip and an `?` icon 
-.te-tooltip-wrapper { 
+// this wrapper contains te-tooltip and an `?` icon
+.te-tooltip-wrapper {
   color: app-shade(black, 9);
 }
 
@@ -14,7 +14,7 @@
   text-shadow: none;
 
   &--large {
-    max-width: 360px;
+    max-width: 400px;
     padding: 0;
   }
 
@@ -23,7 +23,7 @@
   }
 
   &__title {
-    font-size: 16px; 
+    font-size: 16px;
     font-weight: 600;
     &__small {
       font-size: 14px;
@@ -44,7 +44,7 @@
 
   &__body {
     padding: 16px;
-    max-width: 250px;
+    max-width: 400px;
     &--large {
       max-width: unset;
     }
@@ -56,13 +56,13 @@
     font-size: 14px;
     line-height: 20px;
     color: app-shade(black, 9);
-    
+
     &--indent {
       margin-left: 20px;
       display: flex;
       justify-content: space-between;
     }
-    
+
     &--small {
       font-size: 12px;
       line-height: 16px;

@@ -1,12 +1,14 @@
 import Service from '@ember/service';
+import { inject as service } from '@ember/service';
 import {
   toMetricUrn,
   toAbsoluteUrn
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
-import fetch from 'fetch';
 import _ from 'lodash';
-import moment from 'moment';
+
+const ROOTCAUSE_BREAKDOWNS_ENDPOINT = '/rootcause/metric/breakdown';
+const ROOTCAUSE_BREAKDOWNS_PRIORITY = 15;
 
 export default Service.extend({
   breakdowns: null, // {}
@@ -16,6 +18,8 @@ export default Service.extend({
   pending: null, // Set
 
   errors: null, // Set({ urn, error })
+
+  fetcher: service('services/rootcause-fetcher'),
 
   init() {
     this._super(...arguments);
@@ -57,8 +61,8 @@ export default Service.extend({
     }
 
     // metrics
-    missing.forEach(urn => {
-      return this._fetchSlice(urn, requestContext);
+    missing.sort().forEach((urn, i) => {
+      return this._fetchSlice(urn, requestContext, i);
     });
   },
 
@@ -83,14 +87,17 @@ export default Service.extend({
     return breakdowns;
   },
 
-  _fetchSlice(urn, context) {
+  _fetchSlice(urn, context, index) {
+    const fetcher = this.get('fetcher');
+
     const metricUrn = toMetricUrn(urn);
     const range = context.anomalyRange;
     const offset = toAbsoluteUrn(urn, context.compareMode).split(':')[2].toLowerCase();
     const timezone = 'America/Los_Angeles';
+    const limit = offset === 'current' ? 100 : 200; // heuristically over-fetch baseline for heat map
 
-    const url = `/rootcause/metric/breakdown?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=${offset}&timezone=${timezone}`;
-    return fetch(url)
+    const url = `${ROOTCAUSE_BREAKDOWNS_ENDPOINT}?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=${offset}&timezone=${timezone}&limit=${limit}`;
+    return fetcher.fetch(url, ROOTCAUSE_BREAKDOWNS_PRIORITY, index)
       .then(checkStatus)
       .then(res => this._extractBreakdowns(res, urn))
       .then(res => this._complete(context, res))

@@ -4,30 +4,70 @@
  * @exports alert create model
  */
 import fetch from 'fetch';
-import RSVP from 'rsvp';
-import _ from 'lodash';
-import moment from 'moment';
+import { hash } from 'rsvp';
 import Route from '@ember/routing/route';
-import { task, timeout } from 'ember-concurrency';
-import {
-  selfServeApiCommon,
-  selfServeApiOnboard
-} from 'thirdeye-frontend/utils/api/self-serve';
+import { selfServeApiOnboard } from 'thirdeye-frontend/utils/api/self-serve';
 import { postProps, checkStatus } from 'thirdeye-frontend/utils/utils';
+import { inject as service } from '@ember/service';
+import { yamlAlertSettings } from 'thirdeye-frontend/utils/constants';
 
-let onboardStartTime = {};
+const CREATE_GROUP_TEXT = 'Create a new subscription group';
 
 export default Route.extend({
+  anomaliesApiService: service('services/api/anomalies'),
+  session: service(),
+  store: service('store'),
 
   /**
    * Model hook for the create alert route.
    * @method model
    * @return {Object}
    */
-  model(params, transition) {
-    return RSVP.hash({
-      allConfigGroups: fetch(selfServeApiCommon.allConfigGroups).then(checkStatus),
-      allAppNames: fetch(selfServeApiCommon.allApplications).then(checkStatus)
+  async model(params, transition) {
+    const debug = transition.state.queryParams.debug || '';
+    const applications = await this.get('anomaliesApiService').queryApplications(); // Get all applicatons available
+    const subscriptionGroups = await this.get('anomaliesApiService').querySubscriptionGroups(); // Get all subscription groups available
+
+    return hash({
+      subscriptionGroups,
+      applications,
+      debug
+    });
+  },
+
+  setupController(controller, model) {
+    const createGroup = {
+      name: CREATE_GROUP_TEXT,
+      id: 'n/a',
+      yaml: yamlAlertSettings
+    };
+    const moddedArray = [createGroup];
+    const subscriptionGroups = this.get('store')
+      .peekAll('subscription-groups')
+      .sortBy('name')
+      .filter(group => (group.get('active') && group.get('yaml')))
+      .map(group => {
+        return {
+          name: group.get('name'),
+          id: group.get('id'),
+          yaml: group.get('yaml')
+        };
+      });
+    const subscriptionGroupNamesDisplay = [...moddedArray, ...subscriptionGroups];
+    let subscriptionYaml = yamlAlertSettings;
+    let groupName = createGroup;
+    if (subscriptionGroupNamesDisplay && Array.isArray(subscriptionGroupNamesDisplay) && subscriptionGroupNamesDisplay.length > 0) {
+      const firstGroup = subscriptionGroupNamesDisplay[0];
+      subscriptionYaml = firstGroup.yaml;
+      groupName = firstGroup;
+    }
+
+    controller.setProperties({
+      subscriptionGroupNames: model.subscriptionGroups,
+      subscriptionGroupNamesDisplay,
+      groupName,
+      subscriptionYaml,
+      model
     });
   },
 
@@ -72,7 +112,25 @@ export default Route.extend({
     return fetch(selfServeApiOnboard.deleteAlert(functionId), postProps).then(checkStatus);
   },
 
+
   actions: {
+    /**
+     * save session url for transition on login
+     * @method willTransition
+     */
+    willTransition(transition) {
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+    },
+    error() {
+      // The `error` hook is also provided the failed
+      // `transition`, which can be stored and later
+      // `.retry()`d if desired.
+      return true;
+    },
+
     /**
     * Refresh route's model.
     * @method refreshModel
@@ -88,7 +146,7 @@ export default Route.extend({
     * @method triggerReplaySequence
     */
     triggerOnboardingJob(data) {
-      const { ignore, payload } = data;
+      const { payload } = data;
       const jobName = payload.functionName;
 
       fetch(selfServeApiOnboard.updateAlert(jobName), postProps(payload))
@@ -102,7 +160,7 @@ export default Route.extend({
             this.jumpToAlertPage(result.jobId, null);
           }
         })
-        .catch((err) => {
+        .catch(() => {
           // Error state will be handled on alert page
           this.jumpToAlertPage(-1, jobName);
         });

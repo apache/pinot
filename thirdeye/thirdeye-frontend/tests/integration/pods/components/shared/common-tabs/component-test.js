@@ -32,7 +32,7 @@ module('Integration | Component | shared/common-tabs', function(hooks) {
     const $tabs = this.$('.common-tabs ul li');
 
     // Testing tabs
-    assert.equal($tabs.get(0).innerText, 'Metrics', 'Name of the first tab matches `Metrics` is correct.');
-    assert.equal($tabs.get(1).innerText, 'Dimensions', 'Name of the first tab matches `Dimensions` is correct.');
+    assert.equal($tabs.get(0).innerText.trim(), 'Metrics', 'Name of the first tab matches `Metrics` is correct.');
+    assert.equal($tabs.get(1).innerText.trim(), 'Dimensions', 'Name of the first tab matches `Dimensions` is correct.');
   });
 });

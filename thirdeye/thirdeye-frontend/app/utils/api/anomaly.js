@@ -5,37 +5,84 @@
  * @returns {String} the complete anomaly data url
  * @example getAnomalyDataUrl(1491804013000, 1491890413000) // yields => /anomalies/search/anomalyIds/1491804013000/1491890413000/1?anomalyIds=
  */
-export function getAnomalyDataUrl(startStamp = 0, endStamp = 0) {
-  return `/anomalies/search/anomalyIds/${startStamp}/${endStamp}/1?anomalyIds=`;
+export function getAnomalyDataUrl(anomalyId) {
+  return `/dashboard/anomalies/view/${anomalyId}`;
 }
 
 /**
- * Returns the application performance details
-  * @param {String} appName - the application name
-  * @param {Number} startStamp - the anomaly iso start time
-  * @param {Number} endStamp - the anomaly iso end time
- * @returns {String} the complete Anomalies By AppName url
- * @example getPerformanceByAppNameUrl('someAppName', 1508472800000) // yields => /detection-job/eval/application/lms-ads?start=2017-09-01T00:00:00Z&end=2018-04-01T00:00:00Z
+ * Returns url for getting the Anomalies for a given YAML configuration so user can preview
+ * @param {Number} startTime - the anomaly start time
+ * @param {Number} endTime - the anomaly end time
+ * @param {String} alertId - optional alert id that will call /yaml/preview/{id} if provided
+ * @returns {String} the complete yaml/preview url
+ * @example getAnomaliesForYamlPreviewUrl(1508472700000, 1508472800000) // yields => /yaml/preview?start=1508472700000&end=1508472800000&tuningStart=0&tuningEnd=0
  */
-export function getPerformanceByAppNameUrl(appName, startTime, endTime) {
-  return `/detection-job/eval/application/${appName}?start=${startTime}&end=${endTime}`;
+export function getAnomaliesForYamlPreviewUrl(startTime, endTime, alertId) {
+  return `/yaml/preview${alertId ? `/${alertId}` : ''}?start=${startTime}&end=${endTime}&tuningStart=0&tuningEnd=0`;
 }
 
 /**
- * Returns the Anomalies By AppName url
-  * @param {String} appName - the application name
- * @param {Number} startStamp - the anomaly start time
- * @returns {String} the complete Anomalies By AppName url
- * @example getAnomaliesByAppNameUrl('someAppName', 1508472800000) // yields => /userdashboard/anomalies?application=someAppName&start=1508472800000
+ * Returns url for getting the time series with bounds for a given detection id
+ * @param {String} detectionId - the detection id
+ * @param {Number} startTime - the anomaly start time
+ * @param {Number} endTime - the anomaly end time
+ * @returns {String} the complete yaml/preview url
+ * @example getBoundsAndAnomalies(111111, 1508472700000, 1508472800000) // yields => /detection/preview/111111?start=1508472700000&end=1508472800000&diagnostics=true
  */
-export function getAnomaliesByAppNameUrl(appName, startTime) {
-  return `/userdashboard/anomalies?application=${appName}&start=${startTime}`;
+export function getBoundsUrl(detectionId, startTime, endTime) {
+  return `/detection/preview/${detectionId}?start=${startTime}&end=${endTime}&diagnostics=true`;
+}
+
+/**
+ * Returns the url for getting Anomalies for a given detection id over the specified time range
+ * @param {Number} alertId - the alert id aka detection config id
+ * @param {Number} startTime - the anomaly start time
+ * @param {Number} endTime - the anomaly end time
+ * @example getAnomaliesByAlertId(99999999,1508472700000, 1508472800000) // yields => /detection/99999999/anomalies?start=1508472700000&end=1508472800000
+ */
+export function getAnomaliesByAlertIdUrl(alertId, startTime, endTime) {
+  return `/detection/${alertId}/anomalies?start=${startTime}&end=${endTime}`;
+}
+
+/**
+ * Returns the url for getting anomaly filters of all anomalies over the specified time range
+ * @param {Number} startTime - beginning of time range of interest
+ * @param {Number} endTime - end of time range of interest
+ * @example getAnomalyFiltersByTimeRangeUrl(1508472700000, 1508472800000) // yields => /anomalies/search/time/1508472700000/1508472800000/1?filterOnly=true
+ */
+export function getAnomalyFiltersByTimeRangeUrl(startTime, endTime) {
+  return `/anomalies/search/time/${startTime}/${endTime}/1?filterOnly=true`;
+}
+
+/**
+ * Returns the url for getting anomaly filters of anomalies with given id's
+ * @param {Number} startTime - beginning of time range of interest
+ * @param {Number} endTime - end of time range of interest
+ * @param {String} anomalyIds - string of comma delimitedanomaly ids
+ * @example getAnomalyFiltersByAnomalyIdUrl(1508472700000, 1508472800000, anomalyIds) // yields => /anomalies/search/anomalyIds/1508472700000/1508472800000/1?anomalyIds={anomalyIds}
+ */
+export function getAnomalyFiltersByAnomalyIdUrl(startTime, endTime, anomalyIds) {
+  return `/anomalies/search/anomalyIds/${startTime}/${endTime}/1?anomalyIds=${encodeURIComponent(anomalyIds)}`;
+}
+
+/**
+ * Returns the url for getting ai availability table
+ * @param {Number} startDate - beginning of time range of interest
+ * @param {Number} endDate - end of time range of interest
+ * @example getAiAvailabilityUrl(1, 1508472700000, 1508472800000) // yields => /thirdeye/table?detectionConfigId=1&start=1508472700000&end=1508472800000
+ */
+export function getAiAvailabilityUrl(startDate, endDate) {
+  return `/thirdeye/table?metricIds=128856623&metricIds=128856625&start=${startDate}&end=${endDate}&dimensionKeys=grid&dimensionKeys=flow&dimensionKeys=project&dimensionKeys=owner&dimensionKeys=managers&dimensionKeys=sla&dimensionKeys=url`;
 }
 
 export const anomalyApiUrls = {
   getAnomalyDataUrl,
-  getAnomaliesByAppNameUrl,
-  getPerformanceByAppNameUrl
+  getAnomaliesForYamlPreviewUrl,
+  getAnomaliesByAlertIdUrl,
+  getAnomalyFiltersByTimeRangeUrl,
+  getAnomalyFiltersByAnomalyIdUrl,
+  getBoundsUrl,
+  getAiAvailabilityUrl
 };
 
 export default {

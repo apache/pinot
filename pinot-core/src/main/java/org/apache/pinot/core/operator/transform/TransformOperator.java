@@ -1,0 +1,121 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.core.operator.transform;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nonnull;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.ProjectionOperator;
+import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.transform.function.TransformFunction;
+import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
+
+
+/**
+ * Class for evaluating transform expressions.
+ */
+public class TransformOperator extends BaseOperator<TransformBlock> {
+
+  private static final String OPERATOR_NAME = "TransformOperator";
+
+  private final ProjectionOperator _projectionOperator;
+  private final Map<String, DataSource> _dataSourceMap;
+  private final Map<TransformExpressionTree, TransformFunction> _transformFunctionMap = new HashMap<>();
+  private final List<TransformExpressionTree> _expressions;
+
+  /**
+   * Constructor for the class
+   *
+   * @param projectionOperator Projection operator
+   * @param expressions Set of expressions to evaluate
+   */
+  public TransformOperator(@Nonnull ProjectionOperator projectionOperator,
+      @Nonnull List<TransformExpressionTree> expressions) {
+    _projectionOperator = projectionOperator;
+    _expressions = expressions;
+    _dataSourceMap = projectionOperator.getDataSourceMap();
+    for (TransformExpressionTree expression : expressions) {
+      TransformFunction transformFunction = TransformFunctionFactory
+          .get(expression, _dataSourceMap);
+      _transformFunctionMap.put(expression, transformFunction);
+    }
+  }
+
+  /**
+   * Returns the number of columns projected.
+   *
+   * @return Number of columns projected
+   */
+  public int getNumColumnsProjected() {
+    return _dataSourceMap.size();
+  }
+
+  /**
+   * Returns the transform result metadata associated with the given expression.
+   *
+   * @param expression Expression
+   * @return Transform result metadata
+   */
+  public TransformResultMetadata getResultMetadata(@Nonnull TransformExpressionTree expression) {
+    return _transformFunctionMap.get(expression).getResultMetadata();
+  }
+
+  /**
+   * Returns the dictionary associated with the given expression.
+   * <p>Should be called only if {@link #getResultMetadata(TransformExpressionTree)} indicates that the transform result
+   * has dictionary.
+   *
+   * @return Dictionary
+   */
+  public Dictionary getDictionary(@Nonnull TransformExpressionTree expression) {
+    return _transformFunctionMap.get(expression).getDictionary();
+  }
+
+  @Override
+  protected TransformBlock getNextBlock() {
+    ProjectionBlock projectionBlock = _projectionOperator.nextBlock();
+    if (projectionBlock == null) {
+      return null;
+    } else {
+      return new TransformBlock(projectionBlock, _transformFunctionMap);
+    }
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
+  }
+
+  @Override
+  public ExecutionStatistics getExecutionStatistics() {
+    return _projectionOperator.getExecutionStatistics();
+  }
+
+  public List<TransformExpressionTree> getExpressions() {
+    return _expressions;
+  }
+}

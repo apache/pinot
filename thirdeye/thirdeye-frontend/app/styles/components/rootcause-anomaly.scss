@@ -152,4 +152,14 @@
   &__body {
     padding: 0px 24px 24px 24px;
   }
+
+  .diffcurrent-alert {
+    background-color: #E65802;
+    color: #fff;
+    strong {
+      font-weight: 600;
+    }
+    margin-left: 24px;
+    margin-right: 24px;
+  }
 }

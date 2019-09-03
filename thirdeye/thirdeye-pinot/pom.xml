@@ -4,16 +4,16 @@
     xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>com.linkedin.thirdeye</groupId>
+    <groupId>org.apache.pinot.thirdeye</groupId>
     <artifactId>thirdeye</artifactId>
     <version>1.0-SNAPSHOT</version>
   </parent>
-  <groupId>com.linkedin.thirdeye</groupId>
+  <groupId>org.apache.pinot.thirdeye</groupId>
   <artifactId>thirdeye-pinot</artifactId>
   <name>thirdeye-pinot</name>
   <url>http://maven.apache.org</url>
   <properties>
-    <mainClass>com.linkedin.thirdeye.dashboard.ThirdEyeDashboardApplication</mainClass>
+    <mainClass>org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardApplication</mainClass>
   </properties>
 
   <dependencies>
@@ -31,15 +31,15 @@
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
-      <artifactId>commons-lang3</artifactId>
-    </dependency>
-    <dependency> <!-- added because it was removed during a dropwizard version bump -->
-      <groupId>commons-lang</groupId>
-      <artifactId>commons-lang</artifactId>
+      <artifactId>commons-dbcp2</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
-      <artifactId>commons-dbcp2</artifactId>
+      <artifactId>commons-configuration2</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-collections4</artifactId>
     </dependency>
     <dependency>
       <groupId>io.dropwizard</groupId>
@@ -75,6 +75,8 @@
       <groupId>io.dropwizard-bundles</groupId>
       <artifactId>dropwizard-redirect-bundle</artifactId>
     </dependency>
+
+    <!-- Pin jackson version and omit from third party dependencies-->
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-core</artifactId>
@@ -84,7 +86,12 @@
       <artifactId>jackson-databind</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-api</artifactId>
       <exclusions>
         <exclusion>
@@ -98,7 +105,7 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
       <exclusions>
         <exclusion>
@@ -113,6 +120,14 @@
           <groupId>org.slf4j</groupId>
           <artifactId>slf4j-log4j12</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>commons-lang</groupId>
+          <artifactId>commons-lang</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>commons-configuration</groupId>
+          <artifactId>commons-configuration</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -126,6 +141,21 @@
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-proxy</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.reflections</groupId>
+      <artifactId>reflections</artifactId>
+    </dependency>
+    <dependency>
+      <!-- TODO: replace code dependencies and remove -->
+      <groupId>org.json</groupId>
+      <artifactId>json</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.facebook.presto</groupId>
+      <artifactId>presto-jdbc</artifactId>
+      <version>0.215</version>
     </dependency>
 
     <!-- dataframe specific -->
@@ -169,6 +199,12 @@
     <dependency>
       <groupId>com.github.jknack</groupId>
       <artifactId>handlebars</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>commons-lang3</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.github.jknack</groupId>
@@ -203,6 +239,13 @@
       <artifactId>parsii</artifactId>
     </dependency>
 
+    <!-- demo dependencies -->
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <version>1.4.192</version>
+    </dependency>
+
     <!-- force bump up for LI usage -->
     <dependency>
       <groupId>org.glassfish.hk2</groupId>
@@ -229,71 +272,35 @@
       <artifactId>hsqldb</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>com.h2database</groupId>
-      <artifactId>h2</artifactId>
-      <version>1.4.192</version>
-      <scope>test</scope>
-    </dependency>
 
     <!-- Swagger -->
     <dependency>
-      <groupId>io.federecio</groupId>
+      <groupId>com.smoketurner</groupId>
       <artifactId>dropwizard-swagger</artifactId>
     </dependency>
+    <dependency>
+      <groupId>io.swagger</groupId>
+      <artifactId>swagger-annotations</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>javassist</groupId>
+      <artifactId>javassist</artifactId>
+    </dependency>
 
-    <!-- Google Calendar API -->
+    <!-- Holiday loader dependencies -->
     <dependency>
       <groupId>com.google.apis</groupId>
       <artifactId>google-api-services-calendar</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.ibm.icu</groupId>
+      <artifactId>icu4j</artifactId>
+      <version>62.1</version>
     </dependency>
   </dependencies>
 
   <build>
     <plugins>
-      <plugin>
-        <groupId>com.github.eirslett</groupId>
-        <artifactId>frontend-maven-plugin</artifactId>
-        <version>1.3</version>
-
-        <executions>
-
-          <execution>
-            <id>install node and npm</id>
-            <goals>
-              <goal>install-node-and-npm</goal>
-            </goals>
-            <phase>generate-resources</phase>
-            <configuration>
-              <nodeVersion>v6.10.0</nodeVersion>
-              <npmVersion>3.10.0</npmVersion>
-            </configuration>
-          </execution>
-
-          <execution>
-            <id>npm install</id>
-            <goals>
-              <goal>npm</goal>
-            </goals>
-            <phase>generate-resources</phase>
-            <configuration>
-              <arguments>install</arguments>
-            </configuration>
-          </execution>
-
-          <execution>
-            <id>grunt build</id>
-            <goals>
-              <goal>grunt</goal>
-            </goals>
-            <phase>generate-resources</phase>
-            <configuration>
-              <arguments>--no-color</arguments>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
         <version>3.1.0</version>
@@ -388,7 +395,7 @@
           <properties>
             <property>
               <name>listener</name>
-              <value>com.linkedin.thirdeye.TestListener</value>
+              <value>org.apache.pinot.thirdeye.TestListener</value>
             </property>
           </properties>
         </configuration>

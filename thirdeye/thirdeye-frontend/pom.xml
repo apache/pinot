@@ -4,11 +4,11 @@
   xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>com.linkedin.thirdeye</groupId>
+    <groupId>org.apache.pinot.thirdeye</groupId>
     <artifactId>thirdeye</artifactId>
     <version>1.0-SNAPSHOT</version>
   </parent>
-  <groupId>com.linkedin.thirdeye</groupId>
+  <groupId>org.apache.pinot.thirdeye</groupId>
   <artifactId>thirdeye-frontend</artifactId>
   <name>thirdeye-frontend</name>
   <url>http://maven.apache.org</url>
@@ -18,7 +18,7 @@
       <plugin>
         <groupId>com.github.eirslett</groupId>
         <artifactId>frontend-maven-plugin</artifactId>
-        <version>1.3</version>
+        <version>1.6</version>
 
         <executions>
           <execution>
@@ -28,8 +28,8 @@
               <goal>install-node-and-yarn</goal>
             </goals>
             <configuration>
-              <nodeVersion>v6.10.0</nodeVersion>
-              <yarnVersion>v0.16.1</yarnVersion>
+              <nodeVersion>v6.9.1</nodeVersion>
+              <yarnVersion>v1.12.0</yarnVersion>
             </configuration>
           </execution>
           <execution>
@@ -55,7 +55,10 @@
               <goal>yarn</goal>
             </goals>
             <configuration>
-              <arguments>run build -- --prod --output-path=../thirdeye-pinot/src/main/resources/app</arguments>
+              <environmentalVariables>
+                <JOBS>1</JOBS>
+              </environmentalVariables>
+              <arguments>run build --prod --output-path=../thirdeye-pinot/src/main/resources/app</arguments>
             </configuration>
           </execution>
           <execution>
@@ -65,6 +68,9 @@
               <goal>yarn</goal>
             </goals>
             <configuration>
+              <environmentalVariables>
+                <JOBS>1</JOBS>
+              </environmentalVariables>
               <arguments>run test</arguments>
             </configuration>
           </execution>

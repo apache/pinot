@@ -9,9 +9,6 @@ dist: trusty
 addons:
   chrome: stable
 
-cache:
-  yarn: true
-
 env:
   global:
     # See https://git.io/vdao3 for details.

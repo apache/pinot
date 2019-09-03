@@ -1,0 +1,10 @@
+{{#if isLoadingCallgraph}}
+  <div class="spinner-wrapper spinner-wrapper--card">
+    {{ember-spinner}}
+  </div>
+{{/if}}
+
+{{rootcause-callgraph-table
+  edges=edges
+  metricUrn=metricUrn
+}}

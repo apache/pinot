@@ -11,8 +11,9 @@ import { isPresent } from "@ember/utils";
 import Controller from '@ember/controller';
 import { task, timeout } from 'ember-concurrency';
 import {
-  computed,
   set,
+  get,
+  computed,
   setProperties,
   getProperties,
   getWithDefault
@@ -40,11 +41,13 @@ export default Controller.extend({
   startDate: null,
   endDate: null,
   repRunStatus: null,
+  openReport: false,
 
   /**
    * Mapping anomaly table column names to corresponding prop keys
    */
   sortMap: {
+    number: 'index',
     start: 'anomalyStart',
     score: 'severityScore',
     change: 'changeRate',
@@ -68,7 +71,11 @@ export default Controller.extend({
    * @return {undefined}
    */
   initialize() {
-    const repRunStatus = this.get('repRunStatus');
+    const {
+      repRunStatus,
+      openReport
+    } = this.getProperties('repRunStatus', 'openReport');
+
     this.setProperties({
       filters: {},
       loadedWowData: [],
@@ -80,6 +87,7 @@ export default Controller.extend({
       selectedTimeRange: '',
       selectedFilters: JSON.stringify({}),
       timePickerIncrement: 5,
+      renderStatusIcon: true,
       openReportModal: false,
       isAlertReady: false,
       isGraphReady: false,
@@ -90,11 +98,14 @@ export default Controller.extend({
       sortColumnStartUp: false,
       sortColumnScoreUp: false,
       sortColumnChangeUp: false,
+      sortColumnNumberUp: true,
+      isAnomalyListFiltered: false,
       isDimensionFetchDone: false,
       sortColumnResolutionUp: false,
       checkReplayInterval: 2000, // 2 seconds
       selectedDimension: 'All Dimensions',
       selectedResolution: 'All Resolutions',
+      labelMap: anomalyUtil.anomalyResponseMap,
       currentPage: 1,
       pageSize: 10
     });
@@ -109,7 +120,30 @@ export default Controller.extend({
     if (repRunStatus) {
       this.get('checkForNewAnomalies').perform(repRunStatus);
     }
+
+    // If query param is set, auto-open report anomaly modal
+    if (openReport) {
+      this.triggerOpenReportModal();
+    }
   },
+
+  /**
+   * newLink: Id of new alert (for migrated alerts)
+   * @type {String}
+   */
+  newId: computed(
+    'alertData',
+    function() {
+      const alertData = get(this, 'alertData');
+      if(alertData && alertData.functionName) {
+        let pieces = alertData.functionName.split('_');
+        if (pieces.length > 0) {
+          return pieces[pieces.length-1];
+        }
+      }
+      return null;
+    }
+  ),
 
   /**
    * Table pagination: number of pages to display
@@ -175,9 +209,10 @@ export default Controller.extend({
     'currentPage',
     'loadedWoWData',
     'selectedSortMode',
+    'selectedResolution',
     function() {
       let anomalies = this.get('filteredAnomalies');
-      const { pageSize, currentPage, selectedSortMode } = this.getProperties('pageSize', 'currentPage', 'selectedSortMode');
+      const { pageSize, currentPage, selectedSortMode } = getProperties(this, 'pageSize', 'currentPage', 'selectedSortMode');
 
       if (selectedSortMode) {
         let [ sortKey, sortDir ] = selectedSortMode.split(':');
@@ -198,7 +233,7 @@ export default Controller.extend({
    * @type {String}
    */
   uiDateFormat: computed('alertData.windowUnit', function() {
-    const rawGranularity = this.get('alertData.windowUnit');
+    const rawGranularity = this.get('alertData.bucketUnit');
     const granularity = rawGranularity ? rawGranularity.toLowerCase() : '';
 
     switch(granularity) {
@@ -236,10 +271,11 @@ export default Controller.extend({
    */
   isAnomalyLoadError: computed(
     'totalAnomalies',
-    'filteredAnomalies.length',
+    'anomalyData.length',
     function() {
-      const { totalAnomalies, filteredAnomalies } = getProperties(this, 'totalAnomalies', 'filteredAnomalies');
-      return totalAnomalies !== filteredAnomalies.length;
+      const { totalAnomalies, anomalyData } = getProperties(this, 'totalAnomalies', 'anomalyData');
+      const totalsMatching = anomalyData ? (totalAnomalies !== anomalyData.length) : true;
+      return totalsMatching;
     }
   ),
 
@@ -259,7 +295,6 @@ export default Controller.extend({
       } = this.getProperties('alertData', 'alertEvalMetrics', 'DEFAULT_SEVERITY');
       const features = getWithDefault(alertData, 'alertFilter.features', null);
       const mttdStr = _.has(alertData, 'alertFilter.mttd') ? alertData.alertFilter.mttd.split(';') : null;
-      const severityUnitFeatures = (features && features.split(',')[1] !== 'deviation') ? '%' : '';
       const severityUnit = (!mttdStr || mttdStr && mttdStr[1].split('=')[0] !== 'deviation') ? '%' : '';
       const mttdWeight = Number(extractSeverity(alertData, defaultSeverity));
       const convertedWeight = severityUnit === '%' ? mttdWeight * 100 : mttdWeight;
@@ -319,28 +354,32 @@ export default Controller.extend({
     'anomaliesLoaded',
     function() {
       const {
+        labelMap,
+        anomalyData,
         anomaliesLoaded,
         selectedDimension: targetDimension,
         selectedResolution: targetResolution
-      } = this.getProperties('selectedDimension', 'selectedResolution', 'anomaliesLoaded');
-      let anomalies = [];
+      } = this.getProperties('labelMap', 'anomalyData', 'selectedDimension', 'selectedResolution', 'anomaliesLoaded');
+      let newAnomalies = [];
 
-      if (anomaliesLoaded) {
-        anomalies = this.get('anomalyData');
+      if (anomaliesLoaded  && anomalyData) {
+        newAnomalies = this.get('anomalyData');
         if (targetDimension !== 'All Dimensions') {
           // Filter for selected dimension
-          anomalies = anomalies.filter(data => targetDimension === data.dimensionString);
+          newAnomalies = newAnomalies.filter(data => targetDimension === data.dimensionString);
         }
         if (targetResolution !== 'All Resolutions') {
           // Filter for selected resolution
-          anomalies = anomalies.filter(data => targetResolution === data.anomalyFeedback);
+          newAnomalies = newAnomalies.filter(data => targetResolution === labelMap[data.anomalyFeedback]);
         }
+        // Let page know whether anomalies viewed are filtered or not
+        set(this, 'isAnomalyListFiltered', anomalyData.length !== newAnomalies.length);
         // Add an index number to each row
-        anomalies.forEach((anomaly, index) => {
-          anomaly.index = index + 1;
+        newAnomalies.forEach((anomaly, index) => {
+          set(anomaly, 'index', ++index);
         });
       }
-      return anomalies;
+      return newAnomalies;
     }
   ),
 
@@ -392,9 +431,8 @@ export default Controller.extend({
 
     const {
       alertId,
-      replayStartTime,
-      checkReplayInterval
-    } = this.getProperties('alertId', 'replayStartTime', 'checkReplayInterval');
+      replayStartTime
+    } = this.getProperties('alertId', 'replayStartTime');
     const replayStatusList = ['completed', 'failed', 'timeout'];
     const checkStatusUrl = `/detection-onboard/get-status?jobId=${jobId}`;
     let isReplayTimeUp = Number(moment.duration(moment().diff(replayStartTime)).asSeconds().toFixed(0)) > 60;
@@ -474,11 +512,30 @@ export default Controller.extend({
       });
       // Step 1: Report the anomaly
       return fetch(queryStringUrl, postProps('')).then((res) => checkStatus(res, 'post'))
-        .then((saveResult) => {
+        .then(() => {
           // Step 2: Automatically update anomaly feedback in that range
           return fetch(updateUrl, postProps('')).then((res) => checkStatus(res, 'post'));
         });
     }
+  },
+
+  /**
+   * Modal opener for "report missing anomaly". Can be triggered from link click or
+   * automatically via queryparam "openReport=true"
+   * @method triggerOpenReportModal
+   * @return {undefined}
+   */
+  triggerOpenReportModal() {
+    this.setProperties({
+      isReportSuccess: false,
+      isReportFailure: false,
+      openReportModal: true
+    });
+    // We need the C3/D3 graph to render after its containing parent elements are rendered
+    // in order to avoid strange overflow effects.
+    later(() => {
+      this.set('renderModalContent', true);
+    });
   },
 
   /**
@@ -508,7 +565,10 @@ export default Controller.extend({
      * @param {Object} selectedObj - the user-selected dimension to filter by
      */
     onSelectDimension(selectedObj) {
-      this.set('selectedDimension', selectedObj);
+      setProperties(this, {
+        currentPage: 1,
+        selectedDimension: selectedObj
+      });
       // Select graph dimensions based on filter
       this.get('topDimensions').forEach((dimension) => {
         const isAllSelected = selectedObj === 'All Dimensions';
@@ -523,7 +583,10 @@ export default Controller.extend({
      * @param {Object} selectedObj - the user-selected resolution to filter by
      */
     onSelectResolution(selectedObj) {
-      this.set('selectedResolution', selectedObj);
+      setProperties(this, {
+        currentPage: 1,
+        selectedResolution: selectedObj
+      });
     },
 
     /**
@@ -535,21 +598,36 @@ export default Controller.extend({
      */
      onChangeAnomalyResponse: async function(anomalyRecord, selectedResponse, inputObj) {
       const responseObj = anomalyUtil.anomalyResponseObj.find(res => res.name === selectedResponse);
+      const labelMap = get(this, 'labelMap');
+      const loadedResponsesArr = [];
+      const newOptionsArr = [];
+      // Update select field
       set(inputObj, 'selected', selectedResponse);
-      let res;
+      // Reset status icon
+      set(this, 'renderStatusIcon', false);
       try {
         // Save anomaly feedback
-        res = await anomalyUtil.updateAnomalyFeedback(anomalyRecord.anomalyId, responseObj.value)
+        await anomalyUtil.updateAnomalyFeedback(anomalyRecord.anomalyId, responseObj.value);
         // We make a call to ensure our new response got saved
-        res = await anomalyUtil.verifyAnomalyFeedback(anomalyRecord.anomalyId, responseObj.status)
-        const filterMap = getWithDefault(res, 'searchFilters.statusFilterMap', null);
-        if (filterMap && filterMap.hasOwnProperty(responseObj.status)) {
+        const anomaly = await anomalyUtil.verifyAnomalyFeedback(anomalyRecord.anomalyId, responseObj.status);
+        const filterMap = getWithDefault(anomaly, 'searchFilters.statusFilterMap', null);
+        // This verifies that the status change got saved as key in the anomaly statusFilterMap property
+        const keyPresent = filterMap && Object.keys(filterMap).find(key => responseObj.status.includes(key));
+        if (keyPresent) {
           setProperties(anomalyRecord, {
-            anomalyFeedback: selectedResponse,
-            showResponseSaved: true
+            anomalyFeedback: responseObj.status,
+            showResponseSaved: true,
+            showResponseFailed: false
           });
+          // Collect all available new labels
+          loadedResponsesArr.push(responseObj.status, ...get(this, 'anomalyData').mapBy('anomalyFeedback'));
+          loadedResponsesArr.forEach((response) => {
+            if (labelMap[response]) { newOptionsArr.push(labelMap[response]) }
+          });
+          // Update resolutionOptions array - we may have a new option now
+          set(this, 'resolutionOptions', [ ...new Set([ 'All Resolutions', ...newOptionsArr ])]);
         } else {
-          return Promise.reject(new Error('Response not saved'));
+          throw 'Response not saved';
         }
       } catch (err) {
         setProperties(anomalyRecord, {
@@ -557,6 +635,8 @@ export default Controller.extend({
           showResponseSaved: false
         });
       }
+      // Force status icon to refresh
+      set(this, 'renderStatusIcon', true);
     },
 
     /**
@@ -569,10 +649,18 @@ export default Controller.extend({
 
       switch (page) {
         case 'previous':
-          newPage = --currentPage;
+          if (currentPage > 1) {
+            newPage = --currentPage;
+          } else {
+            newPage = currentPage;
+          }
           break;
         case 'next':
-          newPage = ++currentPage;
+          if (currentPage < this.get('pagesNum')) {
+            newPage = ++currentPage;
+          } else {
+            newPage = currentPage;
+          }
           break;
       }
 
@@ -591,6 +679,7 @@ export default Controller.extend({
           const endStr = moment(missingAnomalyProps.endTime).format(rangeFormat);
           this.setProperties({
             isReportSuccess: true,
+            openReportModal: false,
             reportedRange: `${startStr} - ${endStr}`
           });
           // Reload after save confirmation
@@ -614,6 +703,7 @@ export default Controller.extend({
       this.setProperties({
         isReportSuccess: false,
         isReportFailure: false,
+        openReportModal: false,
         renderModalContent: false
       });
     },
@@ -622,16 +712,7 @@ export default Controller.extend({
      * Open modal for missing anomalies
      */
     onClickReportAnomaly() {
-      this.setProperties({
-        isReportSuccess: false,
-        isReportFailure: false,
-        openReportModal: true
-      });
-      // We need the C3/D3 graph to render after its containing parent elements are rendered
-      // in order to avoid strange overflow effects.
-      later(() => {
-        this.set('renderModalContent', true);
-      });
+      this.triggerOpenReportModal();
     },
 
     /**

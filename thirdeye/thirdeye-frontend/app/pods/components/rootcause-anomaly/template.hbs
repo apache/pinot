@@ -40,7 +40,7 @@
         </div>
 
         <div class="rootcause-anomaly__stats-wrapper">
-          {{#each offsets as |offset|}}
+          {{#each availableOffsets as |offset|}}
             <div class="rootcause-anomaly__stats">
               <span class="rootcause-anomaly__stats-label">{{offset}}</span>
               <span class="rootcause-anomaly__stats-value">
@@ -53,48 +53,61 @@
           {{/each}}
         </div>
       </div>
+      {{#if isWarning}}
+      <div class="diffcurrent-alert alert alert-warning fade in">
+        <h4><i class="glyphicon glyphicon-exclamation-sign"></i> Data has been changed since anomaly detected</h4>
+        At the time when anomaly was detected, the data has changed from <strong>{{humanizedAnomalyCurrent}}</strong> to <strong>{{warningChangedTo}}</strong>.<br>
+        No action is needed.  Anomaly will be labeled as <strong>Inconsistent Data</strong>.
+      </div>
+      {{/if}}
     {{/unless}}
 
-    <div class="rootcause-anomaly__body">
-      <div class="row">
-        <div class="col-xs-2 rootcause-anomaly__title rootcause-anomaly__title--small">
-          Is this an anomaly?
-          <span>
-            <i class="glyphicon glyphicon-question-sign"></i>
-            {{#tooltip-on-element class="te-tooltip te-tooltip--large te-tooltip--cover" as |popover|}}
-              <div class="te-tooltip__header">
-                <span class="te-tooltip__title">What do the options mean?</span>
-              </div>
-              <div class="te-tooltip__body te-tooltip__body--large">
-                <div>
-                  <span class="te-tooltip__title te-tooltip__title--small">True Anomaly</span>
+    {{#unless isWarning}}
+      <div class="rootcause-anomaly__body">
+        <div class="row">
+          <div class="col-xs-2 rootcause-anomaly__title rootcause-anomaly__title--small">
+            Is this an anomaly?
+            <span>
+              <i class="glyphicon glyphicon-question-sign"></i>
+              {{#tooltip-on-element side='right' class="te-tooltip te-tooltip--large te-tooltip--cover" as |popover|}}
+                <div class="te-tooltip__header">
+                  <span class="te-tooltip__title">What do the options mean?</span>
                 </div>
-                <p>Similar anomalies should continue to be detected.</p>
-                <div>
-                  <span class="te-tooltip__title te-tooltip__title--small">False Alarm</span>
+                <div class="te-tooltip__body te-tooltip__body--large">
+                  <div>
+                    <span class="te-tooltip__title te-tooltip__title--small">Yes, its unexpected</span>
+                  </div>
+                  <p>Similar anomalies should continue to be detected.</p>
+                  <div>
+                    <span class="te-tooltip__title te-tooltip__title--small">Its an expected temporary change</span>
+                  </div>
+                  <p>Anomaly is caused by predictable events, such as holidays. Similar anomalies will continue to be detected.</p>
+                  <div>
+                    <span class="te-tooltip__title te-tooltip__title--small">Its an expected permanent change</span>
+                  </div>
+                  <p>Metric is experiencing a non-temporary change. Algorithm should adapt to new pattern.</p>
+                  <div>
+                    <span class="te-tooltip__title te-tooltip__title--small">No significant change observed</span>
+                  </div>
+                  <p>Similar anomalies should not be detected.</p>
+                  <div>
+                    <span class="te-tooltip__title">Why is this important?</span>
+                  </div>
+                  <p>This will help us improve detection performance and reduce false alarms.</p>
                 </div>
-                <p>Similar anomalies should not be detected.</p>
-                <div>
-                  <span class="te-tooltip__title te-tooltip__title--small">True but new trend</span>
-                </div>
-                <p>Anomaly is expected and metric is experiencing a non-temporary change. Similar anomalies should be ignored.</p>
-                <div>
-                  <span class="te-tooltip__title">Why is this important?</span>
-                </div>
-                <p>This will help us improve detection performance and reduce false alarms.</p>
-              </div>
-            {{/tooltip-on-element}}
-          </span>
-        </div>
-        {{#each options as |option|}}
-          <div class="col-xs-2 rootcause-anomaly__radio-button-item">
-            {{#radio-button value=option groupValue=status changed=(action "onFeedback")}}
-              <span class="te-radio__option">{{get optionsMapping option}}</span>
-            {{/radio-button}}
+              {{/tooltip-on-element}}
+            </span>
           </div>
-        {{/each}}
+          {{#each options as |option|}}
+            <div class="rootcause-anomaly__radio-button-item">
+              {{#radio-button value=option groupValue=status changed=(action "onFeedback")}}
+                <span class="te-radio__option">{{get optionsMapping option}}</span>
+              {{/radio-button}}
+            </div>
+          {{/each}}
+        </div>
       </div>
-    </div>
+    {{/unless}}
   </div>
 
 {{else}}

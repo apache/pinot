@@ -21,8 +21,17 @@
  */
 
 import Component from '@ember/component';
-import { reads } from '@ember/object/computed';
-import { computed, get, set, getProperties, setProperties } from '@ember/object';
+import {
+  get,
+  set,
+  computed,
+  getProperties,
+  setProperties
+} from '@ember/object';
+import {
+  reads,
+  equal
+} from '@ember/object/computed';
 
 export default Component.extend({
   tagName: 'main',
@@ -40,6 +49,7 @@ export default Component.extend({
   selectedErrorOption: reads('customTableSettings.oneSideError'),
   selectedIncludeDimensions: reads('customTableSettings.dimensions'),
   selectedExcludeDimensions: reads('customTableSettings.excludedDimensions'),
+  isDimensionOrderActive: equal('customTableSettings.orderType', 'manual'),
 
   // Mapping field keys to actual API queryparam keys
   fieldKeyMap: {
@@ -48,6 +58,12 @@ export default Component.extend({
     selectedDimensionLevel: 'depth',
     topContributors: 'summarySize',
     selectedErrorOption: 'oneSideError'
+  },
+
+  // Text for field tooltips
+  tooltips: {
+    maintain: 'Keep this order as dimension columns in analysis table',
+    oneSide: 'Set to true to display only results for which change direction is same as global change. For example, If the global change is negative, the algorithm will only show negative changes in the summary.'
   },
 
   /**
@@ -84,13 +100,24 @@ export default Component.extend({
      * @param {String} inputName - field name
      * @param {String} inputValue - field value
      */
-    onInput(inputName, inputValue,) {
+    onInput(inputName, inputValue) {
       const customTableSettings = get(this, 'customTableSettings');
       const apiKey = get(this, 'fieldKeyMap')[inputName];
       // Set shared custom settings object props
       set(this, `customTableSettings.${apiKey}`, inputValue);
       // Set triggered field value
       set(this, inputName, inputValue);
+    },
+
+    /**
+     * Switch request order type when 'preserve order' checkbox is changed
+     * @method onChangeMaintainOrder
+     */
+    onChangeMaintainOrder() {
+      // toggle the checkbox value (box checked)
+      set(this, 'isDimensionOrderActive', !get(this, 'isDimensionOrderActive'));
+      // set property value in settings object passed from parent
+      set(this, 'customTableSettings.orderType', get(this, 'isDimensionOrderActive') ? 'manual' : 'auto');
     }
   }
 });

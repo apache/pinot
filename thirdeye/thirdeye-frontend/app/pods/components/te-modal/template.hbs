@@ -33,13 +33,15 @@
         <div class="row te-modal__footer">
           {{footerText}}
 
-          <button {{action "onCancel"}} type="Cancel" class="te-button te-button--small te-button--muted btn">
-            {{cancelButtonText}}
-          </button>
+          {{#unless noButtons}}
+            <button {{action "onCancel"}} type="Cancel" class="te-button te-button--small te-button--muted btn">
+              {{cancelButtonText}}
+            </button>
 
-          <button {{action "onSubmit"}} type="submit" class="te-button te-button--small te-button--submit btn" disabled={{isInvalid}}>
-            {{submitButtonText}}
-          </button>
+            <button {{action "onSubmit"}} type="submit" class="te-button te-button--small te-button--submit btn" disabled={{isInvalid}}>
+              {{submitButtonText}}
+            </button>
+          {{/unless}}
 
         </div>
       {{/if}}

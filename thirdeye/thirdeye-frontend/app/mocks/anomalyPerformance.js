@@ -18,4 +18,4 @@ export const performanceData = (numAlerts) => {
 
 export default {
   performanceData
-}
+};

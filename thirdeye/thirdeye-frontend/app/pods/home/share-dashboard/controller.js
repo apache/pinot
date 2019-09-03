@@ -7,31 +7,83 @@
  */
 import Controller from '@ember/controller';
 import $ from 'jquery';
+import _ from 'lodash';
 import * as anomalyUtil from 'thirdeye-frontend/utils/anomaly';
 import { isBlank } from '@ember/utils';
 import { inject as service } from '@ember/service';
 import {
   get,
   set,
+  setProperties,
   computed
 } from '@ember/object';
+import { reads } from '@ember/object/computed';
+
+const CUSTOMIZE_OPTIONS = [{
+  id: 0,
+  label: 'Nothing',
+  value: 'Nothing',
+  selected: null
+}, {
+  id: 1,
+  label: 'WoW',
+  value: 'Wow',
+  selected: null
+}, {
+  id: 2,
+  label: 'Wo2W',
+  value: 'Wo2w',
+  selected: null
+}, {
+  id: 3,
+  label: 'Median4W',
+  value: 'Median4w',
+  selected: null
+}];
 
 export default Controller.extend({
   shareDashboardApiService: service('services/api/share-dashboard'),
-  anomalyResponseObj: anomalyUtil.anomalyResponseObj,
+  anomalyResponseFilterTypes: _.cloneDeep(anomalyUtil.anomalyResponseObj),
   showCopyTooltip: false,
   showSharedTooltip: false,
   shareUrl: null,
+  showDashboardSummary: reads('tree.firstObject.showDashboardSummary'),
+  showCustomizeEmailTemplate: reads('tree.firstObject.showCustomizeEmailTemplate'),
+  showWow: reads('tree.firstObject.showWow'),
+  showWo2w: reads('tree.firstObject.showWo2w'),
+  showMedian4w: reads('tree.firstObject.showMedian4w'),
+  options: reads('tree.firstObject.options'),
+  options_two: reads('tree.firstObject.options_two'),
+  colspanNum: reads('tree.firstObject.colspanNum'),
 
   init() {
     this._super(...arguments);
-    //Add one more option
-    get(this, 'anomalyResponseObj').push({
+    // Add ALL option to copy of global anomaly response object
+    const anomalyResponseFilterTypes = _.cloneDeep(anomalyUtil.anomalyResponseObj);
+    anomalyResponseFilterTypes.push({
       name: 'All Resolutions',
       value: 'ALL',
       status: 'All Resolutions'
     });
+    set(this, 'anomalyResponseFilterTypes', anomalyResponseFilterTypes);
   },
+
+  /**
+   * @summary Returns the config object for the custom share template header.
+   * @return {object} The object of metrics, with array of alerts and array anomalies
+   * @example
+
+   */
+  shareConfig: computed(
+    'shareTemplateConfig',
+    function() {
+      let shareTemplateConfig = get(this, 'shareTemplateConfig');
+      if(_.isEmpty(shareTemplateConfig)) {
+        shareTemplateConfig = false;
+      }
+      return shareTemplateConfig;
+    }
+  ),
 
   /**
    * @summary Returns the anomalies filtered from the filter options on the dashboard
@@ -52,6 +104,7 @@ export default Controller.extend({
 
       if (feedbackItem.value !== 'ALL' && !isBlank(anomalyMapping)) {
         let map = {};
+        let index = 1;
         // Iterate through each anomaly
         Object.keys(anomalyMapping).some(function(metric) {
           Object.keys(anomalyMapping[metric].items).some(function(alert) {
@@ -61,9 +114,12 @@ export default Controller.extend({
                 const metricId = get(item.anomaly, 'metricId');
                 const functionName = get(item.anomaly, 'functionName');
                 const functionId = get(item.anomaly, 'functionId');
+
                 if (!map[metricName]) {
-                  map[metricName] = { 'metricId': metricId, items: {} };
+                  map[metricName] = { 'metricId': metricId, items: {}, count: index };
+                  index++;
                 }
+
                 if(!map[metricName].items[functionName]) {
                   map[metricName].items[functionName] = { 'functionId': functionId, items: [] };
                 }
@@ -89,12 +145,13 @@ export default Controller.extend({
       let count = 0;
 
       Object.keys(filteredAnomalyMapping).some(function(metric) {//key = metric
-        Object.keys(filteredAnomalyMapping[metric].items).some(function(alert) {//item = alert
-          filteredAnomalyMapping[metric].items[alert].items.forEach(anomaly => {//each anomaly
-            count++;
+        if (filteredAnomalyMapping[metric] && filteredAnomalyMapping[metric].items) {
+          Object.keys(filteredAnomalyMapping[metric].items).some(function(alert) {//item = alert
+            count += filteredAnomalyMapping[metric].items[alert].items.length;
           });
-        });
+        }
       });
+
       return count;
     }
   ),
@@ -115,13 +172,13 @@ export default Controller.extend({
             if (typeof metric === 'string') {
               const metricId = filteredAnomalyMapping[metric].metricId;
               const functionId = filteredAnomalyMapping[metric].items[alert].functionId;
-              filteredAnomalyMapping[metric].items[alert].viewTreeNode = viewTreeFirstChild.find(metric => metric.id === metricId).children.find(alert => alert.id === functionId);
+              set(filteredAnomalyMapping[metric].items[alert], 'viewTreeNode', viewTreeFirstChild.find(metric => metric.id === metricId).children.find(alert => alert.id === functionId));
             }
           });
           // Keeping a reference to this new tree node for this metric in filteredAnomalyMapping
           if (typeof metric === 'string') {
             const metricId = filteredAnomalyMapping[metric].metricId;
-            filteredAnomalyMapping[metric].viewTreeNode = viewTreeFirstChild.find(metric => metric.id === metricId);
+            set(filteredAnomalyMapping[metric], 'viewTreeNode', viewTreeFirstChild.find(metric => metric.id === metricId));
           }
         });
         return viewTree;
@@ -129,51 +186,61 @@ export default Controller.extend({
 
       viewTree = [{
         id: 0,
-        name: 'Show only selected metrics/alerts',
+        name: 'Customize metrics/alerts',
         type: 'root',
-        isExpanded: true,
+        isExpanded: false,
         isSelected: false,
         isVisible: true,
         isChecked: true,
         comment: null,
-        children: []
+        children: [],
+        showWow: false,
+        showWo2w: false,
+        showMedian4w: false,
+        showDashboardSummary: false,
+        showCustomizeEmailTemplate: false,
+        options: [ ...CUSTOMIZE_OPTIONS],
+        options_two: [ ...CUSTOMIZE_OPTIONS],
+        colspan: 4
       }];
 
       viewTreeFirstChild = viewTree.get('firstObject').children;
       Object.keys(filteredAnomalyMapping).some((metric, index) => {
         let tempChildren = [];
-        Object.keys(filteredAnomalyMapping[metric].items).some((alert, index) => {
-          tempChildren.push({
-            id: filteredAnomalyMapping[metric].items[alert].functionId,
-            name: alert,
-            type: 'alert',
+        if (filteredAnomalyMapping[metric] && filteredAnomalyMapping[metric].items) {
+          Object.keys(filteredAnomalyMapping[metric].items).some((alert, index) => {
+            tempChildren.push({
+              id: filteredAnomalyMapping[metric].items[alert].functionId,
+              name: alert,
+              type: 'alert',
+              isExpanded: true,
+              isSelected: false,
+              isVisible: true,
+              isChecked: true,
+              isComment: false,
+              comment: null,
+              children: []
+            });
+            // Keeping a reference to this new tree node for this alert in filteredAnomalyMapping
+            set(filteredAnomalyMapping[metric].items[alert], 'viewTreeNode', tempChildren[index]);
+          });
+
+          //add each metric to tree selection
+          viewTreeFirstChild.push({
+            id: filteredAnomalyMapping[metric].metricId,
+            name: metric,
+            type: 'metric',
             isExpanded: true,
             isSelected: false,
             isVisible: true,
             isChecked: true,
-            isComment: false,
+            isComment: true,
             comment: null,
-            children: []
+            children: tempChildren
           });
-          // Keeping a reference to this new tree node for this alert in filteredAnomalyMapping
-          filteredAnomalyMapping[metric].items[alert].viewTreeNode = tempChildren[index];
-        });
-
-        //add each metric to tree selection
-        viewTreeFirstChild.push({
-          id: filteredAnomalyMapping[metric].metricId,
-          name: metric,
-          type: 'metric',
-          isExpanded: true,
-          isSelected: false,
-          isVisible: true,
-          isChecked: true,
-          isComment: true,
-          comment: null,
-          children: tempChildren
-        });
-        // Keeping a reference to this new tree node for this metric in filteredAnomalyMapping
-        filteredAnomalyMapping[metric].viewTreeNode = viewTreeFirstChild[index];
+          // Keeping a reference to this new tree node for this metric in filteredAnomalyMapping
+          set(filteredAnomalyMapping[metric], 'viewTreeNode', viewTreeFirstChild[index]);
+        }
       });
 
       //save the new tree view values
@@ -193,7 +260,7 @@ export default Controller.extend({
    * @return {string}
    */
   _checkFeedback: function(selected) {
-    return get(this, 'anomalyResponseObj').find((type) => {
+    return get(this, 'anomalyResponseFilterTypes').find((type) => {
       return type.name === selected;
     });
   },
@@ -228,11 +295,119 @@ export default Controller.extend({
     return text;
   },
 
+
+  /**
+   * Helper for toggling show properties in tree.firstObject
+   * @param {string} property - showWow, showWo2w, showMedian4w, showDashboardSummary, or showCustomizeEmailTemplate
+   * @return {none} - this helper is just a setter
+   */
+  _toggleTreeProperty(property) {
+    let currentState = get(this, 'tree.firstObject');
+    set(currentState, property, !currentState[property]);
+  },
+
+  /**
+   * Helper for setting selected in email selectors
+   * @param {string} selectedBaseline - Wow, Wo2w, Median4w
+   * @param {Array} choices - [{}, {}, ...]
+   * @return {none} - this helper is just a setter
+   */
+  _selectOption(choices, selectedBaseline) {
+    const newChoices = [];
+    choices.forEach(choice => {
+      const newObj = { ...choice};
+      if (newObj.value === selectedBaseline) {
+        newObj.selected = 'selected';
+      } else {
+        newObj.selected = null;
+      }
+      newChoices.push(newObj);
+    });
+    return newChoices;
+  },
+
+  _customizeEmailHelper(option, type) {
+    //reset both selects' options
+    set(this, 'tree.firstObject.options', [ ...CUSTOMIZE_OPTIONS]);
+    set(this, 'tree.firstObject.options_two', [ ...CUSTOMIZE_OPTIONS]);
+    //hide all except if the sibling's value and not `nothing`
+    let currentState = get(this, 'tree.firstObject');
+    setProperties(currentState, {
+      'showWow': false,
+      'showWo2w': false,
+      'showMedian4w': false
+    });
+
+    //Show sibling
+    const customizeEmail1 = document.getElementById('customizeEmail1').value;
+    const customizeEmail2 = document.getElementById('customizeEmail2').value;
+
+    const siblingValue = type === 'one' ? customizeEmail2 : customizeEmail1;
+    this._toggleTreeProperty(`show${siblingValue}`);
+
+    //Calculates colspan Number
+    const showCustomizeEmailTemplate = get(this, 'showCustomizeEmailTemplate');
+    if(showCustomizeEmailTemplate && (customizeEmail1 === 'Nothing' || customizeEmail2 === 'Nothing')) {
+      set(this, 'tree.firstObject.colspanNum', 5);
+    } else if (showCustomizeEmailTemplate) {
+      set(this, 'tree.firstObject.colspanNum', 6);
+    } else {
+      set(this, 'tree.firstObject.colspanNum', 4);
+    }
+
+    let limitedSelfOptions = this._selectOption([ ...CUSTOMIZE_OPTIONS], option);
+    let limitedSiblingOptions = this._selectOption([ ...CUSTOMIZE_OPTIONS], siblingValue);
+
+    //limited sibling list to selected choice
+    limitedSiblingOptions = limitedSiblingOptions.filter(function(item){
+      return item.value !== option;
+    });
+    //limited current list to sibling's existing selected
+    limitedSelfOptions = limitedSelfOptions.filter(function(item){
+      return item.value !== siblingValue;
+    });
+
+    switch(option) {
+      case 'Nothing':
+        //hide accordingly
+        break;
+      case 'Wow':
+        //show wow column and it's sibling
+        this._toggleTreeProperty('showWow');
+        break;
+      case 'Wo2w':
+        //show wo2w column and it's sibling
+        this._toggleTreeProperty('showWo2w');
+        break;
+      case 'Median4w':
+        //show median4w column and it's sibling
+        this._toggleTreeProperty('showMedian4w');
+        break;
+    }
+
+    if (type === 'one') {
+      set(this, 'tree.firstObject.options_two', limitedSiblingOptions);
+      set(this, 'tree.firstObject.options', limitedSelfOptions);
+    } else {
+      set(this, 'tree.firstObject.options', limitedSiblingOptions);
+      set(this, 'tree.firstObject.options_two', limitedSelfOptions);
+    }
+  },
+
   actions: {
+    onCustomizeEmail1(option) {
+      this._customizeEmailHelper(option, 'one');
+    },
+
+    onCustomizeEmail2(option) {
+      this._customizeEmailHelper(option, 'two');
+    },
+
     /**
      * Created a PDF to save
      */
-    createPDF(){
+    createPDF() {
+      $('.share-dashboard-container__preview-container-body').css({backgroundColor: '#EDF0F3'});
       html2canvas($('.share-dashboard-container__preview-container-body'), {
         onrendered: (canvas) => {
           const imgData = canvas.toDataURL('image/jpeg', 1.0);
@@ -245,6 +420,7 @@ export default Controller.extend({
           }
           doc.addImage(imgData, 'PNG', 10, 10);
           doc.save(`shared_summary.pdf`);
+          $('.share-dashboard-container__preview-container-body').css({backgroundColor: 'transparent'});
         }
       });
     },
@@ -276,7 +452,6 @@ export default Controller.extend({
     updateComment(id) {
       const userComment = document.getElementById(id).value;
       if (id === 'dashboard_summary') {
-        //document.getElementById(`dashboardId_dashboard_summary`).innerHTML = userComment;
         //update the tree with latest comment
         let res = get(this, 'tree.firstObject');
         set(res, 'comment', userComment);
@@ -285,7 +460,6 @@ export default Controller.extend({
         let res = get(this, 'tree.firstObject.children').filter(metric => metric.id === id);
         set(res, 'firstObject.comment', userComment);
       }
-
     },
 
     /**
@@ -306,6 +480,12 @@ export default Controller.extend({
           get(res, 'firstObject').display = element.style.display;
         }
       }
+
+      if (id === 'dashboard_summary') {
+        this._toggleTreeProperty('showDashboardSummary');
+      } else if (id === 'customize_email') {
+        this._toggleTreeProperty('showCustomizeEmailTemplate');
+      }
     },
 
     /**
@@ -317,9 +497,12 @@ export default Controller.extend({
       const shareResponse = get(this, 'shareDashboardApiService').saveShareDashboard(treeView);
       const hashKey = get(this, 'shareDashboardApiService').getHashKey();
       //ADD to helper method
-      let currentUrl = `/app/#/home/share-dashboard?`;
+      let currentUrl = `${window.location.origin}/app/#/home/share-dashboard?`;
       if(get(this, 'model.appName')){
         currentUrl = currentUrl.concat(`appName=${get(this, 'model.appName')}`);
+      }
+      if(get(this, 'model.subGroup')){
+        currentUrl = currentUrl.concat(`subGroup=${get(this, 'model.subGroup')}`);
       }
       if(get(this, 'model.startDate')){
         currentUrl = currentUrl.concat(`&startDate=${get(this, 'model.startDate')}`);
@@ -338,8 +521,8 @@ export default Controller.extend({
         set(this, 'showSharedTooltip', true);
         set(this, 'shareUrl', currentUrl);
         //update the route's params
-        const { appName, duration, startDate, endDate } = get(this, 'model');
-        this.transitionToRoute({ queryParams: { appName, duration, startDate, endDate, shareId: hashKey }});
+        const { appName, subGroup, duration, startDate, endDate } = get(this, 'model');
+        this.transitionToRoute({ queryParams: { appName, subGroup, duration, startDate, endDate, shareId: hashKey }});
       });
       //has to be here to tie user event with the copy action (vs in the promise return above)
       this._copyFromDummyInput(currentUrl);

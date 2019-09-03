@@ -45,12 +45,16 @@
   }
 
   &__application-header {
-    display: flex;
-    justify-content: space-between;
+    display: inline-flex;
     align-items: baseline;
+    width: 100%;
+    position: relative;
 
     &-dropdown {
-      width: 200px;
+      width: 225px;
+      position: absolute;
+      right: 0px;
+      top: 20px;
     }
   }
 
@@ -60,6 +64,21 @@
     .te-anomaly-table__select {
       display: inline-flex;
     }
+  }
+
+  &__alert-selector {
+    margin: 0 0 10px 10px;
+    max-width: 800px;
+  }
+
+  &__icon {
+    font-size: 16px;
+    margin-right: 5px;
+  }
+
+  &__go-link {
+    line-height: 26px;
+    margin: 1px 0 0 10px;
   }
 
   &__redirect-link{
@@ -83,6 +102,14 @@
         &--large-width {
           width: 280px;
         }
+    }
+
+    &__text {
+      margin-bottom: 0px;
+
+      &--stronger {
+        font-weight: bold;
+      }
     }
   }
 

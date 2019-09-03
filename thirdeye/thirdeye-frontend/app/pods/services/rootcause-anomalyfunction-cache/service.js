@@ -1,12 +1,7 @@
 import Service from '@ember/service';
-import {
-  toFilters,
-  toFilterMap
-} from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
-import moment from 'moment';
 
 export default Service.extend({
   timeseries: null, // {}
@@ -29,7 +24,7 @@ export default Service.extend({
   request(requestContext, urns) {
     const { context, timeseries, pending } = this.getProperties('context', 'timeseries', 'pending');
 
-    const metrics = [...urns].filter(urn => urn.startsWith('frontend:anomalyfunction:'));
+    const metrics = [...urns].filter(urn => urn.startsWith('thirdeye:event:anomaly'));
 
     // TODO eviction on cache size limit
 
@@ -78,8 +73,8 @@ export default Service.extend({
   },
 
   _extractTimeseries(json, urn) {
-    const timestamp = json['timeBuckets'].map(bucket => parseInt(bucket['baselineStart'], 10));
-    const value = json['baselineValues'].map(parseFloat);
+    const timestamp = json['timestamp'].map(bucket => parseInt(bucket, 10));
+    const value = json['value'].map(parseFloat);
 
     const timeseries = {};
     timeseries[urn] = {
@@ -91,12 +86,12 @@ export default Service.extend({
   },
 
   _fetchSlice(urn, context) {
-    const functionId = urn.split(':')[2];
-    const startDateTime = moment(context.analysisRange[0]).utc().format();
-    const endDateTime = moment(context.analysisRange[1]).utc().format();
-    const dimensionJsonString = encodeURIComponent(JSON.stringify(this._toFilterMapCustom(toFilters(urn))));
+    const functionId = urn.split(':')[3];
+    const startDateTime = context.analysisRange[0];
+    const endDateTime = context.analysisRange[1];
 
-    const url = `/dashboard/anomaly-function/${functionId}/baseline?start=${startDateTime}&end=${endDateTime}&dimension=${dimensionJsonString}&mode=offline`;
+    const url = `/detection/predicted-baseline/${functionId}?start=${startDateTime}&end=${endDateTime}`;
+
     return fetch(url)
       .then(checkStatus)
       .then(res => this._extractTimeseries(res, urn))
@@ -104,7 +99,7 @@ export default Service.extend({
       .catch(error => this._handleError(urn, error));
   },
 
-  _handleError(urn, error) {
+  _handleError(urn) {
     const { errors, pending } = this.getProperties('errors', 'pending');
 
     const newError = urn;
@@ -119,7 +114,7 @@ export default Service.extend({
   _toFilterMapCustom(filters) {
     const filterMap = {};
     [...filters].forEach(tup => {
-      const [key, value] = tup;
+      const [key, op, value] = tup;
       filterMap[key] = value;
     });
     return filterMap;

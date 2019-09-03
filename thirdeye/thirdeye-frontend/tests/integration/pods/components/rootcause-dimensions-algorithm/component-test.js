@@ -8,7 +8,7 @@ module('Integration | Component | rootcause-dimensions-algorithm', function(hook
 
   test('it renders', async function(assert) {
     this.setProperties({
-      metricUrn: 'dataset1:metric1:12345',
+      metricUrn: 'thirdeye:metric:12345:is_restricted%3Dfalse',
       entities: {
         'thirdeye:metric:12345': {
           label: 'dataset1::metric1'

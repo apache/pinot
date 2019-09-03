@@ -3,15 +3,16 @@ import { assert } from '@ember/debug';
 import { isPresent } from "@ember/utils";
 
 export default Service.extend({
-  durationTypes: {
-    duration: 'string',
-    startDate: 'number',
-    endDate: 'number'
-  },
+  durationTypes: null,
 
   init() {
     this._super(...arguments);
     this.set('durationObj', {});
+    this.set('durationTypes', {
+      duration: 'string',
+      startDate: 'number',
+      endDate: 'number'
+    });
   },
 
   /**

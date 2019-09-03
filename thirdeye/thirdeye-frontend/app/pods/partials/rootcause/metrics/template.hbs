@@ -3,6 +3,16 @@
     {{ember-spinner}}
   </div>
 {{/if}}
+
+{{#if isLoadingMetricData}}
+  <div class="row">
+    <div class="col-xs-12 rootcause-metric__spinner-text">
+      Loading additional metric data ({{metricsPendingCount}})
+      {{ember-spinner scale=0.5}}
+    </div>
+  </div>
+{{/if}}
+
 <div class="pull-right">
   <a {{action "onEntityMappingClick"}} class="thirdeye-link thirdeye-link--settings">
     + add related metrics

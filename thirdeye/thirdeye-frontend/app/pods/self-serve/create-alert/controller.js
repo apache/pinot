@@ -4,13 +4,12 @@
  * @exports create
  */
 import { reads } from '@ember/object/computed';
-
+import { inject as service } from '@ember/service';
 import RSVP from "rsvp";
-import _ from 'lodash';
 import fetch from 'fetch';
 import moment from 'moment';
 import Controller from '@ember/controller';
-import { computed, set, getWithDefault } from '@ember/object';
+import { computed, set, get, getWithDefault } from '@ember/object';
 import { task, timeout } from 'ember-concurrency';
 import {
   isPresent,
@@ -19,10 +18,10 @@ import {
   isBlank
 } from "@ember/utils";
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import {toastOptions} from 'thirdeye-frontend/utils/constants';
 import {
   selfServeApiGraph,
-  selfServeApiCommon,
-  selfServeApiOnboard
+  selfServeApiCommon
 } from 'thirdeye-frontend/utils/api/self-serve';
 import {
   buildMetricDataUrl,
@@ -32,6 +31,7 @@ import {
 import config from 'thirdeye-frontend/config/environment';
 
 export default Controller.extend({
+  notifications: service('toast'),
 
   /**
    * Initialized alert creation page settings
@@ -62,7 +62,15 @@ export default Controller.extend({
   dimensionCount: 7,
   availableDimensions: 0,
   metricLookupCache: [],
+  filtersCache: {},
+  dimensionsCache: [],
+  noResultsArray: [{
+    value: 'abcdefghijklmnopqrstuvwxyz0123456789',
+    caption: 'No Results',
+    snippet: ''
+  }],
   metricHelpMailto: `mailto:${config.email}?subject=Metric Onboarding Request (non-additive UMP or derived)`,
+  helpDocLink: config.docs ? config.docs.createAlert : null,
 
   /**
    * Component property initial settings
@@ -71,6 +79,14 @@ export default Controller.extend({
   graphConfig: {},
   selectedFilters: JSON.stringify({}),
   selectedWeeklyEffect: true,
+  isForm: false,
+  toggleCollapsed: true,              // flag for the accordion that hides/shows preview
+  detectionYaml: null,                // The YAML for the anomaly detection
+  subscriptionYaml:  null,            // The YAML for the subscription group
+  alertDataIsCurrent: true,
+  disableYamlSave: true,
+
+
 
   /**
    * Object to cover basic ield 'presence' validation
@@ -188,12 +204,17 @@ export default Controller.extend({
   /**
    * Application name field options loaded from our model.
    */
-  allApplicationNames: reads('model.allAppNames'),
+  allApplicationNames: reads('model.applications'),
 
   /**
    * The list of all existing alert configuration groups.
    */
-  allAlertsConfigGroups: reads('model.allConfigGroups'),
+  allAlertsConfigGroups: reads('model.subscriptionGroups'),
+
+  /**
+   * The debug flag
+   */
+  debug: reads('model.debug'),
 
   /**
    * Handler for search by function name - using ember concurrency (task)
@@ -204,7 +225,7 @@ export default Controller.extend({
   searchMetricsList: task(function* (metric) {
     yield timeout(600);
     const autoCompleteResults = yield fetch(selfServeApiCommon.metricAutoComplete(metric)).then(checkStatus);
-    this.get('metricLookupCache').push( ...autoCompleteResults );
+    this.get('metricLookupCache').push(...autoCompleteResults);
     return autoCompleteResults;
   }),
 
@@ -281,7 +302,7 @@ export default Controller.extend({
     } = this.getProperties('maxTime', 'selectedFilters', 'selectedDimension', 'selectedGranularity', 'selectedMetricOption');
 
     // Use key properties to derive the metric data url
-    const metricUrl = buildMetricDataUrl({ maxTime, filters, dimension, granularity, id: metric.id });
+    const metricUrl = buildMetricDataUrl({ maxTime, filters, dimension: 'All', granularity, id: metric.id }); // NOTE: avoid dimension explosion - dimension
 
     // Fetch new graph metric data
     // TODO: const metricData = await fetch(metricUrl).then(checkStatus)
@@ -290,7 +311,7 @@ export default Controller.extend({
         const isDataGood = this.isMetricGraphable(metricData);
         this.setProperties({
           metricId: metric.id,
-          isMetricSelected: isDataGood,
+          isMetricSelected: true,
           isMetricDataLoading: false,
           isSecondaryDataLoading: false,
           showGraphLegend: true,
@@ -399,6 +420,8 @@ export default Controller.extend({
     }
   ),
 
+
+
   /**
    * Enables the submit button when all required fields are filled
    * @method isSubmitDisabled
@@ -444,7 +467,7 @@ export default Controller.extend({
         'alertGroupNewRecipient',
         'selectedConfigGroup'
       );
-      const hasRecipients = _.has(groupRecipients, 'recipients');
+      const existingRecipients = groupRecipients ? getWithDefault(groupRecipients, 'receiverAddresses.to', []) : [];
       // Any missing required field values?
       for (var field of requiredFields) {
         if (isBlank(this.get(field))) {
@@ -460,7 +483,7 @@ export default Controller.extend({
         isDisabled = true;
       }
       // For alert group email recipients, require presence only if group recipients is empty
-      if (isBlank(alertGroupNewRecipient) && !hasRecipients) {
+      if (isBlank(alertGroupNewRecipient) && !existingRecipients.length) {
         isDisabled = true;
       }
       // Disable after submit clicked
@@ -500,7 +523,7 @@ export default Controller.extend({
     let isEmailPresent = true;
 
     if (this.get('selectedConfigGroup') || this.get('newConfigGroupName')) {
-      isEmailPresent = isPresent(this.get('selectedGroupRecipients')) || isPresent(emailArr);
+      isEmailPresent = isPresent(this.get('selectedGroupToRecipients')) || isPresent(emailArr);
     }
 
     return isEmailPresent;
@@ -588,7 +611,7 @@ export default Controller.extend({
    * @method generalFieldsEnabled
    * @return {Boolean}
    */
-  generalFieldsEnabled: computed.or('isMetricSelected','isMetricDataInvalid'),
+  generalFieldsEnabled: computed.or('isMetricSelected', 'isMetricDataInvalid'),
 
   /**
    * Preps a mailto link containing the currently selected metric name
@@ -736,7 +759,9 @@ export default Controller.extend({
       selectedConfigGroup: null,
       newConfigGroupName: null,
       alertGroupNewRecipient: null,
-      selectedGroupRecipients: null,
+      selectedGroupToRecipients: null,
+      selectedGroupBccRecipients: null,
+      selectedGroupCcRecipients: null,
       isProcessingForm: false,
       isCreateGroupSuccess: false,
       isGroupNameDuplicate: false,
@@ -752,6 +777,17 @@ export default Controller.extend({
    * Actions for create alert form view
    */
   actions: {
+    changeAccordion() {
+      set(this, 'toggleCollapsed', !get(this, 'toggleCollapsed'));
+    },
+
+    /**
+     * Clears YAML content, disables 'save changes' button, and moves to form
+     */
+    cancelAlertYaml() {
+      set(this, 'isForm', true);
+      set(this, 'currentMetric', null);
+    },
 
     /**
      * When a metric is selected, fetch its props, and send them to the graph builder
@@ -903,12 +939,16 @@ export default Controller.extend({
      * @return {undefined}
      */
     onSelectConfigGroup(selectedObj) {
-      const emails = selectedObj.recipients || '';
+      const toAddr = ((selectedObj.receiverAddresses || []).to || []).join(", ");
+      const ccAddr = ((selectedObj.receiverAddresses || []).cc || []).join(", ");
+      const bccAddr = ((selectedObj.receiverAddresses || []).bcc || []).join(", ");
       this.setProperties({
         selectedConfigGroup: selectedObj,
         newConfigGroupName: null,
-        isEmptyEmail: isEmpty(emails),
-        selectedGroupRecipients: emails.split(',').filter(e => String(e).trim()).join(', ')
+        isEmptyEmail: isEmpty(toAddr),
+        selectedGroupToRecipients: toAddr,
+        selectedGroupCcRecipients: ccAddr,
+        selectedGroupBccRecipients: bccAddr
       });
       this.prepareFunctions(selectedObj).then(functionData => {
         this.set('selectedGroupFunctions', functionData);
@@ -958,7 +998,9 @@ export default Controller.extend({
       this.setProperties({
         newConfigGroupName: name,
         selectedConfigGroup: null,
-        selectedGroupRecipients: null,
+        selectedGroupToRecipients: null,
+        selectedGroupCcRecipients: null,
+        selectedGroupBccRecipients: null,
         isEmptyEmail: isEmpty(this.get('alertGroupNewRecipient'))
       });
     },
@@ -971,7 +1013,7 @@ export default Controller.extend({
      */
     validateAlertEmail(emailInput) {
       const newEmailArr = emailInput.replace(/\s+/g, '').split(',');
-      let existingEmailArr = this.get('selectedGroupRecipients');
+      let existingEmailArr = this.get('selectedGroupToRecipients');
       let cleanEmailArr = [];
       let badEmailArr = [];
       let isDuplicateEmail = false;
@@ -997,7 +1039,7 @@ export default Controller.extend({
         }
         this.setProperties({
           isDuplicateEmail,
-          duplicateEmails: badEmailArr.join()
+          duplicateEmails: badEmailArr.join(", ")
         });
       }
     },
@@ -1009,6 +1051,76 @@ export default Controller.extend({
      */
     onResetForm() {
       this.clearAll();
+    },
+
+    /**
+     * update the detection yaml string
+     * @method updateDetectionYaml
+     * @return {undefined}
+     */
+    updateDetectionYaml(updatedYaml) {
+      this.setProperties({
+        detectionYaml: updatedYaml,
+        alertDataIsCurrent: false,
+        disableYamlSave: false
+      });
+    },
+
+    /**
+     * update the subscription yaml string
+     * @method updateSubscriptionYaml
+     * @return {undefined}
+     */
+    updateSubscriptionYaml(updatedYaml) {
+      set(this, 'subscriptionYaml', updatedYaml);
+    },
+
+    /**
+     * update the subscription group object for dropdown
+     * @method updateSubscriptionGroup
+     * @return {undefined}
+     */
+    changeSubscriptionGroup(group) {
+      this.setProperties({
+        subscriptionYaml: group.yaml,
+        groupName: group
+      });
+    },
+
+    /**
+     * Fired by create button in YAML UI
+     * Grabs YAML content and sends it
+     */
+    createAlertYamlAction() {
+      const content = {
+        detection: get(this, 'detectionYaml'),
+        subscription: get(this, 'subscriptionYaml')
+      };
+      const url = '/yaml/create-alert';
+      const postProps = {
+        method: 'post',
+        body: JSON.stringify(content),
+        headers: { 'content-type': 'application/json' }
+      };
+      const notifications = get(this, 'notifications');
+
+      fetch(url, postProps).then((res) => {
+        res.json().then((result) => {
+          if(result){
+            if (result.detectionMsg) {
+              set(this, 'detectionMsg', result.detectionMsg);
+            }
+            if (result.subscriptionMsg) {
+              set(this, 'subscriptionMsg', result.subscriptionMsg);
+            }
+            if (result.detectionAlertConfigId && result.detectionConfigId) {
+              notifications.success('Created alert successfully.', 'Created', toastOptions);
+            }
+          }
+        });
+      }).catch((error) => {
+        notifications.error('Create alert failed.', error, toastOptions);
+      });
     },
 
     /**

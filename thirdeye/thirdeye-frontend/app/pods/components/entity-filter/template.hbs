@@ -1,28 +1,71 @@
-<div class="entity-filter">
+<header class="entity-filter__head">
+  <div class="manage-alert-container__title">{{title}}
+    {{#if canClear}}
+    <a href="#" {{action "clearFilters"}} >
+      <span class="pull-right">Clear All</span>
+    </a>
+    {{/if}}
+  </div>
+</header>
 
-  <header class="entity-filter__head">
-    <h3 class="entity-filter__title">{{title}}</h3>
-  </header>
+{{#each filterBlocks as |block|}}
+  <section class="entity-filter__group entity-filter__group--{{block.type}}">
+    {{#if (not block.preventCollapse)}}
+      <a class="entity-filter__group-toggle" {{action "toggleDisplay" block}}>
+        <div class="entity-filter__group-title">
+          {{block.title}}
+          <i class="glyphicon entity-filter__group-icon {{if block.isHidden "glyphicon-menu-down" "glyphicon-menu-up"}}"></i>
+        </div>
+      </a>
+    {{/if}}
 
- {{#each filterBlocks as |block|}}
-    <section class="entity-filter__group">
-      <h5 class="entity-filter__group-title">{{block.name}}
-        <a class="entity-filter__group-toggle" {{action "toggleDisplay" block}}>
-          <i class="glyphicon {{if block.isHidden "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
-        </a>
-      </h5>
-      <ul class="entity-filter__group-list {{if block.isHidden "entity-filter__group-list--hidden"}}">
+    <ul class="entity-filter__group-list entity-filter__group-list--{{block.type}} {{if block.isHidden "entity-filter__group-list--hidden"}}">
+      {{#if (or (eq block.type "radio") (eq block.type "checkbox"))}}
         {{#each block.filtersArray as |filter|}}
           <li class="entity-filter__group-filter">
-            {{input
-              type="checkbox"
-              isActive=filter.isActive
-              change=(action "onFilterSelection" block.name filter)
-              id=filter.id }}
-            <label class="entity-filter__group-label {{if (gt filter.name.length maxStrLen) 'entity-filter__group-label--truncated'}}" for="{{filter.id}}" title={{filter.id}}> {{filter.name}} </label>
+            {{#if (eq block.type "radio")}}
+              {{#radio-button value=filter.name groupValue=block.selected changed=(action "onFilterSelection" block filter)}}
+                <span class="entity-filter__group-label">{{filter.name}}</span>
+              {{/radio-button}}
+            {{/if}}
+            {{#if (eq block.type "checkbox")}}
+              {{input
+                type="checkbox"
+                checked=filter.isActive
+                disabled=selectDisabled
+                change=(action "onFilterSelection" block filter)
+              }}
+               <label class="entity-filter__group-label {{if (gt filter.name.length maxStrLen) 'entity-filter__group-label--truncated'}}" title={{filter.id}}> {{filter.name}} </label>
+            {{/if}}
+         </li>
+        {{/each}}
+      {{/if}}
+
+      {{#if (eq block.type "link")}}
+        {{#each block.filtersArray as |filter|}}
+          <li class="entity-filter__group-filter entity-filter__group-filter--link {{if filter.isActive 'entity-filter__group-filter--selected'}}" {{action "onFilterSelection" block filter.name}}>
+            {{filter.name}} <span>({{filter.total}})</span>
           </li>
         {{/each}}
-      </ul>
-    </section>
-  {{/each}}
-</div>
+      {{/if}}
+
+      {{#if (eq block.type "select")}}
+        {{#power-select-multiple
+          selected=(get multiSelectKeys block.tag)
+          options=block.filterKeys
+          searchEnabled=true
+          matchTriggerWidth=block.matchWidth
+          onchange=(action "onFilterSelection" block)
+          placeholder=(concat " Select " block.title)
+          triggerId=(concat "entity-filter-by" block.tag)
+          triggerClass="te-form__select filter-select"
+          verticalPosition="below"
+          disabled=selectDisabled
+          as |option|
+        }}
+          {{option}}
+        {{/power-select-multiple}}
+      {{/if}}
+    </ul>
+  </section>
+{{/each}}

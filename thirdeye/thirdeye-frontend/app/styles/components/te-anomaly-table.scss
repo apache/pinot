@@ -1,11 +1,12 @@
 .te-anomaly-table {
   width: 100%;
   margin-top: 12px;
+  background-color: white;
   border: 1px solid app-shade(black, 1);
 
   &__comment {
-    word-wrap: break-word;
-    width: 220px;
+    margin-left: 10px;
+    float: left;
   }
 
   &__wrapper {
@@ -14,7 +15,12 @@
   }
 
   &__text {
-    margin-right: 30px;
+    margin: 10px 10px 0 30px;
+
+    &--explore {
+      float: left;
+      margin-left: 0;
+    }
   }
 
   &__head {
@@ -22,13 +28,20 @@
   }
 
   &__cell {
-    padding: 5px 20px;
+    padding: 5px 15px;
     font-size: 15px;
     font-weight: 500;
     color: app-shade(black, 8);
     position: relative;
 
-    &:last-child {
+    &--index {
+      font-size: 14px;
+      padding: 7px 0 0 11px;
+      vertical-align: top;
+      color: app-shade(black, 4);
+    }
+
+    &--feedback {
       max-width: 90px;
       text-align: center;
       padding: 4px 0 0 0;
@@ -40,11 +53,15 @@
     font-size: 15px;
     font-weight: bold;
     color: app-shade(black, 6);
-    padding-left: 20px;
+    padding-left: 15px;
     line-height: 45px;
 
     &--fixed {
       width: 215px;
+    }
+
+    &--left {
+      padding-left: 10px;
     }
   }
 
@@ -66,27 +83,30 @@
 
   &__list {
     list-style: none;
-    margin-left: -39px;
+    margin-left: -37px;
     margin-bottom: 0;
     max-width: 280px;
+
+    &--left {
+      margin-left: -45px;
+    }
   }
 
   &__list-item {
+    font-size: 13px;
+
     &--smaller {
-      font-size: 12px;
       margin-left: -2px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     &--lighter {
-      font-size: 12px;
       color: app-shade(black, 6);
     }
 
     &--warning {
       color: $te-red;
-      font-size: 13px;
     }
 
     &--shadow {
@@ -97,7 +117,7 @@
   }
 
   &__list-value {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     margin-left: 5px;
   }
@@ -112,11 +132,15 @@
     &--down {
       color: $te-red;
     }
+
+    &--dash {
+      line-height: 5px;
+    }
   }
 
   &__select {
     display: inline-block;
-    width: 180px;
+    width: 200px;
 
     &--margin-right {
       margin-right: 30px;
@@ -140,6 +164,26 @@
     font-weight: 600;
     letter-spacing: .03em;
     font-size: 15px;
+
+    &--glyph {
+      margin-left: 10px;
+      color: rgba(0, 0, 0, .3);
+      font-size: 17px;
+      display: inline-block;
+
+      &:hover {
+        color: #78b12f;
+      }
+    }
+  }
+
+  &__tooltip {
+    font-weight: normal;
+  }
+
+  &__icon-wrapper {
+    width: 20px;
+    height: 30px;
   }
 
   &__icon {
@@ -147,17 +191,13 @@
     margin-left: 5px;
 
     &--status {
-      -webkit-animation: fadeinout 4s linear forwards;
-      animation: fadeinout 4s linear forwards;
       position: absolute;
-      font-size: 20px;
       margin: 14px 0 0 -26px;
+      @extend %te-icon-animation;
     }
 
     &--status-no-margin {
-      -webkit-animation: fadeinout 4s linear forwards;
-      animation: fadeinout 4s linear forwards;
-      font-size: 20px;
+      @extend %te-icon-animation;
     }
 
     &--hidden {
@@ -168,6 +208,10 @@
     &--small {
       font-size: 11px;
       margin-left: 0px;
+    }
+
+    &--error {
+      color: #e75858;
     }
   }
 

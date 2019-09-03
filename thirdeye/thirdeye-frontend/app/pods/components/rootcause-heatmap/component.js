@@ -1,5 +1,5 @@
 import Component from '@ember/component';
-import { observer, getProperties, computed } from '@ember/object';
+import { observer, get, getProperties, computed } from '@ember/object';
 import {
   toCurrentUrn,
   toBaselineUrn,
@@ -31,6 +31,8 @@ const ROOTCAUSE_ROLE_TAIL = 'tail';
 
 const ROOTCAUSE_ROLLUP_RANGE = [0, 100];
 const ROOTCAUSE_ROLLUP_EXPLAIN_FRACTION = 0.95;
+
+const ROOTCAUSE_VALUE_OTHER = 'OTHER';
 
 const ROOTCAUSE_MODE_MAPPING = {
   'Percentage Change': ROOTCAUSE_ROLLUP_MODE_CHANGE,
@@ -98,7 +100,7 @@ export default Component.extend({
     'sizeMetricUrn', 'sizeOptions',
     function() {
       const { sizeMetricUrn, sizeOptions } =
-        this.getProperties('sizeMetricUrn', 'sizeOptions');
+        getProperties(this, 'sizeMetricUrn', 'sizeOptions');
       return sizeOptions.find(opt => opt.urn === sizeMetricUrn);
     }
   ).readOnly(),
@@ -107,7 +109,7 @@ export default Component.extend({
    * Options for heatmap size
    */
   sizeOptions: computed('entities', function () {
-    const entities = this.get('entities');
+    const entities = get(this, 'entities');
     const metricUrns = filterPrefix(Object.keys(entities), 'thirdeye:metric:');
     return _.sortBy(metricUrns.map(urn => Object.assign({}, { urn, name: toMetricLabel(urn, entities) })), "name");
   }),
@@ -142,7 +144,7 @@ export default Component.extend({
     'selectedUrn',
     function () {
       const { breakdowns, selectedUrn } =
-        this.getProperties('breakdowns', 'selectedUrn');
+        getProperties(this, 'breakdowns', 'selectedUrn');
 
       if (!selectedUrn) {
         return {};
@@ -164,7 +166,7 @@ export default Component.extend({
     'sizeMetricUrn',
     function () {
       const { breakdowns, sizeMetricUrn } =
-        this.getProperties('breakdowns', 'sizeMetricUrn');
+        getProperties(this, 'breakdowns', 'sizeMetricUrn');
       if (!sizeMetricUrn) {
         return {};
       }
@@ -181,7 +183,7 @@ export default Component.extend({
     'selectedUrn',
     function () {
       const { breakdowns, selectedUrn } =
-        this.getProperties('breakdowns', 'selectedUrn');
+        getProperties(this, 'breakdowns', 'selectedUrn');
       if (!selectedUrn) {
         return {};
       }
@@ -198,7 +200,7 @@ export default Component.extend({
     'current',
     'isLoadingBreakdowns',
     function () {
-      const { current, isLoadingBreakdowns } = this.getProperties('current', 'isLoadingBreakdowns');
+      const { current, isLoadingBreakdowns } = getProperties(this, 'current', 'isLoadingBreakdowns');
       return isLoadingBreakdowns || !_.isEmpty(current);
     }
   ),
@@ -207,7 +209,7 @@ export default Component.extend({
     'baseline',
     'isLoadingBreakdowns',
     function () {
-      const { baseline, isLoadingBreakdowns } = this.getProperties('baseline', 'isLoadingBreakdowns');
+      const { baseline, isLoadingBreakdowns } = getProperties(this, 'baseline', 'isLoadingBreakdowns');
       return isLoadingBreakdowns || !_.isEmpty(baseline);
     }
   ),
@@ -216,7 +218,7 @@ export default Component.extend({
     'selectedUrn',
     'entities',
     function () {
-      const { selectedUrn, entities } = this.getProperties('selectedUrn', 'entities');
+      const { selectedUrn, entities } = getProperties(this, 'selectedUrn', 'entities');
       return isInverse(selectedUrn, entities);
     }
   ),
@@ -225,7 +227,7 @@ export default Component.extend({
     'selectedUrn',
     'entities',
     function () {
-      const { selectedUrn, entities } = this.getProperties('selectedUrn', 'entities');
+      const { selectedUrn, entities } = getProperties(this, 'selectedUrn', 'entities');
       // prevent flashing error message
       if (!(selectedUrn in entities)) {
         return true;
@@ -242,7 +244,7 @@ export default Component.extend({
     'rollupRange',
     function () {
       const { current, baseline, sizeMetricCurrent } =
-        this.getProperties('current', 'baseline', 'sizeMetricCurrent');
+        getProperties(this, 'current', 'baseline', 'sizeMetricCurrent');
 
       if (!sizeMetricCurrent) {
         return;
@@ -272,7 +274,7 @@ export default Component.extend({
         const cutoff = this._sum(all.map(v => sizeMetricCurrent[n][v])) * ROOTCAUSE_ROLLUP_EXPLAIN_FRACTION;
         let sum = this._sum(head.map(v => sizeMetricCurrent[n][v]));
         let i = range[0];
-        while (i < range[1] && sum < cutoff) {
+        while (i < range[1] && sum < cutoff && all[i] !== ROOTCAUSE_VALUE_OTHER) {
           sum += sizeMetricCurrent[n][all[i]];
           visible.push(all[i]);
           i++;
@@ -307,7 +309,7 @@ export default Component.extend({
     'isInverse',
     function () {
       const { _dataRollup: values, mode, isInverse } =
-        this.getProperties('_dataRollup', 'mode', 'isInverse');
+        getProperties(this, '_dataRollup', 'mode', 'isInverse');
       const transformation = this._makeTransformation(mode);
       const cells = {};
       Object.keys(values).forEach(n => {
@@ -322,17 +324,16 @@ export default Component.extend({
           const curr = val.current;
           const base = val.baseline;
           const size = val.size;
-
           const labelChange = transformation(curr, base, currTotal, baseTotal);
-
           const [value, labelValue] = this._makeValueLabel(val, labelChange);
+          const sizeRatioLabel = size/sizeTotal < 0.01 ? '' : labelValue;
 
           cells[n].push({
             index,
             role: val.role,
             dimName: val.dimName,
             dimValue: val.dimValue,
-            label: labelValue,
+            label: sizeRatioLabel,
             value,
             size: size / sizeTotal,
             inverse: isInverse,
@@ -418,7 +419,14 @@ export default Component.extend({
     if (!dimNameObj) {
       return [];
     }
-    return Object.keys(dimNameObj).map(v => [dimNameObj[v], v]).sort((a, b) => parseFloat(a[0]) - parseFloat(b[0])).map(t => t[1]);
+    return Object.keys(dimNameObj)
+      .map(v => [dimNameObj[v], v])
+      .sort((a, b) => {
+        if (a[1] === ROOTCAUSE_VALUE_OTHER) { return parseFloat("inf"); }
+        if (b[1] === ROOTCAUSE_VALUE_OTHER) { return parseFloat("-inf"); }
+        return parseFloat(a[0]) - parseFloat(b[0]);
+      })
+      .map(t => t[1]);
   },
 
   _sum(arr) {
@@ -426,13 +434,27 @@ export default Component.extend({
   },
 
   actions: {
-    onHeatmapClick(role, dimName, dimValue) {
+    onInclude(role, dimName, dimValue) {
       const { selectedUrn, onSelection } =
-        this.getProperties('selectedUrn', 'onSelection');
+        getProperties(this, 'selectedUrn', 'onSelection');
 
       // selection
       if (role === ROOTCAUSE_ROLE_VALUE) {
-        const metricUrn = appendFilters(selectedUrn, [[dimName, dimValue]]);
+        const metricUrn = appendFilters(selectedUrn, [[dimName, '=', dimValue]]);
+        const updates = { [metricUrn]: true, [toBaselineUrn(metricUrn)]: true, [toCurrentUrn(metricUrn)]: true };
+        if (onSelection) {
+          onSelection(updates);
+        }
+      }
+    },
+
+    onExclude(role, dimName, dimValue) {
+      const { selectedUrn, onSelection } =
+        getProperties(this, 'selectedUrn', 'onSelection');
+
+      // selection
+      if (role === ROOTCAUSE_ROLE_VALUE) {
+        const metricUrn = appendFilters(selectedUrn, [[dimName, '!=', dimValue]]);
         const updates = { [metricUrn]: true, [toBaselineUrn(metricUrn)]: true, [toCurrentUrn(metricUrn)]: true };
         if (onSelection) {
           onSelection(updates);
@@ -444,7 +466,7 @@ export default Component.extend({
      * Load size metric
      */
     onSizeMetric(option) {
-      const { onSizeMetric } = this.getProperties('onSizeMetric');
+      const { onSizeMetric } = getProperties(this, 'onSizeMetric');
       if (onSizeMetric) {
         onSizeMetric(option.urn);
       }

@@ -1,11 +1,14 @@
 module.exports = {
+  framework: 'qunit',
   test_page: 'tests/index.html?hidepassed',
   disable_watching: true,
+  browser_disconnect_timeout: 500,
+  browser_start_timeout: 90,
   launch_in_ci: [
-    'Firefox'
+    'Chrome'
   ],
   launch_in_dev: [
-    'Chrome'
+    'Chrome', 'Firefox'
   ],
   browser_args: {
     Chrome: {
@@ -22,7 +25,8 @@ module.exports = {
     Firefox: {
       mode: 'ci',
       args: [
-        '-headless'
+        '-headless',
+        '--window-size=1440,900'
       ]
     }
   }

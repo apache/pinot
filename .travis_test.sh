@@ -1,18 +1,21 @@
 #!/bin/bash -x
 #
-# Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+#   http://www.apache.org/licenses/LICENSE-2.0
 #
-#         http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 #
 
 # ThirdEye related changes
@@ -33,7 +36,7 @@ if [ $? -eq 0 ]; then
   fi
 
   cd thirdeye
-  mvn test
+  mvn test -B
   failed=$?
   # Remove Pinot/ThirdEye files from local Maven repository to avoid a useless cache rebuild
   rm -rf ~/.m2/repository/com/linkedin/pinot ~/.m2/repository/com/linkedin/thirdeye
@@ -53,14 +56,25 @@ if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk8' ]; then
 fi
 
 passed=0
+
+KAFKA_BUILD_OPTS=""
+if [ "$KAFKA_VERSION" != '0.9' ]; then
+  git diff --name-only $TRAVIS_COMMIT_RANGE | egrep '^(pinot-connectors)'
+  if [ $? -ne 0 ]; then
+    echo "No Pinot Connector Changes, Skip tests for Kafka Connector: ${KAFKA_VERSION}."
+    exit 0
+  fi
+  KAFKA_BUILD_OPTS="-Dkafka.version=${KAFKA_VERSION}"
+fi
+
 # Only run integration tests if needed
 if [ "$RUN_INTEGRATION_TESTS" != 'false' ]; then
-  mvn test -B -P travis,travis-integration-tests-only
+  mvn test -B -P travis,travis-integration-tests-only ${KAFKA_BUILD_OPTS}
   if [ $? -eq 0 ]; then
     passed=1
   fi
 else
-  mvn test -B -P travis,travis-no-integration-tests
+  mvn test -B -P travis,travis-no-integration-tests ${KAFKA_BUILD_OPTS}
   if [ $? -eq 0 ]; then
     passed=1
   fi

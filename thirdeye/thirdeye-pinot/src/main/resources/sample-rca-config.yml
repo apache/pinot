@@ -8,19 +8,19 @@ frameworks:
         #######################################################################
         - outputName: METRIC_FROM_METRIC_DATASET
           inputNames: [INPUT]
-          className: com.linkedin.thirdeye.rootcause.impl.MetricDatasetPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.MetricDatasetPipeline
 
         - outputName: METRIC_FROM_METRIC
           inputNames: [INPUT]
-          className: com.linkedin.thirdeye.rootcause.impl.EntityMappingPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.EntityMappingPipeline
           properties:
               mappingType: METRIC_TO_METRIC
 
         - outputName: METRIC_TOPK
           inputNames: [INPUT, METRIC_FROM_METRIC_DATASET, METRIC_FROM_METRIC]
-          className: com.linkedin.thirdeye.rootcause.impl.TopKPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.TopKPipeline
           properties:
-              class: com.linkedin.thirdeye.rootcause.impl.MetricEntity
+              class: org.apache.pinot.thirdeye.rootcause.impl.MetricEntity
               k: 20
 
         #######################################################################
@@ -28,13 +28,13 @@ frameworks:
         #######################################################################
         - outputName: DIMENSION_FROM_METRIC
           inputNames: [INPUT, METRIC_TOPK]
-          className: com.linkedin.thirdeye.rootcause.impl.DimensionAnalysisPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.DimensionAnalysisPipeline
           properties:
               parallelism: 5
 
         - outputName: DIMENSION_STANDARDIZED
           inputNames: [DIMENSION_FROM_METRIC]
-          className: com.linkedin.thirdeye.rootcause.impl.EntityMappingPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.EntityMappingPipeline
           properties:
               mappingType: DIMENSION_TO_DIMENSION
               isRewriter: true
@@ -42,9 +42,9 @@ frameworks:
 
         - outputName: DIMENSION_TOPK
           inputNames: [INPUT, DIMENSION_STANDARDIZED]
-          className: com.linkedin.thirdeye.rootcause.impl.TopKPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.TopKPipeline
           properties:
-              class: com.linkedin.thirdeye.rootcause.impl.DimensionEntity
+              class: org.apache.pinot.thirdeye.rootcause.impl.DimensionEntity
               k: 50
 
         #######################################################################
@@ -52,15 +52,15 @@ frameworks:
         #######################################################################
         - outputName: SERVICE_FROM_METRIC
           inputNames: [INPUT, METRIC_TOPK]
-          className: com.linkedin.thirdeye.rootcause.impl.EntityMappingPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.EntityMappingPipeline
           properties:
               mappingType: METRIC_TO_SERVICE
 
         - outputName: SERVICE_TOPK
           inputNames: [INPUT, SERVICE_FROM_METRIC]
-          className: com.linkedin.thirdeye.rootcause.impl.TopKPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.TopKPipeline
           properties:
-              class: com.linkedin.thirdeye.rootcause.impl.ServiceEntity
+              class: org.apache.pinot.thirdeye.rootcause.impl.ServiceEntity
               k: 10
 
         #######################################################################
@@ -68,17 +68,17 @@ frameworks:
         #######################################################################
         - outputName: EVENT_HOLIDAY
           inputNames: [INPUT, DIMENSION_TOPK]
-          className: com.linkedin.thirdeye.rootcause.impl.ThirdEyeEventsPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.ThirdEyeEventsPipeline
 
         - outputName: EVENT_ANOMALY
           inputNames: [INPUT, METRIC_TOPK]
-          className: com.linkedin.thirdeye.rootcause.impl.AnomalyEventsPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.AnomalyEventsPipeline
 
         - outputName: EVENT_TOPK
           inputNames: [INPUT, EVENT_HOLIDAY, EVENT_ANOMALY]
-          className: com.linkedin.thirdeye.rootcause.impl.TopKPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.TopKPipeline
           properties:
-              class: com.linkedin.thirdeye.rootcause.impl.EventEntity
+              class: org.apache.pinot.thirdeye.rootcause.impl.EventEntity
               k: 20
 
         #######################################################################
@@ -86,7 +86,7 @@ frameworks:
         #######################################################################
         - outputName: OUTPUT
           inputNames: [EVENT_TOPK, METRIC_TOPK, DIMENSION_TOPK, SERVICE_TOPK]
-          className: com.linkedin.thirdeye.rootcause.impl.TopKPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.TopKPipeline
           properties:
               k: 50
 
@@ -96,20 +96,20 @@ frameworks:
         #######################################################################
         - outputName: METRIC_FROM_METRIC
           inputNames: [INPUT]
-          className: com.linkedin.thirdeye.rootcause.impl.EntityMappingPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.EntityMappingPipeline
           properties:
               mappingType: METRIC_TO_METRIC
 
         - outputName: METRIC_TOPK
           inputNames: [METRIC_FROM_METRIC]
-          className: com.linkedin.thirdeye.rootcause.impl.TopKPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.TopKPipeline
           properties:
-              class: com.linkedin.thirdeye.rootcause.impl.MetricEntity
+              class: org.apache.pinot.thirdeye.rootcause.impl.MetricEntity
               k: 10
 
         - outputName: OUTPUT
           inputNames: [INPUT, METRIC_TOPK]
-          className: com.linkedin.thirdeye.rootcause.impl.MetricCorrelationRankingPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.MetricCorrelationRankingPipeline
           properties:
               targetInput: INPUT
 

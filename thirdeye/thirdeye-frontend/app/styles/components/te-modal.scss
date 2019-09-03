@@ -101,6 +101,11 @@
     z-index: 10000;
   }
 
+  &__tooltip-icon {
+    margin-left: 3px;
+    opacity: 0.6;
+  }
+
   &__table-header {
     // important is used here to override bootstrap's css
     border-right: 0 !important;

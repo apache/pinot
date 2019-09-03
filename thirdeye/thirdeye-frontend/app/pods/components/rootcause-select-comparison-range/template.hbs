@@ -19,29 +19,6 @@
   {{/power-select}}
 </div>
 <div class="col-xs-9">
-  {{!-- TODO: keeping till we test it more and componentized the date-slider in next PR. - lohuynh
-  <label class="te-label te-label--small">Investigation Period
-    <span>
-      <i class="glyphicon glyphicon-question-sign"></i>
-      {{#tooltip-on-element class="te-tooltip"}}
-        Typically, this is your anomaly period. It is highlighted in orange in the graph above. It also affects the data in views below.
-      {{/tooltip-on-element}}
-    </span>
-  </label>
-  {{date-range-picker
-    class="te-range-picker"
-    timePicker=true
-    timePicker24Hour=true
-    timePickerIncrement=5
-    start=startFormatted
-    end=endFormatted
-    maxDate=maxDateFormatted
-    ranges=rangeOptions
-    showCustomRangeLabel=false
-    format=timeFormat
-    serverFormat="YYYY-MM-DD HH:mm"
-    applyAction=(action "onRange")
-  }} --}}
   <!-- Investigation range slider -->
   <div class="date-slider date-slider--offset">
     <div class="date-slider__picker">

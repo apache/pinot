@@ -1,9 +1,43 @@
-{{#each statsTransformed as |card|}}
-  <ul class="te-horizontal-cards__card">
-    <li class="te-horizontal-cards__card-title">{{card.title}}</li>
-    <li class="te-horizontal-cards__card-text">{{card.description}}</li>
-    <li class="te-horizontal-cards__card-number">
-      {{card.value}}{{#if (eq card.unit 'percent')}}%{{/if}}
-    </li>
-  </ul>
-{{/each}}
+{{#if oneCardOnly}}
+
+  {{#each statsTransformed as |card|}}
+    <ul class="te-horizontal-cards__single-card">
+      <li class="te-horizontal-cards__card-title">
+        <label for="select-dimension" class="control-label te-label">
+          {{card.title}}
+          <span>
+            <i class="glyphicon glyphicon-question-sign"></i>
+            {{#tooltip-on-element class="te-tooltip"}}
+              {{card.description}}
+            {{/tooltip-on-element}}
+          </span>
+        </label>
+      </li>
+      <li class="te-horizontal-cards__card-number">
+        {{card.value}}{{#if (eq card.unit 'percent')}}%{{/if}}
+      </li>
+    </ul>
+  {{/each}}
+
+{{else}}
+
+  {{#each statsTransformed as |card|}}
+    <ul class="te-horizontal-cards__card">
+      <li class="te-horizontal-cards__card-title">
+        <label for="select-dimension" class="control-label te-label">
+          {{card.title}}
+          <span>
+            <i class="glyphicon glyphicon-question-sign"></i>
+            {{#tooltip-on-element class="te-tooltip"}}
+              {{card.description}}
+            {{/tooltip-on-element}}
+          </span>
+        </label>
+      </li>
+      <li class="te-horizontal-cards__card-number">
+        {{card.value}}{{#if (eq card.unit 'percent')}}%{{/if}}
+      </li>
+    </ul>
+  {{/each}}
+
+{{/if}}

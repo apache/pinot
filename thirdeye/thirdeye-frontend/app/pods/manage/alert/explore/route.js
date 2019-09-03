@@ -7,15 +7,12 @@ import RSVP from 'rsvp';
 import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
-import { isArray } from '@ember/array';
 import { later } from '@ember/runloop';
 import { task, timeout } from 'ember-concurrency';
 import { inject as service } from '@ember/service';
 import {
-  set,
   get,
-  setProperties,
-  getWithDefault
+  setProperties
 } from '@ember/object';
 import { isPresent, isNone, isBlank } from '@ember/utils';
 import {
@@ -36,13 +33,15 @@ import {
   selfServeApiCommon,
   selfServeApiGraph
 } from 'thirdeye-frontend/utils/api/self-serve';
-import { anomalyResponseObj } from 'thirdeye-frontend/utils/anomaly';
+import {
+  anomalyResponseObj,
+  anomalyResponseMap
+} from 'thirdeye-frontend/utils/anomaly';
 import { getAnomalyDataUrl } from 'thirdeye-frontend/utils/api/anomaly';
 
 /**
  * Shorthand for setting date defaults
  */
-const dateFormat = 'YYYY-MM-DD';
 const displayDateFormat = 'YYYY-MM-DD HH:mm';
 
 /**
@@ -55,8 +54,6 @@ const METRIC_DATA_COLOR = 'blue';
 /**
  * Basic alert page defaults
  */
-const resolutionOptions = ['All Resolutions'];
-const dimensionOptions = ['All Dimensions'];
 const wowOptions = ['Wow', 'Wo2W', 'Wo3W', 'Wo4W'];
 const durationMap = { m:'month', d:'day', w:'week' };
 const baselineOptions = [{ name: 'Predicted', isActive: true }];
@@ -121,6 +118,7 @@ export default Route.extend({
     duration: queryParamsConfig,
     startDate: queryParamsConfig,
     endDate: queryParamsConfig,
+    openReport: queryParamsConfig,
     repRunStatus: queryParamsConfig
   },
 
@@ -128,6 +126,7 @@ export default Route.extend({
    * Make duration service accessible
    */
   durationCache: service('services/duration'),
+  session: service(),
 
   beforeModel(transition) {
     const { duration, startDate } = transition.queryParams;
@@ -179,6 +178,7 @@ export default Route.extend({
           startDate,
           evalUrl,
           endDate,
+          dateParams,
           alertEvalMetrics,
           isReplayDone
         };
@@ -199,6 +199,7 @@ export default Route.extend({
       startDate,
       endDate,
       duration,
+      dateParams,
       alertEvalMetrics
     } = model;
 
@@ -211,7 +212,6 @@ export default Route.extend({
       bucketSize,
       bucketUnit
     } = alertData;
-
     // Derive start/end time ranges based on querystring input with fallback on default '1 month'
     const {
       startStamp,
@@ -233,10 +233,9 @@ export default Route.extend({
     };
 
     // Load endpoints for projected metrics. TODO: consolidate into CP if duplicating this logic
-    const qsParams = `start=${baseStart.utc().format(dateFormat)}&end=${baseEnd.utc().format(dateFormat)}&useNotified=true`;
     const anomalyDataUrl = getAnomalyDataUrl(startStamp, endStamp);
     const metricsUrl = selfServeApiCommon.metricAutoComplete(metricName);
-    const anomaliesUrl = `/dashboard/anomaly-function/${alertId}/anomalies?${qsParams}`;
+    const anomaliesUrl = `/dashboard/anomaly-function/${alertId}/anomalies?${dateParams}&useNotified=true`;
     let anomalyPromiseHash = {
       projectedMttd: 0,
       metricsByName: [],
@@ -270,10 +269,12 @@ export default Route.extend({
         const maxTime = isReplayDone && metricId ? await fetch(maxTimeUrl).then(checkStatus) : moment().valueOf();
         Object.assign(model, { metricDataUrl: buildMetricDataUrl({
           maxTime,
+          endStamp: config.endStamp,
+          startStamp: config.startStamp,
           id: metricId,
           filters: config.filters,
-          granularity: config.bucketUnit,
-          dimension: config.exploreDimensions ? config.exploreDimensions.split(',')[0] : 'All'
+          granularity: `${config.bucketSize}_${config.bucketUnit}`,
+          dimension: 'All' // NOTE: avoid dimension explosion - config.exploreDimensions ? config.exploreDimensions.split(',')[0] : 'All'
         })});
       })
       // Catch is not mandatory here due to our error action, but left it to add more context
@@ -322,7 +323,6 @@ export default Route.extend({
       baselineOptionsLoading: anomalyIds && anomalyIds.length > 0,
       responseOptions: anomalyResponseObj.map(response => response.name)
     });
-
     // Kick off controller defaults and replay status check
     controller.initialize();
 
@@ -394,6 +394,22 @@ export default Route.extend({
       return (metric.name === alertData.metric) && (metric.dataset === alertData.collection);
     }) || { id: 0 };
     return isBlank(metricList) ? 0 : metricId.id;
+  },
+
+  /**
+   * Returns an aggregate list of all labels found in the currently-loaded anomaly set
+   * @method _filterResolutionLabels
+   * @param {Array} anomalyData - list of all anomalies for current alert
+   * @returns {Array} list of all labels found in anomaly set
+   * @private
+   */
+  _filterResolutionLabels(anomalyData) {
+    let availableLabels = [];
+    anomalyData.forEach((anomaly) => {
+      let mappedLabel = anomalyResponseMap[anomaly.anomalyFeedback];
+      if (mappedLabel) { availableLabels.push(mappedLabel); }
+    });
+    return availableLabels;
   },
 
   /**
@@ -476,6 +492,7 @@ export default Route.extend({
    * @return {undefined}
    */
   loadAnomalyData: task(function * (anomalyIds, exploreDimensions) {
+    const dimensionOptions = ['All Dimensions'];
     const hasDimensions = exploreDimensions && exploreDimensions.length;
     // Load data for each anomaly Id
     const rawAnomalies = yield get(this, 'fetchCombinedAnomalies').perform(anomalyIds);
@@ -484,7 +501,7 @@ export default Route.extend({
     // Process anomaly records to make them template-ready
     const anomalyData = yield enhanceAnomalies(rawAnomalies, severityScores);
     // Prepare de-duped power-select option array for anomaly feedback
-    resolutionOptions.push(...new Set(anomalyData.map(record => record.anomalyFeedback)));
+    const resolutionOptions = ['All Resolutions', ...new Set(this._filterResolutionLabels(anomalyData))];
     // Populate dimensions power-select options if dimensions exist
     if (hasDimensions) {
       dimensionOptions.push(...new Set(anomalyData.map(anomaly => anomaly.dimensionString)));
@@ -495,6 +512,7 @@ export default Route.extend({
       dimensionOptions,
       resolutionOptions,
       anomaliesLoaded: true,
+      totalLoadedAnomalies: anomalyData.length,
       baselineOptionsLoading: false
     });
     // Fetch and append extra WoW data for each anomaly record
@@ -535,10 +553,21 @@ export default Route.extend({
 
   actions: {
     /**
+     * save session url for transition on login
+     * @method willTransition
+     */
+    willTransition(transition) {
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+    },
+
+    /**
     * Refresh route's model.
     */
     refreshModel() {
-      this.refresh();
+      this.replaceWith({ queryParams: { openReport: false } });
     },
 
     /**

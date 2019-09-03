@@ -1,33 +1,5 @@
 <div class="container">
   <div class="row">
-    <div class="col-xs-9">
-      {{rootcause-select-metric-dimension
-        selectedUrn=metricUrn
-        onSelection=(action "onMetricChange")
-      }}
-    </div>
-    <div class="col-xs-3">
-      <label class="te-label te-label--small">Baseline
-        <span>
-              <i class="glyphicon glyphicon-question-sign"></i>
-          {{#tooltip-on-element class="te-tooltip"}}
-            This is the compare mode for computing the baseline in the charts above and below. For example, "Wo2W" uses data from the analysis period shifted by two weeks.
-          {{/tooltip-on-element}}
-            </span>
-      </label>
-      {{#power-select
-        selected=compareMode
-        options=compareModeOptions
-        searchEnabled=false
-        triggerId="select-compare-mode"
-        onchange=(action "onCompareMode")
-      as |mode|
-      }}
-        {{mode}}
-      {{/power-select}}
-    </div>
-  </div>
-  <div class="row">
     <div class="col-xs-12">
       ({{metricUrn}})
     </div>
@@ -39,8 +11,37 @@
         colorMapping=colorMapping
         axis=axis
         zoom=zoom
+        legend=legend
       }}
     </div>
+  </div>
+  <div class="row">
+    <div class="col-xs-4">
+      <label>diagnostics path</label>
+      {{#power-select
+        selected=diagnosticsPath
+        options=diagnosticsPathOptions
+        searchEnabled=false
+        triggerId="select-diagnostics-path"
+        onchange=(action "onDiagnosticsPath")
+      as |path|
+      }}
+        {{path}}
+      {{/power-select}}
+    </div>
+    <div class="col-xs-4">
+      <label>value key</label>
+      {{#power-select-multiple
+        selected=diagnosticsValues
+        options=diagnosticsValueOptions
+        triggerId="select-diagnostics-values"
+        onchange=(action "onDiagnosticsValues")
+      as |value|
+      }}
+        {{value}}
+      {{/power-select-multiple}}
+    </div>
+
   </div>
   <div class="row">
     <div class="col-xs-6">
@@ -66,14 +67,16 @@
       <p>{{errorTimeseries}}</p>
       <p>{{errorBaseline}}</p>
       <p>{{errorAnomalies}}</p>
-      {{#each-in anomaliesGroupedFormatted as | key anomalies |}}
-        <p>{{key}}</p>
-        <ul>
-        {{#each anomalies as | anomaly |}}
-          <li>{{anomaly}}</li>
-        {{/each}}
-        </ul>
-      {{/each-in}}
+      {{#each anomalyMetricEntities as | baseMetric |}}
+        <p>
+          <a {{action "onMetricLink" baseMetric.urn}}>{{baseMetric.label}}{{get-safe anomalyMetricUrnDimensionLabels baseMetric.urn}}</a>
+          <ol>
+          {{#each (get-safe anomalyMetricUrnDimensions baseMetric.urn) as | metric |}}
+            <li><a {{action "onMetricLink" metric}}>{{get-safe anomalyMetricUrnDimensionLabels metric}}</a></li>
+          {{/each}}
+          </ol>
+        </p>
+      {{/each}}
     </div>
   </div>
 </div>

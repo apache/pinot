@@ -1,8 +1,8 @@
 import moment from 'moment';
-import { isPresent } from "@ember/utils";
+import { isPresent, isBlank } from "@ember/utils";
 import { getWithDefault } from '@ember/object';
 import { buildDateEod } from 'thirdeye-frontend/utils/utils';
-import { getFormatedDuration } from 'thirdeye-frontend/utils/anomaly';
+import { getFormattedDuration } from 'thirdeye-frontend/utils/anomaly';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 
 /**
@@ -31,6 +31,30 @@ export function formatEvalMetric(metric, isPercentage = false) {
 export function pluralizeTime(time, unit) {
   const unitStr = time > 1 ? unit + 's' : unit;
   return time ? time + ' ' + unitStr : '';
+}
+
+/**
+ * Performs a case-insensitive sort of a flat array or array of objects
+ * by property. If sorting flat array, pass "null" for targetProperty.
+ * @param {Array} targetArray
+ * @param {String} targetProperty
+ * @returns {Array}
+ */
+export function powerSort(targetArray, targetProperty) {
+  const cleanArray = [];
+  // Make sure we have a valid array
+  targetArray.forEach((item) => {
+    cleanArray.push(isBlank(item) ? 'undefined' : item);
+  });
+  // Do case-insensitive sort
+  const sortedArray = cleanArray.sort((a, b) => {
+    if (targetProperty) {
+      a = a[targetProperty];
+      b = b[targetProperty];
+    }
+    return (a || '').toLowerCase().trim().localeCompare((b || '').toLowerCase().trim());
+  });
+  return sortedArray;
 }
 
 /**
@@ -72,7 +96,7 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
     const isNullChangeRate = Number.isNaN(Number(changeRate));
     // Set 'not reviewed' label
     if (!anomaly.anomalyFeedback) {
-      anomaly.anomalyFeedback = 'Not reviewed yet';
+      anomaly.anomalyFeedback = 'Not Resolved';
     }
     // Add missing properties
     Object.assign(anomaly, {
@@ -81,7 +105,7 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
       shownChangeRate: changeRate,
       isUserReported: anomaly.anomalyResultSource === 'USER_LABELED_ANOMALY',
       startDateStr: moment(anomaly.anomalyStart).format('MMM D, hh:mm A'),
-      durationStr: getFormatedDuration(anomaly.anomalyStart, anomaly.anomalyEnd),
+      durationStr: getFormattedDuration(anomaly.anomalyStart, anomaly.anomalyEnd),
       severityScore: score && !isNaN(score) ? score.toFixed(2) : 'N/A',
       shownCurrent: Number(anomaly.current) > 0 ? anomaly.current : 'N/A',
       shownBaseline: Number(anomaly.baseline) > 0 ? anomaly.baseline : 'N/A',
@@ -127,32 +151,48 @@ export function setUpTimeRangeOptions(datesKeys, duration) {
     isActive: !datesKeys.includes(duration)
   };
 
-  const dateKeyMap = new Map([
-   [ '1m', ['Last 30 Days', 1, 'month'] ],
-   [ '3m', ['3 Months', 3, 'month'] ],
-   [ '2w', ['Last 2 Weeks', 2, 'week'] ],
-   [ '1w', ['Last Week', 1, 'week'] ],
-   [ '2d', ['Yesterday', 2, 'day'] ],
-   [ '1d', ['Last 24 hours', 1, 'day'] ],
-   [ 'today', ['Today'] ]
-   ]);
+  const dateKeyMap = new Map(
+    [
+      [ '1m', ['Last 30 Days', 1, 'month'] ],
+      [ '3m', ['3 Months', 3, 'month'] ],
+      [ '2w', ['Last 2 Weeks', 2, 'week'] ],
+      [ '1w', ['Last Week', 1, 'week'] ],
+      [ '2d', ['Yesterday', 2, 'day'] ],
+      [ '1d', ['Last 24 Hours', 24, 'hour'] ],
+      [ '48h', ['Last 48 Hours', 48, 'hour'] ],
+      [ 'today', ['Today'] ]
+    ]);
 
-   datesKeys.forEach((value) => {
-     const currVal = dateKeyMap.get(value);
-     const label = currVal[0];
-     let start = moment().subtract(currVal[1], currVal[2]).utc();
-     switch(label) {
+  datesKeys.forEach((value) => {
+    const currVal = dateKeyMap.get(value);
+    const label = currVal[0];
+    let start;
+    let end;
+    // overrides map above
+    switch(label) {
       case 'Today':
         start = moment().startOf('day');
+        end = start.add(1, 'days');
         break;
       case 'Yesterday':
         start = moment().subtract(1, 'day').startOf('day');
+        end = moment().startOf('day');
         break;
-     }
-     const end = (label === 'Yesterday') ? moment().subtract(1, 'days').endOf('day') : moment();
-     const isActive = duration === value;
-     newRangeArr.push({ name: label, value, start, end, isActive });
-   });
+      case 'Last 24 Hours':
+        start = moment().subtract(24, 'hour').startOf('hour');
+        end = moment().startOf('hour');
+        break;
+      case 'Last 48 Hours':
+        start = moment().subtract(48, 'hour').startOf('hour');
+        end = moment().startOf('hour');
+        break;
+      default:
+        start = moment().subtract(currVal[1], currVal[2]).startOf('day');
+        end = moment().startOf('day').add(1, 'days');
+    }
+    const isActive = duration === value;
+    newRangeArr.push({ name: label, value, start, end, isActive });
+  });
 
   newRangeArr.push(defaultCustomRange);
   return newRangeArr;
@@ -185,23 +225,21 @@ export function evalObj() {
  * @returns {String} metric data call params/url
  */
 export function buildMetricDataUrl(graphConfig) {
-  const { id, maxTime, filters, dimension, granularity } = graphConfig;
+  const { id, maxTime, startStamp, endStamp, filters, dimension, granularity } = graphConfig;
   // Chosen dimension
   const selectedDimension = dimension || 'All';
   // Do not send a filters param if value not present
   const filterQs = filters ? `&filters=${encodeURIComponent(filters)}` : '';
-  // Load only a week of data if granularity is high
+  // Load only a week of data in default if granularity is high
   const startTimeBucket = granularity && granularity.toLowerCase().includes('minute') ? 'week' : 'months';
-  // For end date, choose either maxTime or end of yesterday
-  const currentEnd = moment(maxTime).isValid() ? moment(maxTime).valueOf() : buildDateEod(1, 'day').valueOf();
-  // For graph start date, take either 1 week or 1 month, depending on granularity
-  const currentStart = moment(currentEnd).subtract(1, startTimeBucket).valueOf();
-  // Baseline starts 1 week before our start date
-  const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
-  // Baseline ends 1 week before our end date
-  const baselineEnd = moment(currentEnd).subtract(1, 'week');
-  // Now build the metric data url
-  return `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=` +
+  // set maxData as maxTime or default
+  const maxData = maxTime && moment(maxTime).isValid() ? moment(maxTime).valueOf() : buildDateEod(1, 'day').valueOf();
+  // For end date, use end stamp if defined and valid, otherwise use maxData
+  const currentEnd = endStamp && moment(endStamp).isValid() ? moment(endStamp).valueOf() : moment(maxData).valueOf();
+  // For graph start date, use start stamp if defined and valid, otherwise pick it usimng startTimeBucket depending on granularity
+  const currentStart = startStamp && moment(startStamp).isValid() ? moment(startStamp).valueOf() : moment(currentEnd).subtract(1, startTimeBucket).valueOf();
+  // Now build the metric data url -> currentEnd and currentStart reused in the call since baseline no longer displayed on graph
+  return `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${currentStart}/${currentEnd}?dimension=` +
          `${selectedDimension}&granularity=${granularity}${filterQs}`;
 }
 
@@ -326,5 +364,6 @@ export default {
   buildAnomalyStats,
   buildMetricDataUrl,
   extractSeverity,
+  powerSort,
   evalObj
 };

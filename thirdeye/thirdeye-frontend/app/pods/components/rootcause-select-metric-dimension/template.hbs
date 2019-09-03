@@ -1,7 +1,7 @@
 <div class="row">
-  <div class="col-xs-5">
+  <div class="col-xs-6">
     <label class="te-label te-label--small" for="select-metric">
-      Metrics to Investigate
+      Metric under Investigation
       <span>
         <i class="glyphicon glyphicon-question-sign"></i>
         {{#tooltip-on-element class="te-tooltip"}}
@@ -11,27 +11,61 @@
     </label>
     {{rootcause-select-metric
       selectedUrn=baseUrn
+      entities=entities
+      selectedUrns=selectedUrns
       onSelection=(action "onMetric")
+      selectionEditable=true
     }}
   </div>
-  <div class="col-xs-7">
-    {{#if selectedUrn}}
+  {{#if selectedUrn}}
+    <div class="{{if showExclusions 'col-xs-3' 'col-xs-6'}}">
       <label class="te-label te-label--small" for="select-filters">
         Filter by
+        {{#unless showExclusions}}
+          <a {{action "showExclusions"}}>Exclude</a>
+        {{/unless}}
         <span>
           <i class="glyphicon glyphicon-question-sign"></i>
           {{#tooltip-on-element class="te-tooltip"}}
-            You can add additional filters to the analyzed metric if you are investigating a subset of the data, for example "countryCode::us". The available filters depend on the data set. You can also select filters in the "Dimensions" tab.
+            You can add filters to the analyzed metric, for example page views for "countryCode::us" only. The available filters depend on the data set. You can also add filters via left-click in the "Dimensions" tab.
           {{/tooltip-on-element}}
         </span>
       </label>
 
       {{filter-select
-        selected=filters
+        selected=inclusions
         options=filterOptions
+        placeholder="  Add a dimension filter (Type to Search)"
         triggerId="select-filters"
-        onChange=(action "onFilters")
+        onChange=(action "onSelect")
       }}
+    </div>
+
+    {{#if showExclusions}}
+      <div class="col-xs-3">
+        <label class="te-label te-label--small" for="select-exclusion">
+          {{#if isExclusionWarning}}
+            {{partial 'partials/rootcause/exclusion-warning'}}
+          {{/if}}
+          Exclude
+          {{#unless hasExclusions}}
+            <a {{action "hideExclusions"}}>Hide</a>
+          {{/unless}}
+          <span>
+            <i class="glyphicon glyphicon-question-sign"></i>
+            {{#tooltip-on-element class="te-tooltip"}}
+              You can exclude subsets of the analyzed metric, for example all page views without "countryCode::us". The available exclusions depend on the data set. You can also add exclusions via right-click in the "Dimensions" tab.
+            {{/tooltip-on-element}}
+          </span>
+        </label>
+        {{filter-select
+          selected=exclusions
+          options=filterOptions
+          placeholder="  Add an exclusion filter (Type to Search)"
+          triggerId="select-exclusion"
+          onChange=(action "onSelect")
+        }}
+      </div>
     {{/if}}
-  </div>
+  {{/if}}
 </div>

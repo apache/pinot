@@ -1,14 +1,12 @@
-<p>
+<p class="anomalies-table__text anomalies-table__text--stronger">
   <label class="te-label te-label--small">
-    <span>
-      {{moment-format record.anomaly.start 'MMM D, hh:mm A'}}
-      {{#tooltip-on-element class="te-tooltip"}}
-        Start: {{moment-format record.anomaly.start 'MMM D, hh:mm A'}}<br />
-        End: {{moment-format record.anomaly.end 'MMM D, hh:mm A'}}
-      {{/tooltip-on-element}}
-    </span>
+    {{moment-format record.anomaly.start 'MMM D, hh:mm A'}}
+    {{#tooltip-on-element}}
+      Start: {{moment-format record.anomaly.start 'MMM D, hh:mm A'}}<br />
+      End: {{moment-format record.anomaly.end 'MMM D, hh:mm A'}}
+    {{/tooltip-on-element}}
   </label>
 </p>
-<p class="anomalies-table__duration">
+<p class="anomalies-table__text">
   {{record.duration}}
 </p>

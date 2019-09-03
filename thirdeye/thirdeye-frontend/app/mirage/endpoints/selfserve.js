@@ -37,11 +37,11 @@ export default function (server) {
     return {
       "Result":"OK",
       "Records":[
-      "thirdeye-demo::thirdeye_rec1",
-      "thirdeye-demo::Thirdeye_rec2",
-      "thirdeye-demo::Thirdeye_rec3",
-      "thirdeye-demo::Thirdeye_rec4",
-      "thirdeye-demo::Thirdeye_rec5"
+        "thirdeye-demo::thirdeye_rec1",
+        "thirdeye-demo::Thirdeye_rec2",
+        "thirdeye-demo::Thirdeye_rec3",
+        "thirdeye-demo::Thirdeye_rec4",
+        "thirdeye-demo::Thirdeye_rec5"
       ]
     };
   });
@@ -76,7 +76,7 @@ export default function (server) {
   /**
    * Returns the email config by id
    */
-  server.get('/thirdeye/email/function/:id', (schema, request) => {
+  server.get('/thirdeye/email/function/:id', () => {
     return [alertConfig[1]];
   });
 
@@ -160,7 +160,7 @@ export default function (server) {
   /**
    * Mocks a list of alerts, displayed in the /manage/alerts page
    */
-  server.get('/thirdeye/entity/ANOMALY_FUNCTION', (schema) => {
+  server.get('/yaml/list', (schema) => {
     return schema.alerts.all().models;
   });
 
@@ -205,5 +205,26 @@ export default function (server) {
   server.get('/anomalies/search/anomalyIds/0/0/1', (schema, request) => {
     const idArray = request.queryParams.anomalyIds ? request.queryParams.anomalyIds : [ 38456269 ];
     return anomalySet(idArray.split(','));
+  });
+
+  /**
+   * get request for all detection alerters
+   */
+  server.get('/thirdeye/entity/DETECTION_ALERT_CONFIG', () => {
+    return [];
+  });
+
+  /**
+   * get request for detection config
+   */
+  server.get('/detection/:id', () => {
+    return [];
+  });
+
+  /**
+   * get request for subscription groups of given alert
+   */
+  server.get('/detection/subscription-groups/:id', () => {
+    return [];
   });
 }

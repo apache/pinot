@@ -77,15 +77,15 @@ module('Integration | Component | range pill selectors', function(hooks) {
       `range-pill-selectors__item--active`,
       'Pill selected as default is highlighted');
     assert.equal(
-      $rangeTitle.get(0).innerText,
+      $rangeTitle.get(0).innerText.trim(),
       'Testing range pills',
       'Title of range pills is correct');
     assert.equal(
-      $rangePill.get(0).innerText,
+      $rangePill.get(0).innerText.trim(),
       'Last 30 Days',
       'Label of first pill is correct');
     assert.equal(
-      $rangePill.get(1).innerText,
+      $rangePill.get(1).innerText.trim(),
       '3 Months',
       'Label of 2nd pill is correct');
     assert.equal(
@@ -109,12 +109,12 @@ module('Integration | Component | range pill selectors', function(hooks) {
       'Range picker modal is displayed');
     await wait();
     assert.equal(
-      $rangePresets.get(0).innerText,
+      $rangePresets.get(0).innerText.trim(),
       'Today',
       'Range picker preset #1 is good');
     await wait();
     assert.equal(
-      $rangePresets.get(1).innerText,
+      $rangePresets.get(1).innerText.trim(),
       'Last 2 weeks',
       'Range picker preset #2 is good');
 

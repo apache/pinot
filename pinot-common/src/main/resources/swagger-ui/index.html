@@ -1,10 +1,32 @@
+<!--
+
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+
+-->
+
+<!-- This is directly copied from Swagger repository and modified to change url variable -->
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <title>Swagger UI</title>
-  <link rel="icon" type="image/png" href="../swaggerui-dist/images/favicon-32x32.png" sizes="32x32" />
-  <link rel="icon" type="image/png" href="../swaggerui-dist/images/favicon-16x16.png" sizes="16x16" />
+  <link rel="icon" type="image/png" href="../swaggerui-dist/images/favicon-32x32.png" sizes="32x32"/>
+  <link rel="icon" type="image/png" href="../swaggerui-dist/images/favicon-16x16.png" sizes="16x16"/>
   <link href='../swaggerui-dist/css/typography.css' media='screen' rel='stylesheet' type='text/css'/>
   <link href='../swaggerui-dist/css/reset.css' media='screen' rel='stylesheet' type='text/css'/>
   <link href='../swaggerui-dist/css/screen.css' media='screen' rel='stylesheet' type='text/css'/>
@@ -45,15 +67,15 @@
       });
 
       // Pre load translate...
-      if(window.SwaggerTranslator) {
+      if (window.SwaggerTranslator) {
         window.SwaggerTranslator.translate();
       }
       window.swaggerUi = new SwaggerUi({
         url: url,
         dom_id: "swagger-ui-container",
         supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch'],
-        onComplete: function(swaggerApi, swaggerUi){
-          if(typeof initOAuth == "function") {
+        onComplete: function (swaggerApi, swaggerUi) {
+          if (typeof initOAuth == "function") {
             initOAuth({
               clientId: "your-client-id",
               clientSecret: "your-client-secret-if-required",
@@ -64,11 +86,11 @@
             });
           }
 
-          if(window.SwaggerTranslator) {
+          if (window.SwaggerTranslator) {
             window.SwaggerTranslator.translate();
           }
         },
-        onFailure: function(data) {
+        onFailure: function (data) {
           log("Unable to Load SwaggerUI");
         },
         docExpansion: "none",
@@ -84,16 +106,18 @@
           console.log.apply(console, arguments);
         }
       }
-  });
+    });
   </script>
 </head>
 
 <body class="swagger-section">
 <div id='header'>
   <div class="swagger-ui-wrap">
-    <a id="logo" href="http://swagger.io"><img class="logo__img" alt="swagger" height="30" width="30" src="../swaggerui-dist/images/logo_small.png" /><span class="logo__title">swagger</span></a>
+    <a id="logo" href="http://swagger.io"><img class="logo__img" alt="swagger" height="30" width="30"
+                                               src="../swaggerui-dist/images/logo_small.png"/><span class="logo__title">swagger</span></a>
     <form id='api_selector'>
-      <div class='input'><input placeholder="http://example.com/api" id="input_baseUrl" name="baseUrl" type="text"/></div>
+      <div class='input'><input placeholder="http://example.com/api" id="input_baseUrl" name="baseUrl" type="text"/>
+      </div>
       <div id='auth_container'></div>
       <div class='input'><a id="explore" class="header__btn" href="#" data-sw-translate>Explore</a></div>
     </form>

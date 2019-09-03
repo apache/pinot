@@ -1,57 +1,74 @@
 <?xml version="1.0"?>
 <!--
 
-    Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
 
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
+      http://www.apache.org/licenses/LICENSE-2.0
 
-            http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
 
 -->
-<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
-    <groupId>com.linkedin.pinot</groupId>
-    <version>0.016</version>
+    <groupId>org.apache.pinot</groupId>
+    <version>0.2.0-SNAPSHOT</version>
   </parent>
-  <groupId>com.linkedin.pinot</groupId>
   <artifactId>pinot-tools</artifactId>
-  <version>0.016</version>
-  <name>pinot-tools</name>
-  <url>http://maven.apache.org</url>
+  <name>Pinot Tools</name>
+  <url>https://pinot.apache.org/</url>
   <properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <pinot.root>${basedir}/..</pinot.root>
   </properties>
   <dependencies>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
     </dependency>
-     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-server</artifactId>
     </dependency>
-     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-controller</artifactId>
     </dependency>
-     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-broker</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-parquet</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-connector-kafka-base</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-connector-kafka-${kafka.version}</artifactId>
+      <version>${project.version}</version>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>commons-cli</groupId>
@@ -78,6 +95,29 @@
       <groupId>org.yaml</groupId>
       <artifactId>snakeyaml</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-math3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-aws</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-annotations</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
@@ -87,150 +127,150 @@
         <configuration>
           <programs>
             <program>
-              <mainClass>com.linkedin.pinot.tools.PinotToolLauncher</mainClass>
+              <mainClass>org.apache.pinot.tools.PinotToolLauncher</mainClass>
               <name>pinot-tools</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j.configuration=conf/pinot-tools-log4j.properties</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.admin.PinotAdministrator</mainClass>
+              <mainClass>org.apache.pinot.tools.admin.PinotAdministrator</mainClass>
               <name>pinot-admin</name>
               <jvmSettings>
                 <initialMemorySize>4G</initialMemorySize>
                 <maxMemorySize>4G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
-                  <extraArgument>-Dlog4j.configuration=conf/pinot-admin-log4j.properties</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-admin-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.scan.query.ScanBasedQueryProcessor</mainClass>
+              <mainClass>org.apache.pinot.tools.scan.query.ScanBasedQueryProcessor</mainClass>
               <name>scan-query</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>20G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
-                  <extraArgument>-Dlog4j.configuration=conf/pinot-tools-log4j.properties</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.query.comparison.QueryComparison</mainClass>
+              <mainClass>org.apache.pinot.tools.query.comparison.QueryComparison</mainClass>
               <name>query-comparator</name>
               <jvmSettings>
                 <initialMemorySize>10G</initialMemorySize>
                 <maxMemorySize>30G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
-                  <extraArgument>-Dlog4j.configuration=conf/pinot-tools-log4j.properties</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.query.comparison.StarQueryComparison</mainClass>
+              <mainClass>org.apache.pinot.tools.query.comparison.StarQueryComparison</mainClass>
               <name>star-query-comparator</name>
               <jvmSettings>
                 <initialMemorySize>10G</initialMemorySize>
                 <maxMemorySize>30G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
-                  <extraArgument>-Dlog4j.configuration=conf/pinot-tools-log4j.properties</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.query.comparison.StatsGenerator</mainClass>
+              <mainClass>org.apache.pinot.tools.query.comparison.StatsGenerator</mainClass>
               <name>stats-generator</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j.configuration=conf/pinot-tools-log4j.properties</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.StarTreeIndexViewer</mainClass>
+              <mainClass>org.apache.pinot.tools.StarTreeIndexViewer</mainClass>
               <name>star-tree-index-viewer</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j.configuration=conf/pinot-tools-log4j.properties</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.admin.PinotController</mainClass>
+              <mainClass>org.apache.pinot.tools.admin.PinotController</mainClass>
               <name>start-controller</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j.configuration=conf/pinot-controller-log4j.properties</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-controller-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.admin.PinotBroker</mainClass>
+              <mainClass>org.apache.pinot.tools.admin.PinotBroker</mainClass>
               <name>start-broker</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j.configuration=conf/pinot-broker-log4j.properties</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-broker-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.admin.PinotServer</mainClass>
+              <mainClass>org.apache.pinot.tools.admin.PinotServer</mainClass>
               <name>start-server</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j.configuration=conf/pinot-server-log4j.properties</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-server-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.Quickstart</mainClass>
+              <mainClass>org.apache.pinot.tools.Quickstart</mainClass>
               <name>quick-start-offline</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j.configuration=conf/quickstart-offline-log4j.properties</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.HybridQuickstart</mainClass>
+              <mainClass>org.apache.pinot.tools.HybridQuickstart</mainClass>
               <name>quick-start-hybrid</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-XX:MaxDirectMemorySize=6g</extraArgument>
-                  <extraArgument>-Dlog4j.configuration=conf/quickstart-offline-log4j.properties</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.RealtimeQuickStart</mainClass>
+              <mainClass>org.apache.pinot.tools.RealtimeQuickStart</mainClass>
               <name>quick-start-realtime</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j.configuration=conf/quickstart-realtime-log4j.properties</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -266,7 +306,7 @@
               </descriptorRefs>
               <archive>
                 <manifest>
-                  <mainClass>com.linkedin.pinot.tools.PinotToolLauncher</mainClass>
+                  <mainClass>org.apache.pinot.tools.PinotToolLauncher</mainClass>
                 </manifest>
               </archive>
               <finalName>pinot-tool-launcher</finalName>
@@ -284,7 +324,7 @@
               </descriptorRefs>
               <archive>
                 <manifest>
-                  <mainClass>com.linkedin.pinot.tools.query.comparison.QueryComparison</mainClass>
+                  <mainClass>org.apache.pinot.tools.query.comparison.QueryComparison</mainClass>
                 </manifest>
               </archive>
               <finalName>query-comparison</finalName>
@@ -293,6 +333,35 @@
             <goals>
               <goal>single</goal>
             </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>2.6</version>
+        <executions>
+          <execution>
+            <id>copy-kafka-resources</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <!-- this is important -->
+              <overwrite>true</overwrite>
+              <!-- target -->
+              <outputDirectory>${basedir}/target/classes/sample_data/</outputDirectory>
+              <resources>
+                <resource>
+                  <!-- source -->
+                  <directory>src/main/resources/sample_data/kafka_${kafka.version}</directory>
+                </resource>
+              </resources>
+            </configuration>
           </execution>
         </executions>
       </plugin>

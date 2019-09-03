@@ -1,12 +1,14 @@
 import Service from '@ember/service';
+import { inject as service } from '@ember/service';
 import {
   toMetricUrn,
   toAbsoluteUrn
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
-import fetch from 'fetch';
 import _ from 'lodash';
-import moment from 'moment';
+
+const ROOTCAUSE_TIMESERIES_ENDPOINT = '/rootcause/metric/timeseries';
+const ROOTCAUSE_TIMESERIES_PRIORITY = 10;
 
 export default Service.extend({
   timeseries: null, // {}
@@ -16,6 +18,8 @@ export default Service.extend({
   pending: null, // Set
 
   errors: null, // Set({ urn, error })
+
+  fetcher: service('services/rootcause-fetcher'),
 
   init() {
     this._super(...arguments);
@@ -38,6 +42,8 @@ export default Service.extend({
     let newTimeseries;
     if(!_.isEqual(context, requestContext)) {
       // new analysis range: evict all, reload, keep stale copy of incoming
+      this.get('fetcher').resetPrefix(ROOTCAUSE_TIMESERIES_ENDPOINT);
+
       missing = metrics;
       newPending = new Set(metrics);
       newTimeseries = metrics.filter(urn => urn in timeseries).reduce((agg, urn) => { agg[urn] = timeseries[urn]; return agg; }, {});
@@ -57,8 +63,8 @@ export default Service.extend({
     }
 
     // metrics
-    missing.forEach(urn => {
-      return this._fetchSlice(urn, requestContext);
+    [...missing].sort().forEach((urn, i) => {
+      return this._fetchSlice(urn, requestContext, i);
     });
   },
 
@@ -84,14 +90,16 @@ export default Service.extend({
   },
 
   _fetchSlice(urn, context) {
+    const fetcher = this.get('fetcher');
+
     const metricUrn = toMetricUrn(urn);
     const range = context.analysisRange;
     const offset = toAbsoluteUrn(urn, context.compareMode).split(':')[2].toLowerCase();
     const granularity = context.granularity;
     const timezone = 'America/Los_Angeles';
 
-    const url = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=${offset}&granularity=${granularity}&timezone=${timezone}`;
-    return fetch(url)
+    const url = `${ROOTCAUSE_TIMESERIES_ENDPOINT}?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=${offset}&granularity=${granularity}&timezone=${timezone}`;
+    return fetcher.fetch(url, ROOTCAUSE_TIMESERIES_PRIORITY)
       .then(checkStatus)
       .then(res => this._extractTimeseries(res, urn))
       .then(res => this._complete(context, res))

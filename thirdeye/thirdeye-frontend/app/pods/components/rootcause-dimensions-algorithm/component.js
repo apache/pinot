@@ -42,7 +42,9 @@ import {
   toBaselineUrn,
   hasPrefix,
   toWidthNumber,
-  toBaselineRange
+  toBaselineRange,
+  toFilters,
+  hasExclusionFilters
 } from 'thirdeye-frontend/utils/rca-utils';
 import {
   groupedHeaders,
@@ -114,7 +116,9 @@ export default Component.extend({
     depth: '3',
     dimensions: [],
     summarySize: 20,
+    orderType: 'auto',
     oneSideError: 'false',
+    enableSubTotals: true,
     excludedDimensions: []
   },
 
@@ -123,12 +127,6 @@ export default Component.extend({
    * @type {Boolean}
    */
   isUserCustomizingRequest: false,
-
-  /**
-   * URN state history in component
-   * @type {Array}
-   */
-  previousUrns: [],
 
   /**
    * Concatenated settings string
@@ -144,10 +142,11 @@ export default Component.extend({
   dimensionOptions: [],
 
   /**
-   * Single record cache for previous row's dimension names array
-   * @type {Array}
+   * Caches for state of previous request
    */
-  previousDimensionValues: [],
+  previousDimensionValues: [], // previous row's dimension names array
+  previousMetricSettings: '',  // previous request's metric urn and settings string
+  previousCustomSettings: '',  // previous request's custom settings string
 
   /**
    * Override for table classes
@@ -157,6 +156,12 @@ export default Component.extend({
     table: 'rootcause-dimensions-table table-condensed',
     noDataCell: 'rootcause-dimensions-table__column--blank-cell'
   },
+
+  /**
+   * Labels to omit from URN when isolating filter keys
+   * @type {Array}
+   */
+  baseUrnArr: ['thirdeye', 'metric'],
 
   /**
    * Boolean to prevent render pre-fetch
@@ -170,6 +175,17 @@ export default Component.extend({
    */
   headerFilteringRowTemplate: 'custom/dimensions-table/header-row-filtering',
 
+  /**
+   * Set up initial states for custom table settings
+   */
+  init() {
+    this._super(...arguments);
+    this._resetSettings(['initialTableSettings', 'savedSettings'], 'customTableSettings');
+  },
+
+  /**
+   * Trigger conditional data fetch method on changing context properties (metric, time range, etc)
+   */
   didReceiveAttrs() {
     this._super(...arguments);
     this._fetchIfNewContext();
@@ -188,6 +204,11 @@ export default Component.extend({
       const dimensionNames = dimensionsRawData.dimensions || [];
       const dimensionRows = dimensionsRawData.responseRows || [];
       let newDimensionRows = [];
+
+      // If "sub-totals" rows are needed for each dimension grouping...
+      if (get(this, 'enableSubTotals')) {
+        this._insertDimensionTotalRows(dimensionRows);
+      }
 
       // Build new dimension array for display as table rows
       if (dimensionRows.length) {
@@ -218,6 +239,11 @@ export default Component.extend({
     }
   ),
 
+  hasExclusion: computed('metricUrn', function () {
+    const metricUrn = get(this, 'metricUrn');
+    return hasExclusionFilters(toFilters(metricUrn));
+  }),
+
   /**
    * Builds the columns array, pushing incoming dimensions into the base columns
    * @type {Array} Array of column objects
@@ -237,7 +263,7 @@ export default Component.extend({
             disableSorting: true,
             isFirstColumn: index === 0,
             disableFiltering: isLastDimension, // currently overridden by headerFilteringRowTemplate
-            propertyName: dimension.camelize(),
+            propertyName: dimension,
             title: dimension.capitalize(),
             isGrouped: !isLastDimension, // no label grouping logic on last dimension
             component: 'custom/dimensions-table/dimension',
@@ -267,44 +293,126 @@ export default Component.extend({
   ),
 
   /**
+   * Prepare new rows for table to display rolled up totals for sub-dimensions
+   * TODO: Remove this prototype if not needed. Else, dry it out some more (smcclung)
+   * @method  _insertDimensionTotalRows
+   * @param {Array} dimensionRows - array of dimension records
+   * @private
+   */
+  _insertDimensionTotalRows(dimensionRows) {
+    // Get all unique parent dimension names
+    const firstLevelGroups = [...new Set(dimensionRows.map(row => row.names[0]))];
+    firstLevelGroups.forEach((topGroupName) => {
+      if (!topGroupName.toLowerCase().includes('all')) {
+        // Insert a "totals" row for each major dimension value (across all subdimensions)
+        let dimNames = [topGroupName, 'All', 'All'];
+        let dimGroup = dimensionRows.filter(rec => rec.names[0] === topGroupName);
+        let whereToInsert = dimensionRows.findIndex(record => record.names[0] === topGroupName);
+        this._rollUpSubDimensionTotals(dimensionRows, dimGroup, whereToInsert, dimNames);
+        // Insert a "totals" row for each child value (sub-dimensions)
+        let secondLevelGroups = [...new Set(dimGroup.map(item => item.names[1]))];
+        secondLevelGroups.forEach((subGroupName) => {
+          let dimNames = [topGroupName, subGroupName, 'All'];
+          let subGroup = dimGroup.filter(rec => rec.names[1] === subGroupName);
+          let whereToInsert = dimensionRows.findIndex(record => record.names[0] === topGroupName && record.names[1] === subGroupName);
+          this._rollUpSubDimensionTotals(dimensionRows, subGroup, whereToInsert, dimNames);
+        });
+      }
+    });
+  },
+
+  /**
+   * Adds up total contribution values by dimension group and sub-group, creating a row for "Total" or "All"
+   * It does this by adding rows to our existing dimension array.
+   * TODO: Remove this prototype if not needed. Else, dry it out some more (smcclung)
+   * @method  _rollUpSubDimensionTotals
+   * @param {Array} dimensionRows - array of dimension records
+   * @param {Array} dimSubGroup - filtered set of dimension rows to add up
+   * @param {Number} whereToInsert - index of dimension array at which we insert our new totals rows
+   * @param {Array} names - breakdown of dimension/subdimension names for given row
+   * @private
+   */
+  _rollUpSubDimensionTotals(dimensionRows, dimSubGroup, whereToInsert, names) {
+    const recordToCopy = dimensionRows[whereToInsert]; // Placeholder for actual values
+    const newRecordObj = {
+      names,
+      currentValue: dimSubGroup.map(row => row.currentValue).reduce((total, amount) => total + amount),
+      baselineValue: dimSubGroup.map(row => row.baselineValue).reduce((total, amount) => total + amount),
+      percentageChange: recordToCopy.percentageChange,
+      contributionChange: recordToCopy.contributionChange,
+      contributionToOverallChange: recordToCopy.contributionToOverallChange,
+      cost: recordToCopy.cost
+    };
+    dimensionRows.splice(whereToInsert, 0, newRecordObj);
+  },
+
+  /**
+   * Extracts the filter keys/values from the metric URN and formats it for the API
+   * @method _stringifyFilterForApi
+   * @returns {String} filters param for 'autoDimensionOrder' request
+   * @private
+   */
+  _stringifyFilterForApi(metricUrn) {
+    const baseUrnArr = get(this, 'baseUrnArr');
+    const metricArr = metricUrn.length ? metricUrn.split(':') : ['0'];
+    // Isolate filter keys/values from incoming metric URN
+    const rawFilterStr = metricArr.filter((urnFragment) => {
+      return isNaN(urnFragment) && !baseUrnArr.includes(urnFragment);
+    }).join(';');
+    // Construct API-ready filter string
+    const finalFilterStr = makeFilterString(decodeURIComponent(rawFilterStr));
+    return rawFilterStr.length ? finalFilterStr : '';
+  },
+
+  /**
    * Decides whether to fetch new table data and reload component
    * @method _fetchIfNewContext
    * @private
    */
   _fetchIfNewContext() {
-    const { mode, range, entities, metricUrn, previousUrns } = this.getProperties(
+    const {
+      mode,
+      range,
+      entities,
+      metricUrn,
+      previousMetricSettings,
+      previousCustomSettings,
+      customTableSettings,
+      hasExclusion
+    } = this.getProperties(
       'mode',
       'range',
       'entities',
       'metricUrn',
-      'previousUrns'
-    );
-    const { previousSettings, customTableSettings, isUserCustomizingRequest } = this.getProperties(
-      'previousSettings',
+      'previousMetricSettings',
+      'previousCustomSettings',
       'customTableSettings',
-      'isUserCustomizingRequest'
+      'hasExclusion'
     );
-    // Labels to omit from URN when isolating filter keys
-    const baseUrnArr = ['thirdeye', 'metric'];
-    // Stringifying any custom settings so that we can append to our caching key
-    const customSettings = Object.values(customTableSettings).join(':');
-    // Isolate filter keys/values from incoming metric URN
-    const rawFilterStr = metricUrn.split(':').filter((urnFragment) => {
-      return isNaN(urnFragment) && !baseUrnArr.includes(urnFragment);
-    }).join(';');
-    // Construct API-ready filter string
-    const finalFilterStr = makeFilterString(decodeURIComponent(rawFilterStr));
-    // Baseline start/end is dependent on 'compareMode' (WoW, Wo2W, etc)
-    const baselineRange = toBaselineRange(range, mode);
-    // If metric URN is found in entity list, proceed. Otherwise, we don't have metric & dataset names for the call.
+
     const metricEntity = entities[metricUrn];
+    let isUserCustomizingRequest = get(this, 'isUserCustomizingRequest');
     // Concatenate incoming settings for bulk comparison
-    const newConcatSettings = `${metricUrn}:${range[0]}:${range[1]}:${mode}:${customSettings}`;
+    const newMetricSettings = `${metricUrn}:${range[0]}:${range[1]}:${mode}`;
+    const newCustomSettings = Object.values(customTableSettings).join(':');
     // Compare current and incoming settings
-    const isSameMetricSettings = previousSettings === newConcatSettings;
-    // If we have new settings, we can trigger fetch/reload. Otherwise, do nothing
-    if ((metricEntity && !isSameMetricSettings) || isUserCustomizingRequest) {
+    const isSameMetricSettings = (previousMetricSettings === newMetricSettings);
+    const isSameCustomSettings = (previousCustomSettings === newCustomSettings);
+
+    // Reset settings if metrics have changed
+    if (!isSameMetricSettings) {
+      isUserCustomizingRequest = true;
+      this._resetSettings(['customTableSettings', 'savedSettings'], 'initialTableSettings');
+    }
+
+    // Abort if metric with exclusion filters
+    if (hasExclusion) { return; }
+
+    // If we have new settings, and a metric to work with, we can trigger fetch/reload. Otherwise, do nothing
+    if (metricEntity && (!isSameCustomSettings || isUserCustomizingRequest)) {
       const parsedMetric = metricEntity.label.split('::');
+      const metricId = metricUrn.match(/^thirdeye:metric:(\d+)/)[1];
+      const baselineRange = toBaselineRange(range, mode); // start/end is dependent on 'compareMode' (WoW, Wo2W, etc)
       const requestObj = {
         metric: parsedMetric[1],
         dataset: parsedMetric[0],
@@ -315,7 +423,8 @@ export default Component.extend({
         summarySize: customTableSettings.summarySize,
         oneSideError: customTableSettings.oneSideError,
         depth: customTableSettings.depth,
-        filters: rawFilterStr.length ? finalFilterStr : ''
+        orderType: customTableSettings.orderType,
+        filters: this._stringifyFilterForApi(metricUrn)
       };
       // Add dimensions/exclusions into query if not empty
       if (customTableSettings.dimensions.length) {
@@ -324,15 +433,31 @@ export default Component.extend({
       if (customTableSettings.excludedDimensions.length) {
         Object.assign(requestObj, { excludedDimensions: customTableSettings.excludedDimensions.join(',') });
       }
+      // Fetch dimension algorithm data
       get(this, 'fetchDimensionAnalysisData').perform(requestObj);
-      // Fetch dimension options
-      get(this, 'fetchDimensionOptions').perform(get(this, 'metricId'));
+      // Fetch dimension options to populate settings modal dropdown
+      get(this, 'fetchDimensionOptions').perform(metricId);
       // Cache incoming settings and URNs
       setProperties(this, {
-        previousSettings: newConcatSettings,
-        previousUrns: [...get(this, 'selectedUrns')]
+        previousMetricSettings: newMetricSettings,
+        previousCustomSettings: newCustomSettings
       });
     }
+  },
+
+  /**
+   * As we're doing this object clone more than once to reset table settings, here is a
+   * helper function, called this way: set(this, 'savedSettings', Object.assign({}, customTableSettings));
+   * @method  _resetSettings
+   * @param {Array} targetObjectNames - array of one or more object names
+   * @param {String} sourceObjName - name of object to copy properties from
+   * @private
+   */
+  _resetSettings(targetObjectNames, sourceObjName) {
+    const sourceObj = get(this, sourceObjName);
+    targetObjectNames.forEach((targetObj) => {
+      set(this, targetObj, Object.assign({}, sourceObj));
+    });
   },
 
   /**
@@ -393,7 +518,7 @@ export default Component.extend({
       let isExclusionRecord = dimensionValue === '(ALL)-';
       let modifiedValue = isExclusionRecord ? 'Other' : dimensionValue;
       return {
-        label: name.camelize(),
+        label: name,
         value: modifiedValue ? modifiedValue.replace('(ALL)', 'All') : '-',
         isHidden: dimensionValue === previousDimensionValues[index], // if its a repeated value, hide it
         otherValues: isExclusionRecord ? otherValues : null
@@ -418,8 +543,12 @@ export default Component.extend({
      * Handle submission of custom settings from settings modal
      */
     onSave() {
-      set(this, 'isUserCustomizingRequest', true);
-      set(this, 'openSettingsModal', false);
+      setProperties(this, {
+        openSettingsModal: false,
+        isUserCustomizingRequest: true
+      });
+      // Cache saved state
+      this._resetSettings(['savedSettings'], 'customTableSettings');
       this._fetchIfNewContext();
     },
 
@@ -427,6 +556,7 @@ export default Component.extend({
      * Handle custom settings modal cancel
      */
     onCancel() {
+      this._resetSettings(['customTableSettings'], 'savedSettings');
       set(this, 'openSettingsModal', false);
     },
 
@@ -444,7 +574,7 @@ export default Component.extend({
      */
     displayDataChanged(eventObj) {
       if (isEmpty(eventObj.selectedItems)) { return; }
-      const { selectedUrns, onSelection } = this.getProperties('selectedUrns', 'onSelection');
+      const onSelection = get(this, 'onSelection');
       const selectedRows = eventObj.selectedItems;
       if (!onSelection) { return; }
       const selectedRecord = selectedRows[0];
@@ -481,9 +611,7 @@ export default Component.extend({
    */
   fetchDimensionAnalysisData: task(function * (dimensionObj) {
     const dimensionsPayload = yield this.get('dimensionsApiService').queryDimensionsByMetric(dimensionObj);
-    const dimensionNames = dimensionsPayload.dimensions || [];
     const ratio = dimensionsPayload.globalRatio;
-    const cobTotal = `${dimensionsPayload.currentTotal}/${dimensionsPayload.baselineTotal}`;
 
     this.setProperties({
       dimensionsRawData: dimensionsPayload,

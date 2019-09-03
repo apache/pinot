@@ -1,0 +1,38 @@
+# Below is a sample subscription group template. You may refer the documentation and update accordingly.
+
+# The name of the subscription group. You may choose an existing or a provide a new subscription group name
+subscriptionGroupName: test_subscription_group
+
+# Every alert in ThirdEye is attached to an application. Please specify the registered application name here. You may request for a new application by dropping an email to ask_thirdeye
+application: thirdeye-internal
+
+# The default notification type. See additional settings for details and exploring other notification types like dimension alerter.
+type: DEFAULT_ALERTER_PIPELINE
+
+# List of detection names that you want to subscribe. Copy-paste the detection name from the above anomaly detection config here.
+subscribedDetections:
+  - sample_detection
+
+# Configure how you want to be alerted. You can receive the standard ThirdEye email alert (recommended)
+# or for advanced critical use-cases setup Iris alert by referring to the documentation
+alertSchemes:
+  - type: EMAIL
+recipients:
+  to:
+    - "me@company.com"          # Specify alert recipient email address here
+    - "me@company.com"
+  cc:
+    - "cc_email@company.com"
+fromAddress: email@domain.com
+
+# The frequency at which you want to be notified. Typically you want to be notified immediately after
+# an anomaly is detected. The below cron runs every 5 minutes. Use online cronmaker to compute this.
+cron: "0 0/5 * 1/1 * ? *"
+
+# Enable or disable notification of alert
+active: true
+
+# The below links will appear in the email alerts. This will help alert recipients to quickly refer and act on.
+referenceLinks:
+  "Oncall Runbook": "http://go/oncall"
+  "Thirdeye FAQs": "http://go/thirdeyefaqs"

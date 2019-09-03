@@ -22,9 +22,7 @@ export default Base.extend({
     return fetch(url, postProps).then(checkStatus).then((res) => {
       // set expiration to 7 days
       let expiration = 60 * 60 * 24 * 7;
-
       this.set('session.store.cookieExpirationTime', expiration);
-
       return res;
     });
   },

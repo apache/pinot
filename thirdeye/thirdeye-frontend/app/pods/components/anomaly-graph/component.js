@@ -4,7 +4,7 @@ import { later } from '@ember/runloop';
 import Component from '@ember/component';
 import moment from 'moment';
 import d3 from 'd3';
-import { eventWeightMapping } from 'thirdeye-frontend/actions/constants';
+import { humanizeFloat } from 'thirdeye-frontend/utils/utils';
 
 const COLOR_MAPPING = {
   blue: '#33AADA',
@@ -26,7 +26,8 @@ const COLOR_MAPPING = {
 export default Component.extend({
   init() {
     this._super(...arguments);
-
+    const subChartStart = this.get('subChartStart');
+    const subChartEnd = this.get('subChartEnd');
     this.setProperties({
       _subchartStart: Number(this.get('subchartStart')),
       _subchartEnd: Number(this.get('subchartEnd'))
@@ -65,94 +66,6 @@ export default Component.extend({
       .attr("y2", 33);
   },
 
-  buildAnomalyRegionSlider(start, end) {
-    const {
-      componentId,
-      regionStart,
-      regionEnd,
-      _subchartStart: subchartStart,
-      _subchartEnd: subchartEnd
-    } = this.getProperties(
-      'componentId',
-      'regionStart',
-      'regionEnd',
-      '_subchartStart',
-      '_subchartEnd');
-
-    start = start || subchartStart;
-    end = end || subchartEnd;
-
-    d3.select(`#${componentId} .anomaly-graph__region-slider`).remove();
-    if (componentId !== 'main-graph') {return;}
-
-    const focus = d3.select(`#${componentId}.c3-chart-component .c3-chart`);
-    const { height, width } = d3.select(`#${componentId} .c3-chart .c3-event-rects`).node().getBoundingClientRect();
-    const dates = this.get('primaryMetric.timeBucketsCurrent');
-    const min = start ? moment(start).valueOf() : d3.min(dates);
-    const max = end ? moment(end).valueOf() : d3.max(dates);
-
-    const x = d3.time.scale()
-      .domain([min, max])
-      .range([0, width]);
-
-    const brush = d3.svg.brush()
-      .on("brushend", brushed.bind(this))
-      .x(x)
-      .extent([+regionStart, +regionEnd]);
-
-    function brushed() {
-      const e = brush.extent();
-      const [ start, end ] = e;
-
-      const regionStart = moment(start).valueOf();
-      const regionEnd = moment(end).valueOf();
-      const subchartStart = this.get('_subchartStart');
-      const subchartEnd = this.get('_subchartEnd');
-
-      this.setProperties({
-        regionStart,
-        regionEnd,
-        subchartStart,
-        subchartEnd
-      });
-    }
-
-    focus.append('g')
-      .attr('class', 'anomaly-graph__region-slider x brush')
-      .call(brush)
-      .selectAll('rect')
-      .attr('y', 0)
-      .attr('height', height);
-
-    const resizeButton = focus.selectAll('.resize');
-    const sliderHeight = height/2;
-    resizeButton.append('circle')
-      .attr('cx', 0)
-      .attr('cy', sliderHeight)
-      .attr('r', 10)
-      .attr('fill', '#E55800');
-    resizeButton.append('line')
-      .attr('class', 'anomaly-graph__slider-line')
-      .attr("x1", 0)
-      .attr("y1", sliderHeight - 3)
-      .attr("x2", 0)
-      .attr("y2", sliderHeight + 3);
-
-    resizeButton.append('line')
-      .attr('class', 'anomaly-graph__slider-line')
-      .attr("x1", -5)
-      .attr("y1", sliderHeight - 3)
-      .attr("x2", -5)
-      .attr("y2", sliderHeight + 3);
-
-    resizeButton.append('line')
-      .attr('class', 'anomaly-graph__slider-line')
-      .attr("x1", 5)
-      .attr("y1", sliderHeight - 3)
-      .attr("x2", 5)
-      .attr("y2", sliderHeight + 3);
-  },
-
   // Builds the Current/Expected legend for the graph
   buildCustomLegend() {
     const componentId = this.get('componentId');
@@ -160,12 +73,11 @@ export default Component.extend({
     const legendText = this.get('legendText');
 
     const {
-      dotted = { text: 'expected', color: 'blue'},
       solid = { text: 'current', color: 'blue' }
     }  = legendText;
 
     chart.insert('div', '.chart').attr('class', 'anomaly-graph__legend').selectAll('span')
-      .data([dotted, solid])
+      .data([solid])
       .enter().append('svg')
       .attr('class', 'anomaly-graph__legend-item')
       .attr('width', 80)
@@ -187,8 +99,8 @@ export default Component.extend({
           .attr('y1', 10)
           .attr('x2', 30)
           .attr('y2', 10)
-          .attr('stroke-dasharray', (d) => {
-            const dasharrayNum = (d === dotted) ? '10%' : 'none';
+          .attr('stroke-dasharray', () => {
+            const dasharrayNum = 'none';
             return dasharrayNum;
           });
       });
@@ -214,8 +126,6 @@ export default Component.extend({
 
     later(() => {
       this.buildSliderButton();
-      // hiding this feature until fully fleshed out
-      // this.buildAnomalyRegionSlider();
       this.buildCustomLegend().then(() => {
         this.notifyPhantomJS();
       });
@@ -255,7 +165,8 @@ export default Component.extend({
       primaryMetric,
       ...relatedMetric,
       ...selectedMetrics,
-      ...selectedDimensions];
+      ...selectedDimensions
+    ];
 
     data.forEach((datum) => {
       const name = datum.metricName || datum.name;
@@ -280,7 +191,7 @@ export default Component.extend({
   dimensions: [],
   selectedDimensions: [],
 
-  showGraphLegend: true,
+  showGraphLegend: false,
   colors: {},
   showSubChart: false,
   subchartStart: null,
@@ -386,10 +297,9 @@ export default Component.extend({
    * Graph Legend config
    */
   legend: computed('showGraphLegend', function() {
-    const showGraphLegend = this.get('showGraphLegend');
     return {
       position: 'inset',
-      show: showGraphLegend
+      show: false
     };
   }),
 
@@ -460,7 +370,7 @@ export default Component.extend({
           show: true,
           // min: 0,
           tick: {
-            format: d3.format('.2s')
+            format: function(d){return humanizeFloat(d);}
           }
         },
         y2: {
@@ -530,8 +440,6 @@ export default Component.extend({
 
       onSubchartBrush && onSubchartBrush(dates);
     }
-    // hiding this feature until fully fleshed out
-    // this.buildAnomalyRegionSlider(start, end);
 
   },
 
@@ -542,8 +450,7 @@ export default Component.extend({
     'showLegend',
     'height',
     function() {
-      const height = this.get('height')
-        || this.get('showLegend') ? 400 : 200;
+      const height = this.get('height') || 400;
       return {
         height
       };
@@ -561,15 +468,13 @@ export default Component.extend({
 
       // Return data only when it's selected
       if (primaryMetric.isSelected) {
-        const { baselineValues, currentValues } = primaryMetric.subDimensionContributionMap['All'];
+        const { currentValues } = primaryMetric.subDimensionContributionMap['All'];
         return [
-          [`${primaryMetric.metricName}-current`, ...currentValues],
-          [`${primaryMetric.metricName}-expected`, ...baselineValues]
+          [`${primaryMetric.metricName}-current`, ...currentValues]
         ];
       }
       return [
-        [`${primaryMetric.metricName}-current`],
-        [`${primaryMetric.metricName}-expected`]
+        [`${primaryMetric.metricName}-current`]
       ];
     }
   ),
@@ -587,9 +492,8 @@ export default Component.extend({
       selectedMetrics.forEach((metric)  => {
         if (!metric) { return; }
 
-        const { baselineValues, currentValues } = metric.subDimensionContributionMap['All'];
+        const { currentValues } = metric.subDimensionContributionMap['All'];
         columns.push([`${metric.metricName}-current`, ...currentValues]);
-        columns.push([`${metric.metricName}-expected`, ...baselineValues]);
       });
       return columns;
     }
@@ -605,9 +509,8 @@ export default Component.extend({
       const selectedDimensions = this.get('selectedDimensions') || [];
 
       selectedDimensions.forEach((dimension) => {
-        const { baselineValues, currentValues } = dimension;
+        const { currentValues } = dimension;
         columns.push([`${dimension.name}-current`, ...currentValues]);
-        columns.push([`${dimension.name}-expected`, ...baselineValues]);
       });
       return columns;
     }
@@ -798,13 +701,9 @@ export default Component.extend({
         } else {
           // do not return values if data point is an event
 
-          const eventType = Object.keys(eventWeightMapping).find((key) => {
-            if (val == eventWeightMapping[key]) {
-              return key;
-            }
-          });
+          // NOTE: eventWeightMapping code removed on rca v1 deprecation
 
-          return eventType || '';
+          return '';
         }
       }
     }

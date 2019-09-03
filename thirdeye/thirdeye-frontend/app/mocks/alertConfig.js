@@ -27,7 +27,11 @@ export default [
       "contactEmail": "simba@disney.com"
     },
     "alertGroupConfig": null,
-    "recipients": "simba@disney.com",
+    "receiverAddresses": {
+      "to": ["kopa@disney.com", "kiara@disney.com", "kion@disney.com"],
+      "cc": ["simba@disney.com, nala@disney.com"],
+      "bcc": ["scar@disney.com"]
+    },
     "fromAddress": "mufasa@disney.com"
   }, {
     "id": 2,
@@ -58,6 +62,8 @@ export default [
       "contactEmail": "gaston@disney.com"
     },
     "alertGroupConfig": null,
-    "recipients": "gaston@disney.com",
+    "receiverAddresses": {
+      "to": ["gaston@disney.com"]
+    },
     "fromAddress": "belle@disney.com"
   }];
