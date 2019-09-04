@@ -26,7 +26,12 @@ import java.util.Set;
 import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.*;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.AbsTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.CeilTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.ExpTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.FloorTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.LnTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.SqrtTransformFunction;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 
 

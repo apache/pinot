@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -29,94 +28,84 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 /**
  * Interface for aggregation functions.
  *
- * @param <IntermediateResult> intermediate result generated from segment.
- * @param <FinalResult> final result used in broker response.
+ * @param <IntermediateResult> Intermediate result generated from segment
+ * @param <FinalResult> Final result used in broker response
  */
 public interface AggregationFunction<IntermediateResult, FinalResult extends Comparable> {
 
   /**
-   * Get the type of the aggregation function.
+   * Returns the type of the aggregation function.
    */
-  @Nonnull
   AggregationFunctionType getType();
 
   /**
-   * Given the aggregation column, get the column name for the results.
+   * Returns the result column name for the given aggregation column, e.g. 'SUM(foo)' -> 'sum_foo'.
    */
-  @Nonnull
-  String getColumnName(@Nonnull String column);
+  String getColumnName(String column);
 
   /**
-   * Accept an aggregation function visitor to visit.
+   * Accepts an aggregation function visitor to visit.
    */
-  void accept(@Nonnull AggregationFunctionVisitorBase visitor);
+  void accept(AggregationFunctionVisitorBase visitor);
 
   /**
-   * Create an aggregation result holder for this function.
+   * Returns an aggregation result holder for this function (aggregation only).
    */
-  @Nonnull
   AggregationResultHolder createAggregationResultHolder();
 
   /**
-   * Create a group-by result holder with the given initial capacity, max capacity and trim size for this function.
+   * Returns a group-by result holder with the given initial capacity and max capacity for this function (aggregation
+   * group-by).
    */
-  @Nonnull
   GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity);
 
   /**
-   * Perform aggregation on the given projection block value sets.
+   * Performs aggregation on the given block value sets (aggregation only).
    */
-  void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull BlockValSet... blockValSets);
+  void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets);
 
   /**
-   * Perform group-by on the given group key array and projection block value sets.
-   * <p>This method is for all single-value group-by columns case, where each docId has only one group key.
+   * Performs aggregation on the given group key array and block value sets (aggregation group-by on single-value
+   * columns).
    */
-  void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray, @Nonnull GroupByResultHolder groupByResultHolder,
-      @Nonnull BlockValSet... blockValSets);
+  void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets);
 
   /**
-   * Perform group-by on the given group keys array and projection block value sets.
-   * <p>This method is for multi-value group by columns case, where each docId can have multiple group keys.
+   * Performs aggregation on the given group keys array and block value sets (aggregation group-by on multi-value
+   * columns).
    */
-  void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray, @Nonnull GroupByResultHolder groupByResultHolder,
-      @Nonnull BlockValSet... blockValSets);
+  void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets);
 
   /**
-   * Extract aggregation result from the aggregation result holder.
+   * Extracts the intermediate result from the aggregation result holder (aggregation only).
    */
-  @Nonnull
-  IntermediateResult extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder);
+  IntermediateResult extractAggregationResult(AggregationResultHolder aggregationResultHolder);
 
   /**
-   * Extract group-by result from the group-by result holder and group key.
+   * Extracts the intermediate result from the group-by result holder for the given group key (aggregation group-by).
    */
-  @Nonnull
-  IntermediateResult extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey);
+  IntermediateResult extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey);
 
   /**
-   * Merge two intermediate results.
+   * Merges two intermediate results.
    */
-  @Nonnull
-  IntermediateResult merge(@Nonnull IntermediateResult intermediateResult1,
-      @Nonnull IntermediateResult intermediateResult2);
+  IntermediateResult merge(IntermediateResult intermediateResult1, IntermediateResult intermediateResult2);
 
   /**
-   * Return whether the intermediate result is comparable.
+   * Returns whether the intermediate result is comparable.
    */
   boolean isIntermediateResultComparable();
 
   /**
-   * Get the {@link DataSchema.ColumnDataType} of the intermediate result.
+   * Returns the {@link ColumnDataType} of the intermediate result.
    * <p>This column data type is used for transferring data in data table.
    */
-  @Nonnull
-  DataSchema.ColumnDataType getIntermediateResultColumnType();
+  ColumnDataType getIntermediateResultColumnType();
 
   /**
-   * Extract the final result used in the broker response from the given intermediate result.
+   * Extracts the final result used in the broker response from the given intermediate result.
    */
-  @Nonnull
-  FinalResult extractFinalResult(@Nonnull IntermediateResult intermediateResult);
+  FinalResult extractFinalResult(IntermediateResult intermediateResult);
 }

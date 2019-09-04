@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -33,38 +32,33 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 
 public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMaxRangePair, Double> {
 
-  @Nonnull
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.MINMAXRANGE;
   }
 
-  @Nonnull
   @Override
-  public String getColumnName(@Nonnull String column) {
+  public String getColumnName(String column) {
     return AggregationFunctionType.MINMAXRANGE.getName() + "_" + column;
   }
 
   @Override
-  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+  public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
 
-  @Nonnull
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
     return new ObjectAggregationResultHolder();
   }
 
-  @Nonnull
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
     return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
   }
 
   @Override
-  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull BlockValSet... blockValSets) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
     switch (valueType) {
       case INT:
@@ -106,8 +100,7 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
     }
   }
 
-  protected void setAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder, double min,
-      double max) {
+  protected void setAggregationResult(AggregationResultHolder aggregationResultHolder, double min, double max) {
     MinMaxRangePair minMaxRangePair = aggregationResultHolder.getResult();
     if (minMaxRangePair == null) {
       aggregationResultHolder.setValue(new MinMaxRangePair(min, max));
@@ -117,8 +110,8 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
   }
 
   @Override
-  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
     switch (valueType) {
       case INT:
@@ -145,8 +138,8 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
   }
 
   @Override
-  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
     switch (valueType) {
       case INT:
@@ -176,8 +169,7 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
     }
   }
 
-  protected void setGroupByResult(int groupKey, @Nonnull GroupByResultHolder groupByResultHolder, double min,
-      double max) {
+  protected void setGroupByResult(int groupKey, GroupByResultHolder groupByResultHolder, double min, double max) {
     MinMaxRangePair minMaxRangePair = groupByResultHolder.getResult(groupKey);
     if (minMaxRangePair == null) {
       groupByResultHolder.setValueForKey(groupKey, new MinMaxRangePair(min, max));
@@ -186,9 +178,8 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
     }
   }
 
-  @Nonnull
   @Override
-  public MinMaxRangePair extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+  public MinMaxRangePair extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     MinMaxRangePair minMaxRangePair = aggregationResultHolder.getResult();
     if (minMaxRangePair == null) {
       return new MinMaxRangePair(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
@@ -197,9 +188,8 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
     }
   }
 
-  @Nonnull
   @Override
-  public MinMaxRangePair extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+  public MinMaxRangePair extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     MinMaxRangePair minMaxRangePair = groupByResultHolder.getResult(groupKey);
     if (minMaxRangePair == null) {
       return new MinMaxRangePair(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
@@ -208,10 +198,8 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
     }
   }
 
-  @Nonnull
   @Override
-  public MinMaxRangePair merge(@Nonnull MinMaxRangePair intermediateResult1,
-      @Nonnull MinMaxRangePair intermediateResult2) {
+  public MinMaxRangePair merge(MinMaxRangePair intermediateResult1, MinMaxRangePair intermediateResult2) {
     intermediateResult1.apply(intermediateResult2);
     return intermediateResult1;
   }
@@ -221,15 +209,13 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
     return true;
   }
 
-  @Nonnull
   @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.OBJECT;
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.OBJECT;
   }
 
-  @Nonnull
   @Override
-  public Double extractFinalResult(@Nonnull MinMaxRangePair intermediateResult) {
+  public Double extractFinalResult(MinMaxRangePair intermediateResult) {
     return intermediateResult.getMax() - intermediateResult.getMin();
   }
 }

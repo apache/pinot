@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -27,21 +26,23 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 public class MaxMVAggregationFunction extends MaxAggregationFunction {
 
-  @Nonnull
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.MAXMV;
   }
 
-  @Nonnull
   @Override
-  public String getColumnName(@Nonnull String column) {
+  public String getColumnName(String column) {
     return AggregationFunctionType.MAXMV.getName() + "_" + column;
   }
 
   @Override
-  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull BlockValSet... blockValSets) {
+  public void accept(AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
+
+  @Override
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
     double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
     double max = aggregationResultHolder.getDoubleResult();
     for (int i = 0; i < length; i++) {
@@ -55,8 +56,8 @@ public class MaxMVAggregationFunction extends MaxAggregationFunction {
   }
 
   @Override
-  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeyArray[i];
@@ -71,8 +72,8 @@ public class MaxMVAggregationFunction extends MaxAggregationFunction {
   }
 
   @Override
-  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
     for (int i = 0; i < length; i++) {
       double[] values = valuesArray[i];

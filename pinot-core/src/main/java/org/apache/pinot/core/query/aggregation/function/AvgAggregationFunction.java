@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -34,38 +33,33 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 public class AvgAggregationFunction implements AggregationFunction<AvgPair, Double> {
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
-  @Nonnull
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.AVG;
   }
 
-  @Nonnull
   @Override
-  public String getColumnName(@Nonnull String column) {
+  public String getColumnName(String column) {
     return AggregationFunctionType.AVG.getName() + "_" + column;
   }
 
   @Override
-  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+  public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
 
-  @Nonnull
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
     return new ObjectAggregationResultHolder();
   }
 
-  @Nonnull
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
     return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
   }
 
   @Override
-  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull BlockValSet... blockValSets) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
     switch (valueType) {
       case INT:
@@ -96,8 +90,7 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
     }
   }
 
-  protected void setAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder, double sum,
-      long count) {
+  protected void setAggregationResult(AggregationResultHolder aggregationResultHolder, double sum, long count) {
     AvgPair avgPair = aggregationResultHolder.getResult();
     if (avgPair == null) {
       aggregationResultHolder.setValue(new AvgPair(sum, count));
@@ -107,8 +100,8 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   }
 
   @Override
-  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
     switch (valueType) {
       case INT:
@@ -134,8 +127,8 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   }
 
   @Override
-  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
     switch (valueType) {
       case INT:
@@ -167,8 +160,7 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
     }
   }
 
-  protected void setGroupByResult(int groupKey, @Nonnull GroupByResultHolder groupByResultHolder, double sum,
-      long count) {
+  protected void setGroupByResult(int groupKey, GroupByResultHolder groupByResultHolder, double sum, long count) {
     AvgPair avgPair = groupByResultHolder.getResult(groupKey);
     if (avgPair == null) {
       groupByResultHolder.setValueForKey(groupKey, new AvgPair(sum, count));
@@ -177,9 +169,8 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
     }
   }
 
-  @Nonnull
   @Override
-  public AvgPair extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+  public AvgPair extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     AvgPair avgPair = aggregationResultHolder.getResult();
     if (avgPair == null) {
       return new AvgPair(0.0, 0L);
@@ -188,9 +179,8 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
     }
   }
 
-  @Nonnull
   @Override
-  public AvgPair extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+  public AvgPair extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     AvgPair avgPair = groupByResultHolder.getResult(groupKey);
     if (avgPair == null) {
       return new AvgPair(0.0, 0L);
@@ -199,9 +189,8 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
     }
   }
 
-  @Nonnull
   @Override
-  public AvgPair merge(@Nonnull AvgPair intermediateResult1, @Nonnull AvgPair intermediateResult2) {
+  public AvgPair merge(AvgPair intermediateResult1, AvgPair intermediateResult2) {
     intermediateResult1.apply(intermediateResult2);
     return intermediateResult1;
   }
@@ -211,15 +200,13 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
     return true;
   }
 
-  @Nonnull
   @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.OBJECT;
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.OBJECT;
   }
 
-  @Nonnull
   @Override
-  public Double extractFinalResult(@Nonnull AvgPair intermediateResult) {
+  public Double extractFinalResult(AvgPair intermediateResult) {
     long count = intermediateResult.getCount();
     if (count == 0L) {
       return DEFAULT_FINAL_RESULT;

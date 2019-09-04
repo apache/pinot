@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -40,38 +39,33 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
     _percentile = percentile;
   }
 
-  @Nonnull
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.PERCENTILEEST;
   }
 
-  @Nonnull
   @Override
-  public String getColumnName(@Nonnull String column) {
+  public String getColumnName(String column) {
     return AggregationFunctionType.PERCENTILEEST.getName() + _percentile + "_" + column;
   }
 
   @Override
-  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+  public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
 
-  @Nonnull
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
     return new ObjectAggregationResultHolder();
   }
 
-  @Nonnull
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
     return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
   }
 
   @Override
-  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull BlockValSet... blockValSets) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
     QuantileDigest quantileDigest = getQuantileDigest(aggregationResultHolder);
 
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
@@ -98,8 +92,8 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
   }
 
   @Override
-  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
     switch (valueType) {
       case INT:
@@ -126,8 +120,8 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
   }
 
   @Override
-  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
     switch (valueType) {
       case INT:
@@ -159,9 +153,8 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
     }
   }
 
-  @Nonnull
   @Override
-  public QuantileDigest extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+  public QuantileDigest extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     QuantileDigest quantileDigest = aggregationResultHolder.getResult();
     if (quantileDigest == null) {
       return new QuantileDigest(DEFAULT_MAX_ERROR);
@@ -170,9 +163,8 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
     }
   }
 
-  @Nonnull
   @Override
-  public QuantileDigest extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+  public QuantileDigest extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     QuantileDigest quantileDigest = groupByResultHolder.getResult(groupKey);
     if (quantileDigest == null) {
       return new QuantileDigest(DEFAULT_MAX_ERROR);
@@ -181,10 +173,8 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
     }
   }
 
-  @Nonnull
   @Override
-  public QuantileDigest merge(@Nonnull QuantileDigest intermediateResult1,
-      @Nonnull QuantileDigest intermediateResult2) {
+  public QuantileDigest merge(QuantileDigest intermediateResult1, QuantileDigest intermediateResult2) {
     intermediateResult1.merge(intermediateResult2);
     return intermediateResult1;
   }
@@ -194,15 +184,13 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
     return false;
   }
 
-  @Nonnull
   @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.OBJECT;
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.OBJECT;
   }
 
-  @Nonnull
   @Override
-  public Long extractFinalResult(@Nonnull QuantileDigest intermediateResult) {
+  public Long extractFinalResult(QuantileDigest intermediateResult) {
     return intermediateResult.getQuantile(_percentile / 100.0);
   }
 
@@ -212,7 +200,7 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
    * @param aggregationResultHolder Result holder
    * @return QuantileDigest from the result holder
    */
-  protected static QuantileDigest getQuantileDigest(@Nonnull AggregationResultHolder aggregationResultHolder) {
+  protected static QuantileDigest getQuantileDigest(AggregationResultHolder aggregationResultHolder) {
     QuantileDigest quantileDigest = aggregationResultHolder.getResult();
     if (quantileDigest == null) {
       quantileDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
@@ -228,7 +216,7 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
    * @param groupKey Group key for which to return the QuantileDigest
    * @return QuantileDigest for the group key
    */
-  protected static QuantileDigest getQuantileDigest(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+  protected static QuantileDigest getQuantileDigest(GroupByResultHolder groupByResultHolder, int groupKey) {
     QuantileDigest quantileDigest = groupByResultHolder.getResult(groupKey);
     if (quantileDigest == null) {
       quantileDigest = new QuantileDigest(DEFAULT_MAX_ERROR);

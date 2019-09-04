@@ -16,9 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.aggregation.function;
+package org.apache.pinot.common.function;
 
-import org.apache.pinot.common.function.AggregationFunctionType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
