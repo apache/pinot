@@ -83,7 +83,6 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
   private String _partitionFunction;
   private String _sortedColumn;
   private int _numOutputFiles;
-  private final String _defaultPermissionsMask;
 
   private final Path _inputSegmentDir;
   private final Path _preprocessedOutputDir;
@@ -106,7 +105,6 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     _inputSegmentDir = Preconditions.checkNotNull(getPathFromProperty(JobConfigConstants.PATH_TO_INPUT));
     _preprocessedOutputDir = getPathFromProperty(JobConfigConstants.PREPROCESS_PATH_TO_OUTPUT);
     _rawTableName = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME));
-    _defaultPermissionsMask = _properties.getProperty(JobConfigConstants.DEFAULT_PERMISSIONS_MASK);
 
     _pathToDependencyJar = getPathFromProperty(JobConfigConstants.PATH_TO_DEPS_JAR);
 
@@ -144,8 +142,10 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     final List<Path> inputDataPaths = getDataFilePaths(_inputSegmentDir);
     Preconditions.checkState(inputDataPaths.size() != 0, "No files in the input directory.");
 
-    JobPreparationHelper.mkdirs(_fileSystem, _preprocessedOutputDir, _defaultPermissionsMask);
-
+    if (_fileSystem.exists(_preprocessedOutputDir)) {
+      _logger.warn("Found output folder {}, deleting", _preprocessedOutputDir);
+      _fileSystem.delete(_preprocessedOutputDir, true);
+    }
     setTableConfigAndSchema();
 
     _logger.info("Initializing a pre-processing job");
