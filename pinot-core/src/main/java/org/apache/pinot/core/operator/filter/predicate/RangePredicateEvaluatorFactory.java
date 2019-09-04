@@ -420,8 +420,16 @@ public class RangePredicateEvaluatorFactory {
     final boolean _includeUpperBoundary;
 
     BytesRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
-      _lowerBoundary = BytesUtils.toBytes(rangePredicate.getLowerBoundary());
-      _upperBoundary = BytesUtils.toBytes(rangePredicate.getUpperBoundary());
+      if (!"*".equals(rangePredicate.getLowerBoundary())) {
+        _lowerBoundary = BytesUtils.toBytes(rangePredicate.getLowerBoundary());
+      } else {
+        _lowerBoundary = null;
+      }
+      if (!"*".equals(rangePredicate.getUpperBoundary())) {
+        _upperBoundary = BytesUtils.toBytes(rangePredicate.getUpperBoundary());
+      } else {
+        _upperBoundary = null;
+      }
       _includeLowerBoundary = rangePredicate.includeLowerBoundary();
       _includeUpperBoundary = rangePredicate.includeUpperBoundary();
     }
@@ -434,14 +442,14 @@ public class RangePredicateEvaluatorFactory {
     @Override
     public boolean applySV(byte[] value) {
       boolean result = true;
-      if (!_lowerBoundary.equals("*")) {
+      if (_lowerBoundary != null) {
         if (_includeLowerBoundary) {
           result = ByteArray.compare(_lowerBoundary, value) <= 0;
         } else {
           result = ByteArray.compare(_lowerBoundary, value) < 0;
         }
       }
-      if (!_upperBoundary.equals("*")) {
+      if (_upperBoundary != null) {
         if (_includeUpperBoundary) {
           result &= ByteArray.compare(_upperBoundary, value) >= 0;
         } else {

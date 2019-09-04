@@ -20,6 +20,8 @@ package org.apache.pinot.core.predicate;
 
 import java.util.Collections;
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.utils.BytesUtils;
+import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.common.predicate.RangePredicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory;
@@ -258,6 +260,61 @@ public class NoDictionaryRangePredicateEvaluatorTest {
     predicateEvaluator = buildRangePredicate("(*\t\t*)", FieldSpec.DataType.STRING);
     for (int i = -20; i < 20; i++) {
       Assert.assertTrue(predicateEvaluator.applySV(Integer.toString(i)));
+    }
+  }
+
+  @Test
+  public void testBytesPredicateEvaluator() {
+
+    PredicateEvaluator predicateEvaluator = buildRangePredicate("[10\t\t20]", FieldSpec.DataType.BYTES);
+    for (int i = 0x00; i < 0x30; i++) {
+      byte[] value = Integer.toString(i).getBytes();
+      Assert.assertEquals(predicateEvaluator.applySV(value),
+          (ByteArray.compare(value, new byte[]{0x10}) >= 0 && ByteArray.compare(value, new byte[]{0x20}) <= 0));
+    }
+
+    predicateEvaluator = buildRangePredicate("(10\t\t20]", FieldSpec.DataType.BYTES);
+    for (int i = 0x00; i < 0x30; i++) {
+      byte[] value = Integer.toString(i).getBytes();
+      Assert.assertEquals(predicateEvaluator.applySV(value),
+          (ByteArray.compare(value, new byte[]{0x10}) > 0 && ByteArray.compare(value, new byte[]{0x20}) <= 0));
+    }
+
+    predicateEvaluator = buildRangePredicate("(10\t\t20)", FieldSpec.DataType.BYTES);
+    for (int i = 0x00; i < 0x30; i++) {
+      byte[] value = Integer.toString(i).getBytes();
+      Assert.assertEquals(predicateEvaluator.applySV(value),
+          (ByteArray.compare(value, new byte[]{0x10}) > 0 && ByteArray.compare(value, new byte[]{0x20}) < 0));
+    }
+
+    predicateEvaluator = buildRangePredicate("(*\t\t10]", FieldSpec.DataType.BYTES);
+    for (int i = 0x00; i < 0x30; i++) {
+      byte[] value = Integer.toString(i).getBytes();
+      Assert.assertEquals(predicateEvaluator.applySV(value), ByteArray.compare(value, new byte[]{0x10}) <= 0);
+    }
+
+    predicateEvaluator = buildRangePredicate("(*\t\t10)", FieldSpec.DataType.BYTES);
+    for (int i = 0x00; i < 0x30; i++) {
+      byte[] value = Integer.toString(i).getBytes();
+      Assert.assertEquals(predicateEvaluator.applySV(value), ByteArray.compare(value, new byte[]{0x10}) < 0);
+    }
+
+    predicateEvaluator = buildRangePredicate("[10\t\t*)", FieldSpec.DataType.BYTES);
+    for (int i = 0x00; i < 0x30; i++) {
+      byte[] value = Integer.toString(i).getBytes();
+      Assert.assertEquals(predicateEvaluator.applySV(value), ByteArray.compare(value, new byte[]{0x10}) >= 0);
+    }
+
+    predicateEvaluator = buildRangePredicate("(10\t\t*)", FieldSpec.DataType.BYTES);
+    for (int i = 0x00; i < 0x30; i++) {
+      byte[] value = Integer.toString(i).getBytes();
+      Assert.assertEquals(predicateEvaluator.applySV(value), ByteArray.compare(value, new byte[]{0x10}) > 0);
+    }
+
+    predicateEvaluator = buildRangePredicate("(*\t\t*)", FieldSpec.DataType.BYTES);
+    for (int i = 0x00; i < 0x30; i++) {
+      byte[] value = Integer.toString(i).getBytes();
+      Assert.assertTrue(predicateEvaluator.applySV(value));
     }
   }
 
