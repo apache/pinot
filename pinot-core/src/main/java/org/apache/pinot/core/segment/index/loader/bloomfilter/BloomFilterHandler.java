@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class BloomFilterHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(InvertedIndexHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BloomFilterHandler.class);
 
   private final File _indexDir;
   private final SegmentDirectory.Writer _segmentWriter;

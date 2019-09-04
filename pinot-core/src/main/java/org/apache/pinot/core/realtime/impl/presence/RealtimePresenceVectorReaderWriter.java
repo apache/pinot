@@ -36,6 +36,6 @@ public class RealtimePresenceVectorReaderWriter implements PresenceVectorReader 
     }
 
     public boolean isPresent(int docId) {
-        return _nullBitmap.contains(docId);
+        return !_nullBitmap.contains(docId);
     }
 }

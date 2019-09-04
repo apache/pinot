@@ -33,19 +33,11 @@ public class PresenceVectorReaderImpl implements PresenceVectorReader {
 
   public PresenceVectorReaderImpl(PinotDataBuffer presenceVectorBuffer) throws IOException {
     _nullBitmap = new ImmutableRoaringBitmap(presenceVectorBuffer.toDirectByteBuffer(0, (int)presenceVectorBuffer.size()));
-
   }
 
   public boolean isPresent(int docId) {
     return !_nullBitmap.contains(docId);
   }
-
-
-  public ImmutableRoaringBitmap getNullVector() {
-    return _nullBitmap;
-  }
-
-
 
   public static void main(String[] args) {
 

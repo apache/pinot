@@ -57,6 +57,9 @@ public class ColumnIndexDirectoryTestHelper {
       case BLOOM_FILTER:
         buf = columnDirectory.newBloomFilterBuffer(columnName, size);
         break;
+      case PRESENCE_VECTOR:
+        buf = columnDirectory.newPresenceVectorBuffer(columnName, size);
+        break;
     }
     return buf;
   }
@@ -79,6 +82,9 @@ public class ColumnIndexDirectoryTestHelper {
         break;
       case BLOOM_FILTER:
         buf = columnDirectory.getBloomFilterBufferFor(columnName);
+        break;
+      case PRESENCE_VECTOR:
+        buf = columnDirectory.getPresenceVectorBufferFor(columnName);
         break;
     }
     return buf;
@@ -141,6 +147,13 @@ public class ColumnIndexDirectoryTestHelper {
       public String answer(InvocationOnMock invocationOnMock)
           throws Throwable {
         return invocationOnMock.getArguments()[0] + ".bloom";
+      }
+    });
+    when(meta.getPresenceVectorFileName(anyString())).thenAnswer(new Answer<String>() {
+      @Override
+      public String answer(InvocationOnMock invocationOnMock)
+              throws Throwable {
+        return invocationOnMock.getArguments()[0] + ".presence";
       }
     });
     return meta;

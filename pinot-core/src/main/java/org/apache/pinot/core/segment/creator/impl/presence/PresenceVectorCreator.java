@@ -60,10 +60,6 @@ public class PresenceVectorCreator implements Closeable {
     _nullBitmap.add(docId);
   }
 
-  protected ImmutableBitmapDataProvider getRoaringBitmap() {
-    return _nullBitmap;
-  }
-
   public static void main(String[] args)
       throws Exception {
     PresenceVectorCreator creator;

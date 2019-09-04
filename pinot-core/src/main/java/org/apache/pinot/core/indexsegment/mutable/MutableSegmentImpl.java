@@ -21,15 +21,8 @@ package org.apache.pinot.core.indexsegment.mutable;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrays;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.data.DimensionFieldSpec;
@@ -64,6 +57,7 @@ import org.apache.pinot.core.util.FixedIntArray;
 import org.apache.pinot.core.util.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.core.util.IdMap;
 import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,7 +91,8 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Map<String, RealtimeInvertedIndexReader> _invertedIndexMap = new HashMap<>();
   private final Map<String, BloomFilterReader> _bloomFilterMap = new HashMap<>();
   private final Map<String, RealtimePresenceVectorReaderWriter> _presenceVectorMap = new HashMap<>();
-  private final Map<Integer, String> _docIdToNullColumnsMap = new HashMap<>();
+  private final Map<Integer, RoaringBitmap> _docIdToNullColumnsMap = new HashMap<>();
+  private final Map<String, Integer> _columnIdMap = new HashMap<>();
   private final IdMap<FixedIntArray> _recordIdMap;
   private boolean _aggregateMetrics;
 
@@ -154,6 +149,7 @@ public class MutableSegmentImpl implements MutableSegment {
     List<DimensionFieldSpec> physicalDimensionFieldSpecs = new ArrayList<>(_schema.getDimensionNames().size());
     List<MetricFieldSpec> physicalMetricFieldSpecs = new ArrayList<>(_schema.getMetricNames().size());
 
+    int columnId = 0;
     for (FieldSpec fieldSpec : allFieldSpecs) {
       if (!fieldSpec.isVirtualColumn()) {
         physicalFieldSpecs.add(fieldSpec);
@@ -164,6 +160,9 @@ public class MutableSegmentImpl implements MutableSegment {
         } else if (fieldType == FieldSpec.FieldType.METRIC) {
           physicalMetricFieldSpecs.add((MetricFieldSpec) fieldSpec);
         }
+
+        // Map column name to a unique ID (used to identify column name in a bitmap)
+        _columnIdMap.put(fieldSpec.getName(), columnId++);
       }
     }
     _physicalFieldSpecs = Collections.unmodifiableCollection(physicalFieldSpecs);
@@ -399,15 +398,24 @@ public class MutableSegmentImpl implements MutableSegment {
       return;
     }
 
-    // Keep track of the 'null_fields' for the given docId
-    // This is useful when fetching a row based on the docId
-    String nullFieldsStr = (String) row.getValue(NULL_FIELDS);
-    _docIdToNullColumnsMap.put(docId, nullFieldsStr);
+    // Keep track of the null column names for the given docId using a bitmap
+    // This is used to populate 'null_fields' when re-creating a row
+    RoaringBitmap columnsBitmap = _docIdToNullColumnsMap.computeIfAbsent(docId, id -> new RoaringBitmap());
 
-    List<String> nullColumnsList = Arrays.asList(nullFieldsStr.split(","));
+    // Parse the comma separated column names (having null values)
+    // For each such column, update the null bitmap
+    String nullFieldsStr = (String) row.getValue(NULL_FIELDS);
+    Set<String> nullColumnsSet = new HashSet<>(_numKeyColumns);
+    StringTokenizer st = new StringTokenizer(nullFieldsStr, ",");
+    while (st.hasMoreTokens()) {
+      String columnName = st.nextToken();
+      nullColumnsSet.add(columnName);
+      columnsBitmap.add(_columnIdMap.get(columnName));
+    }
+
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String columnName = fieldSpec.getName();
-      if (nullColumnsList.contains(columnName)) {
+      if (nullColumnsSet.contains(columnName)) {
         _presenceVectorMap.get(columnName).setIsNull(docId);
       }
     }
@@ -509,10 +517,19 @@ public class MutableSegmentImpl implements MutableSegment {
           .getValue(docId, fieldSpec, _indexReaderWriterMap.get(column), _dictionaryMap.get(column),
               _maxNumValuesMap.getOrDefault(column, 0)));
     }
-    // If the given docId has corresponding 'null_fields' re-add it to the given row
-    String nullColumns = _docIdToNullColumnsMap.get(docId);
-    if (nullColumns != null) {
-      reuse.putField(NULL_FIELDS, nullColumns);
+
+    // Explicitly set it to null in case of reuse
+    reuse.putField(NULL_FIELDS, null);
+
+    // Look up bitmap for this docId and construct a comma separated
+    // null column names based on that bitmap
+    RoaringBitmap bitmap = _docIdToNullColumnsMap.get(docId);
+    if (bitmap != null) {
+      String nullColumnsStr = _columnIdMap.entrySet().stream()
+              .map(entry -> bitmap.contains(entry.getValue()) ? entry.getKey() : null)
+              .filter(name -> name != null)
+              .collect(Collectors.joining(","));
+      reuse.putField(NULL_FIELDS, nullColumnsStr);
     }
     return reuse;
   }

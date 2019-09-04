@@ -59,8 +59,9 @@ public class NullValueTransformer implements RecordTransformer {
         record.putDefaultNullValue(fieldName, entry.getValue());
       }
     }
-    if (nullFields != null) {
-      record.putField(NULL_FIELDS, nullFields.stream().collect(Collectors.joining(",")));
+
+    if (nullColumnNamesSet != null) {
+      record.putField(NULL_FIELDS, String.join(",", nullColumnNamesSet));
     }
     return record;
   }
