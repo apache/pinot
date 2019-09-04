@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.InPredicate;
@@ -75,6 +76,8 @@ public class InPredicateEvaluatorFactory {
         return new DoubleRawValueBasedInPredicateEvaluator(inPredicate);
       case STRING:
         return new StringRawValueBasedInPredicateEvaluator(inPredicate);
+      case BYTES:
+        return new BytesRawValueBasedInPredicateEvaluator(inPredicate);
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType);
     }
@@ -231,6 +234,26 @@ public class InPredicateEvaluatorFactory {
     @Override
     public boolean applySV(String value) {
       return _matchingValues.contains(value);
+    }
+  }
+
+  private static final class BytesRawValueBasedInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final Set<String> _matchingValues;
+
+    BytesRawValueBasedInPredicateEvaluator(InPredicate inPredicate) {
+      String[] values = inPredicate.getValues();
+      _matchingValues = new HashSet<>(HashUtil.getMinHashSetSize(values.length));
+      Collections.addAll(_matchingValues, values);
+    }
+
+    @Override
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.IN;
+    }
+
+    @Override
+    public boolean applySV(byte[] value) {
+      return _matchingValues.contains(BytesUtils.toHexString(value));
     }
   }
 }
