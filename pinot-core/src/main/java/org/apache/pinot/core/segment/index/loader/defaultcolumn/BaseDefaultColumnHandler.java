@@ -303,6 +303,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         dictionaryElementSize = StringUtil.encodeUtf8(stringDefaultValue).length;
         sortedArray = new String[]{stringDefaultValue};
         break;
+      case BYTES:
+        Preconditions.checkState(defaultValue instanceof byte[]);
+        sortedArray = defaultValue;
+        break;
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType + " for column: " + column);
     }
