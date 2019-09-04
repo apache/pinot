@@ -38,6 +38,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
+import org.apache.http.HttpHost;
 import org.apache.http.HttpVersion;
 import org.apache.http.NameValuePair;
 import org.apache.http.StatusLine;
@@ -120,6 +121,16 @@ public class FileUploadDownloadClient implements Closeable {
    */
   public FileUploadDownloadClient(@Nullable SSLContext sslContext) {
     _httpClient = HttpClients.custom().setSSLContext(sslContext).build();
+  }
+
+  /**
+   * Construct the client with optional {@link SSLContext} for HTTPS and a potential proxy.
+   *
+   * @param sslContext SSL context
+   * @param proxy
+   */
+  public FileUploadDownloadClient(@Nullable SSLContext sslContext, @Nullable HttpHost proxy) {
+    _httpClient = HttpClients.custom().setSSLContext(sslContext).setProxy(proxy).build();
   }
 
   private static URI getURI(String scheme, String host, int port, String path)
