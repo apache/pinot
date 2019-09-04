@@ -1,0 +1,17 @@
+apiVersion: skaffold/v1beta7
+kind: Config
+build:
+  artifacts:
+deploy:
+  kubectl:
+    manifests:
+    - ./gke-storageclass-zk-pd.yml
+    - ./gke-storageclass-kafka-pd.yml
+    - ./gke-storageclass-pinot-controller-pd.yml
+    - ./gke-storageclass-pinot-server-pd.yml
+    - ./zookeeper.yml
+    - ./kafka.yml
+    - ./pinot-controller.yml
+    - ./pinot-broker.yml
+    - ./pinot-server.yml
+    - ./pinot-example-loader.yml
