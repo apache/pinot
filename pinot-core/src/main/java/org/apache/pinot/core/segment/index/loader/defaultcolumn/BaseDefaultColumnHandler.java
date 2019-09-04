@@ -31,6 +31,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.core.segment.creator.ForwardIndexType;
 import org.apache.pinot.core.segment.creator.InvertedIndexType;
@@ -305,7 +306,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         break;
       case BYTES:
         Preconditions.checkState(defaultValue instanceof byte[]);
-        sortedArray = defaultValue;
+        sortedArray = new ByteArray[] {new ByteArray((byte[]) defaultValue)};
         break;
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType + " for column: " + column);

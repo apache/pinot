@@ -117,6 +117,17 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), 1L);
+
+    // Metric field with default null value for byte column.
+    fieldSpec1 = new MetricFieldSpec();
+    fieldSpec1.setName("btyeMetric");
+    fieldSpec1.setDataType(BYTES);
+    fieldSpec1.setDefaultNullValue(new byte[]{0x10, 0x20});
+    fieldSpec2 = new MetricFieldSpec("btyeMetric", BYTES, new byte[]{0x10, 0x20});
+    Assert.assertEquals(fieldSpec1, fieldSpec2);
+    Assert.assertEquals(fieldSpec1.toJsonObject(), fieldSpec2.toJsonObject());
+    Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
+    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), fieldSpec2.getDefaultNullValue());
   }
 
   /**

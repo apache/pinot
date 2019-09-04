@@ -16,6 +16,11 @@
     {
       "dataType": "DOUBLE",
       "name": "newDoubleMetric"
+    },
+    {
+      "dataType": "BYTES",
+      "defaultNullValue": "00000008000000ac0000",
+      "name": "newByteMetric"
     }
   ],
   "dimensionFieldSpecs": [
