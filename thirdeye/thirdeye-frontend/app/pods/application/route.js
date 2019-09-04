@@ -34,6 +34,7 @@ export default Route.extend(ApplicationRouteMixin, {
       fetch('/auth')
         .then(checkStatus)
         .catch(() => {
+          this.get('session').set('data.previousTransition', transition.intent.url);
           this.get('session').invalidate();
         });
     }
