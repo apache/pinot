@@ -91,7 +91,6 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
 
   // Optional.
   private final Path _pathToDependencyJar;
-  private final String _defaultPermissionsMask;
 
   private TableConfig _tableConfig;
   private org.apache.pinot.common.data.Schema _pinotTableSchema;
@@ -108,7 +107,6 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     _rawTableName = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME));
 
     _pathToDependencyJar = getPathFromProperty(JobConfigConstants.PATH_TO_DEPS_JAR);
-    _defaultPermissionsMask = _properties.getProperty(JobConfigConstants.DEFAULT_PERMISSIONS_MASK, null);
 
     // Optional push location and table parameters. If set, will use the table config and schema from the push hosts.
     String pushHostsString = _properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS);
@@ -143,8 +141,6 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     _fileSystem = FileSystem.get(_conf);
     final List<Path> inputDataPaths = getDataFilePaths(_inputSegmentDir);
     Preconditions.checkState(inputDataPaths.size() != 0, "No files in the input directory.");
-
-    JobPreparationHelper.setDirPermission(_fileSystem, _preprocessedOutputDir, _defaultPermissionsMask);
 
     if (_fileSystem.exists(_preprocessedOutputDir)) {
       _logger.warn("Found the output folder {}, deleting it", _preprocessedOutputDir);

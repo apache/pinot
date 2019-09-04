@@ -45,7 +45,6 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
   private Schema _outputSchema;
   private boolean _enablePartitioning;
   private boolean _isAppend = false;
-  private String _tableName;
   private NormalizedDateSegmentNameGenerator _normalizedDateSegmentNameGenerator;
   private String _sampleNormalizedTimeColumnValue;
 
@@ -53,7 +52,7 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
   public void setup(final Context context) {
     Configuration configuration = context.getConfiguration();
 
-    _tableName = configuration.get(JobConfigConstants.SEGMENT_TABLE_NAME);
+    String tableName = configuration.get(JobConfigConstants.SEGMENT_TABLE_NAME);
 
     _isAppend = configuration.get(InternalConfigConstants.IS_APPEND).equalsIgnoreCase("true");
 
@@ -68,7 +67,7 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
       String timeType = configuration.get(InternalConfigConstants.SEGMENT_TIME_TYPE);
       String timeFormat = configuration.get(InternalConfigConstants.SEGMENT_TIME_FORMAT);
       TimeUnit timeUnit = TimeUnit.valueOf(timeType);
-      _normalizedDateSegmentNameGenerator = new NormalizedDateSegmentNameGenerator(_tableName, null, false, "APPEND", pushFrequency, timeUnit, timeFormat);
+      _normalizedDateSegmentNameGenerator = new NormalizedDateSegmentNameGenerator(tableName, null, false, "APPEND", pushFrequency, timeUnit, timeFormat);
       _sampleNormalizedTimeColumnValue = _normalizedDateSegmentNameGenerator.getNormalizedDate(timeColumnValue);
     }
 
