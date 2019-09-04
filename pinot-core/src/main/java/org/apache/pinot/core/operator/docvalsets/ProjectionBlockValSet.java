@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.operator.docvalsets;
 
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.core.common.BaseBlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.operator.ProjectionOperator;
@@ -32,7 +32,8 @@ import org.apache.pinot.core.operator.ProjectionOperator;
 public class ProjectionBlockValSet extends BaseBlockValSet {
   private final DataBlockCache _dataBlockCache;
   private final String _column;
-  private final FieldSpec.DataType _dataType;
+  private final DataType _dataType;
+  private final boolean _singleValue;
 
   /**
    * Constructor for the class.
@@ -42,10 +43,21 @@ public class ProjectionBlockValSet extends BaseBlockValSet {
    * @param dataBlockCache data block cache
    * @param column Projection column.
    */
-  public ProjectionBlockValSet(DataBlockCache dataBlockCache, String column, FieldSpec.DataType dataType) {
+  public ProjectionBlockValSet(DataBlockCache dataBlockCache, String column, DataType dataType, boolean singleValue) {
     _dataBlockCache = dataBlockCache;
     _column = column;
     _dataType = dataType;
+    _singleValue = singleValue;
+  }
+
+  @Override
+  public DataType getValueType() {
+    return _dataType;
+  }
+
+  @Override
+  public boolean isSingleValue() {
+    return _singleValue;
   }
 
   @Override
@@ -113,11 +125,6 @@ public class ProjectionBlockValSet extends BaseBlockValSet {
   @Override
   public String[][] getStringValuesMV() {
     return _dataBlockCache.getStringValuesForMVColumn(_column);
-  }
-
-  @Override
-  public FieldSpec.DataType getValueType() {
-    return _dataType;
   }
 
   @Override

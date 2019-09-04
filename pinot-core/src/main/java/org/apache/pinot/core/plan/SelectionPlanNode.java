@@ -54,7 +54,8 @@ public class SelectionPlanNode implements PlanNode {
     if (_selection.getSize() <= 0) {
       return new EmptySelectionOperator(_indexSegment, _selection);
     }
-    return new SelectionOperator(_indexSegment, _selection, _transformPlanNode.run());
+    return new SelectionOperator(_indexSegment, _selection, _transformPlanNode.run(),
+        _transformPlanNode.getSortSequence());
   }
 
   @Override

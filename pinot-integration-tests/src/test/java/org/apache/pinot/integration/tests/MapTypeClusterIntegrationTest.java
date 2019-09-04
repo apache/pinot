@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,16 +29,12 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
-import javax.annotation.Nonnull;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.data.DimensionFieldSpec;
-import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
@@ -46,30 +44,11 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.Lists;
-
 
 public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
+  private static final long NUM_DOCS = 1_000L;
 
-  protected static final String DEFAULT_TABLE_NAME = "myTable";
-  static final long TOTAL_DOCS = 1_000L;
-
-  protected Schema _schema;
-
-  private String _currentTable;
-
-  @Nonnull
-  @Override
-  protected String getTableName() {
-    return _currentTable;
-  }
-
-  @Nonnull
-  @Override
-  protected String getSchemaFileName() {
-    return "";
-  }
+  private Schema _schema;
 
   @BeforeClass
   public void setUp()
@@ -80,37 +59,26 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     startZk();
     startController();
     startBroker();
-    startServers(1);
+    startServer();
 
-    _schema = new Schema();
-    FieldSpec keyFieldSpec = new DimensionFieldSpec();
-    keyFieldSpec.setDataType(DataType.STRING);
-    keyFieldSpec.setDefaultNullValue("");
-    keyFieldSpec.setName("myMap__KEYS");
-    keyFieldSpec.setSingleValueField(false);
-    _schema.addField(keyFieldSpec);
-    FieldSpec valueFieldSpec = new DimensionFieldSpec();
-    valueFieldSpec.setDataType(DataType.STRING);
-    valueFieldSpec.setDefaultNullValue("");
-    valueFieldSpec.setName("myMap__VALUES");
-    valueFieldSpec.setSingleValueField(false);
-    _schema.addField(valueFieldSpec);
+    _schema =
+        new Schema.SchemaBuilder().setSchemaName(getTableName()).addMultiValueDimension("myMap__KEYS", DataType.STRING)
+            .addMultiValueDimension("myMap__VALUES", DataType.STRING).build();
 
     // Create the tables
     ArrayList<String> invertedIndexColumns = Lists.newArrayList();
-    addOfflineTable(DEFAULT_TABLE_NAME, null, null, null, null, null, SegmentVersion.v1, invertedIndexColumns, null,
-        null, null, null);
+    addOfflineTable(getTableName(), null, null, null, null, null, SegmentVersion.v1, invertedIndexColumns, null, null,
+        null, null);
 
     setUpSegmentsAndQueryGenerator();
 
     // Wait for all documents loaded
-    _currentTable = DEFAULT_TABLE_NAME;
     waitForAllDocsLoaded(60_000);
   }
 
   @Override
   protected long getCountStarResult() {
-    return TOTAL_DOCS;
+    return NUM_DOCS;
   }
 
   protected void setUpSegmentsAndQueryGenerator()
@@ -128,7 +96,7 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     File avroFile = new File(parent, "part-" + 0 + ".avro");
     avroFile.getParentFile().mkdirs();
     recordWriter.create(avroSchema, avroFile);
-    for (int i = 0; i < TOTAL_DOCS; i++) {
+    for (int i = 0; i < NUM_DOCS; i++) {
       Map<String, String> map = new HashMap<>();
       map.put("k1", "value-k1-" + i);
       map.put("k2", "value-k2-" + i);
@@ -142,7 +110,7 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     List<File> avroFiles = Lists.newArrayList(avroFile);
 
     // Create and upload segments without star tree indexes from Avro data
-    createAndUploadSegments(avroFiles, DEFAULT_TABLE_NAME, false);
+    createAndUploadSegments(avroFiles, getTableName(), false);
   }
 
   private void createAndUploadSegments(List<File> avroFiles, String tableName, boolean createStarTreeIndex)
@@ -164,7 +132,7 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
 
     //Selection Query
-    String pqlQuery = "Select map_value(myMap__KEYS, 'k1', myMap__VALUES) from " + DEFAULT_TABLE_NAME;
+    String pqlQuery = "Select map_value(myMap__KEYS, 'k1', myMap__VALUES) from " + getTableName();
     JsonNode pinotResponse = postQuery(pqlQuery);
     ArrayNode selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
     Assert.assertNotNull(selectionResults);
@@ -175,7 +143,7 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //Filter Query
-    pqlQuery = "Select map_value(myMap__KEYS, 'k1', myMap__VALUES) from " + DEFAULT_TABLE_NAME
+    pqlQuery = "Select map_value(myMap__KEYS, 'k1', myMap__VALUES) from " + getTableName()
         + "  where map_value(myMap__KEYS, 'k1', myMap__VALUES) = 'value-k1-0'";
     pinotResponse = postQuery(pqlQuery);
     selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
@@ -187,7 +155,7 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //selection order by
-    pqlQuery = "Select map_value(myMap__KEYS, 'k1', myMap__VALUES) from " + DEFAULT_TABLE_NAME
+    pqlQuery = "Select map_value(myMap__KEYS, 'k1', myMap__VALUES) from " + getTableName()
         + " order by map_value(myMap__KEYS, 'k1', myMap__VALUES)";
     pinotResponse = postQuery(pqlQuery);
     selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
@@ -199,7 +167,7 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //Group By Query
-    pqlQuery = "Select count(*) from " + DEFAULT_TABLE_NAME + " group by map_value(myMap__KEYS, 'k1', myMap__VALUES)";
+    pqlQuery = "Select count(*) from " + getTableName() + " group by map_value(myMap__KEYS, 'k1', myMap__VALUES)";
     pinotResponse = postQuery(pqlQuery);
     Assert.assertNotNull(pinotResponse.get("aggregationResults"));
     JsonNode groupByResult = pinotResponse.get("aggregationResults").get(0).get("groupByResult");
@@ -211,7 +179,7 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
   @AfterClass
   public void tearDown()
       throws Exception {
-    dropOfflineTable(DEFAULT_TABLE_NAME);
+    dropOfflineTable(getTableName());
 
     stopServer();
     stopBroker();

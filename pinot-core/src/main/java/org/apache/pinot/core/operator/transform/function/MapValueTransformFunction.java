@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.transform.function;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
+import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -32,17 +33,19 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
  * map_value(keyColName, 'keyName', valColName)
  */
 public class MapValueTransformFunction extends BaseTransformFunction {
-
   public static final String FUNCTION_NAME = "map_value";
 
-  private TransformResultMetadata _resultMetadata;
   private TransformFunction _keyColumnFunction;
-  private String _keyName;
   private TransformFunction _valueColumnFunction;
-  private int[][] _keyDictIds;
-  private int[][] _valueDictIds;
+  private TransformResultMetadata _resultMetadata;
   private int _inputKeyDictId;
-  private int[] _outputValueDictIds;
+
+  private int[] _dictIds;
+  private int[] _intValues;
+  private long[] _longValues;
+  private float[] _floatValues;
+  private double[] _doubleValues;
+  private String[] _stringValues;
 
   @Override
   public String getName() {
@@ -53,15 +56,16 @@ public class MapValueTransformFunction extends BaseTransformFunction {
   public void init(@Nonnull List<TransformFunction> arguments, @Nonnull Map<String, DataSource> dataSourceMap) {
     int numArguments = arguments.size();
     if (numArguments != 3) {
-      throw new IllegalArgumentException("3 arguments are required for MAP_VALUE transform function map_value(keyColName, 'keyName', valColName)");
+      throw new IllegalArgumentException(
+          "3 arguments are required for MAP_VALUE transform function map_value(keyColName, 'keyName', valColName)");
     }
     _keyColumnFunction = arguments.get(0);
-    _keyName = ((LiteralTransformFunction) arguments.get(1)).getLiteral();
+    String keyName = ((LiteralTransformFunction) arguments.get(1)).getLiteral();
     _valueColumnFunction = arguments.get(2);
     TransformResultMetadata valueColumnMetadata = _valueColumnFunction.getResultMetadata();
     _resultMetadata =
         new TransformResultMetadata(valueColumnMetadata.getDataType(), true, valueColumnMetadata.hasDictionary());
-    _inputKeyDictId = _keyColumnFunction.getDictionary().indexOf(_keyName);
+    _inputKeyDictId = _keyColumnFunction.getDictionary().indexOf(keyName);
   }
 
   @Override
@@ -70,26 +74,112 @@ public class MapValueTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[] transformToDictIdsSV(@Nonnull ProjectionBlock projectionBlock) {
-    _outputValueDictIds = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+  public Dictionary getDictionary() {
+    return _valueColumnFunction.getDictionary();
+  }
 
-    _keyDictIds = _keyColumnFunction.transformToDictIdsMV(projectionBlock);
-    _valueDictIds = _valueColumnFunction.transformToDictIdsMV(projectionBlock);
+  @Override
+  public int[] transformToDictIdsSV(@Nonnull ProjectionBlock projectionBlock) {
+    if (_dictIds == null) {
+      _dictIds = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+    int[][] keyDictIds = _keyColumnFunction.transformToDictIdsMV(projectionBlock);
+    int[][] valueDictIds = _valueColumnFunction.transformToDictIdsMV(projectionBlock);
     int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
-      int numKeys = _keyDictIds[i].length;
+      int numKeys = keyDictIds[i].length;
       for (int j = 0; j < numKeys; j++) {
-        if (_keyDictIds[i][j] == _inputKeyDictId) {
-          _outputValueDictIds[i] = _valueDictIds[i][j];
+        if (keyDictIds[i][j] == _inputKeyDictId) {
+          _dictIds[i] = valueDictIds[i][j];
           break;
         }
       }
     }
-    return _outputValueDictIds;
+    return _dictIds;
   }
 
   @Override
-  public Dictionary getDictionary() {
-    return _valueColumnFunction.getDictionary();
+  public int[] transformToIntValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+    if (_resultMetadata.getDataType() != DataType.INT) {
+      return super.transformToIntValuesSV(projectionBlock);
+    }
+    if (_intValues == null) {
+      _intValues = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+    Dictionary dictionary = getDictionary();
+    int[] dictIds = transformToDictIdsSV(projectionBlock);
+    int length = projectionBlock.getNumDocs();
+    for (int i = 0; i < length; i++) {
+      _intValues[i] = dictionary.getIntValue(dictIds[i]);
+    }
+    return _intValues;
+  }
+
+  @Override
+  public long[] transformToLongValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+    if (_resultMetadata.getDataType() != DataType.LONG) {
+      return super.transformToLongValuesSV(projectionBlock);
+    }
+    if (_longValues == null) {
+      _longValues = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+    Dictionary dictionary = getDictionary();
+    int[] dictIds = transformToDictIdsSV(projectionBlock);
+    int length = projectionBlock.getNumDocs();
+    for (int i = 0; i < length; i++) {
+      _longValues[i] = dictionary.getLongValue(dictIds[i]);
+    }
+    return _longValues;
+  }
+
+  @Override
+  public float[] transformToFloatValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+    if (_resultMetadata.getDataType() != DataType.FLOAT) {
+      return super.transformToFloatValuesSV(projectionBlock);
+    }
+    if (_floatValues == null) {
+      _floatValues = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+    Dictionary dictionary = getDictionary();
+    int[] dictIds = transformToDictIdsSV(projectionBlock);
+    int length = projectionBlock.getNumDocs();
+    for (int i = 0; i < length; i++) {
+      _floatValues[i] = dictionary.getFloatValue(dictIds[i]);
+    }
+    return _floatValues;
+  }
+
+  @Override
+  public double[] transformToDoubleValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+    if (_resultMetadata.getDataType() != DataType.DOUBLE) {
+      return super.transformToDoubleValuesSV(projectionBlock);
+    }
+    if (_doubleValues == null) {
+      _doubleValues = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+    Dictionary dictionary = getDictionary();
+    int[] dictIds = transformToDictIdsSV(projectionBlock);
+    int length = projectionBlock.getNumDocs();
+    for (int i = 0; i < length; i++) {
+      _doubleValues[i] = dictionary.getDoubleValue(dictIds[i]);
+    }
+    return _doubleValues;
+  }
+
+  @Override
+  public String[] transformToStringValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+    if (_resultMetadata.getDataType() != DataType.STRING) {
+      return super.transformToStringValuesSV(projectionBlock);
+    }
+    if (_stringValues == null) {
+      _stringValues = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+    Dictionary dictionary = getDictionary();
+    int[] dictIds = transformToDictIdsSV(projectionBlock);
+    int length = projectionBlock.getNumDocs();
+    for (int i = 0; i < length; i++) {
+      _stringValues[i] = dictionary.getStringValue(dictIds[i]);
+    }
+    return _stringValues;
   }
 }

@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.operator.docvalsets;
 
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.core.common.BaseBlockValSet;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -43,8 +43,13 @@ public class TransformBlockValSet extends BaseBlockValSet {
   }
 
   @Override
-  public FieldSpec.DataType getValueType() {
+  public DataType getValueType() {
     return _transformFunction.getResultMetadata().getDataType();
+  }
+
+  @Override
+  public boolean isSingleValue() {
+    return _transformFunction.getResultMetadata().isSingleValue();
   }
 
   @Override

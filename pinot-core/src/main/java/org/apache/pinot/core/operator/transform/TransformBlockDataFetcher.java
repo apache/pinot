@@ -18,320 +18,193 @@
  */
 package org.apache.pinot.core.operator.transform;
 
+import com.google.common.base.Preconditions;
 import java.io.Serializable;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.FieldSpec.DataType;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.common.utils.BytesUtils;
-import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
+
 
 public class TransformBlockDataFetcher {
-
-
   private final Fetcher[] _fetchers;
 
-  public TransformBlockDataFetcher(BlockValSet[] blockValSets, Dictionary[] dictionaries,
-      TransformResultMetadata[] expressionResultMetadata) {
-    _fetchers = new Fetcher[blockValSets.length];
-    for (int i = 0; i < blockValSets.length; i++) {
-      _fetchers[i] = createFetcher(blockValSets[i], dictionaries[i],
-          expressionResultMetadata[i]);
+  public TransformBlockDataFetcher(BlockValSet[] blockValSets) {
+    int numColumns = blockValSets.length;
+    _fetchers = new Fetcher[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      _fetchers[i] = createFetcher(blockValSets[i]);
     }
   }
 
   public Serializable[] getRow(int docId) {
-    Serializable[] row = new Serializable[_fetchers.length];
-    for (int i = 0; i < _fetchers.length; i++) {
-      row[i] = _fetchers[i].getValue(docId);
+    return getRow(docId, new Serializable[_fetchers.length]);
+  }
+
+  public Serializable[] getRow(int docId, Serializable[] reuse) {
+    int numColumns = _fetchers.length;
+    for (int i = 0; i < numColumns; i++) {
+      reuse[i] = _fetchers[i].getValue(docId);
     }
-    return row;
+    return reuse;
   }
 
-  Fetcher createFetcher(BlockValSet blockValSet,
-      Dictionary dictionary,
-      TransformResultMetadata expressionResultMetadata) {
-    if (expressionResultMetadata.hasDictionary()) {
-      if (expressionResultMetadata.isSingleValue()) {
-        return new DictionaryBasedSVValueFetcher(dictionary,
-            blockValSet.getDictionaryIdsSV(), expressionResultMetadata.getDataType());
-      } else {
-        switch (expressionResultMetadata.getDataType()) {
-          case INT:
-            return new DictionaryBasedMVIntValueFetcher(dictionary,
-                blockValSet.getDictionaryIdsMV());
-          case LONG:
-            return new DictionaryBasedMVLongValueFetcher(dictionary,
-                blockValSet.getDictionaryIdsMV());
-          case FLOAT:
-            return new DictionaryBasedMVFloatValueFetcher(dictionary,
-                blockValSet.getDictionaryIdsMV());
-          case DOUBLE:
-            return new DictionaryBasedMVDoubleValueFetcher(dictionary,
-                blockValSet.getDictionaryIdsMV());
-          case BOOLEAN:
-          case STRING:
-            return new DictionaryBasedMVStringValueFetcher(dictionary,
-                blockValSet.getDictionaryIdsMV());
-          case BYTES:
-            return new DictionaryBasedMVBytesValueFetcher(dictionary,
-                blockValSet.getDictionaryIdsMV());
-        }
-      }
-    } else {
-      switch (expressionResultMetadata.getDataType()) {
-        case INT:
-          return new SVIntValueFetcher(blockValSet.getIntValuesSV());
-        case LONG:
-          return new SVLongValueFetcher(blockValSet.getLongValuesSV());
-        case FLOAT:
-          return new SVFloatValueFetcher(blockValSet.getFloatValuesSV());
-        case DOUBLE:
-          return new SVDoubleValueFetcher(blockValSet.getDoubleValuesSV());
-        case BOOLEAN:
-        case STRING:
-          return new SVStringValueFetcher(blockValSet.getStringValuesSV());
-        case BYTES:
-          return new SVBytesValueFetcher(blockValSet.getBytesValuesSV());
-      }
+  private Fetcher createFetcher(BlockValSet blockValSet) {
+    boolean singleValue = blockValSet.isSingleValue();
+    switch (blockValSet.getValueType()) {
+      case INT:
+        return singleValue ? new IntSingleValueFetcher(blockValSet.getIntValuesSV())
+            : new IntMultiValueFetcher(blockValSet.getIntValuesMV());
+      case LONG:
+        return singleValue ? new LongSingleValueFetcher(blockValSet.getLongValuesSV())
+            : new LongMultiValueFetcher(blockValSet.getLongValuesMV());
+      case FLOAT:
+        return singleValue ? new FloatSingleValueFetcher(blockValSet.getFloatValuesSV())
+            : new FloatMultiValueFetcher(blockValSet.getFloatValuesMV());
+      case DOUBLE:
+        return singleValue ? new DoubleSingleValueFetcher(blockValSet.getDoubleValuesSV())
+            : new DoubleMultiValueFetcher(blockValSet.getDoubleValuesMV());
+      case STRING:
+        return singleValue ? new StringSingleValueFetcher(blockValSet.getStringValuesSV())
+            : new StringMultiValueFetcher(blockValSet.getStringValuesMV());
+      case BYTES:
+        Preconditions.checkState(singleValue);
+        return new BytesValueFetcher(blockValSet.getBytesValuesSV());
+      default:
+        throw new IllegalStateException();
     }
-    throw new UnsupportedOperationException();
-  }
-}
-
-
-interface Fetcher {
-
-  Serializable getValue(int docId);
-}
-
-class SVIntValueFetcher implements Fetcher {
-
-  private int[] _values;
-
-  SVIntValueFetcher(int[] values) {
-    _values = values;
   }
 
-  public Serializable getValue(int docId) {
-    return _values[docId];
-  }
-}
-
-class SVLongValueFetcher implements Fetcher {
-
-  private long[] _values;
-
-  SVLongValueFetcher(long[] values) {
-    _values = values;
+  private interface Fetcher {
+    Serializable getValue(int docId);
   }
 
-  public Serializable getValue(int docId) {
-    return _values[docId];
-  }
-}
+  private class IntSingleValueFetcher implements Fetcher {
+    private final int[] _values;
 
-class SVFloatValueFetcher implements Fetcher {
-
-  private float[] _values;
-
-  SVFloatValueFetcher(float[] values) {
-    _values = values;
-  }
-
-  public Serializable getValue(int docId) {
-    return _values[docId];
-  }
-}
-
-class SVDoubleValueFetcher implements Fetcher {
-
-  private double[] _values;
-
-  SVDoubleValueFetcher(double[] values) {
-    _values = values;
-  }
-
-  public Serializable getValue(int docId) {
-    return _values[docId];
-  }
-}
-
-class SVStringValueFetcher implements Fetcher {
-
-  private String[] _values;
-
-  SVStringValueFetcher(String[] values) {
-    _values = values;
-  }
-
-  public Serializable getValue(int docId) {
-    return _values[docId];
-  }
-}
-
-class SVBytesValueFetcher implements Fetcher {
-
-  private byte[][] _values;
-
-  SVBytesValueFetcher(byte[][] values) {
-    _values = values;
-  }
-
-  public Serializable getValue(int docId) {
-    return _values[docId];
-  }
-}
-
-class DictionaryBasedSVValueFetcher implements Fetcher {
-
-  private Dictionary _dictionary;
-  private int[] _dictionaryIds;
-  private DataType _dataType;
-
-  DictionaryBasedSVValueFetcher(Dictionary dictionary, int[] dictionaryIds,
-      DataType dataType) {
-
-    _dictionary = dictionary;
-    _dictionaryIds = dictionaryIds;
-    _dataType = dataType;
-  }
-
-  public Serializable getValue(int docId) {
-    return (Serializable) _dictionary.get(_dictionaryIds[docId]);
-  }
-}
-
-
-class DictionaryBasedMVIntValueFetcher implements Fetcher {
-
-  private Dictionary _dictionary;
-  private int[][] _dictionaryIdsArray;
-
-  DictionaryBasedMVIntValueFetcher(Dictionary dictionary, int[][] dictionaryIdsArray) {
-
-    _dictionary = dictionary;
-    _dictionaryIdsArray = dictionaryIdsArray;
-  }
-
-  public Serializable getValue(int docId) {
-    int[] dictIds = _dictionaryIdsArray[docId];
-    int[] values = new int[dictIds.length];
-    for (int i = 0; i < dictIds.length; i++) {
-      int dictId = dictIds[i];
-      values[i] = _dictionary.getIntValue(dictId);
+    IntSingleValueFetcher(int[] values) {
+      _values = values;
     }
-    return values;
-  }
-}
 
-class DictionaryBasedMVLongValueFetcher implements Fetcher {
-
-  private Dictionary _dictionary;
-  private int[][] _dictionaryIdsArray;
-
-  DictionaryBasedMVLongValueFetcher(Dictionary dictionary, int[][] dictionaryIdsArray) {
-
-    _dictionary = dictionary;
-    _dictionaryIdsArray = dictionaryIdsArray;
-  }
-
-  public Serializable getValue(int docId) {
-    int[] dictIds = _dictionaryIdsArray[docId];
-    long[] values = new long[dictIds.length];
-    for (int i = 0; i < dictIds.length; i++) {
-      int dictId = dictIds[i];
-      values[i] = _dictionary.getLongValue(dictId);
+    public Serializable getValue(int docId) {
+      return _values[docId];
     }
-    return values;
-  }
-}
-
-class DictionaryBasedMVFloatValueFetcher implements Fetcher {
-
-  private Dictionary _dictionary;
-  private int[][] _dictionaryIdsArray;
-
-  DictionaryBasedMVFloatValueFetcher(Dictionary dictionary, int[][] dictionaryIdsArray) {
-
-    _dictionary = dictionary;
-    _dictionaryIdsArray = dictionaryIdsArray;
   }
 
-  public Serializable getValue(int docId) {
-    int[] dictIds = _dictionaryIdsArray[docId];
-    float[] values = new float[dictIds.length];
-    for (int i = 0; i < dictIds.length; i++) {
-      int dictId = dictIds[i];
-      values[i] = _dictionary.getFloatValue(dictId);
+  private class IntMultiValueFetcher implements Fetcher {
+    private final int[][] _values;
+
+    IntMultiValueFetcher(int[][] values) {
+      _values = values;
     }
-    return values;
-  }
-}
 
-class DictionaryBasedMVDoubleValueFetcher implements Fetcher {
-
-  private Dictionary _dictionary;
-  private int[][] _dictionaryIdsArray;
-
-  DictionaryBasedMVDoubleValueFetcher(Dictionary dictionary, int[][] dictionaryIdsArray) {
-
-    _dictionary = dictionary;
-    _dictionaryIdsArray = dictionaryIdsArray;
-  }
-
-  public Serializable getValue(int docId) {
-    int[] dictIds = _dictionaryIdsArray[docId];
-    double[] values = new double[dictIds.length];
-    for (int i = 0; i < dictIds.length; i++) {
-      int dictId = dictIds[i];
-      values[i] = _dictionary.getDoubleValue(dictId);
+    public Serializable getValue(int docId) {
+      return _values[docId];
     }
-    return values;
-  }
-}
-
-class DictionaryBasedMVStringValueFetcher implements Fetcher {
-
-  private Dictionary _dictionary;
-  private int[][] _dictionaryIdsArray;
-
-  DictionaryBasedMVStringValueFetcher(Dictionary dictionary, int[][] dictionaryIdsArray) {
-
-    _dictionary = dictionary;
-    _dictionaryIdsArray = dictionaryIdsArray;
   }
 
-  public Serializable getValue(int docId) {
-    int[] dictIds = _dictionaryIdsArray[docId];
-    String[] values = new String[dictIds.length];
-    for (int i = 0; i < dictIds.length; i++) {
-      int dictId = dictIds[i];
-      values[i] = _dictionary.getStringValue(dictId);
+  private class LongSingleValueFetcher implements Fetcher {
+    private final long[] _values;
+
+    LongSingleValueFetcher(long[] values) {
+      _values = values;
     }
-    return values;
-  }
-}
 
-class DictionaryBasedMVBytesValueFetcher implements Fetcher {
-
-  private Dictionary _dictionary;
-  private int[][] _dictionaryIdsArray;
-
-  DictionaryBasedMVBytesValueFetcher(Dictionary dictionary, int[][] dictionaryIdsArray) {
-
-    _dictionary = dictionary;
-    _dictionaryIdsArray = dictionaryIdsArray;
-  }
-
-  public Serializable getValue(int docId) {
-    int[] dictIds = _dictionaryIdsArray[docId];
-    byte[][] values = new byte[dictIds.length][];
-    for (int i = 0; i < dictIds.length; i++) {
-      int dictId = dictIds[i];
-      values[i] = _dictionary.getBytesValue(dictId);
+    public Serializable getValue(int docId) {
+      return _values[docId];
     }
-    return values;
+  }
+
+  private class LongMultiValueFetcher implements Fetcher {
+    private final long[][] _values;
+
+    LongMultiValueFetcher(long[][] values) {
+      _values = values;
+    }
+
+    public Serializable getValue(int docId) {
+      return _values[docId];
+    }
+  }
+
+  private class FloatSingleValueFetcher implements Fetcher {
+    private final float[] _values;
+
+    FloatSingleValueFetcher(float[] values) {
+      _values = values;
+    }
+
+    public Serializable getValue(int docId) {
+      return _values[docId];
+    }
+  }
+
+  private class FloatMultiValueFetcher implements Fetcher {
+    private final float[][] _values;
+
+    FloatMultiValueFetcher(float[][] values) {
+      _values = values;
+    }
+
+    public Serializable getValue(int docId) {
+      return _values[docId];
+    }
+  }
+
+  private class DoubleSingleValueFetcher implements Fetcher {
+    private final double[] _values;
+
+    DoubleSingleValueFetcher(double[] values) {
+      _values = values;
+    }
+
+    public Serializable getValue(int docId) {
+      return _values[docId];
+    }
+  }
+
+  private class DoubleMultiValueFetcher implements Fetcher {
+    private final double[][] _values;
+
+    DoubleMultiValueFetcher(double[][] values) {
+      _values = values;
+    }
+
+    public Serializable getValue(int docId) {
+      return _values[docId];
+    }
+  }
+
+  private class StringSingleValueFetcher implements Fetcher {
+    private final String[] _values;
+
+    StringSingleValueFetcher(String[] values) {
+      _values = values;
+    }
+
+    public Serializable getValue(int docId) {
+      return _values[docId];
+    }
+  }
+
+  private class StringMultiValueFetcher implements Fetcher {
+    private final String[][] _values;
+
+    StringMultiValueFetcher(String[][] values) {
+      _values = values;
+    }
+
+    public Serializable getValue(int docId) {
+      return _values[docId];
+    }
+  }
+
+  private class BytesValueFetcher implements Fetcher {
+    private final byte[][] _values;
+
+    BytesValueFetcher(byte[][] values) {
+      _values = values;
+    }
+
+    public Serializable getValue(int docId) {
+      return _values[docId];
+    }
   }
 }
