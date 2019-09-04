@@ -146,8 +146,6 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
 
     JobPreparationHelper.setDirPermission(_fileSystem, _preprocessedOutputDir, _defaultPermissionsMask);
 
-    System.out.println("output: " + _preprocessedOutputDir);
-    System.out.println("output dir: " + _preprocessedOutputDir.toString());
     if (_fileSystem.exists(_preprocessedOutputDir)) {
       _logger.warn("Found the output folder {}, deleting it", _preprocessedOutputDir);
       _fileSystem.delete(_preprocessedOutputDir, true);

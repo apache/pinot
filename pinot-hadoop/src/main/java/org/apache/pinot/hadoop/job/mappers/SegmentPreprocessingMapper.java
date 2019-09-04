@@ -32,6 +32,7 @@ import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.hadoop.job.InternalConfigConstants;
+import org.apache.pinot.hadoop.job.JobConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,10 +49,13 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
   private String _pushFrequency;
   private String _timeFormat;
   private TimeUnit _timeUnit;
+  private String _tableName;
 
   @Override
   public void setup(final Context context) {
     Configuration configuration = context.getConfiguration();
+
+    _tableName = configuration.get(JobConfigConstants.SEGMENT_TABLE_NAME);
 
     _isAppend = configuration.get(InternalConfigConstants.IS_APPEND).equalsIgnoreCase("true");
 
@@ -85,7 +89,8 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
 
     if (_isAppend) {
       // Normalize time column value
-      NormalizedDateSegmentNameGenerator normalizedDateSegmentNameGenerator = new NormalizedDateSegmentNameGenerator(_pushFrequency, _timeUnit, _timeFormat);
+      NormalizedDateSegmentNameGenerator normalizedDateSegmentNameGenerator =
+          new NormalizedDateSegmentNameGenerator(_tableName, null, false, "APPEND", _pushFrequency, _timeUnit, _timeFormat);
       String sampleNormalizedTimeColumnValue = normalizedDateSegmentNameGenerator.getNormalizedDate(_timeColumnValue);
       // Normalize time column value and check against sample value
       String timeColumnValue = record.datum().get(_timeColumn).toString();

@@ -334,7 +334,7 @@
     "outgoingGranularitySpec": {
       "name": "DaysSinceEpoch",
       "dataType": "INT",
-      "timeType": "DAYS",
+      "timeType": "DAYS"
     }
   }
 }
