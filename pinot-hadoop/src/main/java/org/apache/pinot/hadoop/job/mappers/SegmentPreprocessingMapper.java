@@ -45,11 +45,9 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
   private Schema _outputSchema;
   private boolean _enablePartitioning;
   private boolean _isAppend = false;
-  private String _timeColumnValue;
-  private String _pushFrequency;
-  private String _timeFormat;
-  private TimeUnit _timeUnit;
   private String _tableName;
+  private NormalizedDateSegmentNameGenerator _normalizedDateSegmentNameGenerator;
+  private String _sampleNormalizedTimeColumnValue;
 
   @Override
   public void setup(final Context context) {
@@ -64,12 +62,14 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
       _timeColumn = configuration.get(InternalConfigConstants.TIME_COLUMN_CONFIG);
 
       // Get sample time column value
-      _timeColumnValue = configuration.get(InternalConfigConstants.TIME_COLUMN_VALUE);
+      String timeColumnValue = configuration.get(InternalConfigConstants.TIME_COLUMN_VALUE);
+      String pushFrequency = configuration.get(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY);
 
-      _pushFrequency = configuration.get(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY);
       String timeType = configuration.get(InternalConfigConstants.SEGMENT_TIME_TYPE);
-      _timeFormat = configuration.get(InternalConfigConstants.SEGMENT_TIME_FORMAT);
-      _timeUnit = TimeUnit.valueOf(timeType);
+      String timeFormat = configuration.get(InternalConfigConstants.SEGMENT_TIME_FORMAT);
+      TimeUnit timeUnit = TimeUnit.valueOf(timeType);
+      _normalizedDateSegmentNameGenerator = new NormalizedDateSegmentNameGenerator(_tableName, null, false, "APPEND", pushFrequency, timeUnit, timeFormat);
+      _sampleNormalizedTimeColumnValue = _normalizedDateSegmentNameGenerator.getNormalizedDate(timeColumnValue);
     }
 
     String sortedColumn = configuration.get(InternalConfigConstants.SORTED_COLUMN_CONFIG);
@@ -88,18 +88,14 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
       throws IOException, InterruptedException {
 
     if (_isAppend) {
-      // Normalize time column value
-      NormalizedDateSegmentNameGenerator normalizedDateSegmentNameGenerator =
-          new NormalizedDateSegmentNameGenerator(_tableName, null, false, "APPEND", _pushFrequency, _timeUnit, _timeFormat);
-      String sampleNormalizedTimeColumnValue = normalizedDateSegmentNameGenerator.getNormalizedDate(_timeColumnValue);
       // Normalize time column value and check against sample value
       String timeColumnValue = record.datum().get(_timeColumn).toString();
-      String normalizedTimeColumnValue = normalizedDateSegmentNameGenerator.getNormalizedDate(timeColumnValue);
+      String normalizedTimeColumnValue = _normalizedDateSegmentNameGenerator.getNormalizedDate(timeColumnValue);
 
-      if (!normalizedTimeColumnValue.equals(sampleNormalizedTimeColumnValue)) {
+      if (!normalizedTimeColumnValue.equals(_sampleNormalizedTimeColumnValue)) {
         // TODO: Create a custom exception and gracefully catch this exception outside, changing what the path to input
         // into segment creation should be
-        LOGGER.error("This segment contains multiple time units. Sample is {}, current is {}", sampleNormalizedTimeColumnValue, normalizedTimeColumnValue);
+        LOGGER.error("This segment contains multiple time units. Sample is {}, current is {}", _sampleNormalizedTimeColumnValue, normalizedTimeColumnValue);
       }
     }
 

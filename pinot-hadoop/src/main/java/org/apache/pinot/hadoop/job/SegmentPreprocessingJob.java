@@ -408,7 +408,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       job.getConfiguration().set(InternalConfigConstants.SEGMENT_TIME_FORMAT, _pinotTableSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeFormat());
       job.getConfiguration().set(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY, validationConfig.getSegmentPushFrequency());
       try (DataFileStream<GenericRecord> dataStreamReader = getAvroReader(path)) {
-        job.getConfiguration().set(InternalConfigConstants.TIME_COLUMN_VALUE, Integer.toString((int) dataStreamReader.next().get(timeColumnName)));
+        job.getConfiguration().set(InternalConfigConstants.TIME_COLUMN_VALUE, dataStreamReader.next().get(timeColumnName).toString());
       }
     }
   }
