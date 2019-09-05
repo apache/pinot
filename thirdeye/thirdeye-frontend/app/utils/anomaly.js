@@ -51,8 +51,16 @@ export const anomalyResponseObjNew = [
     value: 'NONE',
     status: 'Not Resolved'
   },
+  { name: 'Not reviewed yet',
+    value: 'NO_FEEDBACK',
+    status: 'Not Resolved'
+  },
   { name: 'Yes - unexpected',
     value: 'ANOMALY',
+    status: 'Confirmed Anomaly'
+  },
+  { name: 'Yes - unexpected',
+    value: 'FALSE_NEGATIVE',
     status: 'Confirmed Anomaly'
   },
   { name: 'Expected temporary change',

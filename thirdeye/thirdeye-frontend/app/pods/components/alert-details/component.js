@@ -396,7 +396,7 @@ export default Component.extend({
         currentAnomalies = anomalies.filter(anomaly => {
           if (anomaly.metricUrn === metricUrn) {
             if(showRules && anomaly.properties && typeof anomaly.properties === 'object' && selectedRule && typeof selectedRule === 'object') {
-              return (anomaly.properties.detectorComponentName.includes(selectedRule.detectorName));
+              return ((anomaly.properties.detectorComponentName || '').includes(selectedRule.detectorName));
             } else if (!showRules) {
               // This is necessary until we surface rule selector in Alert Overview
               return true;
