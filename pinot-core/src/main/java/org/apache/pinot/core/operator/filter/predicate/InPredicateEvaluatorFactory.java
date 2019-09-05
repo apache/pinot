@@ -32,6 +32,7 @@ import java.util.Set;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.InPredicate;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
@@ -238,12 +239,14 @@ public class InPredicateEvaluatorFactory {
   }
 
   private static final class BytesRawValueBasedInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
-    final Set<String> _matchingValues;
+    final Set<ByteArray> _matchingValues;
 
     BytesRawValueBasedInPredicateEvaluator(InPredicate inPredicate) {
       String[] values = inPredicate.getValues();
       _matchingValues = new HashSet<>(HashUtil.getMinHashSetSize(values.length));
-      Collections.addAll(_matchingValues, values);
+      for (String value : values) {
+        _matchingValues.add(new ByteArray(BytesUtils.toBytes(value)));
+      }
     }
 
     @Override
@@ -253,7 +256,7 @@ public class InPredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(byte[] value) {
-      return _matchingValues.contains(BytesUtils.toHexString(value));
+      return _matchingValues.contains(new ByteArray(value));
     }
   }
 }

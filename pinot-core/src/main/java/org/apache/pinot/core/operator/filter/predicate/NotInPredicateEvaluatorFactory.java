@@ -32,6 +32,7 @@ import java.util.Set;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.NotInPredicate;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
@@ -256,12 +257,14 @@ public class NotInPredicateEvaluatorFactory {
   }
 
   private static final class BytesRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
-    final Set<String> _nonMatchingValues;
+    final Set<ByteArray> _nonMatchingValues;
 
     BytesRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate) {
       String[] values = notInPredicate.getValues();
       _nonMatchingValues = new HashSet<>(HashUtil.getMinHashSetSize(values.length));
-      Collections.addAll(_nonMatchingValues, values);
+      for (String value : values) {
+        _nonMatchingValues.add(new ByteArray(BytesUtils.toBytes(value)));
+      }
     }
 
     @Override
@@ -271,7 +274,7 @@ public class NotInPredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(byte[] value) {
-      return !_nonMatchingValues.contains(BytesUtils.toHexString(value));
+      return !_nonMatchingValues.contains(new ByteArray(value));
     }
   }
 
