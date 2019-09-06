@@ -36,7 +36,7 @@ public class HashUtil {
    * @return the optimal min value
    */
   public static int getMinHashSetSize(int expected) {
-    return Math.min(MIN_FASTUTIL_HASHSET_SIZE, expected);
+    return Math.max(MIN_FASTUTIL_HASHSET_SIZE, expected);
   }
 
   public static long compute(IntBuffer buff) {
