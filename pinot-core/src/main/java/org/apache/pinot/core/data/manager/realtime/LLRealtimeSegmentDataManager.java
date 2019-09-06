@@ -768,9 +768,20 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
     SegmentCompletionProtocol.Response returnedResponse;
     boolean isSplitCommit = response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit();
-    SegmentCommitter segmentCommitter = new SegmentCommitter(isSplitCommit, _segmentBuildDescriptor, _segmentNameStr,
-        _currentOffset, _numRowsConsumed, _instanceId, _isOffHeap, _protocolHandler, _memoryManager, _indexLoadingConfig, response);
-    returnedResponse = segmentCommitter.commitSegment();
+
+    SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
+
+    params.withSegmentName(_segmentNameStr).withOffset(_currentOffset).withNumRows(_numRowsConsumed)
+        .withInstanceId(_instanceId).withBuildTimeMillis(_segmentBuildDescriptor.getBuildTimeMillis())
+        .withSegmentSizeBytes(_segmentBuildDescriptor.getSegmentSizeBytes())
+        .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis());
+
+    if (_isOffHeap) {
+      params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
+    }
+
+    SegmentCommitter segmentCommitter = new SegmentCommitter(isSplitCommit, _segmentNameStr, _protocolHandler, _indexLoadingConfig, response, params);
+    returnedResponse = segmentCommitter.commitSegment(_segmentBuildDescriptor, _currentOffset, _numRowsConsumed);
 
     if (!returnedResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
       return false;
