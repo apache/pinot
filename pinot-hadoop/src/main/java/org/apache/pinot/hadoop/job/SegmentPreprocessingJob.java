@@ -83,14 +83,15 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
   private String _partitionFunction;
   private String _sortedColumn;
   private int _numOutputFiles;
+  private boolean _isMultipleInput = false;
 
-  private final Path _inputSegmentDir;
-  private final Path _preprocessedOutputDir;
-  protected final String _rawTableName;
-  protected final List<PushLocation> _pushLocations;
+  private Path _inputSegmentDir;
+  private Path _preprocessedOutputDir;
+  protected String _rawTableName;
+  protected List<PushLocation> _pushLocations;
 
   // Optional.
-  private final Path _pathToDependencyJar;
+  private Path _pathToDependencyJar;
 
   private TableConfig _tableConfig;
   private org.apache.pinot.common.data.Schema _pinotTableSchema;
@@ -101,8 +102,20 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
 
     _enablePreprocessing = Boolean.parseBoolean(_properties.getProperty(JobConfigConstants.ENABLE_PREPROCESSING));
 
-    // get input/output paths.
-    _inputSegmentDir = Preconditions.checkNotNull(getPathFromProperty(JobConfigConstants.PATH_TO_INPUT));
+    String inputPath = Preconditions.checkNotNull(properties.getProperty(JobConfigConstants.PATH_TO_INPUT));
+
+    // We cannot support this because mapreduce takes complete control of the output path. In order to support this, we
+    // would need control to pipe the exact folders we receive as input to multiple outputs. While we can programmatically
+    // determine record by record what goes into each output path, this does not support our use case. Each folder is a
+    // separate "day," and frequently, our customers will have two dates in one file, due to timezone of data, so we
+    // are not able to distinguish what is "today's" vs. "tomorrow's" data by solely looking at the record.
+    if (inputPath.split(",").length > 1) {
+      _isMultipleInput = true;
+      return;
+    }
+
+    // get input path/output paths.
+    _inputSegmentDir = getPathFromProperty(JobConfigConstants.PATH_TO_INPUT);
     _preprocessedOutputDir = getPathFromProperty(JobConfigConstants.PREPROCESS_PATH_TO_OUTPUT);
     _rawTableName = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME));
 
@@ -136,6 +149,11 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       return;
     } else {
       _logger.info("Starting {}", getClass().getSimpleName());
+    }
+
+    if (_isMultipleInput) {
+      _logger.info("Skipping pre-processing, multiple inputs detected. Not supported");
+      return;
     }
 
     _fileSystem = FileSystem.get(_conf);
