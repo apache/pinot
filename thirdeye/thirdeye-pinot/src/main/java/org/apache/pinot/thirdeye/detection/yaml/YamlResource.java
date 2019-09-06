@@ -234,10 +234,12 @@ public class YamlResource {
     Map<String, String> responseMessage = new HashMap<>();
     LOG.warn("Validation error while {} {} with payload {}", operation, type, payload, e);
     responseMessage.put("message", "Validation Error in " + type + "! " + e.getMessage());
-    StringWriter sw = new StringWriter();
-    PrintWriter pw = new PrintWriter(sw);
-    e.getCause().printStackTrace(pw);
-    responseMessage.put("more-info", "Error = " + sw.toString());
+    if (e.getCause() != null) {
+      StringWriter sw = new StringWriter();
+      PrintWriter pw = new PrintWriter(sw);
+      e.getCause().printStackTrace(pw);
+      responseMessage.put("more-info", "Error = " + sw.toString());
+    }
     return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
   }
 
