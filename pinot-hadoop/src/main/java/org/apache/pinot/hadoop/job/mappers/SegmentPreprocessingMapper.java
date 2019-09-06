@@ -32,6 +32,7 @@ import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.hadoop.job.InternalConfigConstants;
+import org.apache.pinot.hadoop.job.JobConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,13 +44,15 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
   private Schema _outputKeySchema;
   private Schema _outputSchema;
   private boolean _enablePartitioning;
-  private String _sampleNormalizedTimeColumnValue = null;
-  private NormalizedDateSegmentNameGenerator _normalizedDateSegmentNameGenerator = null;
   private boolean _isAppend = false;
+  private NormalizedDateSegmentNameGenerator _normalizedDateSegmentNameGenerator;
+  private String _sampleNormalizedTimeColumnValue;
 
   @Override
   public void setup(final Context context) {
     Configuration configuration = context.getConfiguration();
+
+    String tableName = configuration.get(JobConfigConstants.SEGMENT_TABLE_NAME);
 
     _isAppend = configuration.get(InternalConfigConstants.IS_APPEND).equalsIgnoreCase("true");
 
@@ -59,13 +62,12 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
 
       // Get sample time column value
       String timeColumnValue = configuration.get(InternalConfigConstants.TIME_COLUMN_VALUE);
-
       String pushFrequency = configuration.get(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY);
+
       String timeType = configuration.get(InternalConfigConstants.SEGMENT_TIME_TYPE);
       String timeFormat = configuration.get(InternalConfigConstants.SEGMENT_TIME_FORMAT);
       TimeUnit timeUnit = TimeUnit.valueOf(timeType);
-      // Normalize time column value
-      _normalizedDateSegmentNameGenerator = new NormalizedDateSegmentNameGenerator(pushFrequency, timeUnit, timeFormat);
+      _normalizedDateSegmentNameGenerator = new NormalizedDateSegmentNameGenerator(tableName, null, false, "APPEND", pushFrequency, timeUnit, timeFormat);
       _sampleNormalizedTimeColumnValue = _normalizedDateSegmentNameGenerator.getNormalizedDate(timeColumnValue);
     }
 
@@ -86,14 +88,13 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
 
     if (_isAppend) {
       // Normalize time column value and check against sample value
-      String timeColumnValue = (String) record.datum().get(_timeColumn);
+      String timeColumnValue = record.datum().get(_timeColumn).toString();
       String normalizedTimeColumnValue = _normalizedDateSegmentNameGenerator.getNormalizedDate(timeColumnValue);
 
       if (!normalizedTimeColumnValue.equals(_sampleNormalizedTimeColumnValue)) {
         // TODO: Create a custom exception and gracefully catch this exception outside, changing what the path to input
         // into segment creation should be
-        throw new IllegalArgumentException("Your segment spans multiple time units. Preprocess is not currently allowed for"
-            + " these use cases");
+        LOGGER.error("This segment contains multiple time units. Sample is {}, current is {}", _sampleNormalizedTimeColumnValue, normalizedTimeColumnValue);
       }
     }
 
