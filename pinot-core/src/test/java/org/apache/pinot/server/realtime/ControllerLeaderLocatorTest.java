@@ -26,8 +26,10 @@ import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.core.query.utils.Pair;
 import org.apache.zookeeper.data.Stat;
@@ -177,6 +179,13 @@ public class ControllerLeaderLocatorTest {
     when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
     when(helixAdmin.getResourceExternalView(anyString(), anyString())).thenReturn(null);
 
+    PropertyKey.Builder keyBuilder = mock(PropertyKey.Builder.class);
+    when(helixDataAccessor.keyBuilder()).thenReturn(keyBuilder);
+    ResourceConfig resourceConfig = mock(ResourceConfig.class);
+    PropertyKey resourceConfigKey = mock(PropertyKey.class);
+    when(keyBuilder.resourceConfig(anyString())).thenReturn(resourceConfigKey);
+    when(helixDataAccessor.getProperty(resourceConfigKey)).thenReturn(resourceConfig);
+
     // Create Controller Leader Locator
     FakeControllerLeaderLocator.create(helixManager);
     ControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
@@ -193,7 +202,8 @@ public class ControllerLeaderLocatorTest {
     controllerLeaderLocator.invalidateCachedControllerLeader();
 
     // After enabling lead controller resource config, the leader in lead controller resource should be used.
-    when(znRecord.getSimpleField(anyString())).thenReturn("true");
+    when(resourceConfig.getSimpleConfig(anyString())).thenReturn("true");
+
 
     // External view is null, should return null.
     Assert.assertNull(controllerLeaderLocator.getControllerLeader(testTable));
