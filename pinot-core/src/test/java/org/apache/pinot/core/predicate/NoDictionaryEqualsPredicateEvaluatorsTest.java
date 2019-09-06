@@ -24,6 +24,7 @@ import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.core.common.predicate.EqPredicate;
 import org.apache.pinot.core.common.predicate.NEqPredicate;
 import org.apache.pinot.core.operator.filter.predicate.EqualsPredicateEvaluatorFactory;
@@ -217,6 +218,42 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
           ArrayUtils.contains(randomStrings, stringValue));
       Assert.assertEquals(neqPredicateEvaluator.applyMV(randomStrings, NUM_MULTI_VALUES),
           !ArrayUtils.contains(randomStrings, stringValue));
+    }
+  }
+
+  @Test
+  public void testBytesPredicateEvaluators() {
+    byte[] bytesValue = RandomStringUtils.random(MAX_STRING_LENGTH).getBytes();
+    String hexStringValue = BytesUtils.toHexString(bytesValue);
+    EqPredicate eqPredicate = new EqPredicate(COLUMN_NAME, Collections.singletonList(hexStringValue));
+    PredicateEvaluator eqPredicateEvaluator =
+        EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(eqPredicate, FieldSpec.DataType.BYTES);
+
+    NEqPredicate neqPredicate = new NEqPredicate(COLUMN_NAME, Collections.singletonList(hexStringValue));
+    PredicateEvaluator neqPredicateEvaluator =
+        NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(neqPredicate, FieldSpec.DataType.BYTES);
+
+    Assert.assertTrue(eqPredicateEvaluator.applySV(bytesValue));
+    Assert.assertFalse(neqPredicateEvaluator.applySV(bytesValue));
+
+    byte[][] randomBytesArray = new byte[NUM_MULTI_VALUES][];
+    PredicateEvaluatorTestUtils.fillRandom(randomBytesArray, MAX_STRING_LENGTH);
+    randomBytesArray[_random.nextInt(NUM_MULTI_VALUES)] = bytesValue;
+
+    Assert.assertTrue(eqPredicateEvaluator.applyMV(randomBytesArray, NUM_MULTI_VALUES));
+    Assert.assertFalse(neqPredicateEvaluator.applyMV(randomBytesArray, NUM_MULTI_VALUES));
+
+    for (int i = 0; i < 100; i++) {
+      byte[] randomBytes = RandomStringUtils.random(MAX_STRING_LENGTH).getBytes();
+      String randomString = BytesUtils.toHexString(randomBytes);
+      Assert.assertEquals(eqPredicateEvaluator.applySV(randomBytes), (randomString.equals(hexStringValue)));
+      Assert.assertEquals(neqPredicateEvaluator.applySV(randomBytes), (!randomString.equals(hexStringValue)));
+
+      PredicateEvaluatorTestUtils.fillRandom(randomBytesArray, MAX_STRING_LENGTH);
+      Assert.assertEquals(eqPredicateEvaluator.applyMV(randomBytesArray, NUM_MULTI_VALUES),
+          ArrayUtils.contains(randomBytesArray, hexStringValue));
+      Assert.assertEquals(neqPredicateEvaluator.applyMV(randomBytesArray, NUM_MULTI_VALUES),
+          !ArrayUtils.contains(randomBytesArray, hexStringValue));
     }
   }
 }

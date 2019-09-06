@@ -20,6 +20,7 @@ package org.apache.pinot.core.predicate;
 
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.pinot.common.utils.BytesUtils;
 
 
 public class PredicateEvaluatorTestUtils {
@@ -52,6 +53,12 @@ public class PredicateEvaluatorTestUtils {
   public static void fillRandom(String[] randomValues, int maxStringLength) {
     for (int i = 0; i < randomValues.length; i++) {
       randomValues[i] = RandomStringUtils.random(maxStringLength);
+    }
+  }
+
+  public static void fillRandom(byte[][] randomValues, int maxStringLength) {
+    for (int i = 0; i < randomValues.length; i++) {
+      randomValues[i] = RandomStringUtils.random(maxStringLength).getBytes();
     }
   }
 }
