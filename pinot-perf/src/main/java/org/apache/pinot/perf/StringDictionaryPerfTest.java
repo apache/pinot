@@ -158,6 +158,9 @@ public class StringDictionaryPerfTest {
    * @throws Exception
    */
   private String[] perfTestGetValues(int numGetValues) throws Exception {
+    Runtime r = Runtime.getRuntime();
+    System.gc();
+    long oldMemory = r.totalMemory() - r.freeMemory();
     IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig();
     defaultIndexLoadingConfig.setReadMode(ReadMode.heap);
     Set<String> columnNames = new HashSet<>();
@@ -169,17 +172,19 @@ public class StringDictionaryPerfTest {
 
     Random random = new Random(System.nanoTime());
     long start = System.currentTimeMillis();
-
     for (int i = 0; i < numGetValues; i++) {
       int index = random.nextInt(_dictLength);
       dictionary.get(index);
     }
+    long time = System.currentTimeMillis() - start;
 
+    System.gc();
+    long newMemory = r.totalMemory() - r.freeMemory();
     long segmentSize = immutableSegment.getSegmentSizeBytes();
     FileUtils.deleteQuietly(_indexDir);
-    long time = System.currentTimeMillis() - start;
+
     System.out.println("Total time for " + numGetValues + " lookups: " + time + "ms");
-    System.out.println("Memory usage: " + (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()));
+    System.out.println("Memory usage: " + (newMemory - oldMemory));
     return new String[] {String.valueOf(_statistics.getN()), String.valueOf(time),
         String.valueOf(segmentSize), String.valueOf(numGetValues),
         String.valueOf(_statistics.getMin()), String.valueOf(_statistics.getMax()),
