@@ -42,14 +42,17 @@ public class SimpleIndexedTable extends IndexedTable {
 
   private List<Record> _records;
   private Map<Key, Integer> _lookupTable;
+  private Comparator<Record> _orderByComparator;
 
   @Override
   public void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
-      int maxCapacity) {
-    super.init(dataSchema, aggregationInfos, orderBy, maxCapacity);
+      int maxCapacity, boolean sort) {
+    super.init(dataSchema, aggregationInfos, orderBy, maxCapacity, sort);
 
     _records = new ArrayList<>(maxCapacity);
     _lookupTable = new HashMap<>(maxCapacity);
+
+    _orderByComparator = OrderByUtils.getKeysAndValuesComparator(_dataSchema, _orderBy, _aggregationInfos);
   }
 
   /**
@@ -74,17 +77,15 @@ public class SimpleIndexedTable extends IndexedTable {
     }
 
     if (size() >= _bufferedCapacity) {
-      resize(_evictCapacity);
+      sortAndResize(_evictCapacity);
     }
     return true;
   }
 
-  private void resize(int trimToSize) {
+  private void sortAndResize(int trimToSize) {
     // sort
     if (CollectionUtils.isNotEmpty(_orderBy)) {
-      Comparator<Record> comparator;
-      comparator = OrderByUtils.getKeysAndValuesComparator(_dataSchema, _orderBy, _aggregationInfos);
-      _records.sort(comparator);
+      _records.sort(_orderByComparator);
     }
 
     // evict lowest
@@ -121,6 +122,11 @@ public class SimpleIndexedTable extends IndexedTable {
 
   @Override
   public void finish() {
-    resize(_maxCapacity);
+    sortAndResize(_maxCapacity);
+  }
+
+  @Override
+  public DataSchema getDataSchema() {
+    return _dataSchema;
   }
 }

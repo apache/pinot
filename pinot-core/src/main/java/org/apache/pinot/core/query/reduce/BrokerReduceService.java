@@ -41,6 +41,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.query.ReduceService;
+import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.HavingFilterQuery;
@@ -57,9 +58,13 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.query.aggregation.DistinctTable;
+import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
+import org.apache.pinot.core.data.table.IndexedTable;
+import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
@@ -222,9 +227,14 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     if (dataTableMap.isEmpty()) {
       // For empty data table map, construct empty result using the cached data schema for selection query if exists
       if (cachedDataSchema != null) {
-        List<String> selectionColumns =
-            SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), cachedDataSchema);
-        brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, Collections.emptyList()));
+        if (brokerRequest.isSetSelections()) {
+          List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(),
+              cachedDataSchema);
+          brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, new ArrayList<>(0)));
+        } else if (brokerRequest.isSetOrderBy()) {
+          setGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
+              brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap, preserveType);
+        }
       }
     } else {
       // Reduce server responses data and set query results into the broker response
@@ -268,16 +278,26 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
               preserveType);
         } else {
           // Aggregation group-by query.
-          boolean[] aggregationFunctionSelectStatus =
-              AggregationFunctionUtils.getAggregationFunctionsSelectStatus(brokerRequest.getAggregationsInfo());
-          setGroupByHavingResults(brokerResponseNative, aggregationFunctions, aggregationFunctionSelectStatus,
-              brokerRequest.getGroupBy(), dataTableMap, brokerRequest.getHavingFilterQuery(),
-              brokerRequest.getHavingFilterSubQueryMap(), preserveType);
-          if (brokerMetrics != null && (!brokerResponseNative.getAggregationResults().isEmpty())) {
-            // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the same.
-            // Thus, we can just emit the one from the 1st result.
-            brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.GROUP_BY_SIZE,
-                brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size());
+          if (brokerRequest.isSetOrderBy()) {
+
+            setGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
+                brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap, preserveType);
+
+            if (brokerMetrics != null && brokerResponseNative.getSelectionResults().getRows().size() > 0) {
+              brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.GROUP_BY_SIZE,
+                  brokerResponseNative.getSelectionResults().getRows().size());
+            }
+
+          } else {
+            boolean[] aggregationFunctionSelectStatus = AggregationFunctionUtils.getAggregationFunctionsSelectStatus(brokerRequest.getAggregationsInfo());
+            setGroupByHavingResults(brokerResponseNative, aggregationFunctions, aggregationFunctionSelectStatus,
+                brokerRequest.getGroupBy(), dataTableMap, brokerRequest.getHavingFilterQuery(), brokerRequest.getHavingFilterSubQueryMap(), preserveType);
+            if (brokerMetrics != null && (!brokerResponseNative.getAggregationResults().isEmpty())) {
+              // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the same.
+              // Thus, we can just emit the one from the 1st result.
+              brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.GROUP_BY_SIZE,
+                  brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size());
+            }
           }
         }
       }
@@ -359,7 +379,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     for (DataTable dataTable : dataTableMap.values()) {
       for (int i = 0; i < numAggregationFunctions; i++) {
         Object intermediateResultToMerge;
-        DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
+        ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
         switch (columnDataType) {
           case LONG:
             intermediateResultToMerge = dataTable.getLong(0, i);
@@ -425,6 +445,122 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         reducedAggregationResults.add(new AggregationResult(dataSchema.getColumnName(i), resultValue));
       }
       brokerResponseNative.setAggregationResults(reducedAggregationResults);
+    }
+  }
+
+  private void setGroupByOrderByResults(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
+      List<AggregationInfo> aggregationInfos, GroupBy groupBy, List<SelectionSort> orderBy,
+      Map<ServerInstance, DataTable> dataTableMap, boolean preserveType) {
+    List<String> columns = new ArrayList<>();
+    for (int i = 0; i < dataSchema.size(); i++) {
+      columns.add(dataSchema.getColumnName(i));
+    }
+
+    if (dataTableMap.isEmpty()) {
+      brokerResponseNative.setSelectionResults(new SelectionResults(columns, new ArrayList<>(0)));
+      return;
+    }
+
+    IndexedTable indexedTable = new ConcurrentIndexedTable();
+    indexedTable.init(dataSchema, aggregationInfos, orderBy, Integer.MAX_VALUE, true);
+
+    int numKeys = groupBy.getExpressionsSize();
+    int numValues = aggregationInfos.size();
+
+    for (DataTable dataTable : dataTableMap.values()) {
+      for (int row = 0; row < dataTable.getNumberOfRows(); row++) {
+        Object[] key = new Object[numKeys];
+        int col = 0;
+        for (int j = 0; j < numKeys; j++) {
+          ColumnDataType columnDataType = dataSchema.getColumnDataType(col);
+          switch (columnDataType) {
+
+            case INT:
+              key[j] = dataTable.getInt(row, col);
+              break;
+            case LONG:
+              key[j] = dataTable.getLong(row, col);
+              break;
+            case FLOAT:
+              key[j] = dataTable.getFloat(row, col);
+              break;
+            case DOUBLE:
+              key[j] = dataTable.getDouble(row, col);
+              break;
+            case STRING:
+              key[j] = dataTable.getString(row, col);
+              break;
+            default:
+              key[j] = dataTable.getObject(row, col);
+          }
+          col ++;
+        }
+        Object[] value = new Object[numValues];
+        for (int j = 0; j < numValues; j++) {
+          ColumnDataType columnDataType = dataSchema.getColumnDataType(col);
+          switch (columnDataType) {
+
+            case INT:
+              value[j] = dataTable.getInt(row, col);
+              break;
+            case LONG:
+              value[j] = dataTable.getLong(row, col);
+              break;
+            case FLOAT:
+              value[j] = dataTable.getFloat(row, col);
+              break;
+            case DOUBLE:
+              value[j] = dataTable.getDouble(row, col);
+              break;
+            default:
+              value[j] = dataTable.getObject(row, col);
+          }
+          col ++;
+        }
+        Record record = new Record(new Key(key), value);
+        indexedTable.upsert(record);
+      }
+    }
+    indexedTable.finish();
+
+    List<Serializable[]> results = new ArrayList<>();
+
+    List<AggregationFunction> aggregationFunctions = new ArrayList<>(aggregationInfos.size());
+    for (AggregationInfo aggregationInfo : aggregationInfos) {
+      aggregationFunctions.add(
+          AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction());
+    }
+
+    int numColumns = columns.size();
+    Iterator<Record> sortedIterator = indexedTable.iterator();
+    int numRows = 0;
+    while (numRows < groupBy.getTopN() && sortedIterator.hasNext()) {
+
+      Record nextRecord = sortedIterator.next();
+      Serializable[] row = new Serializable[numColumns];
+      int index = 0;
+      for (Object keyColumn : nextRecord.getKey().getColumns()) {
+        row[index ++] = getSerializableValue(keyColumn);
+      }
+      int aggNum = 0;
+      for (Object valueColumn : nextRecord.getValues()) {
+        row[index] = getSerializableValue(aggregationFunctions.get(aggNum).extractFinalResult(valueColumn));
+        if (preserveType) {
+          row[index] = AggregationFunctionUtils.formatValue(row[index]);
+        }
+        index ++;
+      }
+      results.add(row);
+      numRows++;
+    }
+    brokerResponseNative.setSelectionResults(new SelectionResults(columns, results));
+  }
+
+  private Serializable getSerializableValue(Object value) {
+    if (value instanceof Number) {
+      return (Number) value;
+    } else {
+      return value.toString();
     }
   }
 

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.data.table;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
@@ -39,17 +40,20 @@ import org.apache.pinot.core.data.order.OrderByUtils;
 public class ConcurrentIndexedTable extends IndexedTable {
 
   private ConcurrentMap<Key, Record> _lookupMap;
-  private Comparator<Record> _minHeapComparator;
   private ReentrantReadWriteLock _readWriteLock;
+
+  private Comparator<Record> _minHeapComparator;
+  private Comparator<Record> _orderByComparator;
 
   @Override
   public void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
-      int maxCapacity) {
-    super.init(dataSchema, aggregationInfos, orderBy, maxCapacity);
+      int maxCapacity, boolean sort) {
+    super.init(dataSchema, aggregationInfos, orderBy, maxCapacity, sort);
 
-    _minHeapComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos).reversed();
     _lookupMap = new ConcurrentHashMap<>();
     _readWriteLock = new ReentrantReadWriteLock();
+    _minHeapComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos).reversed();
+    _orderByComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos);
   }
 
   /**
@@ -101,6 +105,11 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
   @Override
   public Iterator<Record> iterator() {
+    if (_sort) {
+      List<Record> sortedList = new ArrayList<>(_lookupMap.values());
+      sortedList.sort(_orderByComparator);
+      return sortedList.iterator();
+    }
     return _lookupMap.values().iterator();
   }
 
@@ -133,5 +142,10 @@ public class ConcurrentIndexedTable extends IndexedTable {
   @Override
   public void finish() {
     resize(_maxCapacity);
+  }
+
+  @Override
+  public DataSchema getDataSchema() {
+    return _dataSchema;
   }
 }

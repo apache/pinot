@@ -72,7 +72,7 @@ public class IndexedTableTest {
     List<SelectionSort> orderBy = Lists.newArrayList(sel);
 
     // max capacity 10, evict at 12, evict until 11
-    indexedTable.init(dataSchema, aggregationInfos, orderBy, 10);
+    indexedTable.init(dataSchema, aggregationInfos, orderBy, 10, false);
 
     // 3 threads upsert together
     // a inserted 6 times (60), b inserted 5 times (50), d inserted 2 times (20)
@@ -160,17 +160,17 @@ public class IndexedTableTest {
 
     IndexedTable simpleIndexedTable = new SimpleIndexedTable();
     // max capacity 10, evict at 12, evict until 11
-    simpleIndexedTable.init(dataSchema, aggregationInfos, orderBy, 10);
+    simpleIndexedTable.init(dataSchema, aggregationInfos, orderBy, 10, false);
     // merge table
     IndexedTable mergeTable = new SimpleIndexedTable();
-    mergeTable.init(dataSchema, aggregationInfos, orderBy, 10);
+    mergeTable.init(dataSchema, aggregationInfos, orderBy, 10, false);
     testNonConcurrent(simpleIndexedTable, mergeTable);
 
     IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable();
     // max capacity 10, evict at 12, evict until 11
-    concurrentIndexedTable.init(dataSchema, aggregationInfos, orderBy, 10);
+    concurrentIndexedTable.init(dataSchema, aggregationInfos, orderBy, 10, false);
     mergeTable = new SimpleIndexedTable();
-    mergeTable.init(dataSchema, aggregationInfos, orderBy, 10);
+    mergeTable.init(dataSchema, aggregationInfos, orderBy, 10, false);
     testNonConcurrent(concurrentIndexedTable, mergeTable);
 
   }

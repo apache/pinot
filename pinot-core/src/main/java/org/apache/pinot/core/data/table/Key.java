@@ -48,14 +48,7 @@ public class Key {
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder();
-    sb.append("[ ");
-    for (Object s : _columns) {
-      sb.append(s);
-      sb.append(", ");
-    }
-    sb.append("]");
-    return sb.toString();
+    return Arrays.deepToString(_columns);
   }
 
 }
