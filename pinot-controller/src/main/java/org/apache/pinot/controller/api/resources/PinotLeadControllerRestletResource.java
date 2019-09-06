@@ -65,7 +65,7 @@ public class PinotLeadControllerRestletResource {
     boolean isLeadControllerResourceEnabled = LeadControllerUtils.isLeadControllerResourceEnabled(helixManager);
 
     String helixLeader = null;
-    // returns an empty map if lead controller resource is disabled.
+    // Returns helix leader if lead controller resource is disabled.
     if (!isLeadControllerResourceEnabled) {
       helixLeader = LeadControllerUtils.getHelixClusterLeader(helixManager);
     }
@@ -86,7 +86,7 @@ public class PinotLeadControllerRestletResource {
       }
     }
 
-    // Assign all the tables to the relevant partitions.
+    // Assigns all the tables to the relevant partitions.
     List<String> tableNames = _pinotHelixResourceManager.getAllTables();
     for (String tableName : tableNames) {
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
@@ -101,10 +101,9 @@ public class PinotLeadControllerRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}")
-  @ApiOperation(value = "Gets leaders for all tables", notes = "Gets leaders for all tables")
-  public LeadControllerResponse getLeadersForTable(
+  @ApiOperation(value = "Gets leader for a given table", notes = "Gets leader for a given table")
+  public LeadControllerResponse getLeaderForTable(
       @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName) {
-
     Map<String, LeadControllerEntry> leadControllerEntryMap = new HashMap<>();
     HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
     boolean isLeadControllerResourceEnabled = LeadControllerUtils.isLeadControllerResourceEnabled(helixManager);
@@ -115,6 +114,7 @@ public class PinotLeadControllerRestletResource {
     String partitionName = LeadControllerUtils.generatePartitionName(partitionId);
 
     String leadControllerId;
+    // Returns controller Id from lead controller resource is enabled, otherwise returns helix leader.
     if (!isLeadControllerResourceEnabled) {
       leadControllerId = LeadControllerUtils.getHelixClusterLeader(helixManager);
     } else {
@@ -140,7 +140,7 @@ public class PinotLeadControllerRestletResource {
     }
     Map<String, String> partitionStateMap = leadControllerResourceExternalView.getStateMap(partitionName);
 
-    // Get master host from partition map. Return null if no master found.
+    // Gets master host from partition map. Returns null if no master found.
     for (Map.Entry<String, String> entry : partitionStateMap.entrySet()) {
       if (MasterSlaveSMD.States.MASTER.name().equals(entry.getValue())) {
         // Found the controller in master state.
