@@ -1574,8 +1574,8 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineTableName, segmentMetadata);
   }
 
-  public void refreshSegment(@Nonnull String offlineTableName, @Nonnull SegmentMetadata segmentMetadata,
-      @Nonnull OfflineSegmentZKMetadata offlineSegmentZKMetadata) {
+  public void refreshSegment(String offlineTableName, SegmentMetadata segmentMetadata,
+      OfflineSegmentZKMetadata offlineSegmentZKMetadata, String downloadUrl, @Nullable String crypter) {
     String segmentName = segmentMetadata.getName();
 
     // NOTE: must first set the segment ZK metadata before trying to refresh because server will pick up the
@@ -1583,6 +1583,8 @@ public class PinotHelixResourceManager {
     // segment or load from local
     ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
     offlineSegmentZKMetadata.setRefreshTime(System.currentTimeMillis());
+    offlineSegmentZKMetadata.setDownloadUrl(downloadUrl);
+    offlineSegmentZKMetadata.setCrypterName(crypter);
     if (!ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineTableName, offlineSegmentZKMetadata)) {
       throw new RuntimeException(
           "Failed to update ZK metadata for segment: " + segmentName + " of table: " + offlineTableName);
