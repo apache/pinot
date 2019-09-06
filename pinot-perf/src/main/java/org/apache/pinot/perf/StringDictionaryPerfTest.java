@@ -174,7 +174,7 @@ public class StringDictionaryPerfTest {
     long start = System.currentTimeMillis();
     for (int i = 0; i < numGetValues; i++) {
       int index = random.nextInt(_dictLength);
-      dictionary.get(index);
+      dictionary.indexOf(dictionary.get(index));
     }
     long time = System.currentTimeMillis() - start;
 
