@@ -59,24 +59,31 @@ public class PinotLeadControllerRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
   @ApiOperation(value = "Gets leaders for all tables", notes = "Gets leaders for all tables")
-  public Map<String, LeadControllerResponse> getLeadersForAllTables() {
-    Map<String, LeadControllerResponse> leadControllerResponses = new LinkedHashMap<>();
+  public LeadControllerResponse getLeadersForAllTables() {
+    Map<String, LeadControllerEntry> leadControllerEntryMap = new LinkedHashMap<>();
     HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
+    boolean isLeadControllerResourceEnabled = LeadControllerUtils.isLeadControllerResourceEnabled(helixManager);
+
+    String helixLeader = null;
     // returns an empty map if lead controller resource is disabled.
-    if (!LeadControllerUtils.isLeadControllerResourceEnabled(helixManager)) {
-      return leadControllerResponses;
+    if (!isLeadControllerResourceEnabled) {
+      helixLeader = LeadControllerUtils.getHelixClusterLeader(helixManager);
     }
 
     ExternalView leadControllerResourceExternalView = getLeadControllerResourceExternalView(helixManager);
     for (int partitionId = 0; partitionId < Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; partitionId++) {
       String partitionName = LeadControllerUtils.generatePartitionName(partitionId);
-      String participantInstanceId =
-          getParticipantInstanceIdFromExternalView(leadControllerResourceExternalView, partitionName);
-      if (participantInstanceId == null) {
-        continue;
+      if (!isLeadControllerResourceEnabled) {
+        leadControllerEntryMap.put(partitionName, new LeadControllerEntry(helixLeader, new ArrayList<>()));
+      } else {
+        String participantInstanceId =
+            getParticipantInstanceIdFromExternalView(leadControllerResourceExternalView, partitionName);
+        if (participantInstanceId == null) {
+          continue;
+        }
+        leadControllerEntryMap
+            .putIfAbsent(partitionName, new LeadControllerEntry(participantInstanceId, new ArrayList<>()));
       }
-      leadControllerResponses
-          .putIfAbsent(partitionName, new LeadControllerResponse(participantInstanceId, new ArrayList<>()));
     }
 
     // Assign all the tables to the relevant partitions.
@@ -85,35 +92,39 @@ public class PinotLeadControllerRestletResource {
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       int partitionId = LeadControllerUtils.getPartitionIdForTable(rawTableName);
       String partitionName = LeadControllerUtils.generatePartitionName(partitionId);
-      LeadControllerResponse leadControllerResponse = leadControllerResponses.get(partitionName);
-      leadControllerResponse.getTableNames().add(tableName);
+      LeadControllerEntry leadControllerEntry = leadControllerEntryMap.get(partitionName);
+      leadControllerEntry.getTableNames().add(tableName);
     }
-    return leadControllerResponses;
+    return new LeadControllerResponse(isLeadControllerResourceEnabled, leadControllerEntryMap);
   }
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}")
   @ApiOperation(value = "Gets leaders for all tables", notes = "Gets leaders for all tables")
-  public Map<String, LeadControllerResponse> getLeadersForTable(
+  public LeadControllerResponse getLeadersForTable(
       @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName) {
-    Map<String, LeadControllerResponse> leadControllerResponses = new HashMap<>();
+
+    Map<String, LeadControllerEntry> leadControllerEntryMap = new HashMap<>();
     HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
-    // returns an empty map if lead controller resource is disabled.
-    if (!LeadControllerUtils.isLeadControllerResourceEnabled(helixManager)) {
-      return leadControllerResponses;
-    }
+    boolean isLeadControllerResourceEnabled = LeadControllerUtils.isLeadControllerResourceEnabled(helixManager);
+
     ExternalView leadControllerResourceExternalView = getLeadControllerResourceExternalView(helixManager);
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     int partitionId = LeadControllerUtils.getPartitionIdForTable(rawTableName);
     String partitionName = LeadControllerUtils.generatePartitionName(partitionId);
-    String participantInstanceId =
-        getParticipantInstanceIdFromExternalView(leadControllerResourceExternalView, partitionName);
 
-    LeadControllerResponse leadControllerResponse =
-        new LeadControllerResponse(participantInstanceId, Collections.singletonList(tableName));
-    leadControllerResponses.put(partitionName, leadControllerResponse);
-    return leadControllerResponses;
+    String leadControllerId;
+    if (!isLeadControllerResourceEnabled) {
+      leadControllerId = LeadControllerUtils.getHelixClusterLeader(helixManager);
+    } else {
+      leadControllerId = getParticipantInstanceIdFromExternalView(leadControllerResourceExternalView, partitionName);
+    }
+
+    LeadControllerEntry leadControllerEntry =
+        new LeadControllerEntry(leadControllerId, Collections.singletonList(tableName));
+    leadControllerEntryMap.put(partitionName, leadControllerEntry);
+    return new LeadControllerResponse(isLeadControllerResourceEnabled, leadControllerEntryMap);
   }
 
   private ExternalView getLeadControllerResourceExternalView(HelixManager helixManager) {
@@ -142,12 +153,12 @@ public class PinotLeadControllerRestletResource {
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
-  public static class LeadControllerResponse {
+  public static class LeadControllerEntry {
     private String _leadControllerId;
     private List<String> _tableNames;
 
     @JsonCreator
-    public LeadControllerResponse(String leadControllerId, List<String> tableNames) {
+    public LeadControllerEntry(String leadControllerId, List<String> tableNames) {
       _leadControllerId = leadControllerId;
       _tableNames = tableNames;
     }
@@ -160,6 +171,27 @@ public class PinotLeadControllerRestletResource {
     @JsonProperty
     public List<String> getTableNames() {
       return _tableNames;
+    }
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static class LeadControllerResponse {
+    private boolean _isLeadControllerResourceEnabled;
+    private Map<String, LeadControllerEntry> _leadControllerEntryMap;
+
+    @JsonCreator
+    public LeadControllerResponse(boolean isLeadControllerResourceEnabled,
+        Map<String, LeadControllerEntry> leadControllerEntryMap) {
+      _isLeadControllerResourceEnabled = isLeadControllerResourceEnabled;
+      _leadControllerEntryMap = leadControllerEntryMap;
+    }
+
+    public boolean isLeadControllerResourceEnabled() {
+      return _isLeadControllerResourceEnabled;
+    }
+
+    public Map<String, LeadControllerEntry> getLeadControllerEntryMap() {
+      return _leadControllerEntryMap;
     }
   }
 }

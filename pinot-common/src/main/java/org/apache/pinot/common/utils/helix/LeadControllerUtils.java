@@ -18,13 +18,17 @@
  */
 package org.apache.pinot.common.utils.helix;
 
+import org.apache.helix.AccessOption;
+import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.StringUtil;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,12 +72,39 @@ public class LeadControllerUtils {
 
   /**
    * Checks from ZK if resource config of leadControllerResource is enabled.
+   * @param helixManager helix manager
    */
   public static boolean isLeadControllerResourceEnabled(HelixManager helixManager) {
-    HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
-    PropertyKey propertyKey = helixDataAccessor.keyBuilder().resourceConfig(Helix.LEAD_CONTROLLER_RESOURCE_NAME);
-    ResourceConfig resourceConfig = helixDataAccessor.getProperty(propertyKey);
-    String resourceEnabled = resourceConfig.getSimpleConfig(Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY);
-    return Boolean.parseBoolean(resourceEnabled);
+    try {
+      HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
+      PropertyKey propertyKey = helixDataAccessor.keyBuilder().resourceConfig(Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+      ResourceConfig resourceConfig = helixDataAccessor.getProperty(propertyKey);
+      String resourceEnabled = resourceConfig.getSimpleConfig(Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY);
+      return Boolean.parseBoolean(resourceEnabled);
+    } catch (Exception e) {
+      LOGGER.warn("Could not get whether lead controller resource is enabled or not.", e);
+      return false;
+    }
+  }
+
+  /**
+   * Gets Helix leader in the cluster. Null if there is no leader.
+   * @param helixManager helix manager
+   * @return instance id of Helix cluster leader, e.g. localhost_9000.
+   */
+  public static String getHelixClusterLeader(HelixManager helixManager) {
+    BaseDataAccessor<ZNRecord> dataAccessor = helixManager.getHelixDataAccessor().getBaseDataAccessor();
+    Stat stat = new Stat();
+    try {
+      ZNRecord znRecord = dataAccessor.get("/" + helixManager.getClusterName() + "/CONTROLLER/LEADER", stat,
+          AccessOption.THROW_EXCEPTION_IFNOTEXIST);
+      String helixLeader = znRecord.getId();
+      LOGGER.info("Getting Helix leader: {} as per znode version {}, mtime {}", helixLeader, stat.getVersion(),
+          stat.getMtime());
+      return helixLeader;
+    } catch (Exception e) {
+      LOGGER.warn("Could not locate Helix leader!", e);
+      return null;
+    }
   }
 }
