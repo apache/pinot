@@ -63,6 +63,7 @@ public class SegmentCreationJob extends BaseSegmentJob {
   protected final Path _schemaFile;
   protected final String _defaultPermissionsMask;
   protected final List<PushLocation> _pushLocations;
+  protected Path _preprocessOutputPath = null;
 
   protected FileSystem _fileSystem;
 
@@ -88,6 +89,11 @@ public class SegmentCreationJob extends BaseSegmentJob {
           PushLocation.getPushLocations(StringUtils.split(pushHostsString, ','), Integer.parseInt(pushPortString));
     } else {
       _pushLocations = null;
+    }
+
+    String preprocessOutputPath = _properties.getProperty(JobConfigConstants.PREPROCESS_PATH_TO_OUTPUT);
+    if (preprocessOutputPath != null) {
+      _preprocessOutputPath = getPathFromProperty(preprocessOutputPath);
     }
 
     _logger.info("*********************************************************************");
@@ -192,6 +198,10 @@ public class SegmentCreationJob extends BaseSegmentJob {
     // Delete the staging directory
     _logger.info("Deleting the staging directory: {}", _stagingDir);
     _fileSystem.delete(_stagingDir, true);
+
+    if (_preprocessOutputPath != null) {
+      _fileSystem.delete(_preprocessOutputPath, true);
+    }
   }
 
   @Nullable
