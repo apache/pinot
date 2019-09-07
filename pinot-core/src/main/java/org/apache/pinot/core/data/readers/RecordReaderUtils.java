@@ -40,6 +40,7 @@ import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.core.data.GenericRow;
 
 
@@ -177,6 +178,8 @@ public class RecordReaderUtils {
         return Double.parseDouble(stringValue);
       case STRING:
         return stringValue;
+      case BYTES:
+        return BytesUtils.toBytes(stringValue);
       default:
         throw new IllegalStateException("Illegal data type: " + dataType);
     }

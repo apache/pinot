@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -37,7 +36,7 @@ public class IdentifierTransformFunction implements TransformFunction {
   private final DataSource _dataSource;
   private final TransformResultMetadata _resultMetadata;
 
-  public IdentifierTransformFunction(@Nonnull String columnName, @Nonnull DataSource dataSource) {
+  public IdentifierTransformFunction(String columnName, DataSource dataSource) {
     _columnName = columnName;
     _dataSource = dataSource;
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
@@ -51,7 +50,7 @@ public class IdentifierTransformFunction implements TransformFunction {
   }
 
   @Override
-  public void init(@Nonnull List<TransformFunction> arguments, @Nonnull Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     throw new UnsupportedOperationException();
   }
 
@@ -66,62 +65,67 @@ public class IdentifierTransformFunction implements TransformFunction {
   }
 
   @Override
-  public int[] transformToDictIdsSV(@Nonnull ProjectionBlock projectionBlock) {
+  public int[] transformToDictIdsSV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getDictionaryIdsSV();
   }
 
   @Override
-  public int[][] transformToDictIdsMV(@Nonnull ProjectionBlock projectionBlock) {
+  public int[][] transformToDictIdsMV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getDictionaryIdsMV();
   }
 
   @Override
-  public int[] transformToIntValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getIntValuesSV();
   }
 
   @Override
-  public long[] transformToLongValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getLongValuesSV();
   }
 
   @Override
-  public float[] transformToFloatValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+  public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getFloatValuesSV();
   }
 
   @Override
-  public double[] transformToDoubleValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getDoubleValuesSV();
   }
 
   @Override
-  public String[] transformToStringValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getStringValuesSV();
   }
 
   @Override
-  public int[][] transformToIntValuesMV(@Nonnull ProjectionBlock projectionBlock) {
+  public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
+    return projectionBlock.getBlockValueSet(_columnName).getBytesValuesSV();
+  }
+
+  @Override
+  public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getIntValuesMV();
   }
 
   @Override
-  public long[][] transformToLongValuesMV(@Nonnull ProjectionBlock projectionBlock) {
+  public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getLongValuesMV();
   }
 
   @Override
-  public float[][] transformToFloatValuesMV(@Nonnull ProjectionBlock projectionBlock) {
+  public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getFloatValuesMV();
   }
 
   @Override
-  public double[][] transformToDoubleValuesMV(@Nonnull ProjectionBlock projectionBlock) {
+  public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getDoubleValuesMV();
   }
 
   @Override
-  public String[][] transformToStringValuesMV(@Nonnull ProjectionBlock projectionBlock) {
+  public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
     return projectionBlock.getBlockValueSet(_columnName).getStringValuesMV();
   }
 }

@@ -21,12 +21,10 @@ package org.apache.pinot.core.operator.transform.function;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.core.util.ArrayCopyUtils;
 
 
 public class DivisionTransformFunction extends BaseTransformFunction {
@@ -44,7 +42,7 @@ public class DivisionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(@Nonnull List<TransformFunction> arguments, @Nonnull Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     // Check that there are exactly 2 arguments
     if (arguments.size() != 2) {
       throw new IllegalArgumentException("Exactly 2 arguments are required for DIV transform function");
@@ -78,7 +76,7 @@ public class DivisionTransformFunction extends BaseTransformFunction {
 
   @SuppressWarnings("Duplicates")
   @Override
-  public double[] transformToDoubleValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     if (_quotients == null) {
       _quotients = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
@@ -88,30 +86,8 @@ public class DivisionTransformFunction extends BaseTransformFunction {
     if (_firstTransformFunction == null) {
       Arrays.fill(_quotients, 0, length, _firstLiteral);
     } else {
-      switch (_firstTransformFunction.getResultMetadata().getDataType()) {
-        case INT:
-          int[] intValues = _firstTransformFunction.transformToIntValuesSV(projectionBlock);
-          ArrayCopyUtils.copy(intValues, _quotients, length);
-          break;
-        case LONG:
-          long[] longValues = _firstTransformFunction.transformToLongValuesSV(projectionBlock);
-          ArrayCopyUtils.copy(longValues, _quotients, length);
-          break;
-        case FLOAT:
-          float[] floatValues = _firstTransformFunction.transformToFloatValuesSV(projectionBlock);
-          ArrayCopyUtils.copy(floatValues, _quotients, length);
-          break;
-        case DOUBLE:
-          double[] doubleValues = _firstTransformFunction.transformToDoubleValuesSV(projectionBlock);
-          System.arraycopy(doubleValues, 0, _quotients, 0, length);
-          break;
-        case STRING:
-          String[] stringValues = _firstTransformFunction.transformToStringValuesSV(projectionBlock);
-          ArrayCopyUtils.copy(stringValues, _quotients, length);
-          break;
-        default:
-          throw new UnsupportedOperationException();
-      }
+      double[] values = _firstTransformFunction.transformToDoubleValuesSV(projectionBlock);
+      System.arraycopy(values, 0, _quotients, 0, length);
     }
 
     if (_secondTransformFunction == null) {
@@ -119,43 +95,12 @@ public class DivisionTransformFunction extends BaseTransformFunction {
         _quotients[i] /= _secondLiteral;
       }
     } else {
-      switch (_secondTransformFunction.getResultMetadata().getDataType()) {
-        case INT:
-          int[] intValues = _secondTransformFunction.transformToIntValuesSV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            _quotients[i] /= intValues[i];
-          }
-          break;
-        case LONG:
-          long[] longValues = _secondTransformFunction.transformToLongValuesSV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            _quotients[i] /= longValues[i];
-          }
-          break;
-        case FLOAT:
-          float[] floatValues = _secondTransformFunction.transformToFloatValuesSV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            _quotients[i] /= floatValues[i];
-          }
-          break;
-        case DOUBLE:
-          double[] doubleValues = _secondTransformFunction.transformToDoubleValuesSV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            _quotients[i] /= doubleValues[i];
-          }
-          break;
-        case STRING:
-          String[] stringValues = _secondTransformFunction.transformToStringValuesSV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            _quotients[i] /= Double.parseDouble(stringValues[i]);
-          }
-          break;
-        default:
-          throw new UnsupportedOperationException();
+      double[] values = _secondTransformFunction.transformToDoubleValuesSV(projectionBlock);
+      for (int i = 0; i < length; i++) {
+        _quotients[i] /= values[i];
       }
     }
 
     return _quotients;
   }
 }
-

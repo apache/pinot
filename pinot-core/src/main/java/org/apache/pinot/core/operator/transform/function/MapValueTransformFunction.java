@@ -18,9 +18,10 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -29,20 +30,29 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 /**
- * map_value(keyColName, 'keyName', valColName)
+ * The MAP_VALUE transform function takes 3 arguments:
+ * <ul>
+ *   <li>KeyColumn: dictionary-encoded multi-value column where the values are sorted inside each multi-value entry</li>
+ *   <li>KeyValue: a literal (number or string)</li>
+ *   <li>ValueColumn: dictionary-encoded multi-value column</li>
+ * </ul>
+ * For each docId, the multi-value entry for ValueColumn has the same number of values as the multi-value entry for
+ * KeyColumn to store the key-value pairs.
+ * <p>E.g. map {"k1": 9, "k2": 5} will be stored as: ["k1", "k2"] in KeyColumn and [9, 5] in ValueColumn.
+ * <p>Except for the filter clause, in order to make MAP_VALUE transform function work, the keyValue provided must exist
+ * in the keyColumn.
+ * <p>To ensure that, the query can have a filter on the keyColumn.
+ * <p>E.g. {@code SELECT mapValue(key, 'myKey', value) FROM myTable WHERE key = 'myKey'}
  */
 public class MapValueTransformFunction extends BaseTransformFunction {
+  public static final String FUNCTION_NAME = "mapValue";
 
-  public static final String FUNCTION_NAME = "map_value";
-
-  private TransformResultMetadata _resultMetadata;
   private TransformFunction _keyColumnFunction;
-  private String _keyName;
+  private int _keyDictId;
   private TransformFunction _valueColumnFunction;
-  private int[][] _keyDictIds;
-  private int[][] _valueDictIds;
-  private int _inputKeyDictId;
-  private int[] _outputValueDictIds;
+  private TransformResultMetadata _resultMetadata;
+
+  private int[] _dictIds;
 
   @Override
   public String getName() {
@@ -50,18 +60,26 @@ public class MapValueTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(@Nonnull List<TransformFunction> arguments, @Nonnull Map<String, DataSource> dataSourceMap) {
-    int numArguments = arguments.size();
-    if (numArguments != 3) {
-      throw new IllegalArgumentException("3 arguments are required for MAP_VALUE transform function map_value(keyColName, 'keyName', valColName)");
-    }
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+    Preconditions.checkArgument(arguments.size() == 3,
+        "3 arguments are required for MAP_VALUE transform function: keyColumn, keyValue, valueColumn, e.g. MAP_VALUE(key, 'myKey', value)");
+
     _keyColumnFunction = arguments.get(0);
-    _keyName = ((LiteralTransformFunction) arguments.get(1)).getLiteral();
+    TransformResultMetadata keyColumnMetadata = _keyColumnFunction.getResultMetadata();
+    Preconditions.checkState(!keyColumnMetadata.isSingleValue() && keyColumnMetadata.hasDictionary(),
+        "Key column must be dictionary-encoded multi-value column");
+
+    TransformFunction keyValueFunction = arguments.get(1);
+    Preconditions.checkState(keyValueFunction instanceof LiteralTransformFunction,
+        "Key value must be a literal (number or string)");
+    String keyValue = ((LiteralTransformFunction) keyValueFunction).getLiteral();
+    _keyDictId = _keyColumnFunction.getDictionary().indexOf(keyValue);
+
     _valueColumnFunction = arguments.get(2);
     TransformResultMetadata valueColumnMetadata = _valueColumnFunction.getResultMetadata();
-    _resultMetadata =
-        new TransformResultMetadata(valueColumnMetadata.getDataType(), true, valueColumnMetadata.hasDictionary());
-    _inputKeyDictId = _keyColumnFunction.getDictionary().indexOf(_keyName);
+    Preconditions.checkState(!valueColumnMetadata.isSingleValue() && valueColumnMetadata.hasDictionary(),
+        "Value column must be dictionary-encoded multi-value column");
+    _resultMetadata = new TransformResultMetadata(valueColumnMetadata.getDataType(), true, true);
   }
 
   @Override
@@ -70,26 +88,29 @@ public class MapValueTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[] transformToDictIdsSV(@Nonnull ProjectionBlock projectionBlock) {
-    _outputValueDictIds = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-
-    _keyDictIds = _keyColumnFunction.transformToDictIdsMV(projectionBlock);
-    _valueDictIds = _valueColumnFunction.transformToDictIdsMV(projectionBlock);
-    int length = projectionBlock.getNumDocs();
-    for (int i = 0; i < length; i++) {
-      int numKeys = _keyDictIds[i].length;
-      for (int j = 0; j < numKeys; j++) {
-        if (_keyDictIds[i][j] == _inputKeyDictId) {
-          _outputValueDictIds[i] = _valueDictIds[i][j];
-          break;
-        }
-      }
-    }
-    return _outputValueDictIds;
+  public Dictionary getDictionary() {
+    return _valueColumnFunction.getDictionary();
   }
 
   @Override
-  public Dictionary getDictionary() {
-    return _valueColumnFunction.getDictionary();
+  public int[] transformToDictIdsSV(ProjectionBlock projectionBlock) {
+    if (_dictIds == null) {
+      _dictIds = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+
+    int[][] keyDictIdsMV = _keyColumnFunction.transformToDictIdsMV(projectionBlock);
+    int[][] valueDictIdsMV = _valueColumnFunction.transformToDictIdsMV(projectionBlock);
+    int length = projectionBlock.getNumDocs();
+    for (int i = 0; i < length; i++) {
+      int[] keyDictIds = keyDictIdsMV[i];
+      int index = Arrays.binarySearch(keyDictIds, _keyDictId);
+      if (index >= 0) {
+        _dictIds[i] = valueDictIdsMV[i][index];
+      } else {
+        // Allow NULL_VALUE_INDEX for filter
+        _dictIds[i] = Dictionary.NULL_VALUE_INDEX;
+      }
+    }
+    return _dictIds;
   }
 }
