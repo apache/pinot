@@ -91,8 +91,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Map<String, RealtimeInvertedIndexReader> _invertedIndexMap = new HashMap<>();
   private final Map<String, BloomFilterReader> _bloomFilterMap = new HashMap<>();
   private final Map<String, RealtimePresenceVectorReaderWriter> _presenceVectorMap = new HashMap<>();
-  private final Map<Integer, RoaringBitmap> _docIdToNullColumnsMap = new HashMap<>();
-  private final Map<String, Integer> _columnIdMap = new HashMap<>();
+  private final Map<Integer, RoaringBitmap> _docIdToNullColumnsBitsetMap = new HashMap<>();
   private final IdMap<FixedIntArray> _recordIdMap;
   private boolean _aggregateMetrics;
 
@@ -149,7 +148,6 @@ public class MutableSegmentImpl implements MutableSegment {
     List<DimensionFieldSpec> physicalDimensionFieldSpecs = new ArrayList<>(_schema.getDimensionNames().size());
     List<MetricFieldSpec> physicalMetricFieldSpecs = new ArrayList<>(_schema.getMetricNames().size());
 
-    int columnId = 0;
     for (FieldSpec fieldSpec : allFieldSpecs) {
       if (!fieldSpec.isVirtualColumn()) {
         physicalFieldSpecs.add(fieldSpec);
@@ -160,9 +158,6 @@ public class MutableSegmentImpl implements MutableSegment {
         } else if (fieldType == FieldSpec.FieldType.METRIC) {
           physicalMetricFieldSpecs.add((MetricFieldSpec) fieldSpec);
         }
-
-        // Map column name to a unique ID (used to identify column name in a bitmap)
-        _columnIdMap.put(fieldSpec.getName(), columnId++);
       }
     }
     _physicalFieldSpecs = Collections.unmodifiableCollection(physicalFieldSpecs);
@@ -388,7 +383,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   /**
-   * Check if the row has "null_fields" key and set the per
+   * Check if the row has 'NULL_FIELDS' key and set the per
    * column presence vectors accordingly
    * @param row specifies row being ingested
    * @param docId specified docId for this row
@@ -398,25 +393,15 @@ public class MutableSegmentImpl implements MutableSegment {
       return;
     }
 
-    // Keep track of the null column names for the given docId using a bitmap
-    // This is used to populate 'null_fields' when re-creating a row
-    RoaringBitmap columnsBitmap = _docIdToNullColumnsMap.computeIfAbsent(docId, id -> new RoaringBitmap());
-
-    // Parse the comma separated column names (having null values)
-    // For each such column, update the null bitmap
-    String nullFieldsStr = (String) row.getValue(NULL_FIELDS);
-    Set<String> nullColumnsSet = new HashSet<>(_numKeyColumns);
-    StringTokenizer st = new StringTokenizer(nullFieldsStr, ",");
-    while (st.hasMoreTokens()) {
-      String columnName = st.nextToken();
-      nullColumnsSet.add(columnName);
-      columnsBitmap.add(_columnIdMap.get(columnName));
-    }
+    // Keep track of the null columns bitmap associated with this docId
+    // This is used to populate NULL_FIELDS when re-creating a row
+    RoaringBitmap nullColumnsBitMap = (RoaringBitmap) row.getValue(NULL_FIELDS);
+    _docIdToNullColumnsBitsetMap.put(docId, nullColumnsBitMap);
 
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String columnName = fieldSpec.getName();
-      if (nullColumnsSet.contains(columnName)) {
-        _presenceVectorMap.get(columnName).setIsNull(docId);
+      if (nullColumnsBitMap.contains(_schema.getColumnId(columnName))) {
+        _presenceVectorMap.get(columnName).setNull(docId);
       }
     }
   }
@@ -518,19 +503,7 @@ public class MutableSegmentImpl implements MutableSegment {
               _maxNumValuesMap.getOrDefault(column, 0)));
     }
 
-    // Explicitly set it to null in case of reuse
-    reuse.putField(NULL_FIELDS, null);
-
-    // Look up bitmap for this docId and construct a comma separated
-    // null column names based on that bitmap
-    RoaringBitmap bitmap = _docIdToNullColumnsMap.get(docId);
-    if (bitmap != null) {
-      String nullColumnsStr = _columnIdMap.entrySet().stream()
-              .map(entry -> bitmap.contains(entry.getValue()) ? entry.getKey() : null)
-              .filter(name -> name != null)
-              .collect(Collectors.joining(","));
-      reuse.putField(NULL_FIELDS, nullColumnsStr);
-    }
+    reuse.putField(NULL_FIELDS, _docIdToNullColumnsBitsetMap.get(docId));
     return reuse;
   }
 

@@ -31,7 +31,7 @@ public class RealtimePresenceVectorReaderWriter implements PresenceVectorReader 
         _nullBitmap = new MutableRoaringBitmap();
     }
 
-    public void setIsNull(int docId) {
+    public void setNull(int docId) {
         _nullBitmap.add(docId);
     }
 

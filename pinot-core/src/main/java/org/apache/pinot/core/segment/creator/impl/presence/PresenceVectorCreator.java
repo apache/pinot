@@ -33,10 +33,9 @@ import org.roaringbitmap.ImmutableBitmapDataProvider;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
-
 /**
- * Presence Vector Creator
- *
+ * Used to persist the null bitmap on disk. This is used by SegmentCreator
+ * while indexing rows.
  */
 public class PresenceVectorCreator implements Closeable {
 
@@ -56,22 +55,7 @@ public class PresenceVectorCreator implements Closeable {
     }
   }
 
-  public void setIsNull(int docId) {
+  public void setNull(int docId) {
     _nullBitmap.add(docId);
-  }
-
-  public static void main(String[] args)
-      throws Exception {
-    PresenceVectorCreator creator;
-    File indexDir = new File("/tmp");
-    creator = new PresenceVectorCreator(indexDir, "test");
-    creator.close();
-    MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
-    System.out.println("bitmap = " + bitmap.serializedSizeInBytes());
-    System.out.println("bitmap = " + Arrays.toString(bitmap.toArray()));
-    File presenceVectorFile = new File("/tmp/FlightNum.bitmap.presence");
-    PinotDataBuffer pinotDataBuffer =
-        PinotDataBuffer.loadFile(presenceVectorFile, 0, presenceVectorFile.length(), ByteOrder.nativeOrder(), "");
-    PresenceVectorReader reader = new PresenceVectorReaderImpl(pinotDataBuffer);
   }
 }

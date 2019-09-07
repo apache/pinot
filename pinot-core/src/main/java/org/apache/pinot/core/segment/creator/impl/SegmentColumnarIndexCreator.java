@@ -58,6 +58,7 @@ import org.apache.pinot.core.segment.creator.impl.presence.PresenceVectorCreator
 import org.apache.pinot.startree.hll.HllConfig;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
+import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -258,12 +259,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   public void indexRow(GenericRow row) {
 
     // Determine if we need to process presence vector per row, per column
-    boolean processPresenceVector = false;
-    Set<String> nullFieldsSet = null;
+    RoaringBitmap nullColumnsBitMap = null;
     if (row.getValue(NULL_FIELDS) != null) {
-      processPresenceVector = true;
-      String nullFieldsStr = (String) row.getValue(NULL_FIELDS);
-      nullFieldsSet = new HashSet<>(Arrays.asList(nullFieldsStr.split(",")));
+      nullColumnsBitMap = (RoaringBitmap) row.getValue(NULL_FIELDS);
     }
 
     for (String columnName : _forwardIndexCreatorMap.keySet()) {
@@ -293,8 +291,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
 
       // If row has null value for given column name, add to presence vector
-      if (processPresenceVector && nullFieldsSet.contains(columnName)) {
-        _presenceVectorCreatorMap.get(columnName).setIsNull(docIdCounter);
+      if (null != nullColumnsBitMap && nullColumnsBitMap.contains(schema.getColumnId(columnName))) {
+        _presenceVectorCreatorMap.get(columnName).setNull(docIdCounter);
       }
     }
     docIdCounter++;

@@ -376,7 +376,7 @@ public class CommonConstants {
 
     public static final String LOCAL_SEGMENT_SCHEME = "file";
 
-    public static final String NULL_FIELDS = "null_fields";
+    public static final String NULL_FIELDS = "null.fields";
 
     public enum SegmentType {
       OFFLINE, REALTIME

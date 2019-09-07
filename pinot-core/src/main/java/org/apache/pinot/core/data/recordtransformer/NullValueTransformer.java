@@ -28,6 +28,7 @@ import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.FieldSpec.FieldType;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
+import org.roaringbitmap.RoaringBitmap;
 
 import static org.apache.pinot.common.utils.CommonConstants.Segment.NULL_FIELDS;
 
@@ -60,9 +61,7 @@ public class NullValueTransformer implements RecordTransformer {
       }
     }
 
-    if (nullColumnNamesSet != null) {
-      record.putField(NULL_FIELDS, String.join(",", nullColumnNamesSet));
-    }
+    record.putField(NULL_FIELDS, nullColumnBitMap);
     return record;
   }
 }

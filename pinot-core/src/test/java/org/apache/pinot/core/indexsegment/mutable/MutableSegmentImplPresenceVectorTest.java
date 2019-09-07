@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.indexsegment.mutable;
 
+import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.JSONRecordReader;
@@ -25,6 +26,7 @@ import org.apache.pinot.core.data.readers.RecordReader;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
 import org.apache.pinot.core.segment.index.readers.PresenceVectorReader;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -32,9 +34,7 @@ import org.testng.annotations.Test;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 import static org.apache.pinot.common.utils.CommonConstants.Segment.NULL_FIELDS;
 
@@ -85,9 +85,15 @@ public class MutableSegmentImplPresenceVectorTest {
     public void testGetRecord() {
         GenericRow reuse = new GenericRow();
         _mutableSegmentImpl.getRecord(0, reuse);
-        String nullFieldsStr = (String) reuse.getValue(NULL_FIELDS);
-        List<String> nullColumns = Arrays.asList(nullFieldsStr.split(","));
+        List<String> nullColumns = new ArrayList<>();
+        RoaringBitmap nullBitmap = (RoaringBitmap) reuse.getValue(NULL_FIELDS);
+        for (String colName : _schema.getColumnNames()) {
+            if (nullBitmap.contains(_schema.getColumnId(colName))) {
+                nullColumns.add(colName);
+            }
+        }
         Assert.assertEquals(nullColumns, _finalNullColumns);
+
         _mutableSegmentImpl.getRecord(1, reuse);
         Assert.assertNull(reuse.getValue(NULL_FIELDS));
     }
