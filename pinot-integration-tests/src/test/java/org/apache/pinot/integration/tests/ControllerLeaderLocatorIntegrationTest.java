@@ -21,6 +21,7 @@ package org.apache.pinot.integration.tests;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
@@ -38,7 +39,7 @@ import org.testng.annotations.Test;
 
 
 public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
-  private static long TIMEOUT_IN_MS = 10_000L;
+  private static long TIMEOUT_IN_MS = 1000_000L;
 
   @BeforeClass
   public void setUp() {
@@ -89,14 +90,24 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
             TIMEOUT_IN_MS, "Failed to start the second controller");
 
     // Generate a table name that the second controller is its new lead controller, which should be different from the first table name.
-    String testTableName3 = generateTableNameUsingSecondController(secondControllerConfig, testTableName1);
+    AtomicReference<String> testTableName3 = new AtomicReference<>();
+    TestUtils.waitForCondition(aVoid -> {
+      String tableName;
+      try {
+        tableName = generateTableNameUsingSecondController(secondControllerConfig, testTableName1);
+      } catch (Exception e) {
+        return false;
+      }
+      testTableName3.set(tableName);
+      return tableName != null;
+    }, TIMEOUT_IN_MS, "Failed to find the second table");
 
     // Mock the behavior that 40 seconds have passed.
     controllerLeaderLocator.setLastCacheInvalidateMillis(System.currentTimeMillis() - 40_000L);
     controllerLeaderLocator.invalidateCachedControllerLeader();
 
     // The second controller should be the lead controller for test table 3, which isn't the helix leader.
-    Pair<String, Integer> thirdPair = controllerLeaderLocator.getControllerLeader(testTableName3);
+    Pair<String, Integer> thirdPair = controllerLeaderLocator.getControllerLeader(testTableName3.get());
     Assert.assertNotNull(thirdPair);
     Assert.assertEquals(thirdPair.getFirst(), ControllerTest.LOCAL_HOST);
     Assert.assertEquals((int) thirdPair.getSecond(), (ControllerTest.DEFAULT_CONTROLLER_PORT + 1));
