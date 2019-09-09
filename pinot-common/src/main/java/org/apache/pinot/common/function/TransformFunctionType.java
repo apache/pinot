@@ -46,6 +46,8 @@ public enum TransformFunctionType {
   VALUEIN("valueIn"),
   MAPVALUE("mapValue");
 
+  JSONPATH("jsonPath");
+
   private final String _name;
 
   TransformFunctionType(String name) {
