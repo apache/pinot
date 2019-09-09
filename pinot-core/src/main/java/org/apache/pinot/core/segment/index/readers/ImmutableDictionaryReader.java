@@ -41,9 +41,10 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
       _valueReader = new VarLengthBytesValueReaderWriter(dataBuffer);
       _numBytesPerValue = -1;
       _paddingByte = 0;
-    }
-    else {
-      Preconditions.checkState(dataBuffer.size() == length * numBytesPerValue);
+    } else {
+      Preconditions.checkState(dataBuffer.size() == length * numBytesPerValue,
+          "The size of the dataBuffer isn't the same as length * numBytesPerValue, where dataBuffer.size() = "
+              + dataBuffer.size() + ", length = " + length + ", numBytesPerValue = " + numBytesPerValue);
       _valueReader = new FixedByteValueReaderWriter(dataBuffer);
       _numBytesPerValue = numBytesPerValue;
       _paddingByte = paddingByte;
