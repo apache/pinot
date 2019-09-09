@@ -206,9 +206,12 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     alertConfig.setSubjectType(makeSubject(emailParams));
     alertConfig.setReferenceLinks(this.config.getReferenceLinks());
 
-    EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, null,
-        "Thirdeye Alert : " + this.config.getName(), null, null, anomalyResultListOfGroup,
-        new EmailContentFormatterContext());
+    EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, null, "Thirdeye Alert : " + this.config.getName(), null,
+              null, anomalyResultListOfGroup, new EmailContentFormatterContext());
+    if (emailEntity.getContent() == null) {
+      // Ignore, nothing to send
+      return;
+    }
 
     HtmlEmail email = emailEntity.getContent();
     email.setSubject(emailEntity.getSubject());

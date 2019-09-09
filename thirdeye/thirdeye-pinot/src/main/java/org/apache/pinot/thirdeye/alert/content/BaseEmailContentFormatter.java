@@ -47,6 +47,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import org.apache.pinot.thirdeye.detector.email.filter.DummyAlertFilter;
 import org.apache.pinot.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
@@ -82,6 +83,8 @@ import org.joda.time.Period;
 import org.joda.time.Weeks;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.thirdeye.alert.content.EntityGroupKeyContentFormatter.*;
 
 
 public abstract class BaseEmailContentFormatter implements EmailContentFormatter {
@@ -287,6 +290,12 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
    */
   public EmailEntity buildEmailEntity(Map<String, Object> paramMap, String subject,
       DetectionAlertFilterRecipients recipients, String fromEmail, String emailTemplate) {
+    EmailEntity emailEntity = new EmailEntity();
+    if (paramMap.containsKey(PROP_ENTITY_ANOMALIES_MAP_KEY) && ConfigUtils.getMap(paramMap.get(PROP_ENTITY_ANOMALIES_MAP_KEY)).size() == 0) {
+      LOG.info("No Entity anomalies to report");
+      return emailEntity;
+    }
+
     if (Strings.isNullOrEmpty(fromEmail)) {
       throw new IllegalArgumentException("Invalid sender's email");
     }
@@ -303,7 +312,6 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     paramMap.put("cid", cid);
 
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    EmailEntity emailEntity = new EmailEntity();
     try (Writer out = new OutputStreamWriter(baos, AlertTaskRunnerV2.CHARSET)) {
       Configuration freemarkerConfig = new Configuration(Configuration.VERSION_2_3_21);
       freemarkerConfig.setClassForTemplateLoading(getClass(), "/org/apache/pinot/thirdeye/detector");
