@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.alert.content;
+package org.apache.pinot.thirdeye.notification.content.templates;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -31,12 +31,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import org.apache.pinot.thirdeye.anomaly.alert.util.EmailScreenshotHelper;
+import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.anomaly.alert.util.AlertScreenshotHelper;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,10 +52,10 @@ import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfi
  * This email formatter generates a report/alert from the anomalies having a groupKey
  * and optionally a whitelist metric which will be listed at the top of the alert report
  */
-public class EntityGroupKeyContentFormatter extends BaseEmailContentFormatter{
-  private static final Logger LOG = LoggerFactory.getLogger(EntityGroupKeyContentFormatter.class);
+public class EntityGroupKeyContent extends BaseNotificationContent {
+  private static final Logger LOG = LoggerFactory.getLogger(EntityGroupKeyContent.class);
 
-  private static final String EMAIL_TEMPLATE = "entity-groupkey-anomaly-report.ftl";
+  private static final String TEMPLATE = "entity-groupkey-anomaly-report.ftl";
 
   // Give some kind of special status to this metric entity. Anomalies from this whitelisted metric entity
   // will appear at the top of the alert report. Specify the entity name of the metric alert here.
@@ -73,12 +77,11 @@ public class EntityGroupKeyContentFormatter extends BaseEmailContentFormatter{
   private Map<String, String> anomalyToChildIdsMap = new HashMap<>();
   private List<String> entityWhitelist = new ArrayList<>();
 
-  public EntityGroupKeyContentFormatter() {}
+  public EntityGroupKeyContent() {}
 
   @Override
-  public void init(Properties properties, EmailContentFormatterConfiguration configuration) {
-    super.init(properties, configuration);
-    this.emailTemplate = EMAIL_TEMPLATE;
+  public void init(Properties properties, ThirdEyeAnomalyConfiguration config) {
+    super.init(properties, config);
     this.configDAO = DAORegistry.getInstance().getDetectionConfigManager();
     if (properties.containsKey(PROP_ENTITY_WHITELIST)) {
       // Support only one whitelist entity. This can be extended in the future.
@@ -87,8 +90,14 @@ public class EntityGroupKeyContentFormatter extends BaseEmailContentFormatter{
   }
 
   @Override
-  protected void updateTemplateDataByAnomalyResults(Map<String, Object> templateData,
-      Collection<AnomalyResult> anomalies, EmailContentFormatterContext context) {
+  public String getTemplate() {
+    return TEMPLATE;
+  }
+
+  @Override
+  public Map<String, Object> format(AlertConfigDTO alertConfigDTO, Long groupId, String groupName, Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
+    Map<String, Object> templateData = super.getTemplateData(alertConfigDTO, groupId, groupName, anomalies);
+
     DetectionConfigDTO config = null;
     Preconditions.checkArgument(anomalies != null && !anomalies.isEmpty(), "Report has empty anomalies");
 
@@ -118,8 +127,7 @@ public class EntityGroupKeyContentFormatter extends BaseEmailContentFormatter{
     if (whitelistMetricToAnomaliesMap.size() == 1 && whitelistMetricToAnomaliesMap.values().size() == 1) {
       AnomalyReportEntity singleAnomaly = whitelistMetricToAnomaliesMap.values().iterator().next();
       try {
-        imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(),
-            emailContentFormatterConfiguration);
+        imgPath = AlertScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), thirdEyeAnomalyConfig);
       } catch (Exception e) {
         LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
       }
@@ -131,6 +139,8 @@ public class EntityGroupKeyContentFormatter extends BaseEmailContentFormatter{
     templateData.put("emailDescription", config.getDescription());
     templateData.put("anomalyToChildIdsMap", anomalyToChildIdsMap);
     templateData.put(PROP_ENTITY_ANOMALIES_MAP_KEY, entityToSortedAnomaliesMap.asMap());
+
+    return templateData;
   }
 
   /**
@@ -138,7 +148,7 @@ public class EntityGroupKeyContentFormatter extends BaseEmailContentFormatter{
    */
   private void updateEntityToAnomalyDetailsMap(MergedAnomalyResultDTO anomaly, DetectionConfigDTO detectionConfig) {
     AnomalyReportEntity anomalyReport = new AnomalyReportEntity(String.valueOf(anomaly.getId()),
-        getAnomalyURL(anomaly, emailContentFormatterConfiguration.getDashboardHost()),
+        getAnomalyURL(anomaly, thirdEyeAnomalyConfig.getDashboardHost()),
         anomaly.getAvgBaselineVal(),
         anomaly.getAvgCurrentVal(), 0d, getDimensionsList(anomaly.getDimensions()),
         getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()), getFeedbackValue(anomaly.getFeedback()),

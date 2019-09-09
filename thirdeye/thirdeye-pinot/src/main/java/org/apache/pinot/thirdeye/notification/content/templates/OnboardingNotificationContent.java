@@ -17,8 +17,10 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.alert.content;
+package org.apache.pinot.thirdeye.notification.content.templates;
 
+import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.dashboard.resources.DetectionJobResource;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
@@ -28,37 +30,39 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
 import org.joda.time.Days;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class OnboardingNotificationEmailContentFormatter extends BaseEmailContentFormatter {
-  private static final Logger LOG = LoggerFactory.getLogger(OnboardingNotificationEmailContentFormatter.class);
-  public static final String EMAIL_TEMPLATE = "emailTemplate";
-  public static final String DEFAULT_EMAIL_TEMPLATE = "onboard-notification-email-template.ftl";
-  public static final String DEFAULT_NULL_STRING_VALUE = "N/A";
-  public static final String ALERT_FILTER_PATTERN_KEY = DetectionJobResource.AUTOTUNE_PATTERN_KEY;
-  public static final String ALERT_CONFIG_NAME = "alertConfigName";
-  public static final int DEFAULT_ONBOARDING_REPLAY_DAYS = 30;
+public class OnboardingNotificationContent extends BaseNotificationContent {
+  private static final Logger LOG = LoggerFactory.getLogger(OnboardingNotificationContent.class);
 
-  public OnboardingNotificationEmailContentFormatter() {
+  private static final String EMAIL_TEMPLATE = "emailTemplate";
+  private static final String DEFAULT_TEMPLATE = "onboard-notification-email-template.ftl";
+  private static final String DEFAULT_NULL_STRING_VALUE = "N/A";
+  private static final String ALERT_FILTER_PATTERN_KEY = DetectionJobResource.AUTOTUNE_PATTERN_KEY;
+  private static final int DEFAULT_ONBOARDING_REPLAY_DAYS = 30;
+
+  public OnboardingNotificationContent() {}
+
+  @Override
+  public void init(Properties properties, ThirdEyeAnomalyConfiguration config) {
+    super.init(properties, config);
   }
 
   @Override
-  public void init(Properties properties, EmailContentFormatterConfiguration configuration) {
-    super.init(properties, configuration);
-    this.emailTemplate = properties.getProperty(EMAIL_TEMPLATE, DEFAULT_EMAIL_TEMPLATE);
+  public String getTemplate() {
+    return properties.getProperty(EMAIL_TEMPLATE, DEFAULT_TEMPLATE);
   }
+
   /**
    * The actual function that convert anomalies into parameter map
-
-   * @param templateData
-   * @param anomalies
    */
   @Override
-  protected void updateTemplateDataByAnomalyResults(Map<String, Object> templateData,
-      Collection<AnomalyResult> anomalies, EmailContentFormatterContext context) {
+  public Map<String, Object> format(AlertConfigDTO alertConfigDTO, Long groupId, String groupName, Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
+    Map<String, Object> templateData = super.getTemplateData(alertConfigDTO, groupId, groupName, anomalies);
     enrichMetricInfo(templateData, anomalies);
     AnomalyFunctionDTO anomalyFunctionSpec = context.getAnomalyFunctionSpec();
     for (AnomalyResult anomalyResult : anomalies) {
@@ -99,6 +103,8 @@ public class OnboardingNotificationEmailContentFormatter extends BaseEmailConten
     templateData.put("recipients", returnValueOrDefault(StringUtils.join(alertConfig.getReceiverAddresses().getTo(), ','), DEFAULT_NULL_STRING_VALUE));
     templateData.put("ccRecipients", returnValueOrDefault(StringUtils.join(alertConfig.getReceiverAddresses().getCc(), ','), DEFAULT_NULL_STRING_VALUE));
     templateData.put("bccRecipients", returnValueOrDefault(StringUtils.join(alertConfig.getReceiverAddresses().getBcc(), ','), DEFAULT_NULL_STRING_VALUE));
+
+    return templateData;
   }
 
   private String returnValueOrDefault(String value, String defaultValue) {

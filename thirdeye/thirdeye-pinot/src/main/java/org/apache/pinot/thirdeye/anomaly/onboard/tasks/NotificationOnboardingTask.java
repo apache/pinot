@@ -20,12 +20,12 @@
 package org.apache.pinot.thirdeye.anomaly.onboard.tasks;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
-import org.apache.pinot.thirdeye.alert.content.EmailContentFormatter;
-import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterConfiguration;
-import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterContext;
-import org.apache.pinot.thirdeye.alert.content.OnboardingNotificationEmailContentFormatter;
+import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
+import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
+import org.apache.pinot.thirdeye.notification.formatter.channels.EmailContentFormatter;
+import org.apache.pinot.thirdeye.notification.content.templates.OnboardingNotificationContent;
 import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import org.apache.pinot.thirdeye.anomaly.alert.util.EmailHelper;
 import org.apache.pinot.thirdeye.anomaly.onboard.framework.BaseDetectionOnboardTask;
@@ -39,7 +39,6 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.mail.EmailException;
 import org.joda.time.DateTime;
@@ -120,29 +119,26 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask {
       filteredAnomalyResults.add(anomaly);
     }
 
-    // Set up thirdeye config
-    EmailContentFormatterConfiguration emailFormatterConfig = new EmailContentFormatterConfiguration();
-    emailFormatterConfig.setSmtpConfiguration(smtpConfiguration);
-    emailFormatterConfig.setDashboardHost(taskConfigs.getString(THIRDEYE_DASHBOARD_HOST));
-    emailFormatterConfig.setPhantomJsPath(taskConfigs.getString(PHANTON_JS_PATH));
-    emailFormatterConfig.setRootDir(taskConfigs.getString(ROOT_DIR));
-    emailFormatterConfig.setFailureFromAddress(taskConfigs.getString(DEFAULT_ALERT_SENDER_ADDRESS));
-    emailFormatterConfig.setFailureToAddress(taskConfigs.getString(DEFAULT_ALERT_RECEIVER_ADDRESS));
-
     // Email Subject
     String subject = String.format("Replay results for %s is ready for review!",
         DAORegistry.getInstance().getAnomalyFunctionDAO().findById(functionId).getFunctionName());
 
-    EmailContentFormatter emailContentFormatter = new OnboardingNotificationEmailContentFormatter();
     // construct context
-    EmailContentFormatterContext context = new EmailContentFormatterContext();
+    ADContentFormatterContext context = new ADContentFormatterContext();
     context.setAnomalyFunctionSpec(anomalyFunctionSpec);
     context.setAlertConfig(alertConfig);
     context.setStart(start);
     context.setEnd(end);
 
-    emailContentFormatter.init(new Properties(), emailFormatterConfig);
-    EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, alertConfig.getReceiverAddresses(),
+    // Set up thirdeye config
+    ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfig = new ThirdEyeAnomalyConfiguration();
+    thirdEyeAnomalyConfig.setDashboardHost(taskConfigs.getString(THIRDEYE_DASHBOARD_HOST));
+    thirdEyeAnomalyConfig.setPhantomJsPath(taskConfigs.getString(PHANTON_JS_PATH));
+    thirdEyeAnomalyConfig.setRootDir(taskConfigs.getString(ROOT_DIR));
+
+    EmailContentFormatter
+        emailFormatter = new EmailContentFormatter(new OnboardingNotificationContent(), thirdEyeAnomalyConfig);
+    EmailEntity emailEntity = emailFormatter.getEmailEntity(alertConfig, alertConfig.getReceiverAddresses(),
         subject, null, "", filteredAnomalyResults, context);
     try {
       EmailHelper.sendEmailWithEmailEntity(emailEntity, smtpConfiguration);

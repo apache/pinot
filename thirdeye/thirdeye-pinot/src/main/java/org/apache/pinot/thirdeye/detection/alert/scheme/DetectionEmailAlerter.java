@@ -21,14 +21,18 @@ package org.apache.pinot.thirdeye.detection.alert.scheme;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashSet;
-import org.apache.pinot.thirdeye.alert.commons.EmailContentFormatterFactory;
-import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
-import org.apache.pinot.thirdeye.alert.content.EmailContentFormatter;
-import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterConfiguration;
-import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterContext;
-import org.apache.pinot.thirdeye.alert.content.EntityGroupKeyContentFormatter;
-import org.apache.pinot.thirdeye.alert.content.MetricAnomaliesEmailContentFormatter;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.mail.DefaultAuthenticator;
+import org.apache.commons.mail.EmailException;
+import org.apache.commons.mail.HtmlEmail;
 import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
@@ -41,17 +45,12 @@ import org.apache.pinot.thirdeye.detection.alert.AlertUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.apache.pinot.thirdeye.detection.annotation.AlertScheme;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.mail.DefaultAuthenticator;
-import org.apache.commons.mail.EmailException;
-import org.apache.commons.mail.HtmlEmail;
+import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
+import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
+import org.apache.pinot.thirdeye.notification.content.templates.EntityGroupKeyContent;
+import org.apache.pinot.thirdeye.notification.content.templates.MetricAnomaliesContent;
+import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
+import org.apache.pinot.thirdeye.notification.formatter.channels.EmailContentFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -166,23 +165,18 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   /**
    * Plug the appropriate template based on configuration.
    */
-  private static EmailContentFormatter makeTemplate(Map<String, Object> emailParams) throws Exception {
+  private static BaseNotificationContent makeTemplate(Map<String, Object> emailParams) {
     EmailTemplate template = EmailTemplate.DEFAULT_EMAIL;
     if (emailParams != null && emailParams.containsKey(PROP_EMAIL_TEMPLATE)) {
       template = EmailTemplate.valueOf(emailParams.get(PROP_EMAIL_TEMPLATE).toString());
     }
 
-    String className;
     switch (template) {
       case DEFAULT_EMAIL:
-        className = MetricAnomaliesEmailContentFormatter.class.getSimpleName();
-        LOG.info("Using " + className + " to render the template.");
-        return EmailContentFormatterFactory.fromClassName(className);
+        return new MetricAnomaliesContent();
 
       case ENTITY_GROUPBY_REPORT:
-        className = EntityGroupKeyContentFormatter.class.getSimpleName();
-        LOG.info("Using " + className + " to render the template.");
-        return EmailContentFormatterFactory.fromClassName(className);
+        return new EntityGroupKeyContent();
 
       default:
         throw new IllegalArgumentException(String.format("Unknown email template '%s'", template));
@@ -211,10 +205,11 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     validateAlert(recipients, anomalies);
 
     Map<String, Object> emailParams = ConfigUtils.getMap(this.config.getAlertSchemes().get(PROP_EMAIL_SCHEME));
-    EmailContentFormatter emailContentFormatter = makeTemplate(emailParams);
-    Properties props = new Properties();
-    props.putAll(emailParams);
-    emailContentFormatter.init(props, EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(this.teConfig));
+    Properties emailProps = new Properties();
+    emailProps.putAll(emailParams);
+    BaseNotificationContent content = makeTemplate(emailParams);
+    LOG.info("Using " + content.getClass().getSimpleName() + " to render the template.");
+    EmailContentFormatter emailContentFormatter = new EmailContentFormatter(content, emailProps, this.teConfig);
 
     List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>(anomalies);
     anomalyResultListOfGroup.sort(COMPARATOR_DESC);
@@ -225,8 +220,9 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     alertConfig.setSubjectType(makeSubject(emailParams));
     alertConfig.setReferenceLinks(this.config.getReferenceLinks());
 
-    EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, null, "Thirdeye Alert : " + this.config.getName(), null,
-              null, anomalyResultListOfGroup, new EmailContentFormatterContext());
+    EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, null,
+        "Thirdeye Alert : " + this.config.getName(), null, null, anomalyResultListOfGroup,
+        new ADContentFormatterContext());
     if (emailEntity.getContent() == null) {
       // Ignore, nothing to send
       return;

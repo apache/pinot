@@ -17,14 +17,18 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.alert.content;
+package org.apache.pinot.thirdeye.notification.formatter;
 
 import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.joda.time.DateTime;
 
 
-public class EmailContentFormatterContext {
+/**
+ * This class holds information about the anomaly detection context
+ * which can be rendered into the alert(email, jira) content.
+ */
+public class ADContentFormatterContext {
   private AnomalyFunctionDTO anomalyFunctionSpec;
   private AlertConfigDTO alertConfig;
   private DateTime start; // anomaly search region starts

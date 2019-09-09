@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.alert.commons;
+package org.apache.pinot.thirdeye.notification.commons;
 
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import org.apache.commons.mail.HtmlEmail;
