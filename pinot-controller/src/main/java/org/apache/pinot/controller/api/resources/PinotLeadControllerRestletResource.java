@@ -64,26 +64,21 @@ public class PinotLeadControllerRestletResource {
     HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
     boolean isLeadControllerResourceEnabled = LeadControllerUtils.isLeadControllerResourceEnabled(helixManager);
 
-    String helixLeader = null;
-    // Returns helix leader if lead controller resource is disabled.
+    // Returns empty map if lead controller resource is disabled.
     if (!isLeadControllerResourceEnabled) {
-      helixLeader = LeadControllerUtils.getHelixClusterLeader(helixManager);
+      return new LeadControllerResponse(false, leadControllerEntryMap);
     }
 
     ExternalView leadControllerResourceExternalView = getLeadControllerResourceExternalView(helixManager);
     for (int partitionId = 0; partitionId < Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; partitionId++) {
       String partitionName = LeadControllerUtils.generatePartitionName(partitionId);
-      if (!isLeadControllerResourceEnabled) {
-        leadControllerEntryMap.put(partitionName, new LeadControllerEntry(helixLeader, new ArrayList<>()));
-      } else {
-        String participantInstanceId =
-            getParticipantInstanceIdFromExternalView(leadControllerResourceExternalView, partitionName);
-        if (participantInstanceId == null) {
-          continue;
-        }
-        leadControllerEntryMap
-            .putIfAbsent(partitionName, new LeadControllerEntry(participantInstanceId, new ArrayList<>()));
+      String participantInstanceId =
+          getParticipantInstanceIdFromExternalView(leadControllerResourceExternalView, partitionName);
+      if (participantInstanceId == null) {
+        continue;
       }
+      leadControllerEntryMap
+          .putIfAbsent(partitionName, new LeadControllerEntry(participantInstanceId, new ArrayList<>()));
     }
 
     // Assigns all the tables to the relevant partitions.
@@ -95,7 +90,7 @@ public class PinotLeadControllerRestletResource {
       LeadControllerEntry leadControllerEntry = leadControllerEntryMap.get(partitionName);
       leadControllerEntry.getTableNames().add(tableName);
     }
-    return new LeadControllerResponse(isLeadControllerResourceEnabled, leadControllerEntryMap);
+    return new LeadControllerResponse(true, leadControllerEntryMap);
   }
 
   @GET
@@ -113,18 +108,16 @@ public class PinotLeadControllerRestletResource {
     int partitionId = LeadControllerUtils.getPartitionIdForTable(rawTableName);
     String partitionName = LeadControllerUtils.generatePartitionName(partitionId);
 
-    String leadControllerId;
-    // Returns controller Id from lead controller resource is enabled, otherwise returns helix leader.
+    // Returns controller Id from lead controller resource is enabled, otherwise returns empty map.
     if (!isLeadControllerResourceEnabled) {
-      leadControllerId = LeadControllerUtils.getHelixClusterLeader(helixManager);
-    } else {
-      leadControllerId = getParticipantInstanceIdFromExternalView(leadControllerResourceExternalView, partitionName);
+      return new LeadControllerResponse(false, leadControllerEntryMap);
     }
 
+    String leadControllerId = getParticipantInstanceIdFromExternalView(leadControllerResourceExternalView, partitionName);
     LeadControllerEntry leadControllerEntry =
         new LeadControllerEntry(leadControllerId, Collections.singletonList(tableName));
     leadControllerEntryMap.put(partitionName, leadControllerEntry);
-    return new LeadControllerResponse(isLeadControllerResourceEnabled, leadControllerEntryMap);
+    return new LeadControllerResponse(true, leadControllerEntryMap);
   }
 
   private ExternalView getLeadControllerResourceExternalView(HelixManager helixManager) {
