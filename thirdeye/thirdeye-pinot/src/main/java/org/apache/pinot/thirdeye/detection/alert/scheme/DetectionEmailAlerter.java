@@ -117,12 +117,10 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   }
 
   private void blacklistRecipients(DetectionAlertFilterRecipients recipients) {
-    if (recipients != null) {
-      if (!emailBlacklist.isEmpty()) {
-        recipients.setTo(removeBlacklisted(recipients.getTo(), emailBlacklist));
-        recipients.setCc(removeBlacklisted(recipients.getCc(), emailBlacklist));
-        recipients.setBcc(removeBlacklisted(recipients.getBcc(), emailBlacklist));
-      }
+    if (recipients != null && !emailBlacklist.isEmpty()) {
+      recipients.setTo(removeBlacklisted(recipients.getTo(), emailBlacklist));
+      recipients.setCc(removeBlacklisted(recipients.getCc(), emailBlacklist));
+      recipients.setBcc(removeBlacklisted(recipients.getBcc(), emailBlacklist));
     }
   }
 
