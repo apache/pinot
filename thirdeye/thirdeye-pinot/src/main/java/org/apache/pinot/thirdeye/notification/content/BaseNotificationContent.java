@@ -130,7 +130,7 @@ public abstract class BaseNotificationContent implements NotificationContent {
   }
 
   public void cleanup() {
-    if (org.apache.commons.lang3.StringUtils.isNotBlank(imgPath)) {
+    if (StringUtils.isNotBlank(imgPath)) {
       try {
         Files.deleteIfExists(new File(imgPath).toPath());
       } catch (IOException e) {

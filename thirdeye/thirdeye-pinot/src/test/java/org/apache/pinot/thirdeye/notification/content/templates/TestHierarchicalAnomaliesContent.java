@@ -17,6 +17,7 @@
 package org.apache.pinot.thirdeye.notification.content.templates;
 
 import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
+import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.apache.pinot.thirdeye.notification.formatter.channels.EmailContentFormatter;
 import org.apache.pinot.thirdeye.notification.ContentFormatterUtils;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
@@ -149,10 +150,12 @@ public class TestHierarchicalAnomaliesContent {
 
     EmailContentFormatter
         contentFormatter = new EmailContentFormatter(new HierarchicalAnomaliesContent(), thirdeyeAnomalyConfig);
+    ADContentFormatterContext context = new ADContentFormatterContext();
+    context.setAlertConfig(alertConfigDTO);
     DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
         EmailUtils.getValidEmailAddresses("a@b.com"));
-    EmailEntity emailEntity = contentFormatter.getEmailEntity(alertConfigDTO, recipients, TEST,
-        null, "", anomalies, null);
+    EmailEntity emailEntity = contentFormatter.getEmailEntity(recipients, TEST,
+        null, "", anomalies, context);
 
     String htmlPath = ClassLoader.getSystemResource("test-hierarchical-metric-anomalies-template.html").getPath();
     Assert.assertEquals(

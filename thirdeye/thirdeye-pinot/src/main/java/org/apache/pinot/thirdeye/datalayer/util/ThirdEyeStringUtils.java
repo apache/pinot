@@ -28,7 +28,7 @@ import java.util.Map;
 import java.util.Properties;
 
 
-public class StringUtils {
+public class ThirdEyeStringUtils {
   private static Splitter SEMICOLON_SPLITTER = Splitter.on(";").omitEmptyStrings();
   private static Splitter EQUALS_SPLITTER = Splitter.on("=").omitEmptyStrings();
 

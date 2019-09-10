@@ -23,6 +23,7 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
 import org.apache.pinot.thirdeye.alert.commons.AnomalyFeedConfig;
 import org.apache.pinot.thirdeye.alert.commons.AnomalyFeedFactory;
+import org.apache.pinot.thirdeye.datalayer.util.ThirdEyeStringUtils;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
 import org.apache.pinot.thirdeye.notification.formatter.AlertContentFormatterFactory;
 import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
@@ -310,7 +311,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
 
         Properties prop;
         if (emailFormatterConfig != null && StringUtils.isNotBlank(emailFormatterConfig.getProperties())) {
-          prop = org.apache.pinot.thirdeye.datalayer.util.StringUtils.decodeCompactedProperties(emailFormatterConfig.getProperties());
+          prop = ThirdEyeStringUtils.decodeCompactedProperties(emailFormatterConfig.getProperties());
         } else {
           prop = new Properties();
         }
@@ -323,9 +324,11 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           recipientsForThisGroup = retainWhitelisted(recipientsForThisGroup, emailWhitelist);
         }
 
+        ADContentFormatterContext context = new ADContentFormatterContext();
+        context.setAlertConfig(alertConfig);
         EmailEntity emailEntity = emailFormatter
-            .getEmailEntity(alertConfig, recipientsForThisGroup, emailSubjectBuilder.toString(),
-                groupedAnomalyDTO.getId(), groupName, anomalyResultListOfGroup, new ADContentFormatterContext());
+            .getEmailEntity(recipientsForThisGroup, emailSubjectBuilder.toString(),
+                groupedAnomalyDTO.getId(), groupName, anomalyResultListOfGroup, context);
         EmailHelper.sendEmailWithEmailEntity(emailEntity,
             SmtpConfiguration.createFromProperties(thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY)));
         // Update notified flag

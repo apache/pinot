@@ -22,10 +22,10 @@ package org.apache.pinot.thirdeye.notification.formatter.channels;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import java.util.Properties;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
-import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
@@ -70,13 +70,13 @@ public class EmailContentFormatter {
     content.init(emailProps, teConfig);
   }
 
-  public EmailEntity getEmailEntity(AlertConfigDTO alertConfigDTO, DetectionAlertFilterRecipients recipients, String subject,
+  public EmailEntity getEmailEntity(DetectionAlertFilterRecipients recipients, String subject,
       Long groupId, String groupName, Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
-    Map<String, Object> templateData = notificationContent.format(alertConfigDTO, groupId, groupName, anomalies, context);
+    Map<String, Object> templateData = notificationContent.format(groupId, groupName, anomalies, context);
     templateData.put("dashboardHost", thirdEyeAnomalyConfig.getDashboardHost());
 
-    String outputSubject = notificationContent.makeSubject(subject, groupName, alertConfigDTO.getSubjectType(), templateData);
-    return buildEmailEntity(templateData, outputSubject, recipients, alertConfigDTO.getFromAddress(), notificationContent.getTemplate());
+    String outputSubject = notificationContent.makeSubject(subject, groupName, context.getAlertConfig().getSubjectType(), templateData);
+    return buildEmailEntity(templateData, outputSubject, recipients, context.getAlertConfig().getFromAddress(), notificationContent.getTemplate());
   }
 
   /**
@@ -91,7 +91,7 @@ public class EmailContentFormatter {
     HtmlEmail email = new HtmlEmail();
     String cid = "";
     try {
-      if (org.apache.commons.lang3.StringUtils.isNotBlank(notificationContent.getSnaphotPath())) {
+      if (StringUtils.isNotBlank(notificationContent.getSnaphotPath())) {
         cid = email.embed(new File(notificationContent.getSnaphotPath()));
       }
     } catch (Exception e) {

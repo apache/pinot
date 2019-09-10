@@ -26,6 +26,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
+import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.apache.pinot.thirdeye.notification.formatter.channels.EmailContentFormatter;
 import org.apache.pinot.thirdeye.notification.ContentFormatterUtils;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
@@ -159,10 +160,11 @@ public class TestEntityGroupKeyContent {
 
     EmailContentFormatter
         contentFormatter = new EmailContentFormatter(new EntityGroupKeyContent(), thirdeyeAnomalyConfig);
+    ADContentFormatterContext context = new ADContentFormatterContext();
+    context.setAlertConfig(DaoTestUtils.getTestAlertConfiguration("Test Config"));
     EmailEntity emailEntity = contentFormatter.getEmailEntity(
-        DaoTestUtils.getTestAlertConfiguration("Test Config"),
         new DetectionAlertFilterRecipients(EmailUtils.getValidEmailAddresses("a@b.com")),
-        TEST, null, "", anomalies, null);
+        TEST, null, "", anomalies, context);
     String htmlPath = ClassLoader.getSystemResource("test-entity-groupby-email-content-formatter.html").getPath();
 
     Assert.assertEquals(
@@ -277,10 +279,11 @@ public class TestEntityGroupKeyContent {
     props.put(PROP_ENTITY_WHITELIST, "metric-X");
     EmailContentFormatter
         contentFormatter = new EmailContentFormatter(new EntityGroupKeyContent(), props, thirdeyeAnomalyConfig);
+    ADContentFormatterContext context = new ADContentFormatterContext();
+    context.setAlertConfig(DaoTestUtils.getTestAlertConfiguration("Test Config"));
     EmailEntity emailEntity = contentFormatter.getEmailEntity(
-        DaoTestUtils.getTestAlertConfiguration("Test Config"),
         new DetectionAlertFilterRecipients(EmailUtils.getValidEmailAddresses("a@b.com")),
-        TEST, null, "", anomalies, null);
+        TEST, null, "", anomalies, context);
     String htmlPath = ClassLoader.getSystemResource("test-entity-groupby-with-whitelist-email-content-formatter.html").getPath();
 
     Assert.assertEquals(

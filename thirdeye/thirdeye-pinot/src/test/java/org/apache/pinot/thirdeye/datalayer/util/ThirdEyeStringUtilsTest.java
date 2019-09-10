@@ -5,11 +5,11 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class StringUtilsTest {
+public class ThirdEyeStringUtilsTest {
   @Test
   public void testDecodeCompactedProperties(){
     String propertiesString = "a=a;b=";
-    Properties props = StringUtils.decodeCompactedProperties(propertiesString);
+    Properties props = ThirdEyeStringUtils.decodeCompactedProperties(propertiesString);
 
     Assert.assertEquals(2, props.size());
     Assert.assertEquals("a", props.getProperty("a"));

@@ -61,8 +61,8 @@ public class OnboardingNotificationContent extends BaseNotificationContent {
    * The actual function that convert anomalies into parameter map
    */
   @Override
-  public Map<String, Object> format(AlertConfigDTO alertConfigDTO, Long groupId, String groupName, Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
-    Map<String, Object> templateData = super.getTemplateData(alertConfigDTO, groupId, groupName, anomalies);
+  public Map<String, Object> format(Long groupId, String groupName, Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
+    Map<String, Object> templateData = super.getTemplateData(context.getAlertConfig(), groupId, groupName, anomalies);
     enrichMetricInfo(templateData, anomalies);
     AnomalyFunctionDTO anomalyFunctionSpec = context.getAnomalyFunctionSpec();
     for (AnomalyResult anomalyResult : anomalies) {

@@ -87,8 +87,8 @@ public class HierarchicalAnomaliesContent extends BaseNotificationContent {
   }
 
   @Override
-  public Map<String, Object> format(AlertConfigDTO alertConfigDTO, Long groupId, String groupName, Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
-    Map<String, Object> templateData = super.getTemplateData(alertConfigDTO, groupId, groupName, anomalies);
+  public Map<String, Object> format(Long groupId, String groupName, Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
+    Map<String, Object> templateData = super.getTemplateData(context.getAlertConfig(), groupId, groupName, anomalies);
     enrichMetricInfo(templateData, anomalies);
     List<AnomalyReportEntity> rootAnomalyDetails = new ArrayList<>();
     SortedMap<String, List<AnomalyReportEntity>> leafAnomalyDetails = new TreeMap<>();
