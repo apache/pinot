@@ -56,6 +56,7 @@ public class EntityGroupKeyContentFormatter extends BaseEmailContentFormatter{
   // Give some kind of special status to this metric entity. Anomalies from this whitelisted metric entity
   // will appear at the top of the alert report. Specify the entity name of the metric alert here.
   static final String PROP_ENTITY_WHITELIST = "entityWhitelist";
+  static final String PROP_ENTITY_ANOMALIES_MAP_KEY = "entityToSortedAnomaliesMap";
 
   static final String PROP_ANOMALY_SCORE = "groupScore";
   static final String PROP_GROUP_KEY = "groupKey";
@@ -129,7 +130,7 @@ public class EntityGroupKeyContentFormatter extends BaseEmailContentFormatter{
     templateData.put("emailHeading", config.getName());
     templateData.put("emailDescription", config.getDescription());
     templateData.put("anomalyToChildIdsMap", anomalyToChildIdsMap);
-    templateData.put("entityToSortedAnomaliesMap", entityToSortedAnomaliesMap.asMap());
+    templateData.put(PROP_ENTITY_ANOMALIES_MAP_KEY, entityToSortedAnomaliesMap.asMap());
   }
 
   /**
