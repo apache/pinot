@@ -84,6 +84,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
     _interSegmentNumGroupsLimit =
         (int) Math.min((long) innerSegmentNumGroupsLimit * INTER_SEGMENT_NUM_GROUPS_LIMIT_FACTOR, Integer.MAX_VALUE);
     _initLock = new ReentrantLock();
+    _indexedTable = new ConcurrentIndexedTable();
   }
 
   /**
@@ -126,7 +127,6 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
             try {
               if (_dataSchema == null) {
                 _dataSchema = intermediateResultsBlock.getDataSchema();
-                _indexedTable = new ConcurrentIndexedTable();
                 _indexedTable.init(_dataSchema, _brokerRequest.getAggregationsInfo(), _brokerRequest.getOrderBy(),
                     _interSegmentNumGroupsLimit, false);
               }

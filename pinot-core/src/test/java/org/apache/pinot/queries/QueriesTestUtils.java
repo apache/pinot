@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.function.Function;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
@@ -119,7 +120,7 @@ public class QueriesTestUtils {
     }
   }
 
-  public static void testInterSegmentAggregationOrderedGroupByResult(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
+  public static void testInterSegmentGroupByOrderByResult(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
       long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
       List<Serializable[]> expectedResults) {
     Assert.assertEquals(brokerResponse.getNumDocsScanned(), expectedNumDocsScanned);
@@ -127,8 +128,8 @@ public class QueriesTestUtils {
     Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), expectedNumEntriesScannedPostFilter);
     Assert.assertEquals(brokerResponse.getTotalDocs(), expectedNumTotalDocs);
 
-    SelectionResults selectionResults = brokerResponse.getSelectionResults();
-    List<Serializable[]> actualResults = selectionResults.getRows();
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Serializable[]> actualResults = resultTable.getRows();
 
     Assert.assertEquals(actualResults.size(), expectedResults.size());
 

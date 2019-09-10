@@ -60,10 +60,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.common.utils.CommonConstants.Broker.*;
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.DEBUG_OPTIONS;
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.PQL;
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.SQL;
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.TRACE;
+import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.*;
 
 
 @ThreadSafe
@@ -227,11 +224,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       LOGGER.debug("Enable trace for request {}: {}", requestId, query);
       brokerRequest.setEnableTrace(true);
     }
+
     if (request.has(DEBUG_OPTIONS)) {
-      Map<String, String> debugOptions = Splitter.on(';').omitEmptyStrings().trimResults().withKeyValueSeparator('=')
-          .split(request.get(DEBUG_OPTIONS).asText());
+      Map<String, String> debugOptions = getOptionsFromRequest(request, DEBUG_OPTIONS);
       LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
       brokerRequest.setDebugOptions(debugOptions);
+    }
+
+    if (request.has(QUERY_OPTIONS)) {
+      Map<String, String> queryOptions = getOptionsFromRequest(request, QUERY_OPTIONS);
+      LOGGER.debug("Query options are set to: {} for request {}: {}", queryOptions, requestId, query);
+      brokerRequest.setQueryOptions(queryOptions);
     }
 
     // Optimize the query
@@ -338,6 +341,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _numDroppedLog.incrementAndGet();
     }
     return brokerResponse;
+  }
+
+  private Map<String, String> getOptionsFromRequest(JsonNode request, String optionsKey) {
+    return Splitter.on(';')
+        .omitEmptyStrings()
+        .trimResults()
+        .withKeyValueSeparator('=')
+        .split(request.get(optionsKey).asText());
   }
 
   private PinotQueryRequest getPinotQueryRequest(JsonNode request) {

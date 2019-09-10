@@ -22,11 +22,21 @@ import com.google.common.collect.Lists;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.GroupByResult;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
+import org.apache.pinot.common.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.*;
 
 
 /**
@@ -34,21 +44,79 @@ import org.testng.annotations.Test;
  */
 public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQueriesTest {
 
-  @Test(dataProvider = "orderByDataProvider")
-  public void testAggregationOrderedGroupByResults(String query, List<Serializable[]> expectedResults,
-      long expectedNumDocsScanned, long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter,
-      long expectedNumTotalDocs) {
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationOrderedGroupByResult(brokerResponse, expectedNumDocsScanned,
+  @Test(dataProvider = "orderByResultTableProvider")
+  public void testGroupByOrderBy(String query, List<Serializable[]> expectedResults, long expectedNumDocsScanned,
+      long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs) {
+    Map<String, String> queryOptions = new HashMap<>(2);
+    queryOptions.put(QueryOptionKey.GROUP_BY_MODE, SQL);
+    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, SQL);
+    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    QueriesTestUtils.testInterSegmentGroupByOrderByResult(brokerResponse, expectedNumDocsScanned,
         expectedNumEntriesScannedInFilter, expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, expectedResults);
   }
 
   /**
-   * Provides various combinations of order by.
+   * Tests the query options for groupByMode, responseFormat.
+   * pql, pql - does not execute order by, returns aggregationResults
+   * pql, sql - does not execute order by, returns aggregationResults
+   * sql, pql - executes order by, but returns aggregationResults. Keys across all aggregations will be same
+   * sql, sql - executes order by, returns resultsTable
+   */
+  @Test
+  public void testQueryOptions() {
+    String query = "SELECT SUM(column1), MIN(column6) FROM testTable GROUP BY column11 ORDER BY column11";
+    Map<String, String> queryOptions = null;
+
+    // default PQL, PQL
+    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    Assert.assertNotNull(brokerResponse.getAggregationResults());
+    Assert.assertNull(brokerResponse.getResultTable());
+
+    // PQL, PQL - don't execute order by, return aggregationResults
+    queryOptions = new HashMap<>(2);
+    queryOptions.put(QueryOptionKey.GROUP_BY_MODE, PQL);
+    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, PQL);
+    brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    Assert.assertNotNull(brokerResponse.getAggregationResults());
+    Assert.assertNull(brokerResponse.getResultTable());
+
+    // PQL, SQL - don't execute order by, return aggregationResults.
+    queryOptions.put(QueryOptionKey.GROUP_BY_MODE, PQL);
+    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, SQL);
+    brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    Assert.assertNotNull(brokerResponse.getAggregationResults());
+    Assert.assertNull(brokerResponse.getResultTable());
+
+    // SQL, PQL - execute the order by, but return aggregationResults. Keys should be same across aggregation functions.
+    queryOptions.put(QueryOptionKey.GROUP_BY_MODE, SQL);
+    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, PQL);
+    brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    Assert.assertNotNull(brokerResponse.getAggregationResults());
+    Assert.assertNull(brokerResponse.getResultTable());
+    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
+    Assert.assertEquals(aggregationResults.size(), 2);
+    Iterator<GroupByResult> it1 = aggregationResults.get(0).getGroupByResult().iterator();
+    Iterator<GroupByResult> it2 = aggregationResults.get(1).getGroupByResult().iterator();
+    while (it1.hasNext() && it2.hasNext()) {
+      GroupByResult groupByResult1 = it1.next();
+      GroupByResult groupByResult2 = it2.next();
+      Assert.assertEquals(groupByResult1.getGroup(), groupByResult2.getGroup());
+    }
+
+    // SQL, SQL - execute order by, return resultsTable
+    queryOptions.put(QueryOptionKey.GROUP_BY_MODE, SQL);
+    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, SQL);
+    brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    Assert.assertNull(brokerResponse.getAggregationResults());
+    Assert.assertNotNull(brokerResponse.getResultTable());
+  }
+
+  /**
+   * Provides various combinations of order by in ResultTable.
    * In order to calculate the expected results, the results from a group by were taken, and then ordered accordingly.
    */
-  @DataProvider(name = "orderByDataProvider")
-  public Object[][] orderByDataProvider() {
+  @DataProvider(name = "orderByResultTableProvider")
+  public Object[][] orderByResultTableProvider() {
 
     List<Object[]> data = new ArrayList<>();
     String query;
