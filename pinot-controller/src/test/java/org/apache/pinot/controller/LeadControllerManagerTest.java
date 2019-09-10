@@ -47,7 +47,7 @@ public class LeadControllerManagerTest {
 
   @BeforeMethod
   public void setup() {
-    _controllerMetrics =  new ControllerMetrics(new MetricsRegistry());
+    _controllerMetrics = new ControllerMetrics(new MetricsRegistry());
     _helixManager = mock(HelixManager.class);
     HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
     when(_helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
@@ -70,7 +70,8 @@ public class LeadControllerManagerTest {
   }
 
   @Test
-  public void testLeadControllerManager() {
+  public void testLeadControllerManager()
+      throws Exception {
     LeadControllerManager leadControllerManager = new LeadControllerManager(_helixManager, _controllerMetrics);
     String tableName = "testTable";
     int expectedPartitionIndex = LeadControllerUtils.getPartitionIdForTable(tableName);

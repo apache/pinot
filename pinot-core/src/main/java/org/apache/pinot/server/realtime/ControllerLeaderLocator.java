@@ -108,7 +108,15 @@ public class ControllerLeaderLocator {
    */
   private Pair<String, Integer> getLeaderForTable(String rawTableName) {
     // Checks whether lead controller resource has been enabled or not.
-    if (LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager)) {
+    boolean leadControllerResourceEnabled;
+    try {
+      leadControllerResourceEnabled = LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager);
+    } catch (Exception e) {
+      LOGGER.error("Exception when checking whether lead controller resource is enabled or not.", e);
+      return null;
+    }
+
+    if (leadControllerResourceEnabled) {
       // Gets leader from lead controller resource.
       return getLeaderFromLeadControllerResource(rawTableName);
     } else {

@@ -74,7 +74,8 @@ public class LeadControllerUtils {
    * Checks from ZK if resource config of leadControllerResource is enabled.
    * @param helixManager helix manager
    */
-  public static boolean isLeadControllerResourceEnabled(HelixManager helixManager) {
+  public static boolean isLeadControllerResourceEnabled(HelixManager helixManager)
+      throws Exception {
     try {
       HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
       PropertyKey propertyKey = helixDataAccessor.keyBuilder().resourceConfig(Helix.LEAD_CONTROLLER_RESOURCE_NAME);
@@ -83,7 +84,7 @@ public class LeadControllerUtils {
       return Boolean.parseBoolean(resourceEnabled);
     } catch (Exception e) {
       LOGGER.warn("Could not get whether lead controller resource is enabled or not.", e);
-      return false;
+      throw e;
     }
   }
 

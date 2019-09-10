@@ -36,6 +36,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.MasterSlaveSMD;
@@ -62,7 +63,14 @@ public class PinotLeadControllerRestletResource {
   public LeadControllerResponse getLeadersForAllTables() {
     Map<String, LeadControllerEntry> leadControllerEntryMap = new LinkedHashMap<>();
     HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
-    boolean isLeadControllerResourceEnabled = LeadControllerUtils.isLeadControllerResourceEnabled(helixManager);
+    boolean isLeadControllerResourceEnabled;
+    try {
+      isLeadControllerResourceEnabled = LeadControllerUtils.isLeadControllerResourceEnabled(helixManager);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Exception when checking whether lead controller resource is enabled or not.",
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
 
     // Returns empty map if lead controller resource is disabled.
     if (!isLeadControllerResourceEnabled) {
@@ -101,7 +109,14 @@ public class PinotLeadControllerRestletResource {
       @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName) {
     Map<String, LeadControllerEntry> leadControllerEntryMap = new HashMap<>();
     HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
-    boolean isLeadControllerResourceEnabled = LeadControllerUtils.isLeadControllerResourceEnabled(helixManager);
+    boolean isLeadControllerResourceEnabled;
+    try {
+      isLeadControllerResourceEnabled = LeadControllerUtils.isLeadControllerResourceEnabled(helixManager);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Exception when checking whether lead controller resource is enabled or not.",
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
 
     ExternalView leadControllerResourceExternalView = getLeadControllerResourceExternalView(helixManager);
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
@@ -113,7 +128,8 @@ public class PinotLeadControllerRestletResource {
       return new LeadControllerResponse(false, leadControllerEntryMap);
     }
 
-    String leadControllerId = getParticipantInstanceIdFromExternalView(leadControllerResourceExternalView, partitionName);
+    String leadControllerId =
+        getParticipantInstanceIdFromExternalView(leadControllerResourceExternalView, partitionName);
     LeadControllerEntry leadControllerEntry =
         new LeadControllerEntry(leadControllerId, Collections.singletonList(tableName));
     leadControllerEntryMap.put(partitionName, leadControllerEntry);
