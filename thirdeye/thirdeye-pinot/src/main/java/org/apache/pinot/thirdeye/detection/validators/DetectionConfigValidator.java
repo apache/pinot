@@ -159,7 +159,7 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
     // Check if the metric defined in the config exists
     MetricConfigDTO metricConfig = provider.fetchMetric(metric, dataset);
     Preconditions.checkArgument(metricConfig != null,
-        "Metric doesn't exist in our records. Metric " + metric + " in sub-alert " + alertName);
+        "Metric doesn't exist in our records. Metric " + metric + " Dataset " + dataset + " in sub-alert " + alertName);
 
     // Check if the dataset defined in the config exists
     DatasetConfigDTO datasetConfig = provider
