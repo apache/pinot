@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.detection.alert.scheme;
 
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.HashSet;
 import org.apache.pinot.thirdeye.alert.commons.EmailContentFormatterFactory;
 import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
@@ -71,6 +72,8 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   private static final String PROP_EMAIL_TEMPLATE = "template";
   private static final String PROP_EMAIL_SUBJECT_STYLE = "subject";
 
+  List<String> emailBlacklist = new ArrayList<>(Arrays.asList("me@company.com", "cc_email@company.com"));
+
   private ThirdEyeAnomalyConfiguration teConfig;
 
   public DetectionEmailAlerter(DetectionAlertConfigDTO config, ThirdEyeAnomalyConfiguration thirdeyeConfig,
@@ -83,6 +86,13 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   private Set<String> retainWhitelisted(Set<String> recipients, Collection<String> emailWhitelist) {
     if (recipients != null) {
       recipients.retainAll(emailWhitelist);
+    }
+    return recipients;
+  }
+
+  private Set<String> removeBlacklisted(Set<String> recipients, Collection<String> emailBlacklist) {
+    if (recipients != null) {
+      recipients.removeAll(emailBlacklist);
     }
     return recipients;
   }
@@ -103,6 +113,14 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
         recipients.setCc(retainWhitelisted(recipients.getCc(), emailWhitelist));
         recipients.setBcc(retainWhitelisted(recipients.getBcc(), emailWhitelist));
       }
+    }
+  }
+
+  private void blacklistRecipients(DetectionAlertFilterRecipients recipients) {
+    if (recipients != null && !emailBlacklist.isEmpty()) {
+      recipients.setTo(removeBlacklisted(recipients.getTo(), emailBlacklist));
+      recipients.setCc(removeBlacklisted(recipients.getCc(), emailBlacklist));
+      recipients.setBcc(removeBlacklisted(recipients.getBcc(), emailBlacklist));
     }
   }
 
@@ -189,6 +207,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   private void sendEmail(DetectionAlertFilterRecipients recipients, Set<MergedAnomalyResultDTO> anomalies) throws Exception {
     configureAdminRecipients(recipients);
     whitelistRecipients(recipients);
+    blacklistRecipients(recipients);
     validateAlert(recipients, anomalies);
 
     Map<String, Object> emailParams = ConfigUtils.getMap(this.config.getAlertSchemes().get(PROP_EMAIL_SCHEME));
