@@ -19,6 +19,7 @@
 package org.apache.pinot.controller;
 
 import com.yammer.metrics.core.MetricsRegistry;
+import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
@@ -60,18 +61,17 @@ public class LeadControllerManagerTest {
     _liveInstance = mock(LiveInstance.class);
     when(helixDataAccessor.getProperty(controllerLeader)).thenReturn(_liveInstance);
 
-    PropertyKey resourceConfigPropertyKey = mock(PropertyKey.class);
-    when(keyBuilder.resourceConfig(any())).thenReturn(resourceConfigPropertyKey);
-    _resourceConfig = mock(ResourceConfig.class);
-    when(helixDataAccessor.getProperty(resourceConfigPropertyKey)).thenReturn(_resourceConfig);
-
     String instanceId = LeadControllerUtils.generateParticipantInstanceId(CONTROLLER_HOST, CONTROLLER_PORT);
     when(_helixManager.getInstanceName()).thenReturn(instanceId);
+
+    ConfigAccessor configAccessor = mock(ConfigAccessor.class);
+    when(_helixManager.getConfigAccessor()).thenReturn(configAccessor);
+    _resourceConfig = mock(ResourceConfig.class);
+    when(configAccessor.getResourceConfig(any(), anyString())).thenReturn(_resourceConfig);
   }
 
   @Test
-  public void testLeadControllerManager()
-      throws Exception {
+  public void testLeadControllerManager() {
     LeadControllerManager leadControllerManager = new LeadControllerManager(_helixManager, _controllerMetrics);
     String tableName = "testTable";
     int expectedPartitionIndex = LeadControllerUtils.getPartitionIdForTable(tableName);

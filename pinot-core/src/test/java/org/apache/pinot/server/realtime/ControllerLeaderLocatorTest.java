@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.helix.BaseDataAccessor;
+import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -59,6 +60,13 @@ public class ControllerLeaderLocatorTest {
     ZNRecord znRecord = mock(ZNRecord.class);
     final String leaderHost = "host";
     final int leaderPort = 12345;
+
+    // Lead controller resource disabled.
+    ConfigAccessor configAccessor = mock(ConfigAccessor.class);
+    ResourceConfig resourceConfig = mock(ResourceConfig.class);
+    when(helixManager.getConfigAccessor()).thenReturn(configAccessor);
+    when(configAccessor.getResourceConfig(anyString(), anyString())).thenReturn(resourceConfig);
+    when(resourceConfig.getSimpleConfig(anyString())).thenReturn("false");
 
     when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
     when(helixDataAccessor.getBaseDataAccessor()).thenReturn(baseDataAccessor);
@@ -142,6 +150,13 @@ public class ControllerLeaderLocatorTest {
     final String leaderHost = "host";
     final int leaderPort = 12345;
 
+    // Lead controller resource disabled.
+    ConfigAccessor configAccessor = mock(ConfigAccessor.class);
+    ResourceConfig resourceConfig = mock(ResourceConfig.class);
+    when(helixManager.getConfigAccessor()).thenReturn(configAccessor);
+    when(configAccessor.getResourceConfig(anyString(), anyString())).thenReturn(resourceConfig);
+    when(resourceConfig.getSimpleConfig(anyString())).thenReturn("false");
+
     when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
     when(helixDataAccessor.getBaseDataAccessor()).thenReturn(baseDataAccessor);
     when(znRecord.getId()).thenReturn(leaderHost + "_" + leaderPort);
@@ -179,12 +194,12 @@ public class ControllerLeaderLocatorTest {
     when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
     when(helixAdmin.getResourceExternalView(anyString(), anyString())).thenReturn(null);
 
-    PropertyKey.Builder keyBuilder = mock(PropertyKey.Builder.class);
-    when(helixDataAccessor.keyBuilder()).thenReturn(keyBuilder);
+    // Lead controller resource disabled.
+    ConfigAccessor configAccessor = mock(ConfigAccessor.class);
     ResourceConfig resourceConfig = mock(ResourceConfig.class);
-    PropertyKey resourceConfigKey = mock(PropertyKey.class);
-    when(keyBuilder.resourceConfig(anyString())).thenReturn(resourceConfigKey);
-    when(helixDataAccessor.getProperty(resourceConfigKey)).thenReturn(resourceConfig);
+    when(helixManager.getConfigAccessor()).thenReturn(configAccessor);
+    when(configAccessor.getResourceConfig(anyString(), anyString())).thenReturn(resourceConfig);
+    when(resourceConfig.getSimpleConfig(anyString())).thenReturn("false");
 
     // Create Controller Leader Locator
     FakeControllerLeaderLocator.create(helixManager);
