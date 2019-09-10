@@ -211,10 +211,10 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     if (brokerMetrics != null) {
       brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.DOCUMENTS_SCANNED, numDocsScanned);
-      brokerMetrics
-          .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
-      brokerMetrics
-          .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER,
+          numEntriesScannedInFilter);
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER,
+          numEntriesScannedPostFilter);
 
       if (numConsumingSegmentsProcessed > 0 && minConsumingFreshnessTimeMs > 0) {
         brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
@@ -233,9 +233,15 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       // For empty data table map, construct empty result using the cached data schema for selection query if exists
       if (cachedDataSchema != null) {
         if (brokerRequest.isSetSelections()) {
-          List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(),
-              cachedDataSchema);
+          List<String> selectionColumns =
+              SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(),
+                  cachedDataSchema);
           brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, new ArrayList<>(0)));
+        } else if (brokerRequest.isSetOrderBy() && queryOptions != null && SQL.equals(
+            queryOptions.get(QueryOptionKey.GROUP_BY_MODE)) && SQL.equals(
+            queryOptions.get(QueryOptionKey.RESPONSE_FORMAT))) {
+          setSQLGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
+              brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap, preserveType);
         }
       }
     } else {

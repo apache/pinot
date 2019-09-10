@@ -343,4 +343,4 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
 
     return data.toArray(new Object[data.size()][]);
   }
-  }
+}
