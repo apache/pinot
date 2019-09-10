@@ -69,7 +69,7 @@ public class PinotLeadControllerRestletResource {
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           "Exception when checking whether lead controller resource is enabled or not.",
-          Response.Status.INTERNAL_SERVER_ERROR);
+          Response.Status.INTERNAL_SERVER_ERROR, e);
     }
 
     // Returns empty map if lead controller resource is disabled.
@@ -82,9 +82,6 @@ public class PinotLeadControllerRestletResource {
       String partitionName = LeadControllerUtils.generatePartitionName(partitionId);
       String participantInstanceId =
           getParticipantInstanceIdFromExternalView(leadControllerResourceExternalView, partitionName);
-      if (participantInstanceId == null) {
-        continue;
-      }
       leadControllerEntryMap
           .putIfAbsent(partitionName, new LeadControllerEntry(participantInstanceId, new ArrayList<>()));
     }
@@ -115,18 +112,17 @@ public class PinotLeadControllerRestletResource {
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           "Exception when checking whether lead controller resource is enabled or not.",
-          Response.Status.INTERNAL_SERVER_ERROR);
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+    // Returns controller Id from lead controller resource is enabled, otherwise returns empty map.
+    if (!isLeadControllerResourceEnabled) {
+      return new LeadControllerResponse(false, leadControllerEntryMap);
     }
 
     ExternalView leadControllerResourceExternalView = getLeadControllerResourceExternalView(helixManager);
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     int partitionId = LeadControllerUtils.getPartitionIdForTable(rawTableName);
     String partitionName = LeadControllerUtils.generatePartitionName(partitionId);
-
-    // Returns controller Id from lead controller resource is enabled, otherwise returns empty map.
-    if (!isLeadControllerResourceEnabled) {
-      return new LeadControllerResponse(false, leadControllerEntryMap);
-    }
 
     String leadControllerId =
         getParticipantInstanceIdFromExternalView(leadControllerResourceExternalView, partitionName);

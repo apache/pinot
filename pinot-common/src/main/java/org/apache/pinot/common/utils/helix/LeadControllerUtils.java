@@ -20,9 +20,8 @@ package org.apache.pinot.common.utils.helix;
 
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
-import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixManager;
-import org.apache.helix.PropertyKey;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
@@ -74,18 +73,12 @@ public class LeadControllerUtils {
    * Checks from ZK if resource config of leadControllerResource is enabled.
    * @param helixManager helix manager
    */
-  public static boolean isLeadControllerResourceEnabled(HelixManager helixManager)
-      throws Exception {
-    try {
-      HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
-      PropertyKey propertyKey = helixDataAccessor.keyBuilder().resourceConfig(Helix.LEAD_CONTROLLER_RESOURCE_NAME);
-      ResourceConfig resourceConfig = helixDataAccessor.getProperty(propertyKey);
-      String resourceEnabled = resourceConfig.getSimpleConfig(Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY);
-      return Boolean.parseBoolean(resourceEnabled);
-    } catch (Exception e) {
-      LOGGER.warn("Could not get whether lead controller resource is enabled or not.", e);
-      throw e;
-    }
+  public static boolean isLeadControllerResourceEnabled(HelixManager helixManager) {
+    ConfigAccessor configAccessor = helixManager.getConfigAccessor();
+    ResourceConfig resourceConfig =
+        configAccessor.getResourceConfig(helixManager.getClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+    String resourceEnabled = resourceConfig.getSimpleConfig(Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY);
+    return Boolean.parseBoolean(resourceEnabled);
   }
 
   /**

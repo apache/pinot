@@ -61,8 +61,7 @@ public class PinotControllerModeTest extends ControllerTest {
   }
 
   @Test
-  public void testDualModeController()
-      throws Exception {
+  public void testDualModeController() {
     // Start the first dual-mode controller
     ControllerConf firstDualModeControllerConfig = getDefaultControllerConfiguration();
     firstDualModeControllerConfig.setControllerMode(ControllerConf.ControllerMode.DUAL);
@@ -95,7 +94,7 @@ public class PinotControllerModeTest extends ControllerTest {
       try {
         return LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager);
       } catch (Exception e) {
-        // Exception caught.
+        Assert.fail("Exception when checking whether lead controller resource is enabled or not.");
         return false;
       }
     }, TIMEOUT_IN_MS, "Failed to mark lead controller resource as enabled");
@@ -173,6 +172,7 @@ public class PinotControllerModeTest extends ControllerTest {
         return !LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager);
       } catch (Exception e) {
         // Exception caught.
+        Assert.fail("Exception when checking whether lead controller resource is enabled or not.");
         return false;
       }
     }, TIMEOUT_IN_MS, "Lead controller resource should be disabled.");

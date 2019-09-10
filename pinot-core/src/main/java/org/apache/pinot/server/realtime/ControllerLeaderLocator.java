@@ -191,6 +191,7 @@ public class ControllerLeaderLocator {
    * @param instanceId instance id without any prefix, e.g. localhost_9000
    * */
   private Pair<String, Integer> convertToHostAndPortPair(String instanceId) {
+    // TODO: improve the exception handling.
     if (instanceId == null) {
       return null;
     }
