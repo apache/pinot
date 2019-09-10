@@ -22,11 +22,16 @@ import com.google.common.collect.Lists;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.*;
 
 
 /**
@@ -37,8 +42,11 @@ public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQuer
   @Test(dataProvider = "orderByDataProvider")
   public void testAggregationOrderedGroupByResults(String query, List<Serializable[]> expectedResults,
       long expectedNumEntriesScannedPostFilter) {
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationOrderedGroupByResult(brokerResponse, 400000L, 0,
+    Map<String, String> queryOptions = new HashMap<>(2);
+    queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.GROUP_BY_MODE, SQL);
+    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, SQL);
+    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    QueriesTestUtils.testInterSegmentGroupByOrderByResult(brokerResponse, 400000L, 0,
         expectedNumEntriesScannedPostFilter, 400000L, expectedResults);
   }
 
