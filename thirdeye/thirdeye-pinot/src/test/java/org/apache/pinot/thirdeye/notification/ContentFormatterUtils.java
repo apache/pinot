@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-package org.apache.pinot.thirdeye.alert.content;
+package org.apache.pinot.thirdeye.notification;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import org.apache.commons.mail.HtmlEmail;
-import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
+import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
 
 
 public class ContentFormatterUtils {
 
-  static String getHtmlContent(String htmlPath) throws IOException {
+  public static String getHtmlContent(String htmlPath) throws IOException {
     StringBuilder htmlContent;
     try (BufferedReader br = new BufferedReader(new FileReader(htmlPath))) {
       htmlContent = new StringBuilder();
@@ -38,7 +38,7 @@ public class ContentFormatterUtils {
     return htmlContent.toString();
   }
 
-  static String getEmailHtml(EmailEntity emailEntity) throws Exception {
+  public static String getEmailHtml(EmailEntity emailEntity) throws Exception {
     HtmlEmail email = emailEntity.getContent();
     Field field = email.getClass().getDeclaredField("html");
     field.setAccessible(true);

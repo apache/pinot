@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.apache.pinot.thirdeye.alert.content;
+package org.apache.pinot.thirdeye.notification.content.templates;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,7 +25,10 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
+import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
+import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
+import org.apache.pinot.thirdeye.notification.formatter.channels.EmailContentFormatter;
+import org.apache.pinot.thirdeye.notification.ContentFormatterUtils;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConfiguration;
 import org.apache.pinot.thirdeye.anomaly.task.TaskDriverConfiguration;
@@ -45,18 +48,16 @@ import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.thirdeye.alert.content.EntityGroupKeyContentFormatter.*;
+import static org.apache.pinot.thirdeye.notification.content.templates.EntityGroupKeyContent.*;
 import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.*;
 import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator.*;
 
 
-public class TestEntityGroupKeyEmailContentFormatter {
+public class TestEntityGroupKeyContent {
   private static final String TEST = "test";
   private int id = 0;
   private String dashboardHost = "http://localhost:8080/dashboard";
@@ -157,12 +158,13 @@ public class TestEntityGroupKeyEmailContentFormatter {
     List<AnomalyResult> anomalies = new ArrayList<>();
     anomalies.add(parentGroupedAnomaly);
 
-    EmailContentFormatter contentFormatter = new EntityGroupKeyContentFormatter();
-    contentFormatter.init(new Properties(), EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(thirdeyeAnomalyConfig));
+    EmailContentFormatter
+        contentFormatter = new EmailContentFormatter(new EntityGroupKeyContent(), thirdeyeAnomalyConfig);
+    ADContentFormatterContext context = new ADContentFormatterContext();
+    context.setAlertConfig(DaoTestUtils.getTestAlertConfiguration("Test Config"));
     EmailEntity emailEntity = contentFormatter.getEmailEntity(
-        DaoTestUtils.getTestAlertConfiguration("Test Config"),
         new DetectionAlertFilterRecipients(EmailUtils.getValidEmailAddresses("a@b.com")),
-        TEST, null, "", anomalies, null);
+        TEST, null, "", anomalies, context);
     String htmlPath = ClassLoader.getSystemResource("test-entity-groupby-email-content-formatter.html").getPath();
 
     Assert.assertEquals(
@@ -273,14 +275,15 @@ public class TestEntityGroupKeyEmailContentFormatter {
     List<AnomalyResult> anomalies = new ArrayList<>();
     anomalies.add(superParentGroupedAnomaly);
 
-    EmailContentFormatter contentFormatter = new EntityGroupKeyContentFormatter();
     Properties props = new Properties();
     props.put(PROP_ENTITY_WHITELIST, "metric-X");
-    contentFormatter.init(props, EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(thirdeyeAnomalyConfig));
+    EmailContentFormatter
+        contentFormatter = new EmailContentFormatter(new EntityGroupKeyContent(), props, thirdeyeAnomalyConfig);
+    ADContentFormatterContext context = new ADContentFormatterContext();
+    context.setAlertConfig(DaoTestUtils.getTestAlertConfiguration("Test Config"));
     EmailEntity emailEntity = contentFormatter.getEmailEntity(
-        DaoTestUtils.getTestAlertConfiguration("Test Config"),
         new DetectionAlertFilterRecipients(EmailUtils.getValidEmailAddresses("a@b.com")),
-        TEST, null, "", anomalies, null);
+        TEST, null, "", anomalies, context);
     String htmlPath = ClassLoader.getSystemResource("test-entity-groupby-with-whitelist-email-content-formatter.html").getPath();
 
     Assert.assertEquals(

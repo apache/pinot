@@ -17,53 +17,14 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.alert.content;
+package org.apache.pinot.thirdeye.notification.content;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.google.common.base.Strings;
-import com.google.common.base.Throwables;
 import com.google.common.collect.Multimap;
-import org.apache.pinot.pql.parsers.utils.Pair;
-import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
-import org.apache.pinot.thirdeye.anomaly.alert.util.DataReportHelper;
-import org.apache.pinot.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
-import org.apache.pinot.thirdeye.anomaly.classification.ClassificationTaskRunner;
-import org.apache.pinot.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
-import org.apache.pinot.thirdeye.anomaly.events.EventFilter;
-import org.apache.pinot.thirdeye.anomaly.events.EventType;
-import org.apache.pinot.thirdeye.anomaly.events.HolidayEventProvider;
-import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
-import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
-import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
-import org.apache.pinot.thirdeye.common.metric.MetricTimeSeries;
-import org.apache.pinot.thirdeye.dashboard.resources.v2.AnomaliesResource;
-import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
-import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
-import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
-import org.apache.pinot.thirdeye.datasource.DAORegistry;
-import org.apache.pinot.thirdeye.detection.ConfigUtils;
-import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
-import org.apache.pinot.thirdeye.detector.email.filter.DummyAlertFilter;
-import org.apache.pinot.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
-import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
-import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
-import freemarker.template.Configuration;
-import freemarker.template.Template;
-import freemarker.template.TemplateExceptionHandler;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -76,7 +37,27 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.mail.HtmlEmail;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.anomaly.alert.util.DataReportHelper;
+import org.apache.pinot.thirdeye.anomaly.classification.ClassificationTaskRunner;
+import org.apache.pinot.thirdeye.anomaly.events.EventFilter;
+import org.apache.pinot.thirdeye.anomaly.events.EventType;
+import org.apache.pinot.thirdeye.anomaly.events.HolidayEventProvider;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.AnomaliesResource;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detector.email.filter.DummyAlertFilter;
+import org.apache.pinot.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
@@ -84,54 +65,53 @@ import org.joda.time.Weeks;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.thirdeye.alert.content.EntityGroupKeyContentFormatter.*;
 
+/**
+ * This class (helper) defines the overall alert message content. This will
+ * be derived to implement various anomaly alerting templates.
+ */
+public abstract class BaseNotificationContent implements NotificationContent {
+  private static final Logger LOG = LoggerFactory.getLogger(BaseNotificationContent.class);
 
-public abstract class BaseEmailContentFormatter implements EmailContentFormatter {
-  private static final Logger LOG = LoggerFactory.getLogger(BaseEmailContentFormatter.class);
+  /*  The Event Crawl Offset takes the standard period format, ex: P1D for 1 day, P1W for 1 week
+  Y: years     M: months              W: weeks
+  D: days      H: hours (after T)     M: minutes (after T)
+  S: seconds along with milliseconds (after T) */
+  private static final String EVENT_CRAWL_OFFSET = "eventCrawlOffset";
+  private static final String PRE_EVENT_CRAWL_OFFSET = "preEventCrawlOffset";
+  private static final String POST_EVENT_CRAWL_OFFSET = "postEventCrawlOffset";
 
-  public static final String INCLUDE_SENT_ANOMALY_ONLY = "includeSentAnomaliesOnly";
-  public static final String INCLUDE_SUMMARY = "includeSummary";
-  public static final String TIME_ZONE = "timezone";
-  /*
-  The Event Crawl Offset takes the standard period format, ex: P1D for 1 day, P1W for 1 week
-  Y: years
-  M: months
-  W: weeks
-  D: days
-  H: hours (after T)
-  M: minutes (after T)
-  S: seconds along with milliseconds (after T)
-   */
-  public static final String EVENT_CRAWL_OFFSET = "eventCrawlOffset";
-  public static final String PRE_EVENT_CRAWL_OFFSET = "preEventCrawlOffset";
-  public static final String POST_EVENT_CRAWL_OFFSET = "postEventCrawlOffset";
+  private static final String INCLUDE_SENT_ANOMALY_ONLY = "includeSentAnomaliesOnly";
+  private static final String INCLUDE_SUMMARY = "includeSummary";
+  private static final String TIME_ZONE = "timezone";
+  private static final String DEFAULT_INCLUDE_SENT_ANOMALY_ONLY = "false";
+  private static final String DEFAULT_INCLUDE_SUMMARY = "false";
+  private static final String DEFAULT_DATE_PATTERN = "MMM dd, HH:mm";
+  private static final String DEFAULT_TIME_ZONE = "America/Los_Angeles";
+  private static final String DEFAULT_EVENT_CRAWL_OFFSET = "P2D";
 
-  public static final String DEFAULT_INCLUDE_SENT_ANOMALY_ONLY = "false";
-  public static final String DEFAULT_INCLUDE_SUMMARY = "false";
-  public static final String DEFAULT_DATE_PATTERN = "MMM dd, HH:mm";
-  public static final String DEFAULT_TIME_ZONE = "America/Los_Angeles";
-  public static final String DEFAULT_EVENT_CRAWL_OFFSET = "P2D";
+  protected static final String EVENT_FILTER_COUNTRY = "countryCode";
 
-  public static final String EVENT_FILTER_COUNTRY = "countryCode";
-
-  protected DateTimeZone dateTimeZone;
   protected boolean includeSentAnomaliesOnly;
+  protected DateTimeZone dateTimeZone;
   protected boolean includeSummary;
-  protected String emailTemplate;
   protected Period preEventCrawlOffset;
   protected Period postEventCrawlOffset;
   protected String imgPath = null;
-  protected EmailContentFormatterConfiguration emailContentFormatterConfiguration;
   protected MetricConfigManager metricDAO;
+  protected ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfig;
+  protected Properties properties;
 
-  @Override
-  public void init(Properties properties, EmailContentFormatterConfiguration configuration) {
+  public void init(Properties properties, ThirdEyeAnomalyConfiguration config) {
+    this.properties = properties;
+    this.thirdEyeAnomalyConfig = config;
+
     this.includeSentAnomaliesOnly = Boolean.valueOf(
         properties.getProperty(INCLUDE_SENT_ANOMALY_ONLY, DEFAULT_INCLUDE_SENT_ANOMALY_ONLY));
     this.includeSummary = Boolean.valueOf(
         properties.getProperty(INCLUDE_SUMMARY, DEFAULT_INCLUDE_SUMMARY));
     this.dateTimeZone = DateTimeZone.forID(properties.getProperty(TIME_ZONE, DEFAULT_TIME_ZONE));
+
     Period defaultPeriod = Period.parse(properties.getProperty(EVENT_CRAWL_OFFSET, DEFAULT_EVENT_CRAWL_OFFSET));
     this.preEventCrawlOffset = defaultPeriod;
     this.postEventCrawlOffset = defaultPeriod;
@@ -141,32 +121,28 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     if (properties.getProperty(POST_EVENT_CRAWL_OFFSET) != null) {
       this.postEventCrawlOffset = Period.parse(properties.getProperty(POST_EVENT_CRAWL_OFFSET));
     }
-    this.emailContentFormatterConfiguration = configuration;
 
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
   }
 
-  @Override
-  public EmailEntity getEmailEntity(AlertConfigDTO alertConfigDTO, DetectionAlertFilterRecipients recipients, String subject,
-      Long groupId, String groupName, Collection<AnomalyResult> anomalies, EmailContentFormatterContext context) {
-    Map<String, Object> templateData = getTemplateData(alertConfigDTO, groupId, groupName, anomalies);
+  public String getSnaphotPath() {
+    return imgPath;
+  }
 
-    updateTemplateDataByAnomalyResults(templateData, anomalies, context);
-
-    String outputSubject = makeSubject(subject, groupName, alertConfigDTO.getSubjectType(), templateData);
-
-    return buildEmailEntity(templateData, outputSubject, recipients, alertConfigDTO.getFromAddress(), emailTemplate);
+  public void cleanup() {
+    if (StringUtils.isNotBlank(imgPath)) {
+      try {
+        Files.deleteIfExists(new File(imgPath).toPath());
+      } catch (IOException e) {
+        LOG.error("Exception in deleting screenshot {}", imgPath, e);
+      }
+    }
   }
 
   /**
    * Generate subject based on configuration.
-   * @param baseSubject
-   * @param groupName
-   * @param type
-   * @param templateData
-   * @return
    */
-  private static String makeSubject(String baseSubject, String groupName, AlertConfigBean.SubjectType type, Map<String, Object> templateData) {
+  public static String makeSubject(String baseSubject, String groupName, AlertConfigBean.SubjectType type, Map<String, Object> templateData) {
     switch (type) {
       case ALERT:
         if (StringUtils.isNotBlank(groupName)) {
@@ -184,14 +160,6 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
         throw new IllegalArgumentException(String.format("Unknown type '%s'", type));
     }
   }
-
-  /**
-   * The actual function that convert anomalies into parameter map
-   * @param templateData
-   * @param anomalies
-   */
-  protected abstract void updateTemplateDataByAnomalyResults(Map<String, Object> templateData,
-      Collection<AnomalyResult> anomalies, EmailContentFormatterContext context);
 
   protected void enrichMetricInfo(Map<String, Object> templateData, Collection<AnomalyResult> anomalies) {
     Set<String> metrics = new TreeSet<>();
@@ -256,7 +224,6 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     templateData.put("alertConfigName", alertConfigDTO.getName());
     templateData.put("includeSummary", includeSummary);
     templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
-    templateData.put("dashboardHost", emailContentFormatterConfiguration.getDashboardHost());
     if (groupId != null) {
       templateData.put("isGroupedAnomaly", true);
       templateData.put("groupId", Long.toString(groupId));
@@ -264,7 +231,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
       templateData.put("isGroupedAnomaly", false);
       templateData.put("groupId", Long.toString(-1));
     }
-    if (org.apache.commons.lang3.StringUtils.isNotBlank(groupName)) {
+    if (StringUtils.isNotBlank(groupName)) {
       templateData.put("groupName", groupName);
     }
     if(precisionRecallEvaluator.getTotalResponses() > 0) {
@@ -279,90 +246,41 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     return templateData;
   }
 
-  /**
-   * Apply the parameter map to given email template, and format it as EmailEntity
-   * @param paramMap
-   * @param subject
-   * @param recipients
-   * @param fromEmail
-   * @param emailTemplate
-   * @return
-   */
-  public EmailEntity buildEmailEntity(Map<String, Object> paramMap, String subject,
-      DetectionAlertFilterRecipients recipients, String fromEmail, String emailTemplate) {
-    EmailEntity emailEntity = new EmailEntity();
-    if (paramMap.containsKey(PROP_ENTITY_ANOMALIES_MAP_KEY) && ConfigUtils.getMap(paramMap.get(PROP_ENTITY_ANOMALIES_MAP_KEY)).size() == 0) {
-      LOG.info("No Entity anomalies to report");
-      return emailEntity;
-    }
-
-    if (Strings.isNullOrEmpty(fromEmail)) {
-      throw new IllegalArgumentException("Invalid sender's email");
-    }
-
-    HtmlEmail email = new HtmlEmail();
-    String cid = "";
-    try {
-      if (org.apache.commons.lang3.StringUtils.isNotBlank(imgPath)) {
-        cid = email.embed(new File(imgPath));
-      }
-    } catch (Exception e) {
-      LOG.error("Exception while embedding screenshot for anomaly", e);
-    }
-    paramMap.put("cid", cid);
-
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    try (Writer out = new OutputStreamWriter(baos, AlertTaskRunnerV2.CHARSET)) {
-      Configuration freemarkerConfig = new Configuration(Configuration.VERSION_2_3_21);
-      freemarkerConfig.setClassForTemplateLoading(getClass(), "/org/apache/pinot/thirdeye/detector");
-      freemarkerConfig.setDefaultEncoding(AlertTaskRunnerV2.CHARSET);
-      freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
-      Template template = freemarkerConfig.getTemplate(emailTemplate);
-
-      template.process(paramMap, out);
-
-      String alertEmailHtml = new String(baos.toByteArray(), AlertTaskRunnerV2.CHARSET);
-
-      emailEntity.setFrom(fromEmail);
-      emailEntity.setTo(recipients);
-      emailEntity.setSubject(subject);
-      email.setHtmlMsg(alertEmailHtml);
-      emailEntity.setContent(email);
-    } catch (Exception e) {
-      Throwables.propagate(e);
-    }
-    return emailEntity;
-  }
-
-  /**
-   * Get the Date String
-   * @param dateTime
-   * @return
-   */
-  public static String getDateString(DateTime dateTime) {
+  protected static String getDateString(DateTime dateTime) {
     return dateTime.toString(DEFAULT_DATE_PATTERN);
   }
-  public static String getDateString(long millis, DateTimeZone dateTimeZone) {
+
+  protected static String getDateString(long millis, DateTimeZone dateTimeZone) {
     return (new DateTime(millis, dateTimeZone)).toString(DEFAULT_DATE_PATTERN);
+  }
+
+  protected static double getLift(double current, double expected) {
+    if (expected == 0) {
+      return 1d;
+    } else {
+      return current/expected - 1;
+    }
+  }
+
+  /**
+   * Get the sign of the severity change
+   */
+  protected static boolean getLiftDirection(double lift) {
+    return lift < 0 ? false : true;
   }
 
   /**
    * Get the timezone in String
-   * @param dateTimeZone
-   * @return
    */
-  public String getTimezoneString(DateTimeZone dateTimeZone) {
+  protected String getTimezoneString(DateTimeZone dateTimeZone) {
     TimeZone tz = TimeZone.getTimeZone(dateTimeZone.getID());
     return tz.getDisplayName(true, 0);
   }
 
   /**
    * Convert the duration into hours, represented in String
-   * @param start
-   * @param end
-   * @return
    */
-  public static String getTimeDiffInHours(long start, long end) {
+  protected static String getTimeDiffInHours(long start, long end) {
     double duration = Double.valueOf((end - start) / 1000) / 3600;
     String durationString = ThirdEyeUtils.getRoundedValue(duration) + ((duration == 1) ? (" hour") : (" hours"));
     return durationString;
@@ -370,10 +288,8 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
 
   /**
    * Flatten the dimension map
-   * @param dimensionMap
-   * @return
    */
-  public static List<String> getDimensionsList(DimensionMap dimensionMap) {
+  protected static List<String> getDimensionsList(DimensionMap dimensionMap) {
     List<String> dimensionsList = new ArrayList<>();
     if (dimensionMap != null && !dimensionMap.isEmpty()) {
       for (Map.Entry<String, String> entry : dimensionMap.entrySet()) {
@@ -384,31 +300,17 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
   }
 
   /**
-   * Get the sign of the severity change
-   * @param lift
-   * @return
-   */
-  public static boolean getLiftDirection(double lift) {
-    return lift < 0 ? false : true;
-  }
-
-  /**
    * Get the url of given anomaly result
-   * @param anomalyResultDTO
-   * @param dashboardUrl
-   * @return
    */
-  public static String getAnomalyURL(MergedAnomalyResultDTO anomalyResultDTO, String dashboardUrl) {
+  protected static String getAnomalyURL(MergedAnomalyResultDTO anomalyResultDTO, String dashboardUrl) {
     String urlPart = "/app/#/rootcause?anomalyId=";
     return dashboardUrl + urlPart;
   }
 
   /**
    * Retrieve the issue type of an anomaly
-   * @param anomalyResultDTO
-   * @return
    */
-  public static String getIssueType(MergedAnomalyResultDTO anomalyResultDTO) {
+  protected static String getIssueType(MergedAnomalyResultDTO anomalyResultDTO) {
     Map<String, String> properties = anomalyResultDTO.getProperties();
     if (MapUtils.isNotEmpty(properties) && properties.containsKey(ClassificationTaskRunner.ISSUE_TYPE_KEY)) {
       return properties.get(ClassificationTaskRunner.ISSUE_TYPE_KEY);
@@ -418,10 +320,8 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
 
   /**
    * Convert Feedback value to user readable values
-   * @param feedback
-   * @return
    */
-  public static String getFeedbackValue(AnomalyFeedback feedback) {
+  protected static String getFeedbackValue(AnomalyFeedback feedback) {
     String feedbackVal = "Not Resolved";
     if (feedback != null && feedback.getFeedbackType() != null) {
       switch (feedback.getFeedbackType()) {
@@ -452,7 +352,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
    * @param targetDimensions the affected dimensions
    * @return a list of related events
    */
-  public List<EventDTO> getRelatedEvents(List<EventType> eventTypes, DateTime start, DateTime end
+  protected List<EventDTO> getRelatedEvents(List<EventType> eventTypes, DateTime start, DateTime end
       , String metricName, String serviceName, Map<String, List<String>> targetDimensions) {
     List<EventDTO> relatedEvents = new ArrayList<>();
     for (EventType eventType : eventTypes) {
@@ -462,44 +362,9 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
   }
 
   /**
-   * Retrieve the average wow baseline values
-   * @param anomaly an instance of MergedAnomalyResultDTO
-   * @param compareMode the way to compare, WoW, Wo2W, Wo3W, and Wo4W
-   * @param start the start time of the monitoring window in millis
-   * @param end the end time of the monitoring window in millis
-   * @return baseline values based on compareMode
-   * @throws Exception
-   */
-  protected Double getAvgComparisonBaseline(MergedAnomalyResultDTO anomaly, COMPARE_MODE compareMode,
-      long start, long end) throws Exception{
-    AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(emailContentFormatterConfiguration.getFunctionConfigPath());
-    AnomalyFunctionDTO anomalyFunction = anomaly.getFunction();
-    DatasetConfigDTO datasetConfigDTO = DAORegistry.getInstance().getDatasetConfigDAO()
-        .findByDataset(anomalyFunction.getCollection());
-    AnomalyDetectionInputContextBuilder contextBuilder = new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
-    contextBuilder.setFunction(anomalyFunction);
-
-    DateTimeZone timeZone = DateTimeZone.forID(datasetConfigDTO.getTimezone());
-    DateTime startTime = new DateTime(start, timeZone);
-    DateTime endTime = new DateTime(end, timeZone);
-
-    Period baselinePeriod = getBaselinePeriod(compareMode);
-    DateTime baselineStartTime = startTime.minus(baselinePeriod);
-    DateTime baselineEndTime = endTime.minus(baselinePeriod);
-
-    Pair<Long, Long> timeRange = new Pair<>(baselineStartTime.getMillis(), baselineEndTime.getMillis());
-    MetricTimeSeries baselineTimeSeries = contextBuilder.fetchTimeSeriesDataByDimension(Arrays.asList(timeRange), anomaly.getDimensions(), false)
-        .build().getDimensionMapMetricTimeSeriesMap().get(anomaly.getDimensions());
-
-    return baselineTimeSeries.getMetricAvgs(0d)[0];
-  }
-
-  /**
    * Convert comparison mode to Period
-   * @param compareMode
-   * @return
    */
-  public static Period getBaselinePeriod(COMPARE_MODE compareMode) {
+  protected static Period getBaselinePeriod(COMPARE_MODE compareMode) {
     switch (compareMode) {
       case Wo2W:
         return Weeks.TWO.toPeriod();
@@ -520,7 +385,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
    * @param targetDimensions the affected dimensions
    * @return a list of related events
    */
-  public List<EventDTO> getHolidayEvents(DateTime start, DateTime end, Map<String, List<String>> targetDimensions) {
+  protected List<EventDTO> getHolidayEvents(DateTime start, DateTime end, Map<String, List<String>> targetDimensions) {
     EventFilter eventFilter = new EventFilter();
     eventFilter.setEventType(EventType.HOLIDAY.name());
     eventFilter.setStartTime(start.minus(preEventCrawlOffset).getMillis());
@@ -537,7 +402,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
    * @param matchText a text to be matched in the filter keys
    * @return a list of filter values
    */
-  public List<String> getMatchedFilterValues(MergedAnomalyResultDTO anomaly, String matchText) {
+  protected List<String> getMatchedFilterValues(MergedAnomalyResultDTO anomaly, String matchText) {
     Multimap<String, String> filterSet = AnomaliesResource.generateFilterSetForTimeSeriesQuery(anomaly);
     for (String filterKey : filterSet.keySet()) {
       if (filterKey.contains(matchText)) {
@@ -545,26 +410,6 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
       }
     }
     return Collections.emptyList();
-  }
-
-
-  public static double getLift(double current, double expected) {
-    if (expected == 0) {
-      return 1d;
-    } else {
-      return current/expected - 1;
-    }
-  }
-
-  @Override
-  public void cleanup() {
-    if (org.apache.commons.lang3.StringUtils.isNotBlank(imgPath)) {
-      try {
-        Files.deleteIfExists(new File(imgPath).toPath());
-      } catch (IOException e) {
-        LOG.error("Exception in deleting screenshot {}", imgPath, e);
-      }
-    }
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -623,7 +468,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
       if (swi != null) {
         this.swi = String.format(PERCENTAGE_FORMAT, swi * 100);
       }
-      double lift = BaseEmailContentFormatter.getLift(currentVal, baselineVal);
+      double lift = BaseNotificationContent.getLift(currentVal, baselineVal);
       this.lift = String.format(PERCENTAGE_FORMAT, lift * 100);
       this.positiveLift = getLiftDirection(lift);
       this.metric = metric;
@@ -634,7 +479,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     }
 
     public void setSeasonalValues(COMPARE_MODE compareMode, double seasonalValue, double current) {
-      double lift = BaseEmailContentFormatter.getLift(current, seasonalValue);
+      double lift = BaseNotificationContent.getLift(current, seasonalValue);
       switch (compareMode) {
         case Wo4W:
           this.wo4wValue = String.format(RAW_VALUE_FORMAT, seasonalValue);

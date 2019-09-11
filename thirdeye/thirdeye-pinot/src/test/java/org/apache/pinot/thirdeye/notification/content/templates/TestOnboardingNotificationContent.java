@@ -14,9 +14,12 @@
  * limitations under the License.
  */
 
-package org.apache.pinot.thirdeye.alert.content;
+package org.apache.pinot.thirdeye.notification.content.templates;
 
-import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
+import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
+import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
+import org.apache.pinot.thirdeye.notification.formatter.channels.EmailContentFormatter;
+import org.apache.pinot.thirdeye.notification.ContentFormatterUtils;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConfiguration;
 import org.apache.pinot.thirdeye.anomaly.task.TaskDriverConfiguration;
@@ -24,21 +27,19 @@ import org.apache.pinot.thirdeye.anomaly.utils.EmailUtils;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datalayer.DaoTestUtils;
+import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -50,29 +51,27 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.*;
 
 
-public class TestMetricAnomaliesEmailContentFormatter {
+public class TestOnboardingNotificationContent {
   private static final String TEST = "test";
   private int id = 0;
   private String dashboardHost = "http://localhost:8080/dashboard";
   private DAOTestBase testDAOProvider;
   private AnomalyFunctionManager anomalyFunctionDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
-  private MetricConfigManager metricDAO;
-
+  private AlertConfigManager alertConfigDAO;
   @BeforeClass
   public void beforeClass(){
     testDAOProvider = DAOTestBase.getInstance();
     DAORegistry daoRegistry = DAORegistry.getInstance();
     anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
     mergedAnomalyResultDAO = daoRegistry.getMergedAnomalyResultDAO();
-    metricDAO = daoRegistry.getMetricConfigDAO();
+    alertConfigDAO = daoRegistry.getAlertConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
     testDAOProvider.cleanup();
   }
-
   @Test
   public void testGetEmailEntity() throws Exception {
     DateTimeZone dateTimeZone = DateTimeZone.forID("America/Los_Angeles");
@@ -96,7 +95,6 @@ public class TestMetricAnomaliesEmailContentFormatter {
     alerters.put("smtpConfiguration", smtpProps);
     thirdeyeAnomalyConfig.setAlerterConfiguration(alerters);
 
-
     List<AnomalyResult> anomalies = new ArrayList<>();
     AnomalyFunctionDTO anomalyFunction = DaoTestUtils.getTestFunctionSpec(TEST, TEST);
     anomalyFunctionDAO.save(anomalyFunction);
@@ -119,24 +117,22 @@ public class TestMetricAnomaliesEmailContentFormatter {
     mergedAnomalyResultDAO.save(anomaly);
     anomalies.add(anomaly);
 
-    MetricConfigDTO metric = new MetricConfigDTO();
-    metric.setName(TEST);
-    metric.setDataset(TEST);
-    metric.setAlias(TEST + "::" + TEST);
-    metricDAO.save(metric);
-
     AlertConfigDTO alertConfigDTO = DaoTestUtils.getTestAlertConfiguration("Test Config");
+    alertConfigDAO.save(alertConfigDTO);
 
-    EmailContentFormatter contentFormatter = new MetricAnomaliesEmailContentFormatter();
-    contentFormatter.init(new Properties(), EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(thirdeyeAnomalyConfig));
+    ADContentFormatterContext context = new ADContentFormatterContext();
+    context.setAnomalyFunctionSpec(anomalyFunction);
+    context.setAlertConfig(alertConfigDTO);
+    EmailContentFormatter
+        contentFormatter = new EmailContentFormatter(new OnboardingNotificationContent(), thirdeyeAnomalyConfig);
     DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
         EmailUtils.getValidEmailAddresses("a@b.com"));
-    EmailEntity emailEntity = contentFormatter.getEmailEntity(alertConfigDTO, recipients, TEST,
-        null, "", anomalies, null);
+    EmailEntity emailEntity = contentFormatter.getEmailEntity(recipients, TEST, null, "", anomalies, context);
 
-    String htmlPath = ClassLoader.getSystemResource("test-metric-anomalies-template.html").getPath();
+    String htmlPath = ClassLoader.getSystemResource("test-onboard-notification-email-content-formatter.html").getPath();
     Assert.assertEquals(
         ContentFormatterUtils.getEmailHtml(emailEntity).replaceAll("\\s", ""),
         ContentFormatterUtils.getHtmlContent(htmlPath).replaceAll("\\s", ""));
   }
+
 }

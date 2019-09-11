@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory;
  * with the given anomaly detection module; the actions can be anomaly detection, information update
  * of merged anomalies, etc.
  * Note that this class provides the default anomaly detection flow for only one single metric (main
- * metric), the other metrics that come along in AnomalyDetectionContext are used as auxiliary
+ * metric), the other metrics that come along in ADContentFormatterContext are used as auxiliary
  * metrics, e.g., they provide additional information during the transformation or detection of the
  * main metric.
  */

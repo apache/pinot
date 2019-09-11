@@ -19,11 +19,7 @@
 
 package org.apache.pinot.thirdeye.anomaly.alert.util;
 
-import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterConfiguration;
-import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
-import org.apache.pinot.thirdeye.anomaly.utils.EmailUtils;
 import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
-import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -37,38 +33,23 @@ import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
 
-
-public class EmailScreenshotHelper {
+public class AlertScreenshotHelper {
+  private static final Logger LOG = LoggerFactory.getLogger(AlertScreenshotHelper.class);
 
   private static final String TEMP_PATH = "/tmp/graph";
   private static final String SCREENSHOT_FILE_SUFFIX = ".png";
   private static final String GRAPH_SCREENSHOT_GENERATOR_SCRIPT = "/getGraphPnj.js";
-  private static final Logger LOG = LoggerFactory.getLogger(EmailScreenshotHelper.class);
   private static final ExecutorService executorService = Executors.newCachedThreadPool();
-
-  public static String takeGraphScreenShot(final String anomalyId, final EmailContentFormatterConfiguration configuration) throws JobExecutionException {
-    return takeGraphScreenShot(anomalyId, configuration.getDashboardHost(), configuration.getRootDir(),
-        configuration.getPhantomJsPath(), configuration.getSmtpConfiguration(), configuration.getFailureFromAddress(),
-        configuration.getFailureToAddress());
-  }
 
   public static String takeGraphScreenShot(final String anomalyId, final ThirdEyeConfiguration configuration) throws JobExecutionException {
     return takeGraphScreenShot(anomalyId, configuration.getDashboardHost(), configuration.getRootDir(),
-        configuration.getPhantomJsPath(),
-        SmtpConfiguration.createFromProperties(configuration.getAlerterConfiguration().get(SMTP_CONFIG_KEY)),
-        configuration.getFailureFromAddress(), configuration.getFailureToAddress());
+        configuration.getPhantomJsPath());
   }
 
   public static String takeGraphScreenShot(final String anomalyId, final String dashboardHost, final String rootDir,
-      final String phantomJsPath, final SmtpConfiguration smtpConfiguration, final String failureFromAddress,
-      final String failureToAddress) throws JobExecutionException{
-    Callable<String> callable = new Callable<String>() {
-      public String call() throws Exception {
-        return takeScreenshot(anomalyId, dashboardHost, rootDir, phantomJsPath);
-      }
-    };
+      final String phantomJsPath) {
+    Callable<String> callable = () -> takeScreenshot(anomalyId, dashboardHost, rootDir, phantomJsPath);
     Future<String> task = executorService.submit(callable);
     String result = null;
     try {
@@ -76,14 +57,11 @@ public class EmailScreenshotHelper {
       LOG.info("Finished with result: {}", result);
     } catch (Exception e) {
       LOG.error("Exception in fetching screenshot for anomaly id {}", anomalyId, e);
-      EmailHelper.sendFailureEmailForScreenshot(anomalyId, e.fillInStackTrace(), smtpConfiguration, failureFromAddress,
-          new DetectionAlertFilterRecipients(EmailUtils.getValidEmailAddresses(failureToAddress)));
     }
     return result;
   }
 
   private static String takeScreenshot(String anomalyId, String dashboardHost, String rootDir, String phantomJsPath) throws Exception {
-
     String imgRoute = dashboardHost + "/app/#/screenshot/" + anomalyId;
     LOG.info("imgRoute {}", imgRoute);
     String phantomScript = rootDir + GRAPH_SCREENSHOT_GENERATOR_SCRIPT;
@@ -117,5 +95,4 @@ public class EmailScreenshotHelper {
     }
     return imgPath;
   }
-
 }

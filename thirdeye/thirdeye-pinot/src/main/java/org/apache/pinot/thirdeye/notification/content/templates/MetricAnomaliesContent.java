@@ -17,21 +17,23 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.alert.content;
+package org.apache.pinot.thirdeye.notification.content.templates;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import org.apache.pinot.thirdeye.anomaly.alert.util.EmailScreenshotHelper;
+import java.util.Properties;
+import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.anomaly.alert.util.AlertScreenshotHelper;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import org.apache.pinot.thirdeye.datasource.DAORegistry;
-import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -39,7 +41,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
+import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,26 +50,27 @@ import org.slf4j.LoggerFactory;
 /**
  * This email formatter lists the anomalies by their functions or metric.
  */
-public class MetricAnomaliesEmailContentFormatter extends BaseEmailContentFormatter{
-  private static final Logger LOG = LoggerFactory.getLogger(MetricAnomaliesEmailContentFormatter.class);
+public class MetricAnomaliesContent extends BaseNotificationContent {
+  private static final Logger LOG = LoggerFactory.getLogger(MetricAnomaliesContent.class);
 
-  private static final String EMAIL_TEMPLATE = "metric-anomalies-template.ftl";
+  private static final String TEMPLATE = "metric-anomalies-template.ftl";
   private DetectionConfigManager configDAO = null;
 
-  public MetricAnomaliesEmailContentFormatter(){
-
-  }
+  public MetricAnomaliesContent() {}
 
   @Override
-  public void init(Properties properties, EmailContentFormatterConfiguration configuration) {
+  public void init(Properties properties, ThirdEyeAnomalyConfiguration configuration) {
     super.init(properties, configuration);
-    this.emailTemplate = EMAIL_TEMPLATE;
-    this.configDAO = DAORegistry.getInstance().getDetectionConfigManager();
   }
 
   @Override
-  protected void updateTemplateDataByAnomalyResults(Map<String, Object> templateData,
-      Collection<AnomalyResult> anomalies, EmailContentFormatterContext context) {
+  public String getTemplate() {
+    return TEMPLATE;
+  }
+
+  @Override
+  public Map<String, Object> format(Long groupId, String groupName, Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
+    Map<String, Object> templateData = super.getTemplateData(context.getAlertConfig(), groupId, groupName, anomalies);
     enrichMetricInfo(templateData, anomalies);
 
     DateTime windowStart = DateTime.now();
@@ -125,7 +128,7 @@ public class MetricAnomaliesEmailContentFormatter extends BaseEmailContentFormat
       }
 
       AnomalyReportEntity anomalyReport = new AnomalyReportEntity(String.valueOf(anomaly.getId()),
-          getAnomalyURL(anomaly, emailContentFormatterConfiguration.getDashboardHost()),
+          getAnomalyURL(anomaly, this.thirdEyeAnomalyConfig.getDashboardHost()),
           anomaly.getAvgBaselineVal(),
           anomaly.getAvgCurrentVal(),
           0d,
@@ -161,8 +164,8 @@ public class MetricAnomaliesEmailContentFormatter extends BaseEmailContentFormat
     final DateTime eventStart = windowStart.minus(preEventCrawlOffset);
     final DateTime eventEnd = windowEnd.plus(postEventCrawlOffset);
     Map<String, List<String>> targetDimensions = new HashMap<>();
-    if (emailContentFormatterConfiguration.getHolidayCountriesWhitelist() != null) {
-      targetDimensions.put(EVENT_FILTER_COUNTRY, emailContentFormatterConfiguration.getHolidayCountriesWhitelist());
+    if (thirdEyeAnomalyConfig.getHolidayCountriesWhitelist() != null) {
+      targetDimensions.put(EVENT_FILTER_COUNTRY, thirdEyeAnomalyConfig.getHolidayCountriesWhitelist());
     }
     List<EventDTO> holidays = getHolidayEvents(eventStart, eventEnd, targetDimensions);
     Collections.sort(holidays, new Comparator<EventDTO>() {
@@ -176,8 +179,7 @@ public class MetricAnomaliesEmailContentFormatter extends BaseEmailContentFormat
     if (anomalyDetails.size() == 1) {
       AnomalyReportEntity singleAnomaly = anomalyDetails.get(0);
       try {
-        imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(),
-            emailContentFormatterConfiguration);
+        imgPath = AlertScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), thirdEyeAnomalyConfig);
       } catch (Exception e) {
         LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
       }
@@ -189,5 +191,7 @@ public class MetricAnomaliesEmailContentFormatter extends BaseEmailContentFormat
     templateData.put("detectionToAnomalyDetailsMap", functionAnomalyReports.asMap());
     templateData.put("metricToAnomalyDetailsMap", metricAnomalyReports.asMap());
     templateData.put("functionToId", functionToId);
+
+    return templateData;
   }
 }

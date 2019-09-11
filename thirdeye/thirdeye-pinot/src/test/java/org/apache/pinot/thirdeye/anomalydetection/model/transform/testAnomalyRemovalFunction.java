@@ -21,7 +21,7 @@ import org.testng.annotations.Test;
 
 public class testAnomalyRemovalFunction {
   // create mock anomaly history
-  // build mock AnomalyDetectionContext
+  // build mock ADContentFormatterContext
   // create AnomalyRemovalFunction
   // compare data with expect case
   @Test

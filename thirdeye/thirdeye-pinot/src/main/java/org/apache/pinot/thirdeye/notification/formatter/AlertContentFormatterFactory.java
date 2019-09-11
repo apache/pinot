@@ -17,18 +17,18 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.alert.commons;
+package org.apache.pinot.thirdeye.notification.formatter;
 
-import org.apache.pinot.thirdeye.alert.content.EmailContentFormatter;
 import org.apache.pinot.thirdeye.common.BaseFactory;
 
 
-public class EmailContentFormatterFactory extends BaseFactory<EmailContentFormatter> {
-  public static final String PACKAGE_PATH = "org.apache.pinot.thirdeye.alert.content";
+/**
+ * Generates instances of alert content formatters
+ */
+public class AlertContentFormatterFactory<T> extends BaseFactory<T> {
 
-  public static EmailContentFormatter fromClassName(String className)
+  public <T> T fromClassPath(String classPath)
       throws ClassNotFoundException, IllegalAccessException, InstantiationException{
-    String classPath = PACKAGE_PATH + "." + className;
-    return (new BaseFactory<EmailContentFormatter>()).getInstance(classPath);
+    return (new BaseFactory<T>()).getInstance(classPath);
   }
 }
