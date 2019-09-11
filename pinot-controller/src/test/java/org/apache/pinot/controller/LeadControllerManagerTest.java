@@ -19,10 +19,12 @@
 package org.apache.pinot.controller;
 
 import com.yammer.metrics.core.MetricsRegistry;
+import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -32,6 +34,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -45,6 +48,7 @@ public class LeadControllerManagerTest {
   private ControllerMetrics _controllerMetrics;
   private LiveInstance _liveInstance;
   private ResourceConfig _resourceConfig;
+  private ZNRecord _znRecord;
 
   @BeforeMethod
   public void setup() {
@@ -68,6 +72,11 @@ public class LeadControllerManagerTest {
     when(_helixManager.getConfigAccessor()).thenReturn(configAccessor);
     _resourceConfig = mock(ResourceConfig.class);
     when(configAccessor.getResourceConfig(any(), anyString())).thenReturn(_resourceConfig);
+
+    BaseDataAccessor<ZNRecord> dataAccessor = mock(BaseDataAccessor.class);
+    when(helixDataAccessor.getBaseDataAccessor()).thenReturn(dataAccessor);
+    _znRecord = mock(ZNRecord.class);
+    when(dataAccessor.get(anyString(), any(), anyInt())).thenReturn(_znRecord);
   }
 
   @Test
@@ -116,7 +125,7 @@ public class LeadControllerManagerTest {
 
   private void becomeHelixLeader(boolean becomeHelixLeader) {
     if (becomeHelixLeader) {
-      when(_liveInstance.getInstanceName()).thenReturn(CONTROLLER_HOST + "_" + CONTROLLER_PORT);
+      when(_znRecord.getId()).thenReturn(CONTROLLER_HOST + "_" + CONTROLLER_PORT);
     }
   }
 

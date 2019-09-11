@@ -93,7 +93,8 @@ public class LeadControllerUtils {
       ZNRecord znRecord = dataAccessor.get("/" + helixManager.getClusterName() + "/CONTROLLER/LEADER", stat,
           AccessOption.THROW_EXCEPTION_IFNOTEXIST);
       String helixLeader = znRecord.getId();
-      LOGGER.info("Getting Helix leader: {} as per znode version {}, mtime {}", helixLeader, stat.getVersion(),
+      // It's ok to log the info since this method isn't called very often.
+      LOGGER.info("Getting Helix leader: {} as per ZNode version {}, mtime {}", helixLeader, stat.getVersion(),
           stat.getMtime());
       return helixLeader;
     } catch (Exception e) {
