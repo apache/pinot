@@ -104,6 +104,12 @@ export default Route.extend({
             } else if (header.text === 'url') {
               const domString = `<a href="${cellValue}">Flow Link</a>`;
               row.columns.push(domString);
+            } else if (!isNaN(parseFloat(cellValue)) && header.text != 'sla') {
+              if (parseFloat(cellValue) < 0.99) {
+                row.columns.push('<font color="red">'.concat(cellValue, '</font>'));
+              } else {
+                row.columns.push(cellValue);
+              }
             } else {
               row.columns.push(cellValue);
             }
@@ -124,7 +130,13 @@ export default Route.extend({
           } else if (header.text === 'url') {
             const domString = `<a href="${cellValue}">Flow Link</a>`;
             row.columns.push(domString);
-          } else {
+          } else if (!isNaN(parseFloat(cellValue)) && header.text != 'sla') {
+            if (parseFloat(cellValue) < 0.99) {
+              row.columns.push('<font color="red">'.concat(cellValue, '</font>'));
+            } else {
+              row.columns.push(cellValue);
+            }
+          }  else {
             row.columns.push(cellValue);
           }
         });
