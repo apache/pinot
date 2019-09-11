@@ -140,14 +140,11 @@ public class LeadControllerManager {
    * Checks from ZK if the current controller host is Helix cluster leader.
    */
   private boolean isHelixLeader() {
-    HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
-    PropertyKey propertyKey = helixDataAccessor.keyBuilder().controllerLeader();
-    LiveInstance liveInstance = helixDataAccessor.getProperty(propertyKey);
-    if (liveInstance == null) {
+    String helixLeaderInstanceId = LeadControllerUtils.getHelixClusterLeader(_helixManager);
+    if (helixLeaderInstanceId == null) {
       LOGGER.warn("Helix leader ZNode is missing");
       return false;
     }
-    String helixLeaderInstanceId = liveInstance.getInstanceName();
     // The instance name from Helix leader ZNode is without controller prefix.
     // It is essential to convert to participant id for fair comparison.
     return _instanceId.equals(Helix.PREFIX_OF_CONTROLLER_INSTANCE + helixLeaderInstanceId);
