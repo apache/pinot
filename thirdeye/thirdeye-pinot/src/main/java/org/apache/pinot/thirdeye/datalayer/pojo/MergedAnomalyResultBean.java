@@ -245,6 +245,10 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   }
 
   public AnomalyType getType() {
+    // default type is deviation
+    if (type == null) {
+      return AnomalyType.DEVIATION;
+    }
     return type;
   }
 
