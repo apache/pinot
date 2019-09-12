@@ -254,13 +254,19 @@ public class PinotTableRestletResource {
 
     List<String> tablesDeleted = new LinkedList<>();
     try {
-      if (tableType != TableType.REALTIME && !TableNameBuilder.REALTIME.tableHasTypeSuffix(tableName)) {
+      if (tableType != TableType.REALTIME && !TableNameBuilder.REALTIME.tableHasTypeSuffix(tableName)
+          && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
         _pinotHelixResourceManager.deleteOfflineTable(tableName);
         tablesDeleted.add(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
       }
-      if (tableType != TableType.OFFLINE && !TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableName)) {
+      if (tableType != TableType.OFFLINE && !TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableName)
+          && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
         _pinotHelixResourceManager.deleteRealtimeTable(tableName);
         tablesDeleted.add(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+      }
+      if (tablesDeleted.size() == 0) {
+        throw new ControllerApplicationException(LOGGER, "Table '" + tableName + "' does not exist",
+            Response.Status.BAD_REQUEST);
       }
       return new SuccessResponse("Tables: " + tablesDeleted + " deleted");
     } catch (Exception e) {
