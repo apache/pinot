@@ -18,20 +18,16 @@
  */
 package org.apache.pinot.core.segment.creator.impl.presence;
 
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
+
 import java.io.Closeable;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.ByteOrder;
-import java.util.Arrays;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.core.segment.index.readers.PresenceVectorReader;
-import org.apache.pinot.core.segment.index.readers.PresenceVectorReaderImpl;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import org.roaringbitmap.ImmutableBitmapDataProvider;
-import org.roaringbitmap.RoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 /**
  * Used to persist the null bitmap on disk. This is used by SegmentCreator
@@ -53,6 +49,11 @@ public class PresenceVectorCreator implements Closeable {
     try (DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(_presenceVectorFile))) {
       _nullBitmap.serialize(outputStream);
     }
+  }
+
+  @VisibleForTesting
+  ImmutableRoaringBitmap getNullBitmap() {
+    return _nullBitmap.clone();
   }
 
   public void setNull(int docId) {

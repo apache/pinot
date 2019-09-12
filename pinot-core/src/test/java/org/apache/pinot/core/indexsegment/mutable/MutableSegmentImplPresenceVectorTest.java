@@ -34,7 +34,11 @@ import org.testng.annotations.Test;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
 
 import static org.apache.pinot.common.utils.CommonConstants.Segment.NULL_FIELDS;
 

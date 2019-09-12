@@ -33,7 +33,10 @@ import org.apache.pinot.core.operator.blocks.SingleValueBlock;
 import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
-import org.apache.pinot.core.segment.index.readers.*;
+import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.index.readers.PresenceVectorReader;
 
 
 public final class ColumnDataSource extends DataSource {

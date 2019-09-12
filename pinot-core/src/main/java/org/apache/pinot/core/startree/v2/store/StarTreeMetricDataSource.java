@@ -27,7 +27,10 @@ import org.apache.pinot.core.io.reader.impl.v1.BaseChunkSingleValueReader;
 import org.apache.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
 import org.apache.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
 import org.apache.pinot.core.operator.blocks.SingleValueBlock;
-import org.apache.pinot.core.segment.index.readers.*;
+import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.index.readers.PresenceVectorReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
