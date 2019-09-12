@@ -267,4 +267,27 @@ public class Pql2Compiler implements AbstractCompiler {
     }
     return functionCalls;
   }
+
+  public static AstNode buildAst(String expression) {
+    CharStream charStream = new ANTLRInputStream(expression);
+    PQL2Lexer lexer = new PQL2Lexer(charStream);
+    lexer.setTokenFactory(new CommonTokenFactory(true));
+    lexer.removeErrorListeners();
+    lexer.addErrorListener(ERROR_LISTENER);
+    TokenStream tokenStream = new UnbufferedTokenStream<CommonToken>(lexer);
+    PQL2Parser parser = new PQL2Parser(tokenStream);
+    parser.setErrorHandler(new BailErrorStrategy());
+    parser.removeErrorListeners();
+    parser.addErrorListener(ERROR_LISTENER);
+
+    // Parse
+    ParseTree parseTree = parser.root();
+
+    ParseTreeWalker walker = new ParseTreeWalker();
+    Pql2AstListener listener = new Pql2AstListener(expression);
+    walker.walk(listener, parseTree);
+
+    AstNode rootNode = listener.getRootNode();
+    return rootNode;
+  }
 }
