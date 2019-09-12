@@ -18,22 +18,36 @@
  */
 package org.apache.pinot.benchmark;
 
+import org.apache.pinot.benchmark.api.PinotClusterManager;
 import org.apache.pinot.benchmark.common.PinotBenchServiceApplication;
+import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 
 public class PinotBenchmarkServiceStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotBenchmarkServiceStarter.class);
 
-  private PinotBenchServiceApplication _pinotBenchServiceApplication;
+  private final PinotBenchConf _config;
+  private final PinotBenchServiceApplication _pinotBenchServiceApplication;
+  private final PinotClusterManager _pinotClusterManager;
 
-  public PinotBenchmarkServiceStarter() {
+  public PinotBenchmarkServiceStarter(PinotBenchConf conf) {
+    _config = conf;
     _pinotBenchServiceApplication = new PinotBenchServiceApplication();
+    _pinotClusterManager = new PinotClusterManager(_config);
   }
 
   public void start() {
+    LOGGER.info("Starting Pinot cluster manager");
 
+    _pinotBenchServiceApplication.registerBinder(new AbstractBinder() {
+      @Override
+      protected void configure() {
+        bind(_pinotClusterManager).to(PinotClusterManager.class);
+      }
+    });
 
     LOGGER.info("Starting Pinot benchmark service.");
     _pinotBenchServiceApplication.start(9008);
@@ -45,9 +59,11 @@ public class PinotBenchmarkServiceStarter {
     _pinotBenchServiceApplication.stop();
   }
 
-
   public static void main(String[] args) throws InterruptedException {
-    PinotBenchmarkServiceStarter starter = new PinotBenchmarkServiceStarter();
+    PinotBenchConf conf = new PinotBenchConf();
+    conf.setPerfControllerHost("localhost");
+    conf.setPerfControllerPort(9000);
+    PinotBenchmarkServiceStarter starter = new PinotBenchmarkServiceStarter(conf);
 
     try {
       LOGGER.info("Start starter.");

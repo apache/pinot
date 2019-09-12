@@ -26,6 +26,7 @@ import java.net.URLClassLoader;
 import javax.ws.rs.container.ContainerResponseFilter;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
+import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -67,6 +68,10 @@ public class PinotBenchServiceApplication extends ResourceConfig {
       return;
     }
     httpServer.shutdownNow();
+  }
+
+  public void registerBinder(AbstractBinder binder) {
+    register(binder);
   }
 
   private void setupSwagger(HttpServer httpServer) {
