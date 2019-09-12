@@ -177,7 +177,7 @@ public class MergeWrapper extends DetectionPipeline {
     Set<MergedAnomalyResultDTO> retainedNewAnomalies = new HashSet<>();
 
     Map<AnomalyKey, MergedAnomalyResultDTO> parents = new HashMap<>();
-    for (MergedAnomalyResultDTO anomaly : input) {
+    for (MergedAnomalyResultDTO anomaly : inputs) {
       AnomalyKey key = AnomalyKey.from(anomaly);
       MergedAnomalyResultDTO parent = parents.get(key);
 
