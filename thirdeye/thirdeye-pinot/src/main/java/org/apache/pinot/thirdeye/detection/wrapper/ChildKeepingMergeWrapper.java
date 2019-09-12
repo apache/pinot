@@ -111,7 +111,7 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
     // Ignore filling baselines for exiting parent anomalies and grouped anomalies
     Collection<MergedAnomalyResultDTO> parentAnomalies = Collections2.filter(output,
         mergedAnomaly -> mergedAnomaly != null && !mergedAnomaly.getChildren().isEmpty() && !isExistingAnomaly(
-            existingParentAnomalies, mergedAnomaly) && !StringUtils.isBlank(mergedAnomaly.getMetric()));
+            existingParentAnomalies, mergedAnomaly) && !StringUtils.isBlank(mergedAnomaly.getMetricUrn()));
     super.fillCurrentAndBaselineValue(new ArrayList<>(parentAnomalies));
     return output;
   }

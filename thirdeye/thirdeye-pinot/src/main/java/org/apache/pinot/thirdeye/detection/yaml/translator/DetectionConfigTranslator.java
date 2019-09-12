@@ -45,6 +45,7 @@ import org.apache.pinot.thirdeye.detection.wrapper.AnomalyFilterWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.ChildKeepingMergeWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.GrouperWrapper;
+import org.apache.pinot.thirdeye.detection.wrapper.EntityAnomalyMergeWrapper;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 
 import static org.apache.pinot.thirdeye.detection.ConfigUtils.*;
@@ -222,8 +223,13 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     List<Map<String, Object>> grouperYamls = getList(metricAlertConfigMap.get(PROP_GROUPER));
     if (!grouperYamls.isEmpty()) {
       properties = buildWrapperProperties(
-          ChildKeepingMergeWrapper.class.getName(),
+          EntityAnomalyMergeWrapper.class.getName(),
           Collections.singletonList(buildGroupWrapperProperties(subEntityName, metricUrn, grouperYamls.get(0), Collections.singletonList(properties))),
+          mergerProperties);
+
+      properties = buildWrapperProperties(
+          ChildKeepingMergeWrapper.class.getName(),
+          Collections.singletonList(properties),
           mergerProperties);
     }
 
@@ -250,13 +256,15 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
 
     // Wrap the entity level grouper, only 1 grouper is supported now
     List<Map<String, Object>> grouperProps = ConfigUtils.getList(compositeAlertConfigMap.get(PROP_GROUPER));
+    Map<String, Object> mergerProperties = ConfigUtils.getMap(compositeAlertConfigMap.get(PROP_MERGER));
     if (!grouperProps.isEmpty()) {
-      properties = buildGroupWrapperProperties(subEntityName, grouperProps.get(0), nestedPropertiesList);
-      nestedPropertiesList = Collections.singletonList(properties);
+      properties = buildWrapperProperties(
+          EntityAnomalyMergeWrapper.class.getName(),
+          Collections.singletonList(buildGroupWrapperProperties(subEntityName, grouperProps.get(0), nestedPropertiesList)),
+          mergerProperties);
+      nestedPropertiesList = Collections.singletonList(properties);;
     }
 
-    // Wrap the entity level merger
-    Map<String, Object> mergerProperties = ConfigUtils.getMap(compositeAlertConfigMap.get(PROP_MERGER));
     properties = buildWrapperProperties(
         ChildKeepingMergeWrapper.class.getName(),
         nestedPropertiesList,
