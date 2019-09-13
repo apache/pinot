@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.queries;
 
 import java.util.ArrayList;
@@ -28,7 +46,7 @@ public class InterSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     expectedColumnTypes.put("column18", "INT");
     expectedColumnTypes.put("daysSinceEpoch", "INT");
 
-    List<String> expectedColumns  = new ArrayList<>();
+    List<String> expectedColumns = new ArrayList<>();
     expectedColumns.add("column1");
     expectedColumns.add("column3");
     expectedColumns.add("column5");
@@ -50,18 +68,18 @@ public class InterSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Map<String, String> expectedColumnTypes = new HashMap<>();
     expectedColumnTypes.put("column1", "INT");
     expectedColumnTypes.put("column5", "STRING");
-    List<String> expectedColumns  = new ArrayList<>();
+    List<String> expectedColumns = new ArrayList<>();
     expectedColumns.add("column1");
     expectedColumns.add("column5");
     verifyBrokerResponse(brokerResponse, 40L, 120000L, expectedColumns, expectedColumnTypes);
   }
 
-  private void verifyBrokerResponse(BrokerResponseNative brokerResponse, long expectedNumDocsScanned, long expectedTotalDocNum, List<String> expectedColumns,
-      Map<String, String> expectedColumnTypes) {
+  private void verifyBrokerResponse(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
+      long expectedTotalDocNum, List<String> expectedColumns, Map<String, String> expectedColumnTypes) {
     Assert.assertEquals(brokerResponse.getNumDocsScanned(), expectedNumDocsScanned);
     Assert.assertEquals(brokerResponse.getTotalDocs(), expectedTotalDocNum);
     Assert.assertEquals(brokerResponse.getSelectionResults().getColumns().size(), expectedColumns.size());
-    for(String column : expectedColumns) {
+    for (String column : expectedColumns) {
       Assert.assertTrue(brokerResponse.getSelectionResults().getColumns().contains(column));
     }
     Assert.assertEquals(brokerResponse.getSelectionResults().getColumnTypes(), expectedColumnTypes);
