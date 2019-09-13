@@ -82,12 +82,12 @@ public class ControllerLeaderLocatorTest {
     ControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
 
     // check values at startup
-    Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderInvalid());
+    Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderValid());
     Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), 0);
 
     // very first invalidate
     controllerLeaderLocator.invalidateCachedControllerLeader();
-    Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderInvalid());
+    Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderValid());
     long lastCacheInvalidateMillis = controllerLeaderLocator.getLastCacheInvalidateMillis();
     Assert.assertTrue(lastCacheInvalidateMillis > 0);
 
@@ -96,12 +96,12 @@ public class ControllerLeaderLocatorTest {
     lastCacheInvalidateMillis = System.currentTimeMillis();
     controllerLeaderLocator.setLastCacheInvalidateMillis(lastCacheInvalidateMillis);
     controllerLeaderLocator.invalidateCachedControllerLeader();
-    Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderInvalid());
+    Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderValid());
     Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), lastCacheInvalidateMillis);
 
     // getControllerLeader, which validates the cache
     controllerLeaderLocator.getControllerLeader(testTable);
-    Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderInvalid());
+    Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderValid());
     Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), lastCacheInvalidateMillis);
 
     // invalidate within {@link ControllerLeaderLocator::getMillisBetweenInvalidate()} millis
@@ -109,7 +109,7 @@ public class ControllerLeaderLocatorTest {
     lastCacheInvalidateMillis = System.currentTimeMillis();
     controllerLeaderLocator.setLastCacheInvalidateMillis(lastCacheInvalidateMillis);
     controllerLeaderLocator.invalidateCachedControllerLeader();
-    Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderInvalid());
+    Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderValid());
     Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), lastCacheInvalidateMillis);
 
     // invalidate after {@link ControllerLeaderLocator::getMillisBetweenInvalidate()} millis have elapsed, by setting lastCacheInvalidateMillis to well before the millisBetweenInvalidate
@@ -117,7 +117,7 @@ public class ControllerLeaderLocatorTest {
     lastCacheInvalidateMillis = System.currentTimeMillis() - 2 * controllerLeaderLocator.getMillisBetweenInvalidate();
     controllerLeaderLocator.setLastCacheInvalidateMillis(lastCacheInvalidateMillis);
     controllerLeaderLocator.invalidateCachedControllerLeader();
-    Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderInvalid());
+    Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderValid());
     Assert.assertTrue(controllerLeaderLocator.getLastCacheInvalidateMillis() > lastCacheInvalidateMillis);
   }
 

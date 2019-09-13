@@ -19,8 +19,8 @@
 package org.apache.pinot.server.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.MasterSlaveSMD;
@@ -43,17 +43,20 @@ public class ControllerLeaderLocator {
 
   private final HelixManager _helixManager;
 
-  // Co-ordinates of the last known controller leader for every partitions, with partition name being the key and lead controller info being the value.
+  // Co-ordinates of the last known controller leader for each of the lead-controller every partitions,
+  // with partition number being the key and controller hostname and port pair being the value.  If the lead
+  // controller resource is disabled in the configuration then this map contains helix cluster leader co-ordinates
+  // for all partitions of leadControllerResource.
   private final Map<Integer, Pair<String, Integer>> _cachedControllerLeaderMap;
 
-  // Indicates whether cached controller leader value is invalid. If so, caches the host-port pair as the last known controller leader.
-  private volatile boolean _cachedControllerLeaderInvalid = true;
+  // Indicates whether cached controller leader(s) value is(are) invalid.
+  private volatile boolean _cachedControllerLeaderValid = false;
   // Time in millis when cache invalidate was last set
   private volatile long _lastCacheInvalidateMillis = 0;
 
   ControllerLeaderLocator(HelixManager helixManager) {
     _helixManager = helixManager;
-    _cachedControllerLeaderMap = new ConcurrentHashMap<>();
+    _cachedControllerLeaderMap = new HashMap<>();
   }
 
   /**
@@ -79,24 +82,24 @@ public class ControllerLeaderLocator {
 
   /**
    * Locates the controller leader so that we can send LLC segment completion requests to it.
-   * Checks the {@link ControllerLeaderLocator::_cachedControllerLeaderInvalid} flag and fetches the leaders to {@link ControllerLeaderLocator::_cachedControllerLeaderMap} from helix if cached value is invalid
+   * Checks the {@link ControllerLeaderLocator::_cachedControllerLeaderValid} flag and fetches the leaders to {@link ControllerLeaderLocator::_cachedControllerLeaderMap} from helix if cached value is invalid
    * @param rawTableName table name without type.
    * @return The host-port pair of the current controller leader.
    */
   public synchronized Pair<String, Integer> getControllerLeader(String rawTableName) {
     int partitionId = LeadControllerUtils.getPartitionIdForTable(rawTableName);
-    if (!_cachedControllerLeaderInvalid) {
+    if (_cachedControllerLeaderValid) {
       return _cachedControllerLeaderMap.get(partitionId);
     }
 
     // No controller leader cached, fetches a fresh copy of external view and then gets the leader for the given table.
     boolean success = refreshControllerLeaderMap();
     if (success) {
-      _cachedControllerLeaderInvalid = false;
+      _cachedControllerLeaderValid = true;
       LOGGER.info("Refreshed controller leader map successfully.");
       return _cachedControllerLeaderMap.get(partitionId);
     } else {
-      _cachedControllerLeaderInvalid = true;
+      _cachedControllerLeaderValid = false;
       LOGGER.warn("Failed to refresh controller leader map.");
       return null;
     }
@@ -157,6 +160,8 @@ public class ControllerLeaderLocator {
           }
         }
         if (!masterFound) {
+          // It's ok to log a warning since we can be in this state for some small time during the migration.
+          // Otherwise, we are attempted to mark this as an error.
           LOGGER.warn("There is no controller in MASTER state for partition: {} in lead controller resource",
               partitionName);
           return false;
@@ -243,14 +248,14 @@ public class ControllerLeaderLocator {
           millisSinceLastInvalidate, MILLIS_BETWEEN_INVALIDATE);
     } else {
       LOGGER.info("Invalidating cached controller leader value");
-      _cachedControllerLeaderInvalid = true;
+      _cachedControllerLeaderValid = false;
       _lastCacheInvalidateMillis = now;
     }
   }
 
   @VisibleForTesting
-  protected boolean isCachedControllerLeaderInvalid() {
-    return _cachedControllerLeaderInvalid;
+  protected boolean isCachedControllerLeaderValid() {
+    return _cachedControllerLeaderValid;
   }
 
   @VisibleForTesting
