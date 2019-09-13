@@ -37,7 +37,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
-import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.apache.pinot.thirdeye.detection.alert.StatefulDetectionAlertFilter;
 import org.apache.pinot.thirdeye.detection.annotation.AlertFilter;
@@ -110,13 +110,15 @@ public class PerUserDimensionAlertFilter extends StatefulDetectionAlertFilter {
     }
 
     for (Map.Entry<String, List<MergedAnomalyResultDTO>> userAnomalyMapping : perUserAnomalies.entrySet()) {
-      result.addMapping(
-          new DetectionAlertFilterRecipients(
-              this.makeGroupRecipients(userAnomalyMapping.getKey()),
-              this.recipients.get(PROP_CC),
-              this.recipients.get(PROP_BCC)),
-          new HashSet<>(userAnomalyMapping.getValue())
-      );
+      Map<String, Set<String>> recipients = new HashMap<>();
+      recipients.put(PROP_TO, this.makeGroupRecipients(userAnomalyMapping.getKey()));
+      recipients.put(PROP_CC, this.recipients.get(PROP_CC));
+      recipients.put(PROP_BCC, this.recipients.get(PROP_BCC));
+
+      Map<String, Object> alertProps = new HashMap<>();
+      alertProps.put(PROP_RECIPIENTS, recipients);
+
+      result.addMapping(new DetectionAlertFilterNotification(alertProps), new HashSet<>(userAnomalyMapping.getValue()));
     }
 
     return result;

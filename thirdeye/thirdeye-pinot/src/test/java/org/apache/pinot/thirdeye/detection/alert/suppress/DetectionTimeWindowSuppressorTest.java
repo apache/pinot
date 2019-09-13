@@ -3,6 +3,7 @@ package org.apache.pinot.thirdeye.detection.alert.suppress;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import java.util.ArrayList;
@@ -115,9 +116,13 @@ public class DetectionTimeWindowSuppressorTest {
    */
   @Test
   public void testTimeWindowSuppressorWithThreshold() throws Exception {
+    Map<String, Set<String>> recipients = new HashMap<>();
+    recipients.put("to", Collections.singleton("test@test"));
 
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
-    result.addMapping(new DetectionAlertFilterRecipients(Collections.singleton("test@test")), anomalies);
+    Map<String, Object> alertProps = new HashMap<>();
+    alertProps.put("recipients", recipients);
+    result.addMapping(new DetectionAlertFilterNotification(alertProps), anomalies);
 
     DetectionAlertTimeWindowSuppressor suppressor = new DetectionAlertTimeWindowSuppressor(config);
     DetectionAlertFilterResult resultsAfterSuppress = suppressor.run(result);
@@ -145,8 +150,13 @@ public class DetectionTimeWindowSuppressorTest {
     alertSuppressors.put(TIME_WINDOW_SUPPRESSOR_KEY, params);
     config.setAlertSuppressors(alertSuppressors);
 
+    Map<String, Set<String>> recipients = new HashMap<>();
+    recipients.put("to", Collections.singleton("test@test"));
+
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
-    result.addMapping(new DetectionAlertFilterRecipients(Collections.singleton("test@test")), anomalies);
+    Map<String, Object> alertProps = new HashMap<>();
+    alertProps.put("recipients", recipients);
+    result.addMapping(new DetectionAlertFilterNotification(alertProps), anomalies);
 
     DetectionAlertTimeWindowSuppressor suppressor = new DetectionAlertTimeWindowSuppressor(config);
     DetectionAlertFilterResult resultsAfterSuppress = suppressor.run(result);

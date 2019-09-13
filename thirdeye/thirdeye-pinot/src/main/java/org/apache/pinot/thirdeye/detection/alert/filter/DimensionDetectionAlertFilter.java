@@ -25,20 +25,23 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.SetMultimap;
+import java.util.Collection;
+import java.util.HashMap;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
-import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.apache.pinot.thirdeye.detection.alert.StatefulDetectionAlertFilter;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.detection.annotation.AlertFilter;
+
+import static org.apache.pinot.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter.*;
 
 
 /**
@@ -77,7 +80,6 @@ public class DimensionDetectionAlertFilter extends StatefulDetectionAlertFilter 
   @Override
   public DetectionAlertFilterResult run(Map<Long, Long> vectorClocks, long highWaterMark) {
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
-
     final long minId = getMinId(highWaterMark);
 
     Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds), minId);
@@ -90,15 +92,16 @@ public class DimensionDetectionAlertFilter extends StatefulDetectionAlertFilter 
       }
     });
 
-    // generate recipients-anomalies mapping
     for (Map.Entry<String, Collection<MergedAnomalyResultDTO>> entry : grouped.asMap().entrySet()) {
-      result.addMapping(
-          new DetectionAlertFilterRecipients(
-              this.makeGroupRecipients(entry.getKey()),
-              this.recipients.get(PROP_CC),
-              this.recipients.get(PROP_BCC)),
-          new HashSet<>(entry.getValue())
-      );
+      Map<String, Set<String>> recipients = new HashMap<>();
+      recipients.put(PROP_TO, this.makeGroupRecipients(entry.getKey()));
+      recipients.put(PROP_CC, this.recipients.get(PROP_CC));
+      recipients.put(PROP_BCC, this.recipients.get(PROP_BCC));
+
+      Map<String, Object> alertProps = new HashMap<>();
+      alertProps.put(PROP_RECIPIENTS, recipients);
+
+      result.addMapping(new DetectionAlertFilterNotification(alertProps), new HashSet<>(entry.getValue()));
     }
 
     return result;

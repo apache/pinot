@@ -21,12 +21,13 @@ package org.apache.pinot.thirdeye.detection.alert.filter;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
+import java.util.HashMap;
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
-import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.apache.pinot.thirdeye.detection.alert.StatefulDetectionAlertFilter;
 import java.util.HashSet;
@@ -49,9 +50,6 @@ public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertF
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   private static final String PROP_SEND_ONCE = "sendOnce";
 
-  Set<String> to;
-  Set<String> cc;
-  Set<String> bcc;
   final SetMultimap<String, String> recipients;
   List<Long> detectionConfigIds;
   boolean sendOnce;
@@ -70,19 +68,17 @@ public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertF
 
     final long minId = getMinId(highWaterMark);
 
-    to = cleanupRecipients(this.recipients.get(PROP_TO));
-    cc = cleanupRecipients(this.recipients.get(PROP_CC));
-    bcc = cleanupRecipients(this.recipients.get(PROP_BCC));
-
-    // Early termination if there are no recipients in the "to" field
-    if (to.isEmpty()) {
-      return result;
-    }
-
     // Fetch all the anomalies to be notified to the recipients
     Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds), minId);
 
-    return result.addMapping(new DetectionAlertFilterRecipients(to, cc, bcc), anomalies);
+    Map<String, Set<String>> recipients = new HashMap<>();
+    recipients.put(PROP_TO, cleanupRecipients(this.recipients.get(PROP_TO)));
+    recipients.put(PROP_CC, cleanupRecipients(this.recipients.get(PROP_CC)));
+    recipients.put(PROP_BCC, cleanupRecipients(this.recipients.get(PROP_BCC)));
+
+    Map<String, Object> alertProps = new HashMap<>();
+    alertProps.put(PROP_RECIPIENTS, recipients);
+    return result.addMapping(new DetectionAlertFilterNotification(alertProps), anomalies);
   }
 
   private Set<String> cleanupRecipients(Set<String> recipient) {
