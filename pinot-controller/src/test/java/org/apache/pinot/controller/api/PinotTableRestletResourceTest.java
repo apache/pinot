@@ -278,26 +278,26 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   @Test
   public void testDeleteTable() throws IOException {
     // Case 1: Create a REALTIME table and delete it directly w/o using query param.
-    TableConfig realtimeTableConfig = _realtimeBuilder.build();
+    TableConfig realtimeTableConfig = _realtimeBuilder.setTableName("table0").build();
     String creationResponse =
         sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonConfigString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table testRealtimeTable_REALTIME succesfully added\"}");
+    Assert.assertEquals(creationResponse, "{\"status\":\"Table table0_REALTIME succesfully added\"}");
 
     // Delete realtime table using REALTIME suffix.
     String deleteResponse = sendDeleteRequest(StringUtil.join("/", this._controllerBaseApiUrl,
         "tables", "testRealtimeTable_REALTIME"));
     Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [testRealtimeTable_REALTIME] deleted\"}");
 
-    // Case 2: Create a REALTIME table and delete it directly w/o using query param.
-    TableConfig offlineTableConfig = _offlineBuilder.build();
+    // Case 2: Create an offline table and delete it directly w/o using query param.
+    TableConfig offlineTableConfig = _offlineBuilder.setTableName("table0").build();
     creationResponse =
         sendPostRequest(_createTableUrl, offlineTableConfig.toJsonConfigString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table testOfflineTable_OFFLINE succesfully added\"}");
+    Assert.assertEquals(creationResponse, "{\"status\":\"Table table0_OFFLINE succesfully added\"}");
 
     // Delete offline table using OFFLINE suffix.
     deleteResponse = sendDeleteRequest(StringUtil.join("/", this._controllerBaseApiUrl,
-        "tables", "testOfflineTable_OFFLINE"));
-    Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [testOfflineTable_OFFLINE] deleted\"}");
+        "tables", "table0_OFFLINE"));
+    Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table0_OFFLINE] deleted\"}");
 
     // Case 3: Create REALTIME and OFFLINE tables and delete both of them.
     TableConfig rtConfig1 = _realtimeBuilder.setTableName("table1").build();

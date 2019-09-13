@@ -254,24 +254,39 @@ public class PinotTableRestletResource {
 
     List<String> tablesDeleted = new LinkedList<>();
     try {
-      if (tableType != TableType.REALTIME && !TableNameBuilder.REALTIME.tableHasTypeSuffix(tableName)
-          && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
+      if (toDeleteOfflineTable(tableName, tableType) && _pinotHelixResourceManager
+          .hasOfflineTable(tableName)) {
         _pinotHelixResourceManager.deleteOfflineTable(tableName);
         tablesDeleted.add(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
       }
-      if (tableType != TableType.OFFLINE && !TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableName)
-          && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+      if (toDeleteRealtimeTable(tableName, tableType) && _pinotHelixResourceManager
+          .hasRealtimeTable(tableName)) {
         _pinotHelixResourceManager.deleteRealtimeTable(tableName);
         tablesDeleted.add(TableNameBuilder.REALTIME.tableNameWithType(tableName));
       }
       if (tablesDeleted.size() == 0) {
         throw new ControllerApplicationException(LOGGER, "Table '" + tableName + "' does not exist",
-            Response.Status.BAD_REQUEST);
+            Response.Status.NOT_FOUND);
       }
       return new SuccessResponse("Tables: " + tablesDeleted + " deleted");
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
     }
+  }
+
+  // Return true if tableType is NOT offline (i.e., null or realtime) and table name does  not end
+  // with _offline suffix.
+  private boolean toDeleteRealtimeTable(String tableName, TableType tableType) {
+    return tableType != TableType.OFFLINE && !TableNameBuilder.OFFLINE
+        .tableHasTypeSuffix(tableName);
+  }
+
+  // Return true if tableType is NOT realtime (i.e., null or offline) and table name does  not end
+  // with _realtime suffix.
+  private boolean toDeleteOfflineTable(String tableName, TableType tableType) {
+    return tableType != TableType.REALTIME && !TableNameBuilder.REALTIME
+        .tableHasTypeSuffix(tableName);
   }
 
   @PUT
