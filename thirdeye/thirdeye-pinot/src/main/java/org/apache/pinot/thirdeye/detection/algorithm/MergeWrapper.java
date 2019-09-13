@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.pinot.thirdeye.anomaly.AnomalyType;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
@@ -328,6 +329,7 @@ public class MergeWrapper extends DetectionPipeline {
     to.setScore(from.getScore());
     to.setWeight(from.getWeight());
     to.setProperties(from.getProperties());
+    to.setType(from.getType());
     return to;
   }
 
@@ -337,18 +339,21 @@ public class MergeWrapper extends DetectionPipeline {
     final DimensionMap dimensions;
     final String mergeKey;
     final String componentKey;
+    final AnomalyType type;
 
-    public AnomalyKey(String metric, String collection, DimensionMap dimensions, String mergeKey, String componentKey) {
+    public AnomalyKey(String metric, String collection, DimensionMap dimensions, String mergeKey, String componentKey,
+        AnomalyType type) {
       this.metric = metric;
       this.collection = collection;
       this.dimensions = dimensions;
       this.mergeKey = mergeKey;
       this.componentKey = componentKey;
+      this.type = type;
     }
 
     public static AnomalyKey from(MergedAnomalyResultDTO anomaly) {
       return new AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions(), anomaly.getProperties().get(PROP_MERGE_KEY),
-          anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_NAME));
+          anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_NAME), anomaly.getType());
     }
 
     @Override
@@ -362,12 +367,12 @@ public class MergeWrapper extends DetectionPipeline {
       AnomalyKey that = (AnomalyKey) o;
       return Objects.equals(metric, that.metric) && Objects.equals(collection, that.collection) && Objects.equals(
           dimensions, that.dimensions) && Objects.equals(mergeKey, that.mergeKey) && Objects.equals(componentKey,
-          that.componentKey);
+          that.componentKey) && Objects.equals(type, that.type);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(metric, collection, dimensions, mergeKey, componentKey);
+      return Objects.hash(metric, collection, dimensions, mergeKey, componentKey, type);
     }
   }
 }
