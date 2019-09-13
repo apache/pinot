@@ -332,7 +332,7 @@ public class DataProviderTest {
       String[] parts = fs.split("=");
       filters.put(parts[0], parts[1]);
     }
-    return new AnomalySlice(start, end, filters, null, true);
+    return new AnomalySlice().withStart(start).withEnd(end).withFilters(filters).withDetectionCompNames(null);
   }
 
   private static MetricConfigDTO makeMetric(Long id, String metric, String dataset) {

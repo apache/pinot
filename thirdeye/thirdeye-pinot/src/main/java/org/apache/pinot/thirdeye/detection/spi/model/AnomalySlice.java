@@ -20,10 +20,8 @@
 package org.apache.pinot.thirdeye.detection.spi.model;
 
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Collections2;
 import com.google.common.collect.Multimap;
 import java.util.List;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 
 import static org.apache.pinot.thirdeye.detection.wrapper.GrouperWrapper.*;
@@ -44,12 +42,12 @@ public class AnomalySlice {
     this(-1, -1, ArrayListMultimap.create(), null, false);
   }
 
-  public AnomalySlice(long start, long end, Multimap<String, String> filters, List<String> detectionComponentName, boolean includeChildAnomalies) {
+  private AnomalySlice(long start, long end, Multimap<String, String> filters, List<String> detectionComponentName, boolean isTaggedAsChild) {
     this.start = start;
     this.end = end;
     this.filters = filters;
     this.detectionComponentNames = detectionComponentName;
-    this.isTaggedAsChild = includeChildAnomalies;
+    this.isTaggedAsChild = isTaggedAsChild;
   }
 
   public long getStart() {
@@ -80,8 +78,8 @@ public class AnomalySlice {
     return new AnomalySlice(this.start, this.end, this.filters, detectionComponentNames, this.isTaggedAsChild);
   }
 
-  public AnomalySlice withIncludeChildAnomalies(boolean includeChildAnomalies) {
-    return new AnomalySlice(this.start, this.end, this.filters, this.detectionComponentNames, includeChildAnomalies);
+  public AnomalySlice withIsTaggedAsChild(boolean isTaggedAsChild) {
+    return new AnomalySlice(this.start, this.end, this.filters, this.detectionComponentNames, isTaggedAsChild);
   }
 
   public boolean match(MergedAnomalyResultDTO anomaly) {
@@ -102,17 +100,15 @@ public class AnomalySlice {
       }
     }
 
-    if (this.detectionComponentNames != null) {
-      if (!anomaly.getProperties().containsKey(PROP_DETECTOR_COMPONENT_NAME) ||
-          !this.detectionComponentNames.contains(anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_NAME))) {
-        return false;
-      }
+    // Note:
+    // Entity Anomalies with detectorComponentName can act as both child (sub-entity) and non-child
+    // (root entity) anomaly. Therefore, when matching based on detectionComponentNames, do not consider
+    // isTaggedAsChild filter as it can take either of the values (true or false).
+    if (this.detectionComponentNames != null && !this.detectionComponentNames.isEmpty()) {
+      return anomaly.getProperties().containsKey(PROP_DETECTOR_COMPONENT_NAME) && this.detectionComponentNames.contains(
+          anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_NAME));
+    } else {
+      return isTaggedAsChild == anomaly.isChild();
     }
-
-    if (!isTaggedAsChild && anomaly.isChild()) {
-      return false;
-    }
-
-    return true;
   }
 }
