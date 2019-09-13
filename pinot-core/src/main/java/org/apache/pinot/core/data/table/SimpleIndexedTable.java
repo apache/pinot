@@ -52,7 +52,9 @@ public class SimpleIndexedTable extends IndexedTable {
     _records = new ArrayList<>(maxCapacity);
     _lookupTable = new HashMap<>(maxCapacity);
 
-    _orderByComparator = OrderByUtils.getKeysAndValuesComparator(_dataSchema, _orderBy, _aggregationInfos);
+    if (CollectionUtils.isNotEmpty(_orderBy)) {
+      _orderByComparator = OrderByUtils.getKeysAndValuesComparator(_dataSchema, _orderBy, _aggregationInfos);
+    }
   }
 
   /**
@@ -88,7 +90,7 @@ public class SimpleIndexedTable extends IndexedTable {
       _records.sort(_orderByComparator);
     }
 
-    // evict lowest
+    // evict lowest (or whatever's at the bottom if sort didnt happen)
     if (_records.size() > trimToSize) {
       _records = new ArrayList<>(_records.subList(0, trimToSize));
     }

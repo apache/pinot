@@ -28,6 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nonnull;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
@@ -52,8 +53,10 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
     _lookupMap = new ConcurrentHashMap<>();
     _readWriteLock = new ReentrantReadWriteLock();
-    _minHeapComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos).reversed();
-    _orderByComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos);
+    if (CollectionUtils.isNotEmpty(_orderBy)) {
+      _minHeapComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos).reversed();
+      _orderByComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos);
+    }
   }
 
   /**
@@ -105,7 +108,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
   @Override
   public Iterator<Record> iterator() {
-    if (_sort) {
+    if (_sort && CollectionUtils.isNotEmpty(_orderBy)) {
       List<Record> sortedList = new ArrayList<>(_lookupMap.values());
       sortedList.sort(_orderByComparator);
       return sortedList.iterator();
@@ -117,24 +120,39 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
     if (_lookupMap.size() > trimToSize) {
 
-      // make min heap of elements to evict
-      int heapSize = _lookupMap.size() - trimToSize;
-      PriorityQueue<Record> minHeap = new PriorityQueue<>(heapSize, _minHeapComparator);
+      if (CollectionUtils.isNotEmpty(_orderBy)) {
+        // drop bottom
 
-      for (Record record : _lookupMap.values()) {
-        if (minHeap.size() < heapSize) {
-          minHeap.offer(record);
-        } else {
-          Record peek = minHeap.peek();
-          if (minHeap.comparator().compare(record, peek) < 0) {
-            minHeap.poll();
+        // make min heap of elements to evict
+        int heapSize = _lookupMap.size() - trimToSize;
+        PriorityQueue<Record> minHeap = new PriorityQueue<>(heapSize, _minHeapComparator);
+
+        for (Record record : _lookupMap.values()) {
+          if (minHeap.size() < heapSize) {
             minHeap.offer(record);
+          } else {
+            Record peek = minHeap.peek();
+            if (minHeap.comparator().compare(record, peek) < 0) {
+              minHeap.poll();
+              minHeap.offer(record);
+            }
           }
         }
-      }
 
-      for (Record evictRecord : minHeap) {
-        _lookupMap.remove(evictRecord.getKey());
+        for (Record evictRecord : minHeap) {
+          _lookupMap.remove(evictRecord.getKey());
+        }
+      } else {
+        // drop randomly
+
+        int numRecordsToDrop = _lookupMap.size() - trimToSize;
+        for (Key evictKey : _lookupMap.keySet()) {
+          _lookupMap.remove(evictKey);
+          numRecordsToDrop --;
+          if (numRecordsToDrop == 0) {
+            break;
+          }
+        }
       }
     }
   }

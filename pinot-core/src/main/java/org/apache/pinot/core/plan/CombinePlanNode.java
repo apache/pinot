@@ -147,9 +147,8 @@ public class CombinePlanNode implements PlanNode {
     if (_brokerRequest.isSetAggregationsInfo() && _brokerRequest.getGroupBy() != null) {
       // Aggregation group-by query
       Map<String, String> queryOptions = _brokerRequest.getQueryOptions();
-      // execute order by only if GROUP_BY_MODE explicitly set to SQL
-      if (_brokerRequest.isSetOrderBy() && queryOptions != null && SQL.equals(
-          queryOptions.get(QueryOptionKey.GROUP_BY_MODE))) {
+      // new Combine operator only when GROUP_BY_MODE explicitly set to SQL
+      if (queryOptions != null && SQL.equals(queryOptions.get(QueryOptionKey.GROUP_BY_MODE))) {
         return new CombineGroupByOrderByOperator(operators, _brokerRequest, _executorService, _timeOutMs,
             _numGroupsLimit);
       }
