@@ -23,12 +23,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.io.Serializable;
 import java.util.List;
+import java.util.Map;
 
 
 /**
  * This class models the aggregation and aggregationGroupBy sections of query response.
  */
-@JsonPropertyOrder({"groupByResult", "function", "groupByColumns"})
+@JsonPropertyOrder({"groupByResult", "function", "groupByColumns", "valueType"})
 public class AggregationResult {
 
   private Serializable _value;
@@ -36,6 +37,7 @@ public class AggregationResult {
 
   List<GroupByResult> _groupByResults;
   List<String> _groupByColumns;
+  private String _valueType;
 
   /**
    * Default constructor, required by JSON de-serializer.
@@ -134,12 +136,13 @@ public class AggregationResult {
     return _groupByColumns;
   }
 
-  /**
-   * Set groupByColumns for the aggregation function.
-   * @param groupByColumns
-   */
-  @JsonProperty("groupByColumns")
-  public void setGroupByColumns(List<String> groupByColumns) {
-    _groupByColumns = groupByColumns;
+  @JsonProperty("valueType")
+  public String getValueType() {
+    return _valueType;
+  }
+
+  @JsonProperty("valueType")
+  public void setValueType(String valueType) {
+    _valueType = valueType;
   }
 }

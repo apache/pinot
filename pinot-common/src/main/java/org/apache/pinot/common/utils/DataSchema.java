@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.google.common.base.Preconditions;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.FieldSpec;
 
@@ -34,10 +37,21 @@ import org.apache.pinot.common.data.FieldSpec;
 public class DataSchema {
   private String[] _columnNames;
   private ColumnDataType[] _columnDataTypes;
+  private Map<String, String> _columnTypeMap;
 
   public DataSchema(@Nonnull String[] columnNames, @Nonnull ColumnDataType[] columnDataTypes) {
     _columnNames = columnNames;
     _columnDataTypes = columnDataTypes;
+    makeColumnType(_columnNames, _columnDataTypes);
+  }
+
+  private void makeColumnType(String[] columnNames, ColumnDataType[] columnDataTypes) {
+    _columnTypeMap = new HashMap<>();
+    Preconditions.checkState(columnNames.length == columnDataTypes.length, "columnName array has"
+        + "different length as column types");
+    for(int i = 0; i < columnNames.length; i++) {
+      _columnTypeMap.put(columnNames[i], columnDataTypes[i].toString());
+    }
   }
 
   public int size() {
@@ -52,6 +66,11 @@ public class DataSchema {
   @Nonnull
   public ColumnDataType getColumnDataType(int index) {
     return _columnDataTypes[index];
+  }
+
+  @Nonnull
+  public Map<String, String> getColumnTypes() {
+    return  _columnTypeMap;
   }
 
   /**

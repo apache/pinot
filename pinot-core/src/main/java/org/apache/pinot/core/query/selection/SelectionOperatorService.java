@@ -75,7 +75,7 @@ public class SelectionOperatorService {
   private final int _selectionOffset;
   private final int _maxNumRows;
   private final PriorityQueue<Serializable[]> _rows;
-
+  private final Map<String, String> _selectionColumnTypes;
   private long _numDocsScanned = 0;
 
   /**
@@ -94,6 +94,7 @@ public class SelectionOperatorService {
     _selectionOffset = selection.getOffset();
     _maxNumRows = _selectionOffset + selection.getSize();
     _rows = new PriorityQueue<>(_maxNumRows, getStrictComparator());
+    _selectionColumnTypes = _dataSchema.getColumnTypes();
   }
 
   /**
@@ -112,6 +113,7 @@ public class SelectionOperatorService {
     _selectionOffset = selection.getOffset();
     _maxNumRows = _selectionOffset + selection.getSize();
     _rows = new PriorityQueue<>(_maxNumRows, getTypeCompatibleComparator());
+    _selectionColumnTypes = _dataSchema.getColumnTypes();
   }
 
   /**
@@ -330,6 +332,6 @@ public class SelectionOperatorService {
       rowsInSelectionResults.addFirst(SelectionOperatorUtils.extractColumns(_rows.poll(), columnIndices));
     }
 
-    return new SelectionResults(_selectionColumns, rowsInSelectionResults);
+    return new SelectionResults(_selectionColumns, rowsInSelectionResults, _selectionColumnTypes);
   }
 }

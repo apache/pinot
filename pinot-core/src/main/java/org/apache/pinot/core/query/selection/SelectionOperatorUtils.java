@@ -428,7 +428,7 @@ public class SelectionOperatorUtils {
     for (int i = 0; i < numRows; i++) {
       rows.set(i, extractColumns(rows.get(i), columnIndices));
     }
-    return new SelectionResults(selectionColumns, rows);
+    return new SelectionResults(selectionColumns, rows, dataSchema.getColumnTypes());
   }
 
   /**

@@ -82,7 +82,7 @@ public class QueriesTestUtils {
 
   public static void testInterSegmentAggregationResult(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
       long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
-      String[] expectedAggregationResults) {
+      String[] expectedAggregationResults, String[] expectedAggregationColumnTypes) {
     testInterSegmentAggregationResult(
         brokerResponse,
         expectedNumDocsScanned,
@@ -90,12 +90,13 @@ public class QueriesTestUtils {
         expectedNumEntriesScannedPostFilter,
         expectedNumTotalDocs,
         Serializable::toString,
-        expectedAggregationResults);
+        expectedAggregationResults, expectedAggregationColumnTypes);
   }
 
   public static void testInterSegmentAggregationResult(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
       long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
-      Function<Serializable, String> responseMapper, String[] expectedAggregationResults) {
+      Function<Serializable, String> responseMapper, String[] expectedAggregationResults,
+      String[] expectedAggregationColumnTypes) {
     Assert.assertEquals(brokerResponse.getNumDocsScanned(), expectedNumDocsScanned);
     Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), expectedNumEntriesScannedInFilter);
     Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), expectedNumEntriesScannedPostFilter);
@@ -103,10 +104,12 @@ public class QueriesTestUtils {
     List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
     int length = expectedAggregationResults.length;
     Assert.assertEquals(aggregationResults.size(), length);
+    Assert.assertEquals(expectedAggregationColumnTypes.length, length);
     for (int i = 0; i < length; i++) {
       AggregationResult aggregationResult = aggregationResults.get(i);
       String expectedAggregationResult = expectedAggregationResults[i];
       Serializable value = aggregationResult.getValue();
+      Assert.assertEquals(aggregationResult.getValueType(), expectedAggregationColumnTypes[i]);
       if (value != null) {
         // Aggregation.
         Assert.assertEquals(responseMapper.apply(value), expectedAggregationResult);

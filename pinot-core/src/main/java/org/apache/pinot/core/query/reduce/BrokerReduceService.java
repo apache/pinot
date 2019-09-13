@@ -66,6 +66,7 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class BrokerReduceService implements ReduceService<BrokerResponseNative> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerReduceService.class);
+  public static final String GROUP_BY_RESULT_MAP = "GroupByResultMap";
 
   @Nonnull
   @Override
@@ -215,7 +216,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       if (cachedDataSchema != null) {
         List<String> selectionColumns = SelectionOperatorUtils
             .getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), cachedDataSchema);
-        brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, new ArrayList<>(0)));
+        brokerResponseNative.setSelectionResults(
+            new SelectionResults(selectionColumns, new ArrayList<>(0), cachedDataSchema.getColumnTypes()));
       }
     } else {
       // Reduce server responses data and set query results into the broker response.
@@ -256,7 +258,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
               AggregationFunctionUtils.getAggregationFunctionsSelectStatus(brokerRequest.getAggregationsInfo());
           setGroupByHavingResults(brokerResponseNative, aggregationFunctions, aggregationFunctionSelectStatus,
               brokerRequest.getGroupBy(), dataTableMap, brokerRequest.getHavingFilterQuery(),
-              brokerRequest.getHavingFilterSubQueryMap(), preserveType);
+              brokerRequest.getHavingFilterSubQueryMap(), preserveType, cachedDataSchema);
           if (brokerMetrics != null && (!brokerResponseNative.getAggregationResults().isEmpty())) {
             // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the same.
             // Thus, we can just emit the one from the 1st result.
@@ -387,7 +389,9 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       if (!preserveType) {
         resultValue = AggregationFunctionUtils.formatValue(resultValue);
       }
-      reducedAggregationResults.add(new AggregationResult(dataSchema.getColumnName(i), resultValue));
+      AggregationResult aggregationResult = new AggregationResult(dataSchema.getColumnName(i), resultValue);
+      aggregationResult.setValueType(dataSchema.getColumnDataType(i).toString());
+      reducedAggregationResults.add(aggregationResult);
     }
     brokerResponseNative.setAggregationResults(reducedAggregationResults);
   }
@@ -406,7 +410,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
   private void setGroupByHavingResults(@Nonnull BrokerResponseNative brokerResponseNative,
       @Nonnull AggregationFunction[] aggregationFunctions, boolean[] aggregationFunctionsSelectStatus,
       @Nonnull GroupBy groupBy, @Nonnull Map<ServerInstance, DataTable> dataTableMap,
-      HavingFilterQuery havingFilterQuery, HavingFilterQueryMap havingFilterQueryMap, boolean preserveType) {
+      HavingFilterQuery havingFilterQuery, HavingFilterQueryMap havingFilterQueryMap, boolean preserveType, DataSchema dataSchema) {
     int numAggregationFunctions = aggregationFunctions.length;
 
     // Merge results from all data tables.
@@ -519,7 +523,9 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       List<AggregationResult> aggregationResults = new ArrayList<>(count);
       for (int i = 0; i < aggregationNumsInFinalResult; i++) {
         List<GroupByResult> groupByResultList = groupByResultLists[i];
-        aggregationResults.add(new AggregationResult(groupByResultList, groupBy.getExpressions(), finalColumnNames[i]));
+        AggregationResult aggResult = new AggregationResult(groupByResultList, groupBy.getExpressions(), finalColumnNames[i]);
+        aggResult.setValueType(dataSchema.getColumnTypes().get(GROUP_BY_RESULT_MAP));
+        aggregationResults.add(aggResult);
       }
       brokerResponseNative.setAggregationResults(aggregationResults);
     } else {

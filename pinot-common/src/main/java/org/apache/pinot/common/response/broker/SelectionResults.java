@@ -23,18 +23,28 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.io.Serializable;
 import java.util.List;
+import java.util.Map;
 
 
-@JsonPropertyOrder({"columns", "results"})
+@JsonPropertyOrder({"columns", "results", "columnTypes"})
 public class SelectionResults {
   private List<String> _columns;
   private List<Serializable[]> _rows;
+  private Map<String, String> _columnTypes;
+
+  /* Deprecated */
+  public SelectionResults(@JsonProperty("columns") List<String> columns,
+      @JsonProperty("results") List<Serializable[]> results) {
+    this(columns, results, null);
+  }
 
   @JsonCreator
   public SelectionResults(@JsonProperty("columns") List<String> columns,
-      @JsonProperty("results") List<Serializable[]> results) {
+      @JsonProperty("results") List<Serializable[]> rows,
+      @JsonProperty("columnTypes") Map<String, String> columnTypes) {
     _columns = columns;
-    _rows = results;
+    _rows = rows;
+    _columnTypes = columnTypes;
   }
 
   @JsonProperty("columns")
@@ -55,5 +65,15 @@ public class SelectionResults {
   @JsonProperty("results")
   public void setRows(List<Serializable[]> rows) {
     _rows = rows;
+  }
+
+  @JsonProperty("columnTypes")
+  public Map<String, String> getColumnTypes() {
+    return _columnTypes;
+  }
+
+  @JsonProperty("columnTypes")
+  public void setColumnTypes(Map<String, String> columnTypes) {
+    _columnTypes = columnTypes;
   }
 }
