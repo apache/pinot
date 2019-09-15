@@ -23,18 +23,29 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 
 
 /**
- * json_path(jsonFieldName, 'json_path', 'results_type')
+ * The <code>JsonPathTransformFunction</code> class implements the json path transformation based on
+ * <a href="https://goessner.net/articles/JsonPath/">Stefan Goessner JsonPath implementation.</a>.
+ *
+ * Please note, currently this method only works with String field. The values in this field should be Json String.
+ *
+ * Usage:
+ * jsonPath(jsonFieldName, 'jsonPath', 'resultsType')
+ * <code>jsonFieldName</code> is the Json String field/expression.
+ * <code>jsonPath</code> is a JsonPath expression which used to read from JSON document
+ * <code>results_type</code> refers to the results data type, could be INT, LONG, FLOAT, DOUBLE, STRING, INT_ARRAY,
+ * LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY.
+ *
  */
 public class JsonPathTransformFunction extends BaseTransformFunction {
 
-  public static final String FUNCTION_NAME = "json_path";
+  public static final String FUNCTION_NAME = "jsonPath";
 
   private TransformFunction _jsonFieldTransformFunction;
   private String _jsonPath;
@@ -51,7 +62,7 @@ public class JsonPathTransformFunction extends BaseTransformFunction {
     // Check that there are exactly 2 arguments
     if (arguments.size() != 3) {
       throw new IllegalArgumentException(
-          "Exactly 3 arguments are required for transform function: JSON_PATH(jsonFieldName, 'json_path', 'results_type')");
+          "Exactly 3 arguments are required for transform function: JSON_PATH(jsonFieldName, 'jsonPath', 'resultsType')");
     }
 
     TransformFunction firstArgument = arguments.get(0);
@@ -118,7 +129,7 @@ public class JsonPathTransformFunction extends BaseTransformFunction {
       if (doubleValue instanceof BigDecimal) {
         results[i] = ((BigDecimal) doubleValue).doubleValue();
       } else {
-        results[i] = (double) doubleValue;
+        results[i] = ((Number) doubleValue).doubleValue();
       }
     }
     return results;
@@ -153,10 +164,10 @@ public class JsonPathTransformFunction extends BaseTransformFunction {
     final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final long[][] results = new long[projectionBlock.getNumDocs()][];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      final List<Long> intVals = JsonPath.read(stringValuesMV[i], _jsonPath);
-      results[i] = new long[intVals.size()];
-      for (int j = 0; j < intVals.size(); j++) {
-        results[i][j] = intVals.get(j);
+      final List<Long> longVals = JsonPath.read(stringValuesMV[i], _jsonPath);
+      results[i] = new long[longVals.size()];
+      for (int j = 0; j < longVals.size(); j++) {
+        results[i][j] = longVals.get(j);
       }
     }
     return results;
@@ -167,10 +178,10 @@ public class JsonPathTransformFunction extends BaseTransformFunction {
     final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final float[][] results = new float[projectionBlock.getNumDocs()][];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      final List<Float> intVals = JsonPath.read(stringValuesMV[i], _jsonPath);
-      results[i] = new float[intVals.size()];
-      for (int j = 0; j < intVals.size(); j++) {
-        results[i][j] = intVals.get(j);
+      final List<Float> floatVals = JsonPath.read(stringValuesMV[i], _jsonPath);
+      results[i] = new float[floatVals.size()];
+      for (int j = 0; j < floatVals.size(); j++) {
+        results[i][j] = floatVals.get(j);
       }
     }
     return results;
@@ -181,10 +192,10 @@ public class JsonPathTransformFunction extends BaseTransformFunction {
     final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final double[][] results = new double[projectionBlock.getNumDocs()][];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      final List<Double> intVals = JsonPath.read(stringValuesMV[i], _jsonPath);
-      results[i] = new double[intVals.size()];
-      for (int j = 0; j < intVals.size(); j++) {
-        results[i][j] = intVals.get(j);
+      final List<Double> doubleVals = JsonPath.read(stringValuesMV[i], _jsonPath);
+      results[i] = new double[doubleVals.size()];
+      for (int j = 0; j < doubleVals.size(); j++) {
+        results[i][j] = doubleVals.get(j);
       }
     }
     return results;
@@ -195,10 +206,10 @@ public class JsonPathTransformFunction extends BaseTransformFunction {
     final String[] stringValuesMV = _jsonFieldTransformFunction.transformToStringValuesSV(projectionBlock);
     final String[][] results = new String[projectionBlock.getNumDocs()][];
     for (int i = 0; i < projectionBlock.getNumDocs(); i++) {
-      final List<String> intVals = JsonPath.read(stringValuesMV[i], _jsonPath);
-      results[i] = new String[intVals.size()];
-      for (int j = 0; j < intVals.size(); j++) {
-        results[i][j] = intVals.get(j);
+      final List<String> stringVals = JsonPath.read(stringValuesMV[i], _jsonPath);
+      results[i] = new String[stringVals.size()];
+      for (int j = 0; j < stringVals.size(); j++) {
+        results[i][j] = stringVals.get(j);
       }
     }
     return results;

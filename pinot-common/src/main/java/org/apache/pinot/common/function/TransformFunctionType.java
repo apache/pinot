@@ -39,14 +39,13 @@ public enum TransformFunctionType {
   SQRT("sqrt"),
 
   CAST("cast"),
+  JSONPATH("jsonPath"),
   TIMECONVERT("timeConvert"),
   DATETIMECONVERT("dateTimeConvert"),
   DATETRUNC("dateTrunc"),
   ARRAYLENGTH("arrayLength"),
   VALUEIN("valueIn"),
   MAPVALUE("mapValue");
-
-  JSONPATH("jsonPath");
 
   private final String _name;
 

@@ -65,14 +65,13 @@ public class TransformFunctionFactory {
           put(TransformFunctionType.SQRT.getName().toLowerCase(), SqrtTransformFunction.class);
 
           put(TransformFunctionType.CAST.getName().toLowerCase(), CastTransformFunction.class);
+          put(TransformFunctionType.JSONPATH.getName().toLowerCase(), JsonPathTransformFunction.class);
           put(TransformFunctionType.TIMECONVERT.getName().toLowerCase(), TimeConversionTransformFunction.class);
           put(TransformFunctionType.DATETIMECONVERT.getName().toLowerCase(), DateTimeConversionTransformFunction.class);
           put(TransformFunctionType.DATETRUNC.getName().toLowerCase(), DateTruncTransformFunction.class);
           put(TransformFunctionType.ARRAYLENGTH.getName().toLowerCase(), ArrayLengthTransformFunction.class);
           put(TransformFunctionType.VALUEIN.getName().toLowerCase(), ValueInTransformFunction.class);
           put(TransformFunctionType.MAPVALUE.getName().toLowerCase(), MapValueTransformFunction.class);
-
-          put(TransformFunctionType.JSONPATH.toLowerCase(), JsonPathTransformFunction.class);
         }
       };
 

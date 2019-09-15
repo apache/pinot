@@ -20,19 +20,14 @@ package org.apache.pinot.core.operator.transform.function;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-
-import static org.apache.pinot.core.common.ObjectSerDeUtils.ObjectType.Map;
 
 
 public class JsonPathTransformFunctionTest extends BaseTransformFunctionTest {
@@ -101,13 +96,13 @@ public class JsonPathTransformFunctionTest extends BaseTransformFunctionTest {
 
   @DataProvider(name = "testJsonPathTransformFunctionArguments")
   public Object[][] testJsonPathTransformFunctionArguments() {
-    return new Object[][]{new Object[]{"json_path(json,'$.intSV','INT')", FieldSpec.DataType.INT, true}, new Object[]{"json_path(json,'$.intMV','INT_ARRAY')", FieldSpec.DataType.INT, false}, new Object[]{"json_path(json,'$.longSV','LONG')", FieldSpec.DataType.LONG, true}, new Object[]{"json_path(json,'$.floatSV','FLOAT')", FieldSpec.DataType.FLOAT, true}, new Object[]{"json_path(json,'$.doubleSV','DOUBLE')", FieldSpec.DataType.DOUBLE, true}, new Object[]{"json_path(json,'$.stringSV','STRING')", FieldSpec.DataType.STRING, true},};
+    return new Object[][]{new Object[]{"jsonPath(json,'$.intSV','INT')", FieldSpec.DataType.INT, true}, new Object[]{"jsonPath(json,'$.intMV','INT_ARRAY')", FieldSpec.DataType.INT, false}, new Object[]{"jsonPath(json,'$.longSV','LONG')", FieldSpec.DataType.LONG, true}, new Object[]{"jsonPath(json,'$.floatSV','FLOAT')", FieldSpec.DataType.FLOAT, true}, new Object[]{"jsonPath(json,'$.doubleSV','DOUBLE')", FieldSpec.DataType.DOUBLE, true}, new Object[]{"jsonPath(json,'$.stringSV','STRING')", FieldSpec.DataType.STRING, true},};
   }
 
   @Test
   public void testJsonPathTransformFunctionWithPredicate() {
     String jsonPathExpressionStr =
-        String.format("json_path(json,'[?($.stringSV==\'\'%s\'\')]','STRING')", _stringSVValues[0]);
+        String.format("jsonPath(json,'[?($.stringSV==''%s'')]','STRING')", _stringSVValues[0]);
     TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(jsonPathExpressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonPathTransformFunction);
@@ -137,7 +132,7 @@ public class JsonPathTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
   public void testJsonPathTransformFunctionForIntMV() {
     TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree("json_path(json,'$.intMV','INT_ARRAY')");
+        TransformExpressionTree.compileToExpressionTree("jsonPath(json,'$.intMV','INT_ARRAY')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonPathTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonPathTransformFunction.FUNCTION_NAME);
@@ -153,7 +148,7 @@ public class JsonPathTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
   public void testJsonPathTransformFunctionForLong() {
     TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree("json_path(json,'$.longSV','LONG')");
+        TransformExpressionTree.compileToExpressionTree("jsonPath(json,'$.longSV','LONG')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonPathTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonPathTransformFunction.FUNCTION_NAME);
@@ -166,7 +161,7 @@ public class JsonPathTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
   public void testJsonPathTransformFunctionForFloat() {
     TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree("json_path(json,'$.floatSV','FLOAT')");
+        TransformExpressionTree.compileToExpressionTree("jsonPath(json,'$.floatSV','FLOAT')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonPathTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonPathTransformFunction.FUNCTION_NAME);
@@ -179,7 +174,7 @@ public class JsonPathTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
   public void testJsonPathTransformFunctionForDouble() {
     TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree("json_path(json,'$.doubleSV','DOUBLE')");
+        TransformExpressionTree.compileToExpressionTree("jsonPath(json,'$.doubleSV','DOUBLE')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonPathTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonPathTransformFunction.FUNCTION_NAME);
@@ -192,7 +187,7 @@ public class JsonPathTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
   public void testJsonPathTransformFunctionForString() {
     TransformExpressionTree expression =
-        TransformExpressionTree.compileToExpressionTree("json_path(json,'$.stringSV','STRING')");
+        TransformExpressionTree.compileToExpressionTree("jsonPath(json,'$.stringSV','STRING')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonPathTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonPathTransformFunction.FUNCTION_NAME);
@@ -210,11 +205,11 @@ public class JsonPathTransformFunctionTest extends BaseTransformFunctionTest {
 
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
-    return new Object[][]{new Object[]{String.format("json_path(%s)",
-        JSON_COLUMN)}, new Object[]{"json_path(5,'$.store.book[0].author','$.store.book[0].author')"}, new Object[]{String.format(
-        "json_path(%s,'$.store.book[0].author')", INT_MV_COLUMN)}, new Object[]{String.format(
-        "json_path(%s,'$.store.book[0].author')", STRING_SV_COLUMN)}, new Object[]{String.format(
-        "json_path(%s,'$.store.book[0].author', 'STRINGARRAY')", STRING_SV_COLUMN)}, new Object[]{String.format(
-        "json_path(%s,%s,'$.store.book[0].author', 'String','abc')", JSON_COLUMN, INT_SV_COLUMN)}};
+    return new Object[][]{new Object[]{String.format("jsonPath(%s)",
+        JSON_COLUMN)}, new Object[]{"jsonPath(5,'$.store.book[0].author','$.store.book[0].author')"}, new Object[]{String.format(
+        "jsonPath(%s,'$.store.book[0].author')", INT_MV_COLUMN)}, new Object[]{String.format(
+        "jsonPath(%s,'$.store.book[0].author')", STRING_SV_COLUMN)}, new Object[]{String.format(
+        "jsonPath(%s,'$.store.book[0].author', 'STRINGARRAY')", STRING_SV_COLUMN)}, new Object[]{String.format(
+        "jsonPath(%s,%s,'$.store.book[0].author', 'String','abc')", JSON_COLUMN, INT_SV_COLUMN)}};
   }
 }
