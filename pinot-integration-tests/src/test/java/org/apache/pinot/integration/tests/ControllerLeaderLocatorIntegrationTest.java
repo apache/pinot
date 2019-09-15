@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -40,6 +41,7 @@ import org.testng.annotations.Test;
 
 public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
   private static long TIMEOUT_IN_MS = 1000_000L;
+  private HashMap<Integer, String> _partitionToTableMap;
 
   @BeforeClass
   public void setUp() {
@@ -47,6 +49,8 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
     startController();
 
     ControllerLeaderLocator.create(_helixManager);
+
+    findTableNamesForAllPartitions();
   }
 
   @Test
@@ -89,71 +93,74 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
         .waitForCondition(aVoid -> secondControllerStarter.getHelixResourceManager().getHelixZkManager().isConnected(),
             TIMEOUT_IN_MS, "Failed to start the second controller");
 
-    // Generate a table name that the second controller is its new lead controller, which should be different from the first table name.
-    AtomicReference<String> testTableName3 = new AtomicReference<>();
+    Set<String> resultSet = new HashSet<>();
     TestUtils.waitForCondition(aVoid -> {
-      String tableName;
-      try {
-        tableName = generateTableNameUsingSecondController(secondControllerConfig, testTableName1);
-      } catch (Exception e) {
-        return false;
+      resultSet.clear();
+      for (Map.Entry<Integer, String> entry : _partitionToTableMap.entrySet()) {
+        // Mock the behavior that 40 seconds have passed.
+        controllerLeaderLocator.setLastCacheInvalidateMillis(System.currentTimeMillis() - 40_000L);
+        controllerLeaderLocator.invalidateCachedControllerLeader();
+
+        String tableName = entry.getValue();
+        Pair<String, Integer> pair1 = controllerLeaderLocator.getControllerLeader(tableName);
+        if (pair1 == null) {
+          return false;
+        }
+        resultSet.add(pair1.getFirst() + pair1.getSecond());
       }
-      testTableName3.set(tableName);
-      return tableName != null;
-    }, TIMEOUT_IN_MS, "Failed to find the second table");
+      // There are two combinations in the result set.
+      return resultSet.size() == 2;
+    }, TIMEOUT_IN_MS, "Failed to get two pairs of controllers.");
+
+    // Disable lead controller resource
+    enableResourceConfigForLeadControllerResource(false);
+
+    TestUtils.waitForCondition(aVoid -> {
+      resultSet.clear();
+      for (Map.Entry<Integer, String> entry : _partitionToTableMap.entrySet()) {
+        // Mock the behavior that 40 seconds have passed.
+        controllerLeaderLocator.setLastCacheInvalidateMillis(System.currentTimeMillis() - 40_000L);
+        controllerLeaderLocator.invalidateCachedControllerLeader();
+
+        String tableName = entry.getValue();
+        Pair<String, Integer> pair1 = controllerLeaderLocator.getControllerLeader(tableName);
+        if (pair1 == null) {
+          return false;
+        }
+        resultSet.add(pair1.getFirst() + pair1.getSecond());
+      }
+      // Only 1 controller should be fetched, which is the helix leader.
+      return resultSet.size() == 1;
+    }, TIMEOUT_IN_MS, "Failed to get only one pair of controller");
 
     // Mock the behavior that 40 seconds have passed.
     controllerLeaderLocator.setLastCacheInvalidateMillis(System.currentTimeMillis() - 40_000L);
     controllerLeaderLocator.invalidateCachedControllerLeader();
 
-    // The second controller should be the lead controller for test table 3, which isn't the helix leader.
-    Pair<String, Integer> thirdPair = controllerLeaderLocator.getControllerLeader(testTableName3.get());
-    Assert.assertNotNull(thirdPair);
-    Assert.assertEquals(thirdPair.getFirst(), ControllerTest.LOCAL_HOST);
-    Assert.assertEquals((int) thirdPair.getSecond(), (ControllerTest.DEFAULT_CONTROLLER_PORT + 1));
-    Assert.assertNotEquals(pair.getSecond(), thirdPair.getSecond());
+    // Since lead controller resource disabled, helix leader should be used.
+    Pair<String, Integer> thirdPair = controllerLeaderLocator.getControllerLeader(testTableName1);
 
+    Assert.assertEquals(pair.getFirst(), thirdPair.getFirst());
+    Assert.assertEquals(pair.getSecond(), thirdPair.getSecond());
+
+    // Stop the second controller.
     secondControllerStarter.stop();
   }
 
   /**
-   * Generates a table name which uses the second controller as its lead controller.
+   * Find the table names for all the partitions.
    */
-  private String generateTableNameUsingSecondController(ControllerConf secondControllerConfig, String testTableName) {
-    String secondParticipantId = LeadControllerUtils
-        .generateParticipantInstanceId(secondControllerConfig.getControllerHost(),
-            Integer.parseInt(secondControllerConfig.getControllerPort()));
-    Set<Integer> partitionIdsForSecondController = new HashSet<>();
+  private void findTableNamesForAllPartitions() {
+    _partitionToTableMap = new HashMap<>();
 
-    // Find out all the partitionIds that the second controller is assigned to.
-    int partitionId = LeadControllerUtils.getPartitionIdForTable(testTableName);
-    String partitionNameForTable1 = LeadControllerUtils.generatePartitionName(partitionId);
-    ExternalView leadControllerResourceExternalView =
-        _helixAdmin.getResourceExternalView(_helixManager.getClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME);
-    Set<String> partitionNames = leadControllerResourceExternalView.getPartitionSet();
-    for (String partitionName : partitionNames) {
-      Map<String, String> partitionStateMap = leadControllerResourceExternalView.getStateMap(partitionName);
-      // Get master host from partition map. Return null if no master found.
-      for (Map.Entry<String, String> entry : partitionStateMap.entrySet()) {
-        if (!partitionNameForTable1.equals(partitionName) && MasterSlaveSMD.States.MASTER.name()
-            .equals(entry.getValue())) {
-          if (secondParticipantId.equals(entry.getKey())) {
-            partitionIdsForSecondController.add(LeadControllerUtils.extractPartitionId(partitionName));
-          }
-        }
-      }
+    int count = 0;
+    while (_partitionToTableMap.size() < Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE) {
+      String tableName = "testTable" + count;
+      int partitionId = LeadControllerUtils.getPartitionIdForTable(tableName);
+      _partitionToTableMap.putIfAbsent(partitionId, tableName);
+      count++;
     }
-
-    // Try 100 times to find out a table which is using the second controller as lead controller.
-    for (int i = 0; i < 100; i++) {
-      String newTestTableName = testTableName + i;
-      int newPartitionId = LeadControllerUtils.getPartitionIdForTable(newTestTableName);
-      if (partitionIdsForSecondController.contains(newPartitionId)) {
-        return newTestTableName;
-      }
-    }
-    throw new RuntimeException(
-        "Fail to find a table name within 100 times which uses the second controller as lead controller");
+    System.out.println("Successfully generate partition to table map after " + count + " iterations");
   }
 
   @AfterClass
