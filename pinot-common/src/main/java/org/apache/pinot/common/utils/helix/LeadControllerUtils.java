@@ -56,6 +56,13 @@ public class LeadControllerUtils {
   }
 
   /**
+   * Extracts controller instance id, e.g. returns localhost_9000 given Controller_localhost_9000 as the participant instance id.
+   */
+  public static String extractControllerInstanceId(String participantInstanceId) {
+    return participantInstanceId.substring(participantInstanceId.indexOf('_') + 1);
+  }
+
+  /**
    * Generates partition name, e.g. returns leadControllerResource_0 given 0 as partition index.
    */
   public static String generatePartitionName(int partitionId) {

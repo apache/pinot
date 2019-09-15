@@ -24,7 +24,7 @@ import java.util.Map;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.MasterSlaveSMD;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.pql.parsers.utils.Pair;
 import org.slf4j.Logger;
@@ -39,7 +39,7 @@ public class ControllerLeaderLocator {
   public static final Logger LOGGER = LoggerFactory.getLogger(ControllerLeaderLocator.class);
 
   // Minimum millis which must elapse between consecutive invalidation of cache
-  private static final long MILLIS_BETWEEN_INVALIDATE = 30_000;
+  private static final long MILLIS_BETWEEN_INVALIDATE = 30_000L;
 
   private final HelixManager _helixManager;
 
@@ -93,54 +93,45 @@ public class ControllerLeaderLocator {
     }
 
     // No controller leader cached, fetches a fresh copy of external view and then gets the leader for the given table.
-    boolean success = refreshControllerLeaderMap();
-    if (success) {
-      _cachedControllerLeaderValid = true;
-      LOGGER.info("Refreshed controller leader map successfully.");
-      return _cachedControllerLeaderMap.get(partitionId);
-    } else {
-      _cachedControllerLeaderValid = false;
-      LOGGER.warn("Failed to refresh controller leader map.");
-      return null;
-    }
+    refreshControllerLeaderMap();
+    return _cachedControllerLeaderValid ? _cachedControllerLeaderMap.get(partitionId) : null;
   }
 
   /**
    * Checks whether lead controller resource has been enabled or not.
    * If yes, updates lead controller pairs from the external view of lead controller resource.
    * Otherwise, updates lead controller pairs from Helix cluster leader.
-   * @return true if refresh is completed successfully.
    */
-  private boolean refreshControllerLeaderMap() {
+  private void refreshControllerLeaderMap() {
     // Checks whether lead controller resource has been enabled or not.
     if (isLeadControllerResourceEnabled()) {
-      return refreshControllerLeaderMapFromLeadControllerResource();
+      refreshControllerLeaderMapFromLeadControllerResource();
     } else {
-      return refreshControllerLeaderMapFromHelixClusterLeader();
+      refreshControllerLeaderMapFromHelixClusterLeader();
     }
   }
 
   /**
    * Updates lead controller pairs from the external view of lead controller resource.
-   * @return true if refresh is completed successfully, false if no leader found or exception thrown.
    */
-  private boolean refreshControllerLeaderMapFromLeadControllerResource() {
+  private void refreshControllerLeaderMapFromLeadControllerResource() {
+    boolean refreshSucceeded = false;
     try {
       ExternalView leadControllerResourceExternalView = _helixManager.getClusterManagmentTool()
-          .getResourceExternalView(_helixManager.getClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+          .getResourceExternalView(_helixManager.getClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME);
       if (leadControllerResourceExternalView == null) {
-        LOGGER.warn("External view of lead controller resource is null.");
-        return false;
+        LOGGER.warn("External view of {} is null.", Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+        return;
       }
       Set<String> partitionNames = leadControllerResourceExternalView.getPartitionSet();
       if (partitionNames.isEmpty()) {
-        LOGGER.warn("The partition set of lead controller resource is empty.");
-        return false;
+        LOGGER.warn("The partition set in the external view of {} is empty.", Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+        return;
       }
-      if (partitionNames.size() != CommonConstants.Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE) {
-        LOGGER.warn("The partition size of lead controller resource isn't {}. Actual size: {}",
-            CommonConstants.Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE, partitionNames.size());
-        return false;
+      if (partitionNames.size() != Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE) {
+        LOGGER.warn("The partition size of {} isn't {}. Actual size: {}", Helix.LEAD_CONTROLLER_RESOURCE_NAME,
+            Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE, partitionNames.size());
+        return;
       }
       for (String partitionName : partitionNames) {
         int partitionId = LeadControllerUtils.extractPartitionId(partitionName);
@@ -153,7 +144,7 @@ public class ControllerLeaderLocator {
             // Converts participant id (with Prefix "Controller_") to controller id and assigns it as the leader,
             // since realtime segment completion protocol doesn't need the prefix in controller instance id.
             String participantInstanceId = entry.getKey();
-            String controllerInstanceId = participantInstanceId.substring(participantInstanceId.indexOf('_') + 1);
+            String controllerInstanceId = LeadControllerUtils.extractControllerInstanceId(participantInstanceId);
             Pair<String, Integer> leadControllerPair = convertToHostAndPortPair(controllerInstanceId);
             masterFound = true;
             _cachedControllerLeaderMap.put(partitionId, leadControllerPair);
@@ -162,33 +153,35 @@ public class ControllerLeaderLocator {
         if (!masterFound) {
           // It's ok to log a warning since we can be in this state for some small time during the migration.
           // Otherwise, we are attempted to mark this as an error.
-          LOGGER.warn("There is no controller in MASTER state for partition: {} in lead controller resource",
-              partitionName);
-          return false;
+          LOGGER.warn("There is no controller in MASTER state for partition: {} in {}", partitionName,
+              Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+          return;
         }
       }
+      LOGGER.info("Refreshed controller leader map successfully.");
+      refreshSucceeded = true;
     } catch (Exception e) {
-      LOGGER.warn(
-          "Caught exception when getting lead controller instance Id from external view of lead controller resource",
-          e);
-      return false;
+      LOGGER.warn("Caught exception when getting lead controller instance Id from external view of {}",
+          Helix.LEAD_CONTROLLER_RESOURCE_NAME, e);
+    } finally {
+      _cachedControllerLeaderValid = refreshSucceeded;
     }
-    return true;
   }
 
   /**
    * Updates lead controller pairs from Helix cluster leader.
-   * @return true if refresh is completed successfully, false if no Helix cluster leader found.
    */
-  private boolean refreshControllerLeaderMapFromHelixClusterLeader() {
+  private void refreshControllerLeaderMapFromHelixClusterLeader() {
     Pair<String, Integer> helixClusterLeader = getHelixClusterLeader();
     if (helixClusterLeader == null) {
-      return false;
+      _cachedControllerLeaderValid = false;
+      return;
     }
-    for (int i = 0; i < CommonConstants.Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
+    for (int i = 0; i < Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
       _cachedControllerLeaderMap.put(i, helixClusterLeader);
     }
-    return true;
+    _cachedControllerLeaderValid = true;
+    LOGGER.info("Refreshed controller leader map successfully.");
   }
 
   /**
@@ -198,11 +191,12 @@ public class ControllerLeaderLocator {
     BaseDataAccessor<ZNRecord> dataAccessor = _helixManager.getHelixDataAccessor().getBaseDataAccessor();
     Stat stat = new Stat();
     try {
-      ZNRecord znRecord = dataAccessor.get("/" + _helixManager.getClusterName() + "/CONFIGS/RESOURCE/"
-          + CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME, stat, AccessOption.THROW_EXCEPTION_IFNOTEXIST);
-      return Boolean.parseBoolean(znRecord.getSimpleField(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY));
+      ZNRecord znRecord = dataAccessor
+          .get("/" + _helixManager.getClusterName() + "/CONFIGS/RESOURCE/" + Helix.LEAD_CONTROLLER_RESOURCE_NAME, stat,
+              AccessOption.THROW_EXCEPTION_IFNOTEXIST);
+      return Boolean.parseBoolean(znRecord.getSimpleField(Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY));
     } catch (Exception e) {
-      LOGGER.warn("Could not get whether lead controller resource is enabled or not.", e);
+      LOGGER.warn("Could not get whether {} is enabled or not.", Helix.LEAD_CONTROLLER_RESOURCE_NAME, e);
       return false;
     }
   }
@@ -240,7 +234,7 @@ public class ControllerLeaderLocator {
    * Thus the frequency limiting is done to guard against frequent cache refreshes, in cases where we might be getting too many NOT_SENT responses due to some other errors.
    */
   public synchronized void invalidateCachedControllerLeader() {
-    long now = System.currentTimeMillis();
+    long now = getCurrentTimeMS();
     long millisSinceLastInvalidate = now - _lastCacheInvalidateMillis;
     if (millisSinceLastInvalidate < MILLIS_BETWEEN_INVALIDATE) {
       LOGGER.info(
@@ -251,6 +245,11 @@ public class ControllerLeaderLocator {
       _cachedControllerLeaderValid = false;
       _lastCacheInvalidateMillis = now;
     }
+  }
+
+  @VisibleForTesting
+  protected long getCurrentTimeMS() {
+    return System.currentTimeMillis();
   }
 
   @VisibleForTesting
@@ -266,10 +265,5 @@ public class ControllerLeaderLocator {
   @VisibleForTesting
   protected long getMillisBetweenInvalidate() {
     return MILLIS_BETWEEN_INVALIDATE;
-  }
-
-  @VisibleForTesting
-  protected void setLastCacheInvalidateMillis(long lastCacheInvalidateMillis) {
-    _lastCacheInvalidateMillis = lastCacheInvalidateMillis;
   }
 }
