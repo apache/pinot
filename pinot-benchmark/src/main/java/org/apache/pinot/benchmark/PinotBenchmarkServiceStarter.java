@@ -33,8 +33,6 @@ public class PinotBenchmarkServiceStarter {
   }
 
   public void start() {
-
-
     LOGGER.info("Starting Pinot benchmark service.");
     _pinotBenchServiceApplication.start(9008);
 
@@ -46,23 +44,24 @@ public class PinotBenchmarkServiceStarter {
   }
 
 
-  public static void main(String[] args) throws InterruptedException {
+  public static void main(String[] args) {
     PinotBenchmarkServiceStarter starter = new PinotBenchmarkServiceStarter();
 
     try {
-      LOGGER.info("Start starter.");
       starter.start();
     } catch (Exception e) {
-      LOGGER.error("Error starting!!!", e);
+      LOGGER.error("Error starting.", e);
+      System.exit(-1);
     }
 
-    int i = 0;
-    while (i++ < 600L) {
-      Thread.sleep(1000L);
+    while (true) {
+      try {
+        Thread.sleep(1000L);
+      } catch (InterruptedException e) {
+        LOGGER.error("Caught InterruptedException. Exiting.");
+        break;
+      }
     }
-
-    System.out.println("Stopping!");
-    LOGGER.info("Stopping!!!");
 
     starter.stop();
   }
