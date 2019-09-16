@@ -16,19 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.benchmark;
+package org.apache.pinot.benchmark.common.utils;
 
-import org.apache.commons.configuration.PropertiesConfiguration;
+public enum PerfTableMode {
+  MIRROR("mirror"), NON_MIRROR("non-mirror");
 
+  private String _perfTableType;
 
-public class BenchmarkConfig extends PropertiesConfiguration {
-  private static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
-  private static final String CONSOLE_WEBAPP_USE_HTTPS = "controller.query.console.useHttps";
+  PerfTableMode(String perfTableType) {
+    _perfTableType = perfTableType;
+  }
 
-  public String getQueryConsoleWebappPath() {
-    if (containsKey(CONSOLE_WEBAPP_ROOT_PATH)) {
-      return (String) getProperty(CONSOLE_WEBAPP_ROOT_PATH);
+  public static PerfTableMode getPerfTableMode(String perfTableMode) {
+    for (PerfTableMode tableType : PerfTableMode.values()) {
+      if (tableType._perfTableType.equalsIgnoreCase(perfTableMode)) {
+        return tableType;
+      }
     }
-    return BenchmarkConfig.class.getClassLoader().getResource("webapp").toExternalForm();
+    return null;
   }
 }

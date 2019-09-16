@@ -70,7 +70,7 @@ public class QuickstartRunner {
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numServers, int numBrokers,
       int numControllers, File tempDir)
       throws Exception {
-    this(tableRequests, numServers, numBrokers, numControllers, tempDir, true);
+    this(tableRequests, numServers, numBrokers, numControllers, tempDir, false);
   }
 
   private void startZookeeper()
