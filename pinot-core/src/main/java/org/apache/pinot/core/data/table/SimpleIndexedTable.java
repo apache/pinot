@@ -25,6 +25,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.LongAccumulator;
+import java.util.concurrent.atomic.LongAdder;
 import javax.annotation.Nonnull;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
@@ -32,6 +34,8 @@ import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.order.OrderByUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -39,11 +43,23 @@ import org.apache.pinot.core.data.order.OrderByUtils;
  */
 @NotThreadSafe
 public class SimpleIndexedTable extends IndexedTable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SimpleIndexedTable.class);
 
   private List<Record> _records;
   private Map<Key, Integer> _lookupTable;
   private Comparator<Record> _orderByComparator;
 
+  private LongAdder _numResizes = new LongAdder();
+  private LongAccumulator _resizeTime = new LongAccumulator(Long::sum, 0);
+
+  /**
+   * Initializes the data structures and comparators needed for this Table
+   * @param dataSchema data schema of the record's keys and values
+   * @param aggregationInfos aggregation infors for the aggregations in record'd values
+   * @param orderBy list of {@link SelectionSort} defining the order by
+   * @param maxCapacity the max number of records to hold
+   * @param sort does final result need to be sorted
+   */
   @Override
   public void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
       int maxCapacity, boolean sort) {
@@ -85,6 +101,8 @@ public class SimpleIndexedTable extends IndexedTable {
   }
 
   private void sortAndResize(int trimToSize) {
+    long startTime = System.currentTimeMillis();
+
     // sort
     if (CollectionUtils.isNotEmpty(_orderBy)) {
       _records.sort(_orderByComparator);
@@ -100,6 +118,12 @@ public class SimpleIndexedTable extends IndexedTable {
     for (int i = 0; i < _records.size(); i++) {
       _lookupTable.put(_records.get(i).getKey(), i);
     }
+
+    long endTime = System.currentTimeMillis();
+    long timeElapsed = endTime - startTime;
+
+    _numResizes.increment();
+    _resizeTime.accumulate(timeElapsed);
   }
 
 
@@ -125,6 +149,10 @@ public class SimpleIndexedTable extends IndexedTable {
   @Override
   public void finish() {
     sortAndResize(_maxCapacity);
+    long numResizes = _numResizes.sum();
+    long resizeTime = _resizeTime.get();
+    LOGGER.info("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", numResizes, resizeTime,
+        resizeTime / numResizes);
   }
 
   @Override

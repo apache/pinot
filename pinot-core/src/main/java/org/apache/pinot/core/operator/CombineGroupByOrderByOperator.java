@@ -28,8 +28,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Function;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.ProcessingException;
@@ -74,8 +76,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
 
   public CombineGroupByOrderByOperator(List<Operator> operators, BrokerRequest brokerRequest,
       ExecutorService executorService, long timeOutMs, int innerSegmentNumGroupsLimit) {
-    Preconditions.checkArgument(
-        brokerRequest.isSetAggregationsInfo() && brokerRequest.isSetGroupBy() && brokerRequest.isSetOrderBy());
+    Preconditions.checkArgument(brokerRequest.isSetAggregationsInfo() && brokerRequest.isSetGroupBy());
 
     _operators = operators;
     _brokerRequest = brokerRequest;
@@ -108,6 +109,8 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
 
     int numAggregationFunctions = _brokerRequest.getAggregationsInfoSize();
     int numGroupBy = _brokerRequest.getGroupBy().getExpressionsSize();
+    boolean isOrderBy = _brokerRequest.isSetOrderBy();
+    AtomicInteger numGroups = new AtomicInteger();
     ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
 
     Future[] futures = new Future[numOperators];
@@ -143,35 +146,23 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
             // Merge aggregation group-by result.
             aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
             if (aggregationGroupByResult != null) {
+              // Get converter functions
+              Function[] converterFunctions = new Function[numGroupBy];
+              for (int i = 0; i < numGroupBy; i++) {
+                converterFunctions[i] = getConverterFunction(_dataSchema.getColumnDataType(i));
+              }
+
               // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable.
               Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
               while (groupKeyIterator.hasNext()) {
+                if (!isOrderBy && numGroups.getAndIncrement() >= _interSegmentNumGroupsLimit) {
+                  break;
+                }
                 GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
                 String[] stringKey = groupKey._stringKey.split(GroupKeyGenerator.DELIMITER);
                 Object[] objectKey = new Object[numGroupBy];
                 for (int i = 0; i < stringKey.length; i++) {
-                  DataSchema.ColumnDataType columnDataType = _dataSchema.getColumnDataType(i);
-                  switch (columnDataType) {
-
-                    case INT:
-                      objectKey[i] = Integer.valueOf(stringKey[i]);
-                      break;
-                    case LONG:
-                      objectKey[i] = Long.valueOf(stringKey[i]);
-                      break;
-                    case FLOAT:
-                      objectKey[i] = Float.valueOf(stringKey[i]);
-                      break;
-                    case DOUBLE:
-                      objectKey[i] = Double.valueOf(stringKey[i]);
-                      break;
-                    case STRING:
-                      objectKey[i] = stringKey[i];
-                      break;
-                    case BYTES:
-                      objectKey[i] = BytesUtils.toBytes(stringKey[i]);
-                      break;
-                  }
+                  objectKey[i] = converterFunctions[i].apply(stringKey[i]);
                 }
                 Object[] values = new Object[numAggregationFunctions];
                 for (int i = 0; i < numAggregationFunctions; i++) {
@@ -240,6 +231,33 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
         }
       }
     }
+  }
+
+  private Function<String, Object> getConverterFunction(DataSchema.ColumnDataType columnDataType) {
+    Function<String, Object> function;
+    switch (columnDataType) {
+
+      case INT:
+        function = Integer::valueOf;
+        break;
+      case LONG:
+        function = Long::valueOf;
+        break;
+      case FLOAT:
+        function = Float::valueOf;
+        break;
+      case DOUBLE:
+        function = Double::valueOf;
+        break;
+      case BYTES:
+        function = BytesUtils::toBytes;
+        break;
+      case STRING:
+      default:
+        function = s -> s;
+        break;
+    }
+    return function;
   }
 
   @Override

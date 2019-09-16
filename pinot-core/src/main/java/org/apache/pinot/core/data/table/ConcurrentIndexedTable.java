@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.LongAccumulator;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nonnull;
 import org.apache.commons.collections.CollectionUtils;
@@ -33,6 +35,8 @@ import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.order.OrderByUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -40,12 +44,25 @@ import org.apache.pinot.core.data.order.OrderByUtils;
  */
 public class ConcurrentIndexedTable extends IndexedTable {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(ConcurrentIndexedTable.class);
+
   private ConcurrentMap<Key, Record> _lookupMap;
   private ReentrantReadWriteLock _readWriteLock;
 
   private Comparator<Record> _minHeapComparator;
   private Comparator<Record> _orderByComparator;
 
+  private LongAdder _numResizes = new LongAdder();
+  private LongAccumulator _resizeTime = new LongAccumulator(Long::sum, 0);
+
+  /**
+   * Initializes the data structures and comparators needed for this Table
+   * @param dataSchema data schema of the record's keys and values
+   * @param aggregationInfos aggregation infors for the aggregations in record'd values
+   * @param orderBy list of {@link SelectionSort} defining the order by
+   * @param maxCapacity the max number of records to hold
+   * @param sort does final result need to be sorted
+   */
   @Override
   public void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
       int maxCapacity, boolean sort) {
@@ -119,6 +136,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
   private void resize(int trimToSize) {
 
     if (_lookupMap.size() > trimToSize) {
+      long startTime = System.currentTimeMillis();
 
       if (CollectionUtils.isNotEmpty(_orderBy)) {
         // drop bottom
@@ -154,12 +172,21 @@ public class ConcurrentIndexedTable extends IndexedTable {
           }
         }
       }
+      long endTime = System.currentTimeMillis();
+      long timeElapsed = endTime - startTime;
+
+      _numResizes.increment();
+      _resizeTime.accumulate(timeElapsed);
     }
   }
 
   @Override
   public void finish() {
     resize(_maxCapacity);
+    long numResizes = _numResizes.sum();
+    long resizeTime = _resizeTime.get();
+    LOGGER.info("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", numResizes, resizeTime,
+        resizeTime / numResizes);
   }
 
   @Override
