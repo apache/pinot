@@ -50,6 +50,10 @@ public class AnomalySlice {
     this.isTaggedAsChild = isTaggedAsChild;
   }
 
+  public AnomalySlice(long start, long end, Multimap<String, String> filters) {
+    this(start, end, filters, null, false);
+  }
+
   public long getStart() {
     return start;
   }
