@@ -1,16 +1,50 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.benchmark.common.utils;
 
-import com.sun.istack.internal.Nullable;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.List;
+import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
+import org.apache.http.Header;
+import org.apache.http.HttpEntity;
 import org.apache.http.HttpVersion;
+import org.apache.http.NameValuePair;
 import org.apache.http.StatusLine;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.methods.RequestBuilder;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.entity.mime.HttpMultipartMode;
+import org.apache.http.entity.mime.MultipartEntityBuilder;
+import org.apache.http.entity.mime.content.ContentBody;
+import org.apache.http.entity.mime.content.InputStreamBody;
+import org.apache.http.entity.mime.content.StringBody;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
@@ -25,11 +59,13 @@ import org.slf4j.LoggerFactory;
 public class PinotClusterClient {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotClusterClient.class);
 
+  public static final int DEFAULT_SOCKET_TIMEOUT_MS = 600 * 1000; // 10 minutes
   public static final int GET_REQUEST_SOCKET_TIMEOUT_MS = 5 * 1000; // 5 seconds
 
   private static final String HTTP = "http";
   private static final String HTTPS = "https";
   private static final String TABLES_PATH = "/tables";
+  private static final String SCHEMA_PATH = "/schemas";
   private final CloseableHttpClient _httpClient;
 
   public PinotClusterClient() {
@@ -45,7 +81,7 @@ public class PinotClusterClient {
     return new URI(scheme, null, host, port, path, null, null);
   }
 
-  public static URI getListAllTablesHttpURI(String host, int port)
+  public static URI getListTablesHttpURI(String host, int port)
       throws URISyntaxException {
     return getURI(HTTP, host, port, TABLES_PATH);
   }
@@ -55,13 +91,125 @@ public class PinotClusterClient {
     return getURI(HTTP, host, port, TABLES_PATH + "/" + rawTableName);
   }
 
+  public static HttpUriRequest getAddTableConfigRequest(URI uri, String tableName, String tableConfigStr)
+      throws UnsupportedEncodingException {
+    return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getEntity(tableConfigStr), null, null,
+        DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  public static HttpUriRequest getUpdateTableConfigRequest(URI uri, String tableName, String tableConfigStr)
+      throws UnsupportedEncodingException {
+    return getUploadFileRequest(HttpPut.METHOD_NAME, uri, getEntity(tableConfigStr), null, null,
+        DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  public static HttpUriRequest getDeleteTableConfigHttpURI(URI uri, String tableName, String tableTypeStr) {
+    return getTableWithTypeRequest(HttpDelete.METHOD_NAME, uri, tableTypeStr, null, null, DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  public static URI getListSchemasHttpURI(String host, int port)
+      throws URISyntaxException {
+    return getURI(HTTP, host, port, SCHEMA_PATH);
+  }
+
+  public static URI getSchemaHTTPURI(String host, int port, String schemaName)
+      throws URISyntaxException {
+    return getURI(HTTP, host, port, SCHEMA_PATH + "/" + schemaName);
+  }
+
   public SimpleHttpResponse sendGetRequest(URI uri)
       throws IOException, HttpErrorStatusException {
     return sendRequest(constructGetRequest(uri));
   }
 
+  public SimpleHttpResponse sendDeleteRequest(URI uri)
+      throws IOException, HttpErrorStatusException {
+    return sendRequest(constructDeleteRequest(uri));
+  }
+
+  public static HttpUriRequest getAddSchemaRequest(URI uri, String schemaName, InputStream schemaInputStream) {
+    return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(schemaName, schemaInputStream), null, null,
+        DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  public static HttpUriRequest getUpdateSchemaRequest(URI uri, String schemaName, InputStream schemaInputStream) {
+    return getUploadFileRequest(HttpPut.METHOD_NAME, uri, getContentBody(schemaName, schemaInputStream), null, null,
+        DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  private static HttpUriRequest getTableWithTypeRequest(String method, URI uri, String tableType,
+      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
+    // Build the request
+    RequestBuilder requestBuilder = RequestBuilder.create(method).setVersion(HttpVersion.HTTP_1_1).setUri(uri);
+    if (tableType != null) {
+      requestBuilder.addParameter("type", tableType);
+    }
+    addHeadersAndParameters(requestBuilder, null, null);
+    setTimeout(requestBuilder, socketTimeoutMs);
+    return requestBuilder.build();
+  }
+
+  private static HttpUriRequest getUploadFileRequest(String method, URI uri, HttpEntity entity,
+      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
+    // Build the request
+    RequestBuilder requestBuilder =
+        RequestBuilder.create(method).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
+    addHeadersAndParameters(requestBuilder, null, null);
+    setTimeout(requestBuilder, socketTimeoutMs);
+    return requestBuilder.build();
+  }
+
+  private static HttpUriRequest getUploadFileRequest(String method, URI uri, ContentBody contentBody,
+      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
+    String fileName = contentBody.getFilename() != null ? contentBody.getFilename() : "file";
+    // Build the Http entity
+    HttpEntity entity =
+        MultipartEntityBuilder.create().setMode(HttpMultipartMode.BROWSER_COMPATIBLE).addPart(fileName, contentBody)
+            .build();
+
+    // Build the request
+    RequestBuilder requestBuilder =
+        RequestBuilder.create(method).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
+    addHeadersAndParameters(requestBuilder, headers, parameters);
+    setTimeout(requestBuilder, socketTimeoutMs);
+    return requestBuilder.build();
+  }
+
+  private static void addHeadersAndParameters(RequestBuilder requestBuilder, @Nullable List<Header> headers,
+      @Nullable List<NameValuePair> parameters) {
+    if (headers != null) {
+      for (Header header : headers) {
+        requestBuilder.addHeader(header);
+      }
+    }
+    if (parameters != null) {
+      for (NameValuePair parameter : parameters) {
+        requestBuilder.addParameter(parameter);
+      }
+    }
+  }
+
+  private static StringEntity getEntity(String fileStr)
+      throws UnsupportedEncodingException {
+    return new StringEntity(fileStr);
+  }
+
+  private static ContentBody getContentBody(String fileName, String fileStr) {
+    return new StringBody(fileStr, ContentType.APPLICATION_JSON);
+  }
+
+  private static ContentBody getContentBody(String fileName, InputStream inputStream) {
+    return new InputStreamBody(inputStream, ContentType.MULTIPART_FORM_DATA, fileName);
+  }
+
   private static HttpUriRequest constructGetRequest(URI uri) {
     RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+    setTimeout(requestBuilder, GET_REQUEST_SOCKET_TIMEOUT_MS);
+    return requestBuilder.build();
+  }
+
+  private static HttpUriRequest constructDeleteRequest(URI uri) {
+    RequestBuilder requestBuilder = RequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_1_1);
     setTimeout(requestBuilder, GET_REQUEST_SOCKET_TIMEOUT_MS);
     return requestBuilder.build();
   }
@@ -71,7 +219,7 @@ public class PinotClusterClient {
     requestBuilder.setConfig(requestConfig);
   }
 
-  private SimpleHttpResponse sendRequest(HttpUriRequest request)
+  public SimpleHttpResponse sendRequest(HttpUriRequest request)
       throws IOException, HttpErrorStatusException {
     try (CloseableHttpResponse response = _httpClient.execute(request)) {
       String controllerHost = null;

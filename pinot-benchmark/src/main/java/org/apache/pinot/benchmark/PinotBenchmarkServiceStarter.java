@@ -18,29 +18,61 @@
  */
 package org.apache.pinot.benchmark;
 
+import java.util.concurrent.TimeUnit;
+import org.apache.helix.HelixManager;
+import org.apache.helix.HelixManagerFactory;
+import org.apache.helix.InstanceType;
 import org.apache.pinot.benchmark.api.PinotClusterManager;
+import org.apache.pinot.benchmark.api.retentions.TableRetentionManager;
 import org.apache.pinot.benchmark.common.PinotBenchServiceApplication;
+import org.apache.pinot.benchmark.common.utils.PinotClusterClient;
+import org.apache.pinot.benchmark.common.utils.PinotClusterLocator;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-
 public class PinotBenchmarkServiceStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotBenchmarkServiceStarter.class);
 
+  private final String _clusterName;
+  private final String _pinotBenchInstanceId;
+  private final String _zkServers;
   private final PinotBenchConf _config;
-  private final PinotBenchServiceApplication _pinotBenchServiceApplication;
+  private PinotClusterLocator _pinotClusterLocator;
+  private final PinotClusterClient _pinotClusterClient;
   private final PinotClusterManager _pinotClusterManager;
+  private final TableRetentionManager _tableRetentionManager;
+  private final PinotBenchServiceApplication _pinotBenchServiceApplication;
+
+  private HelixManager _helixManager;
 
   public PinotBenchmarkServiceStarter(PinotBenchConf conf) {
     _config = conf;
+    String host = _config.getPinotBenchHost();
+    int port = _config.getPinotBenchPort();
+    _clusterName = _config.getClusterName();
+    _pinotBenchInstanceId = host + ":" + port;
+    _zkServers = _config.getZkStr();
+
+    _pinotClusterClient = new PinotClusterClient();
+    _pinotClusterLocator = new PinotClusterLocator(_config);
+    _pinotClusterManager = new PinotClusterManager(_config, _pinotClusterClient, _pinotClusterLocator);
+    _tableRetentionManager = new TableRetentionManager(_config, _pinotClusterManager);
     _pinotBenchServiceApplication = new PinotBenchServiceApplication();
-    _pinotClusterManager = new PinotClusterManager(_config);
   }
 
-  public void start() {
+  public void start()
+      throws Exception {
+    _helixManager =
+        HelixManagerFactory.getZKHelixManager(_clusterName, _pinotBenchInstanceId, InstanceType.SPECTATOR, _zkServers);
+    _helixManager.connect();
+
     LOGGER.info("Starting Pinot cluster manager");
+    _pinotClusterManager.start(_helixManager);
+
+    LOGGER.info("Starting table retention manager");
+    _tableRetentionManager.start(_helixManager);
 
     _pinotBenchServiceApplication.registerBinder(new AbstractBinder() {
       @Override
@@ -50,37 +82,45 @@ public class PinotBenchmarkServiceStarter {
     });
 
     LOGGER.info("Starting Pinot benchmark service.");
-    _pinotBenchServiceApplication.start(9008);
-
+    _pinotBenchServiceApplication.start(_config.getPinotBenchPort());
   }
 
   public void stop() {
     LOGGER.info("Stopping Pinot benchmark service...");
     _pinotBenchServiceApplication.stop();
+
+    _tableRetentionManager.stop();
   }
 
-  public static void main(String[] args) throws InterruptedException {
+  public static void main(String[] args) {
     PinotBenchConf conf = new PinotBenchConf();
     conf.setPerfControllerHost("localhost");
     conf.setPerfControllerPort(9000);
+    conf.setPinotBenchHost("localhost");
+    conf.setPinotBenchPort(9008);
+    conf.setClusterName("QuickStartCluster");
+    conf.setZkStr("localhost:2123");
+    conf.setTableRetentionManagerInitialDelayInSeconds(30L);
+    conf.setTableRetentionManagerFrequencyInSeconds(TimeUnit.HOURS.toSeconds(6L));
+
     PinotBenchmarkServiceStarter starter = new PinotBenchmarkServiceStarter(conf);
 
     try {
-      LOGGER.info("Start starter.");
       starter.start();
     } catch (Exception e) {
-      LOGGER.error("Error starting!!!", e);
+      LOGGER.error("Error starting.", e);
+      System.exit(-1);
     }
 
-    int i = 0;
-    while (i++ < 600L) {
-      Thread.sleep(1000L);
+    while (true) {
+      try {
+        Thread.sleep(1000L);
+      } catch (InterruptedException e) {
+        LOGGER.error("Caught InterruptedException. Exiting.");
+        break;
+      }
     }
-
-    System.out.println("Stopping!");
-    LOGGER.info("Stopping!!!");
 
     starter.stop();
   }
-
 }
