@@ -19,15 +19,21 @@
 
 package org.apache.pinot.thirdeye.detection.yaml.translator;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.DatasetConfigBean;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
+
+import static org.apache.pinot.thirdeye.detection.ConfigUtils.*;
 
 
 /**
@@ -55,9 +61,10 @@ class DetectionMetricAttributeHolder {
       return metricAliasKey;
     }
 
-    MetricConfigDTO metricConfig = this.dataProvider.fetchMetric(metricName, datasetName);
-    DatasetConfigDTO datasetConfig = this.dataProvider.fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
-        .get(metricConfig.getDataset());
+    DatasetConfigDTO datasetConfig = fetchDatasetConfigDTO(this.dataProvider, datasetName);
+
+    MetricConfigDTO metricConfig = this.dataProvider.fetchMetric(metricName, datasetConfig.getDataset());
+
     cron = cron == null ? buildCron(datasetConfig.bucketTimeGranularity()) : cron;
 
     metricAttributesMap.put(metricAliasKey, new DetectionMetricProperties(cron, metricConfig, datasetConfig));

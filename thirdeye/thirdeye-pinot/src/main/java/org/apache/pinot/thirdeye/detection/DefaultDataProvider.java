@@ -382,6 +382,12 @@ public class DefaultDataProvider implements DataProvider {
     return slice.withStart(start).withEnd(end).withGranularity(granularity);
   }
 
+  @Override
+  public  List<DatasetConfigDTO> fetchDatasetByDisplayName(String datasetDisplayName) {
+    List<DatasetConfigDTO> dataset = this.datasetDAO.findByPredicate(Predicate.EQ("displayName", datasetDisplayName));
+    return dataset;
+  }
+
   public static void cleanCache() {
     if (DETECTION_TIME_SERIES_CACHE != null) {
       DETECTION_TIME_SERIES_CACHE.cleanUp();

@@ -59,6 +59,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
             createdBy: detection_json.createdBy,
             updatedBy: detection_json.updatedBy,
             exploreDimensions: detection_json.dimensions,
+            dataset: detection_json.datasetNames,
             filters: formatYamlFilter(detectionInfo.filters),
             dimensionExploration: formatYamlFilter(detectionInfo.dimensionExploration),
             lastDetectionTime: lastDetection.toDateString() + ", " +  lastDetection.toLocaleTimeString() + " (" + moment().tz(moment.tz.guess()).format('z') + ")"

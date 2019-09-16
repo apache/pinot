@@ -29,16 +29,23 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.joda.time.Period;
 import org.joda.time.PeriodType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.Yaml;
+
+import static org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator.*;
+import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator.*;
 
 
 /**
@@ -55,6 +62,12 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
   static final String ATTR_METRIC_URNS = "metricUrns";
   static final String ATTR_IS_ACTIVE = "active";
   static final String ATTR_ALERT_DETAILS_WINDOW_SIZE = "alertDetailsDefaultWindowSize";
+  static final String ATTR_DATASET_NAME = "datasetNames";
+  static final String ATTR_METRIC = "metric";
+  static final String ATTR_FILTERS = "filters";
+  static final String ATTR_DIMENSION_EXPLORE = "dimensionExploration";
+  static final String ATTR_RULES = "rules";
+  static final String ATTR_GRANULARITY = "monitoringGranularity";
 
   private static final String PROP_NESTED_METRIC_URNS_KEY = "nestedMetricUrns";
   private static final String PROP_NESTED_PROPERTIES_KEY = "nested";
@@ -66,16 +79,20 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
 
   private static final long DEFAULT_PRESENTING_WINDOW_SIZE_MINUTELY = TimeUnit.HOURS.toMillis(48);
   private static final long DEFAULT_PRESENTING_WINDOW_SIZE_DAILY = TimeUnit.DAYS.toMillis(30);
+  private static final TimeGranularity DEFAULT_SHOW_GRANULARITY = new TimeGranularity(1, TimeUnit.DAYS);
+
   private static final String ALGORITHM_TYPE = "ALGORITHM";
   private static final String MIGRATED_ALGORITHM_TYPE = "MIGRATED_ALGORITHM";
   private static final String CONFIGURATION = "configuration";
 
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
+  private final Yaml yaml;
 
   public DetectionConfigFormatter(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) {
     this.datasetDAO = datasetDAO;
     this.metricDAO = metricDAO;
+    this.yaml = new Yaml();
   }
 
   @Override
@@ -90,11 +107,62 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
     output.put(ATTR_YAML, config.getYaml());
     output.put(ATTR_LAST_TIMESTAMP, config.getLastTimestamp());
     List<String> metricUrns = extractMetricUrnsFromProperties(config.getProperties());
+
+    Map<String, MetricConfigDTO> metricUrnToMetricDTOs = new HashMap<>();
+    for (String metricUrn : metricUrns) {
+      metricUrnToMetricDTOs.put(metricUrn, getMetricConfigForMetricUrn(metricUrn));
+    }
+    Map<String, Object> yamlObject = ConfigUtils.getMap(this.yaml.load(config.getYaml()));
+
+    Map<String, DatasetConfigDTO> metricUrnToDatasets = metricUrns.stream().collect(Collectors.toMap(metricUrn -> metricUrn,
+      metricUrn -> getDatasetForMetricUrn(metricUrn, metricUrnToMetricDTOs), (d1, d2) -> d1));
+
     // the metric urns monitored by this detection config
     output.put(ATTR_METRIC_URNS, metricUrns);
+    // get the granularity for the detection
+    List<TimeGranularity> granularities = getGranularitiesForConfig(config, metricUrnToDatasets);
+    output.put(ATTR_GRANULARITY, granularities.stream().map(TimeGranularity::toAggregationGranularityString).distinct().collect(Collectors.toList()));
     // the default window size of the alert details page
-    output.put(ATTR_ALERT_DETAILS_WINDOW_SIZE, getAlertDetailsDefaultWindowSize(config, metricUrns));
+    output.put(ATTR_ALERT_DETAILS_WINDOW_SIZE, getAlertDetailsDefaultWindowSize(granularities));
+    output.put(ATTR_METRIC, yamlObject.get(PROP_METRIC));
+    output.put(ATTR_FILTERS, yamlObject.get(PROP_FILTERS));
+    output.put(ATTR_DIMENSION_EXPLORE, yamlObject.get(PROP_DIMENSION_EXPLORATION));
+    output.put(ATTR_DATASET_NAME, getDatasetDisplayNames(metricUrnToDatasets, yamlObject));
+    output.put(ATTR_RULES, yamlObject.get(PROP_RULES));
     return output;
+  }
+
+  /**
+   * Get the display names for the datasets. Show the display name if it is available in the dataset. Otherwize, use the dataset name.
+   * @param metricUrnToDatasets the map of detection config keyed buy metric urn
+   * @return the list of dataset names to show in UI
+   */
+  private List<String> getDatasetDisplayNames(Map<String, DatasetConfigDTO> metricUrnToDatasets, Map<String, Object> yamlObject) {
+    return metricUrnToDatasets.values()
+        .stream()
+        .map(datasetConfigDTO -> {
+          String datasetName = datasetConfigDTO.getName();
+          return StringUtils.isNotBlank(datasetName) ? datasetName : MapUtils.getString(yamlObject, PROP_DATASET);
+        })
+        .distinct()
+        .collect(Collectors.toList());
+  }
+
+  private DatasetConfigDTO getDatasetForMetricUrn(String metricUrn,
+      Map<String, MetricConfigDTO> metricUrnToMetricDTOs) {
+    MetricConfigDTO metricConfig = metricUrnToMetricDTOs.get(metricUrn);
+    if (metricConfig != null) {
+      DatasetConfigDTO datasetConfig = this.datasetDAO.findByDataset(metricConfig.getDataset());
+      if (datasetConfig != null) {
+        return datasetConfig;
+      }
+    }
+    return new DatasetConfigDTO();
+  }
+
+  private MetricConfigDTO getMetricConfigForMetricUrn(String metricUrn) {
+    MetricEntity me = MetricEntity.fromURN(metricUrn);
+    return this.metricDAO.findById(me.getId());
   }
 
   /**
@@ -115,31 +183,34 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
     return metricUrns;
   }
 
-  /**
-   * Generate the default window size for presenting in ThirdEye alert details page.
-   * @param config the detection config
-   * @param metricUrns the list of metric urns
-   * @return the window size in milliseconds
-   */
-  private long getAlertDetailsDefaultWindowSize(DetectionConfigDTO config, List<String> metricUrns) {
+  private List<TimeGranularity> getGranularitiesForConfig(DetectionConfigDTO config, Map<String, DatasetConfigDTO> metricUrnToDatasets) {
     try {
       // first try to get the granularities in config properties
-      List<TimeGranularity> granularities = getMonitoringGranularities(config);
+      List<TimeGranularity> granularities = getDetectionConfigMonitoringGranularities(config);
       // if monitoring granularities is not set, use the metric granularity to decide the default window
       if (granularities.isEmpty()) {
-        granularities = metricUrns.stream().map(this::getGranularityForMetricUrn).collect(Collectors.toList());
+        granularities = metricUrnToDatasets.keySet().stream().map(metricUrn -> metricUrnToDatasets.get(metricUrn).bucketTimeGranularity()).collect(Collectors.toList());
       }
-      List<Long> windowSizes =
-          granularities.stream().map(this::getDefaultWindowSizeForGranularity).collect(Collectors.toList());
-      // show the minimal of all window sizes for UI responsiveness
-      return Collections.min(windowSizes);
+      return granularities;
     } catch (Exception e) {
-      LOG.warn("Exception thrown when getting granularities for detection config {}, use default presenting window size", config.getId(), e);
-      return DEFAULT_PRESENTING_WINDOW_SIZE_DAILY;
+      LOG.warn("Exception thrown when getting granularities for detection config {}, use default granularity", config.getId(), e);
+      return Collections.singletonList(DEFAULT_SHOW_GRANULARITY);
     }
   }
 
-  private List<TimeGranularity> getMonitoringGranularities(DetectionConfigDTO config) {
+  /**
+   * Generate the default window size for presenting in ThirdEye alert details page.
+   * @param granularities list of granularities
+   * @return the window size in milliseconds
+   */
+  private long getAlertDetailsDefaultWindowSize(List<TimeGranularity> granularities) {
+    List<Long> windowSizes =
+        granularities.stream().map(this::getDefaultWindowSizeForGranularity).collect(Collectors.toList());
+    // show the minimal of all window sizes for UI responsiveness
+    return Collections.min(windowSizes);
+  }
+
+  private List<TimeGranularity> getDetectionConfigMonitoringGranularities(DetectionConfigDTO config) {
     List<TimeGranularity> monitoringGranularities = new ArrayList<>();
     for (Map.Entry<String, Object> entry : config.getComponentSpecs().entrySet()) {
       Map<String, Object> specs = (Map<String, Object>) entry.getValue();
@@ -173,10 +244,6 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
     return Optional.empty();
   }
 
-  private TimeGranularity getGranularityForMetricUrn(String metricUrn) {
-    MetricEntity me = MetricEntity.fromURN(metricUrn);
-    return this.datasetDAO.findByDataset(this.metricDAO.findById(me.getId()).getDataset()).bucketTimeGranularity();
-  }
 
   private long getDefaultWindowSizeForGranularity(TimeGranularity granularity) {
     TimeUnit unit = granularity.getUnit();

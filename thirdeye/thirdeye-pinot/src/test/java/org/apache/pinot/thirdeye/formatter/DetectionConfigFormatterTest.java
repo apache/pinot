@@ -21,10 +21,13 @@
 package org.apache.pinot.thirdeye.formatter;
 
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.IOUtils;
+import org.apache.pinot.thirdeye.datalayer.DaoTestUtils;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
@@ -48,17 +51,17 @@ public class DetectionConfigFormatterTest {
   }
 
   @Test
-  public void testDetectionConfigFormatter() {
+  public void testDetectionConfigFormatter() throws IOException {
     DetectionConfigDTO configDTO = new DetectionConfigDTO();
     configDTO.setName("test");
     configDTO.setActive(true);
-    configDTO.setYaml("test yaml");
+    configDTO.setYaml(IOUtils.toString(Thread.currentThread().getContextClassLoader().getResourceAsStream("sample-detection-config.yml")));
     configDTO.setDescription("description");
     configDTO.setCreatedBy("test");
     configDTO.setUpdatedBy("test");
     configDTO.setId(1L);
-    configDTO.setProperties(ImmutableMap.of("nestedMetricUrns", Collections.singleton("thirdeye::metric::1"), "nested",
-        Collections.singletonList(ImmutableMap.of("nestedMetricUrns", Collections.singleton("thirdeye::metric::2")))));
+    configDTO.setProperties(ImmutableMap.of("nestedMetricUrns", Collections.singleton("thirdeye:metric:1"), "nested",
+        Collections.singletonList(ImmutableMap.of("nestedMetricUrns", Collections.singleton("thirdeye:metric:2")))));
     DetectionConfigFormatter formatter =
         new DetectionConfigFormatter(this.daoRegistry.getMetricConfigDAO(), this.daoRegistry.getDatasetConfigDAO());
     Map<String, Object> result = formatter.format(configDTO);
@@ -71,8 +74,9 @@ public class DetectionConfigFormatterTest {
     Assert.assertEquals(result.get(ATTR_CREATED_BY), configDTO.getCreatedBy());
     Assert.assertEquals(result.get(ATTR_UPDATED_BY), configDTO.getUpdatedBy());
     Assert.assertTrue(ConfigUtils.getList(result.get(ATTR_METRIC_URNS))
-        .containsAll(Arrays.asList("thirdeye::metric::1", "thirdeye::metric::2")));
+        .containsAll(Arrays.asList("thirdeye:metric:1", "thirdeye:metric:2")));
     Assert.assertEquals(result.get(ATTR_ALERT_DETAILS_WINDOW_SIZE), TimeUnit.DAYS.toMillis(30));
+    Assert.assertEquals(ConfigUtils.getList(result.get(ATTR_RULES)).size(), 1);
   }
 
   @AfterMethod(alwaysRun = true)
