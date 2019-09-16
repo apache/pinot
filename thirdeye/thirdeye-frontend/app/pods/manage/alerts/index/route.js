@@ -224,6 +224,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
         this.set('session.store.fromUrl', {lastIntentTransition: transition});
       }
     },
+
     error() {
       // The `error` hook is also provided the failed
       // `transition`, which can be stored and later

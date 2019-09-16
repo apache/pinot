@@ -37,7 +37,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
       const detection_status  = get(detection_result, 'status');
       const detection_json = await detection_result.json();
       if (detection_status !== 200) {
-        notifications.error('Retrieval of alert yaml failed.', 'Error', toastOptions);
+        if (detection_status !== 401) {
+          notifications.error('Retrieval of alert yaml failed.', 'Error', toastOptions);
+        }
       } else {
         if (detection_json.yaml) {
           let detectionInfo;
@@ -81,7 +83,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
       const health_status  = get(health_result, 'status');
       const health_json = await health_result.json();
       if (health_status !== 200) {
-        notifications.error('Retrieval of detection health failed.', 'Error', toastOptions);
+        if (health_status !== 401) {
+          notifications.error('Retrieval of detection health failed.', 'Error', toastOptions);
+        }
       } else {
         set(this, 'detectionHealth', health_json);
       }
@@ -96,7 +100,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
       const settings_status  = get(settings_result, 'status');
       const settings_json = await settings_result.json();
       if (settings_status !== 200) {
-        notifications.error('Retrieving subscription groups failed.', 'Error', toastOptions);
+        if (settings_status !== 401) {
+          notifications.error('Retrieving subscription groups failed.', 'Error', toastOptions);
+        }
       } else {
         set(this, 'subscriptionGroups', settings_json);
       }
@@ -184,6 +190,19 @@ export default Route.extend(AuthenticatedRouteMixin, {
       if (transition.intent.name && transition.intent.name !== 'logout') {
         this.set('session.store.fromUrl', {lastIntentTransition: transition});
       }
+    },
+
+    error() {
+      return true;
+    },
+
+    /**
+    * Refresh route's model.
+    * @method refreshModel
+    * @return {undefined}
+    */
+    refreshModel() {
+      this.refresh();
     }
   }
 });

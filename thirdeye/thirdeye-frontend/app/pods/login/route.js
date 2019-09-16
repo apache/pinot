@@ -1,5 +1,5 @@
 import Route from '@ember/routing/route';
-import { get, set } from '@ember/object';
+import { get } from '@ember/object';
 import { inject as service } from '@ember/service';
 import UnauthenticatedRouteMixin from 'ember-simple-auth/mixins/unauthenticated-route-mixin';
 
@@ -27,7 +27,7 @@ export default Route.extend(UnauthenticatedRouteMixin, {
    * Set any needed error message
    * @return {undefined}
    */
-  setupController(controller, model) {
+  setupController(controller) {
     this._super(...arguments);
     const errorMsg = get(this, 'session.store.errorMsg');
 
@@ -63,7 +63,6 @@ export default Route.extend(UnauthenticatedRouteMixin, {
     willTransition(transition) {
       const fromUrl = get(transition, 'intent.url');
       const isAuthenticated = this.get('session.isAuthenticated');
-
       if (!isAuthenticated) {
         transition.abort();
         // set the fromUrl param to the controller prior to re-route to login
@@ -71,9 +70,29 @@ export default Route.extend(UnauthenticatedRouteMixin, {
         loginController.set('fromUrl', fromUrl);
         this.transitionTo('login');
       } else {
+        this.get('session.store')
+          .restore()
+          .then(data => {
+            if (data.previousTransition !== null) {
+              this.transitionTo(data.previousTransition);
+            }
+          });
         return true;
       }
 
+    },
+
+    error() {
+      return true;
+    },
+
+    /**
+    * Refresh route's model.
+    * @method refreshModel
+    * @return {undefined}
+    */
+    refreshModel() {
+      this.refresh();
     }
   }
 });

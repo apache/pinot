@@ -182,6 +182,7 @@ export default Route.extend({
         this.set('session.store.fromUrl', {lastIntentTransition: transition});
       }
     },
+    
     error() {
       return true;
     },
