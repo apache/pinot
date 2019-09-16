@@ -4,6 +4,7 @@
  * @exports aiavailability model
  */
 
+import _ from 'lodash';
 import moment from 'moment';
 import Route from '@ember/routing/route';
 import {
@@ -78,7 +79,7 @@ export default Route.extend({
     this._super(model);
 
     let tableData = (Array.isArray(model.tableData) && model.tableData.length > 0) ? model.tableData : [{ 'No Data Returned' : 'N/A'}];
-    let tableHeaders = [...Object.keys(tableData[0]), 'link to RCA'];
+    let tableHeaders = Object.keys(tableData[0]);
     tableHeaders = tableHeaders.map(header => {
       return {
         text: header,
@@ -91,15 +92,14 @@ export default Route.extend({
       const anomaliesArray = Object.keys(flow.comment);
       if (anomaliesArray.length > 0) {
         anomaliesArray.forEach(anomalyId => {
-          const row = flow;
-          row['link to RCA'] = anomalyId;
-          row.comment = row.comment.anomalyId;
+          const row = _.cloneDeep(flow);
+          row.comment = flow.comment[anomalyId];
           // build array of strings to put on DOM
           row.columns = [];
           tableHeaders.forEach(header => {
             const cellValue = row[header.text];
-            if (header.text === 'link to RCA') {
-              const domString = `<a href="https://thirdeye.corp.linkedin.com/app/#/rootcause?anomalyId=${cellValue}">Comment of the anomaly</a>`;
+            if (header.text === 'comment') {
+              const domString = `<a href="https://thirdeye.corp.linkedin.com/app/#/rootcause?anomalyId=${anomalyId}">${flow.comment[anomalyId]}</a>`;
               row.columns.push(domString);
             } else if (header.text === 'url') {
               const domString = `<a href="${cellValue}">Flow Link</a>`;
@@ -118,13 +118,12 @@ export default Route.extend({
         });
       } else {
         const row = flow;
-        row['link to RCA'] = null;
         row.comment = null;
         // build array of strings to put on DOM
         row.columns = [];
         tableHeaders.forEach(header => {
           const cellValue = row[header.text];
-          if (header.text === 'link to RCA') {
+          if (header.text === 'comment') {
             const domString = 'N/A';
             row.columns.push(domString);
           } else if (header.text === 'url') {
