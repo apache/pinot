@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import java.util.Properties;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.alert.util.AlertScreenshotHelper;
@@ -61,6 +62,7 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
   @Override
   public void init(Properties properties, ThirdEyeAnomalyConfiguration configuration) {
     super.init(properties, configuration);
+    this.configDAO = DAORegistry.getInstance().getDetectionConfigManager();
   }
 
   @Override
