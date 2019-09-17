@@ -86,7 +86,7 @@ public class ControllerLeaderLocatorTest {
     Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), 0);
 
     // very first invalidate
-    long currentTimeMs = System.currentTimeMillis();
+    long currentTimeMs = 31_000L;
     controllerLeaderLocator.setCurrentTimeMs(currentTimeMs);
     controllerLeaderLocator.invalidateCachedControllerLeader();
     Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderValid());
@@ -96,8 +96,8 @@ public class ControllerLeaderLocatorTest {
 
     // invalidate within {@link ControllerLeaderLocator::getMillisBetweenInvalidate()} millis
     // values should remain unchanged
-    lastCacheInvalidateMillis = System.currentTimeMillis();
-    controllerLeaderLocator.setCurrentTimeMs(lastCacheInvalidateMillis);
+    currentTimeMs = 32_000L;
+    controllerLeaderLocator.setCurrentTimeMs(currentTimeMs);
     controllerLeaderLocator.invalidateCachedControllerLeader();
     Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderValid());
     Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), lastCacheInvalidateMillis);
@@ -109,7 +109,7 @@ public class ControllerLeaderLocatorTest {
 
     // invalidate within {@link ControllerLeaderLocator::getMillisBetweenInvalidate()} millis
     // values should remain unchanged
-    currentTimeMs = System.currentTimeMillis();
+    currentTimeMs = 33_000L;
     controllerLeaderLocator.setCurrentTimeMs(currentTimeMs);
     controllerLeaderLocator.invalidateCachedControllerLeader();
     Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderValid());

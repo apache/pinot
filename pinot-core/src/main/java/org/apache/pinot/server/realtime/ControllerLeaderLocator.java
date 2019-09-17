@@ -129,7 +129,7 @@ public class ControllerLeaderLocator {
         return;
       }
       if (partitionNames.size() != Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE) {
-        LOGGER.warn("The partition size of {} isn't {}. Actual size: {}", Helix.LEAD_CONTROLLER_RESOURCE_NAME,
+        LOGGER.warn("The partition size of {} is not {}. Actual size: {}", Helix.LEAD_CONTROLLER_RESOURCE_NAME,
             Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE, partitionNames.size());
         return;
       }
@@ -247,7 +247,6 @@ public class ControllerLeaderLocator {
     }
   }
 
-  @VisibleForTesting
   protected long getCurrentTimeMS() {
     return System.currentTimeMillis();
   }
