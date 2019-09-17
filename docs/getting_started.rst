@@ -168,11 +168,15 @@ In order to set up a table, we need to specify the schema of this transcript:
     ]
   }
 
-To upload the schema, we can use the command below:
+To upload the schema, we can navigate to the directory in pinot-distribution that contains
+pinot-admin.sh, and use the command below:
 
 .. code-block:: none
 
-  $ ./pinot-distribution/target/apache-pinot-incubating-0.2.0-SNAPSHOT-bin/apache-pinot-incubating-0.2.0-SNAPSHOT-bin/bin/pinot-admin.sh AddSchema -schemaFile /Users/host1/Desktop/getting-started/config/transcript-schema.json -exec
+  $ VERSION=0.2.0
+  $ WORKING_DIR=/Users/host1/Desktop/getting-started
+  $ cd ./pinot-distribution/target/apache-pinot-incubating-$VERSION-SNAPSHOT-bin/apache-pinot-incubating-$VERSION-SNAPSHOT-bin/bin
+  $ ./pinot-admin.sh AddSchema -schemaFile $WORKING_DIR/config/transcript-schema.json -exec
   Executing command: AddSchema -controllerHost [controller_host] -controllerPort 9000 -schemaFilePath /Users/host1/Desktop/getting-started/config/transcript-schema.json -exec
   Sending request: http://[controller_host]:9000/schemas to controller: [controller_host], version: 0.2.0-SNAPSHOT-68092ab9eb83af173d725ec685c22ba4eb5bacf9
 
@@ -204,7 +208,7 @@ And upload the table config to Pinot cluster:
 
 .. code-block:: none
 
-  $ ./pinot-distribution/target/apache-pinot-incubating-0.2.0-SNAPSHOT-bin/apache-pinot-incubating-0.2.0-SNAPSHOT-bin/bin/pinot-admin.sh AddTable -filePath /Users/host1/Desktop/getting-started/config/transcript-table-config.json -exec
+  $ ./pinot-admin.sh AddTable -filePath $WORKING_DIR/config/transcript-table-config.json -exec
   Executing command: AddTable -filePath /Users/host1/Desktop/getting-started/config/transcript-table-config.json -controllerHost [controller_host] -controllerPort 9000 -exec
   {"status":"Table transcript_OFFLINE successfully added"}
 
@@ -212,7 +216,7 @@ In order to upload our data to the Pinot cluster, we need to convert our CSV fil
 
 .. code-block:: none
 
-  $ ./pinot-distribution/target/apache-pinot-incubating-0.2.0-SNAPSHOT-bin/apache-pinot-incubating-0.2.0-SNAPSHOT-bin/bin/pinot-admin.sh CreateSegment -dataDir /Users/host1/Desktop/getting-started/data -format CSV -outDir /Users/host1/Desktop/getting-started/test2 -tableName transcript -segmentName transcript_0 -overwrite -schemaFile /Users/host1/Desktop/getting-started/config/transcript-schema.json -readerConfigFile /Users/host1/Desktop/getting-started/config/csv-record-reader-config.json
+  $ ./pinot-admin.sh CreateSegment -dataDir $WORKING_DIR/data -format CSV -outDir $WORKING_DIR/test2 -tableName transcript -segmentName transcript_0 -overwrite -schemaFile $WORKING_DIR/config/transcript-schema.json -readerConfigFile $WORKING_DIR/config/csv-record-reader-config.json
   Executing command: CreateSegment  -generatorConfigFile null -dataDir /Users/host1/Desktop/getting-started/data -format CSV -outDir /Users/host1/Desktop/getting-started/test2 -overwrite true -tableName transcript -segmentName transcript_0 -timeColumnName null -schemaFile /Users/host1/Desktop/getting-started/config/transcript-schema.json -readerConfigFile /Users/host1/Desktop/getting-started/config/csv-record-reader-config.json -enableStarTreeIndex false -starTreeIndexSpecFile null -hllSize 9 -hllColumns null -hllSuffix _hll -numThreads 1
   Accepted files: [file:/Users/host1/Desktop/getting-started/data/test.csv]
   Finished building StatsCollector!
@@ -237,7 +241,7 @@ Once we have the Pinot Segment, we can upload it to our cluster:
 
 .. code-block:: none
 
-  $ ./pinot-distribution/target/apache-pinot-incubating-0.2.0-SNAPSHOT-bin/apache-pinot-incubating-0.2.0-SNAPSHOT-bin/bin/pinot-admin.sh UploadSegment -segmentDir /Users/host1/Desktop/getting-started/test2/
+  $ ./pinot-admin.sh UploadSegment -segmentDir $WORKING_DIR/test2/
   Executing command: UploadSegment -controllerHost [controller_host] -controllerPort 9000 -segmentDir /Users/host1/Desktop/test2/
   Compressing segment transcript_0_0
   Uploading segment transcript_0_0.tar.gz
@@ -249,7 +253,7 @@ To get all the number of rows in the table:
 
 .. code-block:: none
 
-  $ ./pinot-distribution/target/apache-pinot-incubating-0.2.0-SNAPSHOT-bin/apache-pinot-incubating-0.2.0-SNAPSHOT-bin/bin/pinot-admin.sh PostQuery -brokerPort 8000 -query "select count(*) from transcript"
+  $ ./pinot-admin.sh PostQuery -brokerPort 8000 -query "select count(*) from transcript"
   Executing command: PostQuery -brokerHost [controller_host] -brokerPort 8000 -query select count(*) from transcript
   Result: {"aggregationResults":[{"function":"count_star","value":"4"}],"exceptions":[],"numServersQueried":1,"numServersResponded":1,"numSegmentsQueried":1,"numSegmentsProcessed":1,"numSegmentsMatched":1,"numDocsScanned":4,"numEntriesScannedInFilter":0,"numEntriesScannedPostFilter":0,"numGroupsLimitReached":false,"totalDocs":4,"timeUsedMs":7,"segmentStatistics":[],"traceInfo":{}}
 
@@ -257,7 +261,7 @@ To get the average score of subject Maths:
 
 .. code-block:: none
 
-  $ ./pinot-distribution/target/apache-pinot-incubating-0.2.0-SNAPSHOT-bin/apache-pinot-incubating-0.2.0-SNAPSHOT-bin/bin/pinot-admin.sh PostQuery -brokerPort 8000 -query "select avg(score) from transcript where subject = \"Maths\""
+  $ ./pinot-admin.sh PostQuery -brokerPort 8000 -query "select avg(score) from transcript where subject = \"Maths\""
   Executing command: PostQuery -brokerHost [controller_host] -brokerPort 8000 -query select avg(score) from transcript where subject = "Maths"
   Result: {"aggregationResults":[{"function":"avg_score","value":"3.50000"}],"exceptions":[],"numServersQueried":1,"numServersResponded":1,"numSegmentsQueried":1,"numSegmentsProcessed":1,"numSegmentsMatched":1,"numDocsScanned":2,"numEntriesScannedInFilter":4,"numEntriesScannedPostFilter":2,"numGroupsLimitReached":false,"totalDocs":4,"timeUsedMs":33,"segmentStatistics":[],"traceInfo":{}}
 
@@ -265,6 +269,6 @@ To get the average score for Lucy Smith:
 
 .. code-block:: none
 
-  $ ./pinot-distribution/target/apache-pinot-incubating-0.2.0-SNAPSHOT-bin/apache-pinot-incubating-0.2.0-SNAPSHOT-bin/bin/pinot-admin.sh PostQuery -brokerPort 8000 -query "select avg(score) from transcript where firstName = \"Lucy\" and lastName = \"Smith\""
+  $ ./pinot-admin.sh PostQuery -brokerPort 8000 -query "select avg(score) from transcript where firstName = \"Lucy\" and lastName = \"Smith\""
   Executing command: PostQuery -brokerHost [controller_host] -brokerPort 8000 -query select avg(score) from transcript where firstName = "Lucy" and lastName = "Smith"
   Result: {"aggregationResults":[{"function":"avg_score","value":"3.65000"}],"exceptions":[],"numServersQueried":1,"numServersResponded":1,"numSegmentsQueried":1,"numSegmentsProcessed":1,"numSegmentsMatched":1,"numDocsScanned":2,"numEntriesScannedInFilter":6,"numEntriesScannedPostFilter":2,"numGroupsLimitReached":false,"totalDocs":4,"timeUsedMs":67,"segmentStatistics":[],"traceInfo":{}}
