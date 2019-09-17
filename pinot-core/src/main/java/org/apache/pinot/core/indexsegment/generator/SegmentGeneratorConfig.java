@@ -177,6 +177,7 @@ public class SegmentGeneratorConfig {
     }
 
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    _tableName = tableConfig.getTableName();
     List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
     Map<String, String> noDictionaryColumnMap = indexingConfig.getNoDictionaryConfig();
 
