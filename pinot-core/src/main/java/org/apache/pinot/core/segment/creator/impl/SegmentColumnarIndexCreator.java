@@ -572,10 +572,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     Object defaultNullValue = columnIndexCreationInfo.getDefaultNullValue();
-    if (defaultNullValue == null) {
-      defaultNullValue = fieldSpec.getDefaultNullValue();
-    }
-    if (fieldSpec.getDataType() == FieldSpec.DataType.BYTES && defaultNullValue instanceof byte[]) {
+    if (defaultNullValue instanceof byte[]) {
       String defaultNullValueString = BytesUtils.toHexString((byte[]) defaultNullValue);
       properties
           .setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValueString);
