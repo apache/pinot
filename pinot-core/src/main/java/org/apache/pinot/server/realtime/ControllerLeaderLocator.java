@@ -172,16 +172,20 @@ public class ControllerLeaderLocator {
    * Updates lead controller pairs from Helix cluster leader.
    */
   private void refreshControllerLeaderMapFromHelixClusterLeader() {
-    Pair<String, Integer> helixClusterLeader = getHelixClusterLeader();
-    if (helixClusterLeader == null) {
-      _cachedControllerLeaderValid = false;
-      return;
+    boolean refreshSucceeded = false;
+    try {
+      Pair<String, Integer> helixClusterLeader = getHelixClusterLeader();
+      if (helixClusterLeader == null) {
+        return;
+      }
+      for (int i = 0; i < Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
+        _cachedControllerLeaderMap.put(i, helixClusterLeader);
+      }
+      refreshSucceeded = true;
+      LOGGER.info("Refreshed controller leader map successfully.");
+    } finally {
+      _cachedControllerLeaderValid = refreshSucceeded;
     }
-    for (int i = 0; i < Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
-      _cachedControllerLeaderMap.put(i, helixClusterLeader);
-    }
-    _cachedControllerLeaderValid = true;
-    LOGGER.info("Refreshed controller leader map successfully.");
   }
 
   /**
