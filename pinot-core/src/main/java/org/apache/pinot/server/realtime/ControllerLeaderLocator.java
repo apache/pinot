@@ -176,6 +176,7 @@ public class ControllerLeaderLocator {
     try {
       Pair<String, Integer> helixClusterLeader = getHelixClusterLeader();
       if (helixClusterLeader == null) {
+        LOGGER.error("Failed to refresh the controller leader map.");
         return;
       }
       for (int i = 0; i < Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
