@@ -125,7 +125,7 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
         DetectionConfigDTO config = this.configDAO.findById(anomaly.getDetectionConfigId());
         Preconditions.checkNotNull(config, String.format("Cannot find detection config %d", anomaly.getDetectionConfigId()));
         functionName = config.getName();
-        funcDescription = config.getDescription();
+        funcDescription = config.getDescription() == null ? "" : config.getDescription();
         id = config.getId();
       }
 

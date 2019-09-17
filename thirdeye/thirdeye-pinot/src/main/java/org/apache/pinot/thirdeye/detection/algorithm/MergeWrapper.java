@@ -54,12 +54,14 @@ import org.slf4j.LoggerFactory;
  * Forward scan only, greedy clustering. Does not merge clusters that converge.
  */
 public class MergeWrapper extends DetectionPipeline {
+  private static final Logger LOG = LoggerFactory.getLogger(MergeWrapper.class);
+
   private static final String PROP_NESTED = "nested";
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_MERGE_KEY = "mergeKey";
-  private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
+  private static final String PROP_GROUP_KEY = "groupKey";
   private static final int NUMBER_OF_SPLITED_ANOMALIES_LIMIT = 1000;
-  private static final Logger LOG = LoggerFactory.getLogger(MergeWrapper.class);
+  protected static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
 
   protected static final Comparator<MergedAnomalyResultDTO> COMPARATOR = new Comparator<MergedAnomalyResultDTO>() {
     @Override
@@ -176,10 +178,6 @@ public class MergeWrapper extends DetectionPipeline {
 
     Map<AnomalyKey, MergedAnomalyResultDTO> parents = new HashMap<>();
     for (MergedAnomalyResultDTO anomaly : inputs) {
-      if (anomaly.isChild()) {
-        continue;
-      }
-
       AnomalyKey key = AnomalyKey.from(anomaly);
       MergedAnomalyResultDTO parent = parents.get(key);
 
@@ -204,6 +202,7 @@ public class MergeWrapper extends DetectionPipeline {
         //                                 anomaly |-------------|
         //
         parent.setEndTime(Math.max(parent.getEndTime(), anomaly.getEndTime()));
+
         // merge the anomaly's properties into parent
         Map<String, String> properties = parent.getProperties();
         properties.putAll(anomaly.getProperties());
@@ -219,6 +218,10 @@ public class MergeWrapper extends DetectionPipeline {
             anomaly.setId(null);
           }
         }
+
+        // merge the anomaly's children into the parent
+        mergeChildren(parent, anomaly);
+
       } else if (parent.getEndTime() >= anomaly.getStartTime()) {
         // mergeable but exceeds maxDuration, then truncate
         //      parent |---------------------|
@@ -250,6 +253,41 @@ public class MergeWrapper extends DetectionPipeline {
     Collection<MergedAnomalyResultDTO> splitAnomalies
         = enforceMaxDuration(new ArrayList<>(modifiedExistingAnomalies));
     return new ArrayList<>(splitAnomalies);
+  }
+
+  /**
+   * Make the children of both anomalies as the merged children of the parent anomaly.
+   * However, if the anomaly id clashes then we consider the anomaly from the latest detection.
+   *
+   * Why? Since we start merging anomalies bottom-up, the child anomalies detected by the latest
+   * detection will merge with the historical anomalies and the updated baseline, score etc.
+   * would already be computed and stored in the anomaly.
+   */
+  private void mergeChildren(MergedAnomalyResultDTO parentAnomaly, MergedAnomalyResultDTO anomalyToMerge) {
+    Set<MergedAnomalyResultDTO> mergedChildren = new HashSet<>();
+    Map<Long, MergedAnomalyResultDTO> tempMergeBuffer = new HashMap<>();
+
+    Set<MergedAnomalyResultDTO> parentChildren = parentAnomaly.getChildren();
+    Set<MergedAnomalyResultDTO> anomalyChildren = anomalyToMerge.getChildren();
+
+    updateMergeChildAnomalies(tempMergeBuffer, mergedChildren, parentChildren);
+
+    // If anomaly id clash, replace it with the child of anomalyToMerge
+    updateMergeChildAnomalies(tempMergeBuffer, mergedChildren, anomalyChildren);
+
+    mergedChildren.addAll(tempMergeBuffer.values());
+    parentAnomaly.setChildren(mergedChildren);
+  }
+
+  // Helper method to merge child anomalies by updating a map
+  private void updateMergeChildAnomalies(Map<Long, MergedAnomalyResultDTO> tempMergeBuffer, Set<MergedAnomalyResultDTO> mergedChildren, Set<MergedAnomalyResultDTO> anomalies) {
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      if (anomaly.getId() != null) {
+        tempMergeBuffer.put(anomaly.getId(), anomaly);
+      } else {
+        mergedChildren.add(anomaly);
+      }
+    }
   }
 
   /*
@@ -312,6 +350,15 @@ public class MergeWrapper extends DetectionPipeline {
     return time;
   }
 
+  protected List<String> getDetectionCompNames(Iterable<MergedAnomalyResultDTO> anomalies) {
+    List<String> detCompNames = new ArrayList<>();
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      if (anomaly.getProperties() != null && anomaly.getProperties().containsKey(PROP_DETECTOR_COMPONENT_NAME)) {
+        detCompNames.add(anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_NAME));
+      }
+    }
+    return detCompNames;
+  }
 
   protected MergedAnomalyResultDTO copyAnomalyInfo(MergedAnomalyResultDTO from, MergedAnomalyResultDTO to) {
     to.setStartTime(from.getStartTime());
@@ -352,8 +399,20 @@ public class MergeWrapper extends DetectionPipeline {
     }
 
     public static AnomalyKey from(MergedAnomalyResultDTO anomaly) {
-      return new AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions(), anomaly.getProperties().get(PROP_MERGE_KEY),
-          anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_NAME), anomaly.getType());
+      // Anomalies having the same mergeKey or groupKey should be merged
+      String mergeKey = "";
+      if (anomaly.getProperties().containsKey(PROP_MERGE_KEY)) {
+        mergeKey = anomaly.getProperties().get(PROP_MERGE_KEY);
+      } else if (anomaly.getProperties().containsKey(PROP_GROUP_KEY)) {
+        mergeKey = anomaly.getProperties().get(PROP_GROUP_KEY);
+      }
+
+      String componentKey = "";
+      if (anomaly.getProperties().containsKey(PROP_DETECTOR_COMPONENT_NAME)) {
+        componentKey = anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_NAME);
+      }
+
+      return new AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions(), mergeKey, componentKey, anomaly.getType());
     }
 
     @Override
