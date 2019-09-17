@@ -109,8 +109,6 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
 
     int numAggregationFunctions = _brokerRequest.getAggregationsInfoSize();
     int numGroupBy = _brokerRequest.getGroupBy().getExpressionsSize();
-    boolean isOrderBy = _brokerRequest.isSetOrderBy();
-    AtomicInteger numGroups = new AtomicInteger();
     ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
 
     Future[] futures = new Future[numOperators];
@@ -155,9 +153,6 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
               // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable.
               Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
               while (groupKeyIterator.hasNext()) {
-                if (!isOrderBy && numGroups.getAndIncrement() >= _interSegmentNumGroupsLimit) {
-                  break;
-                }
                 GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
                 String[] stringKey = groupKey._stringKey.split(GroupKeyGenerator.DELIMITER);
                 Object[] objectKey = new Object[numGroupBy];

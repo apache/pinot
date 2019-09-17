@@ -47,8 +47,11 @@ public class SimpleIndexedTable extends IndexedTable {
 
   private List<Record> _records;
   private Map<Key, Integer> _lookupTable;
+
+  private boolean _isOrderBy;
   private Comparator<Record> _orderByComparator;
 
+  private boolean _noMoreNewRecords = false;
   private LongAdder _numResizes = new LongAdder();
   private LongAccumulator _resizeTime = new LongAccumulator(Long::sum, 0);
 
@@ -68,8 +71,9 @@ public class SimpleIndexedTable extends IndexedTable {
     _records = new ArrayList<>(maxCapacity);
     _lookupTable = new HashMap<>(maxCapacity);
 
-    if (CollectionUtils.isNotEmpty(_orderBy)) {
-      _orderByComparator = OrderByUtils.getKeysAndValuesComparator(_dataSchema, _orderBy, _aggregationInfos);
+    _isOrderBy = CollectionUtils.isNotEmpty(orderBy);
+    if (_isOrderBy) {
+      _orderByComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos);
     }
   }
 
@@ -82,20 +86,32 @@ public class SimpleIndexedTable extends IndexedTable {
     Preconditions.checkNotNull(keys, "Cannot upsert record with null keys");
 
     Integer index = _lookupTable.get(keys);
-    if (index == null) {
-      index = size();
-      _lookupTable.put(keys, index);
-      _records.add(index, newRecord);
-    } else {
-      Record existingRecord = _records.get(index);
-      for (int i = 0; i < _aggregationFunctions.size(); i++) {
-        existingRecord.getValues()[i] =
-            _aggregationFunctions.get(i).merge(existingRecord.getValues()[i], newRecord.getValues()[i]);
+    if (_noMoreNewRecords) { // only update existing records
+      if (index != null) {
+        Record existingRecord = _records.get(index);
+        for (int i = 0; i < _aggregationFunctions.size(); i++) {
+          existingRecord.getValues()[i] = _aggregationFunctions.get(i).merge(existingRecord.getValues()[i], newRecord.getValues()[i]);
+        }
       }
-    }
+    } else { // allow all records
+      if (index == null) {
+        index = size();
+        _lookupTable.put(keys, index);
+        _records.add(index, newRecord);
+      } else {
+        Record existingRecord = _records.get(index);
+        for (int i = 0; i < _aggregationFunctions.size(); i++) {
+          existingRecord.getValues()[i] = _aggregationFunctions.get(i).merge(existingRecord.getValues()[i], newRecord.getValues()[i]);
+        }
+      }
 
-    if (size() >= _bufferedCapacity) {
-      sortAndResize(_evictCapacity);
+      if (size() >= _bufferedCapacity) {
+        if (_isOrderBy) { // capacity reached, order and resize
+          sortAndResize(_evictCapacity);
+        } else { // capacity reached, but no order by. Allow no more records
+          _noMoreNewRecords = true;
+        }
+      }
     }
     return true;
   }
@@ -104,7 +120,7 @@ public class SimpleIndexedTable extends IndexedTable {
     long startTime = System.currentTimeMillis();
 
     // sort
-    if (CollectionUtils.isNotEmpty(_orderBy)) {
+    if (_isOrderBy) {
       _records.sort(_orderByComparator);
     }
 

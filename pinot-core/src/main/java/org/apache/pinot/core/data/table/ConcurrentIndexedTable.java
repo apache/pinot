@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.LongAccumulator;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -49,9 +50,11 @@ public class ConcurrentIndexedTable extends IndexedTable {
   private ConcurrentMap<Key, Record> _lookupMap;
   private ReentrantReadWriteLock _readWriteLock;
 
+  private boolean _isOrderBy;
   private Comparator<Record> _minHeapComparator;
   private Comparator<Record> _orderByComparator;
 
+  private AtomicBoolean _noMoreNewRecords = new AtomicBoolean();
   private LongAdder _numResizes = new LongAdder();
   private LongAccumulator _resizeTime = new LongAccumulator(Long::sum, 0);
 
@@ -70,7 +73,8 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
     _lookupMap = new ConcurrentHashMap<>();
     _readWriteLock = new ReentrantReadWriteLock();
-    if (CollectionUtils.isNotEmpty(_orderBy)) {
+    _isOrderBy = CollectionUtils.isNotEmpty(orderBy);
+    if (_isOrderBy) {
       _minHeapComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos).reversed();
       _orderByComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos);
     }
@@ -85,25 +89,41 @@ public class ConcurrentIndexedTable extends IndexedTable {
     Key key = newRecord.getKey();
     Preconditions.checkNotNull(key, "Cannot upsert record with null keys");
 
-    Record existingRecord = _lookupMap.putIfAbsent(key, newRecord);
-    if (existingRecord != null) {
-      _lookupMap.compute(key, (k, v) -> {
+    if (_noMoreNewRecords.get()) { // allow only existing record updates
+      _lookupMap.computeIfPresent(key, (k, v) -> {
         for (int i = 0; i < _aggregationFunctions.size(); i++) {
           v.getValues()[i] = _aggregationFunctions.get(i).merge(v.getValues()[i], newRecord.getValues()[i]);
         }
         return v;
       });
-    }
+    } else { // allow all records
 
-    // resize if exceeds capacity
-    if (_lookupMap.size() >= _bufferedCapacity) {
-      _readWriteLock.writeLock().lock();
-      try {
-        if (_lookupMap.size() >= _bufferedCapacity) {
-          resize(_evictCapacity);
+      Record existingRecord = _lookupMap.putIfAbsent(key, newRecord);
+      if (existingRecord != null) {
+        _lookupMap.compute(key, (k, v) -> {
+          for (int i = 0; i < _aggregationFunctions.size(); i++) {
+            v.getValues()[i] = _aggregationFunctions.get(i).merge(v.getValues()[i], newRecord.getValues()[i]);
+          }
+          return v;
+        });
+      }
+
+      // resize if exceeds capacity
+      if (_lookupMap.size() >= _bufferedCapacity) {
+        if (_isOrderBy) {
+          // reached capacity, resize
+          _readWriteLock.writeLock().lock();
+          try {
+            if (_lookupMap.size() >= _bufferedCapacity) {
+              resize(_evictCapacity);
+            }
+          } finally {
+            _readWriteLock.writeLock().unlock();
+          }
+        } else {
+          // reached capacity and no order by. No more new records will be accepted
+          _noMoreNewRecords.set(true);
         }
-      } finally {
-        _readWriteLock.writeLock().unlock();
       }
     }
     return true;
@@ -125,7 +145,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
   @Override
   public Iterator<Record> iterator() {
-    if (_sort && CollectionUtils.isNotEmpty(_orderBy)) {
+    if (_sort && _isOrderBy) {
       List<Record> sortedList = new ArrayList<>(_lookupMap.values());
       sortedList.sort(_orderByComparator);
       return sortedList.iterator();
@@ -138,7 +158,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
     if (_lookupMap.size() > trimToSize) {
       long startTime = System.currentTimeMillis();
 
-      if (CollectionUtils.isNotEmpty(_orderBy)) {
+      if (_isOrderBy) {
         // drop bottom
 
         // make min heap of elements to evict

@@ -272,4 +272,66 @@ public class IndexedTableTest {
   private Record getRecord(Object[] keys, Object[] values) {
     return new Record(new Key(keys), values);
   }
+
+  @Test
+  public void testNoMoreRecords() {
+    DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE,
+            ColumnDataType.DOUBLE});
+
+    AggregationInfo agg1 = new AggregationInfo();
+    Map<String, String> params1 = new HashMap<>();
+    params1.put("column", "m1");
+    agg1.setAggregationParams(params1);
+    agg1.setAggregationType("sum");
+    AggregationInfo agg2 = new AggregationInfo();
+    Map<String, String> params2 = new HashMap<>();
+    params2.put("column", "m2");
+    agg2.setAggregationParams(params2);
+    agg2.setAggregationType("max");
+    List<AggregationInfo> aggregationInfos = Lists.newArrayList(agg1, agg2);
+
+    IndexedTable indexedTable = new SimpleIndexedTable();
+    indexedTable.init(dataSchema, aggregationInfos, null, 10, false);
+    testNoMoreRecordsInTable(indexedTable);
+
+    indexedTable = new ConcurrentIndexedTable();
+    indexedTable.init(dataSchema, aggregationInfos, null, 10, false);
+    testNoMoreRecordsInTable(indexedTable);
+  }
+
+  private void testNoMoreRecordsInTable(IndexedTable indexedTable) {
+    // Insert 14 records. Check that last 2 never made it.
+    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
+    indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
+    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
+    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
+    Assert.assertEquals(indexedTable.size(), 2);
+
+    indexedTable.upsert(getRecord(new Object[]{"c", 3, 30d}, new Object[]{10d, 300d}));
+    indexedTable.upsert(getRecord(new Object[]{"d", 4, 40d}, new Object[]{10d, 400d}));
+    indexedTable.upsert(getRecord(new Object[]{"e", 5, 50d}, new Object[]{10d, 500d}));
+    indexedTable.upsert(getRecord(new Object[]{"f", 6, 60d}, new Object[]{10d, 600d}));
+    indexedTable.upsert(getRecord(new Object[]{"g", 7, 70d}, new Object[]{10d, 700d}));
+    indexedTable.upsert(getRecord(new Object[]{"h", 8, 80d}, new Object[]{10d, 800d}));
+    indexedTable.upsert(getRecord(new Object[]{"i", 9, 90d}, new Object[]{10d, 900d}));
+    indexedTable.upsert(getRecord(new Object[]{"j", 10, 100d}, new Object[]{10d, 1000d}));
+    Assert.assertEquals(indexedTable.size(), 10);
+
+    indexedTable.upsert(getRecord(new Object[]{"k", 11, 110d}, new Object[]{10d, 1100d}));
+    indexedTable.upsert(getRecord(new Object[]{"l", 12, 120d}, new Object[]{10d, 1200d}));
+
+    // no resize. no more records allowed
+    Assert.assertEquals(indexedTable.size(), 12);
+
+    // existing row allowed
+    indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
+    Assert.assertEquals(indexedTable.size(), 12);
+
+    // new rows not allowed
+    indexedTable.upsert(getRecord(new Object[]{"m", 13, 130d}, new Object[]{10d, 1300d}));
+    indexedTable.upsert(getRecord(new Object[]{"n", 14, 140d}, new Object[]{10d, 1400d}));
+    Assert.assertEquals(indexedTable.size(), 12);
+    checkSurvivors(indexedTable, "m", "n");
+  }
 }
