@@ -63,7 +63,7 @@ public class CreateSegmentCommandV2 extends AbstractBaseAdminCommand implements 
   @Option(name = "-schemaFile", metaVar = "<string>", usage = "File containing schema for data.", required = true)
   private String _schemaFile;
 
-  @Option(name = "-tableConfig", metaVar = "<string>", usage = "File containing schema for data.", required = true)
+  @Option(name = "-tableConfig", metaVar = "<string>", usage = "File containing table configuration.", required = true)
   private String _tableConfigFile;
 
   @Option(name = "-dataDir", metaVar = "<string>", usage = "Directory containing the input data.", required = true)
@@ -77,6 +77,9 @@ public class CreateSegmentCommandV2 extends AbstractBaseAdminCommand implements 
 
   @Option(name = "-overwrite", usage = "Overwrite existing output directory.")
   private boolean _overwrite = false;
+
+  @Option(name = "-segmentName", metaVar = "<string>", usage = "Name of the segment.")
+  private String _segmentName;
 
   @Option(name = "-numThreads", metaVar = "<int>", usage = "Parallelism while generating segments, default is 1.")
   private int _numThreads = 1;
@@ -192,7 +195,11 @@ public class CreateSegmentCommandV2 extends AbstractBaseAdminCommand implements 
               md5 = org.apache.commons.codec.digest.DigestUtils.shaHex(is);
             }
             config.setInputFilePath(localFile);
-            config.setSegmentName(config.getTableName() + "_" + md5 + "_" + segCnt);
+            if (_segmentName == null) {
+              _segmentName = config.getTableName() + "_" + md5;
+              LOGGER.info("Segment name is not specified, derived it as {}.", _segmentName);
+            }
+            config.setSegmentName(_segmentName + "_" + segCnt);
 
             final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
             switch (config.getFormat()) {
