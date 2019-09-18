@@ -132,7 +132,11 @@ Instead of using a header line, we will use a separate CSV config JSON file:
     "fileFormat":"CSV"
   }
 
-In order to set up a table, we need to specify the schema of this transcript:
+We can create a working directory called `getting-started` on Desktop, and create two additional directories within `getting-started` called `data`
+and `config`.
+We will store the transcript CSV file in `data`, and the CSV config file in `config`.
+
+In order to set up a table, we need to specify the schema of this transcript in a JSON file that we will store in `config`:
 
 .. code-block:: none
 
@@ -180,7 +184,7 @@ pinot-admin.sh, and use the command below:
   Executing command: AddSchema -controllerHost [controller_host] -controllerPort 9000 -schemaFilePath /Users/host1/Desktop/getting-started/config/transcript-schema.json -exec
   Sending request: http://[controller_host]:9000/schemas to controller: [controller_host], version: 0.2.0-SNAPSHOT-68092ab9eb83af173d725ec685c22ba4eb5bacf9
 
-Then, we need to specify the table config, which links the schema to the table:
+Then, we need to specify the table config in another JSON file (also stored in `config`), which links the schema to the table:
 
 .. code-block:: none
 
