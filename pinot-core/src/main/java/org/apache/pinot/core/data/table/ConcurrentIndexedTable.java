@@ -206,7 +206,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
     long numResizes = _numResizes.sum();
     long resizeTime = _resizeTime.get();
     LOGGER.info("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", numResizes, resizeTime,
-        resizeTime / numResizes);
+        numResizes == 0 ? 0 : resizeTime / numResizes);
   }
 
   @Override
