@@ -254,12 +254,12 @@ public class PinotTableRestletResource {
 
     List<String> tablesDeleted = new LinkedList<>();
     try {
-      if (toDeleteOfflineTable(tableName, tableType) && _pinotHelixResourceManager
+      if (verifyTableType(tableName, tableType, tableType.OFFLINE) && _pinotHelixResourceManager
           .hasOfflineTable(tableName)) {
         _pinotHelixResourceManager.deleteOfflineTable(tableName);
         tablesDeleted.add(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
       }
-      if (toDeleteRealtimeTable(tableName, tableType) && _pinotHelixResourceManager
+      if (verifyTableType(tableName, tableType, tableType.REALTIME) && _pinotHelixResourceManager
           .hasRealtimeTable(tableName)) {
         _pinotHelixResourceManager.deleteRealtimeTable(tableName);
         tablesDeleted.add(TableNameBuilder.REALTIME.tableNameWithType(tableName));
@@ -275,18 +275,12 @@ public class PinotTableRestletResource {
     }
   }
 
-  // Return true if tableType is NOT offline (i.e., null or realtime) and table name does  not end
-  // with _offline suffix.
-  private boolean toDeleteRealtimeTable(String tableName, TableType tableType) {
-    return tableType != TableType.OFFLINE && !TableNameBuilder.OFFLINE
-        .tableHasTypeSuffix(tableName);
-  }
-
-  // Return true if tableType is NOT realtime (i.e., null or offline) and table name does  not end
-  // with _realtime suffix.
-  private boolean toDeleteOfflineTable(String tableName, TableType tableType) {
-    return tableType != TableType.REALTIME && !TableNameBuilder.REALTIME
-        .tableHasTypeSuffix(tableName);
+  // Return true iff the table is of the expectedType based on the given tableName and tableType.
+  private boolean verifyTableType(String tableName, TableType tableType, TableType expectedType) {
+    if (tableType == null)
+      return TableNameBuilder.getTableTypeFromTableName(tableName) == expectedType ||
+          TableNameBuilder.getTableTypeFromTableName(tableName) == null;
+    return tableType == expectedType;
   }
 
   @PUT

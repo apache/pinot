@@ -21,7 +21,6 @@ package org.apache.pinot.controller.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-
 import org.apache.pinot.common.config.QuotaConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
@@ -285,8 +284,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Delete realtime table using REALTIME suffix.
     String deleteResponse = sendDeleteRequest(StringUtil.join("/", this._controllerBaseApiUrl,
-        "tables", "testRealtimeTable_REALTIME"));
-    Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [testRealtimeTable_REALTIME] deleted\"}");
+        "tables", "table0_REALTIME"));
+    Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table0_REALTIME] deleted\"}");
 
     // Case 2: Create an offline table and delete it directly w/o using query param.
     TableConfig offlineTableConfig = _offlineBuilder.setTableName("table0").build();
@@ -338,6 +337,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     try {
       deleteResponse = sendDeleteRequest(
           StringUtil.join("/", this._controllerBaseApiUrl, "tables", "no_such_table_OFFLINE"));
+      Assert.fail("Deleting an existing table should fail.");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof IOException);
       // The server returns status 500 indicating error.
