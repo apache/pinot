@@ -83,45 +83,45 @@ public class ControllerLeaderLocatorTest {
 
     // check values at startup
     Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderValid());
-    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), 0);
+    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidationTimeMs(), 0);
 
     // very first invalidate
     long currentTimeMs = 31_000L;
     controllerLeaderLocator.setCurrentTimeMs(currentTimeMs);
     controllerLeaderLocator.invalidateCachedControllerLeader();
     Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderValid());
-    long lastCacheInvalidateMillis = controllerLeaderLocator.getLastCacheInvalidateMillis();
+    long lastCacheInvalidateMillis = controllerLeaderLocator.getLastCacheInvalidationTimeMs();
     Assert.assertTrue(lastCacheInvalidateMillis > 0);
     Assert.assertEquals(lastCacheInvalidateMillis, currentTimeMs);
 
-    // invalidate within {@link ControllerLeaderLocator::getMillisBetweenInvalidate()} millis
+    // invalidate within {@link ControllerLeaderLocator::getMinInvalidateIntervalMs()} millis
     // values should remain unchanged
     currentTimeMs = 32_000L;
     controllerLeaderLocator.setCurrentTimeMs(currentTimeMs);
     controllerLeaderLocator.invalidateCachedControllerLeader();
     Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderValid());
-    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), lastCacheInvalidateMillis);
+    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidationTimeMs(), lastCacheInvalidateMillis);
 
     // getControllerLeader, which validates the cache
     controllerLeaderLocator.getControllerLeader(testTable);
     Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderValid());
-    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), lastCacheInvalidateMillis);
+    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidationTimeMs(), lastCacheInvalidateMillis);
 
-    // invalidate within {@link ControllerLeaderLocator::getMillisBetweenInvalidate()} millis
+    // invalidate within {@link ControllerLeaderLocator::getMinInvalidateIntervalMs()} millis
     // values should remain unchanged
     currentTimeMs = 33_000L;
     controllerLeaderLocator.setCurrentTimeMs(currentTimeMs);
     controllerLeaderLocator.invalidateCachedControllerLeader();
     Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderValid());
-    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), lastCacheInvalidateMillis);
+    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidationTimeMs(), lastCacheInvalidateMillis);
 
-    // invalidate after {@link ControllerLeaderLocator::getMillisBetweenInvalidate()} millis have elapsed, by setting lastCacheInvalidateMillis to well before the millisBetweenInvalidate
+    // invalidate after {@link ControllerLeaderLocator::getMinInvalidateIntervalMs()} millis have elapsed, by setting lastCacheInvalidateMillis to well before the millisBetweenInvalidate
     // cache should be invalidated and last cache invalidation time should get updated
     controllerLeaderLocator.setCurrentTimeMs(
-        controllerLeaderLocator.getCurrentTimeMS() + 2 * controllerLeaderLocator.getMillisBetweenInvalidate());
+        controllerLeaderLocator.getCurrentTimeMs() + 2 * controllerLeaderLocator.getMinInvalidateIntervalMs());
     controllerLeaderLocator.invalidateCachedControllerLeader();
     Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderValid());
-    Assert.assertTrue(controllerLeaderLocator.getLastCacheInvalidateMillis() > lastCacheInvalidateMillis);
+    Assert.assertTrue(controllerLeaderLocator.getLastCacheInvalidationTimeMs() > lastCacheInvalidateMillis);
   }
 
   @Test
@@ -218,7 +218,7 @@ public class ControllerLeaderLocatorTest {
 
     // Mock the behavior that 40 seconds have passed.
     ((FakeControllerLeaderLocator) controllerLeaderLocator)
-        .setCurrentTimeMs(controllerLeaderLocator.getCurrentTimeMS() + 40_000L);
+        .setCurrentTimeMs(controllerLeaderLocator.getCurrentTimeMs() + 40_000L);
     controllerLeaderLocator.invalidateCachedControllerLeader();
 
     // After enabling lead controller resource config, the leader in lead controller resource should be used.
@@ -258,7 +258,7 @@ public class ControllerLeaderLocatorTest {
 
     // Mock the behavior that 40 seconds have passed.
     ((FakeControllerLeaderLocator) controllerLeaderLocator)
-        .setCurrentTimeMs(controllerLeaderLocator.getCurrentTimeMS() + 40_000L);
+        .setCurrentTimeMs(controllerLeaderLocator.getCurrentTimeMs() + 40_000L);
     controllerLeaderLocator.invalidateCachedControllerLeader();
 
     // No controller in MASTER state, should return null.
@@ -281,7 +281,7 @@ public class ControllerLeaderLocatorTest {
       return _instance;
     }
 
-    protected long getCurrentTimeMS() {
+    protected long getCurrentTimeMs() {
       return _currentTimeMs;
     }
 
