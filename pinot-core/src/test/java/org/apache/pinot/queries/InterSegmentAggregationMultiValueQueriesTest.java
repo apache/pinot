@@ -26,7 +26,8 @@ import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.startree.hll.HllUtil;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValueQueriesTest {
@@ -42,8 +43,8 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, new String[]{"426752"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
-        new String[]{"62480"});
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L, new String[]{"62480"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
     QueriesTestUtils
@@ -168,8 +169,8 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, new String[]{"18499"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
-        new String[]{"1186"});
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L, new String[]{"1186"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
     QueriesTestUtils
@@ -189,8 +190,8 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, new String[]{"20039"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
-        new String[]{"1296"});
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L, new String[]{"1296"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
     QueriesTestUtils
@@ -204,23 +205,28 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
   @Test
   public void testDistinctCountRawHLLMV() {
     String query = "SELECT DISTINCTCOUNTRAWHLLMV(column6) FROM testTable";
-    Function<Serializable, String> cardinalityExtractor = value -> String.valueOf(HllUtil.buildHllFromBytes(BytesUtils.toBytes(value)).cardinality());
+    Function<Serializable, String> cardinalityExtractor =
+        value -> String.valueOf(HllUtil.buildHllFromBytes(BytesUtils.toBytes((String) value)).cardinality());
 
     BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query);
     QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, cardinalityExtractor, new String[]{"20039"});
+        .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, cardinalityExtractor,
+            new String[]{"20039"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L,
-        cardinalityExtractor, new String[]{"1296"});
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 62480L, 1089104L, 62480L, 400000L, cardinalityExtractor,
+            new String[]{"1296"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
     QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, cardinalityExtractor, new String[]{"4715"});
+        .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, cardinalityExtractor,
+            new String[]{"4715"});
 
     brokerResponse = getBrokerResponseForQuery(query + MV_GROUP_BY);
     QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, cardinalityExtractor, new String[]{"3490"});
+        .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, cardinalityExtractor,
+            new String[]{"3490"});
   }
 
   @Test

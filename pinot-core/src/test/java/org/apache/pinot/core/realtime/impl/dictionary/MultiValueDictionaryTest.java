@@ -22,10 +22,12 @@ import java.util.Random;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.fail;
 
 
 public class MultiValueDictionaryTest {
@@ -46,50 +48,37 @@ public class MultiValueDictionaryTest {
 
   @Test
   public void testMultiValueIndexing() {
-    final long seed = System.nanoTime();
-    try {
-      testMultiValueIndexing(seed);
-    } catch (Exception e) {
-      Assert.fail("Failed with seed=" + seed);
-    }
-  }
-
-  private void testMultiValueIndexing(final long seed)
-      throws Exception {
-    final LongOnHeapMutableDictionary dict = new LongOnHeapMutableDictionary();
-    final FixedByteSingleColumnMultiValueReaderWriter indexer =
-        new FixedByteSingleColumnMultiValueReaderWriter(MAX_N_VALUES, MAX_N_VALUES / 2, NROWS / 3, Integer.BYTES,
-            new DirectMemoryManager("test"), "indexer");
-
-    // Insert rows into the indexer and dictionary
-    Random random = new Random(seed);
-    for (int row = 0; row < NROWS; row++) {
-      int nValues = Math.abs(random.nextInt()) % MAX_N_VALUES;
-      Long[] val = new Long[nValues];
-      for (int i = 0; i < nValues; i++) {
-        val[i] = random.nextLong();
+    long seed = System.nanoTime();
+    try (LongOnHeapMutableDictionary dict = new LongOnHeapMutableDictionary();
+        FixedByteSingleColumnMultiValueReaderWriter indexer = new FixedByteSingleColumnMultiValueReaderWriter(
+            MAX_N_VALUES, MAX_N_VALUES / 2, NROWS / 3, Integer.BYTES, new DirectMemoryManager("test"), "indexer")) {
+      // Insert rows into the indexer and dictionary
+      Random random = new Random(seed);
+      for (int row = 0; row < NROWS; row++) {
+        int numValues = Math.abs(random.nextInt()) % MAX_N_VALUES;
+        Long[] values = new Long[numValues];
+        for (int i = 0; i < numValues; i++) {
+          values[i] = random.nextLong();
+        }
+        int[] dictIds = dict.index(values);
+        assertEquals(dictIds.length, numValues);
+        indexer.setIntArray(row, dictIds);
       }
-      dict.index(val);
-      int dictIds[] = new int[nValues];
-      for (int i = 0; i < nValues; i++) {
-        dictIds[i] = dict.indexOf(val[i]);
-      }
-      indexer.setIntArray(row, dictIds);
-    }
 
-    // Read back rows and make sure that the values are good.
-    random = new Random(seed);
-    final int[] dictIds = new int[MAX_N_VALUES];
-    for (int row = 0; row < NROWS; row++) {
-      int nValues = indexer.getIntArray(row, dictIds);
-      Assert.assertEquals(nValues, Math.abs(random.nextInt()) % MAX_N_VALUES,
-          "Mismatching number of values, random seed is: " + seed);
+      // Read back rows and make sure that the values are good.
+      random = new Random(seed);
+      int[] dictIds = new int[MAX_N_VALUES];
+      for (int row = 0; row < NROWS; row++) {
+        int numValues = indexer.getIntArray(row, dictIds);
+        assertEquals(numValues, Math.abs(random.nextInt()) % MAX_N_VALUES);
 
-      for (int i = 0; i < nValues; i++) {
-        Long val = dict.getLongValue(dictIds[i]);
-        Assert.assertEquals(val.longValue(), random.nextLong(),
-            "Value mismatch at row " + row + ", random seed is: " + seed);
+        for (int i = 0; i < numValues; i++) {
+          long value = dict.getLongValue(dictIds[i]);
+          assertEquals(value, random.nextLong());
+        }
       }
+    } catch (Throwable t) {
+      fail("Failed with random seed: " + seed, t);
     }
   }
 }

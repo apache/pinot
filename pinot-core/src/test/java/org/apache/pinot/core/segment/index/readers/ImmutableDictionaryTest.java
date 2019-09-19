@@ -31,6 +31,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -42,8 +43,8 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-public class ImmutableDictionaryReaderTest {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "ImmutableDictionaryReaderTest");
+public class ImmutableDictionaryTest {
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "ImmutableDictionaryTest");
   private static final Random RANDOM = new Random();
   private static final String INT_COLUMN_NAME = "intColumn";
   private static final String LONG_COLUMN_NAME = "longColumn";
@@ -152,19 +153,34 @@ public class ImmutableDictionaryReaderTest {
     try (IntDictionary intDictionary = new IntDictionary(
         PinotDataBuffer.mapReadOnlyBigEndianFile(new File(TEMP_DIR, INT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
         NUM_VALUES)) {
-      for (int i = 0; i < NUM_VALUES; i++) {
-        assertEquals(intDictionary.get(i).intValue(), _intValues[i]);
-        assertEquals(intDictionary.getIntValue(i), _intValues[i]);
-        assertEquals(intDictionary.getLongValue(i), _intValues[i]);
-        assertEquals(intDictionary.getFloatValue(i), _intValues[i], 0.0f);
-        assertEquals(intDictionary.getDoubleValue(i), _intValues[i], 0.0);
-        assertEquals(Integer.parseInt(intDictionary.getStringValue(i)), _intValues[i]);
+      testIntDictionary(intDictionary);
+    }
+  }
 
-        assertEquals(intDictionary.indexOf(_intValues[i]), i);
+  @Test
+  public void testOnHeapIntDictionary()
+      throws Exception {
+    try (OnHeapIntDictionary onHeapIntDictionary = new OnHeapIntDictionary(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(new File(TEMP_DIR, INT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
+        NUM_VALUES)) {
+      testIntDictionary(onHeapIntDictionary);
+    }
+  }
 
-        int randomInt = RANDOM.nextInt();
-        assertEquals(intDictionary.insertionIndexOf(randomInt), Arrays.binarySearch(_intValues, randomInt));
-      }
+  private void testIntDictionary(BaseImmutableDictionary intDictionary) {
+    for (int i = 0; i < NUM_VALUES; i++) {
+      assertEquals(intDictionary.get(i), _intValues[i]);
+      assertEquals(intDictionary.getIntValue(i), _intValues[i]);
+      assertEquals(intDictionary.getLongValue(i), (long) _intValues[i]);
+      assertEquals(intDictionary.getFloatValue(i), (float) _intValues[i]);
+      assertEquals(intDictionary.getDoubleValue(i), (double) _intValues[i]);
+      assertEquals(Integer.parseInt(intDictionary.getStringValue(i)), _intValues[i]);
+
+      assertEquals(intDictionary.indexOf(String.valueOf(_intValues[i])), i);
+
+      int randomInt = RANDOM.nextInt();
+      assertEquals(intDictionary.insertionIndexOf(String.valueOf(randomInt)),
+          Arrays.binarySearch(_intValues, randomInt));
     }
   }
 
@@ -174,19 +190,34 @@ public class ImmutableDictionaryReaderTest {
     try (LongDictionary longDictionary = new LongDictionary(PinotDataBuffer
         .mapReadOnlyBigEndianFile(new File(TEMP_DIR, LONG_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
         NUM_VALUES)) {
-      for (int i = 0; i < NUM_VALUES; i++) {
-        assertEquals(longDictionary.get(i).longValue(), _longValues[i]);
-        assertEquals(longDictionary.getIntValue(i), (int) _longValues[i]);
-        assertEquals(longDictionary.getLongValue(i), _longValues[i]);
-        assertEquals(longDictionary.getFloatValue(i), _longValues[i], 0.0f);
-        assertEquals(longDictionary.getDoubleValue(i), _longValues[i], 0.0);
-        assertEquals(Long.parseLong(longDictionary.getStringValue(i)), _longValues[i]);
+      testLongDictionary(longDictionary);
+    }
+  }
 
-        assertEquals(longDictionary.indexOf(_longValues[i]), i);
+  @Test
+  public void testOnHeapLongDictionary()
+      throws Exception {
+    try (OnHeapLongDictionary onHeapLongDictionary = new OnHeapLongDictionary(PinotDataBuffer
+        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, LONG_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
+        NUM_VALUES)) {
+      testLongDictionary(onHeapLongDictionary);
+    }
+  }
 
-        long randomLong = RANDOM.nextLong();
-        assertEquals(longDictionary.insertionIndexOf(randomLong), Arrays.binarySearch(_longValues, randomLong));
-      }
+  private void testLongDictionary(BaseImmutableDictionary longDictionary) {
+    for (int i = 0; i < NUM_VALUES; i++) {
+      assertEquals(longDictionary.get(i), _longValues[i]);
+      assertEquals(longDictionary.getIntValue(i), (int) _longValues[i]);
+      assertEquals(longDictionary.getLongValue(i), _longValues[i]);
+      assertEquals(longDictionary.getFloatValue(i), (float) _longValues[i]);
+      assertEquals(longDictionary.getDoubleValue(i), (double) _longValues[i]);
+      assertEquals(Long.parseLong(longDictionary.getStringValue(i)), _longValues[i]);
+
+      assertEquals(longDictionary.indexOf(String.valueOf(_longValues[i])), i);
+
+      long randomLong = RANDOM.nextLong();
+      assertEquals(longDictionary.insertionIndexOf(String.valueOf(randomLong)),
+          Arrays.binarySearch(_longValues, randomLong));
     }
   }
 
@@ -196,19 +227,34 @@ public class ImmutableDictionaryReaderTest {
     try (FloatDictionary floatDictionary = new FloatDictionary(PinotDataBuffer
         .mapReadOnlyBigEndianFile(new File(TEMP_DIR, FLOAT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
         NUM_VALUES)) {
-      for (int i = 0; i < NUM_VALUES; i++) {
-        assertEquals(floatDictionary.get(i), _floatValues[i], 0.0f);
-        assertEquals(floatDictionary.getIntValue(i), (int) _floatValues[i]);
-        assertEquals(floatDictionary.getLongValue(i), (long) _floatValues[i]);
-        assertEquals(floatDictionary.getFloatValue(i), _floatValues[i], 0.0f);
-        assertEquals(floatDictionary.getDoubleValue(i), _floatValues[i], 0.0);
-        assertEquals(Float.parseFloat(floatDictionary.getStringValue(i)), _floatValues[i], 0.0f);
+      testFloatDictionary(floatDictionary);
+    }
+  }
 
-        assertEquals(floatDictionary.indexOf(_floatValues[i]), i);
+  @Test
+  public void testOnHeapFloatDictionary()
+      throws Exception {
+    try (OnHeapFloatDictionary onHeapFloatDictionary = new OnHeapFloatDictionary(PinotDataBuffer
+        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, FLOAT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
+        NUM_VALUES)) {
+      testFloatDictionary(onHeapFloatDictionary);
+    }
+  }
 
-        float randomFloat = RANDOM.nextFloat();
-        assertEquals(floatDictionary.insertionIndexOf(randomFloat), Arrays.binarySearch(_floatValues, randomFloat));
-      }
+  private void testFloatDictionary(BaseImmutableDictionary floatDictionary) {
+    for (int i = 0; i < NUM_VALUES; i++) {
+      assertEquals(floatDictionary.get(i), _floatValues[i]);
+      assertEquals(floatDictionary.getIntValue(i), (int) _floatValues[i]);
+      assertEquals(floatDictionary.getLongValue(i), (long) _floatValues[i]);
+      assertEquals(floatDictionary.getFloatValue(i), _floatValues[i]);
+      assertEquals(floatDictionary.getDoubleValue(i), (double) _floatValues[i]);
+      assertEquals(Float.parseFloat(floatDictionary.getStringValue(i)), _floatValues[i], 0.0f);
+
+      assertEquals(floatDictionary.indexOf(String.valueOf(_floatValues[i])), i);
+
+      float randomFloat = RANDOM.nextFloat();
+      assertEquals(floatDictionary.insertionIndexOf(String.valueOf(randomFloat)),
+          Arrays.binarySearch(_floatValues, randomFloat));
     }
   }
 
@@ -218,19 +264,34 @@ public class ImmutableDictionaryReaderTest {
     try (DoubleDictionary doubleDictionary = new DoubleDictionary(PinotDataBuffer
         .mapReadOnlyBigEndianFile(new File(TEMP_DIR, DOUBLE_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
         NUM_VALUES)) {
-      for (int i = 0; i < NUM_VALUES; i++) {
-        assertEquals(doubleDictionary.get(i), _doubleValues[i], 0.0);
-        assertEquals(doubleDictionary.getIntValue(i), (int) _doubleValues[i]);
-        assertEquals(doubleDictionary.getLongValue(i), (long) _doubleValues[i]);
-        assertEquals(doubleDictionary.getFloatValue(i), (float) _doubleValues[i], 0.0f);
-        assertEquals(doubleDictionary.getDoubleValue(i), _doubleValues[i], 0.0);
-        assertEquals(Double.parseDouble(doubleDictionary.getStringValue(i)), _doubleValues[i], 0.0);
+      testDoubleDictionary(doubleDictionary);
+    }
+  }
 
-        assertEquals(doubleDictionary.indexOf(_doubleValues[i]), i);
+  @Test
+  public void testOnHeapDoubleDictionary()
+      throws Exception {
+    try (OnHeapDoubleDictionary onHeapDoubleDictionary = new OnHeapDoubleDictionary(PinotDataBuffer
+        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, DOUBLE_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
+        NUM_VALUES)) {
+      testDoubleDictionary(onHeapDoubleDictionary);
+    }
+  }
 
-        double randomDouble = RANDOM.nextDouble();
-        assertEquals(doubleDictionary.insertionIndexOf(randomDouble), Arrays.binarySearch(_doubleValues, randomDouble));
-      }
+  private void testDoubleDictionary(BaseImmutableDictionary doubleDictionary) {
+    for (int i = 0; i < NUM_VALUES; i++) {
+      assertEquals(doubleDictionary.get(i), _doubleValues[i]);
+      assertEquals(doubleDictionary.getIntValue(i), (int) _doubleValues[i]);
+      assertEquals(doubleDictionary.getLongValue(i), (long) _doubleValues[i]);
+      assertEquals(doubleDictionary.getFloatValue(i), (float) _doubleValues[i]);
+      assertEquals(doubleDictionary.getDoubleValue(i), _doubleValues[i]);
+      assertEquals(Double.parseDouble(doubleDictionary.getStringValue(i)), _doubleValues[i], 0.0);
+
+      assertEquals(doubleDictionary.indexOf(String.valueOf(_doubleValues[i])), i);
+
+      double randomDouble = RANDOM.nextDouble();
+      assertEquals(doubleDictionary.insertionIndexOf(String.valueOf(randomDouble)),
+          Arrays.binarySearch(_doubleValues, randomDouble));
     }
   }
 
@@ -254,7 +315,7 @@ public class ImmutableDictionaryReaderTest {
     }
   }
 
-  private void testStringDictionary(ImmutableDictionaryReader stringDictionary) {
+  private void testStringDictionary(BaseImmutableDictionary stringDictionary) {
     for (int i = 0; i < NUM_VALUES; i++) {
       assertEquals(stringDictionary.get(i), _stringValues[i]);
       assertEquals(stringDictionary.getStringValue(i), _stringValues[i]);
@@ -273,18 +334,22 @@ public class ImmutableDictionaryReaderTest {
     try (BytesDictionary bytesDictionary = new BytesDictionary(PinotDataBuffer
         .mapReadOnlyBigEndianFile(new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
         BYTES_LENGTH)) {
-      for (int i = 0; i < NUM_VALUES; i++) {
-        assertEquals(new ByteArray(bytesDictionary.get(i)), _bytesValues[i]);
-        assertEquals(new ByteArray(bytesDictionary.getBytesValue(i)), _bytesValues[i]);
+      testBytesDictionary(bytesDictionary);
+    }
+  }
 
-        assertEquals(bytesDictionary.indexOf(_bytesValues[i].getBytes()), i);
-        assertEquals(bytesDictionary.indexOf(_bytesValues[i].toHexString()), i);
+  private void testBytesDictionary(BaseImmutableDictionary bytesDictionary) {
+    for (int i = 0; i < NUM_VALUES; i++) {
+      assertEquals(bytesDictionary.get(i), _bytesValues[i].getBytes());
+      assertEquals(bytesDictionary.getStringValue(i), _bytesValues[i].toHexString());
+      assertEquals(bytesDictionary.getBytesValue(i), _bytesValues[i].getBytes());
 
-        byte[] randomBytes = new byte[BYTES_LENGTH];
-        RANDOM.nextBytes(randomBytes);
-        assertEquals(bytesDictionary.insertionIndexOf(randomBytes),
-            Arrays.binarySearch(_bytesValues, new ByteArray(randomBytes)));
-      }
+      assertEquals(bytesDictionary.indexOf(_bytesValues[i].toHexString()), i);
+
+      byte[] randomBytes = new byte[BYTES_LENGTH];
+      RANDOM.nextBytes(randomBytes);
+      assertEquals(bytesDictionary.insertionIndexOf(BytesUtils.toHexString(randomBytes)),
+          Arrays.binarySearch(_bytesValues, new ByteArray(randomBytes)));
     }
   }
 

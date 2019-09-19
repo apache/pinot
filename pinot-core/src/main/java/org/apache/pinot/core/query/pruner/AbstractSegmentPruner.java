@@ -24,7 +24,6 @@ import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.BytesUtils;
-import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
@@ -97,7 +96,7 @@ public abstract class AbstractSegmentPruner implements SegmentPruner {
       if (dataType != FieldSpec.DataType.BYTES) {
         return (Comparable) dataType.convert(input);
       } else {
-        return new ByteArray(BytesUtils.toBytes(input));
+        return BytesUtils.toByteArray(input);
       }
     } catch (Exception e) {
       throw new BadQueryRequestException(e);

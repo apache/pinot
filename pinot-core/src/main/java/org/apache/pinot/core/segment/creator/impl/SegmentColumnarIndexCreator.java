@@ -311,7 +311,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(METRICS, config.getMetrics());
     properties.setProperty(DATETIME_COLUMNS, config.getDateTimeColumnNames());
     properties.setProperty(TIME_COLUMN_NAME, config.getTimeColumnName());
-    properties.setProperty(TIME_INTERVAL, "not_there");
     properties.setProperty(SEGMENT_TOTAL_RAW_DOCS, String.valueOf(totalRawDocs));
     properties.setProperty(SEGMENT_TOTAL_AGGREGATE_DOCS, String.valueOf(totalAggDocs));
     properties.setProperty(SEGMENT_TOTAL_DOCS, String.valueOf(totalDocs));

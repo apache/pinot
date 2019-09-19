@@ -25,14 +25,12 @@ import java.util.Map;
 import org.apache.commons.collections.comparators.ComparableComparator;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
-import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-
-import static org.apache.pinot.common.utils.DataSchema.*;
 
 
 /**
@@ -173,8 +171,8 @@ public final class OrderByUtils {
         if (ascending) {
           comparator = Comparator.comparingInt(o -> (Integer) o.getKey().getColumns()[index]);
         } else {
-          comparator = (o1, o2) -> Integer.compare((Integer) o2.getKey().getColumns()[index],
-              (Integer) o1.getKey().getColumns()[index]);
+          comparator = (o1, o2) -> Integer
+              .compare((Integer) o2.getKey().getColumns()[index], (Integer) o1.getKey().getColumns()[index]);
         }
         break;
       case LONG:
@@ -187,39 +185,40 @@ public final class OrderByUtils {
         break;
       case FLOAT:
         if (ascending) {
-          comparator = (o1, o2) -> Float.compare((Float) o1.getKey().getColumns()[index],
-              (Float) o2.getKey().getColumns()[index]);
+          comparator = (o1, o2) -> Float
+              .compare((Float) o1.getKey().getColumns()[index], (Float) o2.getKey().getColumns()[index]);
         } else {
-          comparator = (o1, o2) -> Float.compare((Float) o2.getKey().getColumns()[index],
-              (Float) o1.getKey().getColumns()[index]);
+          comparator = (o1, o2) -> Float
+              .compare((Float) o2.getKey().getColumns()[index], (Float) o1.getKey().getColumns()[index]);
         }
         break;
       case DOUBLE:
         if (ascending) {
           comparator = Comparator.comparingDouble(o -> (Double) o.getKey().getColumns()[index]);
         } else {
-          comparator = (o1, o2) -> Double.compare((Double) o2.getKey().getColumns()[index],
-              (Double) o1.getKey().getColumns()[index]);
+          comparator = (o1, o2) -> Double
+              .compare((Double) o2.getKey().getColumns()[index], (Double) o1.getKey().getColumns()[index]);
+        }
+        break;
+      case STRING:
+        if (ascending) {
+          comparator = Comparator.comparing(o -> (String) o.getKey().getColumns()[index]);
+        } else {
+          comparator = (o1, o2) -> ((String) o2.getKey().getColumns()[index])
+              .compareTo((String) o1.getKey().getColumns()[index]);
         }
         break;
       case BYTES:
         if (ascending) {
-          comparator = (o1, o2) -> ByteArray.compare(BytesUtils.toBytes(o1.getKey().getColumns()[index]),
-              BytesUtils.toBytes(o2.getKey().getColumns()[index]));
+          comparator = (o1, o2) -> ByteArray
+              .compare((byte[]) o1.getKey().getColumns()[index], (byte[]) o2.getKey().getColumns()[index]);
         } else {
-          comparator = (o1, o2) -> ByteArray.compare(BytesUtils.toBytes(o2.getKey().getColumns()[index]),
-              BytesUtils.toBytes(o1.getKey().getColumns()[index]));
+          comparator = (o1, o2) -> ByteArray
+              .compare((byte[]) o2.getKey().getColumns()[index], (byte[]) o1.getKey().getColumns()[index]);
         }
         break;
-      case STRING:
       default:
-        if (ascending) {
-          comparator = Comparator.comparing(o -> (String) o.getKey().getColumns()[index]);
-        } else {
-          comparator = (o1, o2) -> ((String) o2.getKey().getColumns()[index]).compareTo(
-              (String) o1.getKey().getColumns()[index]);
-        }
-        break;
+        throw new IllegalStateException();
     }
     return comparator;
   }
@@ -255,23 +254,22 @@ public final class OrderByUtils {
           comparator = (o1, o2) -> Double.compare((Double) o2.getValues()[index], (Double) o1.getValues()[index]);
         }
         break;
-      case BYTES:
-        if (ascending) {
-          comparator = (o1, o2) -> ByteArray.compare(BytesUtils.toBytes(o1.getValues()[index]),
-              BytesUtils.toBytes(o2.getValues()[index]));
-        } else {
-          comparator = (o1, o2) -> ByteArray.compare(BytesUtils.toBytes(o2.getValues()[index]),
-              BytesUtils.toBytes(o1.getValues()[index]));
-        }
-        break;
       case STRING:
-      default:
         if (ascending) {
           comparator = Comparator.comparing(o -> (String) o.getValues()[index]);
         } else {
           comparator = (o1, o2) -> ((String) o2.getValues()[index]).compareTo((String) o1.getValues()[index]);
         }
         break;
+      case BYTES:
+        if (ascending) {
+          comparator = (o1, o2) -> ByteArray.compare((byte[]) o1.getValues()[index], (byte[]) o2.getValues()[index]);
+        } else {
+          comparator = (o1, o2) -> ByteArray.compare((byte[]) o2.getValues()[index], (byte[]) o1.getValues()[index]);
+        }
+        break;
+      default:
+        throw new IllegalStateException();
     }
     return comparator;
   }

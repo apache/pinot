@@ -29,61 +29,64 @@ import org.apache.pinot.core.io.util.VarLengthBytesValueReaderWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
-@SuppressWarnings("Duplicates")
-public abstract class ImmutableDictionaryReader extends BaseDictionary {
+public abstract class BaseImmutableDictionary extends BaseDictionary {
   private final ValueReader _valueReader;
   private final int _length;
   private final int _numBytesPerValue;
   private final byte _paddingByte;
 
-  protected ImmutableDictionaryReader(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
+  protected BaseImmutableDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
     if (VarLengthBytesValueReaderWriter.isVarLengthBytesDictBuffer(dataBuffer)) {
       _valueReader = new VarLengthBytesValueReaderWriter(dataBuffer);
-      _numBytesPerValue = -1;
-      _paddingByte = 0;
     } else {
       Preconditions.checkState(dataBuffer.size() == length * numBytesPerValue,
-          "The size of the dataBuffer isn't the same as length * numBytesPerValue, where dataBuffer.size() = "
-              + dataBuffer.size() + ", length = " + length + ", numBytesPerValue = " + numBytesPerValue);
+          "Buffer size mismatch: bufferSize = %s, numValues = %s, numByesPerValue = %s", dataBuffer.size(), length,
+          numBytesPerValue);
       _valueReader = new FixedByteValueReaderWriter(dataBuffer);
-      _numBytesPerValue = numBytesPerValue;
-      _paddingByte = paddingByte;
     }
     _length = length;
+    _numBytesPerValue = numBytesPerValue;
+    _paddingByte = paddingByte;
   }
 
-  protected ImmutableDictionaryReader(ValueReader valueReader, int length) {
-    _valueReader = valueReader;
+  /**
+   * For virtual dictionary.
+   */
+  protected BaseImmutableDictionary(int length) {
+    _valueReader = null;
     _length = length;
     _numBytesPerValue = -1;
     _paddingByte = 0;
   }
 
   /**
-   * Returns the insertion index of object in the dictionary.
-   * <ul>
-   *   <li> If the object already exists, then returns the current index. </li>
-   *   <li> If the object does not exist, then returns the index at which the object would be inserted, with -ve sign.
-   *        Sign of index is inverted to indicate that the object was not found in the dictionary. </li>
-   * </ul>
-   * @param rawValue Object for which to find the insertion index
-   * @return Insertion index of the object (as defined above).
+   * Returns the insertion index of string representation of the value in the dictionary. Follows the same behavior as
+   * in {@link Arrays#binarySearch(Object[], Object)}. This API is for range predicate evaluation.
    */
-  public abstract int insertionIndexOf(Object rawValue);
+  public abstract int insertionIndexOf(String stringValue);
+
+  @Override
+  public boolean isSorted() {
+    return true;
+  }
 
   @Override
   public int length() {
     return _length;
   }
 
-  public boolean isSorted() {
-    return true;
+  @Override
+  public int indexOf(String stringValue) {
+    int index = insertionIndexOf(stringValue);
+    return (index >= 0) ? index : NULL_VALUE_INDEX;
   }
 
   @Override
   public void close()
       throws IOException {
-    _valueReader.close();
+    if (_valueReader != null) {
+      _valueReader.close();
+    }
   }
 
   protected int binarySearch(int value) {
@@ -154,6 +157,13 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
     return -(low + 1);
   }
 
+  /**
+   * WARNING: With non-zero padding byte, binary search result might not reflect the real insertion index for the value.
+   * E.g. with padding byte 'b', if unpadded value "aa" is in the dictionary, and stored as "aab", then unpadded value
+   * "a" will be mis-positioned after value "aa"; unpadded value "aab" will return positive value even if value "aab" is
+   * not in the dictionary.
+   * TODO: Clean up the segments with legacy non-zero padding byte, and remove the support for non-zero padding byte
+   */
   protected int binarySearch(String value) {
     byte[] buffer = getBuffer();
     int low = 0;
@@ -190,13 +200,12 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
   }
 
   protected int binarySearch(byte[] value) {
-    byte[] buffer = getBuffer();
     int low = 0;
     int high = _length - 1;
 
     while (low <= high) {
       int mid = (low + high) >>> 1;
-      byte[] midValue = _valueReader.getBytes(mid, _numBytesPerValue, buffer);
+      byte[] midValue = _valueReader.getBytes(mid, _numBytesPerValue);
       int compareResult = ByteArray.compare(midValue, value);
       if (compareResult < 0) {
         low = mid + 1;
@@ -248,11 +257,11 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
     return _valueReader.getPaddedString(dictId, _numBytesPerValue, buffer);
   }
 
-  protected byte[] getBytes(int dictId, byte[] buffer) {
-    return _valueReader.getBytes(dictId, _numBytesPerValue, buffer);
+  protected byte[] getBytes(int dictId) {
+    return _valueReader.getBytes(dictId, _numBytesPerValue);
   }
 
   protected byte[] getBuffer() {
-    return _numBytesPerValue == -1 ? null : new byte[_numBytesPerValue];
+    return new byte[_numBytesPerValue];
   }
 }

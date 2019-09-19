@@ -18,35 +18,18 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
-import org.apache.pinot.core.io.util.ValueReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
-public class IntDictionary extends ImmutableDictionaryReader {
+public class IntDictionary extends BaseImmutableDictionary {
 
   public IntDictionary(PinotDataBuffer dataBuffer, int length) {
     super(dataBuffer, length, Integer.BYTES, (byte) 0);
   }
 
-  public IntDictionary(ValueReader valueReader, int length) {
-    super(valueReader, length);
-  }
-
   @Override
-  public int indexOf(Object rawValue) {
-    int index = insertionIndexOf(rawValue);
-    return (index >= 0) ? index : -1;
-  }
-
-  @Override
-  public int insertionIndexOf(Object rawValue) {
-    int value;
-    if (rawValue instanceof String) {
-      value = Integer.parseInt((String) rawValue);
-    } else {
-      value = (Integer) rawValue;
-    }
-    return binarySearch(value);
+  public int insertionIndexOf(String stringValue) {
+    return binarySearch(Integer.parseInt(stringValue));
   }
 
   @Override
