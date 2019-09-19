@@ -126,11 +126,12 @@ import static org.apache.pinot.thirdeye.detection.yaml.DetectionConfigTuner.*;
 public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigDTO, DetectionConfigValidator> {
   public static final String PROP_SUB_ENTITY_NAME = "subEntityName";
 
-  private static final String PROP_DIMENSION_EXPLORATION = "dimensionExploration";
+  public static final String PROP_DIMENSION_EXPLORATION = "dimensionExploration";
+  public static final String PROP_FILTERS = "filters";
+
   private static final String PROP_DETECTION = "detection";
   private static final String PROP_CRON = "cron";
   private static final String PROP_FILTER = "filter";
-  private static final String PROP_FILTERS = "filters";
   private static final String PROP_TYPE = "type";
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_PARAMS = "params";

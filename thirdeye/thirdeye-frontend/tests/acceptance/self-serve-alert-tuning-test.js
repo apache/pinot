@@ -25,8 +25,6 @@ module('Acceptance | tune alert settings', function(hooks) {
   test(`visiting alert page to test self-serve tuning flow`, async (assert) => {
     server.createList('alert', 5);
     await visit(`/manage/alerts`);
-    const $targetAlertLink = $(`${selfServeConst.RESULTS_LINK}:contains(${alertLinkTitle})`);
-    const problem = $(selfServeConst.RESULTS_TITLE).get(0).innerText.trim();
 
     // Verify default search results
     assert.equal(

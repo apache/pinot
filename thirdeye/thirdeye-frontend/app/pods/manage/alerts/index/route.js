@@ -13,7 +13,9 @@ const filterToPropertyMap = {
   subscription: 'group',
   owner: 'createdBy',
   type: 'type',
-  metric: 'metric'
+  metric: 'metric',
+  dataset: 'collection',
+  granularity: 'granularity'
 };
 
 export default Route.extend(AuthenticatedRouteMixin, {
@@ -45,8 +47,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
         dimensions = dimensions.substring(0, dimensions.length-2);
       }
       Object.assign(yamlAlert, {
-        functionName: yamlAlert.detectionName,
-        collection: yamlAlert.dataset,
+        functionName: yamlAlert.name,
+        collection: yamlAlert.datasetNames.toString(),
+        granularity: yamlAlert.monitoringGranularity.toString(),
         type: this._detectionType(yamlAlert),
         exploreDimensions: dimensions,
         filters: formatYamlFilter(yamlAlert.filters),
@@ -131,6 +134,18 @@ export default Route.extend(AuthenticatedRouteMixin, {
       {
         name: 'metric',
         title: 'Metrics',
+        type: 'select',
+        filterKeys: []
+      },
+      {
+        name: 'dataset',
+        title: 'Datasets',
+        type: 'select',
+        filterKeys: []
+      },
+      {
+        name: 'granularity',
+        title: 'Time Granularities',
         type: 'select',
         filterKeys: []
       }

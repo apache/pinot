@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.datalayer.entity;
 
 public class DatasetConfigIndex extends AbstractIndexEntity {
   String dataset;
+  String displayName;
   boolean active;
   boolean requiresCompletenessCheck;
 
@@ -30,6 +31,15 @@ public class DatasetConfigIndex extends AbstractIndexEntity {
   public void setDataset(String dataset) {
     this.dataset = dataset;
   }
+
+  public String getDisplayName() {
+    return displayName;
+  }
+
+  public void setDisplayName(String displayName) {
+    this.displayName = displayName;
+  }
+
   public boolean isActive() {
     return active;
   }
