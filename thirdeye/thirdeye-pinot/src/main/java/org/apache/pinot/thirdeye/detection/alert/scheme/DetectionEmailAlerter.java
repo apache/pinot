@@ -74,7 +74,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   private static final String PROP_EMAIL_WHITELIST = "emailWhitelist";
   private static final String PROP_ADMIN_RECIPIENTS = "adminRecipients";
 
-  private static final String PROP_EMAIL_SCHEME = "emailScheme";
+  public static final String PROP_EMAIL_SCHEME = "emailScheme";
   private static final String PROP_EMAIL_TEMPLATE = "template";
   private static final String PROP_EMAIL_SUBJECT_STYLE = "subject";
 
@@ -256,8 +256,10 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     Preconditions.checkNotNull(detectionResult.getResult());
     for (Map.Entry<DetectionAlertFilterNotification, Set<MergedAnomalyResultDTO>> entry : detectionResult.getResult().entrySet()) {
       DetectionAlertFilterNotification notification = entry.getKey();
-      if (notification.getNotificationProps() != null && notification.getNotificationProps().get(PROP_RECIPIENTS) != null) {
-        SetMultimap<String, String> emailRecipients = (SetMultimap<String, String>) notification.getNotificationProps().get(PROP_RECIPIENTS);
+      Map<String, Object> notificationSchemeProps = notification.getNotificationSchemeProps();
+      if (notificationSchemeProps != null && notificationSchemeProps.get(PROP_EMAIL_SCHEME) != null
+          && ConfigUtils.getMap(notificationSchemeProps.get(PROP_EMAIL_SCHEME)).get(PROP_RECIPIENTS) != null) {
+        SetMultimap<String, String> emailRecipients = (SetMultimap<String, String>) ConfigUtils.getMap(notificationSchemeProps.get(PROP_EMAIL_SCHEME)).get(PROP_RECIPIENTS);
         if (emailRecipients.get(PROP_TO) == null || emailRecipients.get(PROP_TO).isEmpty()) {
           LOG.warn("Skipping! No email recipients found for alert {}.", config.getId());
           return;

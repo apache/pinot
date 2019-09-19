@@ -27,18 +27,18 @@ import java.util.Objects;
  * Container class for notification properties
  */
 public class DetectionAlertFilterNotification {
-  Map<String, Object> notificationProps;
+  Map<String, Object> notificationSchemeProps;
 
-  public DetectionAlertFilterNotification(Map<String, Object> notificationProps) {
-    this.notificationProps = notificationProps;
+  public DetectionAlertFilterNotification(Map<String, Object> notificationSchemeProps) {
+    this.notificationSchemeProps = notificationSchemeProps;
   }
 
-  public Map<String, Object> getNotificationProps() {
-    return notificationProps;
+  public Map<String, Object> getNotificationSchemeProps() {
+    return notificationSchemeProps;
   }
 
-  public DetectionAlertFilterNotification setNotificationProps(Map<String, Object> notificationProps) {
-    this.notificationProps = notificationProps;
+  public DetectionAlertFilterNotification setNotificationSchemeProps(Map<String, Object> notificationSchemeProps) {
+    this.notificationSchemeProps = notificationSchemeProps;
     return this;
   }
 
@@ -51,12 +51,12 @@ public class DetectionAlertFilterNotification {
       return false;
     }
     DetectionAlertFilterNotification that = (DetectionAlertFilterNotification) o;
-    return Objects.equals(notificationProps, that.notificationProps);
+    return Objects.equals(notificationSchemeProps, that.notificationSchemeProps);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(notificationProps);
+    return Objects.hash(notificationSchemeProps);
   }
 
 }

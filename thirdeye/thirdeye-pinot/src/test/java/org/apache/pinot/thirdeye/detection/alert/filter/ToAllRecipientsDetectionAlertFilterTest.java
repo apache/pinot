@@ -33,11 +33,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.thirdeye.detection.DetectionTestUtils.*;
+import static org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter.*;
 
 
 public class ToAllRecipientsDetectionAlertFilterTest {
@@ -91,8 +93,8 @@ public class ToAllRecipientsDetectionAlertFilterTest {
     recipients.put(PROP_BCC, PROP_BCC_VALUE);
     properties.put(PROP_RECIPIENTS, recipients);
     properties.put(PROP_DETECTION_CONFIG_IDS, PROP_ID_VALUE);
-
     alertConfig.setProperties(properties);
+
     Map<Long, Long> vectorClocks = new HashMap<>();
     vectorClocks.put(PROP_ID_VALUE.get(0), 0L);
     alertConfig.setVectorClocks(vectorClocks);
@@ -225,7 +227,11 @@ public class ToAllRecipientsDetectionAlertFilterTest {
     recipients.put(PROP_BCC, new HashSet<>(PROP_BCC_VALUE));
 
     recipients.get(PROP_TO).addAll(toRecipients);
-    ALERT_PROPS.put(PROP_RECIPIENTS, recipients);
+
+    Map<String, Object> emailRecipients = new HashMap<>();
+    emailRecipients.put(PROP_RECIPIENTS, recipients);
+
+    ALERT_PROPS.put(PROP_EMAIL_SCHEME, emailRecipients);
 
     return new DetectionAlertFilterNotification(ALERT_PROPS);
   }

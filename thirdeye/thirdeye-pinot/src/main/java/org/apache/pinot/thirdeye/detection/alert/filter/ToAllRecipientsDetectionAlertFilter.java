@@ -37,6 +37,9 @@ import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.detection.annotation.AlertFilter;
 
+import static org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter.*;
+
+
 /**
  * The detection alert filter that sends the anomaly email to all recipients
  */
@@ -76,9 +79,17 @@ public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertF
     recipients.put(PROP_CC, cleanupRecipients(this.recipients.get(PROP_CC)));
     recipients.put(PROP_BCC, cleanupRecipients(this.recipients.get(PROP_BCC)));
 
-    Map<String, Object> alertProps = new HashMap<>();
-    alertProps.put(PROP_RECIPIENTS, recipients);
-    return result.addMapping(new DetectionAlertFilterNotification(alertProps), anomalies);
+    Map<String, Object> alertSchemeProps = new HashMap<>();
+    if (this.config.getAlertSchemes() == null) {
+      Map<String, Map<String, Object>> alertSchemes = new HashMap<>();
+      alertSchemes.put(PROP_EMAIL_SCHEME, new HashMap<>());
+      this.config.setAlertSchemes(alertSchemes);
+    }
+
+    this.config.getAlertSchemes().get(PROP_EMAIL_SCHEME).put(PROP_RECIPIENTS, recipients);
+    alertSchemeProps.putAll(this.config.getAlertSchemes());
+
+    return result.addMapping(new DetectionAlertFilterNotification(alertSchemeProps), anomalies);
   }
 
   private Set<String> cleanupRecipients(Set<String> recipient) {
