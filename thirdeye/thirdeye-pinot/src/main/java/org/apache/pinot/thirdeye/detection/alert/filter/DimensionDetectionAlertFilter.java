@@ -88,7 +88,7 @@ public class DimensionDetectionAlertFilter extends StatefulDetectionAlertFilter 
     for (Map.Entry<String, Collection<MergedAnomalyResultDTO>> dimAnomalyMapping : grouped.asMap().entrySet()) {
       result.addMapping(
           new DetectionAlertFilterNotification(
-              getNotificationSchemeProps(
+              generateNotificationSchemeProps(
                   this.config,
                   this.makeGroupRecipients(dimAnomalyMapping.getKey()),
                   this.recipients.get(PROP_CC),

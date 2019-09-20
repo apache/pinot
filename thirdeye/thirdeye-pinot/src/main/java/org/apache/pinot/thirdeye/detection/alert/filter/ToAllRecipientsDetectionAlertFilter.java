@@ -71,7 +71,7 @@ public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertF
 
     return result.addMapping(
         new DetectionAlertFilterNotification(
-            getNotificationSchemeProps(
+            generateNotificationSchemeProps(
                 this.config,
                 this.recipients.get(PROP_TO),
                 this.recipients.get(PROP_CC),

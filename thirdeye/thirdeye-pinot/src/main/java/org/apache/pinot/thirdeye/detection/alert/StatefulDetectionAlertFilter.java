@@ -111,7 +111,7 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
     return filteredRecipients;
   }
 
-  protected Map<String, Object> getNotificationSchemeProps(DetectionAlertConfigDTO config,
+  protected Map<String, Object> generateNotificationSchemeProps(DetectionAlertConfigDTO config,
       Set<String> to, Set<String> cc, Set<String> bcc) {
     Map<String, Set<String>> recipients = new HashMap<>();
     recipients.put(PROP_TO, cleanupRecipients(to));
@@ -124,12 +124,12 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
       config.setAlertSchemes(alertSchemes);
     }
 
-    Map<String, Object> alertSchemes = new HashMap<>();
+    Map<String, Object> notificationSchemeProps = new HashMap<>();
     for (Map.Entry<String, Map<String, Object>> schemeProps : config.getAlertSchemes().entrySet()) {
-      alertSchemes.put(schemeProps.getKey(), new HashMap<>(schemeProps.getValue()));
+      notificationSchemeProps.put(schemeProps.getKey(), new HashMap<>(schemeProps.getValue()));
     }
-    ((Map<String, Object>) alertSchemes.get(PROP_EMAIL_SCHEME)).put(PROP_RECIPIENTS, recipients);
+    ((Map<String, Object>) notificationSchemeProps.get(PROP_EMAIL_SCHEME)).put(PROP_RECIPIENTS, recipients);
 
-    return alertSchemes;
+    return notificationSchemeProps;
   }
 }

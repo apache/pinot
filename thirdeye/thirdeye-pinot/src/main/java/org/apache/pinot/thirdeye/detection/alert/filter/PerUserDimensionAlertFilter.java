@@ -108,7 +108,7 @@ public class PerUserDimensionAlertFilter extends StatefulDetectionAlertFilter {
     for (Map.Entry<String, List<MergedAnomalyResultDTO>> userAnomalyMapping : perUserAnomalies.entrySet()) {
       result.addMapping(
           new DetectionAlertFilterNotification(
-              getNotificationSchemeProps(
+              generateNotificationSchemeProps(
                   this.config,
                   this.makeGroupRecipients(userAnomalyMapping.getKey()),
                   this.recipients.get(PROP_CC),
