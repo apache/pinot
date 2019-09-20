@@ -26,7 +26,6 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.SetMultimap;
 import java.util.Collection;
-import java.util.HashMap;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
@@ -41,8 +40,6 @@ import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.detection.annotation.AlertFilter;
 
-import static org.apache.pinot.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter.*;
-
 
 /**
  * The detection alert filter that sends the anomaly email to a set
@@ -52,10 +49,6 @@ import static org.apache.pinot.thirdeye.detection.alert.filter.ToAllRecipientsDe
 @AlertFilter(type = "DIMENSION_ALERTER_PIPELINE")
 public class DimensionDetectionAlertFilter extends StatefulDetectionAlertFilter {
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
-  private static final String PROP_TO = "to";
-  private static final String PROP_CC = "cc";
-  private static final String PROP_BCC = "bcc";
-  private static final String PROP_RECIPIENTS = "recipients";
   private static final String PROP_DIMENSION = "dimension";
   private static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
   private static final String PROP_SEND_ONCE = "sendOnce";
@@ -92,16 +85,15 @@ public class DimensionDetectionAlertFilter extends StatefulDetectionAlertFilter 
       }
     });
 
-    for (Map.Entry<String, Collection<MergedAnomalyResultDTO>> entry : grouped.asMap().entrySet()) {
-      Map<String, Set<String>> recipients = new HashMap<>();
-      recipients.put(PROP_TO, this.makeGroupRecipients(entry.getKey()));
-      recipients.put(PROP_CC, this.recipients.get(PROP_CC));
-      recipients.put(PROP_BCC, this.recipients.get(PROP_BCC));
-
-      Map<String, Object> alertProps = new HashMap<>();
-      alertProps.put(PROP_RECIPIENTS, recipients);
-
-      result.addMapping(new DetectionAlertFilterNotification(alertProps), new HashSet<>(entry.getValue()));
+    for (Map.Entry<String, Collection<MergedAnomalyResultDTO>> dimAnomalyMapping : grouped.asMap().entrySet()) {
+      result.addMapping(
+          new DetectionAlertFilterNotification(
+              getNotificationSchemeProps(
+                  this.config,
+                  this.makeGroupRecipients(dimAnomalyMapping.getKey()),
+                  this.recipients.get(PROP_CC),
+                  this.recipients.get(PROP_BCC))),
+          new HashSet<>(dimAnomalyMapping.getValue()));
     }
 
     return result;

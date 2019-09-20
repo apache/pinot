@@ -21,8 +21,6 @@ package org.apache.pinot.thirdeye.detection.alert.filter;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
-import java.util.HashMap;
-import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
@@ -30,14 +28,11 @@ import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.apache.pinot.thirdeye.detection.alert.StatefulDetectionAlertFilter;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.detection.annotation.AlertFilter;
-
-import static org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter.*;
 
 
 /**
@@ -74,32 +69,14 @@ public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertF
     // Fetch all the anomalies to be notified to the recipients
     Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds), minId);
 
-    Map<String, Set<String>> recipients = new HashMap<>();
-    recipients.put(PROP_TO, cleanupRecipients(this.recipients.get(PROP_TO)));
-    recipients.put(PROP_CC, cleanupRecipients(this.recipients.get(PROP_CC)));
-    recipients.put(PROP_BCC, cleanupRecipients(this.recipients.get(PROP_BCC)));
-
-    Map<String, Object> alertSchemeProps = new HashMap<>();
-    if (this.config.getAlertSchemes() == null) {
-      Map<String, Map<String, Object>> alertSchemes = new HashMap<>();
-      alertSchemes.put(PROP_EMAIL_SCHEME, new HashMap<>());
-      this.config.setAlertSchemes(alertSchemes);
-    }
-
-    this.config.getAlertSchemes().get(PROP_EMAIL_SCHEME).put(PROP_RECIPIENTS, recipients);
-    alertSchemeProps.putAll(this.config.getAlertSchemes());
-
-    return result.addMapping(new DetectionAlertFilterNotification(alertSchemeProps), anomalies);
-  }
-
-  private Set<String> cleanupRecipients(Set<String> recipient) {
-    Set<String> filteredRecipients = new HashSet<>();
-    if (recipient != null) {
-      filteredRecipients.addAll(recipient);
-      filteredRecipients = filteredRecipients.stream().map(String::trim).collect(Collectors.toSet());
-      filteredRecipients.removeIf(rec -> rec == null || "".equals(rec));
-    }
-    return filteredRecipients;
+    return result.addMapping(
+        new DetectionAlertFilterNotification(
+            getNotificationSchemeProps(
+                this.config,
+                this.recipients.get(PROP_TO),
+                this.recipients.get(PROP_CC),
+                this.recipients.get(PROP_BCC))),
+        anomalies);
   }
 
   private long getMinId(long highWaterMark) {

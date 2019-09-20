@@ -23,6 +23,8 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 
+import static org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter.*;
+
 
 public class AlertFilterUtils {
 
@@ -42,13 +44,21 @@ public class AlertFilterUtils {
   }
 
   static DetectionAlertFilterNotification makeEmailNotifications(Set<String> toRecipients) {
-    Map<String, Set<String>> recipients = new HashMap<>();
-    recipients.put(PROP_TO, new HashSet<>(PROP_TO_VALUE));
-    recipients.put(PROP_CC, new HashSet<>(PROP_CC_VALUE));
-    recipients.put(PROP_BCC, new HashSet<>(PROP_BCC_VALUE));
+    Set<String> recipients = new HashSet<>(toRecipients);
+    recipients.addAll(PROP_TO_VALUE);
+    return makeEmailNotifications(recipients, PROP_CC_VALUE, PROP_BCC_VALUE);
+  }
 
-    recipients.get(PROP_TO).addAll(toRecipients);
-    ALERT_PROPS.put(PROP_RECIPIENTS, recipients);
+  static DetectionAlertFilterNotification makeEmailNotifications(Set<String> toRecipients, Set<String> ccRecipients, Set<String> bccRecipients) {
+    Map<String, Set<String>> recipients = new HashMap<>();
+    recipients.put(PROP_TO, new HashSet<>(toRecipients));
+    recipients.put(PROP_CC, new HashSet<>(ccRecipients));
+    recipients.put(PROP_BCC, new HashSet<>(bccRecipients));
+
+    Map<String, Object> emailRecipients = new HashMap<>();
+    emailRecipients.put(PROP_RECIPIENTS, recipients);
+
+    ALERT_PROPS.put(PROP_EMAIL_SCHEME, emailRecipients);
 
     return new DetectionAlertFilterNotification(ALERT_PROPS);
   }

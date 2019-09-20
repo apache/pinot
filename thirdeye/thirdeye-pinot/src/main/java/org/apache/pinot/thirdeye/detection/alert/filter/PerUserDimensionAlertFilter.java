@@ -55,10 +55,6 @@ import org.apache.pinot.thirdeye.detection.annotation.AlertFilter;
 @AlertFilter(type = "PER_USER_DIMENSION_ALERTER_PIPELINE")
 public class PerUserDimensionAlertFilter extends StatefulDetectionAlertFilter {
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
-  private static final String PROP_TO = "to";
-  private static final String PROP_CC = "cc";
-  private static final String PROP_BCC = "bcc";
-  private static final String PROP_RECIPIENTS = "recipients";
   private static final String PROP_DIMENSION = "dimension";
   private static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
   private static final String PROP_SEND_ONCE = "sendOnce";
@@ -110,15 +106,14 @@ public class PerUserDimensionAlertFilter extends StatefulDetectionAlertFilter {
     }
 
     for (Map.Entry<String, List<MergedAnomalyResultDTO>> userAnomalyMapping : perUserAnomalies.entrySet()) {
-      Map<String, Set<String>> recipients = new HashMap<>();
-      recipients.put(PROP_TO, this.makeGroupRecipients(userAnomalyMapping.getKey()));
-      recipients.put(PROP_CC, this.recipients.get(PROP_CC));
-      recipients.put(PROP_BCC, this.recipients.get(PROP_BCC));
-
-      Map<String, Object> alertProps = new HashMap<>();
-      alertProps.put(PROP_RECIPIENTS, recipients);
-
-      result.addMapping(new DetectionAlertFilterNotification(alertProps), new HashSet<>(userAnomalyMapping.getValue()));
+      result.addMapping(
+          new DetectionAlertFilterNotification(
+              getNotificationSchemeProps(
+                  this.config,
+                  this.makeGroupRecipients(userAnomalyMapping.getKey()),
+                  this.recipients.get(PROP_CC),
+                  this.recipients.get(PROP_BCC))),
+          new HashSet<>(userAnomalyMapping.getValue()));
     }
 
     return result;

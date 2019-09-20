@@ -108,7 +108,7 @@ public class ToAllRecipientsDetectionAlertFilterTest {
 
     DetectionAlertFilterResult result = this.alertFilter.run();
 
-    DetectionAlertFilterNotification notification = makeEmailNotifications();
+    DetectionAlertFilterNotification notification = AlertFilterUtils.makeEmailNotifications(PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
     Assert.assertEquals(result.getResult().get(notification), new HashSet<>(this.detectedAnomalies.subList(0, 4)));
   }
 
@@ -139,7 +139,7 @@ public class ToAllRecipientsDetectionAlertFilterTest {
     DetectionAlertFilterResult result = this.alertFilter.run();
     Assert.assertEquals(result.getResult().size(), 1);
 
-    DetectionAlertFilterNotification notification = makeEmailNotifications();
+    DetectionAlertFilterNotification notification = AlertFilterUtils.makeEmailNotifications(PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
     Assert.assertTrue(result.getResult().containsKey(notification));
     Assert.assertEquals(result.getResult().get(notification).size(), 3);
     Assert.assertTrue(result.getResult().get(notification).contains(this.detectedAnomalies.get(5)));
@@ -170,7 +170,7 @@ public class ToAllRecipientsDetectionAlertFilterTest {
 
     DetectionAlertFilterResult result = this.alertFilter.run();
 
-    DetectionAlertFilterNotification notification = makeEmailNotifications();
+    DetectionAlertFilterNotification notification = AlertFilterUtils.makeEmailNotifications(PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
     Assert.assertEquals(result.getResult().get(notification).size(), 1);
     Assert.assertTrue(result.getResult().get(notification).contains(existingFuture));
   }
@@ -199,7 +199,7 @@ public class ToAllRecipientsDetectionAlertFilterTest {
 
     DetectionAlertFilterResult result = this.alertFilter.run();
 
-    DetectionAlertFilterNotification notification = makeEmailNotifications();
+    DetectionAlertFilterNotification notification = AlertFilterUtils.makeEmailNotifications(PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
     Assert.assertEquals(result.getResult().get(notification).size(), 2);
     Assert.assertTrue(result.getResult().get(notification).contains(existingNew));
     Assert.assertTrue(result.getResult().get(notification).contains(existingFuture));
@@ -214,25 +214,5 @@ public class ToAllRecipientsDetectionAlertFilterTest {
 
     DetectionAlertFilterResult result = this.alertFilter.run();
     Assert.assertEquals(result.getResult().size(), 1);
-  }
-
-  private static DetectionAlertFilterNotification makeEmailNotifications() {
-    return makeEmailNotifications(new HashSet<String>());
-  }
-
-  private static DetectionAlertFilterNotification makeEmailNotifications(Set<String> toRecipients) {
-    Map<String, Set<String>> recipients = new HashMap<>();
-    recipients.put(PROP_TO, new HashSet<>(PROP_TO_VALUE));
-    recipients.put(PROP_CC, new HashSet<>(PROP_CC_VALUE));
-    recipients.put(PROP_BCC, new HashSet<>(PROP_BCC_VALUE));
-
-    recipients.get(PROP_TO).addAll(toRecipients);
-
-    Map<String, Object> emailRecipients = new HashMap<>();
-    emailRecipients.put(PROP_RECIPIENTS, recipients);
-
-    ALERT_PROPS.put(PROP_EMAIL_SCHEME, emailRecipients);
-
-    return new DetectionAlertFilterNotification(ALERT_PROPS);
   }
 }

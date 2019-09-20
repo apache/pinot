@@ -176,7 +176,7 @@ public class DimensionDetectionAlertFilterTest {
     DetectionAlertFilterResult result = this.alertFilter.run();
     Assert.assertEquals(result.getResult().size(), 2);
 
-    DetectionAlertFilterNotification recDefault = AlertFilterUtils.makeEmailNotifications();
+    DetectionAlertFilterNotification recDefault = AlertFilterUtils.makeEmailNotifications(PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
     Assert.assertTrue(result.getResult().containsKey(recDefault));
     Assert.assertEquals(result.getResult().get(recDefault).size(), 2);
     Assert.assertTrue(result.getResult().get(recDefault).contains(anomalyWithoutFeedback));
