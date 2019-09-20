@@ -149,8 +149,7 @@ public class CombinePlanNode implements PlanNode {
       Map<String, String> queryOptions = _brokerRequest.getQueryOptions();
       // new Combine operator only when GROUP_BY_MODE explicitly set to SQL
       if (queryOptions != null && SQL.equalsIgnoreCase(queryOptions.get(QueryOptionKey.GROUP_BY_MODE))) {
-        return new CombineGroupByOrderByOperator(operators, _brokerRequest, _executorService, _timeOutMs,
-            _numGroupsLimit);
+        return new CombineGroupByOrderByOperator(operators, _brokerRequest, _executorService, _timeOutMs);
       }
       return new CombineGroupByOperator(operators, _brokerRequest, _executorService, _timeOutMs, _numGroupsLimit);
     } else {

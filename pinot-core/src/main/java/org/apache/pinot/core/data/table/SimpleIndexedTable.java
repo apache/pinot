@@ -107,7 +107,7 @@ public class SimpleIndexedTable extends IndexedTable {
 
       if (size() >= _bufferedCapacity) {
         if (_isOrderBy) { // capacity reached, order and resize
-          sortAndResize(_evictCapacity);
+          sortAndResize(_maxCapacity);
         } else { // capacity reached, but no order by. Allow no more records
           _noMoreNewRecords = true;
         }

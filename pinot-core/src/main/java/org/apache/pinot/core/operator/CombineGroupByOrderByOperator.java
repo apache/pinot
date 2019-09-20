@@ -28,7 +28,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
@@ -38,6 +37,7 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.data.order.OrderByUtils;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
@@ -59,12 +59,6 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
   private static final Logger LOGGER = LoggerFactory.getLogger(CombineGroupByOrderByOperator.class);
   private static final String OPERATOR_NAME = "CombineGroupByOrderByOperator";
 
-  // Use a higher limit for groups stored across segments. For most cases, most groups from each segment should be the
-  // same, thus the total number of groups across segments should be equal or slightly higher than the number of groups
-  // in each segment. We still put a limit across segments to protect cases where data is very skewed across different
-  // segments.
-  private static final int INTER_SEGMENT_NUM_GROUPS_LIMIT_FACTOR = 2;
-
   private final List<Operator> _operators;
   private final BrokerRequest _brokerRequest;
   private final ExecutorService _executorService;
@@ -75,17 +69,17 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
   private ConcurrentIndexedTable _indexedTable;
 
   public CombineGroupByOrderByOperator(List<Operator> operators, BrokerRequest brokerRequest,
-      ExecutorService executorService, long timeOutMs, int innerSegmentNumGroupsLimit) {
+      ExecutorService executorService, long timeOutMs) {
     Preconditions.checkArgument(brokerRequest.isSetAggregationsInfo() && brokerRequest.isSetGroupBy());
 
     _operators = operators;
     _brokerRequest = brokerRequest;
     _executorService = executorService;
     _timeOutMs = timeOutMs;
-    _interSegmentNumGroupsLimit =
-        (int) Math.min((long) innerSegmentNumGroupsLimit * INTER_SEGMENT_NUM_GROUPS_LIMIT_FACTOR, Integer.MAX_VALUE);
     _initLock = new ReentrantLock();
     _indexedTable = new ConcurrentIndexedTable();
+    _interSegmentNumGroupsLimit =
+        Math.max(((int) brokerRequest.getGroupBy().getTopN()) * 5, OrderByUtils.NUM_RESULTS_LOWER_LIMIT);
   }
 
   /**

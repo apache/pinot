@@ -32,20 +32,12 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
  * Base abstract implementation of Table for indexed lookup
  */
 public abstract class IndexedTable implements Table {
-  // When table reaches max capacity, we will allow 20% more records to get inserted (bufferedCapacity)
-  // If records beyond bufferedCapacity are received, the table will undergo sort and evict upto evictCapacity (10% more than capacity)
-  // This is to ensure that for a small number beyond capacity, a fair chance is given to all records which have the potential to climb up the order
-  /** Factor used to add buffer to maxCapacity of the Collection used **/
-  private static final double BUFFER_FACTOR = 1.2;
-  /** Factor used to decide eviction threshold **/
-  private static final double EVICTION_FACTOR = 1.1;
 
   List<AggregationFunction> _aggregationFunctions;
   DataSchema _dataSchema;
   boolean _sort;
 
   int _maxCapacity;
-  int _evictCapacity;
   int _bufferedCapacity;
 
   @Override
@@ -60,8 +52,24 @@ public abstract class IndexedTable implements Table {
           AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction());
     }
 
+    /* Factor used to add buffer to maxCapacity of the table **/
+    double bufferFactor;
+    /* Factor used to decide eviction threshold **/
+    /** The true capacity of the table is {@link IndexedTable::_bufferedCapacity},
+     * which is bufferFactor times the {@link IndexedTable::_maxCapacity}
+     *
+     * If records beyond {@link IndexedTable::_bufferedCapacity} are received,
+     * the table resize and evict bottom records, resizing it to {@link IndexedTable::_maxCapacity}
+     * The assumption here is that {@link IndexedTable::_maxCapacity} already has a buffer added by the caller (typically, we do max(top * 5, 5000))
+     */
+    if (maxCapacity > 50000) {
+      // if max capacity is large, buffer capacity is kept smaller, so that we do not accumulate too many records for sorting/resizing
+      bufferFactor = 1.2;
+    } else {
+      // if max capacity is small, buffer capacity is kept larger, so that we avoid frequent resizing
+      bufferFactor = 2.0;
+    }
     _maxCapacity = maxCapacity;
-    _bufferedCapacity = (int) (maxCapacity * BUFFER_FACTOR);
-    _evictCapacity = (int) (maxCapacity * EVICTION_FACTOR);
+    _bufferedCapacity = (int) (maxCapacity * bufferFactor);
   }
 }

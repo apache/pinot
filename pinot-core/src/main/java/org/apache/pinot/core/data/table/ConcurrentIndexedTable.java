@@ -51,7 +51,6 @@ public class ConcurrentIndexedTable extends IndexedTable {
   private ReentrantReadWriteLock _readWriteLock;
 
   private boolean _isOrderBy;
-  private Comparator<Record> _minHeapComparator;
   private Comparator<Record> _orderByComparator;
 
   private AtomicBoolean _noMoreNewRecords = new AtomicBoolean();
@@ -75,7 +74,6 @@ public class ConcurrentIndexedTable extends IndexedTable {
     _readWriteLock = new ReentrantReadWriteLock();
     _isOrderBy = CollectionUtils.isNotEmpty(orderBy);
     if (_isOrderBy) {
-      _minHeapComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos).reversed();
       _orderByComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos);
     }
   }
@@ -115,7 +113,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
           _readWriteLock.writeLock().lock();
           try {
             if (_lookupMap.size() >= _bufferedCapacity) {
-              resize(_evictCapacity);
+              resize(_maxCapacity);
             }
           } finally {
             _readWriteLock.writeLock().unlock();
@@ -163,14 +161,14 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
         // make min heap of elements to evict
         int heapSize = _lookupMap.size() - trimToSize;
-        PriorityQueue<Record> minHeap = new PriorityQueue<>(heapSize, _minHeapComparator);
+        PriorityQueue<Record> minHeap = new PriorityQueue<>(heapSize, _orderByComparator);
 
         for (Record record : _lookupMap.values()) {
           if (minHeap.size() < heapSize) {
             minHeap.offer(record);
           } else {
             Record peek = minHeap.peek();
-            if (minHeap.comparator().compare(record, peek) < 0) {
+            if (minHeap.comparator().compare(peek, record) < 0) {
               minHeap.poll();
               minHeap.offer(record);
             }
