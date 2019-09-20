@@ -61,7 +61,7 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
   private boolean _help = false;
 
   // This can be set via the set method, or via config file input.
-  private boolean _tenantIsolation = true;
+  private boolean _tenantIsolation = false;
 
   @Override
   public boolean getHelp() {

@@ -23,8 +23,11 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.pinot.benchmark.api.PinotClusterManager;
+import org.apache.pinot.benchmark.api.data.DataPreparationManager;
 import org.apache.pinot.benchmark.api.retentions.TableRetentionManager;
 import org.apache.pinot.benchmark.common.PinotBenchServiceApplication;
+import org.apache.pinot.benchmark.common.utils.PinotClusterClient;
+import org.apache.pinot.benchmark.common.utils.PinotClusterLocator;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +40,10 @@ public class PinotBenchmarkServiceStarter {
   private final String _pinotBenchInstanceId;
   private final String _zkServers;
   private final PinotBenchConf _config;
+  private PinotClusterLocator _pinotClusterLocator;
+  private final PinotClusterClient _pinotClusterClient;
   private final PinotClusterManager _pinotClusterManager;
+  private final DataPreparationManager _dataPreparationManager;
   private final TableRetentionManager _tableRetentionManager;
   private final PinotBenchServiceApplication _pinotBenchServiceApplication;
 
@@ -51,7 +57,10 @@ public class PinotBenchmarkServiceStarter {
     _pinotBenchInstanceId = host + ":" + port;
     _zkServers = _config.getZkStr();
 
-    _pinotClusterManager = new PinotClusterManager(_config);
+    _pinotClusterClient = new PinotClusterClient();
+    _pinotClusterLocator = new PinotClusterLocator(_config);
+    _pinotClusterManager = new PinotClusterManager(_config, _pinotClusterClient, _pinotClusterLocator);
+    _dataPreparationManager = new DataPreparationManager(_config, _pinotClusterClient, _pinotClusterLocator);
     _tableRetentionManager = new TableRetentionManager(_config, _pinotClusterManager);
     _pinotBenchServiceApplication = new PinotBenchServiceApplication();
   }
@@ -65,6 +74,9 @@ public class PinotBenchmarkServiceStarter {
     LOGGER.info("Starting Pinot cluster manager");
     _pinotClusterManager.start(_helixManager);
 
+    LOGGER.info("Starting data preparation manager");
+    _dataPreparationManager.start(_helixManager);
+
     LOGGER.info("Starting table retention manager");
     _tableRetentionManager.start(_helixManager);
 
@@ -72,6 +84,7 @@ public class PinotBenchmarkServiceStarter {
       @Override
       protected void configure() {
         bind(_pinotClusterManager).to(PinotClusterManager.class);
+        bind(_dataPreparationManager).to(DataPreparationManager.class);
       }
     });
 
@@ -90,13 +103,16 @@ public class PinotBenchmarkServiceStarter {
       throws InterruptedException {
     PinotBenchConf conf = new PinotBenchConf();
     conf.setPerfControllerHost("localhost");
-    conf.setPerfControllerPort(9000);
+    conf.setPerfControllerPort(9010);
     conf.setPinotBenchHost("localhost");
     conf.setPinotBenchPort(9008);
-    conf.setClusterName("QuickStartCluster");
-    conf.setZkStr("localhost:2123");
+    conf.setClusterName("PinotCluster");
+    conf.setZkStr("localhost:2181");
     conf.setTableRetentionManagerInitialDelayInSeconds(30L);
     conf.setTableRetentionManagerFrequencyInSeconds(TimeUnit.HOURS.toSeconds(6L));
+
+    conf.setProdControllerHost("localhost");
+    conf.setProdControllerPort(9000);
 
     PinotBenchmarkServiceStarter starter = new PinotBenchmarkServiceStarter(conf);
 

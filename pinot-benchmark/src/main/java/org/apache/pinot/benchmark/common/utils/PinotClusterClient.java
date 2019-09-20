@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.benchmark.common.utils;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
@@ -47,6 +49,8 @@ import org.apache.http.entity.mime.content.InputStreamBody;
 import org.apache.http.entity.mime.content.StringBody;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicHeader;
+import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -66,6 +70,13 @@ public class PinotClusterClient {
   private static final String HTTPS = "https";
   private static final String TABLES_PATH = "/tables";
   private static final String SCHEMA_PATH = "/schemas";
+  private static final String SEGMENT_PATH = "/segments";
+  private static final String METADATA_PATH = "/metadata";
+  private static final String V2_SEGMENT_PATH = "/v2/segments";
+
+  private static final String UPLOAD_TYPE = "UPLOAD_TYPE";
+  private static final String DOWNLOAD_URI = "DOWNLOAD_URI";
+
   private final CloseableHttpClient _httpClient;
 
   public PinotClusterClient() {
@@ -115,6 +126,11 @@ public class PinotClusterClient {
   public static URI getSchemaHTTPURI(String host, int port, String schemaName)
       throws URISyntaxException {
     return getURI(HTTP, host, port, SCHEMA_PATH + "/" + schemaName);
+  }
+
+  public static URI getUploadSegmentHttpURI(String host, int port)
+      throws URISyntaxException {
+    return getURI(HTTP, host, port, V2_SEGMENT_PATH);
   }
 
   public SimpleHttpResponse sendGetRequest(URI uri)
@@ -173,6 +189,37 @@ public class PinotClusterClient {
     addHeadersAndParameters(requestBuilder, headers, parameters);
     setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
+  }
+
+  public static URI getListSegmentsHttpURI(String host, int port, String tableName)
+      throws URISyntaxException {
+    return getURI(HTTP, host, port, SEGMENT_PATH + "/" + tableName);
+  }
+
+  public static URI getRetrieveSegmentMetadataHttpURI(String host, int port, String rawTableName, String segmentName)
+      throws URISyntaxException {
+    return getURI(HTTP, host, port,
+        TABLES_PATH + "/" + rawTableName + SEGMENT_PATH + "/" + segmentName + METADATA_PATH);
+  }
+
+  public static HttpUriRequest getUploadSegmentRequest(URI uri, String segmentName, InputStream schemaInputStream) {
+    return getUploadSegmentRequest(uri, segmentName, schemaInputStream, null, null);
+  }
+
+  public static HttpUriRequest getUploadSegmentRequest(URI uri, String tableName, String segmentName, String downloadUrl) {
+    List<Header> headers = new ArrayList<>();
+    headers.add(new BasicHeader(UPLOAD_TYPE, "URI"));
+    headers.add(new BasicHeader(DOWNLOAD_URI, downloadUrl));
+
+    List<NameValuePair> nameValuePairs = new ArrayList<>();
+    nameValuePairs.add(new BasicNameValuePair("tableName", tableName));
+    return getUploadSegmentRequest(uri, segmentName, new ByteArrayInputStream(new byte[] {}), headers, nameValuePairs);
+  }
+
+  public static HttpUriRequest getUploadSegmentRequest(URI uri, String segmentName, InputStream schemaInputStream,
+      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters) {
+    return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(segmentName, schemaInputStream), headers,
+        parameters, DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
   private static void addHeadersAndParameters(RequestBuilder requestBuilder, @Nullable List<Header> headers,

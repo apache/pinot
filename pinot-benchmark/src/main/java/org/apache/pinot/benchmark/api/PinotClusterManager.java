@@ -69,10 +69,10 @@ public class PinotClusterManager {
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
 
-  public PinotClusterManager(PinotBenchConf conf) {
+  public PinotClusterManager(PinotBenchConf conf, PinotClusterClient pinotClusterClient, PinotClusterLocator pinotClusterLocator) {
     _conf = conf;
-    _pinotClusterLocator = new PinotClusterLocator(conf);
-    _pinotClusterClient = new PinotClusterClient();
+    _pinotClusterClient = pinotClusterClient;
+    _pinotClusterLocator = pinotClusterLocator;
   }
 
   public void start(HelixManager helixManager) {
@@ -285,9 +285,9 @@ public class PinotClusterManager {
 
     try {
       // puts sleeps between two calls.
-      Thread.sleep(50L);
+      Thread.sleep(100L);
       addTableConfig(offlineTableConfig);
-      Thread.sleep(50L);
+      Thread.sleep(100L);
       addTableConfig(realtimeTableConfig);
       return new SuccessResponse("Create Table " + schema.getSchemaName() + " successfully");
     } catch (Exception e) {

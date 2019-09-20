@@ -53,6 +53,10 @@ public class PinotClusterLocator {
     return _perfClusterPair;
   }
 
+  public Pair<String, Integer> getProdClusterPair() {
+    return _prodClusterPair;
+  }
+
   public enum PinotClusterType {
     PERF("perf"), PROD("prod");
 
