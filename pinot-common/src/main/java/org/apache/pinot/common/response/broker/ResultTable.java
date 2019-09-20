@@ -28,16 +28,16 @@ import java.util.List;
 /**
  * Hosts the results in a standard tabular structure
  */
-@JsonPropertyOrder({"columns", "results"})
+@JsonPropertyOrder({"columns", "rows"})
 public class ResultTable {
   private List<String> _columns;
   private List<Serializable[]> _rows;
 
   @JsonCreator
   public ResultTable(@JsonProperty("columns") List<String> columns,
-      @JsonProperty("results") List<Serializable[]> results) {
+      @JsonProperty("rows") List<Serializable[]> rows) {
     _columns = columns;
-    _rows = results;
+    _rows = rows;
   }
 
   @JsonProperty("columns")
