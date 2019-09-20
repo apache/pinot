@@ -25,14 +25,14 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.SetMultimap;
+import java.util.Collection;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
-import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.apache.pinot.thirdeye.detection.alert.StatefulDetectionAlertFilter;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -49,10 +49,6 @@ import org.apache.pinot.thirdeye.detection.annotation.AlertFilter;
 @AlertFilter(type = "DIMENSION_ALERTER_PIPELINE")
 public class DimensionDetectionAlertFilter extends StatefulDetectionAlertFilter {
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
-  private static final String PROP_TO = "to";
-  private static final String PROP_CC = "cc";
-  private static final String PROP_BCC = "bcc";
-  private static final String PROP_RECIPIENTS = "recipients";
   private static final String PROP_DIMENSION = "dimension";
   private static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
   private static final String PROP_SEND_ONCE = "sendOnce";
@@ -77,7 +73,6 @@ public class DimensionDetectionAlertFilter extends StatefulDetectionAlertFilter 
   @Override
   public DetectionAlertFilterResult run(Map<Long, Long> vectorClocks, long highWaterMark) {
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
-
     final long minId = getMinId(highWaterMark);
 
     Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds), minId);
@@ -90,15 +85,15 @@ public class DimensionDetectionAlertFilter extends StatefulDetectionAlertFilter 
       }
     });
 
-    // generate recipients-anomalies mapping
-    for (Map.Entry<String, Collection<MergedAnomalyResultDTO>> entry : grouped.asMap().entrySet()) {
+    for (Map.Entry<String, Collection<MergedAnomalyResultDTO>> dimAnomalyMapping : grouped.asMap().entrySet()) {
       result.addMapping(
-          new DetectionAlertFilterRecipients(
-              this.makeGroupRecipients(entry.getKey()),
-              this.recipients.get(PROP_CC),
-              this.recipients.get(PROP_BCC)),
-          new HashSet<>(entry.getValue())
-      );
+          new DetectionAlertFilterNotification(
+              generateNotificationSchemeProps(
+                  this.config,
+                  this.makeGroupRecipients(dimAnomalyMapping.getKey()),
+                  this.recipients.get(PROP_CC),
+                  this.recipients.get(PROP_BCC))),
+          new HashSet<>(dimAnomalyMapping.getValue()));
     }
 
     return result;

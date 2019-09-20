@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.detection.alert.scheme;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.SetMultimap;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -42,6 +43,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.alert.AlertUtils;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.apache.pinot.thirdeye.detection.annotation.AlertScheme;
@@ -64,10 +66,15 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   private static final Comparator<AnomalyResult> COMPARATOR_DESC =
       (o1, o2) -> -1 * Long.compare(o1.getStartTime(), o2.getStartTime());
 
+  private static final String PROP_RECIPIENTS = "recipients";
+  private static final String PROP_TO = "to";
+  private static final String PROP_CC = "cc";
+  private static final String PROP_BCC = "bcc";
+
   private static final String PROP_EMAIL_WHITELIST = "emailWhitelist";
   private static final String PROP_ADMIN_RECIPIENTS = "adminRecipients";
 
-  private static final String PROP_EMAIL_SCHEME = "emailScheme";
+  public static final String PROP_EMAIL_SCHEME = "emailScheme";
   private static final String PROP_EMAIL_TEMPLATE = "template";
   private static final String PROP_EMAIL_SUBJECT_STYLE = "subject";
 
@@ -247,15 +254,27 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   private void generateAndSendEmails(DetectionAlertFilterResult detectionResult) throws Exception {
     LOG.info("Preparing an email alert for subscription group id {}", config.getId());
     Preconditions.checkNotNull(detectionResult.getResult());
-    for (Map.Entry<DetectionAlertFilterRecipients, Set<MergedAnomalyResultDTO>> entry : detectionResult.getResult().entrySet()) {
-      DetectionAlertFilterRecipients recipients = entry.getKey();
-      Set<MergedAnomalyResultDTO> anomalies = entry.getValue();
+    for (Map.Entry<DetectionAlertFilterNotification, Set<MergedAnomalyResultDTO>> entry : detectionResult.getResult().entrySet()) {
+      DetectionAlertFilterNotification notification = entry.getKey();
+      Map<String, Object> notificationSchemeProps = notification.getNotificationSchemeProps();
+      if (notificationSchemeProps != null && notificationSchemeProps.get(PROP_EMAIL_SCHEME) != null
+          && ConfigUtils.getMap(notificationSchemeProps.get(PROP_EMAIL_SCHEME)).get(PROP_RECIPIENTS) != null) {
+        SetMultimap<String, String> emailRecipients = (SetMultimap<String, String>) ConfigUtils.getMap(notificationSchemeProps.get(PROP_EMAIL_SCHEME)).get(PROP_RECIPIENTS);
+        if (emailRecipients.get(PROP_TO) == null || emailRecipients.get(PROP_TO).isEmpty()) {
+          LOG.warn("Skipping! No email recipients found for alert {}.", config.getId());
+          return;
+        }
 
-      try {
-        sendEmail(recipients, anomalies);
-      } catch (IllegalArgumentException e) {
-        LOG.warn("Skipping! Found illegal arguments while sending {} anomalies to recipient {} for alert {}."
-            + " Exception message: ", anomalies.size(), recipients, config.getId(), e);
+        DetectionAlertFilterRecipients recipients =
+            new DetectionAlertFilterRecipients(emailRecipients.get(PROP_TO), emailRecipients.get(PROP_CC),
+                emailRecipients.get(PROP_BCC));
+        Set<MergedAnomalyResultDTO> anomalies = entry.getValue();
+
+        try {
+          sendEmail(recipients, anomalies);
+        } catch (IllegalArgumentException e) {
+          LOG.warn("Skipping! Found illegal arguments while sending {} anomalies to recipient {} for alert {}." + " Exception message: ", anomalies.size(), recipients, config.getId(), e);
+        }
       }
     }
   }

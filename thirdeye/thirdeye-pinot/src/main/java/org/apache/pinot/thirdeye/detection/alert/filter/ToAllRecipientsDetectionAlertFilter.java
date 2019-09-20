@@ -21,20 +21,19 @@ package org.apache.pinot.thirdeye.detection.alert.filter;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
-import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
-import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.apache.pinot.thirdeye.detection.alert.StatefulDetectionAlertFilter;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.detection.annotation.AlertFilter;
+
 
 /**
  * The detection alert filter that sends the anomaly email to all recipients
@@ -49,9 +48,6 @@ public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertF
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   private static final String PROP_SEND_ONCE = "sendOnce";
 
-  Set<String> to;
-  Set<String> cc;
-  Set<String> bcc;
   final SetMultimap<String, String> recipients;
   List<Long> detectionConfigIds;
   boolean sendOnce;
@@ -70,29 +66,17 @@ public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertF
 
     final long minId = getMinId(highWaterMark);
 
-    to = cleanupRecipients(this.recipients.get(PROP_TO));
-    cc = cleanupRecipients(this.recipients.get(PROP_CC));
-    bcc = cleanupRecipients(this.recipients.get(PROP_BCC));
-
-    // Early termination if there are no recipients in the "to" field
-    if (to.isEmpty()) {
-      return result;
-    }
-
     // Fetch all the anomalies to be notified to the recipients
     Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds), minId);
 
-    return result.addMapping(new DetectionAlertFilterRecipients(to, cc, bcc), anomalies);
-  }
-
-  private Set<String> cleanupRecipients(Set<String> recipient) {
-    Set<String> filteredRecipients = new HashSet<>();
-    if (recipient != null) {
-      filteredRecipients.addAll(recipient);
-      filteredRecipients = filteredRecipients.stream().map(String::trim).collect(Collectors.toSet());
-      filteredRecipients.removeIf(rec -> rec == null || "".equals(rec));
-    }
-    return filteredRecipients;
+    return result.addMapping(
+        new DetectionAlertFilterNotification(
+            generateNotificationSchemeProps(
+                this.config,
+                this.recipients.get(PROP_TO),
+                this.recipients.get(PROP_CC),
+                this.recipients.get(PROP_BCC))),
+        anomalies);
   }
 
   private long getMinId(long highWaterMark) {

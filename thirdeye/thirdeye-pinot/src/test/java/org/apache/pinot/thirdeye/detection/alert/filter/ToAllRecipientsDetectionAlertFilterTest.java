@@ -23,7 +23,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilter;
-import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,11 +33,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.thirdeye.detection.DetectionTestUtils.*;
+import static org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter.*;
 
 
 public class ToAllRecipientsDetectionAlertFilterTest {
@@ -53,13 +55,10 @@ public class ToAllRecipientsDetectionAlertFilterTest {
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   private static final List<Long> PROP_ID_VALUE = Arrays.asList(1001L, 1002L);
   private static final String PROP_SEND_ONCE = "sendOnce";
-
-  private static final DetectionAlertFilterRecipients RECIPIENTS = new DetectionAlertFilterRecipients(
-      new HashSet<>(PROP_TO_VALUE), new HashSet<>(PROP_CC_VALUE), new HashSet<>(PROP_BCC_VALUE));
+  private static final Map<String, Object> ALERT_PROPS = new HashMap<>();
 
   private DetectionAlertFilter alertFilter;
   private List<MergedAnomalyResultDTO> detectedAnomalies;
-
   private MockDataProvider provider;
   private DetectionAlertConfigDTO alertConfig;
 
@@ -94,8 +93,8 @@ public class ToAllRecipientsDetectionAlertFilterTest {
     recipients.put(PROP_BCC, PROP_BCC_VALUE);
     properties.put(PROP_RECIPIENTS, recipients);
     properties.put(PROP_DETECTION_CONFIG_IDS, PROP_ID_VALUE);
-
     alertConfig.setProperties(properties);
+
     Map<Long, Long> vectorClocks = new HashMap<>();
     vectorClocks.put(PROP_ID_VALUE.get(0), 0L);
     alertConfig.setVectorClocks(vectorClocks);
@@ -108,7 +107,9 @@ public class ToAllRecipientsDetectionAlertFilterTest {
     this.alertFilter = new ToAllRecipientsDetectionAlertFilter(this.provider, this.alertConfig,2500L);
 
     DetectionAlertFilterResult result = this.alertFilter.run();
-    Assert.assertEquals(result.getResult().get(RECIPIENTS), new HashSet<>(this.detectedAnomalies.subList(0, 4)));
+
+    DetectionAlertFilterNotification notification = AlertFilterUtils.makeEmailNotifications(PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
+    Assert.assertEquals(result.getResult().get(notification), new HashSet<>(this.detectedAnomalies.subList(0, 4)));
   }
 
   @Test
@@ -137,11 +138,13 @@ public class ToAllRecipientsDetectionAlertFilterTest {
 
     DetectionAlertFilterResult result = this.alertFilter.run();
     Assert.assertEquals(result.getResult().size(), 1);
-    Assert.assertTrue(result.getResult().containsKey(RECIPIENTS));
-    Assert.assertEquals(result.getResult().get(RECIPIENTS).size(), 3);
-    Assert.assertTrue(result.getResult().get(RECIPIENTS).contains(this.detectedAnomalies.get(5)));
-    Assert.assertTrue(result.getResult().get(RECIPIENTS).contains(anomalyWithoutFeedback));
-    Assert.assertTrue(result.getResult().get(RECIPIENTS).contains(anomalyWithNull));
+
+    DetectionAlertFilterNotification notification = AlertFilterUtils.makeEmailNotifications(PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
+    Assert.assertTrue(result.getResult().containsKey(notification));
+    Assert.assertEquals(result.getResult().get(notification).size(), 3);
+    Assert.assertTrue(result.getResult().get(notification).contains(this.detectedAnomalies.get(5)));
+    Assert.assertTrue(result.getResult().get(notification).contains(anomalyWithoutFeedback));
+    Assert.assertTrue(result.getResult().get(notification).contains(anomalyWithNull));
   }
 
   @Test
@@ -166,8 +169,10 @@ public class ToAllRecipientsDetectionAlertFilterTest {
     this.alertFilter = new ToAllRecipientsDetectionAlertFilter(this.provider, this.alertConfig,2500L);
 
     DetectionAlertFilterResult result = this.alertFilter.run();
-    Assert.assertEquals(result.getResult().get(RECIPIENTS).size(), 1);
-    Assert.assertTrue(result.getResult().get(RECIPIENTS).contains(existingFuture));
+
+    DetectionAlertFilterNotification notification = AlertFilterUtils.makeEmailNotifications(PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
+    Assert.assertEquals(result.getResult().get(notification).size(), 1);
+    Assert.assertTrue(result.getResult().get(notification).contains(existingFuture));
   }
 
   @Test
@@ -193,9 +198,11 @@ public class ToAllRecipientsDetectionAlertFilterTest {
     this.alertFilter = new ToAllRecipientsDetectionAlertFilter(this.provider, this.alertConfig,2500L);
 
     DetectionAlertFilterResult result = this.alertFilter.run();
-    Assert.assertEquals(result.getResult().get(RECIPIENTS).size(), 2);
-    Assert.assertTrue(result.getResult().get(RECIPIENTS).contains(existingNew));
-    Assert.assertTrue(result.getResult().get(RECIPIENTS).contains(existingFuture));
+
+    DetectionAlertFilterNotification notification = AlertFilterUtils.makeEmailNotifications(PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
+    Assert.assertEquals(result.getResult().get(notification).size(), 2);
+    Assert.assertTrue(result.getResult().get(notification).contains(existingNew));
+    Assert.assertTrue(result.getResult().get(notification).contains(existingFuture));
   }
 
   @Test
@@ -206,6 +213,6 @@ public class ToAllRecipientsDetectionAlertFilterTest {
     this.alertFilter = new ToAllRecipientsDetectionAlertFilter(this.provider, this.alertConfig,2500L);
 
     DetectionAlertFilterResult result = this.alertFilter.run();
-    Assert.assertEquals(result.getResult().size(), 0);
+    Assert.assertEquals(result.getResult().size(), 1);
   }
 }
