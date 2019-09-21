@@ -40,6 +40,8 @@ public class PinotBenchConf extends PropertiesConfiguration {
   private static final String TABLE_RETENTION_MANAGER_FREQUENCY_IN_SECONDS =
       "pinot.bench.table.retention.frequencyInSeconds";
 
+  private static final String PINOT_BENCH_BASE_QUERY_DIR = "pinot.bench.base.query.dir";
+
   private static final String LOCAL_TEMP_DIR = "controller.local.temp.dir";
 
   public void setPinotBenchHost(String pinotBenchHost) {
@@ -120,5 +122,13 @@ public class PinotBenchConf extends PropertiesConfiguration {
 
   public long getTableRetentionManagerFrequencyInSeconds() {
     return getLong(TABLE_RETENTION_MANAGER_FREQUENCY_IN_SECONDS);
+  }
+
+  public void setPinotBenchBaseQueryDir(String pinotBenchBaseQueryDir) {
+    setProperty(PINOT_BENCH_BASE_QUERY_DIR, pinotBenchBaseQueryDir);
+  }
+
+  public String getPinotBenchBaseQueryDir() {
+    return (String) getProperty(PINOT_BENCH_BASE_QUERY_DIR);
   }
 }

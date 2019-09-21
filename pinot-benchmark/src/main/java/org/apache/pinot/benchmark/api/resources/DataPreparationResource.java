@@ -76,4 +76,12 @@ public class DataPreparationResource {
       @ApiParam(value = "diffOnly") @QueryParam("diffOnly") @DefaultValue("false") boolean diffOnly) {
     return _dataPreparationManager.copyConvertAndUploadSegments(originTableName, targetTableName, diffOnly);
   }
+
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/data/queries")
+  public SuccessResponse uploadQueries(@ApiParam(value = "originTableName") @QueryParam("from") String originTableName,
+      @ApiParam(value = "targetTableName") @QueryParam("to") String targetTableName, FormDataMultiPart multiPart) {
+    return _dataPreparationManager.uploadQueries(originTableName, targetTableName, multiPart);
+  }
 }

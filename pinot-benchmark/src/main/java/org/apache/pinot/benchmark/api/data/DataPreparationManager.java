@@ -19,11 +19,18 @@
 package org.apache.pinot.benchmark.api.data;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 import javax.ws.rs.core.Response;
+import org.apache.commons.io.IOUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.http.NameValuePair;
@@ -52,6 +59,7 @@ public class DataPreparationManager {
   private final PinotBenchConf _conf;
   private final PinotClusterClient _pinotClusterClient;
   private final PinotClusterLocator _pinotClusterLocator;
+  private final String _baseQueryDir;
 
   private HelixManager _helixManager;
   private HelixAdmin _helixAdmin;
@@ -59,6 +67,7 @@ public class DataPreparationManager {
   public DataPreparationManager(PinotBenchConf pinotBenchConf, PinotClusterClient pinotClusterClient,
       PinotClusterLocator pinotClusterLocator) {
     _conf = pinotBenchConf;
+    _baseQueryDir = _conf.getPinotBenchBaseQueryDir();
     _pinotClusterClient = pinotClusterClient;
     _pinotClusterLocator = pinotClusterLocator;
   }
@@ -238,6 +247,38 @@ public class DataPreparationManager {
       throw new PinotBenchException(LOGGER,
           "Exception when getting metadata for Segment: " + segmentName + " of Table: " + rawTableName,
           Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  public SuccessResponse uploadQueries(String originalTableName, String targetTableName, FormDataMultiPart multiPart) {
+    if (targetTableName == null || targetTableName.isEmpty()) {
+      throw new PinotBenchException(LOGGER, "Target table name should not be null", Response.Status.BAD_REQUEST);
+    }
+    String targetRawTableName = TableNameBuilder.extractRawTableName(targetTableName);
+    FormDataBodyPart bodyPart = multiPart.getFields().values().iterator().next().get(0);
+    InputStream queriesInputStream = bodyPart.getValueAs(InputStream.class);
+
+    File targetTableDir = new File(_baseQueryDir, targetTableName);
+    targetTableDir.mkdirs();
+    PrintWriter p;
+
+    try (OutputStream outputStream = new FileOutputStream(new File(targetTableDir, "queries.txt"), false)) {
+      if (originalTableName == null) {
+        IOUtils.copy(queriesInputStream, outputStream);
+      } else {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(queriesInputStream));
+        p = new PrintWriter(outputStream);
+        String originalRawTableName = TableNameBuilder.extractRawTableName(originalTableName);
+        String line;
+        while ((line = reader.readLine()) != null) {
+          p.println(line.replace(originalRawTableName, targetRawTableName));
+        }
+        p.flush();
+      }
+      return new SuccessResponse("Successfully uploaded queries for Table: " + targetTableName);
+    } catch (IOException e) {
+      throw new PinotBenchException(LOGGER, "IOException when uploading queries. " + e.getMessage(),
+          Response.Status.BAD_REQUEST, e);
     }
   }
 }

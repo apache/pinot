@@ -99,8 +99,7 @@ public class PinotBenchmarkServiceStarter {
     _tableRetentionManager.stop();
   }
 
-  public static void main(String[] args)
-      throws InterruptedException {
+  public static void main(String[] args) {
     PinotBenchConf conf = new PinotBenchConf();
     conf.setPerfControllerHost("localhost");
     conf.setPerfControllerPort(9010);
@@ -108,6 +107,7 @@ public class PinotBenchmarkServiceStarter {
     conf.setPinotBenchPort(9008);
     conf.setClusterName("PinotCluster");
     conf.setZkStr("localhost:2181");
+    conf.setPinotBenchBaseQueryDir("/Users/user1/Desktop/testQueries");
     conf.setTableRetentionManagerInitialDelayInSeconds(30L);
     conf.setTableRetentionManagerFrequencyInSeconds(TimeUnit.HOURS.toSeconds(6L));
 
@@ -117,18 +117,21 @@ public class PinotBenchmarkServiceStarter {
     PinotBenchmarkServiceStarter starter = new PinotBenchmarkServiceStarter(conf);
 
     try {
-      LOGGER.info("Start starter.");
       starter.start();
     } catch (Exception e) {
-      LOGGER.error("Error starting", e);
+      LOGGER.error("Error starting.", e);
+      System.exit(-1);
     }
 
-    int i = 0;
-    while (i++ < 600L) {
-      Thread.sleep(1000L);
+    while (true) {
+      try {
+        Thread.sleep(1000L);
+      } catch (InterruptedException e) {
+        LOGGER.error("Caught InterruptedException. Exiting.");
+        break;
+      }
     }
 
-    LOGGER.info("Stopping");
     starter.stop();
   }
 }
