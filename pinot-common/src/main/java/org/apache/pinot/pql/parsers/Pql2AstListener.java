@@ -379,7 +379,7 @@ public class Pql2AstListener extends PQL2BaseListener {
   @Override
   public void enterOrderByExpression(@NotNull PQL2Parser.OrderByExpressionContext ctx) {
     if (ctx.getChildCount() == 1) {
-      pushNode(new OrderByExpressionAstNode(ctx.getChild(0).getText(), "asc"));
+      pushNode(new OrderByExpressionAstNode(ctx.getChild(0).getText(), OrderByAstNode.ASCENDING_ORDER));
     } else {
       pushNode(new OrderByExpressionAstNode(ctx.getChild(0).getText(), ctx.getChild(1).getText()));
     }
