@@ -76,7 +76,7 @@ The ``segmentsConfig`` section has information about configuring the following:
 
   * Allowed values - ``daily``, ``hourly``
 
-* ``segmentPushType`` - Indicates the type of push to the table. Ignored for tables if type ``REALTIME``.
+* ``segmentPushType`` - Indicates the type of push to the table. Ignored for tables of type ``REALTIME``.
 
   * Allowed values:
 
@@ -310,9 +310,10 @@ Configuration generic to all stream types
    (can be changed with the setting ``realtime.segment.flush.autotune.initialRows``).
    and increasing to reach the desired segment size. Segment size may go over the desired size significantly
    during the learning phase.
-   Pinot starts corrects the estimation as it
-   goes along, so exact value that is guaranteed. You should set this value to optimize
-   the performance of queries.
+   Pinot corrects the estimation as it
+   goes along, so it is not guaranteed that the resulting completed segments are of the exact size
+   as configured. You should set this value to optimize the performance of queries (i.e. neither
+   too small nor too large)
 
    Default is ``"200M"``
 
