@@ -73,6 +73,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import org.apache.pinot.core.query.selection.SelectionOperatorService;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.core.util.GroupByUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -554,7 +555,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       throws Throwable {
 
     IndexedTable indexedTable = new ConcurrentIndexedTable();
-    int capacity = Math.max(((int) groupBy.getTopN()) * 5, OrderByUtils.NUM_RESULTS_LOWER_LIMIT);
+    int capacity = GroupByUtils.getTableCapacity((int) groupBy.getTopN());
     indexedTable.init(dataSchema, aggregationInfos, orderBy, capacity, true);
 
     for (DataTable dataTable : dataTableMap.values()) {

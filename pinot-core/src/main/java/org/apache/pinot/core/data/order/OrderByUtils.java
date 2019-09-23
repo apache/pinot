@@ -38,8 +38,6 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
  */
 public final class OrderByUtils {
 
-  public static final int NUM_RESULTS_LOWER_LIMIT = 5000;
-
   private OrderByUtils() {
   }
 

@@ -44,6 +44,7 @@ import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,8 +79,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
     _timeOutMs = timeOutMs;
     _initLock = new ReentrantLock();
     _indexedTable = new ConcurrentIndexedTable();
-    _interSegmentNumGroupsLimit =
-        Math.max(((int) brokerRequest.getGroupBy().getTopN()) * 5, OrderByUtils.NUM_RESULTS_LOWER_LIMIT);
+    _interSegmentNumGroupsLimit = GroupByUtils.getTableCapacity((int) brokerRequest.getGroupBy().getTopN());
   }
 
   /**
