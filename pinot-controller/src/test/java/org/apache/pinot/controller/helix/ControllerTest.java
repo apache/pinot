@@ -33,6 +33,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
@@ -466,8 +467,18 @@ public abstract class ControllerTest {
 
   public static String sendPostRequest(String urlString, String payload)
       throws IOException {
+    return sendPostRequest(urlString, payload, Collections.EMPTY_MAP);
+  }
+
+  public static String sendPostRequest(String urlString, String payload, Map<String, String> headers)
+      throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setRequestMethod("POST");
+    if (headers != null) {
+      for (String key : headers.keySet()) {
+        httpConnection.setRequestProperty(key, headers.get(key));
+      }
+    }
 
     if (payload != null && !payload.isEmpty()) {
       httpConnection.setDoOutput(true);
