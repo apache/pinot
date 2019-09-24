@@ -34,6 +34,7 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
+import org.apache.helix.PropertyKey;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.model.ExternalView;
@@ -145,6 +146,11 @@ public class HelixServerStarter {
 
     LOGGER.info("Connecting Helix manager");
     _helixManager.connect();
+    // Overwrite the server netty host and port.
+    if (_serverConf.getBoolean(CONFIG_OF_USE_LOGICAL_INSTANCE_ID, false)) {
+      overwriteServerHostInfo();
+    }
+
     _helixAdmin = _helixManager.getClusterManagmentTool();
     addInstanceTagIfNeeded(helixClusterName, _instanceId);
 
@@ -184,6 +190,16 @@ public class HelixServerStarter {
     serverMetrics.addCallbackGauge("memory.mmapBufferCount", PinotDataBuffer::getMmapBufferCount);
     serverMetrics.addCallbackGauge("memory.mmapBufferUsage", PinotDataBuffer::getMmapBufferUsage);
     serverMetrics.addCallbackGauge("memory.allocationFailureCount", PinotDataBuffer::getAllocationFailureCount);
+  }
+
+  private void overwriteServerHostInfo() {
+    // Internally, Helix use instanceId to derive Hostname and Port. To decouple them, explicitly set the hostname/port
+    // field in zk.
+    PropertyKey.Builder keyBuilder = _helixManager.getHelixDataAccessor().keyBuilder();
+    InstanceConfig config = _helixManager.getHelixDataAccessor().getProperty(keyBuilder.instanceConfig(_instanceId));
+    config.setHostName(_serverConf.getString(KEY_OF_SERVER_NETTY_HOST));
+    config.setPort(Integer.toString(_serverConf.getInt(KEY_OF_SERVER_NETTY_PORT, DEFAULT_SERVER_NETTY_PORT)));
+    _helixManager.getHelixDataAccessor().setProperty(keyBuilder.instanceConfig(_instanceId), config);
   }
 
   /**
@@ -507,6 +523,10 @@ public class HelixServerStarter {
       }
     }
     return true;
+  }
+
+  public HelixManager getHelixManager() {
+    return _helixManager;
   }
 
   /**
