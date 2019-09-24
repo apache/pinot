@@ -22,25 +22,22 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.core.query.utils.Pair;
-import org.apache.zookeeper.data.Stat;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -56,9 +53,6 @@ public class ControllerLeaderLocatorTest {
   public void testInvalidateCachedControllerLeader() {
     HelixManager helixManager = mock(HelixManager.class);
     HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
-    BaseDataAccessor<ZNRecord> baseDataAccessor = mock(BaseDataAccessor.class);
-    HelixAdmin helixAdmin = mock(HelixAdmin.class);
-    ZNRecord znRecord = mock(ZNRecord.class);
     final String leaderHost = "host";
     final int leaderPort = 12345;
 
@@ -66,16 +60,18 @@ public class ControllerLeaderLocatorTest {
     ConfigAccessor configAccessor = mock(ConfigAccessor.class);
     ResourceConfig resourceConfig = mock(ResourceConfig.class);
     when(helixManager.getConfigAccessor()).thenReturn(configAccessor);
-    when(configAccessor.getResourceConfig(anyString(), anyString())).thenReturn(resourceConfig);
+    when(configAccessor.getResourceConfig(any(), anyString())).thenReturn(resourceConfig);
     when(resourceConfig.getSimpleConfig(anyString())).thenReturn("false");
 
+    // Mocks the helix leader
     when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
-    when(helixDataAccessor.getBaseDataAccessor()).thenReturn(baseDataAccessor);
-    when(znRecord.getId()).thenReturn(leaderHost + "_" + leaderPort);
-    when(baseDataAccessor.get(anyString(), any(), anyInt())).thenReturn(znRecord);
-    when(helixManager.getClusterName()).thenReturn("testCluster");
-    when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
-    when(helixAdmin.getResourceExternalView(anyString(), anyString())).thenReturn(null);
+    PropertyKey.Builder keyBuilder = mock(PropertyKey.Builder.class);
+    when(helixDataAccessor.keyBuilder()).thenReturn(keyBuilder);
+    PropertyKey controllerLeader = mock(PropertyKey.class);
+    when(keyBuilder.controllerLeader()).thenReturn(controllerLeader);
+    LiveInstance liveInstance = mock(LiveInstance.class);
+    when(helixDataAccessor.getProperty(controllerLeader)).thenReturn(liveInstance);
+    when(liveInstance.getInstanceName()).thenReturn(leaderHost + "_" + leaderPort);
 
     // Create Controller Leader Locator
     FakeControllerLeaderLocator.create(helixManager);
@@ -128,29 +124,34 @@ public class ControllerLeaderLocatorTest {
   public void testNoControllerLeader() {
     HelixManager helixManager = mock(HelixManager.class);
     HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
-    BaseDataAccessor<ZNRecord> baseDataAccessor = mock(BaseDataAccessor.class);
-    HelixAdmin helixAdmin = mock(HelixAdmin.class);
 
+    // Mock that there is no helix leader.
     when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
-    when(helixDataAccessor.getBaseDataAccessor()).thenReturn(baseDataAccessor);
-    when(baseDataAccessor.get(anyString(), (Stat) any(), anyInt())).thenThrow(new RuntimeException());
-    when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
-    when(helixAdmin.getResourceExternalView(anyString(), anyString())).thenReturn(null);
+    PropertyKey.Builder keyBuilder = mock(PropertyKey.Builder.class);
+    when(helixDataAccessor.keyBuilder()).thenReturn(keyBuilder);
+    PropertyKey controllerLeader = mock(PropertyKey.class);
+    when(keyBuilder.controllerLeader()).thenReturn(controllerLeader);
+    when(helixDataAccessor.getProperty(controllerLeader)).thenReturn(null);
+
+    // Lead controller resource disabled.
+    ConfigAccessor configAccessor = mock(ConfigAccessor.class);
+    ResourceConfig resourceConfig = mock(ResourceConfig.class);
+    when(helixManager.getConfigAccessor()).thenReturn(configAccessor);
+    when(configAccessor.getResourceConfig(any(), any())).thenReturn(resourceConfig);
+    when(resourceConfig.getSimpleConfig(anyString())).thenReturn("false");
 
     // Create Controller Leader Locator
     FakeControllerLeaderLocator.create(helixManager);
     ControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
 
-    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(testTable), null);
+    Assert.assertNull(controllerLeaderLocator.getControllerLeader(testTable));
   }
 
   @Test
   public void testControllerLeaderExists() {
     HelixManager helixManager = mock(HelixManager.class);
     HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
-    BaseDataAccessor<ZNRecord> baseDataAccessor = mock(BaseDataAccessor.class);
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
-    ZNRecord znRecord = mock(ZNRecord.class);
     final String leaderHost = "host";
     final int leaderPort = 12345;
 
@@ -158,13 +159,19 @@ public class ControllerLeaderLocatorTest {
     ConfigAccessor configAccessor = mock(ConfigAccessor.class);
     ResourceConfig resourceConfig = mock(ResourceConfig.class);
     when(helixManager.getConfigAccessor()).thenReturn(configAccessor);
-    when(configAccessor.getResourceConfig(anyString(), anyString())).thenReturn(resourceConfig);
+    when(configAccessor.getResourceConfig(any(), anyString())).thenReturn(resourceConfig);
     when(resourceConfig.getSimpleConfig(anyString())).thenReturn("false");
 
+    // Mocks the helix leader
     when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
-    when(helixDataAccessor.getBaseDataAccessor()).thenReturn(baseDataAccessor);
-    when(znRecord.getId()).thenReturn(leaderHost + "_" + leaderPort);
-    when(baseDataAccessor.get(anyString(), (Stat) any(), anyInt())).thenReturn(znRecord);
+    PropertyKey.Builder keyBuilder = mock(PropertyKey.Builder.class);
+    when(helixDataAccessor.keyBuilder()).thenReturn(keyBuilder);
+    PropertyKey controllerLeader = mock(PropertyKey.class);
+    when(keyBuilder.controllerLeader()).thenReturn(controllerLeader);
+    LiveInstance liveInstance = mock(LiveInstance.class);
+    when(helixDataAccessor.getProperty(controllerLeader)).thenReturn(liveInstance);
+    when(liveInstance.getInstanceName()).thenReturn(leaderHost + "_" + leaderPort);
+
     when(helixManager.getClusterName()).thenReturn("myCluster");
     when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
     when(helixAdmin.getResourceExternalView(anyString(), anyString())).thenReturn(null);
@@ -184,16 +191,19 @@ public class ControllerLeaderLocatorTest {
   public void testWhenLeadControllerResourceEnabled() {
     HelixManager helixManager = mock(HelixManager.class);
     HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
-    BaseDataAccessor<ZNRecord> baseDataAccessor = mock(BaseDataAccessor.class);
     HelixAdmin helixAdmin = mock(HelixAdmin.class);
-    ZNRecord znRecord = mock(ZNRecord.class);
     final String leaderHost = "host";
     final int leaderPort = 12345;
 
     when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
-    when(helixDataAccessor.getBaseDataAccessor()).thenReturn(baseDataAccessor);
-    when(znRecord.getId()).thenReturn(leaderHost + "_" + leaderPort);
-    when(baseDataAccessor.get(anyString(), (Stat) any(), anyInt())).thenReturn(znRecord);
+    PropertyKey.Builder keyBuilder = mock(PropertyKey.Builder.class);
+    when(helixDataAccessor.keyBuilder()).thenReturn(keyBuilder);
+    PropertyKey controllerLeader = mock(PropertyKey.class);
+    when(keyBuilder.controllerLeader()).thenReturn(controllerLeader);
+    LiveInstance liveInstance = mock(LiveInstance.class);
+    when(helixDataAccessor.getProperty(controllerLeader)).thenReturn(liveInstance);
+    when(liveInstance.getInstanceName()).thenReturn(leaderHost + "_" + leaderPort);
+
     when(helixManager.getClusterName()).thenReturn("myCluster");
     when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
     when(helixAdmin.getResourceExternalView(anyString(), anyString())).thenReturn(null);
@@ -202,7 +212,7 @@ public class ControllerLeaderLocatorTest {
     ConfigAccessor configAccessor = mock(ConfigAccessor.class);
     ResourceConfig resourceConfig = mock(ResourceConfig.class);
     when(helixManager.getConfigAccessor()).thenReturn(configAccessor);
-    when(configAccessor.getResourceConfig(anyString(), anyString())).thenReturn(resourceConfig);
+    when(configAccessor.getResourceConfig(any(), anyString())).thenReturn(resourceConfig);
     when(resourceConfig.getSimpleConfig(anyString())).thenReturn("false");
 
     // Create Controller Leader Locator
@@ -223,7 +233,6 @@ public class ControllerLeaderLocatorTest {
 
     // After enabling lead controller resource config, the leader in lead controller resource should be used.
     when(resourceConfig.getSimpleConfig(anyString())).thenReturn("true");
-
 
     // External view is null, should return null.
     Assert.assertNull(controllerLeaderLocator.getControllerLeader(testTable));
@@ -285,7 +294,7 @@ public class ControllerLeaderLocatorTest {
       return _currentTimeMs;
     }
 
-    public void setCurrentTimeMs(long currentTimeMs) {
+    void setCurrentTimeMs(long currentTimeMs) {
       _currentTimeMs = currentTimeMs;
     }
   }

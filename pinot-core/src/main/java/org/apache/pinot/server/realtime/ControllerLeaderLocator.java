@@ -105,7 +105,7 @@ public class ControllerLeaderLocator {
    */
   private void refreshControllerLeaderMap() {
     // Checks whether lead controller resource has been enabled or not.
-    if (isLeadControllerResourceEnabled()) {
+    if (LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager)) {
       refreshControllerLeaderMapFromLeadControllerResource();
     } else {
       refreshControllerLeaderMapFromHelixClusterLeader();
@@ -176,23 +176,6 @@ public class ControllerLeaderLocator {
     }
     _cachedControllerLeaderValid = true;
     LOGGER.info("Refreshed controller leader map successfully.");
-  }
-
-  /**
-   * Checks whether lead controller resource is enabled or not. The switch is in resource config.
-   */
-  private boolean isLeadControllerResourceEnabled() {
-    BaseDataAccessor<ZNRecord> dataAccessor = _helixManager.getHelixDataAccessor().getBaseDataAccessor();
-    Stat stat = new Stat();
-    try {
-      ZNRecord znRecord = dataAccessor
-          .get("/" + _helixManager.getClusterName() + "/CONFIGS/RESOURCE/" + Helix.LEAD_CONTROLLER_RESOURCE_NAME, stat,
-              AccessOption.THROW_EXCEPTION_IFNOTEXIST);
-      return Boolean.parseBoolean(znRecord.getSimpleField(Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY));
-    } catch (Exception e) {
-      LOGGER.error("Could not get whether {} is enabled or not.", Helix.LEAD_CONTROLLER_RESOURCE_NAME, e);
-      return false;
-    }
   }
 
   /**
