@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.recordtransformer;
 
+import java.util.List;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.utils.BytesUtils;
 
@@ -438,6 +439,14 @@ public enum PinotDataType {
   INTEGER_ARRAY {
     @Override
     public Integer[] convert(Object value, PinotDataType sourceType) {
+      if (value instanceof List) {
+        final List list = (List) value;
+        Integer[] res = new Integer[list.size()];
+        for (int i = 0;i < list.size(); i++) {
+          res[i] = sourceType.toInteger(list.get(i));
+        }
+        return res;
+      }
       return sourceType.toIntegerArray(value);
     }
   },
@@ -445,6 +454,14 @@ public enum PinotDataType {
   LONG_ARRAY {
     @Override
     public Long[] convert(Object value, PinotDataType sourceType) {
+      if (value instanceof List) {
+        final List list = (List) value;
+        Long[] res = new Long[list.size()];
+        for (int i = 0;i < list.size(); i++) {
+          res[i] = sourceType.toLong(list.get(i));
+        }
+        return res;
+      }
       return sourceType.toLongArray(value);
     }
   },
@@ -452,6 +469,14 @@ public enum PinotDataType {
   FLOAT_ARRAY {
     @Override
     public Float[] convert(Object value, PinotDataType sourceType) {
+      if (value instanceof List) {
+        final List list = (List) value;
+        Float[] res = new Float[list.size()];
+        for (int i = 0;i < list.size(); i++) {
+          res[i] = sourceType.toFloat(list.get(i));
+        }
+        return res;
+      }
       return sourceType.toFloatArray(value);
     }
   },
@@ -459,6 +484,14 @@ public enum PinotDataType {
   DOUBLE_ARRAY {
     @Override
     public Double[] convert(Object value, PinotDataType sourceType) {
+      if (value instanceof List) {
+        final List list = (List) value;
+        Double[] res = new Double[list.size()];
+        for (int i = 0;i < list.size(); i++) {
+          res[i] = sourceType.toDouble(list.get(i));
+        }
+        return res;
+      }
       return sourceType.toDoubleArray(value);
     }
   },

@@ -27,6 +27,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.hadoop.io.BooleanWritable;
+import org.apache.hadoop.io.ByteWritable;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.FloatWritable;
@@ -164,6 +165,8 @@ public class ORCRecordReader implements RecordReader {
       obj = ((DoubleWritable) w).get();
     } else if (BytesWritable.class.isAssignableFrom(w.getClass())) {
       obj = ((BytesWritable) w).getBytes();
+    } else if (ByteWritable.class.isAssignableFrom(w.getClass())) {
+      obj = ((ByteWritable) w).toString();
     } else if (Text.class.isAssignableFrom(w.getClass())) {
       obj = ((Text) w).toString();
     } else if (OrcList.class.isAssignableFrom(w.getClass())) {
