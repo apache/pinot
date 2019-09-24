@@ -328,9 +328,8 @@ public class PinotByteBuffer extends PinotDataBuffer {
 
   @Override
   protected void release() {
-    Cleaner cleaner = ((DirectBuffer) _buffer).cleaner();
-    if (cleaner != null) {
-      cleaner.clean();
+    if ( ((DirectBuffer) _buffer).cleaner() != null) {
+      ((DirectBuffer) _buffer).cleaner().clean();
     }
   }
 }
