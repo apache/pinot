@@ -18,16 +18,15 @@
  */
 package org.apache.pinot.common.utils.helix;
 
-import org.apache.helix.AccessOption;
-import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.ConfigAccessor;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
-import org.apache.helix.ZNRecord;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +52,13 @@ public class LeadControllerUtils {
    */
   public static String generateParticipantInstanceId(String controllerHost, int controllerPort) {
     return Helix.PREFIX_OF_CONTROLLER_INSTANCE + controllerHost + "_" + controllerPort;
+  }
+
+  /**
+   * Extracts controller instance id, e.g. returns localhost_9000 given Controller_localhost_9000 as the participant instance id.
+   */
+  public static String extractControllerInstanceId(String participantInstanceId) {
+    return participantInstanceId.substring(participantInstanceId.indexOf('_') + 1);
   }
 
   /**
@@ -87,19 +93,18 @@ public class LeadControllerUtils {
    * @return instance id of Helix cluster leader, e.g. localhost_9000.
    */
   public static String getHelixClusterLeader(HelixManager helixManager) {
-    BaseDataAccessor<ZNRecord> dataAccessor = helixManager.getHelixDataAccessor().getBaseDataAccessor();
-    Stat stat = new Stat();
-    try {
-      ZNRecord znRecord = dataAccessor.get("/" + helixManager.getClusterName() + "/CONTROLLER/LEADER", stat,
-          AccessOption.THROW_EXCEPTION_IFNOTEXIST);
-      String helixLeader = znRecord.getId();
-      // It's ok to log the info since this method isn't called very often.
-      LOGGER.info("Getting Helix leader: {} as per ZNode version {}, mtime {}", helixLeader, stat.getVersion(),
-          stat.getMtime());
-      return helixLeader;
-    } catch (Exception e) {
-      LOGGER.warn("Could not locate Helix leader!", e);
+    HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
+    PropertyKey propertyKey = helixDataAccessor.keyBuilder().controllerLeader();
+    LiveInstance liveInstance = helixDataAccessor.getProperty(propertyKey);
+    if (liveInstance == null) {
+      LOGGER.warn("Helix leader ZNode is missing");
       return null;
     }
+    String helixLeaderInstanceId = liveInstance.getInstanceName();
+    String helixVersion = liveInstance.getHelixVersion();
+    long modifiedTime = liveInstance.getModifiedTime();
+    LOGGER.info("Getting Helix leader: {}, Helix version: {}, mtime: {}", helixLeaderInstanceId, helixVersion,
+        modifiedTime);
+    return helixLeaderInstanceId;
   }
 }
