@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -34,6 +36,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
@@ -55,6 +58,8 @@ import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.query.aggregation.DistinctTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
@@ -256,8 +261,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       } else {
         // Aggregation query
 
-        AggregationFunction[] aggregationFunctions =
-            AggregationFunctionUtils.getAggregationFunctions(brokerRequest.getAggregationsInfo());
+        AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(brokerRequest);
         if (!brokerRequest.isSetGroupBy()) {
           // Aggregation only query.
           setAggregationResults(brokerResponseNative, aggregationFunctions, dataTableMap, cachedDataSchema,
@@ -332,6 +336,10 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     }
   }
 
+  private boolean isDistinct(final AggregationFunction[] aggregationFunctions) {
+    return aggregationFunctions.length == 1 && aggregationFunctions[0].getType() == AggregationFunctionType.DISTINCT;
+  }
+
   /**
    * Reduce aggregation results from multiple servers and set them into BrokerResponseNative passed in.
    *
@@ -374,19 +382,50 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       }
     }
 
-    // Extract final results and set them into the broker response.
-    List<AggregationResult> reducedAggregationResults = new ArrayList<>(numAggregationFunctions);
-    for (int i = 0; i < numAggregationFunctions; i++) {
-      Serializable resultValue = AggregationFunctionUtils
-          .getSerializableValue(aggregationFunctions[i].extractFinalResult(intermediateResults[i]));
+    // The DISTINCT query is just another SELECTION style query from the user's point of view
+    // and will return one or records in the result table for the column selected.
+    // Internally the execution is happening as an aggregation function (but that is an implementation
+    // detail) and so for that reason, response from broker should be a selection query result
+    // up until now, we have treated DISTINCT similar to another aggregation function even in terms
+    // of the result from function since it has been implemented as an aggregation function.
+    // However, the broker response will be a selection query response as that makes sense from SQL
+    // perspective
+    if (isDistinct(aggregationFunctions)) {
+      Object merged = intermediateResults[0];
+      Preconditions.checkState(merged instanceof DistinctTable, "Error: Expecting merged result of type DistinctTable");
+      DistinctTable distinctTable = (DistinctTable) merged;
+      String[] columnNames = distinctTable.getColumnNames();
+      List<Serializable[]> resultSet = new ArrayList<>(distinctTable.size());
+      Iterator<Key> iterator = distinctTable.getIterator();
 
-      // Format the value into string if required
-      if (!preserveType) {
-        resultValue = AggregationFunctionUtils.formatValue(resultValue);
+      while (iterator.hasNext()) {
+        Key key = iterator.next();
+        Object[] columns = key.getColumns();
+        Preconditions.checkState(columns.length == columnNames.length,
+            "Error: unexpected number of columns in RecordHolder for DISTINCT");
+        Serializable[] distinctRow = new Serializable[columns.length];
+        for (int col = 0; col < columns.length; col++) {
+          final Serializable columnValue = AggregationFunctionUtils.getSerializableValue(columns[col]);
+          distinctRow[col] = columnValue;
+        }
+        resultSet.add(distinctRow);
       }
-      reducedAggregationResults.add(new AggregationResult(dataSchema.getColumnName(i), resultValue));
+      brokerResponseNative.setSelectionResults((new SelectionResults(Arrays.asList(columnNames), resultSet)));
+    } else {
+      // Extract final results and set them into the broker response.
+      List<AggregationResult> reducedAggregationResults = new ArrayList<>(numAggregationFunctions);
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        Serializable resultValue = AggregationFunctionUtils
+            .getSerializableValue(aggregationFunctions[i].extractFinalResult(intermediateResults[i]));
+
+        // Format the value into string if required
+        if (!preserveType) {
+          resultValue = AggregationFunctionUtils.formatValue(resultValue);
+        }
+        reducedAggregationResults.add(new AggregationResult(dataSchema.getColumnName(i), resultValue));
+      }
+      brokerResponseNative.setAggregationResults(reducedAggregationResults);
     }
-    brokerResponseNative.setAggregationResults(reducedAggregationResults);
   }
 
   /**

@@ -20,9 +20,12 @@ package org.apache.pinot.pql.parsers;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.function.FunctionDefinitionRegistry;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -39,6 +42,7 @@ import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
+import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.OrderByAstNode;
 
 
@@ -220,36 +224,69 @@ public class PinotQuery2BrokerRequestConverter {
 
   private AggregationInfo buildAggregationInfo(Function function) {
     List<Expression> operands = function.getOperands();
-    if (operands == null || operands.size() != 1) {
-      throw new Pql2CompilationException(
-          "Aggregation function" + function.getOperator() + " expects 1 argument. found: " + operands);
+    if (operands == null || operands.isEmpty()) {
+      throw new Pql2CompilationException("Aggregation function expects non null argument");
     }
-    String functionName = function.getOperator();
-    String columnName;
-    if (functionName.equalsIgnoreCase("count")) {
-      columnName = "*";
-    } else {
-      Expression functionParam = operands.get(0);
 
-      switch (functionParam.getType()) {
-        case LITERAL:
-          columnName = functionParam.getLiteral().getStringValue();
-          break;
-        case IDENTIFIER:
-          columnName = functionParam.getIdentifier().getName();
-          break;
-        case FUNCTION:
-          columnName = standardizeExpression(functionParam, false, true);
-          break;
-        default:
-          throw new UnsupportedOperationException("Unrecognized functionParamType:" + functionParam.getType());
+    String columnName;
+    String functionName = function.getOperator();
+
+    if (functionName.equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
+      // DISTINCT can support multiple arguments
+      if (operands.size() == 1) {
+        // single column DISTINCT
+        columnName = getColumnExpression(operands.get(0));
+      } else {
+        // multi column DISTINCT
+        Set<String> expressions = new HashSet<>();
+        StringBuilder sb = new StringBuilder();
+        int numOperands = operands.size();
+        for (int i = 0; i < numOperands; i++) {
+          Expression expression = operands.get(i);
+          String columnExpression = getColumnExpression(expression);
+          if (expressions.add(columnExpression)) {
+            // deduplicate the columns
+            if (i != 0) {
+              sb.append(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR);
+            }
+            sb.append(getColumnExpression(expression));
+          }
+        }
+        columnName = sb.toString();
+      }
+    } else {
+      // other aggregation functions support exactly one argument
+      if (operands.size() != 1) {
+        throw new Pql2CompilationException(
+            "Aggregation function" + function.getOperator() + " expects 1 argument. found: " + operands);
+      }
+
+      if (functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
+        columnName = "*";
+      } else {
+        Expression functionParam = operands.get(0);
+        columnName = getColumnExpression(functionParam);
       }
     }
+
     AggregationInfo aggregationInfo = new AggregationInfo();
     aggregationInfo.setAggregationType(functionName);
-    aggregationInfo.putToAggregationParams("column", columnName);
+    aggregationInfo.putToAggregationParams(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO, columnName);
     aggregationInfo.setIsInSelectList(true);
     return aggregationInfo;
+  }
+
+  private String getColumnExpression(Expression functionParam) {
+    switch (functionParam.getType()) {
+      case LITERAL:
+        return functionParam.getLiteral().getStringValue();
+      case IDENTIFIER:
+        return functionParam.getIdentifier().getName();
+      case FUNCTION:
+        return standardizeExpression(functionParam, false, true);
+      default:
+        throw new UnsupportedOperationException("Unrecognized functionParamType:" + functionParam.getType());
+    }
   }
 
   private FilterQuery traverseFilterExpression(Expression filterExpression, FilterQueryMap filterSubQueryMap) {

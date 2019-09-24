@@ -19,16 +19,12 @@
 package org.apache.pinot.core.operator.transform;
 
 import java.io.Serializable;
-import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.FieldSpec.DataType;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.common.utils.BytesUtils;
-import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 
-public class TransformBlockDataFetcher {
 
+public class TransformBlockDataFetcher {
 
   private final Fetcher[] _fetchers;
 
@@ -36,8 +32,11 @@ public class TransformBlockDataFetcher {
       TransformResultMetadata[] expressionResultMetadata) {
     _fetchers = new Fetcher[blockValSets.length];
     for (int i = 0; i < blockValSets.length; i++) {
-      _fetchers[i] = createFetcher(blockValSets[i], dictionaries[i],
-          expressionResultMetadata[i]);
+      if (dictionaries.length == 0 && expressionResultMetadata.length == 0) {
+        _fetchers[i] = createSVNoDictionaryFetcher(blockValSets[i]);
+      } else {
+        _fetchers[i] = createFetcher(blockValSets[i], dictionaries[i], expressionResultMetadata[i]);
+      }
     }
   }
 
@@ -49,34 +48,52 @@ public class TransformBlockDataFetcher {
     return row;
   }
 
-  Fetcher createFetcher(BlockValSet blockValSet,
-      Dictionary dictionary,
+  /**
+   * Create SV non-dictionary based fetcher
+   * @param blockValSet column value set
+   * @return fetcher
+   */
+  private Fetcher createSVNoDictionaryFetcher(BlockValSet blockValSet) {
+    switch (blockValSet.getValueType()) {
+      case INT:
+        return new SVIntValueFetcher(blockValSet.getIntValuesSV());
+      case LONG:
+        return new SVLongValueFetcher(blockValSet.getLongValuesSV());
+      case FLOAT:
+        return new SVFloatValueFetcher(blockValSet.getFloatValuesSV());
+      case DOUBLE:
+        return new SVDoubleValueFetcher(blockValSet.getDoubleValuesSV());
+      case BOOLEAN:
+      case STRING:
+        return new SVStringValueFetcher(blockValSet.getStringValuesSV());
+      case BYTES:
+        return new SVBytesValueFetcher(blockValSet.getBytesValuesSV());
+    }
+
+    throw new UnsupportedOperationException();
+  }
+
+  private Fetcher createFetcher(BlockValSet blockValSet, Dictionary dictionary,
       TransformResultMetadata expressionResultMetadata) {
     if (expressionResultMetadata.hasDictionary()) {
       if (expressionResultMetadata.isSingleValue()) {
-        return new DictionaryBasedSVValueFetcher(dictionary,
-            blockValSet.getDictionaryIdsSV(), expressionResultMetadata.getDataType());
+        return new DictionaryBasedSVValueFetcher(dictionary, blockValSet.getDictionaryIdsSV(),
+            expressionResultMetadata.getDataType());
       } else {
         switch (expressionResultMetadata.getDataType()) {
           case INT:
-            return new DictionaryBasedMVIntValueFetcher(dictionary,
-                blockValSet.getDictionaryIdsMV());
+            return new DictionaryBasedMVIntValueFetcher(dictionary, blockValSet.getDictionaryIdsMV());
           case LONG:
-            return new DictionaryBasedMVLongValueFetcher(dictionary,
-                blockValSet.getDictionaryIdsMV());
+            return new DictionaryBasedMVLongValueFetcher(dictionary, blockValSet.getDictionaryIdsMV());
           case FLOAT:
-            return new DictionaryBasedMVFloatValueFetcher(dictionary,
-                blockValSet.getDictionaryIdsMV());
+            return new DictionaryBasedMVFloatValueFetcher(dictionary, blockValSet.getDictionaryIdsMV());
           case DOUBLE:
-            return new DictionaryBasedMVDoubleValueFetcher(dictionary,
-                blockValSet.getDictionaryIdsMV());
+            return new DictionaryBasedMVDoubleValueFetcher(dictionary, blockValSet.getDictionaryIdsMV());
           case BOOLEAN:
           case STRING:
-            return new DictionaryBasedMVStringValueFetcher(dictionary,
-                blockValSet.getDictionaryIdsMV());
+            return new DictionaryBasedMVStringValueFetcher(dictionary, blockValSet.getDictionaryIdsMV());
           case BYTES:
-            return new DictionaryBasedMVBytesValueFetcher(dictionary,
-                blockValSet.getDictionaryIdsMV());
+            return new DictionaryBasedMVBytesValueFetcher(dictionary, blockValSet.getDictionaryIdsMV());
         }
       }
     } else {
@@ -99,7 +116,6 @@ public class TransformBlockDataFetcher {
     throw new UnsupportedOperationException();
   }
 }
-
 
 interface Fetcher {
 
@@ -190,8 +206,7 @@ class DictionaryBasedSVValueFetcher implements Fetcher {
   private int[] _dictionaryIds;
   private DataType _dataType;
 
-  DictionaryBasedSVValueFetcher(Dictionary dictionary, int[] dictionaryIds,
-      DataType dataType) {
+  DictionaryBasedSVValueFetcher(Dictionary dictionary, int[] dictionaryIds, DataType dataType) {
 
     _dictionary = dictionary;
     _dictionaryIds = dictionaryIds;
@@ -202,7 +217,6 @@ class DictionaryBasedSVValueFetcher implements Fetcher {
     return (Serializable) _dictionary.get(_dictionaryIds[docId]);
   }
 }
-
 
 class DictionaryBasedMVIntValueFetcher implements Fetcher {
 

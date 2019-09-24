@@ -26,10 +26,12 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.core.plan.AggregationFunctionInitializer;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 
 
 /**
@@ -39,7 +41,7 @@ public class AggregationFunctionUtils {
   private AggregationFunctionUtils() {
   }
 
-  public static final String COLUMN_KEY = "column";
+  public static final String COLUMN_KEY = FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO;
 
   /**
    * Extracts the aggregation column (could be column name or UDF expression) from the {@link AggregationInfo}.
@@ -59,24 +61,37 @@ public class AggregationFunctionUtils {
     return new AggregationFunctionColumnPair(functionType, getColumn(aggregationInfo));
   }
 
+  public static boolean isDistinct(AggregationFunctionContext[] functionContexts) {
+    return functionContexts.length == 1
+        && functionContexts[0].getAggregationFunction().getType() == AggregationFunctionType.DISTINCT;
+  }
+
   /**
    * Creates an {@link AggregationFunctionContext} from the {@link AggregationInfo}.
    */
   @Nonnull
   public static AggregationFunctionContext getAggregationFunctionContext(@Nonnull AggregationInfo aggregationInfo) {
-    String functionName = aggregationInfo.getAggregationType();
-    AggregationFunction aggregationFunction = AggregationFunctionFactory.getAggregationFunction(functionName);
-    return new AggregationFunctionContext(aggregationFunction, AggregationFunctionUtils.getColumn(aggregationInfo));
+    return getAggregationFunctionContext(aggregationInfo, null);
   }
 
   @Nonnull
-  public static AggregationFunctionContext[] getAggregationFunctionContexts(
-      @Nonnull List<AggregationInfo> aggregationInfos, @Nullable SegmentMetadata segmentMetadata) {
+  public static AggregationFunctionContext getAggregationFunctionContext(AggregationInfo aggregationInfo,
+      @Nullable BrokerRequest brokerRequest) {
+    String column = getColumn(aggregationInfo);
+    AggregationFunction aggregationFunction =
+        AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
+    return new AggregationFunctionContext(aggregationFunction, column);
+  }
+
+  @Nonnull
+  public static AggregationFunctionContext[] getAggregationFunctionContexts(BrokerRequest brokerRequest,
+      @Nullable SegmentMetadata segmentMetadata) {
+    List<AggregationInfo> aggregationInfos = brokerRequest.getAggregationsInfo();
     int numAggregationFunctions = aggregationInfos.size();
     AggregationFunctionContext[] aggregationFunctionContexts = new AggregationFunctionContext[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationInfo aggregationInfo = aggregationInfos.get(i);
-      aggregationFunctionContexts[i] = getAggregationFunctionContext(aggregationInfo);
+      aggregationFunctionContexts[i] = getAggregationFunctionContext(aggregationInfo, brokerRequest);
     }
     if (segmentMetadata != null) {
       AggregationFunctionInitializer aggregationFunctionInitializer =
@@ -89,12 +104,13 @@ public class AggregationFunctionUtils {
   }
 
   @Nonnull
-  public static AggregationFunction[] getAggregationFunctions(@Nonnull List<AggregationInfo> aggregationInfos) {
+  public static AggregationFunction[] getAggregationFunctions(BrokerRequest brokerRequest) {
+    List<AggregationInfo> aggregationInfos = brokerRequest.getAggregationsInfo();
     int numAggregationFunctions = aggregationInfos.size();
     AggregationFunction[] aggregationFunctions = new AggregationFunction[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       aggregationFunctions[i] =
-          AggregationFunctionFactory.getAggregationFunction(aggregationInfos.get(i).getAggregationType());
+          AggregationFunctionFactory.getAggregationFunction(aggregationInfos.get(i), brokerRequest);
     }
     return aggregationFunctions;
   }

@@ -109,7 +109,7 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
     ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
 
     AggregationFunctionContext[] aggregationFunctionContexts =
-        AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest.getAggregationsInfo(), null);
+        AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest, null);
     int numAggregationFunctions = aggregationFunctionContexts.length;
     AggregationFunction[] aggregationFunctions = new AggregationFunction[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
