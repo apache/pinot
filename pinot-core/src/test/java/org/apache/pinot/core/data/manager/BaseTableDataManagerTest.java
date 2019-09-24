@@ -158,11 +158,6 @@ public class BaseTableDataManagerTest {
     // Removing the segment again is fine.
     tableDataManager.removeSegment(segmentName);
 
-    // Delete the segment
-    tableDataManager.notifySegmentDeleted(segmentName);
-    // check that it is recorded as deleted
-    Assert.assertTrue(tableDataManager.isRecentlyDeleted(segmentName));
-
     // Add a new segment and remove it in order this time.
     final String anotherSeg = "AnotherSegment";
     ImmutableSegment ix1 = makeImmutableSegment(anotherSeg, totalDocs);

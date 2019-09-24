@@ -19,13 +19,10 @@
 package org.apache.pinot.core.data.manager;
 
 import com.google.common.base.Preconditions;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.ZNRecord;
@@ -45,12 +42,8 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public abstract class BaseTableDataManager implements TableDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseTableDataManager.class);
-  // cache deleted segment names for utmost this duration
-  private static final int MAX_CACHE_DURATION_SEC = 6 * 3600; // 6 hours
 
   protected final ConcurrentHashMap<String, SegmentDataManager> _segmentDataManagerMap = new ConcurrentHashMap<>();
-
-  protected Cache<String, Boolean> _deletedSegmentsCache;
 
   protected TableDataManagerConfig _tableDataManagerConfig;
   protected String _instanceId;
@@ -66,7 +59,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
       @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull ServerMetrics serverMetrics) {
     LOGGER.info("Initializing table data manager for table: {}", tableDataManagerConfig.getTableName());
 
-    _deletedSegmentsCache = CacheBuilder.newBuilder().expireAfterWrite(MAX_CACHE_DURATION_SEC, TimeUnit.SECONDS).build();
     _tableDataManagerConfig = tableDataManagerConfig;
     _instanceId = instanceId;
     _propertyStore = propertyStore;
@@ -125,8 +117,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
     ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
     SegmentDataManager oldSegmentManager = _segmentDataManagerMap.put(segmentName, newSegmentManager);
-
-    // release old segment if needed
     if (oldSegmentManager == null) {
       _logger.info("Added new immutable segment: {} to table: {}", segmentName, _tableNameWithType);
     } else {
@@ -166,35 +156,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  /**
-   * Called when a segment is deleted. The actual handling of segment delete is outside of this method.
-   * This method provides book-keeping around deleted segments.
-   * @param segmentName name of the segment to track.
-   */
-  public void notifySegmentDeleted(@Nonnull String segmentName) {
-    // add segment to the cache
-    _deletedSegmentsCache.put(segmentName, true);
-  }
-
-  /**
-   * Check if a segment is recently deleted.
-   *
-   * @param segmentName name of the segment to check.
-   * @return true if segment is in the cache, false otherwise
-   */
-  public boolean isRecentlyDeleted(@Nonnull String segmentName) {
-    return _deletedSegmentsCache.getIfPresent(segmentName) != null;
-  }
-
-  /**
-   * Remove a segment from the deleted cache if it is being added back.
-   *
-   * @param segmentName name of the segment that needs to removed from the cache (if needed)
-   */
-  public void notifySegmentAdded(@Nonnull String segmentName) {
-    _deletedSegmentsCache.invalidate(segmentName);
-  }
-
   @Nonnull
   @Override
   public List<SegmentDataManager> acquireAllSegments() {
@@ -215,6 +176,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
       SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
       if (segmentDataManager != null && segmentDataManager.increaseReferenceCount()) {
         segmentDataManagers.add(segmentDataManager);
+      } else {
+        handleMissingSegment(segmentName);
       }
     }
     return segmentDataManagers;
@@ -226,8 +189,15 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (segmentDataManager != null && segmentDataManager.increaseReferenceCount()) {
       return segmentDataManager;
     } else {
+      handleMissingSegment(segmentName);
       return null;
     }
+  }
+
+  private void handleMissingSegment(String segmentName) {
+    // could not find segment
+    LOGGER.error("Could not find segment " + segmentName + " for table " + _tableNameWithType);
+    _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, 1);
   }
 
   @Override
