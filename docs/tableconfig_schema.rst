@@ -113,6 +113,25 @@ The ``segmentsConfig`` section has information about configuring the following:
       "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
     },
 
+* Completion Config
+
+  You can also add a ``completionConfig`` section under the ``segmentsConfig`` section. Completion config holds information related to realtime segment completion. There's just 1 field in this config as of now, which is the ``completionMode``. The value of the ``completioMode`` decides how non-winner servers should replace the completed segment during realtime segment completion. Currently, the supported values are
+
+  * ``DEFAULT``: if the in memory segment in the non-winner server is equivalent to the committed segment, then build and replace, else download
+  * ``DOWNLOAD``: non-winner servers always download the segment, never build it
+
+For example:
+
+.. code-block:: none
+
+    "segmentsConfig": {
+      ..
+      ..
+      "completionConfig": {
+        "completionMode": "DOWNLOAD"
+      }
+    },
+
 Table Index Config Section
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
