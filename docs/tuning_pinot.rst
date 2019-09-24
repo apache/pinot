@@ -37,3 +37,4 @@ improving query throughput for Pinot cluster. If you have identified a performan
    
    index_techniques
    tuning_scatter_and_gather
+   tuning_realtime_performance
