@@ -19,9 +19,12 @@
 package org.apache.pinot.controller;
 
 import com.yammer.metrics.core.MetricsRegistry;
+import org.apache.helix.BaseDataAccessor;
+import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -31,6 +34,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -44,10 +48,11 @@ public class LeadControllerManagerTest {
   private ControllerMetrics _controllerMetrics;
   private LiveInstance _liveInstance;
   private ResourceConfig _resourceConfig;
+  private ZNRecord _znRecord;
 
   @BeforeMethod
   public void setup() {
-    _controllerMetrics =  new ControllerMetrics(new MetricsRegistry());
+    _controllerMetrics = new ControllerMetrics(new MetricsRegistry());
     _helixManager = mock(HelixManager.class);
     HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
     when(_helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
@@ -60,13 +65,18 @@ public class LeadControllerManagerTest {
     _liveInstance = mock(LiveInstance.class);
     when(helixDataAccessor.getProperty(controllerLeader)).thenReturn(_liveInstance);
 
-    PropertyKey resourceConfigPropertyKey = mock(PropertyKey.class);
-    when(keyBuilder.resourceConfig(any())).thenReturn(resourceConfigPropertyKey);
-    _resourceConfig = mock(ResourceConfig.class);
-    when(helixDataAccessor.getProperty(resourceConfigPropertyKey)).thenReturn(_resourceConfig);
-
     String instanceId = LeadControllerUtils.generateParticipantInstanceId(CONTROLLER_HOST, CONTROLLER_PORT);
     when(_helixManager.getInstanceName()).thenReturn(instanceId);
+
+    ConfigAccessor configAccessor = mock(ConfigAccessor.class);
+    when(_helixManager.getConfigAccessor()).thenReturn(configAccessor);
+    _resourceConfig = mock(ResourceConfig.class);
+    when(configAccessor.getResourceConfig(any(), anyString())).thenReturn(_resourceConfig);
+
+    BaseDataAccessor<ZNRecord> dataAccessor = mock(BaseDataAccessor.class);
+    when(helixDataAccessor.getBaseDataAccessor()).thenReturn(dataAccessor);
+    _znRecord = mock(ZNRecord.class);
+    when(dataAccessor.get(anyString(), any(), anyInt())).thenReturn(_znRecord);
   }
 
   @Test
@@ -87,7 +97,7 @@ public class LeadControllerManagerTest {
 
     // Even resource config is enabled, leadControllerManager should return false because no index is cached yet.
     Assert.assertFalse(leadControllerManager.isLeaderForTable(tableName));
-    Assert.assertTrue(leadControllerManager.isLeadControllerResourceEnabled());
+    Assert.assertTrue(LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager));
 
     // After the target partition index is cached, leadControllerManager should return true.
     leadControllerManager.addPartitionLeader(partitionName);
@@ -102,7 +112,7 @@ public class LeadControllerManagerTest {
     enableResourceConfig(false);
     leadControllerManager.onResourceConfigChange();
 
-    Assert.assertFalse(leadControllerManager.isLeadControllerResourceEnabled());
+    Assert.assertFalse(LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager));
     Assert.assertFalse(leadControllerManager.isLeaderForTable(tableName));
     leadControllerManager.addPartitionLeader(partitionName);
     Assert.assertFalse(leadControllerManager.isLeaderForTable(tableName));
@@ -115,7 +125,7 @@ public class LeadControllerManagerTest {
 
   private void becomeHelixLeader(boolean becomeHelixLeader) {
     if (becomeHelixLeader) {
-      when(_liveInstance.getInstanceName()).thenReturn(CONTROLLER_HOST + "_" + CONTROLLER_PORT);
+      when(_znRecord.getId()).thenReturn(CONTROLLER_HOST + "_" + CONTROLLER_PORT);
     }
   }
 

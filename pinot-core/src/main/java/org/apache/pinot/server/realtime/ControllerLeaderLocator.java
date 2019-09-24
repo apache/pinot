@@ -20,16 +20,12 @@ package org.apache.pinot.server.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
-import org.apache.helix.AccessOption;
-import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixManager;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.pql.parsers.utils.Pair;
-import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,28 +108,20 @@ public class ControllerLeaderLocator {
    */
   private Pair<String, Integer> getLeaderForTable(String rawTableName) {
     // Checks whether lead controller resource has been enabled or not.
-    if (isLeadControllerResourceEnabled()) {
+    boolean leadControllerResourceEnabled;
+    try {
+      leadControllerResourceEnabled = LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager);
+    } catch (Exception e) {
+      LOGGER.error("Exception when checking whether lead controller resource is enabled or not.", e);
+      return null;
+    }
+
+    if (leadControllerResourceEnabled) {
       // Gets leader from lead controller resource.
       return getLeaderFromLeadControllerResource(rawTableName);
     } else {
       // Gets Helix leader to be the leader to this table, otherwise returns null.
       return getHelixClusterLeader();
-    }
-  }
-
-  /**
-   * Checks whether lead controller resource is enabled or not. The switch is in resource config.
-   */
-  private boolean isLeadControllerResourceEnabled() {
-    BaseDataAccessor<ZNRecord> dataAccessor = _helixManager.getHelixDataAccessor().getBaseDataAccessor();
-    Stat stat = new Stat();
-    try {
-      ZNRecord znRecord = dataAccessor.get("/" + _helixManager.getClusterName() + "/CONFIGS/RESOURCE/"
-          + CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME, stat, AccessOption.THROW_EXCEPTION_IFNOTEXIST);
-      return Boolean.parseBoolean(znRecord.getSimpleField(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY));
-    } catch (Exception e) {
-      LOGGER.warn("Could not get whether lead controller resource is enabled or not.", e);
-      return false;
     }
   }
 
@@ -157,19 +145,8 @@ public class ControllerLeaderLocator {
    * @return instance id of Helix cluster leader, e.g. localhost_9000.
    */
   private Pair<String, Integer> getHelixClusterLeader() {
-    BaseDataAccessor<ZNRecord> dataAccessor = _helixManager.getHelixDataAccessor().getBaseDataAccessor();
-    Stat stat = new Stat();
-    try {
-      ZNRecord znRecord = dataAccessor.get("/" + _helixManager.getClusterName() + "/CONTROLLER/LEADER", stat,
-          AccessOption.THROW_EXCEPTION_IFNOTEXIST);
-      String helixLeader = znRecord.getId();
-      LOGGER.info("Getting Helix leader: {} as per znode version {}, mtime {}", helixLeader, stat.getVersion(),
-          stat.getMtime());
-      return convertToHostAndPortPair(helixLeader);
-    } catch (Exception e) {
-      LOGGER.warn("Could not locate Helix leader!", e);
-      return null;
-    }
+    String helixLeader = LeadControllerUtils.getHelixClusterLeader(_helixManager);
+    return convertToHostAndPortPair(helixLeader);
   }
 
   /**
@@ -214,6 +191,10 @@ public class ControllerLeaderLocator {
    * @param instanceId instance id without any prefix, e.g. localhost_9000
    * */
   private Pair<String, Integer> convertToHostAndPortPair(String instanceId) {
+    // TODO: improve the exception handling.
+    if (instanceId == null) {
+      return null;
+    }
     int index = instanceId.lastIndexOf('_');
     String leaderHost = instanceId.substring(0, index);
     int leaderPort = Integer.valueOf(instanceId.substring(index + 1));

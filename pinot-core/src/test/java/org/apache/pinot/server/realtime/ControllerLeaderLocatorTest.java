@@ -23,11 +23,14 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.helix.BaseDataAccessor;
+import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.core.query.utils.Pair;
 import org.apache.zookeeper.data.Stat;
@@ -57,6 +60,13 @@ public class ControllerLeaderLocatorTest {
     ZNRecord znRecord = mock(ZNRecord.class);
     final String leaderHost = "host";
     final int leaderPort = 12345;
+
+    // Lead controller resource disabled.
+    ConfigAccessor configAccessor = mock(ConfigAccessor.class);
+    ResourceConfig resourceConfig = mock(ResourceConfig.class);
+    when(helixManager.getConfigAccessor()).thenReturn(configAccessor);
+    when(configAccessor.getResourceConfig(anyString(), anyString())).thenReturn(resourceConfig);
+    when(resourceConfig.getSimpleConfig(anyString())).thenReturn("false");
 
     when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
     when(helixDataAccessor.getBaseDataAccessor()).thenReturn(baseDataAccessor);
@@ -140,6 +150,13 @@ public class ControllerLeaderLocatorTest {
     final String leaderHost = "host";
     final int leaderPort = 12345;
 
+    // Lead controller resource disabled.
+    ConfigAccessor configAccessor = mock(ConfigAccessor.class);
+    ResourceConfig resourceConfig = mock(ResourceConfig.class);
+    when(helixManager.getConfigAccessor()).thenReturn(configAccessor);
+    when(configAccessor.getResourceConfig(anyString(), anyString())).thenReturn(resourceConfig);
+    when(resourceConfig.getSimpleConfig(anyString())).thenReturn("false");
+
     when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
     when(helixDataAccessor.getBaseDataAccessor()).thenReturn(baseDataAccessor);
     when(znRecord.getId()).thenReturn(leaderHost + "_" + leaderPort);
@@ -177,6 +194,13 @@ public class ControllerLeaderLocatorTest {
     when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
     when(helixAdmin.getResourceExternalView(anyString(), anyString())).thenReturn(null);
 
+    // Lead controller resource disabled.
+    ConfigAccessor configAccessor = mock(ConfigAccessor.class);
+    ResourceConfig resourceConfig = mock(ResourceConfig.class);
+    when(helixManager.getConfigAccessor()).thenReturn(configAccessor);
+    when(configAccessor.getResourceConfig(anyString(), anyString())).thenReturn(resourceConfig);
+    when(resourceConfig.getSimpleConfig(anyString())).thenReturn("false");
+
     // Create Controller Leader Locator
     FakeControllerLeaderLocator.create(helixManager);
     ControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
@@ -193,7 +217,8 @@ public class ControllerLeaderLocatorTest {
     controllerLeaderLocator.invalidateCachedControllerLeader();
 
     // After enabling lead controller resource config, the leader in lead controller resource should be used.
-    when(znRecord.getSimpleField(anyString())).thenReturn("true");
+    when(resourceConfig.getSimpleConfig(anyString())).thenReturn("true");
+
 
     // External view is null, should return null.
     Assert.assertNull(controllerLeaderLocator.getControllerLeader(testTable));
