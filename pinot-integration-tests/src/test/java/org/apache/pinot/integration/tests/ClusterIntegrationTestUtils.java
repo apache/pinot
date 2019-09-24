@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
@@ -53,11 +54,12 @@ import org.apache.pinot.broker.requesthandler.PinotQueryParserFactory;
 import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
 import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.apache.pinot.core.realtime.stream.StreamDataProducer;
 import org.apache.pinot.core.realtime.stream.StreamDataProvider;
@@ -655,9 +657,18 @@ public class ClusterIntegrationTestUtils {
       ResultSet h2ResultSet = h2statement.getResultSet();
       ResultSetMetaData h2MetaData = h2ResultSet.getMetaData();
 
-      List<String> orderByColumns = SelectionOperatorUtils.extractSortColumns(
-          PinotQueryParserFactory.get("pql").compileToBrokerRequest(pinotQuery).getSelections()
-              .getSelectionSortSequence());
+      List<SelectionSort> sortSequence =
+          PinotQueryParserFactory.get(CommonConstants.Broker.Request.PQL).compileToBrokerRequest(pinotQuery)
+              .getSelections().getSelectionSortSequence();
+      Set<String> orderByColumns;
+      if (sortSequence == null) {
+        orderByColumns = Collections.emptySet();
+      } else {
+        orderByColumns = new TreeSet<>();
+        for (SelectionSort selectionSort : sortSequence) {
+          orderByColumns.add(selectionSort.getColumn());
+        }
+      }
       Set<String> expectedValues = new HashSet<>();
       List<String> expectedOrderByValues = new ArrayList<>();
       Map<String, String> reusableExpectedValueMap = new HashMap<>();

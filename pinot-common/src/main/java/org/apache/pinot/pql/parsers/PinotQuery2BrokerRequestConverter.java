@@ -39,6 +39,7 @@ import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
+import org.apache.pinot.pql.parsers.pql2.ast.OrderByAstNode;
 
 
 public class PinotQuery2BrokerRequestConverter {
@@ -84,11 +85,7 @@ public class PinotQuery2BrokerRequestConverter {
       SelectionSort selectionSort = new SelectionSort();
       //order by is always a function (ASC or DESC)
       Function functionCall = orderByExpr.getFunctionCall();
-      if (functionCall.getOperator().equalsIgnoreCase("ASC")) {
-        selectionSort.setIsAsc(true);
-      } else {
-        selectionSort.setIsAsc(false);
-      }
+      selectionSort.setIsAsc(functionCall.getOperator().equalsIgnoreCase(OrderByAstNode.ASCENDING_ORDER));
       selectionSort.setColumn(standardizeExpression(functionCall.getOperands().get(0), true));
       sortSequenceList.add(selectionSort);
     }

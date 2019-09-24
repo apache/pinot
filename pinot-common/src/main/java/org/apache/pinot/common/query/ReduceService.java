@@ -19,7 +19,6 @@
 package org.apache.pinot.common.query;
 
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -45,7 +44,6 @@ public interface ReduceService<T extends BrokerResponse> {
    * @param brokerMetrics broker metrics to track execution statistics.
    * @return broker response.
    */
-  @Nonnull
-  T reduceOnDataTable(@Nonnull BrokerRequest brokerRequest, @Nonnull Map<ServerInstance, DataTable> instanceResponseMap,
+  T reduceOnDataTable(BrokerRequest brokerRequest, Map<ServerInstance, DataTable> instanceResponseMap,
       @Nullable BrokerMetrics brokerMetrics);
 }
