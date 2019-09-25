@@ -153,6 +153,8 @@ public class ORCRecordReader implements RecordReader {
       obj = null;
     } else if (BooleanWritable.class.isAssignableFrom(w.getClass())) {
       obj = ((BooleanWritable) w).get();
+    } else if (ByteWritable.class.isAssignableFrom(w.getClass())) {
+      obj = ((ByteWritable) w).get();
     } else if (ShortWritable.class.isAssignableFrom(w.getClass())) {
       obj = ((ShortWritable) w).get();
     } else if (IntWritable.class.isAssignableFrom(w.getClass())) {
@@ -165,8 +167,6 @@ public class ORCRecordReader implements RecordReader {
       obj = ((DoubleWritable) w).get();
     } else if (BytesWritable.class.isAssignableFrom(w.getClass())) {
       obj = ((BytesWritable) w).getBytes();
-    } else if (ByteWritable.class.isAssignableFrom(w.getClass())) {
-      obj = ((ByteWritable) w).get();
     } else if (Text.class.isAssignableFrom(w.getClass())) {
       obj = ((Text) w).toString();
     } else if (OrcList.class.isAssignableFrom(w.getClass())) {

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.data.recordtransformer;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
@@ -88,7 +89,18 @@ public class DataTypeTransformer implements RecordTransformer {
         record.putField(column, value);
       } else {
         PinotDataType source;
-        if (value instanceof Object[]) {
+        if (value instanceof List) {
+          // Multi-valued column
+          List values = (List) value;
+          if (!values.isEmpty()) {
+            source = MULTI_VALUE_TYPE_MAP.get(values.get(0).getClass());
+            if (source == null) {
+              source = PinotDataType.OBJECT_ARRAY;
+            }
+          } else {
+            source = PinotDataType.OBJECT_ARRAY;
+          }
+        } else if (value instanceof Object[]) {
           // Multi-valued column
           Object[] values = (Object[]) value;
           source = MULTI_VALUE_TYPE_MAP.get(values[0].getClass());

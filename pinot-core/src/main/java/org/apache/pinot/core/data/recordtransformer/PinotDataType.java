@@ -502,17 +502,17 @@ public enum PinotDataType {
   }
 
   public Integer[] toIntegerArray(Object value) {
-    if (value instanceof List) {
-      List list = (List) value;
-      int listSize = list.size();
-      Integer[] res = new Integer[listSize];
-      for (int i = 0; i < listSize; i++) {
-        res[i] = toInteger(list.get(i));
-      }
-      return res;
-    }
     if (isSingleValue()) {
       return new Integer[]{toInteger(value)};
+    } else if (value instanceof List) {
+      List valueList = (List) value;
+      int length = valueList.size();
+      Integer[] integerArray = new Integer[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        integerArray[i] = singleValueType.toInteger(valueList.get(i));
+      }
+      return integerArray;
     } else {
       Object[] valueArray = (Object[]) value;
       int length = valueArray.length;
@@ -526,17 +526,17 @@ public enum PinotDataType {
   }
 
   public Long[] toLongArray(Object value) {
-    if (value instanceof List) {
-      List list = (List) value;
-      int listSize = list.size();
-      Long[] res = new Long[listSize];
-      for (int i = 0; i < listSize; i++) {
-        res[i] = toLong(list.get(i));
-      }
-      return res;
-    }
     if (isSingleValue()) {
       return new Long[]{toLong(value)};
+    } else if (value instanceof List) {
+      List valueList = (List) value;
+      int length = valueList.size();
+      Long[] longArray = new Long[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        longArray[i] = singleValueType.toLong(valueList.get(i));
+      }
+      return longArray;
     } else {
       Object[] valueArray = (Object[]) value;
       int length = valueArray.length;
@@ -550,17 +550,17 @@ public enum PinotDataType {
   }
 
   public Float[] toFloatArray(Object value) {
-    if (value instanceof List) {
-      List list = (List) value;
-      int listSize = list.size();
-      Float[] res = new Float[listSize];
-      for (int i = 0; i < listSize; i++) {
-        res[i] = toFloat(list.get(i));
-      }
-      return res;
-    }
     if (isSingleValue()) {
       return new Float[]{toFloat(value)};
+    } else if (value instanceof List) {
+      List valueList = (List) value;
+      int length = valueList.size();
+      Float[] floatArray = new Float[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        floatArray[i] = singleValueType.toFloat(valueList.get(i));
+      }
+      return floatArray;
     } else {
       Object[] valueArray = (Object[]) value;
       int length = valueArray.length;
@@ -574,17 +574,17 @@ public enum PinotDataType {
   }
 
   public Double[] toDoubleArray(Object value) {
-    if (value instanceof List) {
-      List list = (List) value;
-      int listSize = list.size();
-      Double[] res = new Double[listSize];
-      for (int i = 0; i < listSize; i++) {
-        res[i] = toDouble(list.get(i));
-      }
-      return res;
-    }
     if (isSingleValue()) {
       return new Double[]{toDouble(value)};
+    } else if (value instanceof List) {
+      List valueList = (List) value;
+      int length = valueList.size();
+      Double[] doubleArray = new Double[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        doubleArray[i] = singleValueType.toDouble(valueList.get(i));
+      }
+      return doubleArray;
     } else {
       Object[] valueArray = (Object[]) value;
       int length = valueArray.length;
@@ -598,17 +598,17 @@ public enum PinotDataType {
   }
 
   public String[] toStringArray(Object value) {
-    if (value instanceof List) {
-      List list = (List) value;
-      int listSize = list.size();
-      String[] res = new String[listSize];
-      for (int i = 0; i < listSize; i++) {
-        res[i] = toString(list.get(i));
-      }
-      return res;
-    }
     if (isSingleValue()) {
       return new String[]{toString(value)};
+    } else if (value instanceof List) {
+      List valueList = (List) value;
+      int length = valueList.size();
+      String[] stringArray = new String[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        stringArray[i] = singleValueType.toString(valueList.get(i));
+      }
+      return stringArray;
     } else {
       Object[] valueArray = (Object[]) value;
       int length = valueArray.length;
