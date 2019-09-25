@@ -178,6 +178,13 @@ easy and automated mechanisms for replacing pinot servers, or expanding capacity
 `special mechanisms <https://cwiki.apache.org/confluence/display/PINOT/Consuming+and+Indexing+rows+in+Realtime#ConsumingandIndexingrowsinRealtime-Segmentcompletionprotocol>`_
 that ensure that the completed segment is equivalent across all replicas.
 
+During segment completion, one winner is chosen by the controller from all the replicas as the ``committer server``. The ``committer server`` builds the segment and uploads it to the controller. All the other ``non-committer servers`` follow one of these two paths:
+
+1. If the in-memory segment is equivalent to the committed segment, the ``non-committer`` server also builds the segment locally and replaces the in-memory segment
+2. If the in-memory segment is non equivalent to the committed segment, the ``non-committer`` server downloads the segment from the controller.
+
+For more details on this protocol, please refer to `this doc <https://cwiki.apache.org/confluence/display/PINOT/Consuming+and+Indexing+rows+in+Realtime#ConsumingandIndexingrowsinRealtime-Segmentcompletionprotocol>`_.
+
 In ``HighLevel`` mode, the servers persist the consumed rows into local store (and **not** the segment store). Since consumption of rows
 can be from any partition, it is not possible to guarantee equivalence of segments across replicas.
 

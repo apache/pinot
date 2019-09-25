@@ -68,10 +68,17 @@ that will help you to come up with an optimal setting for the segment size.
 Moving completed segments to different hosts
 --------------------------------------------
 
-The strutcture of the consuming segments and the completed segments are very different. The memory, CPU, I/O
+The structure of the consuming segments and the completed segments are very different. The memory, CPU, I/O
 and GC characteristics could be very different while processing queries on these segments. Therefore it may be
 useful to move the completed segments onto differnt set of hosts in some use cases.
 
 You can host completed segments on a different set of hosts using the ``tagOverrideConfig`` as described in 
 :ref:`table-config-section`. Pinot will automatically move them once the consuming segments are completed.
+
+Completion config
+-----------------
+
+When a realtime segment completes, a winner server is chosen amongst all replicas by the controller. That committer server builds the segment and uploads to the controller. The non-committer servers are asked to catchup to the winning offset. If the non-committer servers are able to catch up, they are asked to build the segment and replace the in-memory segment. If they are unable to catchup, they are asked to download the segment from the controller.
+
+In certain scenarios, segment build can get very memory intensive. It might become desirable to enforce the non-committer servers to just download the segment from the controller, instead of building it again. The ``completionConfig`` as described in :ref:`table-config-section` can be used to configure this.
 
