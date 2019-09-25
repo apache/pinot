@@ -58,31 +58,50 @@ AzurePinotFS requires the following configs according to your environment:
 adl.accountId, adl.authEndpoint, adl.clientId, adl.clientSecret
 
 Sample Controller Config
-    pinot.controller.storage.factory.class.adl: org.apache.pinot.filesystem.AzurePinotFS
-    pinot.controller.storage.factory.adl.accountId: xxxx
-    pinot.controller.storage.factory.adl.authEndpoint: xxxx
-    pinot.controller.storage.factory.adl.clientId: xxxx
-    pinot.controller.storage.factory.adl.clientId: xxxx
-    pinot.controller.segment.fetcher.protocols: adl
+
+.. code-block:: none
+
+    "pinot.controller.storage.factory.class.adl": "org.apache.pinot.filesystem.AzurePinotFS"
+    "pinot.controller.storage.factory.adl.accountId": "xxxx"
+    "pinot.controller.storage.factory.adl.authEndpoint": "xxxx"
+    "pinot.controller.storage.factory.adl.clientId": "xxxx"
+    "pinot.controller.storage.factory.adl.clientId": "xxxx"
+    "pinot.controller.segment.fetcher.protocols": "adl"
+
 
 Sample Server Config
-    pinot.server.storage.factory.class.adl: org.apache.pinot.filesystem.AzurePinotFS
-    pinot.server.storage.factory.adl.accountId: xxxx
-    pinot.server.storage.factory.adl.authEndpoint: xxxx
-    pinot.server.storage.factory.adl.clientId: xxxx
-    pinot.server.storage.factory.adl.clientId: xxxx
-    pinot.server.segment.fetcher.protocols: adl
+
+.. code-block:: none
+
+    "pinot.server.storage.factory.class.adl": "org.apache.pinot.filesystem.AzurePinotFS"
+    "pinot.server.storage.factory.adl.accountId": "xxxx"
+    "pinot.server.storage.factory.adl.authEndpoint": "xxxx"
+    "pinot.server.storage.factory.adl.clientId": "xxxx"
+    "pinot.server.storage.factory.adl.clientId": "xxxx"
+    "pinot.server.segment.fetcher.protocols": "adl"
+
 
 You can find the parameters in your account as follows:
 https://stackoverflow.com/questions/56349040/what-is-clientid-authtokenendpoint-clientkey-for-accessing-azure-data-lake
 
 Please also make sure to set the following config with the value "adl"
-segment.fetcher.protocols : adl
 
+.. code-block:: none
+
+  "segment.fetcher.protocols" : "adl"
+
+
+To see how to upload segments to different storage systems, check
+:file:`../segment_fetcher.rst`.
 
 HadoopPinotFS requires the following configs according to your environment:
 
 hadoop.kerberos.principle, hadoop.kerberos.keytab, hadoop.conf.path
 
 Please make sure to also set the following config with the value "hdfs"
-segment.fetcher.protocols : hdfs
+
+.. code-block:: none
+
+  "segment.fetcher.protocols" : "hdfs"
+
+
