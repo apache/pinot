@@ -270,16 +270,16 @@ public class PinotTableRestletResource {
       }
       return new SuccessResponse("Tables: " + tablesDeleted + " deleted");
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(),
-          Response.Status.INTERNAL_SERVER_ERROR, e);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
   // Return true iff the table is of the expectedType based on the given tableName and tableType.
   private boolean verifyTableType(String tableName, TableType tableType, TableType expectedType) {
-    if (tableType == null)
-      return TableNameBuilder.getTableTypeFromTableName(tableName) == expectedType ||
-          TableNameBuilder.getTableTypeFromTableName(tableName) == null;
+    if (tableType == null) {
+      TableType typeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
+      return typeFromTableName == expectedType || typeFromTableName == null;
+    }
     return tableType == expectedType;
   }
 
