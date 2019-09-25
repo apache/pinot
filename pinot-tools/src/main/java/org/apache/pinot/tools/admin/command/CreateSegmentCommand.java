@@ -437,7 +437,25 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   }
 
   protected boolean isDataFile(String fileName) {
-    return fileName.endsWith(".avro") || fileName.endsWith(".csv") || fileName.endsWith(".json") || fileName
-        .endsWith(".thrift") || fileName.endsWith(".parquet") || fileName.endsWith(".orc");
+    switch (_format) {
+      case AVRO:
+      case GZIPPED_AVRO:
+        return fileName.endsWith(".avro");
+      case PARQUET:
+        return fileName.endsWith(".parquet");
+      case CSV:
+        return fileName.endsWith(".csv");
+      case JSON:
+        return fileName.endsWith(".json");
+      case THRIFT:
+        return fileName.endsWith(".thrift");
+      case ORC:
+        return fileName.endsWith(".orc");
+      case OTHER:
+      case PINOT:
+      default:
+        return fileName.endsWith(".avro") || fileName.endsWith(".csv") || fileName.endsWith(".json") || fileName
+            .endsWith(".thrift") || fileName.endsWith(".parquet") || fileName.endsWith(".orc");
+    }
   }
 }

@@ -87,6 +87,7 @@ public class DataTypeTransformer implements RecordTransformer {
           value = new Object[]{defaultNullValue};
         }
         record.putField(column, value);
+        continue;
       } else {
         PinotDataType source;
         if (value instanceof List) {
@@ -100,6 +101,9 @@ public class DataTypeTransformer implements RecordTransformer {
           } else {
             source = PinotDataType.OBJECT_ARRAY;
           }
+          value = dest.convert(value, source);
+          record.putField(column, value);
+          continue;
         } else if (value instanceof Object[]) {
           // Multi-valued column
           Object[] values = (Object[]) value;
