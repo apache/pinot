@@ -57,6 +57,22 @@ AzurePinotFS requires the following configs according to your environment:
 
 adl.accountId, adl.authEndpoint, adl.clientId, adl.clientSecret
 
+Sample Controller Config
+    pinot.controller.storage.factory.class.adl: org.apache.pinot.filesystem.AzurePinotFS
+    pinot.controller.storage.factory.adl.accountId: xxxx
+    pinot.controller.storage.factory.adl.authEndpoint: xxxx
+    pinot.controller.storage.factory.adl.clientId: xxxx
+    pinot.controller.storage.factory.adl.clientId: xxxx
+    pinot.controller.segment.fetcher.protocols: adl
+
+Sample Server Config
+    pinot.server.storage.factory.class.adl: org.apache.pinot.filesystem.AzurePinotFS
+    pinot.server.storage.factory.adl.accountId: xxxx
+    pinot.server.storage.factory.adl.authEndpoint: xxxx
+    pinot.server.storage.factory.adl.clientId: xxxx
+    pinot.server.storage.factory.adl.clientId: xxxx
+    pinot.server.segment.fetcher.protocols: adl
+
 You can find the parameters in your account as follows:
 https://stackoverflow.com/questions/56349040/what-is-clientid-authtokenendpoint-clientkey-for-accessing-azure-data-lake
 
