@@ -69,7 +69,6 @@ public class PinotSchemaRestletResourceTest extends ControllerTest {
       Map<String, String> header = new HashMap<>();
       sendPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schemaString, header);
     } catch (IOException e) {
-      e.printStackTrace();
       Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 415"), e.getMessage());
     }
 
@@ -79,7 +78,6 @@ public class PinotSchemaRestletResourceTest extends ControllerTest {
       final String response = sendPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schemaString, header);
       Assert.assertEquals(response, "{\"status\":\"transcript successfully added\"}");
     } catch (IOException e) {
-      e.printStackTrace();
       // should not reach here
       Assert.fail("Shouldn't have caught an exception");
     }
