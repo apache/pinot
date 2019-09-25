@@ -29,7 +29,7 @@ Aggregation
 
 .. code-block:: none
 
-  curl -X POST -d '{"pql":"select count(*) from flights"}' http://localhost:8099/query
+  curl -X POST -d '{"pql":"select count(*) from flights"}' http://localhost:8099/pql
 
 
   {
@@ -53,7 +53,7 @@ Aggregation with grouping
 
 .. code-block:: none
 
-  curl -X POST -d '{"pql":"select count(*) from flights group by Carrier"}' http://localhost:8099/query
+  curl -X POST -d '{"pql":"select count(*) from flights group by Carrier"}' http://localhost:8099/pql
 
 
   {
@@ -91,7 +91,7 @@ Selection
 
 .. code-block:: none
 
-  curl -X POST -d '{"pql":"select * from flights limit 3"}' http://localhost:8099/query
+  curl -X POST -d '{"pql":"select * from flights limit 3"}' http://localhost:8099/pql
 
 
   {
