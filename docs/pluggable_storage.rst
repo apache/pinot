@@ -57,6 +57,9 @@ AzurePinotFS requires the following configs according to your environment:
 
 adl.accountId, adl.authEndpoint, adl.clientId, adl.clientSecret
 
+You can find the parameters in your account as follows:
+https://stackoverflow.com/questions/56349040/what-is-clientid-authtokenendpoint-clientkey-for-accessing-azure-data-lake
+
 Please also make sure to set the following config with the value "adl"
 segment.fetcher.protocols : adl
 
