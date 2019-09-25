@@ -54,6 +54,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Pinot controller resource enabled
   PINOT_LEAD_CONTROLLER_RESOURCE_ENABLED("PinotLeadControllerResourceEnabled", true),
 
+  // Number of partitions for which current controller becomes the leader
+  CONTROLLER_LEADER_PARTITION_COUNT("ControllerLeaderPartitionCount", true),
+
   // Number of extra live instances needed
   SHORT_OF_LIVE_INSTANCES("ShortOfLiveInstances", false),
 
