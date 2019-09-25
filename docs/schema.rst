@@ -47,13 +47,15 @@ Sample Schema:
        {
          "name": "tags",
          "dataType": "STRING",
-         "singleValueField": false
+         "singleValueField": false,
+         "defaultNullValue": "null"
        }
      ],
      "metricFieldSpecs": [
        {
          "name": "price",
-         "dataType": "DOUBLE"
+         "dataType": "DOUBLE",
+         "defaultNullValue": 0
        }
      ],
      "timeFieldSpec": {
@@ -122,3 +124,15 @@ The schema above also contains a ``timeFieldSpec`` that is used to specify the a
 In this example, the input timestamp specified in ``SECONDS`` will be automatically converted into ``DAYS`` before storing into Pinot. The ``timeFieldSpec`` also has an optional attribute ``timeFormat`` that can take values ``EPOCH`` (default) and ``SIMPLE_DATE_FORMAT:<format>``.
 
 Time columns are mandatory for ``APPEND`` (incremental data push) use cases but optional for ``REFRESH`` (data refresh with each push) use cases. More details on this can be found at the `Segment Config <tableconfig_schema.html#segments-config-section>`_ section. 
+
+
+Default Null Value:
+~~~~~~~~~~~~~~~~~~~
+
+Pinot does not store null values natively, so null values are stored as placeholder values as specified in the fieldspec, or a default value chosen by the system. In the schema example above, all null values in the input for column ``flights`` are converted to String ``"null"`` and stored internally. Simiarly, null values in the input for column ``price`` is converted to integer ``0`` and stored internally. Since this is an optional field, if not specified, default null values are chosen by the system as follows:
+
+* **Dimensions**: Numeric fields get a default null value of MIN_VALUE (e.g Integer.MIN_VALUE, Double.MIN_VALUE, etc), and String fields get a default null value of String ``"null"``, if not specified in the field spec.
+* **Metrics**: All metrics get a default null value of numeric ``0`` if not specified in the field spec.
+
+Dimension and metric columns of data type ``BYTES`` get a defaulit null value of ``byte[0]``, if not specified in the field spec. For specifiying a custom defaultNullValue for column of ``BYTES`` type, use the Hex String representation of the byte[] using `this <https://commons.apache.org/proper/commons-codec/apidocs/org/apache/commons/codec/binary/Hex.html>`_ library.
+
