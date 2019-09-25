@@ -38,7 +38,7 @@ import org.testng.annotations.Test;
 
 
 public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
-  private static long TIMEOUT_IN_MS = 1000_000L;
+  private static long TIMEOUT_IN_MS = 10_000L;
   private HashMap<Integer, String> _partitionToTableMap;
 
   @BeforeClass
@@ -83,7 +83,7 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
     // After disabling lead controller resource, only helix leader should be used.
     validateResultSet(controllerLeaderLocator, resultSet, 1, "Failed to get only one pair of controller");
 
-    // Mock the behavior that 60 seconds have passed.
+    // Mock time so it is beyond minimum time to invalidate leader cache
     controllerLeaderLocator.setCurrentTimeMs(
         controllerLeaderLocator.getCurrentTimeMs() + 2 * controllerLeaderLocator.getMinInvalidateIntervalMs());
     controllerLeaderLocator.invalidateCachedControllerLeader();
@@ -119,7 +119,7 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
     TestUtils.waitForCondition(aVoid -> {
       resultSet.clear();
       for (Map.Entry<Integer, String> entry : _partitionToTableMap.entrySet()) {
-        // Mock the behavior that 60 seconds have passed.
+        // Mock time so it is beyond minimum time to invalidate leader cache
         controllerLeaderLocator.setCurrentTimeMs(
             controllerLeaderLocator.getCurrentTimeMs() + 2 * controllerLeaderLocator.getMinInvalidateIntervalMs());
         controllerLeaderLocator.invalidateCachedControllerLeader();
@@ -131,7 +131,6 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
         }
         resultSet.add(pair1.getFirst() + pair1.getSecond());
       }
-      // Only 1 controller should be fetched, which is the helix leader.
       return resultSet.size() == expectedNumberOfUniqueResults;
     }, TIMEOUT_IN_MS, errorMessage);
   }
