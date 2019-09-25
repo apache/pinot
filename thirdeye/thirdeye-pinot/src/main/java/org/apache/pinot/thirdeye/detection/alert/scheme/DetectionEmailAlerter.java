@@ -259,7 +259,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
       Map<String, Object> notificationSchemeProps = notification.getNotificationSchemeProps();
       if (notificationSchemeProps != null && notificationSchemeProps.get(PROP_EMAIL_SCHEME) != null
           && ConfigUtils.getMap(notificationSchemeProps.get(PROP_EMAIL_SCHEME)).get(PROP_RECIPIENTS) != null) {
-        SetMultimap<String, String> emailRecipients = (SetMultimap<String, String>) ConfigUtils.getMap(notificationSchemeProps.get(PROP_EMAIL_SCHEME)).get(PROP_RECIPIENTS);
+        Map<String, Set<String>> emailRecipients = (Map<String, Set<String>>) ConfigUtils.getMap(notificationSchemeProps.get(PROP_EMAIL_SCHEME)).get(PROP_RECIPIENTS);
         if (emailRecipients.get(PROP_TO) == null || emailRecipients.get(PROP_TO).isEmpty()) {
           LOG.warn("Skipping! No email recipients found for alert {}.", config.getId());
           return;
