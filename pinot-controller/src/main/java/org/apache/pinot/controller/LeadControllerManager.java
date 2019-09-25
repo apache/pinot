@@ -124,7 +124,7 @@ public class LeadControllerManager {
     _leadForPartitions.add(partitionId);
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_PARTITION_LEADER, partitionName, 1L);
     _controllerMetrics
-        .setValueOfGlobalGauge(ControllerGauge.NUMBER_PARTITIONS_CONTROLLER_BECOMES_LEADER, _leadForPartitions.size());
+        .setValueOfGlobalGauge(ControllerGauge.CONTROLLER_LEADER_PARTITION_COUNT, _leadForPartitions.size());
   }
 
   /**
@@ -137,7 +137,7 @@ public class LeadControllerManager {
     _leadForPartitions.remove(partitionId);
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_PARTITION_LEADER, partitionName, 0L);
     _controllerMetrics
-        .setValueOfGlobalGauge(ControllerGauge.NUMBER_PARTITIONS_CONTROLLER_BECOMES_LEADER, _leadForPartitions.size());
+        .setValueOfGlobalGauge(ControllerGauge.CONTROLLER_LEADER_PARTITION_COUNT, _leadForPartitions.size());
   }
 
   /**
