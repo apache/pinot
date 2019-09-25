@@ -115,10 +115,14 @@ The ``segmentsConfig`` section has information about configuring the following:
 
 * Completion Config
 
-  You can also add a ``completionConfig`` section under the ``segmentsConfig`` section. Completion config holds information related to realtime segment completion. There's just 1 field in this config as of now, which is the ``completionMode``. The value of the ``completioMode`` decides how non-winner servers should replace the completed segment during realtime segment completion. Currently, the supported values are
+  You can also add a ``completionConfig`` section under the ``segmentsConfig`` section. Completion config holds information related to realtime segment completion. There is just one field in this config as of now, which is the ``completionMode``. The value of the ``completioMode`` decides how non-committers servers should replace the in-memory segment during realtime segment completion. Refer to the `Architecture <architecture.html#ingesting-realtime-data>`_ for description about committer server and non-committer servers.
 
-  * ``DEFAULT``: if the in memory segment in the non-winner server is equivalent to the committed segment, then build and replace, else download
-  * ``DOWNLOAD``: non-winner servers always download the segment, never build it
+  By default, if the in memory segment in the non-winner server is equivalent to the committed segment, then the non-committer server builds and replaces the segment, else it download the segment from the controller.
+
+  Currently, the supported value for ``completionMode`` is
+
+  * ``DOWNLOAD``: In certain scenarios, segment build can get very memory intensive. It might become desirable to enforce the non-committer servers to just download the segment from the controller, instead of building it again. Setting this completionMode ensures that the non-committer servers always download the segment.
+
 
 For example:
 
