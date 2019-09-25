@@ -401,7 +401,6 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
   private void setTableConfigAndSchema() throws IOException {
     // If push locations, table config, and schema are not configured, this does not necessarily mean that segments
     // cannot be created. We should allow the user to go to the next step rather than failing the job.
-    Preconditions.checkState(!_pushLocations.isEmpty(), "Push locations cannot be empty.");
     try(ControllerRestApi controllerRestApi = getControllerRestApi()) {
       if (controllerRestApi != null) {
         _tableConfig = controllerRestApi.getTableConfig();
