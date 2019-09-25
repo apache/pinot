@@ -74,6 +74,19 @@ public abstract class BaseSegmentJob extends Configured {
   }
 
   /**
+   * This method is currently implemented in SegmentCreationJob and SegmentPreprocessingJob due to a dependency on
+   * the hadoop filesystem, which we can only get once the job begins to run.
+   * We return null here to make it clear that for now, all implementations of this method have to support
+   * reading from a schema file. In the future, we hope to deprecate reading the schema from the schema file in favor
+   * of mandating that a schema is pushed to the controller.
+   * @return
+   */
+  @Nullable
+  protected org.apache.pinot.common.data.Schema getSchema() throws IOException {
+    return null;
+  }
+
+  /**
    * Can be overridden to provide custom controller Rest API.
    */
   @Nullable

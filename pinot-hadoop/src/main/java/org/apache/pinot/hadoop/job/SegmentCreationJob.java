@@ -193,6 +193,7 @@ public class SegmentCreationJob extends BaseSegmentJob {
     _fileSystem.delete(_stagingDir, true);
   }
 
+  @Override
   protected Schema getSchema()
       throws IOException {
     try (ControllerRestApi controllerRestApi = getControllerRestApi()) {

@@ -377,6 +377,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     fieldSet.add(hashCodeField);
   }
 
+  @Override
   protected org.apache.pinot.common.data.Schema getSchema()
       throws IOException {
     try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
