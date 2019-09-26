@@ -21,7 +21,6 @@ package org.apache.pinot.hadoop.job;
 import com.google.common.base.Preconditions;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -42,7 +41,6 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.hadoop.job.mappers.SegmentCreationMapper;
 import org.apache.pinot.hadoop.utils.JobPreparationHelper;
@@ -191,20 +189,6 @@ public class SegmentCreationJob extends BaseSegmentJob {
     // Delete the staging directory
     _logger.info("Deleting the staging directory: {}", _stagingDir);
     _fileSystem.delete(_stagingDir, true);
-  }
-
-  @Override
-  protected Schema getSchema()
-      throws IOException {
-    try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
-      if (controllerRestApi != null) {
-        return controllerRestApi.getSchema();
-      } else {
-        try (InputStream inputStream = _fileSystem.open(_schemaFile)) {
-          return Schema.fromInputSteam(inputStream);
-        }
-      }
-    }
   }
 
   protected void validateTableConfig(TableConfig tableConfig) {
