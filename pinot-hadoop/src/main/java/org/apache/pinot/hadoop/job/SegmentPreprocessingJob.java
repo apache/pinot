@@ -20,6 +20,7 @@ package org.apache.pinot.hadoop.job;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -374,6 +375,20 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
   private void addHashCodeField(Set<Schema.Field> fieldSet) {
     Schema.Field hashCodeField = new Schema.Field("hashcode", Schema.create(Schema.Type.INT), "hashcode", null);
     fieldSet.add(hashCodeField);
+  }
+
+  @Override
+  protected org.apache.pinot.common.data.Schema getSchema()
+      throws IOException {
+    try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
+      if (controllerRestApi != null) {
+        return controllerRestApi.getSchema();
+      } else {
+        try (InputStream inputStream = _fileSystem.open(_schemaFile)) {
+          return org.apache.pinot.common.data.Schema.fromInputSteam(inputStream);
+        }
+      }
+    }
   }
 
   /**
