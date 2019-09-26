@@ -28,7 +28,6 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
-import java.util.Arrays;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.utils.StringUtil;
@@ -230,7 +229,7 @@ public class SegmentDictionaryCreator implements Closeable {
           FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
         for (int i = 0; i < sortedByteArrays.length; i++) {
           byte[] value = sortedByteArrays[i];
-          writer.writeUnpaddedString(i, _numBytesPerEntry, value);
+          writer.writeBytes(i, _numBytesPerEntry, value);
         }
 
         LOGGER.info("Using fixed bytes value dictionary for column: {}, size: {}", _fieldSpec.getName(),

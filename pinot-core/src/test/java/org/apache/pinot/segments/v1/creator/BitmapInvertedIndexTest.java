@@ -27,7 +27,6 @@ import java.util.Set;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.util.Utf8;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.Pairs;
@@ -96,20 +95,16 @@ public class BitmapInvertedIndexTest {
 
     // Compare the loaded inverted index with the record in avro file
     try (DataFileStream<GenericRecord> reader = new DataFileStream<>(new FileInputStream(_avroFile),
-        new GenericDatumReader<GenericRecord>())) {
+        new GenericDatumReader<>())) {
       // Check the first 1000 records
       for (int docId = 0; docId < 1000; docId++) {
         GenericRecord record = reader.next();
         for (String column : INVERTED_INDEX_COLUMNS) {
-          Object entry = record.get(column);
-          if (entry instanceof Utf8) {
-            entry = entry.toString();
-          }
           DataSource dataSource = indexSegment.getDataSource(column);
           Dictionary dictionary = dataSource.getDictionary();
           InvertedIndexReader invertedIndex = dataSource.getInvertedIndex();
 
-          int dictId = dictionary.indexOf(entry);
+          int dictId = dictionary.indexOf(record.get(column).toString());
           int size = dictionary.length();
           if (dataSource.getDataSourceMetadata().isSorted()) {
             for (int i = 0; i < size; i++) {

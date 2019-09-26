@@ -61,11 +61,9 @@ public class BenchmarkOffHeapDictionaryMemory {
     }
   }
 
-  private BaseOffHeapMutableDictionary testMem(final int initialCardinality, final int maxOverflowSize)
-      throws Exception {
+  private BaseOffHeapMutableDictionary testMem(final int initialCardinality, final int maxOverflowSize) {
     LongOffHeapMutableDictionary dictionary =
         new LongOffHeapMutableDictionary(initialCardinality, maxOverflowSize, _memoryManager, "longColumn");
-
     for (Long colValue : _colValues) {
       dictionary.index(colValue);
     }
@@ -115,9 +113,9 @@ public class BenchmarkOffHeapDictionaryMemory {
       setupValues(_cardinality, _nRows);
       for (int i = 0; i < _nRuns; i++) {
         int initialCardinality = _cardinality / div;
-        BaseOffHeapMutableDictionary dictionary = testMem(initialCardinality, maxOverflowSize);
-        addStats(dictionary, div);
-        dictionary.close();
+        try (BaseOffHeapMutableDictionary dictionary = testMem(initialCardinality, maxOverflowSize)) {
+          addStats(dictionary, div);
+        }
       }
     }
 

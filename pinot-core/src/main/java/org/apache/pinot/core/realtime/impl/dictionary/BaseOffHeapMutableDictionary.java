@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
@@ -132,7 +131,7 @@ import org.slf4j.LoggerFactory;
  * - It may be useful to implement a way to stop adding new items when the the number of buffers reaches a certain
  *   threshold. In this case, we could close the realtime segment, and start a new one with bigger buffers.
  */
-public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
+public abstract class BaseOffHeapMutableDictionary extends BaseMutableDictionary {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseOffHeapMutableDictionary.class);
 
   // List of primes from http://compoasso.free.fr/primelistweb/page/prime/liste_online_en.php
@@ -157,11 +156,11 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
   private final int _maxItemsInOverflowHash;
 
   // Number of entries in the dictionary. Max dictId is _numEntries-1.
-  private int _numEntries;
+  private volatile int _numEntries;
 
   // We keep a list of PinotDataBuffer items from which we get the IntBuffer items, so
   // that we can call close() on these.
-  private List<PinotDataBuffer> _pinotDataBuffers = new ArrayList<>();
+  private final List<PinotDataBuffer> _pinotDataBuffers = new ArrayList<>();
   private final int _initialRowCount;
   protected final PinotDataBufferMemoryManager _memoryManager;
   protected final String _allocationContext;
@@ -211,11 +210,6 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
   @Override
   public int length() {
     return _numEntries;
-  }
-
-  @Override
-  public boolean isEmpty() {
-    return _numEntries == 0;
   }
 
   @Override
@@ -339,12 +333,12 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
    * IDs may match to the same raw value. Use the methods provided by sub-class
    * to compare the raw values with those in the forward map.
    *
-   * @param rawValue value of object for which we need to get dictionary ID
+   * @param value value of object for which we need to get dictionary ID
    * @param serializedValue serialized form of the
    * @return dictionary ID if found, NULL_VALUE_INDEX otherwise.
    */
-  protected int getDictId(@Nonnull Object rawValue, byte[] serializedValue) {
-    final int hashVal = rawValue.hashCode() & Integer.MAX_VALUE;
+  protected int getDictId(Object value, byte[] serializedValue) {
+    final int hashVal = value.hashCode() & Integer.MAX_VALUE;
     final ValueToDictId valueToDictId = _valueToDict;
     final List<IntBuffer> iBufList = valueToDictId.getIBufList();
     for (IntBuffer iBuf : iBufList) {
@@ -353,7 +347,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
       for (int i = offsetInBuf; i < offsetInBuf + NUM_COLUMNS; i++) {
         int dictId = iBuf.get(i);
         if (dictId != NULL_VALUE_INDEX) {
-          if (equalsValueAt(dictId, rawValue, serializedValue)) {
+          if (equalsValueAt(dictId, value, serializedValue)) {
             return dictId;
           }
         }
@@ -362,7 +356,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     if (_maxItemsInOverflowHash == 0) {
       return NULL_VALUE_INDEX;
     }
-    Integer dictId = valueToDictId.getOverflowMap().get(rawValue);
+    Integer dictId = valueToDictId.getOverflowMap().get(value);
     if (dictId == null) {
       return NULL_VALUE_INDEX;
     }
@@ -378,23 +372,23 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
    * @param value value to be inserted into the dictionary
    * @param serializedValue serialized representation of the value, may be null.
    */
-  protected void indexValue(@Nonnull Object value, byte[] serializedValue) {
+  protected int indexValue(Object value, byte[] serializedValue) {
     final int hashVal = value.hashCode() & Integer.MAX_VALUE;
+    int newValueDictId = _numEntries;
     ValueToDictId valueToDictId = _valueToDict;
-    final List<IntBuffer> iBufList = valueToDictId.getIBufList();
 
-    for (IntBuffer iBuf : iBufList) {
+    for (IntBuffer iBuf : valueToDictId.getIBufList()) {
       final int modulo = iBuf.capacity() / NUM_COLUMNS;
       final int offsetInBuf = (hashVal % modulo) * NUM_COLUMNS;
       for (int i = offsetInBuf; i < offsetInBuf + NUM_COLUMNS; i++) {
         final int dictId = iBuf.get(i);
         if (dictId == NULL_VALUE_INDEX) {
-          setRawValueAt(_numEntries, value, serializedValue);
-          iBuf.put(i, _numEntries++);
-          return;
-        }
-        if (equalsValueAt(dictId, value, serializedValue)) {
-          return;
+          setValue(newValueDictId, value, serializedValue);
+          iBuf.put(i, newValueDictId);
+          _numEntries = newValueDictId + 1;
+          return newValueDictId;
+        } else if (equalsValueAt(dictId, value, serializedValue)) {
+          return dictId;
         }
       }
     }
@@ -403,43 +397,37 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     if (_maxItemsInOverflowHash > 0) {
       Integer dictId = overflowMap.get(value);
       if (dictId != null) {
-        return;
+        return dictId;
       }
     }
 
-    setRawValueAt(_numEntries, value, serializedValue);
+    setValue(newValueDictId, value, serializedValue);
 
     if (_maxItemsInOverflowHash > 0) {
       if (overflowMap.size() < _maxItemsInOverflowHash) {
-        overflowMap.put(value, _numEntries++);
-        return;
+        overflowMap.put(value, newValueDictId);
+        _numEntries = newValueDictId + 1;
+        return newValueDictId;
       }
     }
     // Need a new buffer
     IntBuffer buf = expand();
     final int modulo = buf.capacity() / NUM_COLUMNS;
     final int offsetInBuf = (hashVal % modulo) * NUM_COLUMNS;
-    boolean done = false;
     for (int i = offsetInBuf; i < offsetInBuf + NUM_COLUMNS; i++) {
       if (buf.get(i) == NULL_VALUE_INDEX) {
-        buf.put(i, _numEntries++);
-        done = true;
-        break;
+        buf.put(i, newValueDictId);
+        _numEntries = newValueDictId + 1;
+        return newValueDictId;
       }
     }
-    if (_maxItemsInOverflowHash == 0) {
-      if (!done) {
-        throw new RuntimeException("Impossible");
-      }
-    }
-    if (!done) {
-      valueToDictId = _valueToDict;
-      overflowMap = valueToDictId.getOverflowMap();
-      overflowMap.put(value, _numEntries++);
-    }
+    overflowMap = _valueToDict.getOverflowMap();
+    overflowMap.put(value, newValueDictId);
+    _numEntries = newValueDictId + 1;
+    return newValueDictId;
   }
 
-  public long getTotalOffHeapMemUsed() {
+  protected long getOffHeapMemUsed() {
     ValueToDictId valueToDictId = _valueToDict;
     long size = 0;
     for (IntBuffer iBuf : valueToDictId._iBufList) {
@@ -458,12 +446,14 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     return valueToDictId._overflowMap.size();
   }
 
-  protected boolean equalsValueAt(int dictId, Object value, byte[] serializedValue) {
-    return value.equals(get(dictId));
-  }
+  protected abstract void setValue(int dictId, Object value, byte[] serializedValue);
 
-  public abstract void doClose()
+  protected abstract boolean equalsValueAt(int dictId, Object value, byte[] serializedValue);
+
+  public abstract int getAvgValueSize();
+
+  public abstract long getTotalOffHeapMemUsed();
+
+  protected abstract void doClose()
       throws IOException;
-
-  protected abstract void setRawValueAt(int dictId, Object rawValue, byte[] serializedValue);
 }

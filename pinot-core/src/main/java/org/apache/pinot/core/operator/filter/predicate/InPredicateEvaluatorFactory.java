@@ -245,7 +245,7 @@ public class InPredicateEvaluatorFactory {
       String[] values = inPredicate.getValues();
       _matchingValues = new HashSet<>(HashUtil.getMinHashSetSize(values.length));
       for (String value : values) {
-        _matchingValues.add(new ByteArray(BytesUtils.toBytes(value)));
+        _matchingValues.add(BytesUtils.toByteArray(value));
       }
     }
 

@@ -30,12 +30,12 @@ import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
 import org.apache.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.BytesDictionary;
 import org.apache.pinot.core.segment.index.readers.DoubleDictionary;
 import org.apache.pinot.core.segment.index.readers.FloatDictionary;
-import org.apache.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import org.apache.pinot.core.segment.index.readers.IntDictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.LongDictionary;
@@ -57,7 +57,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
 
   private final DataFileReader _forwardIndex;
   private final InvertedIndexReader _invertedIndex;
-  private final ImmutableDictionaryReader _dictionary;
+  private final BaseImmutableDictionary _dictionary;
   private final BloomFilterReader _bloomFilterReader;
 
   public PhysicalColumnIndexContainer(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
@@ -131,7 +131,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   }
 
   @Override
-  public ImmutableDictionaryReader getDictionary() {
+  public BaseImmutableDictionary getDictionary() {
     return _dictionary;
   }
 
@@ -140,7 +140,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     return _bloomFilterReader;
   }
 
-  private static ImmutableDictionaryReader loadDictionary(PinotDataBuffer dictionaryBuffer, ColumnMetadata metadata,
+  private static BaseImmutableDictionary loadDictionary(PinotDataBuffer dictionaryBuffer, ColumnMetadata metadata,
       boolean loadOnHeap) {
     FieldSpec.DataType dataType = metadata.getDataType();
     if (loadOnHeap) {

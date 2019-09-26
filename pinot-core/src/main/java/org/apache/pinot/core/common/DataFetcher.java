@@ -106,7 +106,7 @@ public class DataFetcher {
     if (dictionary != null) {
       int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
       fetchDictIds(column, inDocIds, length, dictIds);
-      dictionary.readIntValues(dictIds, 0, length, outValues, 0);
+      dictionary.readIntValues(dictIds, length, outValues);
     } else {
       _singleValueSetMap.get(column).getIntValues(inDocIds, 0, length, outValues, 0);
     }
@@ -125,7 +125,7 @@ public class DataFetcher {
     if (dictionary != null) {
       int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
       fetchDictIds(column, inDocIds, length, dictIds);
-      dictionary.readLongValues(dictIds, 0, length, outValues, 0);
+      dictionary.readLongValues(dictIds, length, outValues);
     } else {
       _singleValueSetMap.get(column).getLongValues(inDocIds, 0, length, outValues, 0);
     }
@@ -144,7 +144,7 @@ public class DataFetcher {
     if (dictionary != null) {
       int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
       fetchDictIds(column, inDocIds, length, dictIds);
-      dictionary.readFloatValues(dictIds, 0, length, outValues, 0);
+      dictionary.readFloatValues(dictIds, length, outValues);
     } else {
       _singleValueSetMap.get(column).getFloatValues(inDocIds, 0, length, outValues, 0);
     }
@@ -163,7 +163,7 @@ public class DataFetcher {
     if (dictionary != null) {
       int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
       fetchDictIds(column, inDocIds, length, dictIds);
-      dictionary.readDoubleValues(dictIds, 0, length, outValues, 0);
+      dictionary.readDoubleValues(dictIds, length, outValues);
     } else {
       _singleValueSetMap.get(column).getDoubleValues(inDocIds, 0, length, outValues, 0);
     }
@@ -182,7 +182,7 @@ public class DataFetcher {
     if (dictionary != null) {
       int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
       fetchDictIds(column, inDocIds, length, dictIds);
-      dictionary.readStringValues(dictIds, 0, length, outValues, 0);
+      dictionary.readStringValues(dictIds, length, outValues);
     } else {
       _singleValueSetMap.get(column).getStringValues(inDocIds, 0, length, outValues, 0);
     }
@@ -201,7 +201,7 @@ public class DataFetcher {
     if (dictionary != null) {
       int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
       fetchDictIds(column, inDocIds, length, dictIds);
-      dictionary.readBytesValues(dictIds, 0, length, outValues, 0);
+      dictionary.readBytesValues(dictIds, length, outValues);
     } else {
       _singleValueSetMap.get(column).getBytesValues(inDocIds, 0, length, outValues, 0);
     }
@@ -242,7 +242,7 @@ public class DataFetcher {
       blockMultiValIterator.skipTo(inDocIds[i]);
       int numMultiValues = blockMultiValIterator.nextIntVal(_reusableMVDictIds);
       outValues[i] = new int[numMultiValues];
-      _dictionaryMap.get(column).readIntValues(_reusableMVDictIds, 0, numMultiValues, outValues[i], 0);
+      _dictionaryMap.get(column).readIntValues(_reusableMVDictIds, numMultiValues, outValues[i]);
     }
   }
 
@@ -260,7 +260,7 @@ public class DataFetcher {
       blockMultiValIterator.skipTo(inDocIds[i]);
       int numMultiValues = blockMultiValIterator.nextIntVal(_reusableMVDictIds);
       outValues[i] = new long[numMultiValues];
-      _dictionaryMap.get(column).readLongValues(_reusableMVDictIds, 0, numMultiValues, outValues[i], 0);
+      _dictionaryMap.get(column).readLongValues(_reusableMVDictIds, numMultiValues, outValues[i]);
     }
   }
 
@@ -278,7 +278,7 @@ public class DataFetcher {
       blockMultiValIterator.skipTo(inDocIds[i]);
       int numMultiValues = blockMultiValIterator.nextIntVal(_reusableMVDictIds);
       outValues[i] = new float[numMultiValues];
-      _dictionaryMap.get(column).readFloatValues(_reusableMVDictIds, 0, numMultiValues, outValues[i], 0);
+      _dictionaryMap.get(column).readFloatValues(_reusableMVDictIds, numMultiValues, outValues[i]);
     }
   }
 
@@ -296,7 +296,7 @@ public class DataFetcher {
       blockMultiValIterator.skipTo(inDocIds[i]);
       int numMultiValues = blockMultiValIterator.nextIntVal(_reusableMVDictIds);
       outValues[i] = new double[numMultiValues];
-      _dictionaryMap.get(column).readDoubleValues(_reusableMVDictIds, 0, numMultiValues, outValues[i], 0);
+      _dictionaryMap.get(column).readDoubleValues(_reusableMVDictIds, numMultiValues, outValues[i]);
     }
   }
 
@@ -314,7 +314,7 @@ public class DataFetcher {
       blockMultiValIterator.skipTo(inDocIds[i]);
       int numMultiValues = blockMultiValIterator.nextIntVal(_reusableMVDictIds);
       outValues[i] = new String[numMultiValues];
-      _dictionaryMap.get(column).readStringValues(_reusableMVDictIds, 0, numMultiValues, outValues[i], 0);
+      _dictionaryMap.get(column).readStringValues(_reusableMVDictIds, numMultiValues, outValues[i]);
     }
   }
 

@@ -86,12 +86,11 @@ public final class FixedByteValueReaderWriter implements Closeable, ValueReader 
   }
 
   @Override
-  public byte[] getBytes(int index, int numBytesPerValue, byte[] buffer) {
-    assert buffer.length >= numBytesPerValue;
-
+  public byte[] getBytes(int index, int numBytesPerValue) {
     long startOffset = (long) index * numBytesPerValue;
-    _dataBuffer.copyTo(startOffset, buffer, 0, numBytesPerValue);
-    return buffer;
+    byte[] value = new byte[numBytesPerValue];
+    _dataBuffer.copyTo(startOffset, value, 0, numBytesPerValue);
+    return value;
   }
 
   public void writeInt(int index, int value) {
@@ -110,7 +109,7 @@ public final class FixedByteValueReaderWriter implements Closeable, ValueReader 
     _dataBuffer.putDouble((long) index * Double.BYTES, value);
   }
 
-  public void writeUnpaddedString(int index, int numBytesPerValue, byte[] value) {
+  public void writeBytes(int index, int numBytesPerValue, byte[] value) {
     assert value.length <= numBytesPerValue;
 
     long startIndex = (long) index * numBytesPerValue;

@@ -18,94 +18,35 @@
  */
 package org.apache.pinot.core.realtime.impl.dictionary;
 
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.ints.IntSets;
 import java.util.Arrays;
-import javax.annotation.Nonnull;
+import org.apache.pinot.core.common.predicate.RangePredicate;
 
 
+@SuppressWarnings("Duplicates")
 public class DoubleOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
-  private double _min = Double.MAX_VALUE;
-  private double _max = Double.MIN_VALUE;
+  private volatile double _min = Double.MAX_VALUE;
+  private volatile double _max = Double.MIN_VALUE;
 
   @Override
-  public int indexOf(Object rawValue) {
-    if (rawValue instanceof String) {
-      return getDictId(Double.valueOf((String) rawValue));
-    } else {
-      return getDictId(rawValue);
-    }
+  public int index(Object value) {
+    Double doubleValue = (Double) value;
+    updateMinMax(doubleValue);
+    return indexValue(doubleValue);
   }
 
   @Override
-  public void index(@Nonnull Object rawValue) {
-    if (rawValue instanceof Double) {
-      // Single value
-      indexValue(rawValue);
-      updateMinMax((Double) rawValue);
-    } else {
-      // Multi value
-      Object[] values = (Object[]) rawValue;
-      for (Object value : values) {
-        indexValue(value);
-        updateMinMax((Double) value);
-      }
-    }
-  }
-
-  @SuppressWarnings("Duplicates")
-  @Override
-  public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare, boolean includeLower,
-      boolean includeUpper) {
-    double lowerDouble = Double.parseDouble(lower);
-    double upperDouble = Double.parseDouble(upper);
-    double valueToCompare = (Double) get(dictIdToCompare);
-
-    if (includeLower) {
-      if (valueToCompare < lowerDouble) {
-        return false;
-      }
-    } else {
-      if (valueToCompare <= lowerDouble) {
-        return false;
-      }
-    }
-
-    if (includeUpper) {
-      if (valueToCompare > upperDouble) {
-        return false;
-      }
-    } else {
-      if (valueToCompare >= upperDouble) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  @Nonnull
-  @Override
-  public Double getMinVal() {
-    return _min;
-  }
-
-  @Nonnull
-  @Override
-  public Double getMaxVal() {
-    return _max;
-  }
-
-  @Nonnull
-  @Override
-  public double[] getSortedValues() {
-    int numValues = length();
-    double[] sortedValues = new double[numValues];
-
+  public int[] index(Object[] values) {
+    int numValues = values.length;
+    int[] dictIds = new int[numValues];
     for (int i = 0; i < numValues; i++) {
-      sortedValues[i] = (Double) get(i);
+      Double doubleValue = (Double) values[i];
+      updateMinMax(doubleValue);
+      dictIds[i] = indexValue(doubleValue);
     }
-
-    Arrays.sort(sortedValues);
-    return sortedValues;
+    return dictIds;
   }
 
   @Override
@@ -114,23 +55,134 @@ public class DoubleOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   }
 
   @Override
+  public IntSet getDictIdsInRange(String lower, String upper, boolean includeLower, boolean includeUpper) {
+    int numValues = length();
+    if (numValues == 0) {
+      return IntSets.EMPTY_SET;
+    }
+    IntSet dictIds = new IntOpenHashSet();
+
+    if (lower.equals(RangePredicate.UNBOUNDED)) {
+      double upperValue = Double.parseDouble(upper);
+      if (includeUpper) {
+        for (int dictId = 0; dictId < numValues; dictId++) {
+          double value = getDoubleValue(dictId);
+          if (value <= upperValue) {
+            dictIds.add(dictId);
+          }
+        }
+      } else {
+        for (int dictId = 0; dictId < numValues; dictId++) {
+          double value = getDoubleValue(dictId);
+          if (value < upperValue) {
+            dictIds.add(dictId);
+          }
+        }
+      }
+    } else if (upper.equals(RangePredicate.UNBOUNDED)) {
+      double lowerValue = Double.parseDouble(lower);
+      if (includeLower) {
+        for (int dictId = 0; dictId < numValues; dictId++) {
+          double value = getDoubleValue(dictId);
+          if (value >= lowerValue) {
+            dictIds.add(dictId);
+          }
+        }
+      } else {
+        for (int dictId = 0; dictId < numValues; dictId++) {
+          double value = getDoubleValue(dictId);
+          if (value > lowerValue) {
+            dictIds.add(dictId);
+          }
+        }
+      }
+    } else {
+      double lowerValue = Double.parseDouble(lower);
+      double upperValue = Double.parseDouble(upper);
+      if (includeLower && includeUpper) {
+        for (int dictId = 0; dictId < numValues; dictId++) {
+          double value = getDoubleValue(dictId);
+          if (value >= lowerValue && value <= upperValue) {
+            dictIds.add(dictId);
+          }
+        }
+      } else if (includeLower) {
+        for (int dictId = 0; dictId < numValues; dictId++) {
+          double value = getDoubleValue(dictId);
+          if (value >= lowerValue && value < upperValue) {
+            dictIds.add(dictId);
+          }
+        }
+      } else if (includeUpper) {
+        for (int dictId = 0; dictId < numValues; dictId++) {
+          double value = getDoubleValue(dictId);
+          if (value > lowerValue && value <= upperValue) {
+            dictIds.add(dictId);
+          }
+        }
+      } else {
+        for (int dictId = 0; dictId < numValues; dictId++) {
+          double value = getDoubleValue(dictId);
+          if (value > lowerValue && value < upperValue) {
+            dictIds.add(dictId);
+          }
+        }
+      }
+    }
+    return dictIds;
+  }
+
+  @Override
+  public Double getMinVal() {
+    return _min;
+  }
+
+  @Override
+  public Double getMaxVal() {
+    return _max;
+  }
+
+  @Override
+  public double[] getSortedValues() {
+    int numValues = length();
+    double[] sortedValues = new double[numValues];
+
+    for (int dictId = 0; dictId < numValues; dictId++) {
+      sortedValues[dictId] = getDoubleValue(dictId);
+    }
+
+    Arrays.sort(sortedValues);
+    return sortedValues;
+  }
+
+  @Override
+  public int indexOf(String stringValue) {
+    return getDictId(Double.valueOf(stringValue));
+  }
+
+  @Override
   public int getIntValue(int dictId) {
-    return ((Double) get(dictId)).intValue();
+    return (int) getDoubleValue(dictId);
   }
 
   @Override
   public long getLongValue(int dictId) {
-    return ((Double) get(dictId)).longValue();
+    return (long) getDoubleValue(dictId);
   }
 
   @Override
   public float getFloatValue(int dictId) {
-    return ((Double) get(dictId)).floatValue();
+    return (float) getDoubleValue(dictId);
   }
 
   @Override
   public double getDoubleValue(int dictId) {
     return (Double) get(dictId);
+  }
+
+  @Override
+  public String getStringValue(int dictId) {
+    return Double.toString(getDoubleValue(dictId));
   }
 
   private void updateMinMax(double value) {
