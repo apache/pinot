@@ -36,6 +36,7 @@ import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.FieldSpec.FieldType;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.core.data.GenericRow;
@@ -118,13 +119,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     // Initialize creators for dictionary, forward index and inverted index
     for (FieldSpec fieldSpec : fieldSpecs) {
-      String columnName = fieldSpec.getName();
-
       // Ignore virtual columns
-      if (schema.isVirtualColumn(columnName)) {
+      if (fieldSpec.isVirtualColumn()) {
         continue;
       }
 
+      String columnName = fieldSpec.getName();
       ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(columnName);
       Preconditions.checkNotNull(indexCreationInfo, "Missing index creation info for column: %s", columnName);
 
@@ -572,11 +572,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     Object defaultNullValue = columnIndexCreationInfo.getDefaultNullValue();
-    if (defaultNullValue == null) {
-      defaultNullValue = fieldSpec.getDefaultNullValue();
+    if (defaultNullValue instanceof byte[]) {
+      String defaultNullValueString = BytesUtils.toHexString((byte[]) defaultNullValue);
+      properties
+          .setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValueString);
+    } else {
+      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DEFAULT_NULL_VALUE),
+          String.valueOf(defaultNullValue));
     }
-    properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DEFAULT_NULL_VALUE),
-        String.valueOf(defaultNullValue));
   }
 
   public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column, String minValue,

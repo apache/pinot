@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
@@ -37,8 +36,8 @@ public class OnHeapStringDictionary extends OnHeapDictionary {
   private final byte _paddingByte;
   private final String[] _unpaddedStrings;
   private final String[] _paddedStrings;
-  private final Map<String, Integer> _paddedStringToIdMap;
-  private final Map<String, Integer> _unPaddedStringToIdMap;
+  private final Object2IntOpenHashMap<String> _paddedStringToIdMap;
+  private final Object2IntOpenHashMap<String> _unPaddedStringToIdMap;
 
   public OnHeapStringDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
     super(dataBuffer, length, numBytesPerValue, paddingByte);
@@ -46,7 +45,8 @@ public class OnHeapStringDictionary extends OnHeapDictionary {
     _paddingByte = paddingByte;
     byte[] buffer = new byte[numBytesPerValue];
     _unpaddedStrings = new String[length];
-    _unPaddedStringToIdMap = new HashMap<>(length);
+    _unPaddedStringToIdMap = new Object2IntOpenHashMap<>(length);
+    _unPaddedStringToIdMap.defaultReturnValue(-1);
 
     for (int i = 0; i < length; i++) {
       _unpaddedStrings[i] = getUnpaddedString(i, buffer);
@@ -58,7 +58,8 @@ public class OnHeapStringDictionary extends OnHeapDictionary {
       _paddedStringToIdMap = null;
     } else {
       _paddedStrings = new String[length];
-      _paddedStringToIdMap = new HashMap<>(length);
+      _paddedStringToIdMap = new Object2IntOpenHashMap<>(length);
+      _paddedStringToIdMap.defaultReturnValue(-1);
 
       for (int i = 0; i < length; i++) {
         _paddedStrings[i] = getPaddedString(i, buffer);
@@ -69,16 +70,15 @@ public class OnHeapStringDictionary extends OnHeapDictionary {
 
   @Override
   public int indexOf(Object rawValue) {
-    Map<String, Integer> stringToIdMap = (_paddingByte == 0) ? _unPaddedStringToIdMap : _paddedStringToIdMap;
-    Integer index = stringToIdMap.get(rawValue);
-    return (index != null) ? index : -1;
+    Object2IntOpenHashMap<String> stringToIdMap = (_paddingByte == 0) ? _unPaddedStringToIdMap : _paddedStringToIdMap;
+    return stringToIdMap.getInt(rawValue);
   }
 
   @Override
   public int insertionIndexOf(Object rawValue) {
     if (_paddingByte == 0) {
-      Integer id = _unPaddedStringToIdMap.get(rawValue);
-      return (id != null) ? id : Arrays.binarySearch(_unpaddedStrings, rawValue);
+      int id = _unPaddedStringToIdMap.getInt(rawValue);
+      return (id != -1) ? id : Arrays.binarySearch(_unpaddedStrings, rawValue);
     } else {
       String paddedValue = padString((String) rawValue);
       return Arrays.binarySearch(_paddedStrings, paddedValue);

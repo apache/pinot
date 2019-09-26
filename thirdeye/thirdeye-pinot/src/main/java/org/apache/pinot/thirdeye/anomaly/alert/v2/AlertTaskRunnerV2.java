@@ -23,11 +23,12 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
 import org.apache.pinot.thirdeye.alert.commons.AnomalyFeedConfig;
 import org.apache.pinot.thirdeye.alert.commons.AnomalyFeedFactory;
-import org.apache.pinot.thirdeye.alert.commons.EmailContentFormatterFactory;
-import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
-import org.apache.pinot.thirdeye.alert.content.EmailContentFormatter;
-import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterConfiguration;
-import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterContext;
+import org.apache.pinot.thirdeye.datalayer.util.ThirdEyeStringUtils;
+import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
+import org.apache.pinot.thirdeye.notification.formatter.AlertContentFormatterFactory;
+import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
+import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
+import org.apache.pinot.thirdeye.notification.formatter.channels.EmailContentFormatter;
 import org.apache.pinot.thirdeye.alert.feed.AnomalyFeed;
 import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
@@ -110,7 +111,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
   private static final Logger LOG = LoggerFactory.getLogger(AlertTaskRunnerV2.class);
 
   public static final TimeZone DEFAULT_TIME_ZONE = TimeZone.getTimeZone("America/Los_Angeles");
-  public static final String DEFAULT_EMAIL_FORMATTER_TYPE = "MetricAnomaliesEmailContentFormatter";
+  public static final String DEFAULT_EMAIL_FORMATTER_TYPE = "MetricAnomaliesContent";
   public static final String CHARSET = "UTF-8";
   public static final String EMAIL_WHITELIST_KEY = "emailWhitelist";
 
@@ -297,23 +298,24 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           groupName = sb.toString();
         }
         // Generate and send out an anomaly report for this group
-        EmailContentFormatter emailContentFormatter;
+        EmailContentFormatter emailFormatter;
         EmailFormatterConfig emailFormatterConfig = alertConfig.getEmailFormatterConfig();
+        AlertContentFormatterFactory<BaseNotificationContent> alertContentFactory = new AlertContentFormatterFactory<>();
+        BaseNotificationContent notificationContent;
         try {
-          emailContentFormatter = EmailContentFormatterFactory.fromClassName(emailFormatterConfig.getType());
+          notificationContent = alertContentFactory.fromClassPath(Class.forName(emailFormatterConfig.getType()).getCanonicalName());
         } catch (Exception e) {
           LOG.error("User-assigned Email Formatter Config {} is not available. Use default instead.", alertConfig.getEmailFormatterConfig());
-          emailContentFormatter = EmailContentFormatterFactory.fromClassName(DEFAULT_EMAIL_FORMATTER_TYPE);
+          notificationContent = alertContentFactory.fromClassPath(Class.forName(DEFAULT_EMAIL_FORMATTER_TYPE).getCanonicalName());
         }
-        EmailContentFormatterConfiguration emailContemtFormatterConfig = EmailContentFormatterConfiguration
-            .fromThirdEyeAnomalyConfiguration(thirdeyeConfig);
+
+        Properties prop;
         if (emailFormatterConfig != null && StringUtils.isNotBlank(emailFormatterConfig.getProperties())) {
-          emailContentFormatter.init(org.apache.pinot.thirdeye.datalayer.util.
-              StringUtils.decodeCompactedProperties(emailFormatterConfig.getProperties()), emailContemtFormatterConfig
-              );
+          prop = ThirdEyeStringUtils.decodeCompactedProperties(emailFormatterConfig.getProperties());
         } else {
-          emailContentFormatter.init(new Properties(), emailContemtFormatterConfig);
+          prop = new Properties();
         }
+        emailFormatter = new EmailContentFormatter(notificationContent, prop, thirdeyeConfig);
 
         // whitelisted recipients only
         List<String> emailWhitelist = ConfigUtils.getList(
@@ -322,9 +324,11 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           recipientsForThisGroup = retainWhitelisted(recipientsForThisGroup, emailWhitelist);
         }
 
-        EmailEntity emailEntity = emailContentFormatter
-            .getEmailEntity(alertConfig, recipientsForThisGroup, emailSubjectBuilder.toString(),
-                groupedAnomalyDTO.getId(), groupName, anomalyResultListOfGroup, new EmailContentFormatterContext());
+        ADContentFormatterContext context = new ADContentFormatterContext();
+        context.setAlertConfig(alertConfig);
+        EmailEntity emailEntity = emailFormatter
+            .getEmailEntity(recipientsForThisGroup, emailSubjectBuilder.toString(),
+                groupedAnomalyDTO.getId(), groupName, anomalyResultListOfGroup, context);
         EmailHelper.sendEmailWithEmailEntity(emailEntity,
             SmtpConfiguration.createFromProperties(thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY)));
         // Update notified flag

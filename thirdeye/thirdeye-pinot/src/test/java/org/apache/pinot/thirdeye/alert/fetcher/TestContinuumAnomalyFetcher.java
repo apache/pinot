@@ -17,7 +17,6 @@
 package org.apache.pinot.thirdeye.alert.fetcher;
 
 import org.apache.pinot.thirdeye.alert.commons.AnomalyFetcherConfig;
-import org.apache.pinot.thirdeye.alert.commons.AnomalySource;
 import org.apache.pinot.thirdeye.datalayer.DaoTestUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertSnapshotDTO;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
@@ -25,7 +24,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import org.apache.pinot.thirdeye.datalayer.util.StringUtils;
+import org.apache.pinot.thirdeye.datalayer.util.ThirdEyeStringUtils;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import java.util.Collection;
 import java.util.Properties;
@@ -73,9 +72,9 @@ public class TestContinuumAnomalyFetcher {
   public void testGetAlertCandidates(){
     AlertSnapshotDTO alertSnapshot = DaoTestUtils.getTestAlertSnapshot();
     AnomalyFetcherConfig anomalyFetcherConfig = DaoTestUtils.getTestAnomalyFetcherConfig();
-    Properties properties = StringUtils.decodeCompactedProperties(anomalyFetcherConfig.getProperties());
+    Properties properties = ThirdEyeStringUtils.decodeCompactedProperties(anomalyFetcherConfig.getProperties());
     properties.put(ContinuumAnomalyFetcher.REALERT_FREQUENCY, "5_MILLISECONDS");
-    anomalyFetcherConfig.setProperties(StringUtils.encodeCompactedProperties(properties));
+    anomalyFetcherConfig.setProperties(ThirdEyeStringUtils.encodeCompactedProperties(properties));
 
     AnomalyFetcher anomalyFetcher = new ContinuumAnomalyFetcher();
     anomalyFetcher.init(anomalyFetcherConfig);

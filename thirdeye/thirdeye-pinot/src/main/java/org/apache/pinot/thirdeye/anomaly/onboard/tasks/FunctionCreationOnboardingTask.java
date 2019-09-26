@@ -37,6 +37,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean.EmailConfig;
+import org.apache.pinot.thirdeye.datalayer.util.ThirdEyeStringUtils;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
@@ -198,9 +199,9 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       AnomalyFunctionDTO defaultFunctionSpec = getDefaultFunctionSpecByTimeGranularity(dataGranularity);
 
       // Merge user properties with default properties; the user assigned property can override default property
-      Properties userAssignedFunctionProperties = org.apache.pinot.thirdeye.datalayer.util.StringUtils
+      Properties userAssignedFunctionProperties = ThirdEyeStringUtils
           .decodeCompactedProperties(configuration.getString(PROPERTIES, ""));
-      Properties defaultFunctionProperties = org.apache.pinot.thirdeye.datalayer.util.StringUtils
+      Properties defaultFunctionProperties = ThirdEyeStringUtils
           .decodeCompactedProperties(defaultFunctionSpec.getProperties());
       for (Map.Entry propertyEntry : userAssignedFunctionProperties.entrySet()) {
         defaultFunctionProperties.setProperty((String) propertyEntry.getKey(), (String) propertyEntry.getValue());
@@ -231,7 +232,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       anomalyFunction.setWindowDelayUnit(TimeUnit.valueOf(
           configuration.getString(WINDOW_DELAY_UNIT, dataGranularity.getUnit().toString())));
       anomalyFunction.setType(configuration.getString(FUNCTION_TYPE, defaultFunctionSpec.getType()));
-      anomalyFunction.setProperties(org.apache.pinot.thirdeye.datalayer.util.StringUtils.
+      anomalyFunction.setProperties(ThirdEyeStringUtils.
           encodeCompactedProperties(defaultFunctionProperties));
       if (defaultFunctionSpec.getFrequency() != null) {
         anomalyFunction.setFrequency(defaultFunctionSpec.getFrequency());

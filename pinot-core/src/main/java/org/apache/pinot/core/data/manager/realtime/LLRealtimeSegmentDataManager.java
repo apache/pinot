@@ -134,6 +134,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
+  private static int MINIMUM_CONSUME_TIME_MINUTES = 10;
+
   protected class SegmentBuildDescriptor {
     final String _segmentTarFilePath;
     final Map<String, File> _metadataFileMap;
@@ -1063,6 +1065,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segBuildSemaphore = realtimeTableDataManager.getSegmentBuildSemaphore();
     _segmentZKMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
     _tableConfig = tableConfig;
+    _tableNameWithType = _tableConfig.getTableName();
     _realtimeTableDataManager = realtimeTableDataManager;
     _resourceDataDir = resourceDataDir;
     _indexLoadingConfig = indexLoadingConfig;
@@ -1071,17 +1074,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     _instanceId = _realtimeTableDataManager.getServerInstance();
     _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_instanceId);
-    _protocolHandler = new ServerSegmentCompletionProtocolHandler(_serverMetrics);
+    _protocolHandler = new ServerSegmentCompletionProtocolHandler(_serverMetrics, _tableNameWithType);
 
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
-    _partitionLevelStreamConfig = new PartitionLevelStreamConfig(indexingConfig.getStreamConfigs());
+    _partitionLevelStreamConfig = new PartitionLevelStreamConfig(_tableNameWithType, indexingConfig.getStreamConfigs());
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_partitionLevelStreamConfig);
     _streamTopic = _partitionLevelStreamConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _segmentName = new LLCSegmentName(_segmentNameStr);
     _streamPartitionId = _segmentName.getPartitionId();
-    _tableNameWithType = _tableConfig.getTableName();
     _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     _metricKeyName = _tableNameWithType + "-" + _streamTopic + "-" + _streamPartitionId;
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
@@ -1180,7 +1182,22 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     long now = now();
     _consumeStartTime = now;
-    _consumeEndTime = now + _partitionLevelStreamConfig.getFlushThresholdTimeMillis();
+    long maxConsumeTimeMillis = _partitionLevelStreamConfig.getFlushThresholdTimeMillis();
+    _consumeEndTime = segmentZKMetadata.getCreationTime() + maxConsumeTimeMillis;
+
+    // When we restart a server, the consuming segments retain their creationTime (derived from segment
+    // metadata), but a couple of corner cases can happen:
+    // (1) The server was down for a very long time, and the consuming segment is not yet completed.
+    // (2) The consuming segment was just about to be completed, but the server went down.
+    // In either of these two cases, if a different replica could not complete the segment, it is possible
+    // that we get a value for _consumeEndTime that is in the very near future, or even in the past. In such
+    // cases, we let some minimum consumption happen before we attempt to complete the segment (unless, of course
+    // the max consumption time has been configured to be less than the minimum time we use in this class).
+    long minConsumeTimeMillis = Math.min(maxConsumeTimeMillis,
+        TimeUnit.MILLISECONDS.convert(MINIMUM_CONSUME_TIME_MINUTES, TimeUnit.MINUTES));
+    if (_consumeEndTime - now < minConsumeTimeMillis) {
+      _consumeEndTime = now + minConsumeTimeMillis;
+    }
 
     segmentLogger
         .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", _segmentName,

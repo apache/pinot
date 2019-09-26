@@ -130,9 +130,9 @@ public class ImmutableSegmentLoader {
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSchema(schema);
 
     // Instantiate virtual columns
-    for (String columnName : schema.getColumnNames()) {
-      if (schema.isVirtualColumn(columnName)) {
-        FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (fieldSpec.isVirtualColumn()) {
+        String columnName = fieldSpec.getName();
         VirtualColumnProvider provider =
             VirtualColumnProviderFactory.buildProvider(fieldSpec.getVirtualColumnProvider());
         VirtualColumnContext context = new VirtualColumnContext(NetUtil.getHostnameOrAddress(), segmentName, columnName,

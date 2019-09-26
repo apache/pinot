@@ -164,4 +164,21 @@ public interface PredicateEvaluator {
    * @return Whether the entry matches the predicate
    */
   boolean applyMV(String[] values, int length);
+
+  /**
+   * Apply a single-value entry to the predicate.
+   *
+   * @param value Raw value
+   * @return Whether the entry matches the predicate
+   */
+  boolean applySV(byte[] value);
+
+  /**
+   * Apply a multi-value entry to the predicate.
+   *
+   * @param values Array of raw values
+   * @param length Number of values in the entry
+   * @return Whether the entry matches the predicate
+   */
+  boolean applyMV(byte[][] values, int length);
 }

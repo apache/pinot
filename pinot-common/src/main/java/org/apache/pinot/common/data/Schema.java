@@ -275,15 +275,13 @@ public final class Schema {
   @JsonIgnore
   @Nonnull
   public Set<String> getPhysicalColumnNames() {
-    Set<String> cols = new HashSet<>();
-    cols.addAll(_fieldSpecMap.keySet());
-    for (String col : _fieldSpecMap.keySet()) {
-      // exclude virtual columns
-      if (isVirtualColumn(col)) {
-        cols.remove(col);
+    Set<String> physicalColumnNames = new HashSet<>();
+    for (FieldSpec fieldSpec : _fieldSpecMap.values()) {
+      if (!fieldSpec.isVirtualColumn()) {
+        physicalColumnNames.add(fieldSpec.getName());
       }
     }
-    return cols;
+    return physicalColumnNames;
   }
 
   @JsonIgnore
@@ -670,10 +668,5 @@ public final class Schema {
     result = EqualityUtils.hashCodeOf(result, _timeFieldSpec);
     result = EqualityUtils.hashCodeOf(result, _dateTimeFieldSpecs);
     return result;
-  }
-
-  public boolean isVirtualColumn(String columnName) {
-    return columnName.startsWith("$") || (getFieldSpecFor(columnName).getVirtualColumnProvider() != null
-        && !getFieldSpecFor(columnName).getVirtualColumnProvider().isEmpty());
   }
 }

@@ -33,6 +33,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -66,11 +67,10 @@ import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.ControllerLeadershipManager;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.upload.SegmentValidator;
-import org.apache.pinot.controller.api.upload.SegmentValidatorResponse;
 import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
@@ -113,7 +113,7 @@ public class PinotSegmentUploadRestletResource {
   AccessControlFactory _accessControlFactory;
 
   @Inject
-  ControllerLeadershipManager _controllerLeadershipManager;
+  LeadControllerManager _leadControllerManager;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -230,24 +230,18 @@ public class PinotSegmentUploadRestletResource {
         "All segments of table " + TableNameBuilder.forType(tableType).tableNameWithType(tableName) + " deleted");
   }
 
-  private SuccessResponse uploadSegment(String tableName, FormDataMultiPart multiPart, boolean enableParallelPushProtection,
-      HttpHeaders headers, Request request, boolean moveSegmentToFinalLocation) {
+  private SuccessResponse uploadSegment(@Nullable String tableName, FormDataMultiPart multiPart,
+      boolean enableParallelPushProtection, HttpHeaders headers, Request request, boolean moveSegmentToFinalLocation) {
+    String uploadTypeStr = null;
+    String crypterClassName = null;
+    String downloadUri = null;
     if (headers != null) {
-      LOGGER.info("HTTP Header {} is {}", CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER,
-          headers.getRequestHeader(CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER));
-      LOGGER.info("HTTP Header {} is {}", CommonConstants.Controller.TABLE_NAME_HTTP_HEADER,
-          headers.getRequestHeader(CommonConstants.Controller.TABLE_NAME_HTTP_HEADER));
+      extractHttpHeader(headers, CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER);
+      extractHttpHeader(headers, CommonConstants.Controller.TABLE_NAME_HTTP_HEADER);
+      uploadTypeStr = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
+      crypterClassName = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.CRYPTER);
+      downloadUri = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
     }
-
-    // Get upload type
-    String uploadTypeStr = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
-    FileUploadDownloadClient.FileUploadType uploadType = getUploadType(uploadTypeStr);
-
-    // Get crypter class
-    String crypterClassHeader = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.CRYPTER);
-
-    // Get URI of current segment location
-    String currentSegmentLocationURI = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
 
     File tempEncryptedFile = null;
     File tempDecryptedFile = null;
@@ -261,8 +255,8 @@ public class PinotSegmentUploadRestletResource {
       // Set default crypter to the noop crypter when no crypter header is sent
       // In this case, the noop crypter will not do any operations, so the encrypted and decrypted file will have the same
       // file path.
-      if (crypterClassHeader == null) {
-        crypterClassHeader = NoOpPinotCrypter.class.getSimpleName();
+      if (crypterClassName == null) {
+        crypterClassName = NoOpPinotCrypter.class.getSimpleName();
         tempEncryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName);
       } else {
         tempEncryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName + ENCRYPTED_SUFFIX);
@@ -272,15 +266,16 @@ public class PinotSegmentUploadRestletResource {
       String metadataProviderClass = DefaultMetadataExtractor.class.getName();
 
       SegmentMetadata segmentMetadata;
+      FileUploadDownloadClient.FileUploadType uploadType = getUploadType(uploadTypeStr);
       switch (uploadType) {
         case URI:
           segmentMetadata =
-              getMetadataForURI(crypterClassHeader, currentSegmentLocationURI, tempEncryptedFile, tempDecryptedFile,
-                  tempSegmentDir, metadataProviderClass);
+              getMetadataForURI(crypterClassName, downloadUri, tempEncryptedFile, tempDecryptedFile, tempSegmentDir,
+                  metadataProviderClass);
           break;
         case SEGMENT:
           getFileFromMultipart(multiPart, tempDecryptedFile);
-          segmentMetadata = getSegmentMetadata(crypterClassHeader, tempEncryptedFile, tempDecryptedFile, tempSegmentDir,
+          segmentMetadata = getSegmentMetadata(crypterClassName, tempEncryptedFile, tempDecryptedFile, tempSegmentDir,
               metadataProviderClass);
           break;
         default:
@@ -290,43 +285,43 @@ public class PinotSegmentUploadRestletResource {
       // Fetch segment name
       String segmentName = segmentMetadata.getName();
 
-      // Fetch raw table name. Try to derive the table name from the parameter and then from segment metadata
+      // Fetch table name. Try to derive the table name from the parameter and then from segment metadata
       String rawTableName;
       if (tableName != null && !tableName.isEmpty()) {
         rawTableName = TableNameBuilder.extractRawTableName(tableName);
         LOGGER.info("Uploading segment {} to table: {}, (Derived from API parameter)", segmentName, tableName);
       } else {
-        // TODO: remove this when we completely deprecate the segment name from segment metadata
+        // TODO: remove this when we completely deprecate the table name from segment metadata
         rawTableName = segmentMetadata.getTableName();
         LOGGER.info("Uploading a segment {} to table: {}, (Derived from segment metadata)", segmentName, tableName);
       }
 
-      String zkDownloadUri;
-      // This boolean is here for V1 segment upload, where we keep the segment in the downloadURI sent in the header.
-      // We will deprecate this behavior eventually.
-      if (!moveSegmentToFinalLocation) {
-        LOGGER.info("Setting zkDownloadUri to {} for segment {} of table {}, skipping move", currentSegmentLocationURI,
-            segmentName, rawTableName);
-        zkDownloadUri = currentSegmentLocationURI;
-      } else {
-        zkDownloadUri = getZkDownloadURIForSegmentUpload(provider, rawTableName, segmentName);
-      }
-
-      String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+      String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
       LOGGER
           .info("Processing upload request for segment: {} of table: {} from client: {}", segmentName, offlineTableName,
               clientAddress);
 
       // Validate segment
-      SegmentValidatorResponse segmentValidatorResponse =
-          new SegmentValidator(_pinotHelixResourceManager, _controllerConf, _executor, _connectionManager,
-              _controllerMetrics, _controllerLeadershipManager)
-              .validateSegment(rawTableName, segmentMetadata, tempSegmentDir);
+      new SegmentValidator(_pinotHelixResourceManager, _controllerConf, _executor, _connectionManager,
+          _controllerMetrics, _leadControllerManager.isLeaderForTable(offlineTableName))
+          .validateOfflineSegment(offlineTableName, segmentMetadata, tempSegmentDir);
+
+      String zkDownloadUri;
+      // This boolean is here for V1 segment upload, where we keep the segment in the downloadURI sent in the header.
+      // We will deprecate this behavior eventually.
+      if (!moveSegmentToFinalLocation) {
+        LOGGER
+            .info("Setting zkDownloadUri: to {} for segment: {} of table: {}, skipping move", downloadUri, segmentName,
+                offlineTableName);
+        zkDownloadUri = downloadUri;
+      } else {
+        zkDownloadUri = getZkDownloadURIForSegmentUpload(provider, rawTableName, segmentName);
+      }
 
       // Zk operations
       completeZkOperations(enableParallelPushProtection, headers, tempEncryptedFile, provider, rawTableName,
-          segmentMetadata, segmentName, zkDownloadUri, moveSegmentToFinalLocation, segmentValidatorResponse);
+          segmentMetadata, segmentName, zkDownloadUri, moveSegmentToFinalLocation);
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + rawTableName);
     } catch (WebApplicationException e) {
@@ -340,6 +335,15 @@ public class PinotSegmentUploadRestletResource {
       FileUtils.deleteQuietly(tempDecryptedFile);
       FileUtils.deleteQuietly(tempSegmentDir);
     }
+  }
+
+  @Nullable
+  private String extractHttpHeader(HttpHeaders headers, String name) {
+    String value = headers.getHeaderString(name);
+    if (value != null) {
+      LOGGER.info("HTTP Header: {} is: {}", name, value);
+    }
+    return value;
   }
 
   private String getZkDownloadURIForSegmentUpload(FileUploadPathProvider provider, String rawTableName,
@@ -383,13 +387,13 @@ public class PinotSegmentUploadRestletResource {
 
   private void completeZkOperations(boolean enableParallelPushProtection, HttpHeaders headers, File tempDecryptedFile,
       FileUploadPathProvider provider, String rawTableName, SegmentMetadata segmentMetadata, String segmentName,
-      String zkDownloadURI, boolean moveSegmentToFinalLocation, SegmentValidatorResponse segmentValidatorResponse)
+      String zkDownloadURI, boolean moveSegmentToFinalLocation)
       throws Exception {
     URI finalSegmentLocationURI =
         URIUtils.getUri(provider.getBaseDataDirURI().toString(), rawTableName, URIUtils.encode(segmentName));
     ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
     zkOperator.completeSegmentOperations(rawTableName, segmentMetadata, finalSegmentLocationURI, tempDecryptedFile,
-        enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation, segmentValidatorResponse);
+        enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation);
   }
 
   private void decryptFile(String crypterClassHeader, File tempEncryptedFile, File tempDecryptedFile) {

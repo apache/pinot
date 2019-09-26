@@ -118,10 +118,10 @@ public class SegmentCreationJob extends BaseSegmentJob {
 
     // Initialize all directories
     _fileSystem = FileSystem.get(_conf);
-    mkdirs(_outputDir);
-    mkdirs(_stagingDir);
+    JobPreparationHelper.mkdirs(_fileSystem, _outputDir, _defaultPermissionsMask);
+    JobPreparationHelper.mkdirs(_fileSystem, _stagingDir, _defaultPermissionsMask);
     Path stagingInputDir = new Path(_stagingDir, "input");
-    mkdirs(stagingInputDir);
+    JobPreparationHelper.mkdirs(_fileSystem, stagingInputDir, _defaultPermissionsMask);
 
     // Gather all data files
     List<Path> dataFilePaths = getDataFilePaths(_inputPattern);
@@ -192,17 +192,6 @@ public class SegmentCreationJob extends BaseSegmentJob {
     // Delete the staging directory
     _logger.info("Deleting the staging directory: {}", _stagingDir);
     _fileSystem.delete(_stagingDir, true);
-  }
-
-  protected void mkdirs(Path dirPath)
-      throws IOException {
-    if (_fileSystem.exists(dirPath)) {
-      _logger.warn("Deleting existing file: {}", dirPath);
-      _fileSystem.delete(dirPath, true);
-    }
-    _logger.info("Making directory: {}", dirPath);
-    _fileSystem.mkdirs(dirPath);
-    JobPreparationHelper.setDirPermission(_fileSystem, dirPath, _defaultPermissionsMask);
   }
 
   @Nullable

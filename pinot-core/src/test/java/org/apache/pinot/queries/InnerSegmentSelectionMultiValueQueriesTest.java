@@ -55,8 +55,10 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(selectionDataSchema.size(), 10);
     Assert.assertTrue(columnIndexMap.containsKey("column1"));
     Assert.assertTrue(columnIndexMap.containsKey("column6"));
-    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
-    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")), DataSchema.ColumnDataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
+        DataSchema.ColumnDataType.INT_ARRAY);
     Assert.assertTrue(resultsBlock.getSelectionResult().isEmpty());
 
     // Test query with filter
@@ -72,8 +74,10 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(selectionDataSchema.size(), 10);
     Assert.assertTrue(columnIndexMap.containsKey("column1"));
     Assert.assertTrue(columnIndexMap.containsKey("column6"));
-    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
-    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")), DataSchema.ColumnDataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
+        DataSchema.ColumnDataType.INT_ARRAY);
     Assert.assertTrue(resultsBlock.getSelectionResult().isEmpty());
   }
 
@@ -95,8 +99,10 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(selectionDataSchema.size(), 10);
     Assert.assertTrue(columnIndexMap.containsKey("column1"));
     Assert.assertTrue(columnIndexMap.containsKey("column6"));
-    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
-    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")), DataSchema.ColumnDataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
+        DataSchema.ColumnDataType.INT_ARRAY);
     List<Serializable[]> selectionResult = (List<Serializable[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     Serializable[] firstRow = selectionResult.get(0);
@@ -118,8 +124,10 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(selectionDataSchema.size(), 10);
     Assert.assertTrue(columnIndexMap.containsKey("column1"));
     Assert.assertTrue(columnIndexMap.containsKey("column6"));
-    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
-    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")), DataSchema.ColumnDataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
+        DataSchema.ColumnDataType.INT_ARRAY);
     selectionResult = (List<Serializable[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     firstRow = selectionResult.get(0);
@@ -146,8 +154,10 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(selectionDataSchema.size(), 3);
     Assert.assertTrue(columnIndexMap.containsKey("column1"));
     Assert.assertTrue(columnIndexMap.containsKey("column6"));
-    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
-    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")), DataSchema.ColumnDataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
+        DataSchema.ColumnDataType.INT_ARRAY);
     List<Serializable[]> selectionResult = (List<Serializable[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     Serializable[] firstRow = selectionResult.get(0);
@@ -169,8 +179,10 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(selectionDataSchema.size(), 3);
     Assert.assertTrue(columnIndexMap.containsKey("column1"));
     Assert.assertTrue(columnIndexMap.containsKey("column6"));
-    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
-    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")), DataSchema.ColumnDataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
+        DataSchema.ColumnDataType.INT_ARRAY);
     selectionResult = (List<Serializable[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     firstRow = selectionResult.get(0);
@@ -197,8 +209,10 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(selectionDataSchema.size(), 4);
     Assert.assertTrue(columnIndexMap.containsKey("column1"));
     Assert.assertTrue(columnIndexMap.containsKey("column6"));
-    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
-    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")), DataSchema.ColumnDataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
+        DataSchema.ColumnDataType.INT_ARRAY);
     Queue<Serializable[]> selectionResult = (Queue<Serializable[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     Serializable[] lastRow = selectionResult.peek();
@@ -220,8 +234,10 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(selectionDataSchema.size(), 4);
     Assert.assertTrue(columnIndexMap.containsKey("column1"));
     Assert.assertTrue(columnIndexMap.containsKey("column6"));
-    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
-    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")), DataSchema.ColumnDataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
+        DataSchema.ColumnDataType.INT_ARRAY);
     selectionResult = (Queue<Serializable[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     lastRow = selectionResult.peek();

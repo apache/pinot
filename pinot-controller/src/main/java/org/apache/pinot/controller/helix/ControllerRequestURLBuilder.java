@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.controller.helix;
 
-import org.apache.avro.reflect.Nullable;
+import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 
 
 public class ControllerRequestURLBuilder {
@@ -109,8 +111,32 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableRebalance(String tableName, String tableType) {
-    String query = "rebalance?dryrun=false&type=" + tableType;
-    return StringUtil.join("/", _baseUrl, "tables", tableName, query);
+    return forTableRebalance(tableName, tableType, RebalanceConfigConstants.DEFAULT_DRY_RUN,
+        RebalanceConfigConstants.DEFAULT_REASSIGN_INSTANCES, RebalanceConfigConstants.DEFAULT_INCLUDE_CONSUMING,
+        RebalanceConfigConstants.DEFAULT_DOWNTIME,
+        RebalanceConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME);
+  }
+
+  public String forTableRebalance(String tableName, String tableType, boolean dryRun, boolean reassignInstances,
+      boolean includeConsuming, boolean downtime, int minAvailableReplicas) {
+    StringBuilder stringBuilder =
+        new StringBuilder(StringUtil.join("/", _baseUrl, "tables", tableName, "rebalance?type=" + tableType));
+    if (dryRun != RebalanceConfigConstants.DEFAULT_DRY_RUN) {
+      stringBuilder.append("&dryRun=").append(dryRun);
+    }
+    if (reassignInstances != RebalanceConfigConstants.DEFAULT_REASSIGN_INSTANCES) {
+      stringBuilder.append("&reassignInstances=").append(reassignInstances);
+    }
+    if (includeConsuming != RebalanceConfigConstants.DEFAULT_INCLUDE_CONSUMING) {
+      stringBuilder.append("&includeConsuming=").append(includeConsuming);
+    }
+    if (downtime != RebalanceConfigConstants.DEFAULT_DOWNTIME) {
+      stringBuilder.append("&downtime=").append(downtime);
+    }
+    if (minAvailableReplicas != RebalanceConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME) {
+      stringBuilder.append("&minAvailableReplicas=").append(minAvailableReplicas);
+    }
+    return stringBuilder.toString();
   }
 
   public String forTableReload(String tableName, String tableType) {
@@ -201,5 +227,40 @@ public class ControllerRequestURLBuilder {
 
   public String forSegmentListAPI(String tableName) {
     return StringUtil.join("/", _baseUrl, "segments", tableName);
+  }
+
+  public String forInstancePartitions(String tableName, @Nullable InstancePartitionsType instancePartitionsType) {
+    String url = StringUtil.join("/", _baseUrl, "tables", tableName, "instancePartitions");
+    if (instancePartitionsType != null) {
+      url += "?type=" + instancePartitionsType;
+    }
+    return url;
+  }
+
+  public String forInstanceAssign(String tableName, @Nullable InstancePartitionsType instancePartitionsType,
+      boolean dryRun) {
+    String url = StringUtil.join("/", _baseUrl, "tables", tableName, "assignInstances");
+    if (instancePartitionsType != null) {
+      url += "?type=" + instancePartitionsType;
+      if (dryRun) {
+        url += "&dryRun=true";
+      }
+    } else {
+      if (dryRun) {
+        url += "?dryRun=true";
+      }
+    }
+    return url;
+  }
+
+  public String forInstanceReplace(String tableName, @Nullable InstancePartitionsType instancePartitionsType,
+      String oldInstanceId, String newInstanceId) {
+    String url =
+        StringUtil.join("/", _baseUrl, "tables", tableName, "replaceInstance") + "?oldInstanceId=" + oldInstanceId
+            + "&newInstanceId=" + newInstanceId;
+    if (instancePartitionsType != null) {
+      url += "&type=" + instancePartitionsType;
+    }
+    return url;
   }
 }

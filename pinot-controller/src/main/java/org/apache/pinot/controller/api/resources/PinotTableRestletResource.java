@@ -43,24 +43,21 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.restlet.resources.RebalanceResult;
-import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.core.util.ReplicationUtils;
 import org.slf4j.LoggerFactory;
 
@@ -445,57 +442,52 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/rebalance")
   @ApiOperation(value = "Rebalances segments of a table across servers", notes = "Rebalances segments of a table across servers")
-  public String rebalance(
+  public RebalanceResult rebalance(
       @ApiParam(value = "Name of the table to rebalance") @Nonnull @PathParam("tableName") String tableName,
-      @ApiParam(value = "offline|realtime") @Nonnull @QueryParam("type") String tableType,
-      @ApiParam(value = "true if rebalancer should be run in dryRun mode, false otherwise") @Nonnull @DefaultValue("true") @QueryParam("dryrun") Boolean dryRun,
-      @ApiParam(value = "true if consuming segments should be considered for rebalancing realtime tables, false otherwise") @DefaultValue("false") @QueryParam("includeConsuming") Boolean includeConsuming,
-      @ApiParam(value = "true if downtime is acceptable during rebalance, false otherwise") @DefaultValue("false") @QueryParam("downtime") Boolean downtime,
-      @ApiParam(value = "minimum number of replicas to keep alive during rebalance(if downtime is false)") @DefaultValue("1") @QueryParam("minAvailableReplicas") Integer minAvailableReplicas) {
+      @ApiParam(value = "OFFLINE|REALTIME") @Nonnull @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Whether to rebalance table in dry-run mode") @DefaultValue("false") @QueryParam("dryRun") boolean dryRun,
+      @ApiParam(value = "Whether to reassign instances before rebalancing the table") @DefaultValue("false") @QueryParam("reassignInstances") boolean reassignInstances,
+      @ApiParam(value = "Whether to rebalance CONSUMING segments for real-time table") @DefaultValue("false") @QueryParam("includeConsuming") boolean includeConsuming,
+      @ApiParam(value = "Whether to allow downtime (0 replicas up) for rebalance") @DefaultValue("false") @QueryParam("downtime") boolean downtime,
+      @ApiParam(value = "Minimum number of replicas to keep alive during rebalance (if downtime is false), or maximum number of replicas allowed to be unavailable if value is negative") @DefaultValue("1") @QueryParam("minAvailableReplicas") int minAvailableReplicas) {
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
 
-    if (tableType != null && !EnumUtils.isValidEnum(CommonConstants.Helix.TableType.class, tableType.toUpperCase())) {
-      throw new ControllerApplicationException(LOGGER, "Illegal table type " + tableType, Response.Status.BAD_REQUEST);
-    }
+    Configuration rebalanceConfig = new BaseConfiguration();
+    rebalanceConfig.addProperty(RebalanceConfigConstants.DRY_RUN, dryRun);
+    rebalanceConfig.addProperty(RebalanceConfigConstants.REASSIGN_INSTANCES, reassignInstances);
+    rebalanceConfig.addProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, includeConsuming);
+    rebalanceConfig.addProperty(RebalanceConfigConstants.DOWNTIME, downtime);
+    rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME, minAvailableReplicas);
 
-    Configuration rebalanceUserConfig = new PropertiesConfiguration();
-    rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.DRYRUN, dryRun);
-    rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.INCLUDE_CONSUMING, includeConsuming);
-    rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.DOWNTIME, downtime);
-    rebalanceUserConfig
-        .addProperty(RebalanceUserConfigConstants.MIN_REPLICAS_TO_KEEPUP_FOR_NODOWNTIME, minAvailableReplicas);
-
-    TableType type = TableType.valueOf(tableType.toUpperCase());
-    if (type == TableType.OFFLINE && (!_pinotHelixResourceManager.hasOfflineTable(tableName))
-        || type == TableType.REALTIME && (!_pinotHelixResourceManager.hasRealtimeTable(tableName))) {
-      throw new ControllerApplicationException(LOGGER, "Table " + tableName + " does not exist",
-          Response.Status.NOT_FOUND);
-    }
-
-    RebalanceResult result;
     try {
       if (dryRun) {
-        result = _pinotHelixResourceManager.rebalanceTable(tableName, type, rebalanceUserConfig);
+        return _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig);
       } else {
-        // run rebalance asynchronously
-        _executorService.submit(new Runnable() {
-          @Override
-          public void run() {
+        // Make a dry-run first to get the target assignment
+        Configuration dryRunConfig = new BaseConfiguration();
+        dryRunConfig.addProperty(RebalanceConfigConstants.DRY_RUN, true);
+        dryRunConfig.addProperty(RebalanceConfigConstants.REASSIGN_INSTANCES, reassignInstances);
+        dryRunConfig.addProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, includeConsuming);
+        RebalanceResult dryRunResult = _pinotHelixResourceManager.rebalanceTable(tableNameWithType, dryRunConfig);
+        if (dryRunResult.getStatus() == RebalanceResult.Status.DONE) {
+          // If dry-run succeeded, run rebalance asynchronously
+          _executorService.submit(() -> {
             try {
-              _pinotHelixResourceManager.rebalanceTable(tableName, type, rebalanceUserConfig);
-            } catch (Throwable e) {
-              // catch all throwables to prevent losing the thread
-              LOGGER.error("Encountered error during rebalance for table {}", tableName, e);
+              _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig);
+            } catch (Throwable t) {
+              LOGGER.error("Caught exception/error while rebalancing table: {}", tableNameWithType, t);
             }
-          }
-        });
-        result = new RebalanceResult();
-        result.setStatus("Rebalance for table " + tableName + " in progress. Check controller logs for updates.");
+          });
+          return new RebalanceResult(RebalanceResult.Status.IN_PROGRESS,
+              "In progress, check controller logs for updates", dryRunResult.getInstanceAssignment(),
+              dryRunResult.getSegmentAssignment());
+        } else {
+          return dryRunResult;
+        }
       }
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
-    } catch (InvalidConfigException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
     }
-    return ResourceUtils.convertToJsonString(result);
   }
 }

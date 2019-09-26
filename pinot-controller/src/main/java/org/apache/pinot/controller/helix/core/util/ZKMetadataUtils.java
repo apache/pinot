@@ -34,7 +34,7 @@ public class ZKMetadataUtils {
   private ZKMetadataUtils() {
   }
 
-  public static OfflineSegmentZKMetadata updateSegmentMetadata(OfflineSegmentZKMetadata offlineSegmentZKMetadata,
+  public static void updateSegmentMetadata(OfflineSegmentZKMetadata offlineSegmentZKMetadata,
       SegmentMetadata segmentMetadata) {
     offlineSegmentZKMetadata.setSegmentName(segmentMetadata.getName());
     offlineSegmentZKMetadata.setTableName(segmentMetadata.getTableName());
@@ -70,7 +70,5 @@ public class ZKMetadataUtils {
     if (!columnPartitionMap.isEmpty()) {
       offlineSegmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(columnPartitionMap));
     }
-
-    return offlineSegmentZKMetadata;
   }
 }

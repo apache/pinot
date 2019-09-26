@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.common.config;
 
-import org.apache.pinot.common.utils.InstancePartitionsType;
+import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.utils.ServerType;
 import org.apache.pinot.common.utils.TenantRole;
 

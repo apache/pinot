@@ -21,6 +21,8 @@ package org.apache.pinot.core.operator.filter.predicate;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.utils.BytesUtils;
+import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.RangePredicate;
 import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionary;
@@ -71,6 +73,8 @@ public class RangePredicateEvaluatorFactory {
         return new DoubleRawValueBasedRangePredicateEvaluator(rangePredicate);
       case STRING:
         return new StringRawValueBasedRangePredicateEvaluator(rangePredicate);
+      case BYTES:
+        return new BytesRawValueBasedRangePredicateEvaluator(rangePredicate);
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType);
     }
@@ -403,6 +407,53 @@ public class RangePredicateEvaluatorFactory {
           result &= _upperBoundary.compareTo(value) >= 0;
         } else {
           result &= _upperBoundary.compareTo(value) > 0;
+        }
+      }
+      return result;
+    }
+  }
+
+  private static final class BytesRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final byte[] _lowerBoundary;
+    final byte[] _upperBoundary;
+    final boolean _includeLowerBoundary;
+    final boolean _includeUpperBoundary;
+
+    BytesRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
+      if (!"*".equals(rangePredicate.getLowerBoundary())) {
+        _lowerBoundary = BytesUtils.toBytes(rangePredicate.getLowerBoundary());
+      } else {
+        _lowerBoundary = null;
+      }
+      if (!"*".equals(rangePredicate.getUpperBoundary())) {
+        _upperBoundary = BytesUtils.toBytes(rangePredicate.getUpperBoundary());
+      } else {
+        _upperBoundary = null;
+      }
+      _includeLowerBoundary = rangePredicate.includeLowerBoundary();
+      _includeUpperBoundary = rangePredicate.includeUpperBoundary();
+    }
+
+    @Override
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.RANGE;
+    }
+
+    @Override
+    public boolean applySV(byte[] value) {
+      boolean result = true;
+      if (_lowerBoundary != null) {
+        if (_includeLowerBoundary) {
+          result = ByteArray.compare(_lowerBoundary, value) <= 0;
+        } else {
+          result = ByteArray.compare(_lowerBoundary, value) < 0;
+        }
+      }
+      if (_upperBoundary != null) {
+        if (_includeUpperBoundary) {
+          result &= ByteArray.compare(_upperBoundary, value) >= 0;
+        } else {
+          result &= ByteArray.compare(_upperBoundary, value) > 0;
         }
       }
       return result;

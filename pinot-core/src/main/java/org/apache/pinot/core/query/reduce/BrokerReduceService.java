@@ -18,20 +18,25 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
@@ -41,6 +46,9 @@ import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.HavingFilterQuery;
 import org.apache.pinot.common.request.HavingFilterQueryMap;
 import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -50,6 +58,8 @@ import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.query.aggregation.DistinctTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
@@ -67,10 +77,9 @@ import org.slf4j.LoggerFactory;
 public class BrokerReduceService implements ReduceService<BrokerResponseNative> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerReduceService.class);
 
-  @Nonnull
   @Override
-  public BrokerResponseNative reduceOnDataTable(@Nonnull BrokerRequest brokerRequest,
-      @Nonnull Map<ServerInstance, DataTable> dataTableMap, @Nullable BrokerMetrics brokerMetrics) {
+  public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest,
+      Map<ServerInstance, DataTable> dataTableMap, @Nullable BrokerMetrics brokerMetrics) {
     if (dataTableMap.size() == 0) {
       // Empty response.
       return BrokerResponseNative.empty();
@@ -147,7 +156,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
       String minConsumingFreshnessTimeMsString = metadata.get(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS);
       if (minConsumingFreshnessTimeMsString != null) {
-          minConsumingFreshnessTimeMs = Math.min(Long.parseLong(minConsumingFreshnessTimeMsString), minConsumingFreshnessTimeMs);
+        minConsumingFreshnessTimeMs =
+            Math.min(Long.parseLong(minConsumingFreshnessTimeMsString), minConsumingFreshnessTimeMs);
       }
 
       String numTotalRawDocsString = metadata.get(DataTable.TOTAL_DOCS_METADATA_KEY);
@@ -208,24 +218,30 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         .getOrDefault(CommonConstants.Broker.Request.QueryOptionKey.PRESERVE_TYPE, "false");
     boolean preserveType = Boolean.valueOf(preserveTypeString);
 
+    Selection selection = brokerRequest.getSelections();
     if (dataTableMap.isEmpty()) {
-      // For empty data table map, construct empty result using the cached data schema.
-
-      // This will only happen to selection query.
+      // For empty data table map, construct empty result using the cached data schema for selection query if exists
       if (cachedDataSchema != null) {
-        List<String> selectionColumns = SelectionOperatorUtils
-            .getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), cachedDataSchema);
-        brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, new ArrayList<>(0)));
+        List<String> selectionColumns =
+            SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), cachedDataSchema);
+        brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, Collections.emptyList()));
       }
     } else {
-      // Reduce server responses data and set query results into the broker response.
+      // Reduce server responses data and set query results into the broker response
       assert cachedDataSchema != null;
 
-      if (brokerRequest.isSetSelections()) {
-        // Selection query.
+      if (selection != null) {
+        // Selection query
 
-        // For data table map with more than one data tables, remove conflicting data tables.
-        DataSchema masterDataSchema = cachedDataSchema.clone();
+        // Temporary code to handle the selection query with different DataSchema returned from different servers
+        // TODO: Remove the code after all servers are migrated to the current version
+        DataSchema masterDataSchema = getCanonicalDataSchema(selection, cachedDataSchema);
+        String[] columnNames = masterDataSchema.getColumnNames();
+        for (Map.Entry<ServerInstance, DataTable> entry : dataTableMap.entrySet()) {
+          entry.setValue(new CanonicalDataTable(entry.getValue(), columnNames));
+        }
+
+        // For data table map with more than one data tables, remove conflicting data tables
         if (dataTableMap.size() > 1) {
           List<String> droppedServers = removeConflictingResponses(masterDataSchema, dataTableMap);
           if (!droppedServers.isEmpty()) {
@@ -240,12 +256,12 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
                 .addToExceptions(new QueryProcessingException(QueryException.MERGE_RESPONSE_ERROR_CODE, errorMessage));
           }
         }
-        setSelectionResults(brokerResponseNative, brokerRequest.getSelections(), dataTableMap, masterDataSchema,
-            preserveType);
+
+        setSelectionResults(brokerResponseNative, selection, dataTableMap, masterDataSchema, preserveType);
       } else {
-        // Aggregation query.
-        AggregationFunction[] aggregationFunctions =
-            AggregationFunctionUtils.getAggregationFunctions(brokerRequest.getAggregationsInfo());
+        // Aggregation query
+
+        AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(brokerRequest);
         if (!brokerRequest.isSetGroupBy()) {
           // Aggregation only query.
           setAggregationResults(brokerResponseNative, aggregationFunctions, dataTableMap, cachedDataSchema,
@@ -277,9 +293,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
    * @param dataTableMap map from server to data table.
    * @return list of server names where the data table got removed.
    */
-  @Nonnull
-  private List<String> removeConflictingResponses(@Nonnull DataSchema dataSchema,
-      @Nonnull Map<ServerInstance, DataTable> dataTableMap) {
+  private List<String> removeConflictingResponses(DataSchema dataSchema, Map<ServerInstance, DataTable> dataTableMap) {
     List<String> droppedServers = new ArrayList<>();
     Iterator<Map.Entry<ServerInstance, DataTable>> iterator = dataTableMap.entrySet().iterator();
     while (iterator.hasNext()) {
@@ -304,35 +318,26 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
    * @param dataTableMap map from server to data table.
    * @param dataSchema data schema.
    */
-  private void setSelectionResults(@Nonnull BrokerResponseNative brokerResponseNative, @Nonnull Selection selection,
-      @Nonnull Map<ServerInstance, DataTable> dataTableMap, @Nonnull DataSchema dataSchema, boolean preserveType) {
-    // Reduce the selection results.
+  private void setSelectionResults(BrokerResponseNative brokerResponseNative, Selection selection,
+      Map<ServerInstance, DataTable> dataTableMap, DataSchema dataSchema, boolean preserveType) {
     int selectionSize = selection.getSize();
-    SelectionResults selectionResults;
-    int[] columnIndices;
-    List<String> selectionColumns =
-        SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), dataSchema);
-    if (selection.isSetSelectionSortSequence() && selectionSize != 0) {
-      // Selection order-by.
+    if (selectionSize > 0 && selection.isSetSelectionSortSequence()) {
+      // Selection order-by
       SelectionOperatorService selectionService = new SelectionOperatorService(selection, dataSchema);
       selectionService.reduceWithOrdering(dataTableMap);
-      selectionResults = selectionService.renderSelectionResultsWithOrdering();
-      columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, dataSchema);
+      brokerResponseNative.setSelectionResults(selectionService.renderSelectionResultsWithOrdering(preserveType));
     } else {
-      // Selection only.
-      selectionResults = SelectionOperatorUtils.renderSelectionResultsWithoutOrdering(
-          SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap, selectionSize), dataSchema, selectionColumns);
-      columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, dataSchema);
+      // Selection only
+      List<String> selectionColumns =
+          SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), dataSchema);
+      brokerResponseNative.setSelectionResults(SelectionOperatorUtils.renderSelectionResultsWithoutOrdering(
+          SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap, selectionSize), dataSchema, selectionColumns,
+          preserveType));
     }
+  }
 
-    // TODO: use "formatRowsWithoutOrdering", "formatRowsWithOrdering" properly for selection when the server is updated
-    // to the latest code
-    if (!preserveType) {
-      selectionResults.setRows(
-          SelectionOperatorUtils.formatRowsWithOrdering(selectionResults.getRows(), columnIndices, dataSchema));
-    }
-
-    brokerResponseNative.setSelectionResults(selectionResults);
+  private boolean isDistinct(final AggregationFunction[] aggregationFunctions) {
+    return aggregationFunctions.length == 1 && aggregationFunctions[0].getType() == AggregationFunctionType.DISTINCT;
   }
 
   /**
@@ -344,9 +349,9 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
    * @param dataSchema data schema.
    */
   @SuppressWarnings("unchecked")
-  private void setAggregationResults(@Nonnull BrokerResponseNative brokerResponseNative,
-      @Nonnull AggregationFunction[] aggregationFunctions, @Nonnull Map<ServerInstance, DataTable> dataTableMap,
-      @Nonnull DataSchema dataSchema, boolean preserveType) {
+  private void setAggregationResults(BrokerResponseNative brokerResponseNative,
+      AggregationFunction[] aggregationFunctions, Map<ServerInstance, DataTable> dataTableMap, DataSchema dataSchema,
+      boolean preserveType) {
     int numAggregationFunctions = aggregationFunctions.length;
 
     // Merge results from all data tables.
@@ -377,19 +382,50 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       }
     }
 
-    // Extract final results and set them into the broker response.
-    List<AggregationResult> reducedAggregationResults = new ArrayList<>(numAggregationFunctions);
-    for (int i = 0; i < numAggregationFunctions; i++) {
-      Serializable resultValue = AggregationFunctionUtils
-          .getSerializableValue(aggregationFunctions[i].extractFinalResult(intermediateResults[i]));
+    // The DISTINCT query is just another SELECTION style query from the user's point of view
+    // and will return one or records in the result table for the column selected.
+    // Internally the execution is happening as an aggregation function (but that is an implementation
+    // detail) and so for that reason, response from broker should be a selection query result
+    // up until now, we have treated DISTINCT similar to another aggregation function even in terms
+    // of the result from function since it has been implemented as an aggregation function.
+    // However, the broker response will be a selection query response as that makes sense from SQL
+    // perspective
+    if (isDistinct(aggregationFunctions)) {
+      Object merged = intermediateResults[0];
+      Preconditions.checkState(merged instanceof DistinctTable, "Error: Expecting merged result of type DistinctTable");
+      DistinctTable distinctTable = (DistinctTable) merged;
+      String[] columnNames = distinctTable.getColumnNames();
+      List<Serializable[]> resultSet = new ArrayList<>(distinctTable.size());
+      Iterator<Key> iterator = distinctTable.getIterator();
 
-      // Format the value into string if required
-      if (!preserveType) {
-        resultValue = AggregationFunctionUtils.formatValue(resultValue);
+      while (iterator.hasNext()) {
+        Key key = iterator.next();
+        Object[] columns = key.getColumns();
+        Preconditions.checkState(columns.length == columnNames.length,
+            "Error: unexpected number of columns in RecordHolder for DISTINCT");
+        Serializable[] distinctRow = new Serializable[columns.length];
+        for (int col = 0; col < columns.length; col++) {
+          final Serializable columnValue = AggregationFunctionUtils.getSerializableValue(columns[col]);
+          distinctRow[col] = columnValue;
+        }
+        resultSet.add(distinctRow);
       }
-      reducedAggregationResults.add(new AggregationResult(dataSchema.getColumnName(i), resultValue));
+      brokerResponseNative.setSelectionResults((new SelectionResults(Arrays.asList(columnNames), resultSet)));
+    } else {
+      // Extract final results and set them into the broker response.
+      List<AggregationResult> reducedAggregationResults = new ArrayList<>(numAggregationFunctions);
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        Serializable resultValue = AggregationFunctionUtils
+            .getSerializableValue(aggregationFunctions[i].extractFinalResult(intermediateResults[i]));
+
+        // Format the value into string if required
+        if (!preserveType) {
+          resultValue = AggregationFunctionUtils.formatValue(resultValue);
+        }
+        reducedAggregationResults.add(new AggregationResult(dataSchema.getColumnName(i), resultValue));
+      }
+      brokerResponseNative.setAggregationResults(reducedAggregationResults);
     }
-    brokerResponseNative.setAggregationResults(reducedAggregationResults);
   }
 
   /**
@@ -403,10 +439,10 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
    * @param havingFilterQueryMap having filter query map
    */
   @SuppressWarnings("unchecked")
-  private void setGroupByHavingResults(@Nonnull BrokerResponseNative brokerResponseNative,
-      @Nonnull AggregationFunction[] aggregationFunctions, boolean[] aggregationFunctionsSelectStatus,
-      @Nonnull GroupBy groupBy, @Nonnull Map<ServerInstance, DataTable> dataTableMap,
-      HavingFilterQuery havingFilterQuery, HavingFilterQueryMap havingFilterQueryMap, boolean preserveType) {
+  private void setGroupByHavingResults(BrokerResponseNative brokerResponseNative,
+      AggregationFunction[] aggregationFunctions, boolean[] aggregationFunctionsSelectStatus, GroupBy groupBy,
+      Map<ServerInstance, DataTable> dataTableMap, HavingFilterQuery havingFilterQuery,
+      HavingFilterQueryMap havingFilterQueryMap, boolean preserveType) {
     int numAggregationFunctions = aggregationFunctions.length;
 
     // Merge results from all data tables.
@@ -525,6 +561,165 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     } else {
       throw new IllegalStateException(
           "There should be minimum one aggregation function in the select list of a Group by query");
+    }
+  }
+
+  /**
+   * Following part are temporary code to handle the selection query with different DataSchema returned from different
+   * servers.
+   * TODO: Remove the code after all servers are migrated to the current version.
+   */
+
+  private static DataSchema getCanonicalDataSchema(Selection selection, DataSchema dataSchema) {
+    String[] columnNames = dataSchema.getColumnNames();
+    Map<String, Integer> columnToIndexMap = SelectionOperatorUtils.getColumnToIndexMap(columnNames);
+    int numColumns = columnToIndexMap.size();
+
+    Set<String> canonicalColumnSet = new HashSet<>();
+    List<String> canonicalColumns = new ArrayList<>(numColumns);
+
+    // Put order-by columns at the front
+    List<SelectionSort> sortSequence = selection.getSelectionSortSequence();
+    if (sortSequence != null) {
+      for (SelectionSort selectionSort : sortSequence) {
+        String orderByColumn = selectionSort.getColumn();
+        if (canonicalColumnSet.add(orderByColumn)) {
+          canonicalColumns.add(orderByColumn);
+        }
+      }
+    }
+
+    List<String> selectionColumns = selection.getSelectionColumns();
+    if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
+      selectionColumns = new ArrayList<>(numColumns);
+      for (String column : columnToIndexMap.keySet()) {
+        if (TransformExpressionTree.compileToExpressionTree(column).getExpressionType()
+            == TransformExpressionTree.ExpressionType.IDENTIFIER) {
+          selectionColumns.add(column);
+        }
+      }
+      selectionColumns.sort(null);
+    }
+
+    for (String selectionColumn : selectionColumns) {
+      if (canonicalColumnSet.add(selectionColumn)) {
+        canonicalColumns.add(selectionColumn);
+      }
+    }
+
+    int numCanonicalColumns = canonicalColumns.size();
+    String[] canonicalColumnNames = new String[numCanonicalColumns];
+    DataSchema.ColumnDataType[] canonicalColumnDataTypes = new DataSchema.ColumnDataType[numCanonicalColumns];
+    DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    for (int i = 0; i < numCanonicalColumns; i++) {
+      String canonicalColumn = canonicalColumns.get(i);
+      canonicalColumnNames[i] = canonicalColumn;
+      canonicalColumnDataTypes[i] = columnDataTypes[columnToIndexMap.get(canonicalColumn)];
+    }
+    return new DataSchema(canonicalColumnNames, canonicalColumnDataTypes);
+  }
+
+  private static class CanonicalDataTable implements DataTable {
+    final DataTable _dataTable;
+    final int[] _indexMap;
+    final DataSchema _canonicalDataSchema;
+
+    CanonicalDataTable(DataTable dataTable, String[] canonicalColumns) {
+      _dataTable = dataTable;
+      int numCanonicalColumns = canonicalColumns.length;
+      _indexMap = new int[numCanonicalColumns];
+      DataSchema.ColumnDataType[] canonicalColumnDataTypes = new DataSchema.ColumnDataType[numCanonicalColumns];
+
+      DataSchema dataSchema = dataTable.getDataSchema();
+      Map<String, Integer> columnToIndexMap = SelectionOperatorUtils.getColumnToIndexMap(dataSchema.getColumnNames());
+      DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+      for (int i = 0; i < numCanonicalColumns; i++) {
+        int columnIndex = columnToIndexMap.get(canonicalColumns[i]);
+        _indexMap[i] = columnIndex;
+        canonicalColumnDataTypes[i] = columnDataTypes[columnIndex];
+      }
+      _canonicalDataSchema = new DataSchema(canonicalColumns, canonicalColumnDataTypes);
+    }
+
+    @Override
+    public void addException(ProcessingException processingException) {
+      _dataTable.addException(processingException);
+    }
+
+    @Override
+    public byte[] toBytes()
+        throws IOException {
+      return _dataTable.toBytes();
+    }
+
+    @Override
+    public Map<String, String> getMetadata() {
+      return _dataTable.getMetadata();
+    }
+
+    @Override
+    public DataSchema getDataSchema() {
+      return _canonicalDataSchema;
+    }
+
+    @Override
+    public int getNumberOfRows() {
+      return _dataTable.getNumberOfRows();
+    }
+
+    @Override
+    public int getInt(int rowId, int colId) {
+      return _dataTable.getInt(rowId, _indexMap[colId]);
+    }
+
+    @Override
+    public long getLong(int rowId, int colId) {
+      return _dataTable.getLong(rowId, _indexMap[colId]);
+    }
+
+    @Override
+    public float getFloat(int rowId, int colId) {
+      return _dataTable.getFloat(rowId, _indexMap[colId]);
+    }
+
+    @Override
+    public double getDouble(int rowId, int colId) {
+      return _dataTable.getDouble(rowId, _indexMap[colId]);
+    }
+
+    @Override
+    public String getString(int rowId, int colId) {
+      return _dataTable.getString(rowId, _indexMap[colId]);
+    }
+
+    @Override
+    public <T> T getObject(int rowId, int colId) {
+      return _dataTable.getObject(rowId, _indexMap[colId]);
+    }
+
+    @Override
+    public int[] getIntArray(int rowId, int colId) {
+      return _dataTable.getIntArray(rowId, _indexMap[colId]);
+    }
+
+    @Override
+    public long[] getLongArray(int rowId, int colId) {
+      return _dataTable.getLongArray(rowId, _indexMap[colId]);
+    }
+
+    @Override
+    public float[] getFloatArray(int rowId, int colId) {
+      return _dataTable.getFloatArray(rowId, _indexMap[colId]);
+    }
+
+    @Override
+    public double[] getDoubleArray(int rowId, int colId) {
+      return _dataTable.getDoubleArray(rowId, _indexMap[colId]);
+    }
+
+    @Override
+    public String[] getStringArray(int rowId, int colId) {
+      return _dataTable.getStringArray(rowId, _indexMap[colId]);
     }
   }
 }

@@ -80,6 +80,16 @@ public abstract class BaseDictionaryBasedPredicateEvaluator extends BasePredicat
     throw new UnsupportedOperationException();
   }
 
+  @Override
+  public final boolean applySV(byte[] value) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public final boolean applyMV(byte[][] values, int length) {
+    throw new UnsupportedOperationException();
+  }
+
   // NOTE: override it for exclusive predicate
   @Override
   public int[] getNonMatchingDictIds() {

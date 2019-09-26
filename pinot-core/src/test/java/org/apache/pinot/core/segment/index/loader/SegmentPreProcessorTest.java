@@ -70,6 +70,8 @@ public class SegmentPreProcessorTest {
   private static final String NEW_BOOLEAN_SV_DIMENSION_COLUMN_NAME = "newBooleanSVDimension";
   private static final String NEW_INT_SV_DIMENSION_COLUMN_NAME = "newIntSVDimension";
   private static final String NEW_STRING_MV_DIMENSION_COLUMN_NAME = "newStringMVDimension";
+  private static final String NEW_HLL_BYTE_METRIC_COLUMN_NAME = "newHLLByteMetric";
+  private static final String NEW_TDIGEST_BYTE_METRIC_COLUMN_NAME = "newTDigestByteMetric";
 
   private File _indexDir;
   private IndexLoadingConfig _indexLoadingConfig;
@@ -274,6 +276,16 @@ public class SegmentPreProcessorTest {
     try (SegmentPreProcessor processor = new SegmentPreProcessor(_indexDir, _indexLoadingConfig, _newColumnsSchema3)) {
       processor.process();
     }
+
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    ColumnMetadata hllMetricMetadata = segmentMetadata.getColumnMetadataFor(NEW_HLL_BYTE_METRIC_COLUMN_NAME);
+    Assert.assertEquals(hllMetricMetadata.getDataType(), FieldSpec.DataType.BYTES);
+    Assert.assertEquals(hllMetricMetadata.getDefaultNullValueString(), "00000008000000ac00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+
+    ColumnMetadata tDigestMetricMetadata = segmentMetadata.getColumnMetadataFor(NEW_TDIGEST_BYTE_METRIC_COLUMN_NAME);
+    Assert.assertEquals(tDigestMetricMetadata.getDataType(), FieldSpec.DataType.BYTES);
+    Assert.assertEquals(tDigestMetricMetadata.getDefaultNullValueString(), "0000000141ba085ee15d2f3241ba085ee15d2f324059000000000000000000013ff000000000000041ba085ee15d2f32");
   }
 
   private void checkUpdateDefaultColumns()

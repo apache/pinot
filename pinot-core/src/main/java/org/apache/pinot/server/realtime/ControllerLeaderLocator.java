@@ -19,12 +19,15 @@
 package org.apache.pinot.server.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.helix.AccessOption;
-import org.apache.helix.BaseDataAccessor;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 import org.apache.helix.HelixManager;
-import org.apache.helix.ZNRecord;
-import org.apache.pinot.core.query.utils.Pair;
-import org.apache.zookeeper.data.Stat;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.MasterSlaveSMD;
+import org.apache.pinot.common.utils.CommonConstants.Helix;
+import org.apache.pinot.common.utils.helix.LeadControllerUtils;
+import org.apache.pinot.pql.parsers.utils.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,22 +39,25 @@ public class ControllerLeaderLocator {
   private static ControllerLeaderLocator _instance = null;
   public static final Logger LOGGER = LoggerFactory.getLogger(ControllerLeaderLocator.class);
 
-  private final HelixManager _helixManager;
-  private final String _clusterName;
-
-  // Co-ordinates of the last known controller leader.
-  private Pair<String, Integer> _controllerLeaderHostPort = null;
-
-  // Indicates whether cached controller leader value is invalid
-  private volatile boolean _cachedControllerLeaderInvalid = true;
-  // Time in millis when cache invalidate was last set
-  private volatile long _lastCacheInvalidateMillis = 0;
   // Minimum millis which must elapse between consecutive invalidation of cache
-  private static final long MILLIS_BETWEEN_INVALIDATE = 30_000;
+  private static final long MIN_INVALIDATE_INTERVAL_MS = 30_000L;
+
+  private final HelixManager _helixManager;
+
+  // Co-ordinates of the last known controller leader for each of the lead-controller every partitions,
+  // with partition number being the key and controller hostname and port pair being the value.  If the lead
+  // controller resource is disabled in the configuration then this map contains helix cluster leader co-ordinates
+  // for all partitions of leadControllerResource.
+  private final Map<Integer, Pair<String, Integer>> _cachedControllerLeaderMap;
+
+  // Indicates whether cached controller leader(s) value is(are) valid.
+  private volatile boolean _cachedControllerLeaderValid = false;
+  // Time in millis when cache invalidate was last set
+  private volatile long _lastCacheInvalidationTimeMs = 0L;
 
   ControllerLeaderLocator(HelixManager helixManager) {
     _helixManager = helixManager;
-    _clusterName = helixManager.getClusterName();
+    _cachedControllerLeaderMap = new HashMap<>();
   }
 
   /**
@@ -76,76 +82,165 @@ public class ControllerLeaderLocator {
   }
 
   /**
-   * Locate the controller leader so that we can send LLC segment completion requests to it.
-   * Checks the {@link ControllerLeaderLocator::_cachedControllerLeaderInvalid} flag and fetches the leader from helix if cached value is invalid
-   *
-   * @return The host:port string of the current controller leader.
+   * Locates the controller leader so that we can send LLC segment completion requests to it.
+   * Checks the {@link ControllerLeaderLocator::_cachedControllerLeaderValid} flag and fetches the leaders to {@link ControllerLeaderLocator::_cachedControllerLeaderMap} from helix if cached value is invalid
+   * @param rawTableName table name without type.
+   * @return The host-port pair of the current controller leader.
    */
-  public synchronized Pair<String, Integer> getControllerLeader() {
-    if (!_cachedControllerLeaderInvalid) {
-      return _controllerLeaderHostPort;
+  public synchronized Pair<String, Integer> getControllerLeader(String rawTableName) {
+    int partitionId = LeadControllerUtils.getPartitionIdForTable(rawTableName);
+    if (_cachedControllerLeaderValid) {
+      return _cachedControllerLeaderMap.get(partitionId);
     }
 
-    BaseDataAccessor<ZNRecord> dataAccessor = _helixManager.getHelixDataAccessor().getBaseDataAccessor();
-    Stat stat = new Stat();
+    // No controller leader cached, fetches a fresh copy of external view and then gets the leader for the given table.
+    refreshControllerLeaderMap();
+    return _cachedControllerLeaderValid ? _cachedControllerLeaderMap.get(partitionId) : null;
+  }
+
+  /**
+   * Checks whether lead controller resource has been enabled or not.
+   * If yes, updates lead controller pairs from the external view of lead controller resource.
+   * Otherwise, updates lead controller pairs from Helix cluster leader.
+   */
+  private void refreshControllerLeaderMap() {
+    // Checks whether lead controller resource has been enabled or not.
+    if (LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager)) {
+      refreshControllerLeaderMapFromLeadControllerResource();
+    } else {
+      refreshControllerLeaderMapFromHelixClusterLeader();
+    }
+  }
+
+  /**
+   * Updates lead controller pairs from the external view of lead controller resource.
+   */
+  private void refreshControllerLeaderMapFromLeadControllerResource() {
     try {
-      ZNRecord znRecord =
-          dataAccessor.get("/" + _clusterName + "/CONTROLLER/LEADER", stat, AccessOption.THROW_EXCEPTION_IFNOTEXIST);
-      String leader = znRecord.getId();
-      int index = leader.lastIndexOf('_');
-      String leaderHost = leader.substring(0, index);
-      int leaderPort = Integer.valueOf(leader.substring(index + 1));
-      _controllerLeaderHostPort = new Pair<>(leaderHost, leaderPort);
-      _cachedControllerLeaderInvalid = false;
-      LOGGER.info("Setting controller leader to be {}:{} as per znode version {}, mtime {}", leaderHost, leaderPort,
-          stat.getVersion(), stat.getMtime());
-      return _controllerLeaderHostPort;
+      ExternalView leadControllerResourceExternalView = _helixManager.getClusterManagmentTool()
+          .getResourceExternalView(_helixManager.getClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+      if (leadControllerResourceExternalView == null) {
+        LOGGER.error("External view of {} is null.", Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+        return;
+      }
+      Set<String> partitionNames = leadControllerResourceExternalView.getPartitionSet();
+      if (partitionNames.size() != Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE) {
+        LOGGER.error("The partition size of {} is not {}. Actual size: {}", Helix.LEAD_CONTROLLER_RESOURCE_NAME,
+            Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE, partitionNames.size());
+        return;
+      }
+      for (String partitionName : partitionNames) {
+        int partitionId = LeadControllerUtils.extractPartitionId(partitionName);
+        Map<String, String> partitionStateMap = leadControllerResourceExternalView.getStateMap(partitionName);
+        boolean masterFound = false;
+        // Get master host from partition map. Return null if no master found.
+        for (Map.Entry<String, String> entry : partitionStateMap.entrySet()) {
+          if (MasterSlaveSMD.States.MASTER.name().equals(entry.getValue())) {
+            // Found the controller in master state.
+            // Converts participant id (with Prefix "Controller_") to controller id and assigns it as the leader,
+            // since realtime segment completion protocol doesn't need the prefix in controller instance id.
+            String participantInstanceId = entry.getKey();
+            String controllerInstanceId = LeadControllerUtils.extractControllerInstanceId(participantInstanceId);
+            Pair<String, Integer> leadControllerPair = convertToHostAndPortPair(controllerInstanceId);
+            masterFound = true;
+            _cachedControllerLeaderMap.put(partitionId, leadControllerPair);
+          }
+        }
+        if (!masterFound) {
+          // It's ok to log a warning since we can be in this state for some small time during the migration.
+          // Otherwise, we are attempted to mark this as an error.
+          LOGGER.warn("There is no controller in MASTER state for partition: {} in {}", partitionName,
+              Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+          return;
+        }
+      }
+      _cachedControllerLeaderValid = true;
+      LOGGER.info("Refreshed controller leader map successfully.");
     } catch (Exception e) {
-      LOGGER.warn("Could not locate controller leader, exception", e);
-      _cachedControllerLeaderInvalid = true;
+      LOGGER.error("Caught exception when getting lead controller instance Id from external view of {}",
+          Helix.LEAD_CONTROLLER_RESOURCE_NAME, e);
+    }
+  }
+
+  /**
+   * Updates lead controller pairs from Helix cluster leader.
+   */
+  private void refreshControllerLeaderMapFromHelixClusterLeader() {
+    Pair<String, Integer> helixClusterLeader = getHelixClusterLeader();
+    if (helixClusterLeader == null) {
+      LOGGER.error("Failed to refresh the controller leader map.");
+      return;
+    }
+    for (int i = 0; i < Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
+      _cachedControllerLeaderMap.put(i, helixClusterLeader);
+    }
+    _cachedControllerLeaderValid = true;
+    LOGGER.info("Refreshed controller leader map successfully.");
+  }
+
+  /**
+   * Gets Helix leader in the cluster. Null if there is no leader.
+   * @return instance id of Helix cluster leader, e.g. localhost_9000.
+   */
+  private Pair<String, Integer> getHelixClusterLeader() {
+    String helixLeader = LeadControllerUtils.getHelixClusterLeader(_helixManager);
+    return convertToHostAndPortPair(helixLeader);
+  }
+
+  /**
+   * Converts instance id to a pair of hostname and port.
+   * @param instanceId instance id without any prefix, e.g. localhost_9000
+   * */
+  private Pair<String, Integer> convertToHostAndPortPair(String instanceId) {
+    // TODO: improve the exception handling.
+    if (instanceId == null) {
       return null;
     }
+    int index = instanceId.lastIndexOf('_');
+    String leaderHost = instanceId.substring(0, index);
+    int leaderPort = Integer.valueOf(instanceId.substring(index + 1));
+    return new Pair<>(leaderHost, leaderPort);
   }
 
   /**
    * Invalidates the cached controller leader value by setting the {@link ControllerLeaderLocator::_cacheControllerLeadeInvalid} flag.
    * This flag is always checked first by {@link ControllerLeaderLocator::getControllerLeader()} method before returning the leader. If set, leader is fetched from helix, else cached leader value is returned.
    *
-   * Invalidates are not allowed more frequently than {@link ControllerLeaderLocator::MILLIS_BETWEEN_INVALIDATE} millis.
+   * Invalidates are not allowed more frequently than {@link ControllerLeaderLocator::MIN_INVALIDATE_INTERVAL_MS} millis.
    * The cache is invalidated whenever server gets NOT_LEADER or NOT_SENT response. A NOT_LEADER response definitely needs a cache refresh. However, a NOT_SENT response could also happen for reasons other than controller not being leader.
    * Thus the frequency limiting is done to guard against frequent cache refreshes, in cases where we might be getting too many NOT_SENT responses due to some other errors.
    */
   public synchronized void invalidateCachedControllerLeader() {
-    long now = System.currentTimeMillis();
-    long millisSinceLastInvalidate = now - _lastCacheInvalidateMillis;
-    if (millisSinceLastInvalidate < MILLIS_BETWEEN_INVALIDATE) {
+    long now = getCurrentTimeMs();
+    long millisSinceLastInvalidate = now - _lastCacheInvalidationTimeMs;
+    if (millisSinceLastInvalidate < MIN_INVALIDATE_INTERVAL_MS) {
       LOGGER.info(
           "Millis since last controller cache value invalidate {} is less than allowed frequency {}. Skipping invalidate.",
-          millisSinceLastInvalidate, MILLIS_BETWEEN_INVALIDATE);
+          millisSinceLastInvalidate, MIN_INVALIDATE_INTERVAL_MS);
     } else {
       LOGGER.info("Invalidating cached controller leader value");
-      _cachedControllerLeaderInvalid = true;
-      _lastCacheInvalidateMillis = now;
+      _cachedControllerLeaderValid = false;
+      _lastCacheInvalidationTimeMs = now;
     }
   }
 
   @VisibleForTesting
-  protected boolean isCachedControllerLeaderInvalid() {
-    return _cachedControllerLeaderInvalid;
+  protected long getCurrentTimeMs() {
+    return System.currentTimeMillis();
   }
 
   @VisibleForTesting
-  protected long getLastCacheInvalidateMillis() {
-    return _lastCacheInvalidateMillis;
+  protected boolean isCachedControllerLeaderValid() {
+    return _cachedControllerLeaderValid;
   }
 
   @VisibleForTesting
-  protected long getMillisBetweenInvalidate() {
-    return MILLIS_BETWEEN_INVALIDATE;
+  protected long getLastCacheInvalidationTimeMs() {
+    return _lastCacheInvalidationTimeMs;
   }
 
   @VisibleForTesting
-  protected void setLastCacheInvalidateMillis(long lastCacheInvalidateMillis) {
-    _lastCacheInvalidateMillis = lastCacheInvalidateMillis;
+  protected long getMinInvalidateIntervalMs() {
+    return MIN_INVALIDATE_INTERVAL_MS;
   }
 }

@@ -594,7 +594,9 @@ public class HelixExternalViewBasedRouting implements ClusterChangeHandler, Rout
     ArrayNode routingTableSnapshot = JsonUtils.newArrayNode();
 
     for (String currentTable : _routingTableBuilderMap.keySet()) {
-      if (tableName == null || currentTable.startsWith(tableName)) {
+      if (tableName == null || (TableNameBuilder.getTableTypeFromTableName(tableName) != null && tableName
+          .equals(currentTable)) || (TableNameBuilder.getTableTypeFromTableName(tableName) == null && tableName
+          .equals(TableNameBuilder.extractRawTableName(currentTable)))) {
         ObjectNode tableEntry = JsonUtils.newObjectNode();
         tableEntry.put("tableName", currentTable);
 

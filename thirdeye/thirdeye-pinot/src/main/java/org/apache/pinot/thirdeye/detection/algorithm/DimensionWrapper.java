@@ -79,6 +79,10 @@ public class DimensionWrapper extends DetectionPipeline {
   // Stop running if the first several dimension combinations all failed.
   private static final int EARLY_STOP_THRESHOLD = 10;
 
+  // the max number of dimensions to calculate the evaluations for
+  // this is to prevent storing the evaluations for too many dimensions
+  private static final int DIMENSION_EVALUATION_LIMIT = 5;
+
   private final String metricUrn;
   private final int k;
   private final double minContribution;
@@ -95,6 +99,9 @@ public class DimensionWrapper extends DetectionPipeline {
   protected final String nestedMetricUrnKey;
   protected final List<String> dimensions;
   protected final Collection<String> nestedMetricUrns;
+  // the metric urn to calculate the evaluation metrics for, by default set to top 5 dimensions
+  private final Set<String> evaluationMetricUrns;
+
   protected final List<Map<String, Object>> nestedProperties;
 
   public DimensionWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
@@ -131,6 +138,7 @@ public class DimensionWrapper extends DetectionPipeline {
     if (minStart.isBefore(this.start)) {
       this.start = minStart;
     }
+    this.evaluationMetricUrns = new HashSet<>();
   }
 
   /**
@@ -177,9 +185,10 @@ public class DimensionWrapper extends DetectionPipeline {
         aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).multiply(multiplier).gte(this.minValueDaily)).dropNull();
       }
 
+      aggregates = aggregates.sortedBy(COL_VALUE).reverse();
       // top k
       if (this.k > 0) {
-        aggregates = aggregates.sortedBy(COL_VALUE).tail(this.k).reverse();
+        aggregates = aggregates.head(this.k);
       }
 
       for (String nestedMetricUrn : this.nestedMetricUrns) {
@@ -191,7 +200,11 @@ public class DimensionWrapper extends DetectionPipeline {
             nestedFilter.put(dimName, aggregates.getString(dimName, i));
           }
 
-          nestedMetrics.add(MetricEntity.fromURN(nestedMetricUrn).withFilters(nestedFilter));
+          MetricEntity me = MetricEntity.fromURN(nestedMetricUrn).withFilters(nestedFilter);
+          nestedMetrics.add(me);
+          if (i < DIMENSION_EVALUATION_LIMIT) {
+            evaluationMetricUrns.add(me.getUrn());
+          }
         }
       }
 
@@ -259,7 +272,7 @@ public class DimensionWrapper extends DetectionPipeline {
   }
 
   private List<EvaluationDTO> calculateEvaluationMetrics(List<PredictionResult> predictionResults) {
-    return predictionResults.stream()
+    return predictionResults.stream().filter(predictionResult -> this.evaluationMetricUrns.contains(predictionResult.getMetricUrn()))
         .map(prediction -> EvaluationDTO.fromPredictionResult(prediction, this.startTime, this.endTime,
             this.config.getId()))
         .collect(Collectors.toList());

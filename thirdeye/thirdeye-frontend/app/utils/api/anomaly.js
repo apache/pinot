@@ -72,7 +72,7 @@ export function getAnomalyFiltersByAnomalyIdUrl(startTime, endTime, anomalyIds) 
  * @example getAiAvailabilityUrl(1, 1508472700000, 1508472800000) // yields => /thirdeye/table?detectionConfigId=1&start=1508472700000&end=1508472800000
  */
 export function getAiAvailabilityUrl(startDate, endDate) {
-  return `/thirdeye/table?metricIds=128856623&metricIds=128856625&start=${startDate}&end=${endDate}&dimensionKeys=grid&dimensionKeys=flow&dimensionKeys=project&dimensionKeys=owner&dimensionKeys=managers&dimensionKeys=sla&dimensionKeys=url`;
+  return `/thirdeye/table?metricIds=128856623&metricIds=128856146&metricIds=128856625&start=${startDate}&end=${endDate}&dimensionKeys=grid&dimensionKeys=flow&dimensionKeys=project&dimensionKeys=owner&dimensionKeys=managers&dimensionKeys=sla&dimensionKeys=url`;
 }
 
 export const anomalyApiUrls = {

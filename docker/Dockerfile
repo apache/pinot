@@ -22,8 +22,9 @@ FROM openjdk:8
 LABEL MAINTAINER=dev@pinot.apache.org
 
 ARG PINOT_BRANCH=master
+ARG KAFKA_VERSION=2.0
 ARG PINOT_GIT_URL="https://github.com/apache/incubator-pinot.git"
-RUN echo "Trying to build Pinot from [ ${PINOT_GIT_URL} ] on branch [ ${PINOT_BRANCH} ]"
+RUN echo "Trying to build Pinot from [ ${PINOT_GIT_URL} ] on branch [ ${PINOT_BRANCH} ] with Kafka version [ ${KAFKA_VERSION} ]"
 ENV PINOT_HOME=/opt/pinot
 ENV PINOT_BUILD_DIR=/opt/pinot-build
 
@@ -42,7 +43,7 @@ RUN apt-get update && \
 RUN git clone ${PINOT_GIT_URL} ${PINOT_BUILD_DIR} && \
     cd ${PINOT_BUILD_DIR} && \
     git checkout ${PINOT_BRANCH} && \
-    mvn install package -DskipTests -Pbin-dist -Pbuild-shaded-jar && \
+    mvn install package -DskipTests -Pbin-dist -Pbuild-shaded-jar -Dkafka.version=${KAFKA_VERSION} && \
     mkdir -p ${PINOT_HOME}/configs && \
     mkdir -p ${PINOT_HOME}/data && \
     cp -r pinot-distribution/target/apache-pinot-*-bin/apache-pinot-*-bin/* ${PINOT_HOME}/. && \

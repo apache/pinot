@@ -36,8 +36,6 @@ import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfi
 
 public class TriggerConditionGrouperTest {
 
-  private static final String PROP_VALUE = "value";
-
   public static MergedAnomalyResultDTO makeAnomaly(long start, long end, String entity) {
     MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(1000l, start, end, null, null, Collections.<String, String>emptyMap());
     Map<String, String> props = new HashMap<>();
@@ -69,14 +67,7 @@ public class TriggerConditionGrouperTest {
     anomalies.add(makeAnomaly(2500, 3000, "entityB"));
 
     TriggerConditionGrouperSpec spec = new TriggerConditionGrouperSpec();
-    spec.setOperator(PROP_AND);
-    Map<String, Object> leftOp = new HashMap<>();
-    leftOp.put(PROP_VALUE, "entityA");
-    spec.setLeftOp(leftOp);
-
-    Map<String, Object> rigthOp = new HashMap<>();
-    rigthOp.put(PROP_VALUE, "entityB");
-    spec.setRightOp(rigthOp);
+    spec.setExpression("entityA && entityB");
 
     grouper.init(spec, null);
     List<MergedAnomalyResultDTO> groupedAnomalies = grouper.group(anomalies);
@@ -121,14 +112,7 @@ public class TriggerConditionGrouperTest {
     anomalies.add(makeAnomaly(2500, 3000, "entityB"));
 
     TriggerConditionGrouperSpec spec = new TriggerConditionGrouperSpec();
-    spec.setOperator(PROP_OR);
-    Map<String, Object> leftOp = new HashMap<>();
-    leftOp.put(PROP_VALUE, "entityA");
-    spec.setLeftOp(leftOp);
-
-    Map<String, Object> rigthOp = new HashMap<>();
-    rigthOp.put(PROP_VALUE, "entityB");
-    spec.setRightOp(rigthOp);
+    spec.setExpression("entityA || entityB");
 
     grouper.init(spec, null);
     List<MergedAnomalyResultDTO> groupedAnomalies = grouper.group(anomalies);
@@ -180,22 +164,7 @@ public class TriggerConditionGrouperTest {
     anomalies.add(makeAnomaly(1600, 1900, "entityC"));
 
     TriggerConditionGrouperSpec spec = new TriggerConditionGrouperSpec();
-
-    Map<String, Object> leftOp = new HashMap<>();
-    leftOp.put(PROP_VALUE, "entityA");
-    Map<String, Object> leftSubOp = new HashMap<>();
-    leftSubOp.put(PROP_VALUE, "entityB");
-    Map<String, Object> rightSubOp = new HashMap<>();
-    rightSubOp.put(PROP_VALUE, "entityC");
-
-    Map<String, Object> rigthOp = new HashMap<>();
-    rigthOp.put(PROP_OPERATOR, PROP_OR);
-    rigthOp.put(PROP_LEFT_OP, leftSubOp);
-    rigthOp.put(PROP_RIGHT_OP, rightSubOp);
-
-    spec.setOperator(PROP_AND);
-    spec.setLeftOp(leftOp);
-    spec.setRightOp(rigthOp);
+    spec.setExpression("entityA && (entityB || entityC)");
 
     grouper.init(spec, null);
     List<MergedAnomalyResultDTO> groupedAnomalies = grouper.group(anomalies);

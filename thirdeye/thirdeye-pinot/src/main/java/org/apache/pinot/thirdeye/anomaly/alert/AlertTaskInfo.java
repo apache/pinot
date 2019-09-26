@@ -33,6 +33,7 @@ import org.apache.pinot.thirdeye.util.CustomDateDeserializer;
 import org.apache.pinot.thirdeye.util.CustomDateSerializer;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
+@Deprecated
 public class AlertTaskInfo implements TaskInfo {
 
   private long jobExecutionId;

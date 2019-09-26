@@ -314,7 +314,7 @@ public class AnomalyReportGenerator {
       if (anomalyReports.size() == 1) {
         AnomalyReportDTO singleAnomaly = anomalyReports.get(0);
         try {
-          imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), configuration);
+          imgPath = AlertScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), configuration);
           if (StringUtils.isNotBlank(imgPath)) {
             cid = email.embed(new File(imgPath));
           }

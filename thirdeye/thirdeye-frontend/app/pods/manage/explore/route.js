@@ -26,7 +26,6 @@ export default Route.extend(AuthenticatedRouteMixin, {
       headers: { 'content-type': 'application/json' }
     };
     const notifications = get(this, 'notifications');
-    let granularity;
 
     //detection alert fetch
     const detectionUrl = `/detection/${alertId}`;
@@ -35,7 +34,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
       const detection_status  = get(detection_result, 'status');
       const detection_json = await detection_result.json();
       if (detection_status !== 200) {
-        notifications.error('Retrieval of alert yaml failed.', 'Error', toastOptions);
+        if (detection_status !== 401) {
+          notifications.error('Retrieval of alert yaml failed.', 'Error', toastOptions);
+        }
       } else {
         if (detection_json.yaml) {
           let detectionInfo;
@@ -55,29 +56,19 @@ export default Route.extend(AuthenticatedRouteMixin, {
             createdBy: detection_json.createdBy,
             updatedBy: detection_json.updatedBy,
             exploreDimensions: detection_json.dimensions,
+            dataset: detection_json.datasetNames,
             filters: formatYamlFilter(detectionInfo.filters),
             dimensionExploration: formatYamlFilter(detectionInfo.dimensionExploration),
             lastDetectionTime: lastDetection.toDateString() + ", " +  lastDetection.toLocaleTimeString() + " (" + moment().tz(moment.tz.guess()).format('z') + ")",
             rawYaml: detection_json.yaml
           });
 
-          try {
-            if (detectionInfo.dataset) {
-              const datasetUrl = `/detection/dataset?name=${detectionInfo.dataset}`;
-              const dataset_result = await fetch(datasetUrl, getProps);
-              const dataset_json = await dataset_result.json();
-              granularity = dataset_json.timeUnit;
-            }
-          } catch (error) {
-            granularity = null;
-          }
           this.setProperties({
             alertId: alertId,
             detectionInfo,
             rawDetectionYaml: detection_json.yaml,
             metricUrn: detection_json.metricUrns[0],
             metricUrnList: detection_json.metricUrns,
-            granularity,
             timeWindowSize: detection_json.alertDetailsDefaultWindowSize
           });
 
@@ -94,7 +85,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
       const health_status  = get(health_result, 'status');
       const health_json = await health_result.json();
       if (health_status !== 200) {
-        notifications.error('Retrieval of detection health failed.', 'Error', toastOptions);
+        if (health_status !== 401) {
+          notifications.error('Retrieval of detection health failed.', 'Error', toastOptions);
+        }
       } else {
         set(this, 'detectionHealth', health_json);
       }
@@ -109,7 +102,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
       const settings_status  = get(settings_result, 'status');
       const settings_json = await settings_result.json();
       if (settings_status !== 200) {
-        notifications.error('Retrieving subscription groups failed.', 'Error', toastOptions);
+        if (settings_status !== 401) {
+          notifications.error('Retrieval of subscription groups failed.', 'Error', toastOptions);
+        }
       } else {
         set(this, 'subscriptionGroups', settings_json);
       }
@@ -140,7 +135,6 @@ export default Route.extend(AuthenticatedRouteMixin, {
       subscribedGroups,
       metricUrn: get(this, 'metricUrn'),
       metricUrnList: get(this, 'metricUrnList') ? get(this, 'metricUrnList') : [],
-      granularity,
       timeWindowSize: get(this, 'timeWindowSize')
     });
   },
@@ -155,6 +149,19 @@ export default Route.extend(AuthenticatedRouteMixin, {
       if (transition.intent.name && transition.intent.name !== 'logout') {
         this.set('session.store.fromUrl', {lastIntentTransition: transition});
       }
+    },
+
+    error() {
+      return true;
+    },
+
+    /**
+    * Refresh route's model.
+    * @method refreshModel
+    * @return {undefined}
+    */
+    refreshModel() {
+      this.refresh();
     }
   }
 });

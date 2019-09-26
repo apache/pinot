@@ -23,7 +23,7 @@ PQL
 ===
 
 * PQL is a derivative of SQL derivative that supports selection, projection, aggregation, grouping aggregation.
-  There is no support for Joins.
+  There is no support for Joins or Subqueries.
 
 * Specifically, for Pinot:
 
@@ -235,11 +235,16 @@ Supported transform functions
    Quotient of two values
 
 ``TIMECONVERT``
-   Takes 3 arguments, converts the value into another time unit. E.g. ``TIMECONVERT(time, 'MILLISECONDS', 'SECONDS')``
+   Takes 3 arguments, converts the value into another time unit. *e.g.* ``TIMECONVERT(time, 'MILLISECONDS', 'SECONDS')``
+   This expression converts the value of coulumn ``time`` (taken to be in milliseconds) to the nearest seconds
+   (*i.e.* the nearest seconds that is lower than the value of ``date`` column)
 
 ``DATETIMECONVERT``
    Takes 4 arguments, converts the value into another date time format, and buckets time based on the given time granularity.
    *e.g.* ``DATETIMECONVERT(date, '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '15:MINUTES')``
+   This expression converts the column ``date`` which is formatted as ``1:MILLISECONDS:EPOCH``, and converts it into 
+   format ``1:SECONDS:EPOCH`` with a granularity of ``15:MINUTES`` (*i.e.* nearest 15-minute value lower than the value
+   of ``date`` column.
 
 ``VALUEIN``
    Takes at least 2 arguments, where the first argument is a multi-valued column, and the following arguments are constant values.

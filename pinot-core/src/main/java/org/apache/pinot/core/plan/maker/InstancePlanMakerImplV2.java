@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
@@ -38,7 +39,6 @@ import org.apache.pinot.core.plan.MetadataBasedAggregationPlanNode;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.plan.SelectionPlanNode;
-import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.config.QueryExecutorConfig;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
@@ -101,9 +101,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
             _numGroupsLimit);
       } else {
         if (isFitForMetadataBasedPlan(brokerRequest, indexSegment)) {
-          return new MetadataBasedAggregationPlanNode(indexSegment, brokerRequest.getAggregationsInfo());
+          return new MetadataBasedAggregationPlanNode(indexSegment, brokerRequest);
         } else if (isFitForDictionaryBasedPlan(brokerRequest, indexSegment)) {
-          return new DictionaryBasedAggregationPlanNode(indexSegment, brokerRequest.getAggregationsInfo());
+          return new DictionaryBasedAggregationPlanNode(indexSegment, brokerRequest);
         } else {
           return new AggregationPlanNode(indexSegment, brokerRequest);
         }

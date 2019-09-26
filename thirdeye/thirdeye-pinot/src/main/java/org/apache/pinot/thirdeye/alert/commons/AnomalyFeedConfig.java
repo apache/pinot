@@ -19,7 +19,7 @@
 
 package org.apache.pinot.thirdeye.alert.commons;
 
-import org.apache.pinot.thirdeye.datalayer.util.StringUtils;
+import org.apache.pinot.thirdeye.datalayer.util.ThirdEyeStringUtils;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -63,10 +63,10 @@ public class AnomalyFeedConfig {
       anomalyFetcherConfigs = Collections.emptyList();
     }
     for (AnomalyFetcherConfig anomalyFetcherConfig : anomalyFetcherConfigs) {
-      Properties properties = StringUtils.decodeCompactedProperties(anomalyFetcherConfig.getProperties());
+      Properties properties = ThirdEyeStringUtils.decodeCompactedProperties(anomalyFetcherConfig.getProperties());
       anomalyFetcherConfig.setAnomalySourceType(anomalySourceType);
       anomalyFetcherConfig.setAnomalySource(anomalySource);
-      anomalyFetcherConfig.setProperties(StringUtils.encodeCompactedProperties(properties));
+      anomalyFetcherConfig.setProperties(ThirdEyeStringUtils.encodeCompactedProperties(properties));
     }
     return anomalyFetcherConfigs;
   }

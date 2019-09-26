@@ -186,6 +186,9 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
       case STRING:
         return new StringMatcher();
 
+      case BYTES:
+        return new BytesMatcher();
+
       default:
         throw new UnsupportedOperationException("Index without dictionary not supported for data type: " + dataType);
     }
@@ -238,6 +241,14 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     @Override
     public boolean doesCurrentEntryMatch(BlockSingleValIterator valueIterator) {
       return _evaluator.applySV(valueIterator.nextStringVal());
+    }
+  }
+
+  private static class BytesMatcher extends ValueMatcher {
+
+    @Override
+    public boolean doesCurrentEntryMatch(BlockSingleValIterator valueIterator) {
+      return _evaluator.applySV(valueIterator.nextBytesVal());
     }
   }
 }

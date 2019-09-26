@@ -216,10 +216,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       anomaly.getProperties().put(PROP_SUB_ENTITY_NAME, this.entityName);
     }
     long lastTimeStamp = this.getLastTimeStamp();
-    List<MergedAnomalyResultDTO> anomalyResults = anomalies.stream().filter(anomaly -> anomaly.getEndTime() <= lastTimeStamp).collect(
-        Collectors.toList());
     PredictionResult predictedTimeSeries = new PredictionResult(this.detectorName, this.metricUrn, predictedResult.getDataFrame());
-    return new DetectionPipelineResult(anomalyResults, lastTimeStamp, Collections.singletonList(predictedTimeSeries));
+    return new DetectionPipelineResult(anomalies, lastTimeStamp, Collections.singletonList(predictedTimeSeries));
   }
 
   /**

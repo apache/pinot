@@ -43,6 +43,7 @@ import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.helix.model.builder.FullAutoModeISBuilder;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixBrokerResourceOnlineOfflineStateModelGenerator;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import org.slf4j.Logger;
@@ -148,7 +149,8 @@ public class HelixSetupUtils {
 
   private static void createLeadControllerResourceIfNeeded(String helixClusterName, HelixAdmin helixAdmin,
       ConfigAccessor configAccessor, boolean enableBatchMessageMode) {
-    if (helixAdmin.getResourceIdealState(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME) == null) {
+    IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME);
+    if (idealState == null) {
       LOGGER.info("Adding resource: {}", LEAD_CONTROLLER_RESOURCE_NAME);
 
       // FULL-AUTO Master-Slave state model with CrushED rebalance strategy
@@ -158,7 +160,7 @@ public class HelixSetupUtils {
       // Initialize partitions and replicas
       idealStateBuilder.setNumPartitions(NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
       for (int i = 0; i < NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
-        idealStateBuilder.add(LEAD_CONTROLLER_RESOURCE_NAME + "_" + i);
+        idealStateBuilder.add(LeadControllerUtils.generatePartitionName(i));
       }
       idealStateBuilder.setNumReplica(LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT);
       // The below config guarantees if active number of replicas is no less than minimum active replica, there will not be partition movements happened.
@@ -169,16 +171,19 @@ public class HelixSetupUtils {
       idealStateBuilder.setRebalanceDelay(REBALANCE_DELAY_MS);
       idealStateBuilder.enableDelayRebalance();
       // Set instance group tag
-      IdealState idealState = idealStateBuilder.build();
+      idealState = idealStateBuilder.build();
       idealState.setInstanceGroupTag(CONTROLLER_INSTANCE);
       // Set batch message mode
       idealState.setBatchMessageMode(enableBatchMessageMode);
       // Explicitly disable this resource when creating this new resource.
       // When all the controllers are running the code with the logic to handle this resource, it can be enabled for backward compatibility.
       // In the next major release, we can enable this resource by default, so that all the controller logic can be separated.
-      idealState.enable(false);
 
       helixAdmin.addResource(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, idealState);
+    } else if (!idealState.isEnabled()) {
+      // Enable lead controller resource and let resource config be the only switch for enabling logic of lead controller resource.
+      idealState.enable(true);
+      helixAdmin.updateIdealState(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, idealState);
     }
 
     // Create resource config for lead controller resource if it doesn't exist
@@ -187,8 +192,8 @@ public class HelixSetupUtils {
       resourceConfig = new ResourceConfig(LEAD_CONTROLLER_RESOURCE_NAME);
     }
     // Set RESOURCE_ENABLED to false if it's absent in resource config
-    if (resourceConfig.getSimpleConfig("RESOURCE_ENABLED") == null) {
-      resourceConfig.putSimpleConfig("RESOURCE_ENABLED", Boolean.FALSE.toString());
+    if (resourceConfig.getSimpleConfig(LEAD_CONTROLLER_RESOURCE_ENABLED_KEY) == null) {
+      resourceConfig.putSimpleConfig(LEAD_CONTROLLER_RESOURCE_ENABLED_KEY, Boolean.FALSE.toString());
     }
     configAccessor.setResourceConfig(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, resourceConfig);
   }

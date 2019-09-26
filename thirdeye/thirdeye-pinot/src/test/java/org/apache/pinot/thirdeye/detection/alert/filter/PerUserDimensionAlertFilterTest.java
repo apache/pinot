@@ -29,7 +29,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilter;
-import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -44,9 +44,6 @@ public class PerUserDimensionAlertFilterTest {
   private static final String PROP_TO = "to";
   private static final String PROP_CC = "cc";
   private static final String PROP_BCC = "bcc";
-  private static final Set<String> PROP_TO_VALUE = new HashSet<>(Arrays.asList("test@example.com", "test@example.org"));
-  private static final Set<String> PROP_CC_VALUE = new HashSet<>(Arrays.asList("cctest@example.com", "cctest@example.org"));
-  private static final Set<String> PROP_BCC_VALUE = new HashSet<>(Arrays.asList("bcctest@example.com", "bcctest@example.org"));
   private static final Set<String> PROP_TO_FOR_VALUE = new HashSet<>(Arrays.asList("myTest@example.com", "myTest@example.org"));
   private static final Set<String> PROP_TO_FOR_ANOTHER_VALUE = new HashSet<>(Arrays.asList("myTest@example.net", "myTest@example.com"));
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
@@ -54,6 +51,7 @@ public class PerUserDimensionAlertFilterTest {
   private static final String PROP_DIMENSION = "dimension";
   private static final String PROP_DIMENSION_VALUE = "key";
   private static final String PROP_DIMENSION_TO = "dimensionRecipients";
+  private static final Map<String, Object> ALERT_PROPS = new HashMap<>();
   private static final Map<String, Collection<String>> PROP_DIMENSION_TO_VALUE = new HashMap<>();
   static {
     PROP_DIMENSION_TO_VALUE.put("value", PROP_TO_FOR_VALUE);
@@ -89,9 +87,9 @@ public class PerUserDimensionAlertFilterTest {
 
     Map<String, Object> properties = new HashMap<>();
     Map<String, Set<String>> recipients = new HashMap<>();
-    recipients.put(PROP_TO, PROP_TO_VALUE);
-    recipients.put(PROP_CC, PROP_CC_VALUE);
-    recipients.put(PROP_BCC, PROP_BCC_VALUE);
+    recipients.put(PROP_TO, AlertFilterUtils.PROP_TO_VALUE);
+    recipients.put(PROP_CC, AlertFilterUtils.PROP_CC_VALUE);
+    recipients.put(PROP_BCC, AlertFilterUtils.PROP_BCC_VALUE);
     properties.put(PROP_RECIPIENTS, recipients);
     properties.put(PROP_DETECTION_CONFIG_IDS, PROP_ID_VALUE);
     properties.put(PROP_DIMENSION, PROP_DIMENSION_VALUE);
@@ -110,15 +108,17 @@ public class PerUserDimensionAlertFilterTest {
   public void testAlertFilterRecipients() throws Exception {
     this.alertFilter = new PerUserDimensionAlertFilter(provider, alertConfig,2500L);
 
-    DetectionAlertFilterRecipients recipient1 = makeRecipients(Collections.singleton("myTest@example.com"));
-    DetectionAlertFilterRecipients recipient2 = makeRecipients(Collections.singleton("myTest@example.org"));
-    DetectionAlertFilterRecipients recipient3 = makeRecipients(Collections.singleton("myTest@example.net"));
-
     DetectionAlertFilterResult result = this.alertFilter.run();
     Assert.assertEquals(result.getResult().size(), 3);
-    Assert.assertEquals(result.getResult().get(recipient1), makeSet(1, 2, 5));
-    Assert.assertEquals(result.getResult().get(recipient2), makeSet(1, 5));
-    Assert.assertEquals(result.getResult().get(recipient3), makeSet(2));
+
+    DetectionAlertFilterNotification notification1 = AlertFilterUtils.makeEmailNotifications(Collections.singleton("myTest@example.com"));
+    Assert.assertEquals(result.getResult().get(notification1), makeSet(1, 2, 5));
+
+    DetectionAlertFilterNotification notification2 = AlertFilterUtils.makeEmailNotifications(Collections.singleton("myTest@example.org"));
+    Assert.assertEquals(result.getResult().get(notification2), makeSet(1, 5));
+
+    DetectionAlertFilterNotification notification3 = AlertFilterUtils.makeEmailNotifications(Collections.singleton("myTest@example.net"));
+    Assert.assertEquals(result.getResult().get(notification3), makeSet(2));
   }
 
   private Set<MergedAnomalyResultDTO> makeSet(int... anomalyIndices) {
@@ -127,15 +127,5 @@ public class PerUserDimensionAlertFilterTest {
       output.add(this.detectedAnomalies.get(anomalyIndex));
     }
     return output;
-  }
-
-  private static DetectionAlertFilterRecipients makeRecipients() {
-    return makeRecipients(new HashSet<String>());
-  }
-
-  private static DetectionAlertFilterRecipients makeRecipients(Set<String> to) {
-    Set<String> newTo = new HashSet<>(PROP_TO_VALUE);
-    newTo.addAll(to);
-    return new DetectionAlertFilterRecipients(newTo, new HashSet<>(PROP_CC_VALUE), new HashSet<>(PROP_BCC_VALUE));
   }
 }

@@ -19,6 +19,8 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.utils.BytesUtils;
+import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.NEqPredicate;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
@@ -63,6 +65,8 @@ public class NotEqualsPredicateEvaluatorFactory {
         return new DoubleRawValueBasedNeqPredicateEvaluator(nEqPredicate);
       case STRING:
         return new StringRawValueBasedNeqPredicateEvaluator(nEqPredicate);
+      case BYTES:
+        return new BytesRawValueBasedNeqPredicateEvaluator(nEqPredicate);
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType);
     }
@@ -213,6 +217,24 @@ public class NotEqualsPredicateEvaluatorFactory {
     @Override
     public boolean applySV(String value) {
       return !_nonMatchingValue.equals(value);
+    }
+  }
+
+  private static final class BytesRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final byte[] _nonMatchingValue;
+
+    BytesRawValueBasedNeqPredicateEvaluator(NEqPredicate nEqPredicate) {
+      _nonMatchingValue = BytesUtils.toBytes(nEqPredicate.getNotEqualsValue());
+    }
+
+    @Override
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.NEQ;
+    }
+
+    @Override
+    public boolean applySV(byte[] value) {
+      return ByteArray.compare(_nonMatchingValue, value) != 0;
     }
   }
 }

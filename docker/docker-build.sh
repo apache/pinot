@@ -42,6 +42,13 @@ else
   PINOT_GIT_URL="https://github.com/apache/incubator-pinot.git"
 fi
 
-echo "Trying to build Pinot docker image from Git URL: [ ${PINOT_GIT_URL} ] on branch: [ ${PINOT_BRANCH} ] and tag it as: [ ${DOCKER_TAG} ]"
+if [[ "$#" -gt 3 ]]
+then
+  KAFKA_VERSION=$4
+else
+  KAFKA_VERSION=2.0
+fi
 
-docker build --no-cache -t ${DOCKER_TAG} --build-arg PINOT_BRANCH=${PINOT_BRANCH} --build-arg PINOT_GIT_URL=${PINOT_GIT_URL} -f Dockerfile .
+echo "Trying to build Pinot docker image from Git URL: [ ${PINOT_GIT_URL} ] on branch: [ ${PINOT_BRANCH} ] and tag it as: [ ${DOCKER_TAG} ]. Kafka Dependencies: [ ${KAFKA_VERSION} ]."
+
+docker build --no-cache -t ${DOCKER_TAG} --build-arg PINOT_BRANCH=${PINOT_BRANCH} --build-arg PINOT_GIT_URL=${PINOT_GIT_URL} --build-arg KAFKA_VERSION=${KAFKA_VERSION} -f Dockerfile .

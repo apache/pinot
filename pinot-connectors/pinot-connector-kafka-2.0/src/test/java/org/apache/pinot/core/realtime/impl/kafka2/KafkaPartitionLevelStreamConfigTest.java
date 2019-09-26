@@ -41,6 +41,7 @@ public class KafkaPartitionLevelStreamConfigTest {
     String consumerType = StreamConfig.ConsumerType.LOWLEVEL.toString();
     String consumerFactoryClassName = KafkaConsumerFactory.class.getName();
     String decoderClass = "org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder";
+    String tableNameWithType = "tableName_REALTIME";
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
     streamConfigMap
         .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
@@ -67,7 +68,7 @@ public class KafkaPartitionLevelStreamConfigTest {
     if (fetcherMinBytes != null) {
       streamConfigMap.put("stream.kafka.fetcher.minBytes", fetcherMinBytes);
     }
-    return new KafkaPartitionLevelStreamConfig(new StreamConfig(streamConfigMap));
+    return new KafkaPartitionLevelStreamConfig(new StreamConfig(tableNameWithType, streamConfigMap));
   }
 
   @Test

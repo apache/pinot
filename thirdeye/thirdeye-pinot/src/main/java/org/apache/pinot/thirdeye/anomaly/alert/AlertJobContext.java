@@ -25,6 +25,7 @@ import org.apache.pinot.thirdeye.anomaly.job.JobContext;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
+@Deprecated
 public class AlertJobContext extends JobContext {
 
   private Long alertConfigId;

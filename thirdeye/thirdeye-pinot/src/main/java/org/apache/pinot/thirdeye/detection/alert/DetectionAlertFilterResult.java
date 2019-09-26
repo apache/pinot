@@ -36,7 +36,7 @@ public class DetectionAlertFilterResult {
   /**
    * The Result.
    */
-  private Map<DetectionAlertFilterRecipients, Set<MergedAnomalyResultDTO>> result;
+  private Map<DetectionAlertFilterNotification, Set<MergedAnomalyResultDTO>> result;
 
   /**
    * Instantiates a new Detection alert filter result.
@@ -50,7 +50,7 @@ public class DetectionAlertFilterResult {
    *
    * @param result the result
    */
-  public DetectionAlertFilterResult(Map<DetectionAlertFilterRecipients, Set<MergedAnomalyResultDTO>> result) {
+  public DetectionAlertFilterResult(Map<DetectionAlertFilterNotification, Set<MergedAnomalyResultDTO>> result) {
     Preconditions.checkNotNull(result);
     this.result = result;
   }
@@ -60,7 +60,7 @@ public class DetectionAlertFilterResult {
    *
    * @return the result
    */
-  public Map<DetectionAlertFilterRecipients, Set<MergedAnomalyResultDTO>> getResult() {
+  public Map<DetectionAlertFilterNotification, Set<MergedAnomalyResultDTO>> getResult() {
     return result;
   }
 
@@ -80,15 +80,15 @@ public class DetectionAlertFilterResult {
   /**
    * Add a mapping from anomalies to recipients in this detection alert filter result.
    *
-   * @param recipients the recipients
+   * @param alertProp the alert properties
    * @param anomalies the anomalies
    * @return the detection alert filter result
    */
-  public DetectionAlertFilterResult addMapping(DetectionAlertFilterRecipients recipients, Set<MergedAnomalyResultDTO> anomalies) {
-    if (!this.result.containsKey(recipients)) {
-      this.result.put(recipients, new HashSet<MergedAnomalyResultDTO>());
+  public DetectionAlertFilterResult addMapping(DetectionAlertFilterNotification alertProp, Set<MergedAnomalyResultDTO> anomalies) {
+    if (!this.result.containsKey(alertProp)) {
+      this.result.put(alertProp, new HashSet<MergedAnomalyResultDTO>());
     }
-    this.result.get(recipients).addAll(anomalies);
+    this.result.get(alertProp).addAll(anomalies);
     return this;
   }
 }

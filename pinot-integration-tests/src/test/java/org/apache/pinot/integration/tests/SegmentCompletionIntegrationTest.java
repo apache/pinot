@@ -139,7 +139,7 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
 
     // Now report to the controller that we had to stop consumption
     ServerSegmentCompletionProtocolHandler protocolHandler =
-        new ServerSegmentCompletionProtocolHandler(new ServerMetrics(new MetricsRegistry()));
+        new ServerSegmentCompletionProtocolHandler(new ServerMetrics(new MetricsRegistry()), realtimeTableName);
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withOffset(45688L).withSegmentName(_currentSegment).withReason("RandomReason")
         .withInstanceId(_serverInstance);

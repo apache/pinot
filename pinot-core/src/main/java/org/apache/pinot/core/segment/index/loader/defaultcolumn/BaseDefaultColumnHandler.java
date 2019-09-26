@@ -31,6 +31,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.core.segment.creator.ForwardIndexType;
 import org.apache.pinot.core.segment.creator.InvertedIndexType;
@@ -302,6 +303,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         // Length of the UTF-8 encoded byte array.
         dictionaryElementSize = StringUtil.encodeUtf8(stringDefaultValue).length;
         sortedArray = new String[]{stringDefaultValue};
+        break;
+      case BYTES:
+        Preconditions.checkState(defaultValue instanceof byte[]);
+        sortedArray = new ByteArray[] {new ByteArray((byte[]) defaultValue)};
         break;
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType + " for column: " + column);

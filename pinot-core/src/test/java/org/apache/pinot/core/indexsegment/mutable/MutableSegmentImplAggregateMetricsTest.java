@@ -24,8 +24,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.realtime.stream.StreamMessageMetadata;
@@ -39,6 +42,8 @@ public class MutableSegmentImplAggregateMetricsTest {
   private static final String DIMENSION_1 = "dim1";
   private static final String DIMENSION_2 = "dim2";
   private static final String METRIC = "metric";
+  private static final String METRIC_2 = "metric2";
+  private static final String TIME_COLUMN = "time";
   private static final String KEY_SEPARATOR = "\t\t";
   private static final int NUM_ROWS = 10001;
 
@@ -49,36 +54,53 @@ public class MutableSegmentImplAggregateMetricsTest {
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addSingleValueDimension(DIMENSION_1, FieldSpec.DataType.INT)
         .addSingleValueDimension(DIMENSION_2, FieldSpec.DataType.STRING).addMetric(METRIC, FieldSpec.DataType.LONG)
+        .addMetric(METRIC_2, FieldSpec.DataType.FLOAT).addTime(TIME_COLUMN, TimeUnit.DAYS, FieldSpec.DataType.INT)
         .build();
+    // Add virtual columns, which should not be aggregated
+    DimensionFieldSpec virtualDimensionFieldSpec =
+        new DimensionFieldSpec("$virtualDimension", FieldSpec.DataType.INT, true, Object.class);
+    schema.addField(virtualDimensionFieldSpec);
+    MetricFieldSpec virtualMetricFieldSpec = new MetricFieldSpec("$virtualMetric", FieldSpec.DataType.INT);
+    virtualMetricFieldSpec.setVirtualColumnProvider("provider.class");
+    schema.addField(virtualMetricFieldSpec);
+
     _mutableSegmentImpl = MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(DIMENSION_1, METRIC)),
-            new HashSet<>(Arrays.asList(DIMENSION_1)),
-            Collections.singleton(DIMENSION_1), true);
+        .createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(METRIC, METRIC_2)),
+            Collections.singleton(DIMENSION_2), new HashSet<>(Arrays.asList(DIMENSION_1, DIMENSION_2, TIME_COLUMN)),
+            true);
   }
 
   @Test
   public void testAggregateMetrics() {
     String[] stringValues = new String[10];
+    Float[] floatValues = new Float[10];
+    Random random = new Random();
     for (int i = 0; i < stringValues.length; i++) {
       stringValues[i] = RandomStringUtils.random(10);
+      floatValues[i] = random.nextFloat() * 10f;
     }
 
     Map<String, Long> expectedValues = new HashMap<>();
+    Map<String, Float> expectedValuesFloat = new HashMap<>();
     StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis());
-    Random random = new Random();
     for (int i = 0; i < NUM_ROWS; i++) {
+      int daysSinceEpoch = random.nextInt(10);
       GenericRow row = new GenericRow();
       row.putField(DIMENSION_1, random.nextInt(10));
       row.putField(DIMENSION_2, stringValues[random.nextInt(stringValues.length)]);
+      row.putField(TIME_COLUMN, daysSinceEpoch);
       // Generate random int to prevent overflow
       long metricValue = random.nextInt();
       row.putField(METRIC, metricValue);
+      float metricValueFloat = floatValues[random.nextInt(floatValues.length)];
+      row.putField(METRIC_2, metricValueFloat);
 
       _mutableSegmentImpl.index(row, defaultMetadata);
 
       // Update expected values
       String key = buildKey(row);
       expectedValues.put(key, expectedValues.getOrDefault(key, 0L) + metricValue);
+      expectedValuesFloat.put(key, expectedValuesFloat.getOrDefault(key, 0f) + metricValueFloat);
     }
 
     int numDocsIndexed = _mutableSegmentImpl.getNumDocsIndexed();
@@ -92,11 +114,13 @@ public class MutableSegmentImplAggregateMetricsTest {
       GenericRow row = _mutableSegmentImpl.getRecord(docId, reuse);
       String key = buildKey(row);
       Assert.assertEquals(row.getValue(METRIC), expectedValues.get(key));
+      Assert.assertEquals(row.getValue(METRIC_2), expectedValuesFloat.get(key));
     }
   }
 
   private String buildKey(GenericRow row) {
-    return String.valueOf(row.getValue(DIMENSION_1)) + KEY_SEPARATOR + row.getValue(DIMENSION_2);
+    return row.getValue(DIMENSION_1) + KEY_SEPARATOR + row.getValue(DIMENSION_2) + KEY_SEPARATOR + row
+        .getValue(TIME_COLUMN);
   }
 
   @AfterClass

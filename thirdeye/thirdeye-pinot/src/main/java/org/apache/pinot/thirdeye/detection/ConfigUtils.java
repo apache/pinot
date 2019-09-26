@@ -25,11 +25,15 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.SetMultimap;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.DatasetConfigBean;
 import org.joda.time.Period;
 import org.joda.time.PeriodType;
 
@@ -242,5 +246,30 @@ public class ConfigUtils {
     }
 
     throw new IllegalArgumentException(String.format("Invalid period type '%s'", type));
+  }
+
+  /**
+   * Fetch dataset config DTO using the dataset name and data provider. Lookup based on dataset name first, if not found,
+   * lookup based on the dataset display name.
+   * @param provider the data provider
+   * @param datasetName the dataset name, can be either dataset's key or display name
+   * @return the dataset config DTO
+   */
+  public static DatasetConfigDTO fetchDatasetConfigDTO(DataProvider provider, String datasetName) {
+    DatasetConfigDTO datasetConfig = provider.fetchDatasets(Collections.singletonList(datasetName)).get(datasetName);
+    // if dataset cannot be located in database by real dataset name (usually the pinot table name), they might be using the display name
+    if (datasetConfig == null) {
+      List<DatasetConfigDTO> datasetConfigs = provider.fetchDatasetByDisplayName(datasetName);
+      if (datasetConfigs.isEmpty()) {
+        throw new RuntimeException("Dataset doesn't exist in our records: " + datasetName);
+      }
+      if (datasetConfigs.size() > 1) {
+        throw new RuntimeException(String.format(
+            "multiple datasets found based on the dataset's display name %s, please specify which one to use. candidates: %s",
+            datasetName, datasetConfigs.stream().map(DatasetConfigBean::getDataset).collect(Collectors.joining(", "))));
+      }
+      datasetConfig = datasetConfigs.get(0);
+    }
+    return datasetConfig;
   }
 }
