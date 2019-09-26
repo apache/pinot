@@ -41,6 +41,7 @@ import org.apache.pinot.core.data.readers.RecordReader;
 import org.apache.pinot.core.data.readers.RecordReaderFactory;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.orc.data.readers.ORCRecordReader;
 import org.apache.pinot.parquet.data.readers.ParquetRecordReader;
 import org.apache.pinot.startree.hll.HllConfig;
 import org.apache.pinot.startree.hll.HllConstants;
@@ -63,7 +64,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   @Option(name = "-dataDir", metaVar = "<string>", usage = "Directory containing the data.")
   private String _dataDir;
 
-  @Option(name = "-format", metaVar = "<AVRO/CSV/JSON>", usage = "Input data format.")
+  @Option(name = "-format", metaVar = "<AVRO/CSV/JSON/THRIFT/PARQUET/ORC>", usage = "Input data format.")
   private FileFormat _format;
 
   @Option(name = "-outDir", metaVar = "<string>", usage = "Name of output directory.")
@@ -392,6 +393,11 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
                 parquetRecordReader.init(config);
                 driver.init(config, parquetRecordReader);
                 break;
+              case ORC:
+                RecordReader orcRecordReader = new ORCRecordReader();
+                orcRecordReader.init(config);
+                driver.init(config, orcRecordReader);
+                break;
               default:
                 driver.init(config);
             }
@@ -431,7 +437,28 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   }
 
   protected boolean isDataFile(String fileName) {
-    return fileName.endsWith(".avro") || fileName.endsWith(".csv") || fileName.endsWith(".json") || fileName
-        .endsWith(".thrift") || fileName.endsWith(".parquet");
+    if (_format == null) {
+      return fileName.endsWith(".avro") || fileName.endsWith(".csv") || fileName.endsWith(".json") || fileName
+          .endsWith(".thrift") || fileName.endsWith(".parquet") || fileName.endsWith(".orc");
+    }
+    switch (_format) {
+      case AVRO:
+      case GZIPPED_AVRO:
+        return fileName.endsWith(".avro");
+      case PARQUET:
+        return fileName.endsWith(".parquet");
+      case CSV:
+        return fileName.endsWith(".csv");
+      case JSON:
+        return fileName.endsWith(".json");
+      case THRIFT:
+        return fileName.endsWith(".thrift");
+      case ORC:
+        return fileName.endsWith(".orc");
+      case OTHER:
+      case PINOT:
+      default:
+        throw new RuntimeException("Not supported file format for segment creation");
+    }
   }
 }
