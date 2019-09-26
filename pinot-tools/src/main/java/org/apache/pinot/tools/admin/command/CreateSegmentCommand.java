@@ -38,7 +38,6 @@ import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.core.data.readers.FileFormat;
 import org.apache.pinot.core.data.readers.RecordReader;
-import org.apache.pinot.core.data.readers.RecordReaderFactory;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.orc.data.readers.ORCRecordReader;
@@ -437,28 +436,22 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   }
 
   protected boolean isDataFile(String fileName) {
-    if (_format == null) {
-      return fileName.endsWith(".avro") || fileName.endsWith(".csv") || fileName.endsWith(".json") || fileName
-          .endsWith(".thrift") || fileName.endsWith(".parquet") || fileName.endsWith(".orc");
-    }
     switch (_format) {
       case AVRO:
       case GZIPPED_AVRO:
         return fileName.endsWith(".avro");
-      case PARQUET:
-        return fileName.endsWith(".parquet");
       case CSV:
         return fileName.endsWith(".csv");
       case JSON:
         return fileName.endsWith(".json");
       case THRIFT:
         return fileName.endsWith(".thrift");
+      case PARQUET:
+        return fileName.endsWith(".parquet");
       case ORC:
         return fileName.endsWith(".orc");
-      case OTHER:
-      case PINOT:
       default:
-        throw new RuntimeException("Not supported file format for segment creation");
+        throw new IllegalStateException("Unsupported file format for segment creation: " + _format);
     }
   }
 }
