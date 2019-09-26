@@ -60,7 +60,6 @@ public class DataTypeTransformer implements RecordTransformer {
 
   private final Schema _schema;
   private final Map<String, PinotDataType> _dataTypes = new HashMap<>();
-
   public DataTypeTransformer(Schema schema) {
     _schema = schema;
     for (Map.Entry<String, FieldSpec> entry : schema.getFieldSpecMap().entrySet()) {
@@ -77,7 +76,8 @@ public class DataTypeTransformer implements RecordTransformer {
 
       // NOTE: should not need to set default null value in normal case (RecordReader is responsible for filling in the
       // default null value; TimeTransformer is responsible for filling in the outgoing time value if not exists)
-      if (value == null || (value instanceof Object[] && ((Object[]) value).length == 0)) {
+      if (value == null || (value instanceof Object[] && ((Object[]) value).length == 0) || (value instanceof List
+          && ((List) value).isEmpty())) {
         // Set default null value
         FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
         Object defaultNullValue = fieldSpec.getDefaultNullValue();
@@ -93,16 +93,12 @@ public class DataTypeTransformer implements RecordTransformer {
         if (value instanceof List) {
           // Multi-valued column
           List values = (List) value;
-          if (!values.isEmpty()) {
-            source = MULTI_VALUE_TYPE_MAP.get(values.get(0).getClass());
-            if (source == null) {
-              source = PinotDataType.OBJECT_ARRAY;
-            }
-          } else {
+          source = MULTI_VALUE_TYPE_MAP.get(values.get(0).getClass());
+          if (source == null) {
             source = PinotDataType.OBJECT_ARRAY;
           }
-          value = dest.convert(value, source);
-          record.putField(column, value);
+          // We need to convert value from list to object[] for further processing.
+          record.putField(column, dest.convert(value, source));
           continue;
         } else if (value instanceof Object[]) {
           // Multi-valued column

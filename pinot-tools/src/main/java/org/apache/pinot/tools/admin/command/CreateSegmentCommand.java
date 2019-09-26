@@ -437,6 +437,10 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   }
 
   protected boolean isDataFile(String fileName) {
+    if (_format == null) {
+      return fileName.endsWith(".avro") || fileName.endsWith(".csv") || fileName.endsWith(".json") || fileName
+          .endsWith(".thrift") || fileName.endsWith(".parquet") || fileName.endsWith(".orc");
+    }
     switch (_format) {
       case AVRO:
       case GZIPPED_AVRO:
@@ -454,8 +458,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
       case OTHER:
       case PINOT:
       default:
-        return fileName.endsWith(".avro") || fileName.endsWith(".csv") || fileName.endsWith(".json") || fileName
-            .endsWith(".thrift") || fileName.endsWith(".parquet") || fileName.endsWith(".orc");
+        throw new RuntimeException("Not supported file format for segment creation");
     }
   }
 }
