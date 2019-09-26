@@ -399,16 +399,8 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
   }
 
   private void setTableConfigAndSchema() throws IOException {
-    // If push locations, table config, and schema are not configured, this does not necessarily mean that segments
-    // cannot be created. We should allow the user to go to the next step rather than failing the job.
-    try(ControllerRestApi controllerRestApi = getControllerRestApi()) {
-      if (controllerRestApi != null) {
-        _tableConfig = getTableConfig();
-        _pinotTableSchema = getSchema();
-      } else {
-        throw new RuntimeException("Controller REST API not initialized");
-      }
-    }
+    _tableConfig = getTableConfig();
+    _pinotTableSchema = getSchema();
 
     Preconditions.checkState(_tableConfig != null, "Table config cannot be null.");
     Preconditions.checkState(_pinotTableSchema != null, "Schema cannot be null");
