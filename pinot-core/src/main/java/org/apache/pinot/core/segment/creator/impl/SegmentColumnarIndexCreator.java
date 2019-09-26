@@ -37,6 +37,7 @@ import org.apache.pinot.common.data.FieldSpec.FieldType;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.utils.BytesUtils;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.core.data.GenericRow;
@@ -67,7 +68,6 @@ import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.CommonConstants.Segment.NULL_FIELDS;
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.*;
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
 import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.StarTree.*;
@@ -262,11 +262,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   @Override
   public void indexRow(GenericRow row) {
-
     // Determine if we need to process presence vector per row, per column
     RoaringBitmap nullColumnsBitMap = null;
-    if (row.getValue(NULL_FIELDS) != null) {
-      nullColumnsBitMap = (RoaringBitmap) row.getValue(NULL_FIELDS);
+    if (row.getValue(CommonConstants.Segment.NULL_FIELDS) != null) {
+      nullColumnsBitMap = (RoaringBitmap) row.getValue(CommonConstants.Segment.NULL_FIELDS);
     }
 
     for (String columnName : _forwardIndexCreatorMap.keySet()) {

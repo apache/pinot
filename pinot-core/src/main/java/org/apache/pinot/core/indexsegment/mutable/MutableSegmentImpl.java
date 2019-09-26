@@ -37,6 +37,7 @@ import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.metadata.RowMetadata;
 import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.indexsegment.IndexSegmentUtils;
@@ -55,6 +56,7 @@ import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
+import org.apache.pinot.core.segment.index.readers.PresenceVectorReader;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
@@ -66,8 +68,6 @@ import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.common.utils.CommonConstants.Segment.NULL_FIELDS;
 
 
 public class MutableSegmentImpl implements MutableSegment {
@@ -97,7 +97,6 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Map<String, RealtimeInvertedIndexReader> _invertedIndexMap = new HashMap<>();
   private final Map<String, BloomFilterReader> _bloomFilterMap = new HashMap<>();
   private final Map<String, RealtimePresenceVectorReaderWriter> _presenceVectorMap = new HashMap<>();
-  private final Map<Integer, RoaringBitmap> _docIdToNullColumnsBitsetMap = new HashMap<>();
   private final IdMap<FixedIntArray> _recordIdMap;
   private boolean _aggregateMetrics;
 
@@ -395,15 +394,11 @@ public class MutableSegmentImpl implements MutableSegment {
    * @param docId specified docId for this row
    */
   private void addPresenceVector(GenericRow row, int docId) {
-    if (row.getValue(NULL_FIELDS) == null) {
+    if (row.getValue(CommonConstants.Segment.NULL_FIELDS) == null) {
       return;
     }
 
-    // Keep track of the null columns bitmap associated with this docId
-    // This is used to populate NULL_FIELDS when re-creating a row
-    RoaringBitmap nullColumnsBitMap = (RoaringBitmap) row.getValue(NULL_FIELDS);
-    _docIdToNullColumnsBitsetMap.put(docId, nullColumnsBitMap);
-
+    RoaringBitmap nullColumnsBitMap = (RoaringBitmap) row.getValue(CommonConstants.Segment.NULL_FIELDS);
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String columnName = fieldSpec.getName();
       if (nullColumnsBitMap.contains(_schema.getColumnId(columnName))) {
@@ -502,14 +497,24 @@ public class MutableSegmentImpl implements MutableSegment {
    * @return Generic row with physical columns of the specified row.
    */
   public GenericRow getRecord(int docId, GenericRow reuse) {
+    RoaringBitmap nullColumnBitMap = null;
+
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       String column = fieldSpec.getName();
       reuse.putField(column, IndexSegmentUtils
           .getValue(docId, fieldSpec, _indexReaderWriterMap.get(column), _dictionaryMap.get(column),
               _maxNumValuesMap.getOrDefault(column, 0)));
+
+      PresenceVectorReader reader = _presenceVectorMap.get(column);
+      if (reader != null && !reader.isPresent(docId)) {
+        if (nullColumnBitMap == null) {
+          nullColumnBitMap = new RoaringBitmap();
+        }
+        nullColumnBitMap.add(_schema.getColumnId(column));
+      }
     }
 
-    reuse.putField(NULL_FIELDS, _docIdToNullColumnsBitsetMap.get(docId));
+    reuse.putField(CommonConstants.Segment.NULL_FIELDS, nullColumnBitMap);
     return reuse;
   }
 

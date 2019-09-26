@@ -22,21 +22,22 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+
 public class RealtimePresenceVectorReaderWriterTest {
-    private static RealtimePresenceVectorReaderWriter readerWriter = null;
+  private static RealtimePresenceVectorReaderWriter readerWriter = null;
 
-    @BeforeClass
-    public void setup() {
-        readerWriter = new RealtimePresenceVectorReaderWriter();
-    }
+  @BeforeClass
+  public void setup() {
+    readerWriter = new RealtimePresenceVectorReaderWriter();
+  }
 
-    @Test
-    public void testRealtimePresenceVectorReaderWriter() {
-        for (int i=0;i<100;i++) {
-            readerWriter.setNull(i);
-        }
-        for (int i=0;i<100;i++) {
-            Assert.assertFalse(readerWriter.isPresent(i));
-        }
+  @Test
+  public void testRealtimePresenceVectorReaderWriter() {
+    for (int i = 0; i < 100; i++) {
+      readerWriter.setNull(i);
     }
+    for (int i = 0; i < 100; i++) {
+      Assert.assertFalse(readerWriter.isPresent(i));
+    }
+  }
 }

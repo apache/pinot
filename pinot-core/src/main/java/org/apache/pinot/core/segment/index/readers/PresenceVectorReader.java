@@ -25,11 +25,12 @@ package org.apache.pinot.core.segment.index.readers;
  */
 public interface PresenceVectorReader {
 
-    /**
-     * Check if the given docId is present in the corresponding column
-     *
-     * @param docId specifies ID to check for presence
-     * @return true if docId is present (non null). False otherwise
-     */
-    boolean isPresent(int docId);
+
+  /**
+   * Check if the given docId is present in the corresponding column
+   *
+   * @param docId specifies ID to check for presence
+   * @return true if docId is present (non null). False otherwise
+   */
+  boolean isPresent(int docId);
 }

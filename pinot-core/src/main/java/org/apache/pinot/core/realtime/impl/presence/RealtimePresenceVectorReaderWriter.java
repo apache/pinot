@@ -21,21 +21,22 @@ package org.apache.pinot.core.realtime.impl.presence;
 import org.apache.pinot.core.segment.index.readers.PresenceVectorReader;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
+
 /**
  * Defines a real-time presence vector to be used in realtime ingestion.
  */
 public class RealtimePresenceVectorReaderWriter implements PresenceVectorReader {
-    private final MutableRoaringBitmap _nullBitmap;
+  private final MutableRoaringBitmap _nullBitmap;
 
-    public RealtimePresenceVectorReaderWriter() {
-        _nullBitmap = new MutableRoaringBitmap();
-    }
+  public RealtimePresenceVectorReaderWriter() {
+    _nullBitmap = new MutableRoaringBitmap();
+  }
 
-    public void setNull(int docId) {
-        _nullBitmap.add(docId);
-    }
+  public void setNull(int docId) {
+    _nullBitmap.add(docId);
+  }
 
-    public boolean isPresent(int docId) {
-        return !_nullBitmap.contains(docId);
-    }
+  public boolean isPresent(int docId) {
+    return !_nullBitmap.contains(docId);
+  }
 }

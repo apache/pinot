@@ -53,7 +53,7 @@ public interface ColumnIndexContainer {
 
   /**
    *
-   * @return Get the bloom filter for the column if it exists else  {@code null}
+   * @return Get the presence vector for the column if it exists else  {@code null}
    */
   PresenceVectorReaderImpl getPresenceVector();
 }
