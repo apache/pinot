@@ -21,9 +21,19 @@ package org.apache.pinot.thirdeye.detection.algorithm;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -31,21 +41,13 @@ import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
-import org.apache.pinot.thirdeye.detection.DetectionPipelineException;
 import org.apache.pinot.thirdeye.detection.DetectionPipeline;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineException;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.PredictionResult;
+import org.apache.pinot.thirdeye.detection.spi.exception.DetectorDataInsufficientException;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-import org.apache.commons.collections4.MapUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
@@ -243,32 +245,38 @@ public class DimensionWrapper extends DetectionPipeline {
 
     long totalNestedMetrics = nestedMetrics.size();
     long successNestedMetrics = 0; // record the number of successfully explored dimensions
-    Exception lastException = null;
+    List<Exception> exceptions = new ArrayList<>();
     LOG.info("Run detection for {} metrics", totalNestedMetrics);
     for (int i = 0; i < totalNestedMetrics; i++) {
-      checkEarlyStop(totalNestedMetrics, successNestedMetrics, i, lastException);
+      checkEarlyStop(totalNestedMetrics, successNestedMetrics, i, exceptions);
       MetricEntity metric = nestedMetrics.get(i);
-      try {
+      List<Exception> exceptionsForNestedMetric = new ArrayList<>();
         LOG.info("running detection for metric urn {}. {}/{}", metric.getUrn(), i + 1, totalNestedMetrics);
         for (Map<String, Object> properties : this.nestedProperties) {
-          DetectionPipelineResult intermediate = this.runNested(metric, properties);
+          DetectionPipelineResult intermediate;
+          try {
+            intermediate = this.runNested(metric, properties);
+          } catch (Exception e) {
+            LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed for metric urn {}.",
+                this.config.getId(), this.start, this.end, metric.getUrn(), e);
+            exceptionsForNestedMetric.add(e);
+            continue;
+          }
           lastTimeStamps.add(intermediate.getLastTimestamp());
           anomalies.addAll(intermediate.getAnomalies());
           diagnostics.put(metric.getUrn(), intermediate.getDiagnostics());
           predictionResults.addAll(intermediate.getPredictions());
         }
-        successNestedMetrics++;
-      } catch (Exception e) {
-        LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed for metric urn {}.",
-            this.config.getId(), this.start, this.end, metric.getUrn(), e);
-        lastException = e;
-      }
+        // if either one detector run successfully, mark the dimension as successful
+        if (exceptionsForNestedMetric.size() != this.nestedMetricUrns.size()) {
+          successNestedMetrics++;
+        }
+        exceptions.addAll(exceptionsForNestedMetric);
     }
 
-    checkNestedMetricsStatus(totalNestedMetrics, successNestedMetrics, lastException);
-    return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps), predictionResults
-    , calculateEvaluationMetrics(predictionResults))
-        .setDiagnostics(diagnostics);
+    checkNestedMetricsStatus(totalNestedMetrics, successNestedMetrics, exceptions, predictionResults);
+    return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps),
+        predictionResults, calculateEvaluationMetrics(predictionResults)).setDiagnostics(diagnostics);
   }
 
   private List<EvaluationDTO> calculateEvaluationMetrics(List<PredictionResult> predictionResults) {
@@ -278,22 +286,44 @@ public class DimensionWrapper extends DetectionPipeline {
         .collect(Collectors.toList());
   }
 
-  private void checkEarlyStop(long totalNestedMetrics, long successNestedMetrics, int i, Exception lastException) throws DetectionPipelineException {
+  private void checkEarlyStop(long totalNestedMetrics, long successNestedMetrics, int i, List<Exception> exceptions)
+      throws DetectionPipelineException {
     // if the first certain number of dimensions all failed, throw an exception
     if (i == EARLY_STOP_THRESHOLD && successNestedMetrics == 0) {
       throw new DetectionPipelineException(String.format(
           "Detection failed for first %d out of %d metric dimensions for monitoring window %d to %d, stop processing.",
-          i, totalNestedMetrics, this.getStartTime(), this.getEndTime()), lastException);
+          i, totalNestedMetrics, this.getStartTime(), this.getEndTime()), Iterables.getLast(exceptions));
     }
   }
 
-  private void checkNestedMetricsStatus(long totalNestedMetrics, long successNestedMetrics, Exception lastException)
-      throws DetectionPipelineException {
+  /**
+   * Check the exception for all nested metric and determine whether to fail the detection.
+   *
+   * This method will throw an exception to outer wrappers if the all nested metrics failed.
+   * UNLESS the exception for all nested metrics are failed by
+   * {@link DetectorDataInsufficientException} and multiple detector are configured to run,
+   * and some of them run successfully. In such case, this method will
+   * still allow the detection to finish and return the generated anomalies. Because the data insufficient exception
+   * thrown by one detector should not block other detectors's result.
+   *
+   * @param totalNestedMetrics the total number of nested metrics
+   * @param successNestedMetrics the successfully generated nested metrics
+   * @param exceptions the list of all exceptions
+   * @param predictions the prediction results generated, which can tell us whether there are detectors run successfully.
+   * @throws DetectionPipelineException the exception to throw
+   */
+  private void checkNestedMetricsStatus(long totalNestedMetrics, long successNestedMetrics, List<Exception> exceptions,
+      List<PredictionResult> predictions) throws DetectionPipelineException {
     // if all nested metrics failed, throw an exception
     if (successNestedMetrics == 0 && totalNestedMetrics > 0) {
-      throw new DetectionPipelineException(String.format(
-          "Detection failed for all nested dimensions for detection config id %d for monitoring window %d to %d.",
-          this.config.getId(), this.getStartTime(), this.getEndTime()), lastException);
+      // if all exceptions are AnomalyDetectorWrapperException and caused by DetectorDataInsufficientException and
+      // there are other detectors run successfully, keep the detection running
+      if (!exceptions.stream().allMatch(e -> e.getCause() instanceof DetectorDataInsufficientException)
+          || predictions.size() == 0) {
+        throw new DetectionPipelineException(String.format(
+            "Detection failed for all nested dimensions for detection config id %d for monitoring window %d to %d.",
+            this.config.getId(), this.getStartTime(), this.getEndTime()), Iterables.getLast(exceptions));
+      }
     }
   }
 
