@@ -17,6 +17,8 @@
 .. under the License.
 ..
 
+.. _segment-fetcher:
+
 Segment Fetchers
 ================
 
