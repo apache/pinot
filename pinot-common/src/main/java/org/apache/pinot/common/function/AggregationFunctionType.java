@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.common.function;
 
-import javax.annotation.Nonnull;
-
-
 public enum AggregationFunctionType {
   // Aggregation functions for single-valued columns
   COUNT("count"),
@@ -53,16 +50,15 @@ public enum AggregationFunctionType {
 
   private final String _name;
 
-  AggregationFunctionType(@Nonnull String name) {
+  AggregationFunctionType(String name) {
     _name = name;
   }
 
-  @Nonnull
   public String getName() {
     return _name;
   }
 
-  public boolean isOfType(@Nonnull AggregationFunctionType... aggregationFunctionTypes) {
+  public boolean isOfType(AggregationFunctionType... aggregationFunctionTypes) {
     for (AggregationFunctionType aggregationFunctionType : aggregationFunctionTypes) {
       if (this == aggregationFunctionType) {
         return true;
@@ -72,34 +68,33 @@ public enum AggregationFunctionType {
   }
 
   /**
-   * Given the name of the aggregation function, returns the corresponding aggregation function type.
+   * Returns the corresponding aggregation function type for the given function name.
    */
-  @Nonnull
-  public static AggregationFunctionType getAggregationFunctionType(@Nonnull String functionName) {
-    try {
-      String upperCaseFunctionName = functionName.toUpperCase();
-      if (upperCaseFunctionName.startsWith("PERCENTILE")) {
-        String remainingFunctionName = upperCaseFunctionName.substring(10);
-        if (remainingFunctionName.matches("\\d+")) {
-          return PERCENTILE;
-        } else if (remainingFunctionName.matches("EST\\d+")) {
-          return PERCENTILEEST;
-        } else if (remainingFunctionName.matches("TDIGEST\\d+")) {
-          return PERCENTILETDIGEST;
-        } else if (remainingFunctionName.matches("\\d+MV")) {
-          return PERCENTILEMV;
-        } else if (remainingFunctionName.matches("EST\\d+MV")) {
-          return PERCENTILEESTMV;
-        } else if (remainingFunctionName.matches("TDIGEST\\d+MV")) {
-          return PERCENTILETDIGESTMV;
-        } else {
-          throw new IllegalArgumentException();
-        }
+  public static AggregationFunctionType getAggregationFunctionType(String functionName) {
+    String upperCaseFunctionName = functionName.toUpperCase();
+    if (upperCaseFunctionName.startsWith("PERCENTILE")) {
+      String remainingFunctionName = upperCaseFunctionName.substring(10);
+      if (remainingFunctionName.matches("\\d+")) {
+        return PERCENTILE;
+      } else if (remainingFunctionName.matches("EST\\d+")) {
+        return PERCENTILEEST;
+      } else if (remainingFunctionName.matches("TDIGEST\\d+")) {
+        return PERCENTILETDIGEST;
+      } else if (remainingFunctionName.matches("\\d+MV")) {
+        return PERCENTILEMV;
+      } else if (remainingFunctionName.matches("EST\\d+MV")) {
+        return PERCENTILEESTMV;
+      } else if (remainingFunctionName.matches("TDIGEST\\d+MV")) {
+        return PERCENTILETDIGESTMV;
       } else {
-        return AggregationFunctionType.valueOf(upperCaseFunctionName);
+        throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
       }
-    } catch (Exception e) {
-      throw new UnsupportedOperationException("Invalid aggregation function name: " + functionName);
+    } else {
+      try {
+        return AggregationFunctionType.valueOf(upperCaseFunctionName);
+      } catch (Exception e) {
+        throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
+      }
     }
   }
 }

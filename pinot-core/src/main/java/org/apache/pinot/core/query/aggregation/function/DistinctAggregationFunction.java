@@ -20,10 +20,9 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
 import java.util.Iterator;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.operator.transform.TransformBlockDataFetcher;
@@ -37,15 +36,15 @@ import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 
 
 /**
- * DISTINCT clause in SQL is implemented as function in the
- * execution engine of Pinot.
+ * The DISTINCT clause in SQL is executed as the DISTINCT aggregation function.
+ * // TODO: Support group-by
  */
 public class DistinctAggregationFunction implements AggregationFunction<DistinctTable, Comparable> {
-
   private final DistinctTable _distinctTable;
   private final String[] _columnNames;
-  private FieldSpec.DataType[] _dataTypes;
   private final int _limit;
+
+  private FieldSpec.DataType[] _dataTypes;
 
   DistinctAggregationFunction(String multiColumnExpression, int limit) {
     _distinctTable = new DistinctTable(limit);
@@ -53,43 +52,35 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
     _limit = limit;
   }
 
-  @Nonnull
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.DISTINCT;
   }
 
-  @Nonnull
   @Override
-  public String getColumnName(@Nonnull String column) {
+  public String getColumnName(String column) {
     return AggregationFunctionType.DISTINCT.getName() + "_" + column;
   }
 
-  @Nonnull
   @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.OBJECT;
-  }
-
-  @Override
-  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+  public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
 
-  @Nonnull
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
     return new ObjectAggregationResultHolder();
   }
 
   @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      @Nonnull BlockValSet... blockValSets) {
-    Preconditions.checkArgument(blockValSets.length == _columnNames.length, "Error invalid number of block value sets");
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
+    int numColumns = _columnNames.length;
+    Preconditions.checkState(blockValSets.length == numColumns, "Size mismatch: numBlockValSets = %s, numColumns = %s",
+        blockValSets.length, numColumns);
 
     if (_dataTypes == null) {
-      _dataTypes = new FieldSpec.DataType[_columnNames.length];
-      for (int i = 0; i < blockValSets.length; i++) {
+      _dataTypes = new FieldSpec.DataType[numColumns];
+      for (int i = 0; i < numColumns; i++) {
         _dataTypes[i] = blockValSets[i].getValueType();
       }
       _distinctTable.setColumnNames(_columnNames);
@@ -114,13 +105,11 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
     }
   }
 
-  @Nonnull
   @Override
   public DistinctTable extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return _distinctTable;
   }
 
-  @Nonnull
   @Override
   public DistinctTable merge(DistinctTable inProgressMergedResult, DistinctTable newResultToMerge) {
     // do the union
@@ -132,7 +121,16 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
     return inProgressMergedResult;
   }
 
-  @Nonnull
+  @Override
+  public boolean isIntermediateResultComparable() {
+    return false;
+  }
+
+  @Override
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.OBJECT;
+  }
+
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
     throw new UnsupportedOperationException("Operation not supported for DISTINCT aggregation function");
@@ -145,23 +143,16 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
   }
 
   @Override
-  public void aggregateGroupByMV(int length, int[][] groupKeysArray, @Nonnull GroupByResultHolder groupByResultHolder,
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       BlockValSet... blockValSets) {
     throw new UnsupportedOperationException("Operation not supported for DISTINCT aggregation function");
   }
 
-  @Nonnull
   @Override
   public DistinctTable extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     throw new UnsupportedOperationException("Operation not supported for DISTINCT aggregation function");
   }
 
-  @Override
-  public boolean isIntermediateResultComparable() {
-    return false;
-  }
-
-  @Nonnull
   @Override
   public Comparable extractFinalResult(DistinctTable intermediateResult) {
     throw new UnsupportedOperationException("Operation not supported for DISTINCT aggregation function");

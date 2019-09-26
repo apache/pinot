@@ -20,10 +20,9 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.tdunning.math.stats.TDigest;
 import java.nio.ByteBuffer;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -44,38 +43,33 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
     _percentile = percentile;
   }
 
-  @Nonnull
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.PERCENTILETDIGEST;
   }
 
-  @Nonnull
   @Override
-  public String getColumnName(@Nonnull String column) {
+  public String getColumnName(String column) {
     return AggregationFunctionType.PERCENTILETDIGEST.getName() + _percentile + "_" + column;
   }
 
   @Override
-  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+  public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
 
-  @Nonnull
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
     return new ObjectAggregationResultHolder();
   }
 
-  @Nonnull
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
     return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
   }
 
   @Override
-  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull BlockValSet... blockValSets) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
     TDigest tDigest = getTDigest(aggregationResultHolder);
 
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
@@ -102,8 +96,8 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   }
 
   @Override
-  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
     switch (valueType) {
       case INT:
@@ -130,8 +124,8 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   }
 
   @Override
-  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
     switch (valueType) {
       case INT:
@@ -162,9 +156,8 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
     }
   }
 
-  @Nonnull
   @Override
-  public TDigest extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+  public TDigest extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     TDigest tDigest = aggregationResultHolder.getResult();
     if (tDigest == null) {
       return TDigest.createMergingDigest(DEFAULT_TDIGEST_COMPRESSION);
@@ -173,9 +166,8 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
     }
   }
 
-  @Nonnull
   @Override
-  public TDigest extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+  public TDigest extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     TDigest tDigest = groupByResultHolder.getResult(groupKey);
     if (tDigest == null) {
       return TDigest.createMergingDigest(DEFAULT_TDIGEST_COMPRESSION);
@@ -184,9 +176,8 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
     }
   }
 
-  @Nonnull
   @Override
-  public TDigest merge(@Nonnull TDigest intermediateResult1, @Nonnull TDigest intermediateResult2) {
+  public TDigest merge(TDigest intermediateResult1, TDigest intermediateResult2) {
     intermediateResult1.add(intermediateResult2);
     return intermediateResult1;
   }
@@ -196,15 +187,13 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
     return false;
   }
 
-  @Nonnull
   @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.OBJECT;
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.OBJECT;
   }
 
-  @Nonnull
   @Override
-  public Double extractFinalResult(@Nonnull TDigest intermediateResult) {
+  public Double extractFinalResult(TDigest intermediateResult) {
     return calculatePercentile(intermediateResult, _percentile);
   }
 
@@ -212,7 +201,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
    * Calculates percentile from {@link TDigest}.
    * <p>Handles cases where only one value in TDigest object.
    */
-  public static double calculatePercentile(@Nonnull TDigest tDigest, int percentile) {
+  public static double calculatePercentile(TDigest tDigest, int percentile) {
     if (tDigest.size() == 1) {
       // Specialize cases where only one value in TDigest (cannot use quantile method)
       return tDigest.centroids().iterator().next().mean();
@@ -227,7 +216,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
    * @param aggregationResultHolder Result holder
    * @return TDigest from the result holder
    */
-  protected static TDigest getTDigest(@Nonnull AggregationResultHolder aggregationResultHolder) {
+  protected static TDigest getTDigest(AggregationResultHolder aggregationResultHolder) {
     TDigest tDigest = aggregationResultHolder.getResult();
     if (tDigest == null) {
       tDigest = TDigest.createMergingDigest(DEFAULT_TDIGEST_COMPRESSION);
@@ -243,7 +232,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
    * @param groupKey Group key for which to return the TDigest
    * @return TDigest for the group key
    */
-  protected static TDigest getTDigest(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+  protected static TDigest getTDigest(GroupByResultHolder groupByResultHolder, int groupKey) {
     TDigest tDigest = groupByResultHolder.getResult(groupKey);
     if (tDigest == null) {
       tDigest = TDigest.createMergingDigest(DEFAULT_TDIGEST_COMPRESSION);

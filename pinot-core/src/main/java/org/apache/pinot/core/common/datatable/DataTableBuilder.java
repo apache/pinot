@@ -309,7 +309,8 @@ public class DataTableBuilder {
     int numAggregations = aggregationsInfo.size();
     AggregationFunctionContext[] aggregationFunctionContexts = new AggregationFunctionContext[numAggregations];
     for (int i = 0; i < numAggregations; i++) {
-      aggregationFunctionContexts[i] = AggregationFunctionUtils.getAggregationFunctionContext(aggregationsInfo.get(i));
+      aggregationFunctionContexts[i] =
+          AggregationFunctionUtils.getAggregationFunctionContext(aggregationsInfo.get(i), brokerRequest);
     }
     if (brokerRequest.isSetGroupBy()) {
       // Aggregation group-by query.

@@ -20,10 +20,9 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -35,38 +34,33 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 public class DistinctCountHLLAggregationFunction implements AggregationFunction<HyperLogLog, Long> {
   public static final int DEFAULT_LOG2M = 8;
 
-  @Nonnull
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.DISTINCTCOUNTHLL;
   }
 
-  @Nonnull
   @Override
-  public String getColumnName(@Nonnull String column) {
+  public String getColumnName(String column) {
     return AggregationFunctionType.DISTINCTCOUNTHLL.getName() + "_" + column;
   }
 
   @Override
-  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+  public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
 
-  @Nonnull
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
     return new ObjectAggregationResultHolder();
   }
 
-  @Nonnull
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
     return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
   }
 
   @Override
-  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull BlockValSet... blockValSets) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
     HyperLogLog hyperLogLog = getHyperLogLog(aggregationResultHolder);
 
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
@@ -118,8 +112,8 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   }
 
   @Override
-  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
     switch (valueType) {
       case INT:
@@ -170,8 +164,8 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   }
 
   @Override
-  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
     switch (valueType) {
       case INT:
@@ -221,9 +215,8 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
     }
   }
 
-  @Nonnull
   @Override
-  public HyperLogLog extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+  public HyperLogLog extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
     if (hyperLogLog == null) {
       return new HyperLogLog(DEFAULT_LOG2M);
@@ -232,9 +225,8 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
     }
   }
 
-  @Nonnull
   @Override
-  public HyperLogLog extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+  public HyperLogLog extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
     if (hyperLogLog == null) {
       return new HyperLogLog(DEFAULT_LOG2M);
@@ -243,9 +235,8 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
     }
   }
 
-  @Nonnull
   @Override
-  public HyperLogLog merge(@Nonnull HyperLogLog intermediateResult1, @Nonnull HyperLogLog intermediateResult2) {
+  public HyperLogLog merge(HyperLogLog intermediateResult1, HyperLogLog intermediateResult2) {
     try {
       intermediateResult1.addAll(intermediateResult2);
     } catch (Exception e) {
@@ -259,15 +250,13 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
     return false;
   }
 
-  @Nonnull
   @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.OBJECT;
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.OBJECT;
   }
 
-  @Nonnull
   @Override
-  public Long extractFinalResult(@Nonnull HyperLogLog intermediateResult) {
+  public Long extractFinalResult(HyperLogLog intermediateResult) {
     return intermediateResult.cardinality();
   }
 
@@ -278,8 +267,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
    * @param groupKey Group-key for which to set the value
    * @param value Value for the group key
    */
-  private static void setValueForGroupKey(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey,
-      Object value) {
+  private static void setValueForGroupKey(GroupByResultHolder groupByResultHolder, int groupKey, Object value) {
     HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
     hyperLogLog.offer(value);
   }
@@ -291,8 +279,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
    * @param groupKey Group-key for which to set the value
    * @param value HyperLogLog value for the group key
    */
-  private static void setValueForGroupKey(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey,
-      HyperLogLog value)
+  private static void setValueForGroupKey(GroupByResultHolder groupByResultHolder, int groupKey, HyperLogLog value)
       throws CardinalityMergeException {
     HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
     hyperLogLog.addAll(value);
@@ -305,8 +292,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
    * @param groupKeys Group keys for which to set the value
    * @param value Value to set
    */
-  private static void setValueForGroupKeys(@Nonnull GroupByResultHolder groupByResultHolder, int[] groupKeys,
-      Object value) {
+  private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, Object value) {
     for (int groupKey : groupKeys) {
       setValueForGroupKey(groupByResultHolder, groupKey, value);
     }
@@ -319,8 +305,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
    * @param groupKeys Group keys for which to set the value
    * @param value HyperLogLog value to set
    */
-  private static void setValueForGroupKeys(@Nonnull GroupByResultHolder groupByResultHolder, int[] groupKeys,
-      HyperLogLog value)
+  private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, HyperLogLog value)
       throws CardinalityMergeException {
     for (int groupKey : groupKeys) {
       setValueForGroupKey(groupByResultHolder, groupKey, value);
@@ -333,7 +318,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
    * @param aggregationResultHolder Result holder
    * @return HyperLogLog from the result holder
    */
-  protected static HyperLogLog getHyperLogLog(@Nonnull AggregationResultHolder aggregationResultHolder) {
+  protected static HyperLogLog getHyperLogLog(AggregationResultHolder aggregationResultHolder) {
     HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
     if (hyperLogLog == null) {
       hyperLogLog = new HyperLogLog(DEFAULT_LOG2M);
@@ -349,7 +334,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
    * @param groupKey Group key for which to return the HyperLogLog
    * @return HyperLogLog for the group key
    */
-  protected static HyperLogLog getHyperLogLog(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+  protected static HyperLogLog getHyperLogLog(GroupByResultHolder groupByResultHolder, int groupKey) {
     HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
     if (hyperLogLog == null) {
       hyperLogLog = new HyperLogLog(DEFAULT_LOG2M);

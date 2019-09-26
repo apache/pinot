@@ -22,7 +22,6 @@ import com.google.common.math.DoubleMath;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Locale;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
@@ -46,16 +45,14 @@ public class AggregationFunctionUtils {
   /**
    * Extracts the aggregation column (could be column name or UDF expression) from the {@link AggregationInfo}.
    */
-  @Nonnull
-  public static String getColumn(@Nonnull AggregationInfo aggregationInfo) {
+  public static String getColumn(AggregationInfo aggregationInfo) {
     return aggregationInfo.getAggregationParams().get(COLUMN_KEY);
   }
 
   /**
    * Creates an {@link AggregationFunctionColumnPair} from the {@link AggregationInfo}.
    */
-  @Nonnull
-  public static AggregationFunctionColumnPair getFunctionColumnPair(@Nonnull AggregationInfo aggregationInfo) {
+  public static AggregationFunctionColumnPair getFunctionColumnPair(AggregationInfo aggregationInfo) {
     AggregationFunctionType functionType =
         AggregationFunctionType.getAggregationFunctionType(aggregationInfo.getAggregationType());
     return new AggregationFunctionColumnPair(functionType, getColumn(aggregationInfo));
@@ -69,12 +66,10 @@ public class AggregationFunctionUtils {
   /**
    * Creates an {@link AggregationFunctionContext} from the {@link AggregationInfo}.
    */
-  @Nonnull
-  public static AggregationFunctionContext getAggregationFunctionContext(@Nonnull AggregationInfo aggregationInfo) {
+  public static AggregationFunctionContext getAggregationFunctionContext(AggregationInfo aggregationInfo) {
     return getAggregationFunctionContext(aggregationInfo, null);
   }
 
-  @Nonnull
   public static AggregationFunctionContext getAggregationFunctionContext(AggregationInfo aggregationInfo,
       @Nullable BrokerRequest brokerRequest) {
     String column = getColumn(aggregationInfo);
@@ -83,7 +78,6 @@ public class AggregationFunctionUtils {
     return new AggregationFunctionContext(aggregationFunction, column);
   }
 
-  @Nonnull
   public static AggregationFunctionContext[] getAggregationFunctionContexts(BrokerRequest brokerRequest,
       @Nullable SegmentMetadata segmentMetadata) {
     List<AggregationInfo> aggregationInfos = brokerRequest.getAggregationsInfo();
@@ -103,7 +97,6 @@ public class AggregationFunctionUtils {
     return aggregationFunctionContexts;
   }
 
-  @Nonnull
   public static AggregationFunction[] getAggregationFunctions(BrokerRequest brokerRequest) {
     List<AggregationInfo> aggregationInfos = brokerRequest.getAggregationsInfo();
     int numAggregationFunctions = aggregationInfos.size();
@@ -115,8 +108,7 @@ public class AggregationFunctionUtils {
     return aggregationFunctions;
   }
 
-  @Nonnull
-  public static boolean[] getAggregationFunctionsSelectStatus(@Nonnull List<AggregationInfo> aggregationInfos) {
+  public static boolean[] getAggregationFunctionsSelectStatus(List<AggregationInfo> aggregationInfos) {
     int numAggregationFunctions = aggregationInfos.size();
     boolean[] aggregationFunctionsStatus = new boolean[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
@@ -125,15 +117,14 @@ public class AggregationFunctionUtils {
     return aggregationFunctionsStatus;
   }
 
-  @Nonnull
-  public static String formatValue(@Nonnull Object value) {
+  public static String formatValue(Object value) {
     if (value instanceof Double) {
       Double doubleValue = (Double) value;
 
       // String.format is very expensive, so avoid it for whole numbers that can fit in Long.
       // We simply append ".00000" to long, in order to keep the existing behavior.
       if (doubleValue <= Long.MAX_VALUE && DoubleMath.isMathematicalInteger(doubleValue)) {
-        return Long.toString(doubleValue.longValue()) + ".00000";
+        return doubleValue.longValue() + ".00000";
       } else {
         return String.format(Locale.US, "%1.5f", doubleValue);
       }
@@ -142,8 +133,7 @@ public class AggregationFunctionUtils {
     }
   }
 
-  @Nonnull
-  public static Serializable getSerializableValue(@Nonnull Object value) {
+  public static Serializable getSerializableValue(Object value) {
     if (value instanceof Number) {
       return (Number) value;
     } else {

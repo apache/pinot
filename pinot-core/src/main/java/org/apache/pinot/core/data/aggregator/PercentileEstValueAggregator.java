@@ -19,8 +19,8 @@
 package org.apache.pinot.core.data.aggregator;
 
 import org.apache.pinot.common.data.FieldSpec.DataType;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.function.PercentileEstAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.customobject.QuantileDigest;
 

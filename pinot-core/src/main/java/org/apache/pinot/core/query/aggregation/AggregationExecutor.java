@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.aggregation;
 
 import java.util.List;
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 
 
@@ -34,7 +33,7 @@ public interface AggregationExecutor {
    *
    * @param transformBlock Transform Block
    */
-  void aggregate(@Nonnull TransformBlock transformBlock);
+  void aggregate(TransformBlock transformBlock);
 
   /**
    * Returns the result of aggregation.
