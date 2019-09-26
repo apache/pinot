@@ -79,7 +79,6 @@ public abstract class BaseSegmentJob extends Configured {
    * We return null here to make it clear that for now, all implementations of this method have to support
    * reading from a schema file. In the future, we hope to deprecate reading the schema from the schema file in favor
    * of mandating that a schema is pushed to the controller.
-   * @return
    */
   @Nullable
   protected org.apache.pinot.common.data.Schema getSchema() throws IOException {

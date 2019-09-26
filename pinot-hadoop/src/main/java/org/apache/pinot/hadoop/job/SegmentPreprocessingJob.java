@@ -403,8 +403,8 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     // cannot be created. We should allow the user to go to the next step rather than failing the job.
     try(ControllerRestApi controllerRestApi = getControllerRestApi()) {
       if (controllerRestApi != null) {
-        _tableConfig = controllerRestApi.getTableConfig();
-        _pinotTableSchema = controllerRestApi.getSchema();
+        _tableConfig = getTableConfig();
+        _pinotTableSchema = getSchema();
       } else {
         throw new RuntimeException("Controller REST API not initialized");
       }
