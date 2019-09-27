@@ -62,7 +62,6 @@ public abstract class BaseSegmentJob extends Configured {
     }
 
     _rawTableName = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME));
-
   }
 
   @Nullable

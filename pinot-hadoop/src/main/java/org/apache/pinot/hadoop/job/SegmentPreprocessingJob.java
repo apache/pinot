@@ -37,7 +37,6 @@ import org.apache.avro.mapred.AvroValue;
 import org.apache.avro.mapreduce.AvroJob;
 import org.apache.avro.mapreduce.AvroKeyOutputFormat;
 import org.apache.avro.mapreduce.AvroMultipleOutputs;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -63,7 +62,6 @@ import org.apache.pinot.hadoop.job.mappers.SegmentPreprocessingMapper;
 import org.apache.pinot.hadoop.job.partitioners.GenericPartitioner;
 import org.apache.pinot.hadoop.job.reducers.SegmentPreprocessingReducer;
 import org.apache.pinot.hadoop.utils.JobPreparationHelper;
-import org.apache.pinot.hadoop.utils.PushLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,8 +85,6 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
 
   private final Path _inputSegmentDir;
   private final Path _preprocessedOutputDir;
-  protected final String _rawTableName;
-  protected List<PushLocation> _pushLocations;
 
   // Optional.
   private final Path _pathToDependencyJar;
@@ -106,21 +102,10 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     // get input/output paths.
     _inputSegmentDir = Preconditions.checkNotNull(getPathFromProperty(JobConfigConstants.PATH_TO_INPUT));
     _preprocessedOutputDir = getPathFromProperty(JobConfigConstants.PREPROCESS_PATH_TO_OUTPUT);
-    _rawTableName = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME));
 
     // Optional
     _pathToDependencyJar = getPathFromProperty(JobConfigConstants.PATH_TO_DEPS_JAR);
     _schemaFile = getPathFromProperty(JobConfigConstants.PATH_TO_SCHEMA);
-
-    // Optional push location and table parameters. If set, will use the table config and schema from the push hosts.
-    String pushHostsString = _properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS);
-    String pushPortString = _properties.getProperty(JobConfigConstants.PUSH_TO_PORT);
-    if (pushHostsString != null && pushPortString != null) {
-      _pushLocations =
-          PushLocation.getPushLocations(StringUtils.split(pushHostsString, ','), Integer.parseInt(pushPortString));
-    } else {
-      _pushLocations = null;
-    }
 
     _logger.info("*********************************************************************");
     _logger.info("enable.preprocessing: {}", _enablePreprocessing);
