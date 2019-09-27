@@ -60,6 +60,7 @@ public class DataTypeTransformer implements RecordTransformer {
 
   private final Schema _schema;
   private final Map<String, PinotDataType> _dataTypes = new HashMap<>();
+
   public DataTypeTransformer(Schema schema) {
     _schema = schema;
     for (Map.Entry<String, FieldSpec> entry : schema.getFieldSpecMap().entrySet()) {
@@ -72,10 +73,8 @@ public class DataTypeTransformer implements RecordTransformer {
     for (Map.Entry<String, PinotDataType> entry : _dataTypes.entrySet()) {
       String column = entry.getKey();
       PinotDataType dest = entry.getValue();
-      Object value = record.getValue(column);
 
-      // NOTE: should not need to set default null value in normal case (RecordReader is responsible for filling in the
-      // default null value; TimeTransformer is responsible for filling in the outgoing time value if not exists)
+      Object value = record.getValue(column);
       if (value == null || (value instanceof Object[] && ((Object[]) value).length == 0) || (value instanceof List
           && ((List) value).isEmpty())) {
         // Set default null value
@@ -86,21 +85,15 @@ public class DataTypeTransformer implements RecordTransformer {
         } else {
           value = new Object[]{defaultNullValue};
         }
-        record.putField(column, value);
-        continue;
       } else {
-        PinotDataType source;
+        // Convert List value to Object[]
         if (value instanceof List) {
-          // Multi-valued column
-          List values = (List) value;
-          source = MULTI_VALUE_TYPE_MAP.get(values.get(0).getClass());
-          if (source == null) {
-            source = PinotDataType.OBJECT_ARRAY;
-          }
-          // We need to convert value from list to object[] for further processing.
-          record.putField(column, dest.convert(value, source));
-          continue;
-        } else if (value instanceof Object[]) {
+          value = ((List) value).toArray();
+        }
+
+        // Convert data type if necessary
+        PinotDataType source;
+        if (value instanceof Object[]) {
           // Multi-valued column
           Object[] values = (Object[]) value;
           source = MULTI_VALUE_TYPE_MAP.get(values[0].getClass());
@@ -114,12 +107,11 @@ public class DataTypeTransformer implements RecordTransformer {
             source = PinotDataType.OBJECT;
           }
         }
-
         if (source != dest) {
           value = dest.convert(value, source);
-          record.putField(column, value);
         }
       }
+      record.putField(column, value);
     }
     return record;
   }
