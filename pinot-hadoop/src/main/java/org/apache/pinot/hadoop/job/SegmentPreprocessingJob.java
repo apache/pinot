@@ -20,6 +20,7 @@ package org.apache.pinot.hadoop.job;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -36,7 +37,6 @@ import org.apache.avro.mapred.AvroValue;
 import org.apache.avro.mapreduce.AvroJob;
 import org.apache.avro.mapreduce.AvroKeyOutputFormat;
 import org.apache.avro.mapreduce.AvroMultipleOutputs;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -62,7 +62,6 @@ import org.apache.pinot.hadoop.job.mappers.SegmentPreprocessingMapper;
 import org.apache.pinot.hadoop.job.partitioners.GenericPartitioner;
 import org.apache.pinot.hadoop.job.reducers.SegmentPreprocessingReducer;
 import org.apache.pinot.hadoop.utils.JobPreparationHelper;
-import org.apache.pinot.hadoop.utils.PushLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,11 +85,10 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
 
   private final Path _inputSegmentDir;
   private final Path _preprocessedOutputDir;
-  protected final String _rawTableName;
-  protected final List<PushLocation> _pushLocations;
 
   // Optional.
   private final Path _pathToDependencyJar;
+  protected final Path _schemaFile;
 
   private TableConfig _tableConfig;
   private org.apache.pinot.common.data.Schema _pinotTableSchema;
@@ -104,21 +102,10 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     // get input/output paths.
     _inputSegmentDir = Preconditions.checkNotNull(getPathFromProperty(JobConfigConstants.PATH_TO_INPUT));
     _preprocessedOutputDir = getPathFromProperty(JobConfigConstants.PREPROCESS_PATH_TO_OUTPUT);
-    _rawTableName = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME));
 
+    // Optional
     _pathToDependencyJar = getPathFromProperty(JobConfigConstants.PATH_TO_DEPS_JAR);
-
-    // Optional push location and table parameters. If set, will use the table config and schema from the push hosts.
-    String pushHostsString = _properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS);
-    String pushPortString = _properties.getProperty(JobConfigConstants.PUSH_TO_PORT);
-    if (pushHostsString != null && pushPortString != null) {
-      _pushLocations =
-          PushLocation.getPushLocations(StringUtils.split(pushHostsString, ','), Integer.parseInt(pushPortString));
-    } else {
-      throw new RuntimeException(String
-          .format("Push location is mis-configured! %s: %s, %s: %s", JobConfigConstants.PUSH_TO_HOSTS, pushHostsString,
-              JobConfigConstants.PUSH_TO_PORT, pushPortString));
-    }
+    _schemaFile = getPathFromProperty(JobConfigConstants.PATH_TO_SCHEMA);
 
     _logger.info("*********************************************************************");
     _logger.info("enable.preprocessing: {}", _enablePreprocessing);
@@ -375,14 +362,30 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     fieldSet.add(hashCodeField);
   }
 
-  private void setTableConfigAndSchema() throws IOException {
-    // If push locations, table config, and schema are not configured, this does not necessarily mean that segments
-    // cannot be created. We should allow the user to go to the next step rather than failing the job.
-    Preconditions.checkState(!_pushLocations.isEmpty(), "Push locations cannot be empty.");
-    try(ControllerRestApi controllerRestApi = new DefaultControllerRestApi(_pushLocations, _rawTableName)) {
-      _tableConfig = controllerRestApi.getTableConfig();
-      _pinotTableSchema = controllerRestApi.getSchema();
+  @Override
+  protected org.apache.pinot.common.data.Schema getSchema()
+      throws IOException {
+    try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
+      if (controllerRestApi != null) {
+        return controllerRestApi.getSchema();
+      } else {
+        try (InputStream inputStream = _fileSystem.open(_schemaFile)) {
+          return org.apache.pinot.common.data.Schema.fromInputSteam(inputStream);
+        }
+      }
     }
+  }
+
+  /**
+   * Can be overridden to set additional job properties.
+   */
+  @SuppressWarnings("unused")
+  protected void addAdditionalJobProperties(Job job) {
+  }
+
+  private void setTableConfigAndSchema() throws IOException {
+    _tableConfig = getTableConfig();
+    _pinotTableSchema = getSchema();
 
     Preconditions.checkState(_tableConfig != null, "Table config cannot be null.");
     Preconditions.checkState(_pinotTableSchema != null, "Schema cannot be null");

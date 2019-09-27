@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -194,14 +193,7 @@ public class SegmentCreationJob extends BaseSegmentJob {
     _fileSystem.delete(_stagingDir, true);
   }
 
-  @Nullable
-  protected TableConfig getTableConfig()
-      throws IOException {
-    try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
-      return controllerRestApi != null ? controllerRestApi.getTableConfig() : null;
-    }
-  }
-
+  @Override
   protected Schema getSchema()
       throws IOException {
     try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
@@ -213,14 +205,6 @@ public class SegmentCreationJob extends BaseSegmentJob {
         }
       }
     }
-  }
-
-  /**
-   * Can be overridden to provide custom controller Rest API.
-   */
-  @Nullable
-  protected ControllerRestApi getControllerRestApi() {
-    return _pushLocations != null ? new DefaultControllerRestApi(_pushLocations, _rawTableName) : null;
   }
 
   protected void validateTableConfig(TableConfig tableConfig) {
