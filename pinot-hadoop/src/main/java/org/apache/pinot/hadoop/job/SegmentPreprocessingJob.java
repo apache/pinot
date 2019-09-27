@@ -125,7 +125,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       _logger.info("Starting {}", getClass().getSimpleName());
     }
 
-    _fileSystem = FileSystem.get(_conf);
+    _fileSystem = FileSystem.get(_inputSegmentDir.toUri(), _conf);
     final List<Path> inputDataPaths = getDataFilePaths(_inputSegmentDir);
     Preconditions.checkState(inputDataPaths.size() != 0, "No files in the input directory.");
 
@@ -369,7 +369,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       if (controllerRestApi != null) {
         return controllerRestApi.getSchema();
       } else {
-        try (InputStream inputStream = _fileSystem.open(_schemaFile)) {
+        try (InputStream inputStream = FileSystem.get(_schemaFile.toUri(), getConf()).open(_schemaFile)) {
           return org.apache.pinot.common.data.Schema.fromInputSteam(inputStream);
         }
       }

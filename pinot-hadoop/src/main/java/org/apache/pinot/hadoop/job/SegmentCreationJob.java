@@ -108,7 +108,7 @@ public class SegmentCreationJob extends BaseSegmentJob {
       return true;
     }
     return fileName.endsWith(".avro") || fileName.endsWith(".csv") || fileName.endsWith(".json") || fileName
-        .endsWith(".thrift");
+        .endsWith(".thrift") || fileName.endsWith(".parquet") || fileName.endsWith(".orc");
   }
 
   public void run()
@@ -116,7 +116,7 @@ public class SegmentCreationJob extends BaseSegmentJob {
     _logger.info("Starting {}", getClass().getSimpleName());
 
     // Initialize all directories
-    _fileSystem = FileSystem.get(_conf);
+    _fileSystem = FileSystem.get(_outputDir.toUri(), _conf);
     JobPreparationHelper.mkdirs(_fileSystem, _outputDir, _defaultPermissionsMask);
     JobPreparationHelper.mkdirs(_fileSystem, _stagingDir, _defaultPermissionsMask);
     Path stagingInputDir = new Path(_stagingDir, "input");
@@ -200,7 +200,8 @@ public class SegmentCreationJob extends BaseSegmentJob {
       if (controllerRestApi != null) {
         return controllerRestApi.getSchema();
       } else {
-        try (InputStream inputStream = _fileSystem.open(_schemaFile)) {
+        // Schema file could be stored local or remotely.
+        try (InputStream inputStream = FileSystem.get(_schemaFile.toUri(), getConf()).open(_schemaFile)) {
           return Schema.fromInputSteam(inputStream);
         }
       }

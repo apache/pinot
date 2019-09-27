@@ -43,6 +43,7 @@
         <plugins>
           <plugin>
             <artifactId>maven-shade-plugin</artifactId>
+            <version>3.2.1</version>
             <executions>
               <execution>
                 <phase>package</phase>
@@ -50,6 +51,16 @@
                   <goal>shade</goal>
                 </goals>
                 <configuration>
+                  <relocations>
+                    <relocation>
+                      <pattern>com.google.common.base.Preconditions</pattern>
+                      <shadedPattern>shaded.com.google.common.base.Preconditions</shadedPattern>
+                    </relocation>
+                    <relocation>
+                      <pattern>com.fasterxml.jackson</pattern>
+                      <shadedPattern>shaded.com.fasterxml.jackson</shadedPattern>
+                    </relocation>
+                  </relocations>
                   <transformers>
                     <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                     <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">

@@ -148,7 +148,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     Preconditions.checkState(_localSegmentDir.mkdir());
     Preconditions.checkState(_localSegmentTarDir.mkdir());
 
-    _fileSystem = FileSystem.get(context.getConfiguration());
+    // Note: we made an assumption that input file and output path are using same filesystem.
+    _fileSystem = FileSystem.get(_hdfsSegmentTarDir.toUri(), context.getConfiguration());
 
     _logger.info("*********************************************************************");
     _logger.info("Raw Table Name: {}", _rawTableName);
