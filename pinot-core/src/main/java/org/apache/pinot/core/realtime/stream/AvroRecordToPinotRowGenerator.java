@@ -44,7 +44,7 @@ public class AvroRecordToPinotRowGenerator {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       FieldSpec incomingFieldSpec =
           fieldSpec.getFieldType() == FieldSpec.FieldType.TIME ? _incomingTimeFieldSpec : fieldSpec;
-      AvroUtils.extractField(_schema, incomingFieldSpec, from, to);
+      AvroUtils.extractField(incomingFieldSpec, from, to);
     }
     return to;
   }

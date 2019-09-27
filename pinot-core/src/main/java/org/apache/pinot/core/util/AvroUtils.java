@@ -24,7 +24,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
@@ -42,7 +41,6 @@ import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.TimeFieldSpec;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.RecordReaderUtils;
-import org.apache.pinot.core.data.recordtransformer.PinotDataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -305,36 +303,30 @@ public class AvroUtils {
   }
 
   @SuppressWarnings("unchecked")
-  public static void extractField(Schema schema, FieldSpec fieldSpec, GenericRecord from, GenericRow to) {
+  public static void extractField(FieldSpec fieldSpec, GenericRecord from, GenericRow to) {
     String fieldName = fieldSpec.getName();
 
-    // Handle Map type
+    // Handle the Map type
     if (fieldName.endsWith(MAP_KEY_COLUMN_SUFFIX)) {
       String avroFieldName = fieldName.substring(0, fieldName.length() - MAP_KEY_COLUMN_SUFFIX.length());
       Map map = (Map) from.get(avroFieldName);
-      // Store sorted values in the key column
-      PinotDataType keyType = PinotDataType.getPinotDataType(fieldSpec).getSingleValueType();
-      TreeSet sortedKeys = new TreeSet();
-      for (Object key : map.keySet()) {
-        // Avro always store keys as string
-        sortedKeys.add(keyType.convert(key.toString(), PinotDataType.STRING));
+      if (map != null) {
+        // Sort the keys so that the order is deterministic
+        TreeSet sortedKeys = new TreeSet(map.keySet());
+        to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, sortedKeys));
+        return;
       }
-      to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, sortedKeys));
     } else if (fieldName.endsWith(MAP_VALUE_COLUMN_SUFFIX)) {
       String avroFieldName = fieldName.substring(0, fieldName.length() - MAP_VALUE_COLUMN_SUFFIX.length());
       Map map = (Map) from.get(avroFieldName);
-      // Maintain the key-value pair order the same as the key column
-      PinotDataType keyType =
-          PinotDataType.getPinotDataType(schema.getFieldSpecFor(avroFieldName + MAP_KEY_COLUMN_SUFFIX))
-              .getSingleValueType();
-      TreeMap sortedMap = new TreeMap<>();
-      for (Map.Entry entry : (Set<Map.Entry>) map.entrySet()) {
-        // Avro always store keys as string
-        sortedMap.put(keyType.convert(entry.getKey().toString(), PinotDataType.STRING), entry.getValue());
+      if (map != null) {
+        // Sort the keys so that the order is deterministic
+        TreeMap sortedMap = new TreeMap<>(map);
+        to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, sortedMap.values()));
+        return;
       }
-      to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, sortedMap.values()));
-    } else {
-      to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, from.get(fieldName)));
     }
+
+    to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, from.get(fieldName)));
   }
 }

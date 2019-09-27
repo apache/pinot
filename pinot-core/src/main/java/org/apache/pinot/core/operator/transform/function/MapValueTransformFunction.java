@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.common.DataSource;
@@ -103,13 +102,17 @@ public class MapValueTransformFunction extends BaseTransformFunction {
     int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       int[] keyDictIds = keyDictIdsMV[i];
-      int index = Arrays.binarySearch(keyDictIds, _keyDictId);
-      if (index >= 0) {
-        _dictIds[i] = valueDictIdsMV[i][index];
-      } else {
-        // Allow NULL_VALUE_INDEX for filter
-        _dictIds[i] = Dictionary.NULL_VALUE_INDEX;
+
+      // Allow NULL_VALUE_INDEX for filter
+      int valueDictId = Dictionary.NULL_VALUE_INDEX;
+      int numValues = keyDictIds.length;
+      for (int j = 0; j < numValues; j++) {
+        if (keyDictIds[j] == _keyDictId) {
+          valueDictId = valueDictIdsMV[i][j];
+          break;
+        }
       }
+      _dictIds[i] = valueDictId;
     }
     return _dictIds;
   }
