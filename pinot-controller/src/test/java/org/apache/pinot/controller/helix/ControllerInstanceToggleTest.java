@@ -117,7 +117,7 @@ public class ControllerInstanceToggleTest extends ControllerTest {
         return false;
       }
       return true;
-    }, TIMEOUT_MS, "Failed to toggle instance state: \'" + state + "\' for instance: " + instanceName);
+    }, TIMEOUT_MS, "Failed to toggle instance state: '" + state + "' for instance: " + instanceName);
   }
 
   private void checkNumOnlineInstancesFromExternalView(String resourceName, int expectedNumOnlineInstances)

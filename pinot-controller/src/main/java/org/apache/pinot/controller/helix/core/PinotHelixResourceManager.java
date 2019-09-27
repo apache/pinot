@@ -2175,6 +2175,9 @@ public class PinotHelixResourceManager {
             for (String state : currentState.getPartitionStateMap().values()) {
               // If instance is enabled, all the partitions should not eventually be offline.
               // If instance is disabled, all the partitions should eventually be offline.
+              // TODO: Handle the case when realtime segments are in OFFLINE state because there're some problem with realtime segment consumption,
+              //  and realtime segment will mark itself as OFFLINE in ideal state.
+              //  Issue: https://github.com/apache/incubator-pinot/issues/4653
               if ((enableInstance && !offlineState.equals(state)) || (!enableInstance && offlineState.equals(state))) {
                 toggleSucceeded = false;
                 break;
