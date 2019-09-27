@@ -114,7 +114,29 @@ Suppose we have a transcript in CSV format containing students' basic info and t
 |     202    |     Nick   |   Young   |    Male   |  Physics  |    3.6    |
 +------------+------------+-----------+-----------+-----------+-----------+
 
-We will not include a header line in this CSV file:
+When we create a CSV file, we will also need a separate CSV config JSON file.
+
+First, however, we will create a working directory called ``getting-started`` (in this example, it is on ``Desktop``), and create two additional directories within ``getting-started`` called ``data``
+and ``config``.
+
+Note that we can create a variable for the working directory called ``WORKING_DIR``.
+
+.. code-block:: none
+
+  $ WORKING_DIR=/Users/host1/Desktop/getting-started
+  $ cd $WORKING_DIR
+  $ mkdir getting-started
+  $ mkdir getting-started/data
+  $ mkdir getting started/config
+
+We will create the transcript CSV file in ``data``, and the CSV config file in ``config``.
+
+.. code-block:: none
+
+  $ touch getting-started/data/test.csv
+  $ touch getting-started/config/csv-record-reader-config.json
+
+The ``test.csv`` file should look like this, with no header line at the top:
 
 .. code-block:: none
 
@@ -123,7 +145,7 @@ We will not include a header line in this CSV file:
   201,Bob,King,Male,Maths,3.2
   202,Nick,Young,Male,Physics,3.6
 
-Instead of using a header line, we will use a separate CSV config JSON file:
+Instead of using a header line, we will use the CSV config JSON file ``csv-record-reader-config.json`` to specify the header:
 
 .. code-block:: none
 
@@ -132,11 +154,13 @@ Instead of using a header line, we will use a separate CSV config JSON file:
     "fileFormat":"CSV"
   }
 
-We can create a working directory called `getting-started` on Desktop, and create two additional directories within `getting-started` called `data`
-and `config`.
-We will store the transcript CSV file in `data`, and the CSV config file in `config`.
+In order to set up a table, we need to specify the schema of this transcript in ``transcript-schema.json``, which we will store in ``config``:
 
-In order to set up a table, we need to specify the schema of this transcript in a JSON file that we will store in `config`:
+.. code-block:: none
+
+  $ touch getting-started/config/transcript-schema.json
+
+``transcript-schema.json`` should look like this:
 
 .. code-block:: none
 
@@ -172,19 +196,24 @@ In order to set up a table, we need to specify the schema of this transcript in 
     ]
   }
 
-To upload the schema, we can navigate to the directory in pinot-distribution that contains
-pinot-admin.sh, and use the command below:
+To upload the schema, we can navigate to the directory in ``pinot-distribution`` that contains
+``pinot-admin.sh``, and use the command below:
 
 .. code-block:: none
 
   $ VERSION=0.2.0
-  $ WORKING_DIR=/Users/host1/Desktop/getting-started
   $ cd ./pinot-distribution/target/apache-pinot-incubating-$VERSION-SNAPSHOT-bin/apache-pinot-incubating-$VERSION-SNAPSHOT-bin/bin
   $ ./pinot-admin.sh AddSchema -schemaFile $WORKING_DIR/config/transcript-schema.json -exec
   Executing command: AddSchema -controllerHost [controller_host] -controllerPort 9000 -schemaFilePath /Users/host1/Desktop/getting-started/config/transcript-schema.json -exec
   Sending request: http://[controller_host]:9000/schemas to controller: [controller_host], version: 0.2.0-SNAPSHOT-68092ab9eb83af173d725ec685c22ba4eb5bacf9
 
-Then, we need to specify the table config in another JSON file (also stored in `config`), which links the schema to the table:
+Then, we need to specify the table config in another JSON file (also stored in ``config``), which links the schema to the table:
+
+.. code-block:: none
+
+  $ touch getting-started/config/transcript-table-config.json
+
+``transcript-table-config.json`` should look like this:
 
 .. code-block:: none
 
