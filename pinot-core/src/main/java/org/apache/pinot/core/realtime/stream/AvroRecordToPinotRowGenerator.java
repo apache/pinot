@@ -28,7 +28,6 @@ import org.apache.pinot.core.util.AvroUtils;
 
 
 public class AvroRecordToPinotRowGenerator {
-
   private final Schema _schema;
   private final FieldSpec _incomingTimeFieldSpec;
 
@@ -45,7 +44,7 @@ public class AvroRecordToPinotRowGenerator {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       FieldSpec incomingFieldSpec =
           fieldSpec.getFieldType() == FieldSpec.FieldType.TIME ? _incomingTimeFieldSpec : fieldSpec;
-      AvroUtils.extractField(incomingFieldSpec, from, to);
+      AvroUtils.extractField(_schema, incomingFieldSpec, from, to);
     }
     return to;
   }
