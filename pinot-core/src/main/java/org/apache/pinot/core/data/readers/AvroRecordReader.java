@@ -82,7 +82,7 @@ public class AvroRecordReader implements RecordReader {
       Object value = _reusableAvroRecord.get(fieldName);
       // Allow default value for non-time columns
       if (value != null || fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
-        AvroUtils.extractField(_schema, fieldSpec, _reusableAvroRecord, reuse);
+        AvroUtils.extractField(fieldSpec, _reusableAvroRecord, reuse);
       }
     }
     return reuse;
