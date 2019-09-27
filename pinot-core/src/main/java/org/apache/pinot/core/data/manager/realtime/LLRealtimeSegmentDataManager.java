@@ -677,6 +677,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         segmentLogger.info("Waiting to acquire semaphore for building segment");
         _segBuildSemaphore.acquire();
       }
+      // This method can be called in either the consumerThread or the main server thread. In case of the former
+      // the thread should double check the _shouldStop value before proceeding further.
+      if (_shouldStop && Thread.currentThread() == _consumerThread) {
+        segmentLogger.info("The consumer thread was asked to stop build segments.");
+        return null;
+      }
       // Increment llc simultaneous segment builds.
       _serverMetrics.addValueToGlobalGauge(ServerGauge.LLC_SIMULTANEOUS_SEGMENT_BUILDS, 1L);
 
@@ -701,6 +707,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       final long waitTimeMillis = lockAquireTimeMillis - startTimeMillis;
       segmentLogger
           .info("Successfully built segment in {} ms, after lockWaitTime {} ms", buildTimeMillis, waitTimeMillis);
+      // This method can be called in either the consumerThread or the main server thread. In case of the former
+      // the thread should double check the _shouldStop value before proceeding further.
+      if (_shouldStop && Thread.currentThread() == _consumerThread) {
+        segmentLogger.info("The consumer thread was asked to stop build segments.");
+        FileUtils.deleteQuietly(tempSegmentFolder);
+        return null;
+      }
       File destDir = makeSegmentDirPath();
       FileUtils.deleteQuietly(destDir);
       try {
