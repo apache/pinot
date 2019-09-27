@@ -602,6 +602,26 @@ public class CalciteSqlCompilerTest {
           "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name after DISTINCT keyword"));
     }
 
+    // Pinot currently does not support ORDER BY with DISTINCT
+    try {
+      sql = "SELECT DISTINCT C1, C2 FROM foo ORDER BY C1, C2";
+      CalciteSqlParser.compileToPinotQuery(sql);
+      Assert.fail("Query should have failed compilation");
+    } catch (Exception e) {
+      Assert.assertTrue(e instanceof SqlCompilationException);
+      Assert.assertTrue(e.getMessage().contains("DISTINCT with ORDER BY is not supported"));
+    }
+
+    // Pinot currently does not support GROUP BY with DISTINCT
+    try {
+      sql = "SELECT DISTINCT C1, C2 FROM foo GROUP BY C1";
+      CalciteSqlParser.compileToPinotQuery(sql);
+      Assert.fail("Query should have failed compilation");
+    } catch (Exception e) {
+      Assert.assertTrue(e instanceof SqlCompilationException);
+      Assert.assertTrue(e.getMessage().contains("DISTINCT with GROUP BY is not supported"));
+    }
+
     // distinct with transform is supported since the output of
     // transform can be piped into distinct function
 
