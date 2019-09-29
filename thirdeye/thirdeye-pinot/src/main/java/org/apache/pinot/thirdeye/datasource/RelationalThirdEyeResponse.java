@@ -98,6 +98,8 @@ public class RelationalThirdEyeResponse extends BaseThirdEyeResponse {
     return rows.size();
   }
 
+  public List<String[]> getRows() { return rows; }
+
   @Override
   public ThirdEyeResponseRow getRow(int rowId) {
     return responseRows.get(rowId);

@@ -56,13 +56,12 @@ import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
-import org.apache.pinot.thirdeye.datasource.comparison.Row;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EvaluationSlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
-import org.joda.time.DateTimeZone;
+import org.apache.pinot.thirdeye.util.CacheUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -129,6 +128,7 @@ public class DefaultDataProvider implements DataProvider {
 
       // if the time series slice is already in cache, return directly
       for (MetricSlice slice : slices){
+        LOG.info(slice.toString());
         for (Map.Entry<MetricSlice, DataFrame> entry : DETECTION_TIME_SERIES_CACHE.asMap().entrySet()) {
           // current slice potentially contained in cache
           if (entry.getKey().containSlice(slice)){
@@ -144,6 +144,18 @@ public class DefaultDataProvider implements DataProvider {
 
       // if not in cache, fetch from data source
       Map<MetricSlice, Future<DataFrame>> futures = new HashMap<>();
+
+      // work on getting the detectionId
+      boolean runBryanPoC = true;
+      if (runBryanPoC) {
+        long detectionId = 123456;
+        // find the max window and fetch it
+        Map<Long, MetricSlice> ranges = CacheUtils.findMaxRangeInterval(slices);
+        for (MetricSlice slice : ranges.values()) {
+          timeseriesLoader.prefetchTimeSeriesWindowRangeIntoCache(detectionId, slice);
+        }
+      }
+
       for (final MetricSlice slice : slices) {
         if (!output.containsKey(slice)){
           futures.put(slice, this.executor.submit(() -> DefaultDataProvider.this.timeseriesLoader.load(slice)));
@@ -177,7 +189,7 @@ public class DefaultDataProvider implements DataProvider {
         // make a copy of the result so that cache won't be contaminated by client code
         timeseriesResult.put(alignedMetricSlicesToOriginalSlice.get(entry.getKey()), entry.getValue().copy());
       }
-      return  timeseriesResult;
+      return timeseriesResult;
     } catch (Exception e) {
       throw new RuntimeException("fetch time series failed", e);
     }

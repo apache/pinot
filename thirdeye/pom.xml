@@ -511,6 +511,25 @@
         <artifactId>google-api-services-calendar</artifactId>
         <version>${calendar-api.version}</version>
       </dependency>
+
+      <dependency>
+        <groupId>nz.ac.waikato.cms.weka</groupId>
+        <artifactId>weka-dev</artifactId>
+        <version>3.7.10</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-configuration2</artifactId>
+        <version>2.0</version>
+      </dependency>
+
+      <dependency>
+        <groupId>com.couchbase.client</groupId>
+        <artifactId>java-client</artifactId>
+        <version>2.7.9</version>
+      </dependency>
+
     </dependencies>
   </dependencyManagement>
 
