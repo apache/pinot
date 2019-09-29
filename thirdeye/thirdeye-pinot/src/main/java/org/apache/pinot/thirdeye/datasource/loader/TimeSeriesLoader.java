@@ -44,4 +44,5 @@ public interface TimeSeriesLoader {
    * @return dataframe with aligned timestamps and values
    */
   DataFrame load(MetricSlice slice) throws Exception;
+  void prefetchTimeSeriesWindowRangeIntoCache(long detectionId, MetricSlice slice) throws Exception;
 }

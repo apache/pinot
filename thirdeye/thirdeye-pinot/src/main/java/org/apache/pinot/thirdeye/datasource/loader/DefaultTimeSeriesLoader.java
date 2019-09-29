@@ -27,6 +27,8 @@ import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
+import org.apache.pinot.thirdeye.detection.cache.DefaultTimeSeriesCache;
+import org.apache.pinot.thirdeye.detection.cache.ThirdEyeCacheRequestContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,11 +39,13 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
   private final QueryCache cache;
+  private final DefaultTimeSeriesCache timeSeriesCache;
 
   public DefaultTimeSeriesLoader(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, QueryCache cache) {
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
     this.cache = cache;
+    this.timeSeriesCache = new DefaultTimeSeriesCache(metricDAO, datasetDAO, cache);
   }
 
   /**
@@ -56,7 +60,28 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
     LOG.info("Loading time series for '{}'", slice);
 
     TimeSeriesRequestContainer rc = DataFrameUtils.makeTimeSeriesRequestAligned(slice, "ref", this.metricDAO, this.datasetDAO);
-    ThirdEyeResponse response = this.cache.getQueryResult(rc.getRequest());
+    ThirdEyeResponse response = null;
+
+    boolean runBryanPoC = true;
+    if (runBryanPoC) {
+      String detectionId = "123456";
+      response = timeSeriesCache.fetchTimeSeries(new ThirdEyeCacheRequestContainer(detectionId, rc.getRequest()));
+    } else {
+      response = this.cache.getQueryResult(rc.getRequest());
+    }
+
+
     return DataFrameUtils.evaluateResponse(response, rc);
+  }
+
+  public void prefetchTimeSeriesWindowRangeIntoCache(long detectionId, MetricSlice slice) throws Exception {
+
+    // TODO: Reenable this once we get the detectionId
+    if (!timeSeriesCache.detectionIdExistsInCache(detectionId)) {
+      TimeSeriesRequestContainer rc = DataFrameUtils.makeTimeSeriesRequestAligned(slice, "ref", this.metricDAO, this.datasetDAO);
+      ThirdEyeResponse response = this.cache.getQueryResult(rc.getRequest());
+
+      timeSeriesCache.insertTimeSeriesIntoCache(String.valueOf(detectionId), response);
+    }
   }
 }
