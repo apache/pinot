@@ -14,6 +14,6 @@ rules:
       - name: detection_rule_1
         type: THRESHOLD
         params:
-          max: 500
-          min: NaN
+          max: 900
+          min: 100
           monitoringGranularity: 1_HOURS

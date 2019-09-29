@@ -72,7 +72,7 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
 
   @Override
   public Map<String, Object> format(Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
-    Map<String, Object> templateData = super.getTemplateData(context.getAlertConfig(), anomalies);
+    Map<String, Object> templateData = super.getTemplateData(context.getNotificationConfig(), anomalies);
     enrichMetricInfo(templateData, anomalies);
 
     DateTime windowStart = DateTime.now();

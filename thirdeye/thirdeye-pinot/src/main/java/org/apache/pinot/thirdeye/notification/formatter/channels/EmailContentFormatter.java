@@ -70,12 +70,13 @@ public class EmailContentFormatter {
     content.init(emailProps, teConfig);
   }
 
-  public EmailEntity getEmailEntity(DetectionAlertFilterRecipients recipients, String subject, Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
+  public EmailEntity getEmailEntity(DetectionAlertFilterRecipients recipients, String subject,
+      Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
     Map<String, Object> templateData = notificationContent.format(anomalies, context);
     templateData.put("dashboardHost", thirdEyeAnomalyConfig.getDashboardHost());
 
-    String outputSubject = notificationContent.makeSubject(subject, context.getAlertConfig().getSubjectType(), templateData);
-    return buildEmailEntity(templateData, outputSubject, recipients, context.getAlertConfig().getFromAddress(), notificationContent.getTemplate());
+    String outputSubject = notificationContent.makeSubject(subject, context.getNotificationConfig().getSubjectType(), templateData);
+    return buildEmailEntity(templateData, outputSubject, recipients, context.getNotificationConfig().getFrom(), notificationContent.getTemplate());
   }
 
   /**
