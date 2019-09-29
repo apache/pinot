@@ -55,8 +55,6 @@ import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfi
 public class EntityGroupKeyContent extends BaseNotificationContent {
   private static final Logger LOG = LoggerFactory.getLogger(EntityGroupKeyContent.class);
 
-  private static final String TEMPLATE = "entity-groupkey-anomaly-report.ftl";
-
   // Give some kind of special status to this metric entity. Anomalies from this whitelisted metric entity
   // will appear at the top of the alert report. Specify the entity name of the metric alert here.
   static final String PROP_ENTITY_WHITELIST = "entityWhitelist";
@@ -91,7 +89,7 @@ public class EntityGroupKeyContent extends BaseNotificationContent {
 
   @Override
   public String getTemplate() {
-    return TEMPLATE;
+    return EntityGroupKeyContent.class.getSimpleName();
   }
 
   @Override

@@ -16,6 +16,7 @@
 
 package org.apache.pinot.thirdeye.notification.content.templates;
 
+import java.util.Properties;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
@@ -30,6 +31,8 @@ import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
+import org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector;
 import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
 import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.apache.pinot.thirdeye.notification.formatter.channels.EmailContentFormatter;
@@ -60,8 +63,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.*;
 import static org.apache.pinot.thirdeye.datalayer.DaoTestUtils.*;
+import static org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration.*;
 
 
 public class TestMetricAnomaliesContent {
@@ -112,6 +115,8 @@ public class TestMetricAnomaliesContent {
 
   @Test
   public void testGetEmailEntity() throws Exception {
+    DetectionRegistry.registerComponent(ThresholdRuleDetector.class.getName(), "THRESHOLD");
+
     DateTimeZone dateTimeZone = DateTimeZone.forID("America/Los_Angeles");
     ThirdEyeAnomalyConfiguration thirdeyeAnomalyConfig = new ThirdEyeAnomalyConfiguration();
     thirdeyeAnomalyConfig.setId(id);
@@ -165,13 +170,11 @@ public class TestMetricAnomaliesContent {
     metric.setAlias(TEST + "::" + TEST);
     metricDAO.save(metric);
 
-    EmailContentFormatter
-        contentFormatter = new EmailContentFormatter(new MetricAnomaliesContent(), thirdeyeAnomalyConfig);
     ADContentFormatterContext context = new ADContentFormatterContext();
     context.setNotificationConfig(DaoTestUtils.getTestNotificationConfig("Test Config"));
-    DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
-        EmailUtils.getValidEmailAddresses("a@b.com"));
-    EmailEntity emailEntity = contentFormatter.getEmailEntity(recipients, TEST, anomalies, context);
+    EmailContentFormatter
+        contentFormatter = new EmailContentFormatter(new Properties(), new MetricAnomaliesContent(), thirdeyeAnomalyConfig, context);
+    EmailEntity emailEntity = contentFormatter.getEmailEntity(anomalies);
 
     String htmlPath = ClassLoader.getSystemResource("test-metric-anomalies-template.html").getPath();
     Assert.assertEquals(

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.anomaly;
+package org.apache.pinot.thirdeye.notification.commons;
 
 import java.util.Map;
 import java.util.Objects;
@@ -96,13 +96,15 @@ public class SmtpConfiguration {
 
   public static SmtpConfiguration createFromProperties(Map<String,Object> smtpConfiguration) {
     SmtpConfiguration conf = new SmtpConfiguration();
-    try {
-      conf.setSmtpHost(MapUtils.getString(smtpConfiguration, SMTP_HOST_KEY));
-      conf.setSmtpPort(MapUtils.getIntValue(smtpConfiguration, SMTP_PORT_KEY));
-      conf.setSmtpUser(MapUtils.getString(smtpConfiguration, SMTP_USER_KEY));
-      conf.setSmtpPassword(MapUtils.getString(smtpConfiguration, SMTP_PASSWD_KEY));
-    } catch (Exception e) {
-      throw new RuntimeException("Error occurred while parsing smtp configuration into object.", e);
+    if (smtpConfiguration != null) {
+      try {
+        conf.setSmtpHost(MapUtils.getString(smtpConfiguration, SMTP_HOST_KEY));
+        conf.setSmtpPort(MapUtils.getIntValue(smtpConfiguration, SMTP_PORT_KEY));
+        conf.setSmtpUser(MapUtils.getString(smtpConfiguration, SMTP_USER_KEY));
+        conf.setSmtpPassword(MapUtils.getString(smtpConfiguration, SMTP_PASSWD_KEY));
+      } catch (Exception e) {
+        throw new RuntimeException("Error occurred while parsing smtp configuration into object.", e);
+      }
     }
     return conf;
   }

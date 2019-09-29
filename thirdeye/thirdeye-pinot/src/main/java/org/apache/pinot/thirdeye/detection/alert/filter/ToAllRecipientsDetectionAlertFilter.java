@@ -41,10 +41,10 @@ import org.apache.pinot.thirdeye.detection.annotation.AlertFilter;
 @AlertFilter(type = "DEFAULT_ALERTER_PIPELINE")
 public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertFilter {
 
-  private static final String PROP_RECIPIENTS = "recipients";
-  private static final String PROP_TO = "to";
-  private static final String PROP_CC = "cc";
-  private static final String PROP_BCC = "bcc";
+  public static final String PROP_RECIPIENTS = "recipients";
+  public static final String PROP_TO = "to";
+  public static final String PROP_CC = "cc";
+  public static final String PROP_BCC = "bcc";
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   private static final String PROP_SEND_ONCE = "sendOnce";
 

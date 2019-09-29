@@ -19,14 +19,14 @@
 
 package org.apache.pinot.thirdeye.notification.formatter.channels;
 
-import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
-import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateExceptionHandler;
@@ -37,6 +37,9 @@ import java.io.Writer;
 import java.util.Collection;
 import java.util.Map;
 import org.apache.commons.mail.HtmlEmail;
+import org.apache.pinot.thirdeye.notification.content.templates.EntityGroupKeyContent;
+import org.apache.pinot.thirdeye.notification.content.templates.HierarchicalAnomaliesContent;
+import org.apache.pinot.thirdeye.notification.content.templates.MetricAnomaliesContent;
 import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
 import org.slf4j.Logger;
@@ -46,48 +49,34 @@ import org.slf4j.LoggerFactory;
 /**
  * This class formats the content for email alerts.
  */
-public class EmailContentFormatter {
+public class EmailContentFormatter extends AlertContentFormatter {
   private static final Logger LOG = LoggerFactory.getLogger(EmailContentFormatter.class);
 
   private static final String CHARSET = "UTF-8";
 
-  private ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfig;
-  private BaseNotificationContent notificationContent;
-
-  public EmailContentFormatter(BaseNotificationContent formatter, ThirdEyeAnomalyConfiguration config) {
-    this(formatter, new Properties(), config);
+  private static final Map<String, String> alertContentToTemplateMap;
+  static {
+    Map<String, String> aMap = new HashMap<>();
+    aMap.put(MetricAnomaliesContent.class.getSimpleName(), "metric-anomalies-template.ftl");
+    aMap.put(EntityGroupKeyContent.class.getSimpleName(), "entity-groupkey-anomaly-report.ftl");
+    aMap.put(HierarchicalAnomaliesContent.class.getSimpleName(), "hierarchical-anomalies-email-template.ftl");
+    alertContentToTemplateMap = Collections.unmodifiableMap(aMap);
   }
 
-  public EmailContentFormatter(BaseNotificationContent formatter, Properties emailProps, ThirdEyeAnomalyConfiguration teConfig) {
-    init(formatter, teConfig, emailProps);
+  public EmailContentFormatter(Properties emailClientConfig, BaseNotificationContent content, ThirdEyeAnomalyConfiguration teConfig, ADContentFormatterContext adContext) {
+    super(emailClientConfig, content, teConfig, adContext);
   }
 
-  private void init(BaseNotificationContent content, ThirdEyeAnomalyConfiguration teConfig,
-      Properties emailProps) {
-    this.notificationContent = content;
-    this.thirdEyeAnomalyConfig = teConfig;
-
-    content.init(emailProps, teConfig);
-  }
-
-  public EmailEntity getEmailEntity(DetectionAlertFilterRecipients recipients, String subject,
-      Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
-    Map<String, Object> templateData = notificationContent.format(anomalies, context);
-    templateData.put("dashboardHost", thirdEyeAnomalyConfig.getDashboardHost());
-
-    String outputSubject = notificationContent.makeSubject(subject, context.getNotificationConfig().getSubjectType(), templateData);
-    return buildEmailEntity(templateData, outputSubject, recipients, context.getNotificationConfig().getFrom(), notificationContent.getTemplate());
+  public EmailEntity getEmailEntity(Collection<AnomalyResult> anomalies) {
+    Map<String, Object> templateData = notificationContent.format(anomalies, adContext);
+    templateData.put("dashboardHost", teConfig.getDashboardHost());
+    return buildEmailEntity(alertContentToTemplateMap.get(notificationContent.getTemplate()), templateData);
   }
 
   /**
    * Apply the parameter map to given email template, and format it as EmailEntity
    */
-  private EmailEntity buildEmailEntity(Map<String, Object> paramMap, String subject,
-      DetectionAlertFilterRecipients recipients, String fromEmail, String emailTemplate) {
-    if (Strings.isNullOrEmpty(fromEmail)) {
-      throw new IllegalArgumentException("Invalid sender's email");
-    }
-
+  private EmailEntity buildEmailEntity(String emailTemplate, Map<String, Object> templateValues) {
     HtmlEmail email = new HtmlEmail();
     String cid = "";
     try {
@@ -97,7 +86,7 @@ public class EmailContentFormatter {
     } catch (Exception e) {
       LOG.error("Exception while embedding screenshot for anomaly", e);
     }
-    paramMap.put("cid", cid);
+    templateValues.put("cid", cid);
 
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     EmailEntity emailEntity = new EmailEntity();
@@ -108,12 +97,11 @@ public class EmailContentFormatter {
       freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
       Template template = freemarkerConfig.getTemplate(emailTemplate);
 
-      template.process(paramMap, out);
+      template.process(templateValues, out);
 
       String alertEmailHtml = new String(baos.toByteArray(), CHARSET);
 
-      emailEntity.setFrom(fromEmail);
-      emailEntity.setTo(recipients);
+      String subject = BaseNotificationContent.makeSubject(getSubjectType(alertClientConfig), adContext.getNotificationConfig(), templateValues);
       emailEntity.setSubject(subject);
       email.setHtmlMsg(alertEmailHtml);
       emailEntity.setContent(email);

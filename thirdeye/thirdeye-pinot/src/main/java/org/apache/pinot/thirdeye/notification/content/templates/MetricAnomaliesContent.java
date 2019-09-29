@@ -54,7 +54,6 @@ import org.slf4j.LoggerFactory;
 public class MetricAnomaliesContent extends BaseNotificationContent {
   private static final Logger LOG = LoggerFactory.getLogger(MetricAnomaliesContent.class);
 
-  private static final String TEMPLATE = "metric-anomalies-template.ftl";
   private DetectionConfigManager configDAO = null;
 
   public MetricAnomaliesContent() {}
@@ -67,7 +66,7 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
 
   @Override
   public String getTemplate() {
-    return TEMPLATE;
+    return MetricAnomaliesContent.class.getSimpleName();
   }
 
   @Override
