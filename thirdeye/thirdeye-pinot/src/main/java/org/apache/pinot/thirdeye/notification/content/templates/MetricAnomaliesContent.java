@@ -118,15 +118,10 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
       String funcDescription = "";
       Long id = -1L;
 
-      if (anomaly.getFunction() != null){
-        functionName = anomaly.getFunction().getFunctionName();
-        id = anomaly.getFunction().getId();
-      } else if ( anomaly.getDetectionConfigId() != null){
-        DetectionConfigDTO config = this.configDAO.findById(anomaly.getDetectionConfigId());
-        Preconditions.checkNotNull(config, String.format("Cannot find detection config %d", anomaly.getDetectionConfigId()));
-        functionName = config.getName();
-        funcDescription = config.getDescription() == null ? "" : config.getDescription();
-        id = config.getId();
+      if (anomaly.getDetectionConfig() != null){
+        functionName = anomaly.getDetectionConfig().getName();
+        funcDescription = anomaly.getDetectionConfig().getDescription() == null ? "" : anomaly.getDetectionConfig().getDescription();
+        id = anomaly.getDetectionConfig().getId();
       }
 
       AnomalyReportEntity anomalyReport = new AnomalyReportEntity(String.valueOf(anomaly.getId()),

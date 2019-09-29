@@ -35,6 +35,7 @@ public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements A
   private AnomalyFeedbackDTO feedback;
 
   private AnomalyFunctionDTO function;
+  private DetectionConfigDTO detectionConfig;
 
   private Set<MergedAnomalyResultDTO> children = new HashSet<>();
 
@@ -81,6 +82,14 @@ public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements A
 
   public void setFunction(AnomalyFunctionDTO function) {
     this.function = function;
+  }
+
+  public DetectionConfigDTO getDetectionConfig() {
+    return detectionConfig;
+  }
+
+  public void setDetectionConfig(DetectionConfigDTO detectionConfig) {
+    this.detectionConfig = detectionConfig;
   }
 
   public Set<MergedAnomalyResultDTO> getChildren() {

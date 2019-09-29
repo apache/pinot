@@ -23,8 +23,10 @@ import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.AnomalyFunctionBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.DetectionConfigBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -471,6 +473,10 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       bean.setFunctionId(entity.getFunction().getId());
     }
 
+    if (entity.getDetectionConfig() != null) {
+      bean.setDetectionConfigId(entity.getDetectionConfig().getId());
+    }
+
     return bean;
   }
 
@@ -483,6 +489,12 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       AnomalyFunctionBean anomalyFunctionBean = genericPojoDao.get(mergedAnomalyResultBean.getFunctionId(), AnomalyFunctionBean.class);
       AnomalyFunctionDTO anomalyFunctionDTO = MODEL_MAPPER.map(anomalyFunctionBean, AnomalyFunctionDTO.class);
       mergedAnomalyResultDTO.setFunction(anomalyFunctionDTO);
+    }
+
+    if (mergedAnomalyResultBean.getDetectionConfigId() != null) {
+      DetectionConfigBean detectionConfigBean = genericPojoDao.get(mergedAnomalyResultBean.getDetectionConfigId(), DetectionConfigBean.class);
+      DetectionConfigDTO detectionConfigDTO = MODEL_MAPPER.map(detectionConfigBean, DetectionConfigDTO.class);
+      mergedAnomalyResultDTO.setDetectionConfig(detectionConfigDTO);
     }
 
     if (mergedAnomalyResultBean.getAnomalyFeedbackId() != null) {

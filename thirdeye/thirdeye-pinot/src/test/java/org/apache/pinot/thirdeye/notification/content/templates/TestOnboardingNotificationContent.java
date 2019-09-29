@@ -72,6 +72,7 @@ public class TestOnboardingNotificationContent {
   void afterClass() {
     testDAOProvider.cleanup();
   }
+
   @Test
   public void testGetEmailEntity() throws Exception {
     DateTimeZone dateTimeZone = DateTimeZone.forID("America/Los_Angeles");
