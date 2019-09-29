@@ -139,7 +139,7 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask {
     EmailContentFormatter
         emailFormatter = new EmailContentFormatter(new OnboardingNotificationContent(), thirdEyeAnomalyConfig);
     EmailEntity emailEntity = emailFormatter.getEmailEntity(alertConfig.getReceiverAddresses(),
-        subject, null, "", filteredAnomalyResults, context);
+        subject, filteredAnomalyResults, context);
     try {
       EmailHelper.sendEmailWithEmailEntity(emailEntity, smtpConfiguration);
     } catch (EmailException e) {

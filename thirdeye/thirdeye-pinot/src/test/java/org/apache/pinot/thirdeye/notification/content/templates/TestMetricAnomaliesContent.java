@@ -135,7 +135,7 @@ public class TestMetricAnomaliesContent {
     context.setAlertConfig(alertConfigDTO);
     DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
         EmailUtils.getValidEmailAddresses("a@b.com"));
-    EmailEntity emailEntity = contentFormatter.getEmailEntity(recipients, TEST, null, "", anomalies, context);
+    EmailEntity emailEntity = contentFormatter.getEmailEntity(recipients, TEST, anomalies, context);
 
     String htmlPath = ClassLoader.getSystemResource("test-metric-anomalies-template.html").getPath();
     Assert.assertEquals(
