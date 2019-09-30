@@ -41,7 +41,11 @@ Pinot requires JDK 8 or later and Apache Maven 3.
 
 #. Check out the code from GitHub (https://github.com/apache/incubator-pinot)
 #. With Maven installed, run ``mvn install package -DskipTests -Pbin-dist`` in the directory in which you checked out Pinot.
-#. Make the generated scripts executable ``cd pinot-distribution/target/apache-pinot-incubating-<version>-SNAPSHOT-bin; chmod +x bin/*.sh``
+#. Make the generated scripts executable:
+
+.. code-block:: none
+
+  cd pinot-distribution/target/apache-pinot-incubating-<version>-SNAPSHOT-bin/apache-pinot-incubating-<version>-SNAPSHOT-bin; chmod +x bin/*.sh
 
 Trying out Offline quickstart demo
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -123,9 +127,9 @@ Note that we can create a variable for the working directory called ``WORKING_DI
 
 .. code-block:: none
 
+  $ mkdir getting-started
   $ WORKING_DIR=/Users/host1/Desktop/getting-started
   $ cd $WORKING_DIR
-  $ mkdir getting-started
   $ mkdir getting-started/data
   $ mkdir getting started/config
 
@@ -245,7 +249,19 @@ And upload the table config to Pinot cluster:
   Executing command: AddTable -filePath /Users/host1/Desktop/getting-started/config/transcript-table-config.json -controllerHost [controller_host] -controllerPort 9000 -exec
   {"status":"Table transcript_OFFLINE successfully added"}
 
-In order to upload our data to the Pinot cluster, we need to convert our CSV file into a Pinot Segment:
+At this point, the directory tree for our ``getting-started`` should look like this:
+
+.. code-block:: none
+
+  |-- getting-started
+      |-- data
+             |-- test.csv
+      |-- config
+             |-- csv-record-reader-config.json
+             |-- transcript-schema.json
+             |-- transcript-table-config.json
+
+In order to upload our data to the Pinot cluster, we need to convert our CSV file into a Pinot Segment, which will be put in a new directory $WORKING_DIR/test2:
 
 .. code-block:: none
 
