@@ -49,6 +49,11 @@ public final class SingleValueSet extends BaseBlockValSet {
   }
 
   @Override
+  public boolean isSingleValue() {
+    return true;
+  }
+
+  @Override
   public void getIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outValues, int outStartPos) {
     int inEndPos = inStartPos + inDocIdsSize;
     ReaderContext context = _reader.createContext();

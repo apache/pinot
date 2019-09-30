@@ -27,6 +27,8 @@ public interface BlockValSet {
 
   DataType getValueType();
 
+  boolean isSingleValue();
+
   /**
    * DOCUMENT ID BASED APIs
    */

@@ -18,20 +18,13 @@
  */
 package org.apache.pinot.core.common;
 
-import org.apache.pinot.common.data.FieldSpec;
-
-
 /**
  * Abstract base class implementation for BlockValSet
  */
 public abstract class BaseBlockValSet implements BlockValSet {
-  @Override
-  public BlockValIterator iterator() {
-    throw new UnsupportedOperationException();
-  }
 
   @Override
-  public FieldSpec.DataType getValueType() {
+  public BlockValIterator iterator() {
     throw new UnsupportedOperationException();
   }
 

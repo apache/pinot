@@ -24,14 +24,12 @@ import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.data.table.Key;
-import org.apache.pinot.core.operator.transform.TransformBlockDataFetcher;
-import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.DistinctTable;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 
 
@@ -89,8 +87,7 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
 
     // TODO: Follow up PR will make few changes to start using DictionaryBasedAggregationOperator
     // for DISTINCT queries without filter.
-    TransformBlockDataFetcher transformBlockDataFetcher =
-        new TransformBlockDataFetcher(blockValSets, new Dictionary[0], new TransformResultMetadata[0]);
+    RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
 
     int rowIndex = 0;
     // TODO: Do early termination in the operator itself which should
@@ -99,7 +96,7 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
     // has to communicate back that required number of records have
     // been collected
     while (rowIndex < length && _distinctTable.size() < _limit) {
-      Object[] columnData = transformBlockDataFetcher.getRow(rowIndex);
+      Object[] columnData = blockValueFetcher.getRow(rowIndex);
       _distinctTable.addKey(new Key(columnData));
       rowIndex++;
     }
