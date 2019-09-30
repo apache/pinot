@@ -73,7 +73,8 @@ public class SimpleIndexedTable extends IndexedTable {
 
     _isOrderBy = CollectionUtils.isNotEmpty(orderBy);
     if (_isOrderBy) {
-      _orderByComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos);
+      // final results not extracted upfront
+      _orderByComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos, true);
     }
   }
 

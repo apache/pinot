@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.order;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -107,12 +108,33 @@ public final class OrderByUtils {
     return globalComparator;
   }
 
+  public static List<Integer> getAggregationIndexes(List<SelectionSort> orderBy, List<AggregationInfo> aggregationInfos) {
+    Map<String, Integer> aggregationColumnToIndex = new HashMap<>(aggregationInfos.size());
+    for (int i = 0; i < aggregationInfos.size(); i++) {
+      AggregationInfo aggregationInfo = aggregationInfos.get(i);
+      String aggregationColumn =
+          aggregationInfo.getAggregationType().toLowerCase() + "(" + AggregationFunctionUtils.getColumn(aggregationInfo)
+              + ")";
+      aggregationColumnToIndex.put(aggregationColumn, i);
+    }
+
+    List<Integer> aggregationIndexes = new ArrayList<>();
+    for (SelectionSort orderByInfo : orderBy) {
+      String column = orderByInfo.getColumn();
+
+      if (aggregationColumnToIndex.containsKey(column)) {
+        aggregationIndexes.add(aggregationColumnToIndex.get(column));
+      }
+    }
+    return aggregationIndexes;
+  }
+
   /**
    * Constructs the comparator for ordering by a combination of keys from {@link Record::_keys}
    * and aggregation values from {@link Record::values}
    */
   public static Comparator<Record> getKeysAndValuesComparator(DataSchema dataSchema, List<SelectionSort> orderBy,
-      List<AggregationInfo> aggregationInfos) {
+      List<AggregationInfo> aggregationInfos, boolean extractFinalResults) {
 
     int numKeys = dataSchema.size() - aggregationInfos.size();
     Map<String, Integer> keyIndexMap = new HashMap<>();
@@ -150,7 +172,7 @@ public final class OrderByUtils {
         AggregationFunction aggregationFunction =
             AggregationFunctionUtils.getAggregationFunctionContext(aggregationColumnToInfo.get(column))
                 .getAggregationFunction();
-        comparator = getAggregationComparator(ascending, index, aggregationFunction);
+        comparator = getAggregationComparator(ascending, index, aggregationFunction, extractFinalResults);
       } else {
         throw new UnsupportedOperationException("Could not find column " + column + " in data schema");
       }
@@ -275,18 +297,27 @@ public final class OrderByUtils {
   }
 
   private static Comparator<Record> getAggregationComparator(boolean ascending, int index,
-      AggregationFunction aggregationFunction) {
+      AggregationFunction aggregationFunction, boolean extractFinalResults) {
 
     Comparator<Record> comparator;
-    // TODO: extract the final results and cache them, so that we do it n times and avoid doing it nlogn times
-    if (ascending) {
-      comparator = (v1, v2) -> ComparableComparator.getInstance()
-          .compare(aggregationFunction.extractFinalResult(v1.getValues()[index]),
-              aggregationFunction.extractFinalResult(v2.getValues()[index]));
+    if (extractFinalResults) {
+      if (ascending) {
+        comparator = (v1, v2) -> ComparableComparator.getInstance()
+            .compare(aggregationFunction.extractFinalResult(v1.getValues()[index]),
+                aggregationFunction.extractFinalResult(v2.getValues()[index]));
+      } else {
+        comparator = (v1, v2) -> ComparableComparator.getInstance()
+            .compare(aggregationFunction.extractFinalResult(v2.getValues()[index]),
+                aggregationFunction.extractFinalResult(v1.getValues()[index]));
+      }
     } else {
-      comparator = (v1, v2) -> ComparableComparator.getInstance()
-          .compare(aggregationFunction.extractFinalResult(v2.getValues()[index]),
-              aggregationFunction.extractFinalResult(v1.getValues()[index]));
+      if (ascending) {
+        comparator =
+            (v1, v2) -> ComparableComparator.getInstance().compare(v1.getValues()[index], v2.getValues()[index]);
+      } else {
+        comparator =
+            (v1, v2) -> ComparableComparator.getInstance().compare(v2.getValues()[index], v1.getValues()[index]);
+      }
     }
     return comparator;
   }

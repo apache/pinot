@@ -52,6 +52,8 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
   private boolean _isOrderBy;
   private Comparator<Record> _orderByComparator;
+  private Comparator<Record> _finalOrderByComparator;
+  private List<Integer> _aggregationIndexes;
 
   private AtomicBoolean _noMoreNewRecords = new AtomicBoolean();
   private LongAdder _numResizes = new LongAdder();
@@ -74,7 +76,10 @@ public class ConcurrentIndexedTable extends IndexedTable {
     _readWriteLock = new ReentrantReadWriteLock();
     _isOrderBy = CollectionUtils.isNotEmpty(orderBy);
     if (_isOrderBy) {
-      _orderByComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos);
+      _orderByComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos, false);
+      _finalOrderByComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos, true);
+      // get indices of aggregations to extract final results upfront
+      _aggregationIndexes = OrderByUtils.getAggregationIndexes(orderBy, aggregationInfos);
     }
   }
 
@@ -145,7 +150,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
   public Iterator<Record> iterator() {
     if (_sort && _isOrderBy) {
       List<Record> sortedList = new ArrayList<>(_lookupMap.values());
-      sortedList.sort(_orderByComparator);
+      sortedList.sort(_finalOrderByComparator);
       return sortedList.iterator();
     }
     return _lookupMap.values().iterator();
@@ -164,6 +169,14 @@ public class ConcurrentIndexedTable extends IndexedTable {
         PriorityQueue<Record> minHeap = new PriorityQueue<>(heapSize, _orderByComparator);
 
         for (Record record : _lookupMap.values()) {
+
+          // extract final results before hand for comparisons on aggregations
+          if (!_aggregationIndexes.isEmpty()) {
+            Object[] values = record.getValues();
+            for (Integer index : _aggregationIndexes) {
+              values[index] = _aggregationFunctions.get(index).extractFinalResult(values[index]);
+            }
+          }
           if (minHeap.size() < heapSize) {
             minHeap.offer(record);
           } else {
