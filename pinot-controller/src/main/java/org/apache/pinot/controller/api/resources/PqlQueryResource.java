@@ -128,7 +128,7 @@ public class PqlQueryResource {
 
     // Send query to a random broker.
     String instanceId = instanceIds.get(RANDOM.nextInt(instanceIds.size()));
-    InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
+    InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId, false);
     if (instanceConfig == null) {
       LOGGER.error("Instance {} not found", instanceId);
       return QueryException.INTERNAL_ERROR.toString();

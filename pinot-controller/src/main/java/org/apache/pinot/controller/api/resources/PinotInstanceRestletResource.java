@@ -76,7 +76,7 @@ public class PinotInstanceRestletResource {
   @ApiOperation(value = "List all instances")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal error")})
   public Instances getAllInstances() {
-    return new Instances(pinotHelixResourceManager.getAllInstances());
+    return new Instances(pinotHelixResourceManager.getAllInstances(false));
   }
 
   @GET
@@ -86,7 +86,7 @@ public class PinotInstanceRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Instance not found"), @ApiResponse(code = 500, message = "Internal error")})
   public String getInstance(
       @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000") @PathParam("instanceName") String instanceName) {
-    InstanceConfig instanceConfig = pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
+    InstanceConfig instanceConfig = pinotHelixResourceManager.getHelixInstanceConfig(instanceName, false);
     if (instanceConfig == null) {
       throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " not found",
           Response.Status.NOT_FOUND);

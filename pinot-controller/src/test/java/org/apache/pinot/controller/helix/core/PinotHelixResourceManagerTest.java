@@ -114,7 +114,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
       throws Exception {
     Set<String> servers = _helixResourceManager.getAllInstancesForServerTenant(SERVER_TENANT_NAME);
     for (String server : servers) {
-      InstanceConfig cachedInstanceConfig = _helixResourceManager.getHelixInstanceConfig(server);
+      InstanceConfig cachedInstanceConfig = _helixResourceManager.getHelixInstanceConfig(server, false);
       InstanceConfig realInstanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), server);
       Assert.assertEquals(cachedInstanceConfig, realInstanceConfig);
     }
@@ -135,7 +135,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     Assert.assertTrue(zkClient.exists(instanceConfigPath));
     ZNRecord znRecord = zkClient.readData(instanceConfigPath, null);
 
-    InstanceConfig cachedInstanceConfig = _helixResourceManager.getHelixInstanceConfig(instanceName);
+    InstanceConfig cachedInstanceConfig = _helixResourceManager.getHelixInstanceConfig(instanceName, false);
     String originalPort = cachedInstanceConfig.getPort();
     Assert.assertNotNull(originalPort);
     String newPort = Long.toString(System.currentTimeMillis());
@@ -146,11 +146,11 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     zkClient.writeData(instanceConfigPath, znRecord);
 
     long maxTime = System.currentTimeMillis() + MAX_TIMEOUT_IN_MILLISECOND;
-    InstanceConfig latestCachedInstanceConfig = _helixResourceManager.getHelixInstanceConfig(instanceName);
+    InstanceConfig latestCachedInstanceConfig = _helixResourceManager.getHelixInstanceConfig(instanceName, false);
     String latestPort = latestCachedInstanceConfig.getPort();
     while (!newPort.equals(latestPort) && System.currentTimeMillis() < maxTime) {
       Thread.sleep(100L);
-      latestCachedInstanceConfig = _helixResourceManager.getHelixInstanceConfig(instanceName);
+      latestCachedInstanceConfig = _helixResourceManager.getHelixInstanceConfig(instanceName, false);
       latestPort = latestCachedInstanceConfig.getPort();
     }
     Assert.assertTrue(System.currentTimeMillis() < maxTime, "Timeout when waiting for adding instance config");
@@ -166,29 +166,29 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     String instanceName = "Server_localhost_" + biggerRandomNumber;
     String instanceConfigPath = PropertyPathBuilder.instanceConfig(getHelixClusterName(), instanceName);
     Assert.assertFalse(zkClient.exists(instanceConfigPath));
-    List<String> instances = _helixResourceManager.getAllInstances();
+    List<String> instances = _helixResourceManager.getAllInstances(false);
     Assert.assertFalse(instances.contains(instanceName));
 
     // Add new ZNode.
     ZNRecord znRecord = new ZNRecord(instanceName);
     zkClient.createPersistent(instanceConfigPath, znRecord);
 
-    List<String> latestAllInstances = _helixResourceManager.getAllInstances();
+    List<String> latestAllInstances = _helixResourceManager.getAllInstances(false);
     long maxTime = System.currentTimeMillis() + MAX_TIMEOUT_IN_MILLISECOND;
     while (!latestAllInstances.contains(instanceName) && System.currentTimeMillis() < maxTime) {
       Thread.sleep(100L);
-      latestAllInstances = _helixResourceManager.getAllInstances();
+      latestAllInstances = _helixResourceManager.getAllInstances(false);
     }
     Assert.assertTrue(System.currentTimeMillis() < maxTime, "Timeout when waiting for adding instance config");
 
     // Remove new ZNode.
     zkClient.delete(instanceConfigPath);
 
-    latestAllInstances = _helixResourceManager.getAllInstances();
+    latestAllInstances = _helixResourceManager.getAllInstances(false);
     maxTime = System.currentTimeMillis() + MAX_TIMEOUT_IN_MILLISECOND;
     while (latestAllInstances.contains(instanceName) && System.currentTimeMillis() < maxTime) {
       Thread.sleep(100L);
-      latestAllInstances = _helixResourceManager.getAllInstances();
+      latestAllInstances = _helixResourceManager.getAllInstances(false);
     }
     Assert.assertTrue(System.currentTimeMillis() < maxTime, "Timeout when waiting for removing instance config");
   }

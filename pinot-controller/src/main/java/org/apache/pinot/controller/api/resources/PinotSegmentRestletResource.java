@@ -415,7 +415,7 @@ public class PinotSegmentRestletResource {
     if (segmentName == null) {
       // For enable, allow 5 seconds per segment for an instance as timeout.
       if (state == StateType.ENABLE) {
-        int instanceCount = helixResourceManager.getAllInstances().size();
+        int instanceCount = helixResourceManager.getAllInstances(true).size();
         if (instanceCount != 0) {
           timeOutInSeconds = (_offlineToOnlineTimeoutInseconds * segmentsToToggle.size()) / instanceCount;
         } else {

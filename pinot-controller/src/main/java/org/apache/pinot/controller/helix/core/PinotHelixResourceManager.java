@@ -254,7 +254,7 @@ public class PinotHelixResourceManager {
    * Add instance group tag for controller so that pinot controller can be assigned to lead controller resource.
    */
   private void addInstanceGroupTagIfNeeded() {
-    InstanceConfig instanceConfig = getHelixInstanceConfig(_instanceId);
+    InstanceConfig instanceConfig = getHelixInstanceConfig(_instanceId, false);
     if (!instanceConfig.containsTag(Helix.CONTROLLER_INSTANCE)) {
       LOGGER.info("Controller: {} doesn't contain group tag: {}. Adding one.", _instanceId, Helix.CONTROLLER_INSTANCE);
       instanceConfig.addTag(Helix.CONTROLLER_INSTANCE);
@@ -268,44 +268,42 @@ public class PinotHelixResourceManager {
    */
 
   /**
-   * Get all instance Ids.
-   *
+   * Get all instance Ids. If it's related to segment operation like assigning segments to instances, cache accessor would be used.
+   * Otherwise, direct data accessor would be used.
+   * @param segmentRelatedOperation whether it's related to segment operation
    * @return List of instance Ids
    */
   @Nonnull
-  public List<String> getAllInstances() {
-    return _cacheInstanceConfigsDataAccessor.getChildNames("/", AccessOption.PERSISTENT);
+  public List<String> getAllInstances(boolean segmentRelatedOperation) {
+    if (segmentRelatedOperation) {
+      return _cacheInstanceConfigsDataAccessor.getChildNames("/", AccessOption.PERSISTENT);
+    } else {
+      return _helixAdmin.getInstancesInCluster(_helixClusterName);
+    }
   }
 
   /**
    * Returns the config for all the Helix instances in the cluster.
+   * All the callers are not for segment assignment. No need to use cached accessor.
    */
   public List<InstanceConfig> getAllHelixInstanceConfigs() {
-    List<ZNRecord> znRecords = _cacheInstanceConfigsDataAccessor.getChildren("/", null, AccessOption.PERSISTENT);
-    int numZNRecords = znRecords.size();
-    List<InstanceConfig> instanceConfigs = new ArrayList<>(numZNRecords);
-    for (ZNRecord znRecord : znRecords) {
-      // NOTE: it is possible that znRecord is null if the record gets removed while calling this method
-      if (znRecord != null) {
-        instanceConfigs.add(new InstanceConfig(znRecord));
-      }
-    }
-    int numNullZNRecords = numZNRecords - instanceConfigs.size();
-    if (numNullZNRecords > 0) {
-      LOGGER.warn("Failed to read {}/{} instance configs", numZNRecords - numNullZNRecords, numZNRecords);
-    }
-    return instanceConfigs;
+    return HelixHelper.getInstanceConfigs(_helixZkManager);
   }
 
   /**
    * Get the Helix instance config for the given instance Id.
    *
    * @param instanceId Instance Id
+   * @param segmentRelatedOperation whether it's related to segment operation
    * @return Helix instance config
    */
-  public InstanceConfig getHelixInstanceConfig(@Nonnull String instanceId) {
-    ZNRecord znRecord = _cacheInstanceConfigsDataAccessor.get("/" + instanceId, null, AccessOption.PERSISTENT);
-    return znRecord != null ? new InstanceConfig(znRecord) : null;
+  public InstanceConfig getHelixInstanceConfig(@Nonnull String instanceId, boolean segmentRelatedOperation) {
+    if (segmentRelatedOperation) {
+      ZNRecord znRecord = _cacheInstanceConfigsDataAccessor.get("/" + instanceId, null, AccessOption.PERSISTENT);
+      return znRecord != null ? new InstanceConfig(znRecord) : null;
+    } else {
+      return _helixAdmin.getInstanceConfig(_helixClusterName, instanceId);
+    }
   }
 
   /**
@@ -355,7 +353,7 @@ public class PinotHelixResourceManager {
    */
   @Nonnull
   public synchronized PinotResourceManagerResponse addInstance(@Nonnull Instance instance) {
-    List<String> instances = getAllInstances();
+    List<String> instances = getAllInstances(false);
     String instanceIdToAdd = instance.getInstanceId();
     if (instances.contains(instanceIdToAdd)) {
       return PinotResourceManagerResponse.failure("Instance " + instanceIdToAdd + " already exists");
@@ -944,7 +942,7 @@ public class PinotHelixResourceManager {
   }
 
   public Set<String> getAllInstancesForServerTenant(String tenantName) {
-    return getAllInstancesForServerTenant(getAllHelixInstanceConfigs(), tenantName);
+    return getAllInstancesForServerTenant(HelixHelper.getInstanceConfigs(_helixZkManager), tenantName);
   }
 
   /**
@@ -956,7 +954,7 @@ public class PinotHelixResourceManager {
   }
 
   public Set<String> getAllInstancesForBrokerTenant(String tenantName) {
-    return getAllInstancesForBrokerTenant(getAllHelixInstanceConfigs(), tenantName);
+    return getAllInstancesForBrokerTenant(HelixHelper.getInstanceConfigs(_helixZkManager), tenantName);
   }
 
   /**
@@ -2217,14 +2215,15 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Check if an Instance exists in the Helix cluster.
+   * Check if an Instance exists in the Helix cluster. It's only for toggling instance. So no cached accessor should be used.
    *
    * @param instanceName: Name of instance to check.
    * @return True if instance exists in the Helix cluster, False otherwise.
    */
   public boolean instanceExists(String instanceName) {
-    ZNRecord znRecord = _cacheInstanceConfigsDataAccessor.get("/" + instanceName, null, AccessOption.PERSISTENT);
-    return (znRecord != null);
+    HelixDataAccessor helixDataAccessor = _helixZkManager.getHelixDataAccessor();
+    InstanceConfig config = helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
+    return (config != null);
   }
 
   public boolean isSingleTenantCluster() {
@@ -2272,7 +2271,7 @@ public class PinotHelixResourceManager {
     Preconditions.checkNotNull(instances);
     BiMap<String, String> endpointToInstance = HashBiMap.create(instances.size());
     for (String instance : instances) {
-      InstanceConfig helixInstanceConfig = getHelixInstanceConfig(instance);
+      InstanceConfig helixInstanceConfig = getHelixInstanceConfig(instance, true);
       if (helixInstanceConfig == null) {
         LOGGER.warn("Instance {} not found", instance);
         continue;

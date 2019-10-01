@@ -171,7 +171,7 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
   @Test
   public void testPinotHelixResourceManagerAPIs() {
     // Instance APIs
-    Assert.assertEquals(_helixResourceManager.getAllInstances().size(), 7);
+    Assert.assertEquals(_helixResourceManager.getAllInstances(false).size(), 7);
     Assert.assertEquals(_helixResourceManager.getOnlineInstanceList().size(), 7);
     Assert.assertEquals(_helixResourceManager.getOnlineUnTaggedBrokerInstanceList().size(), 0);
     Assert.assertEquals(_helixResourceManager.getOnlineUnTaggedServerInstanceList().size(), 0);
