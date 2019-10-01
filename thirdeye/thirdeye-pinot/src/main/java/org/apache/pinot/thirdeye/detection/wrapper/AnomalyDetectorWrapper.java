@@ -166,7 +166,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     if (this.cachingPeriodLookback >= 0) {
       MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - cachingPeriodLookback, endTime,
           this.metricEntity.getFilters());
-      this.provider.fetchTimeseries(Collections.singleton(cacheSlice));
+      this.provider.fetchTimeseries(Collections.singleton(cacheSlice), this.getConfig().getId());
     }
 
     List<Interval> monitoringWindows = this.getMonitoringWindows();
@@ -266,7 +266,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
           this.startTime,
           this.endTime,
           this.metricEntity.getFilters());
-      DoubleSeries timestamps = this.provider.fetchTimeseries(Collections.singleton(metricSlice)).get(metricSlice).getDoubles(COL_TIME);
+      DoubleSeries timestamps = this.provider.fetchTimeseries(Collections.singleton(metricSlice), this.getConfig().getId()).get(metricSlice).getDoubles(COL_TIME);
       if (timestamps.size() == 0) {
         // no data available, don't update time stamp
         return -1;

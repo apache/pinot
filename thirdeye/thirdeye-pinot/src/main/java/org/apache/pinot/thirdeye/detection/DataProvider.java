@@ -54,7 +54,7 @@ public interface DataProvider {
    * @param slices metric slices
    * @return map of timeseries (keyed by slice)
    */
-  Map<MetricSlice, DataFrame> fetchTimeseries(Collection<MetricSlice> slices);
+  Map<MetricSlice, DataFrame> fetchTimeseries(Collection<MetricSlice> slices, long configId);
 
   /**
    * Returns a map of aggregation values (keyed by slice) for a given set of slices,
