@@ -162,17 +162,16 @@ public class DefaultDataProvider implements DataProvider {
       boolean runBryanPoC = true;
 
       if (runBryanPoC) {
-        long detectionId = 123456;
         // find the max window and fetch it
         Map<Long, MetricSlice> ranges = CacheUtils.findMaxRangeInterval(slices);
         for (MetricSlice slice : ranges.values()) {
-          timeseriesLoader.prefetchTimeSeriesWindowRangeIntoCache(detectionId, slice);
+          timeseriesLoader.prefetchTimeSeriesWindowRangeIntoCache(slice, configId);
         }
       }
 
       for (final MetricSlice slice : slices) {
         if (!output.containsKey(slice)){
-          futures.put(slice, this.executor.submit(() -> DefaultDataProvider.this.timeseriesLoader.load(slice)));
+          futures.put(slice, this.executor.submit(() -> DefaultDataProvider.this.timeseriesLoader.load(slice, configId)));
         }
       }
       //LOG.info("Fetching {} slices of timeseries, {} cache hit, {} cache miss", slices.size(), output.size(), futures.size());

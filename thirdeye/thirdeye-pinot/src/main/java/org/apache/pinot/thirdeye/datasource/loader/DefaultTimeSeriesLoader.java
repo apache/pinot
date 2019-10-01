@@ -58,7 +58,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
    * @throws Exception
    */
   @Override
-  public DataFrame load(MetricSlice slice) throws Exception {
+  public DataFrame load(MetricSlice slice, long configId) throws Exception {
     LOG.info("Loading time series for '{}'", slice);
 
     TimeSeriesRequestContainer rc = DataFrameUtils.makeTimeSeriesRequestAligned(slice, "ref", this.metricDAO, this.datasetDAO);
@@ -66,8 +66,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
 
     boolean runBryanPoC = true;
     if (runBryanPoC) {
-      String detectionId = "123456";
-      response = timeSeriesCache.fetchTimeSeries(new ThirdEyeCacheRequestContainer(detectionId, rc.getRequest()));
+      response = timeSeriesCache.fetchTimeSeries(new ThirdEyeCacheRequestContainer(String.valueOf(configId), rc.getRequest()));
     } else {
       response = this.cache.getQueryResult(rc.getRequest());
     }
@@ -76,7 +75,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
     return DataFrameUtils.evaluateResponse(response, rc);
   }
 
-  public void prefetchTimeSeriesWindowRangeIntoCache(long detectionId, MetricSlice slice) throws Exception {
+  public void prefetchTimeSeriesWindowRangeIntoCache(MetricSlice slice, long detectionId) throws Exception {
 
     // TODO: Reenable this once we get the detectionId
     if (!timeSeriesCache.detectionIdExistsInCache(detectionId)) {
