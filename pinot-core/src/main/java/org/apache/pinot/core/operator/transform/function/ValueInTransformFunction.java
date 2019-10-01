@@ -51,6 +51,9 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "valueIn";
 
   private TransformFunction _mainTransformFunction;
+  private TransformResultMetadata _resultMetadata;
+  private Dictionary _dictionary;
+
   private IntSet _dictIdSet;
   private int[][] _dictIds;
   private IntSet _intValueSet;
@@ -84,6 +87,8 @@ public class ValueInTransformFunction extends BaseTransformFunction {
           "The first argument of VALUE_IN transform function must be a multi-valued column or a transform function");
     }
     _mainTransformFunction = firstArgument;
+    _resultMetadata = _mainTransformFunction.getResultMetadata();
+    _dictionary = _mainTransformFunction.getDictionary();
 
     // Collect all values for the VALUE_IN transform function
     _stringValueSet = new HashSet<>(numArguments - 1);
@@ -94,21 +99,21 @@ public class ValueInTransformFunction extends BaseTransformFunction {
 
   @Override
   public TransformResultMetadata getResultMetadata() {
-    return _mainTransformFunction.getResultMetadata();
+    return _resultMetadata;
   }
 
   @Override
   public Dictionary getDictionary() {
-    return _mainTransformFunction.getDictionary();
+    return _dictionary;
   }
 
   @Override
   public int[][] transformToDictIdsMV(ProjectionBlock projectionBlock) {
     if (_dictIdSet == null) {
       _dictIdSet = new IntOpenHashSet();
-      Dictionary dictionary = _mainTransformFunction.getDictionary();
+      assert _dictionary != null;
       for (String inValue : _stringValueSet) {
-        int dictId = dictionary.indexOf(inValue);
+        int dictId = _dictionary.indexOf(inValue);
         if (dictId >= 0) {
           _dictIdSet.add(dictId);
         }
@@ -125,8 +130,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
-    TransformResultMetadata resultMetadata = getResultMetadata();
-    if (resultMetadata.hasDictionary() || resultMetadata.getDataType() != FieldSpec.DataType.INT) {
+    if (_dictionary != null || _resultMetadata.getDataType() != FieldSpec.DataType.INT) {
       return super.transformToIntValuesMV(projectionBlock);
     }
 
@@ -147,8 +151,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
 
   @Override
   public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
-    TransformResultMetadata resultMetadata = getResultMetadata();
-    if (resultMetadata.hasDictionary() || resultMetadata.getDataType() != FieldSpec.DataType.LONG) {
+    if (_dictionary != null || _resultMetadata.getDataType() != FieldSpec.DataType.LONG) {
       return super.transformToLongValuesMV(projectionBlock);
     }
 
@@ -169,8 +172,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
 
   @Override
   public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
-    TransformResultMetadata resultMetadata = getResultMetadata();
-    if (resultMetadata.hasDictionary() || resultMetadata.getDataType() != FieldSpec.DataType.FLOAT) {
+    if (_dictionary != null || _resultMetadata.getDataType() != FieldSpec.DataType.FLOAT) {
       return super.transformToFloatValuesMV(projectionBlock);
     }
 
@@ -191,8 +193,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
-    TransformResultMetadata resultMetadata = getResultMetadata();
-    if (resultMetadata.hasDictionary() || resultMetadata.getDataType() != FieldSpec.DataType.DOUBLE) {
+    if (_dictionary != null || _resultMetadata.getDataType() != FieldSpec.DataType.DOUBLE) {
       return super.transformToDoubleValuesMV(projectionBlock);
     }
 
@@ -213,8 +214,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
 
   @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
-    TransformResultMetadata resultMetadata = getResultMetadata();
-    if (resultMetadata.hasDictionary() || resultMetadata.getDataType() != FieldSpec.DataType.STRING) {
+    if (_dictionary != null || _resultMetadata.getDataType() != FieldSpec.DataType.STRING) {
       return super.transformToStringValuesMV(projectionBlock);
     }
 

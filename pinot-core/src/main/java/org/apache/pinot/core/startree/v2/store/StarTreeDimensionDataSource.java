@@ -99,6 +99,11 @@ public class StarTreeDimensionDataSource extends DataSource {
   }
 
   @Override
+  public Dictionary getDictionary() {
+    return _dictionary;
+  }
+
+  @Override
   public InvertedIndexReader getInvertedIndex() {
     return null;
   }
@@ -106,11 +111,6 @@ public class StarTreeDimensionDataSource extends DataSource {
   @Override
   public BloomFilterReader getBloomFilter() {
     return null;
-  }
-
-  @Override
-  public Dictionary getDictionary() {
-    return _dictionary;
   }
 
   @Override
