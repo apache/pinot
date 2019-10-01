@@ -84,14 +84,6 @@ public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements A
     this.function = function;
   }
 
-  public DetectionConfigDTO getDetectionConfig() {
-    return detectionConfig;
-  }
-
-  public void setDetectionConfig(DetectionConfigDTO detectionConfig) {
-    this.detectionConfig = detectionConfig;
-  }
-
   public Set<MergedAnomalyResultDTO> getChildren() {
     return children;
   }

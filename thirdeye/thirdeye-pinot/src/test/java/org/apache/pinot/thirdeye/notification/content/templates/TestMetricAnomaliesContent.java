@@ -144,7 +144,7 @@ public class TestMetricAnomaliesContent {
         new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis(),
         new DateTime(2017, 11, 6, 13, 0, dateTimeZone).getMillis(),
         TEST, TEST, 0.1, 1l, new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis());
-    anomaly.setDetectionConfig(detectionConfigDTO);
+    anomaly.setDetectionConfigId(detectionConfigDTO.getId());
     anomaly.setAvgCurrentVal(1.1);
     anomaly.setAvgBaselineVal(1.0);
     mergedAnomalyResultDAO.save(anomaly);
@@ -153,7 +153,7 @@ public class TestMetricAnomaliesContent {
         new DateTime(2017, 11, 7, 10, 0, dateTimeZone).getMillis(),
         new DateTime(2017, 11, 7, 17, 0, dateTimeZone).getMillis(),
         TEST, TEST, 0.1, 1l, new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis());
-    anomaly.setDetectionConfig(detectionConfigDTO);
+    anomaly.setDetectionConfigId(detectionConfigDTO.getId());
     anomaly.setAvgCurrentVal(0.9);
     anomaly.setAvgBaselineVal(1.0);
     mergedAnomalyResultDAO.save(anomaly);
