@@ -49,6 +49,16 @@ public class ControllerInstanceToggleTest extends ControllerTest {
     startController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_INSTANCES, true);
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_INSTANCES, true);
+
+    // Wait to make sure cached data accessor has caught up.
+    TestUtils.waitForCondition(aVoid -> {
+      Set<String> brokerInstances = _helixResourceManager.getAllInstancesForBrokerTenant(null);
+      return brokerInstances != null && brokerInstances.size() == NUM_INSTANCES;
+    }, TIMEOUT_MS, "Failed to add " + NUM_INSTANCES + " fake brokers.");
+    TestUtils.waitForCondition(aVoid -> {
+      Set<String> serverInstances = _helixResourceManager.getAllInstancesForServerTenant(null);
+      return serverInstances != null && serverInstances.size() == NUM_INSTANCES;
+    }, TIMEOUT_MS, "Failed to add " + NUM_INSTANCES + " fake servers.");
   }
 
   @Test

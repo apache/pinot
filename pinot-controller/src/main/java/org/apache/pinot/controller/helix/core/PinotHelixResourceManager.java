@@ -944,7 +944,7 @@ public class PinotHelixResourceManager {
   }
 
   public Set<String> getAllInstancesForServerTenant(String tenantName) {
-    return getAllInstancesForServerTenant(HelixHelper.getInstanceConfigs(_helixZkManager), tenantName);
+    return getAllInstancesForServerTenant(getAllHelixInstanceConfigs(), tenantName);
   }
 
   /**
@@ -956,7 +956,7 @@ public class PinotHelixResourceManager {
   }
 
   public Set<String> getAllInstancesForBrokerTenant(String tenantName) {
-    return getAllInstancesForBrokerTenant(HelixHelper.getInstanceConfigs(_helixZkManager), tenantName);
+    return getAllInstancesForBrokerTenant(getAllHelixInstanceConfigs(), tenantName);
   }
 
   /**
