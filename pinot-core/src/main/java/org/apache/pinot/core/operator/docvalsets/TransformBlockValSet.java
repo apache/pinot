@@ -48,6 +48,11 @@ public class TransformBlockValSet extends BaseBlockValSet {
   }
 
   @Override
+  public boolean isSingleValue() {
+    return _transformFunction.getResultMetadata().isSingleValue();
+  }
+
+  @Override
   public int[] getDictionaryIdsSV() {
     return _transformFunction.transformToDictIdsSV(_projectionBlock);
   }
@@ -75,6 +80,11 @@ public class TransformBlockValSet extends BaseBlockValSet {
   @Override
   public String[] getStringValuesSV() {
     return _transformFunction.transformToStringValuesSV(_projectionBlock);
+  }
+
+  @Override
+  public byte[][] getBytesValuesSV() {
+    return _transformFunction.transformToBytesValuesSV(_projectionBlock);
   }
 
   @Override

@@ -28,16 +28,15 @@ import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
-import org.apache.pinot.core.operator.transform.TransformBlockDataFetcher;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
@@ -48,8 +47,6 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   private final List<SelectionSort> _sortSequence;
   private final List<TransformExpressionTree> _expressions;
   private final TransformResultMetadata[] _expressionMetadata;
-  private final Dictionary[] _dictionaries;
-  private final BlockValSet[] _blockValSets;
   private final DataSchema _dataSchema;
   private final int _numRowsToKeep;
   private final PriorityQueue<Serializable[]> _rows;
@@ -65,17 +62,12 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
     int numExpressions = _expressions.size();
     _expressionMetadata = new TransformResultMetadata[numExpressions];
-    _dictionaries = new Dictionary[numExpressions];
-    _blockValSets = new BlockValSet[numExpressions];
     String[] columnNames = new String[numExpressions];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
     for (int i = 0; i < numExpressions; i++) {
       TransformExpressionTree expression = _expressions.get(i);
       TransformResultMetadata expressionMetadata = _transformOperator.getResultMetadata(expression);
       _expressionMetadata[i] = expressionMetadata;
-      if (expressionMetadata.hasDictionary()) {
-        _dictionaries[i] = _transformOperator.getDictionary(expression);
-      }
       columnNames[i] = expression.toString();
       columnDataTypes[i] =
           DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
@@ -142,17 +134,17 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       int numExpressions = _expressions.size();
+      BlockValSet[] blockValSets = new BlockValSet[numExpressions];
       for (int i = 0; i < numExpressions; i++) {
         TransformExpressionTree expression = _expressions.get(i);
-        _blockValSets[i] = transformBlock.getBlockValueSet(expression);
+        blockValSets[i] = transformBlock.getBlockValueSet(expression);
       }
-      TransformBlockDataFetcher dataFetcher =
-          new TransformBlockDataFetcher(_blockValSets, _dictionaries, _expressionMetadata);
+      RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
 
       int numDocsFetched = transformBlock.getNumDocs();
       numDocsScanned += numDocsFetched;
       for (int i = 0; i < numDocsFetched; i++) {
-        SelectionOperatorUtils.addToPriorityQueue(dataFetcher.getRow(i), _rows, _numRowsToKeep);
+        SelectionOperatorUtils.addToPriorityQueue(blockValueFetcher.getRow(i), _rows, _numRowsToKeep);
       }
     }
 

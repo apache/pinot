@@ -45,4 +45,9 @@ public final class MultiValueSet extends BaseBlockValSet {
   public DataType getValueType() {
     return _dataType;
   }
+
+  @Override
+  public boolean isSingleValue() {
+    return false;
+  }
 }
