@@ -37,7 +37,6 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.data.order.OrderByUtils;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
@@ -64,7 +63,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
   private final BrokerRequest _brokerRequest;
   private final ExecutorService _executorService;
   private final long _timeOutMs;
-  private final int _interSegmentNumGroupsLimit;
+  private final int _indexedTableCapacity;
   private Lock _initLock;
   private DataSchema _dataSchema;
   private ConcurrentIndexedTable _indexedTable;
@@ -79,7 +78,9 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
     _timeOutMs = timeOutMs;
     _initLock = new ReentrantLock();
     _indexedTable = new ConcurrentIndexedTable();
-    _interSegmentNumGroupsLimit = GroupByUtils.getTableCapacity((int) brokerRequest.getGroupBy().getTopN());
+    _indexedTableCapacity = 1_000_000;
+    // FIXME: indexedTableCapacity should be derived from TOP. Hardcoding this value to a higher number until we can tune the resize
+    //_indexedTableCapacity = GroupByUtils.getTableCapacity((int) brokerRequest.getGroupBy().getTopN());
   }
 
   /**
@@ -123,7 +124,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
               if (_dataSchema == null) {
                 _dataSchema = intermediateResultsBlock.getDataSchema();
                 _indexedTable.init(_dataSchema, _brokerRequest.getAggregationsInfo(), _brokerRequest.getOrderBy(),
-                    _interSegmentNumGroupsLimit, false);
+                    _indexedTableCapacity, false);
               }
             } finally {
               _initLock.unlock();
@@ -205,7 +206,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
       mergedBlock.setNumSegmentsMatched(executionStatistics.getNumSegmentsMatched());
       mergedBlock.setNumTotalRawDocs(executionStatistics.getNumTotalRawDocs());
 
-      if (_indexedTable.size() >= _interSegmentNumGroupsLimit) {
+      if (_indexedTable.size() >= _indexedTableCapacity) {
         mergedBlock.setNumGroupsLimitReached(true);
       }
 

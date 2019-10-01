@@ -555,8 +555,10 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       throws Throwable {
 
     IndexedTable indexedTable = new ConcurrentIndexedTable();
-    int capacity = GroupByUtils.getTableCapacity((int) groupBy.getTopN());
-    indexedTable.init(dataSchema, aggregationInfos, orderBy, capacity, true);
+    int indexedTableCapacity = 1_000_000;
+    // FIXME: indexedTableCapacity should be derived from TOP. Hardcoding this value to a higher number until we can tune the resize
+    // int capacity = GroupByUtils.getTableCapacity((int) groupBy.getTopN());
+    indexedTable.init(dataSchema, aggregationInfos, orderBy, indexedTableCapacity, true);
 
     for (DataTable dataTable : dataTableMap.values()) {
       CheckedFunction2[] functions = new CheckedFunction2[dataSchema.size()];
