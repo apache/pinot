@@ -64,7 +64,7 @@ public class MockDataProvider implements DataProvider {
   }
 
   @Override
-  public Map<MetricSlice, DataFrame> fetchTimeseries(Collection<MetricSlice> slices) {
+  public Map<MetricSlice, DataFrame> fetchTimeseries(Collection<MetricSlice> slices, long configId) {
     Map<MetricSlice, DataFrame> result = new HashMap<>();
     for (final MetricSlice slice : slices) {
       List<String> filters = new ArrayList<>(slice.getFilters().keySet());

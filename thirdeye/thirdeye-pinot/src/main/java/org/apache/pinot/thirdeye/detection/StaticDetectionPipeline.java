@@ -78,7 +78,7 @@ public abstract class StaticDetectionPipeline extends DetectionPipeline {
   @Override
   public final DetectionPipelineResult run() throws Exception {
     InputDataSpec dataSpec = this.getInputDataSpec();
-    Map<MetricSlice, DataFrame> timeseries = this.provider.fetchTimeseries(dataSpec.getTimeseriesSlices());
+    Map<MetricSlice, DataFrame> timeseries = this.provider.fetchTimeseries(dataSpec.getTimeseriesSlices(), this.getConfig().getId());
     Map<MetricSlice, DataFrame> aggregates = this.provider.fetchAggregates(dataSpec.getAggregateSlices(), Collections.<String>emptyList());
     Multimap<AnomalySlice, MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(dataSpec.getAnomalySlices(), this.config.getId());
     Multimap<EventSlice, EventDTO> events = this.provider.fetchEvents(dataSpec.getEventSlices());

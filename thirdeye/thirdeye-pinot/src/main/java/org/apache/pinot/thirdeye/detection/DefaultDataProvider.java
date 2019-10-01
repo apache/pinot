@@ -56,8 +56,10 @@ import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.datasource.comparison.Row;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
+import org.apache.pinot.thirdeye.detection.cache.LoadTimeseriesRequestContainer;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EvaluationSlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
@@ -82,7 +84,7 @@ public class DefaultDataProvider implements DataProvider {
   private final TimeSeriesLoader timeseriesLoader;
   private final AggregationLoader aggregationLoader;
   private final DetectionPipelineLoader loader;
-  private static LoadingCache<MetricSlice, DataFrame> DETECTION_TIME_SERIES_CACHE;
+  private static LoadingCache<LoadTimeseriesRequestContainer, DataFrame> DETECTION_TIME_SERIES_CACHE;
 
   public DefaultDataProvider(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, EventManager eventDAO,
       MergedAnomalyResultManager anomalyDAO, EvaluationManager evaluationDAO, TimeSeriesLoader timeseriesLoader,
@@ -104,24 +106,35 @@ public class DefaultDataProvider implements DataProvider {
           .maximumWeight(cacheSize)
           // Estimate that most detection tasks will complete within 15 minutes
           .expireAfterWrite(15, TimeUnit.MINUTES)
-          .weigher((Weigher<MetricSlice, DataFrame>) (slice, dataFrame) -> dataFrame.size() * (Long.BYTES + Double.BYTES))
-          .build(new CacheLoader<MetricSlice, DataFrame>() {
+          .weigher((Weigher<LoadTimeseriesRequestContainer, DataFrame>) (slice, dataFrame) -> dataFrame.size() * (Long.BYTES + Double.BYTES))
+          .build(new CacheLoader<LoadTimeseriesRequestContainer, DataFrame>() {
             // load single slice
             @Override
-            public DataFrame load(MetricSlice slice) {
-              return loadTimeseries(Collections.singleton(slice)).get(slice);
+            public DataFrame load(LoadTimeseriesRequestContainer rc) {
+              return loadTimeseries(Collections.singleton(rc.getSlice()), rc.getConfigId()).get(rc.getSlice());
             }
 
             // buck loading time series slice in parallel
             @Override
-            public Map<MetricSlice, DataFrame> loadAll(Iterable<? extends MetricSlice> slices) {
-              return loadTimeseries(Lists.newArrayList(slices));
+            public Map<LoadTimeseriesRequestContainer, DataFrame> loadAll(Iterable<? extends LoadTimeseriesRequestContainer> requestContainers) {
+              long configId = -1;
+              Collection<MetricSlice> slices = new ArrayList<>();
+              for (LoadTimeseriesRequestContainer rc : requestContainers) {
+                slices.add(rc.getSlice());
+                configId = rc.getConfigId();
+              }
+              Map<MetricSlice, DataFrame> r = loadTimeseries(slices, configId);
+              Map<LoadTimeseriesRequestContainer, DataFrame> result = new HashMap<>();
+              for(Map.Entry<MetricSlice, DataFrame> entry : r.entrySet()) {
+                result.put(new LoadTimeseriesRequestContainer(entry.getKey(), configId), entry.getValue());
+              }
+              return result;
             }
           });
     }
   }
 
-  private Map<MetricSlice, DataFrame> loadTimeseries(Collection<MetricSlice> slices) {
+  private Map<MetricSlice, DataFrame> loadTimeseries(Collection<MetricSlice> slices, long configId) {
     try {
       long ts = System.currentTimeMillis();
       Map<MetricSlice, DataFrame> output = new HashMap<>();
@@ -129,9 +142,9 @@ public class DefaultDataProvider implements DataProvider {
       // if the time series slice is already in cache, return directly
       for (MetricSlice slice : slices){
         LOG.info(slice.toString());
-        for (Map.Entry<MetricSlice, DataFrame> entry : DETECTION_TIME_SERIES_CACHE.asMap().entrySet()) {
+        for (Map.Entry<LoadTimeseriesRequestContainer, DataFrame> entry : DETECTION_TIME_SERIES_CACHE.asMap().entrySet()) {
           // current slice potentially contained in cache
-          if (entry.getKey().containSlice(slice)){
+          if (entry.getKey().getSlice().containSlice(slice)){
             DataFrame df = entry.getValue().filter(entry.getValue().getLongs(COL_TIME).between(slice.getStart(), slice.getEnd())).dropNull(COL_TIME);
             // double check if it is cache hit
             if (df.getLongs(COL_TIME).size() > 0) {
@@ -147,6 +160,7 @@ public class DefaultDataProvider implements DataProvider {
 
       // work on getting the detectionId
       boolean runBryanPoC = true;
+
       if (runBryanPoC) {
         long detectionId = 123456;
         // find the max window and fetch it
@@ -177,17 +191,17 @@ public class DefaultDataProvider implements DataProvider {
   }
 
   @Override
-  public Map<MetricSlice, DataFrame> fetchTimeseries(Collection<MetricSlice> slices) {
+  public Map<MetricSlice, DataFrame> fetchTimeseries(Collection<MetricSlice> slices, long configId) {
     try {
-      Map<MetricSlice, MetricSlice> alignedMetricSlicesToOriginalSlice = new HashMap<>();
+      Map<LoadTimeseriesRequestContainer, MetricSlice> alignedMetricSlicesToOriginalSlice = new HashMap<>();
       for (MetricSlice slice: slices) {
-        alignedMetricSlicesToOriginalSlice.put(alignSlice(slice), slice);
+        alignedMetricSlicesToOriginalSlice.put(new LoadTimeseriesRequestContainer(alignSlice(slice), configId), slice);
       }
-      Map<MetricSlice, DataFrame> cacheResult = DETECTION_TIME_SERIES_CACHE.getAll(alignedMetricSlicesToOriginalSlice.keySet());
+      Map<LoadTimeseriesRequestContainer, DataFrame> cacheResult = DETECTION_TIME_SERIES_CACHE.getAll(alignedMetricSlicesToOriginalSlice.keySet());
       Map<MetricSlice, DataFrame> timeseriesResult = new HashMap<>();
-      for (Map.Entry<MetricSlice, DataFrame> entry : cacheResult.entrySet()){
+      for (Map.Entry<LoadTimeseriesRequestContainer, DataFrame> entry : cacheResult.entrySet()){
         // make a copy of the result so that cache won't be contaminated by client code
-        timeseriesResult.put(alignedMetricSlicesToOriginalSlice.get(entry.getKey()), entry.getValue().copy());
+        timeseriesResult.put(alignedMetricSlicesToOriginalSlice.get(entry.getKey().getSlice()), entry.getValue().copy());
       }
       return timeseriesResult;
     } catch (Exception e) {

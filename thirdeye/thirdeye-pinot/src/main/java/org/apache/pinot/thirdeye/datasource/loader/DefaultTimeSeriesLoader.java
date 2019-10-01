@@ -19,6 +19,8 @@
 
 package org.apache.pinot.thirdeye.datasource.loader;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
@@ -81,7 +83,9 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
       TimeSeriesRequestContainer rc = DataFrameUtils.makeTimeSeriesRequestAligned(slice, "ref", this.metricDAO, this.datasetDAO);
       ThirdEyeResponse response = this.cache.getQueryResult(rc.getRequest());
 
-      timeSeriesCache.insertTimeSeriesIntoCache(String.valueOf(detectionId), response);
+      // fire and forget
+      ExecutorService executor = Executors.newCachedThreadPool();
+      executor.execute(() -> timeSeriesCache.insertTimeSeriesIntoCache(String.valueOf(detectionId), response));
     }
   }
 }

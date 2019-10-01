@@ -570,7 +570,7 @@ public class DetectionResource {
     if (!baselineTimeseries.contains(COL_CURRENT)) {
       // add current time series if not exists
       MetricSlice currentSlice = MetricSlice.from(me.getId(), start, end, me.getFilters());
-      DataFrame dfCurrent = this.provider.fetchTimeseries(Collections.singleton(currentSlice)).get(currentSlice).renameSeries(COL_VALUE, COL_CURRENT);
+      DataFrame dfCurrent = this.provider.fetchTimeseries(Collections.singleton(currentSlice), anomaly.getDetectionConfigId()).get(currentSlice).renameSeries(COL_VALUE, COL_CURRENT);
       baselineTimeseries = dfCurrent.joinOuter(baselineTimeseries);
     }
     return Response.ok(baselineTimeseries).build();

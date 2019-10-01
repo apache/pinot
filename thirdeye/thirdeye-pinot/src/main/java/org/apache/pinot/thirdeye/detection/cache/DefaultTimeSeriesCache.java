@@ -1,6 +1,8 @@
 package org.apache.pinot.thirdeye.detection.cache;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.auto.onboard.AutoOnboardUtility;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
@@ -34,7 +36,7 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
   public ThirdEyeResponse fetchTimeSeries(ThirdEyeCacheRequestContainer rc) throws Exception {
     LOG.info("trying to fetch data from cache...");
 
-    ThirdEyeResponse response = null;
+    ThirdEyeResponse response;
     ThirdEyeCacheResponse cacheResponse = cacheDAO.tryFetchExistingTimeSeries(rc);
 
     DateTime start = rc.getRequest().getStartTimeInclusive();
@@ -43,7 +45,10 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
     if (cacheResponse == null || cacheResponse.isMissingSlice(start, end)) {
       LOG.info("cache miss or bad cache response received");
       response = this.cache.getQueryResult(rc.getRequest());
-      this.insertTimeSeriesIntoCache(rc.getDetectionId(), response);
+      // fire and forget
+      ExecutorService executor = Executors.newCachedThreadPool();
+      executor.execute(() -> insertTimeSeriesIntoCache(rc.getDetectionId(), response));
+      //this.insertTimeSeriesIntoCache(rc.getDetectionId(), response);
     } else {
 
       TimeSpec responseSpec = cacheResponse.getTimeSpec();
