@@ -26,11 +26,23 @@ import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 
 public abstract class DataSource extends BaseOperator {
 
+  /**
+   * Returns the metadata for the data source.
+   */
   public abstract DataSourceMetadata getDataSourceMetadata();
 
-  public abstract InvertedIndexReader getInvertedIndex();
-
+  /**
+   * Returns the dictionary for the data source if the data is dictionary-encoded, or {@code null} if not.
+   */
   public abstract Dictionary getDictionary();
 
+  /**
+   * Returns the inverted index for the data source if exists, or {@code null} if not.
+   */
+  public abstract InvertedIndexReader getInvertedIndex();
+
+  /**
+   * Returns the bloom filter for the data source if exists, or {@code null} if not.
+   */
   public abstract BloomFilterReader getBloomFilter();
 }

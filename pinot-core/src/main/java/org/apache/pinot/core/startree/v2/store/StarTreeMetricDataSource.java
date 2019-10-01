@@ -104,12 +104,12 @@ public class StarTreeMetricDataSource extends DataSource {
   }
 
   @Override
-  public InvertedIndexReader getInvertedIndex() {
+  public Dictionary getDictionary() {
     return null;
   }
 
   @Override
-  public Dictionary getDictionary() {
+  public InvertedIndexReader getInvertedIndex() {
     return null;
   }
 

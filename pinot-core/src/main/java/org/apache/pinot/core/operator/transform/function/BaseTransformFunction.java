@@ -52,7 +52,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
 
   @Override
   public Dictionary getDictionary() {
-    throw new UnsupportedOperationException();
+    return null;
   }
 
   @Override
@@ -72,12 +72,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
     }
 
     int length = projectionBlock.getNumDocs();
-    TransformResultMetadata resultMetadata = getResultMetadata();
-    if (resultMetadata.hasDictionary()) {
+    Dictionary dictionary = getDictionary();
+    if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
-      getDictionary().readIntValues(dictIds, length, _intValuesSV);
+      dictionary.readIntValues(dictIds, length, _intValuesSV);
     } else {
-      switch (resultMetadata.getDataType()) {
+      switch (getResultMetadata().getDataType()) {
         case LONG:
           long[] longValues = transformToLongValuesSV(projectionBlock);
           ArrayCopyUtils.copy(longValues, _intValuesSV, length);
@@ -108,12 +108,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
     }
 
     int length = projectionBlock.getNumDocs();
-    TransformResultMetadata resultMetadata = getResultMetadata();
-    if (resultMetadata.hasDictionary()) {
+    Dictionary dictionary = getDictionary();
+    if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
-      getDictionary().readLongValues(dictIds, length, _longValuesSV);
+      dictionary.readLongValues(dictIds, length, _longValuesSV);
     } else {
-      switch (resultMetadata.getDataType()) {
+      switch (getResultMetadata().getDataType()) {
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _longValuesSV, length);
@@ -144,12 +144,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
     }
 
     int length = projectionBlock.getNumDocs();
-    TransformResultMetadata resultMetadata = getResultMetadata();
-    if (resultMetadata.hasDictionary()) {
+    Dictionary dictionary = getDictionary();
+    if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
-      getDictionary().readFloatValues(dictIds, length, _floatValuesSV);
+      dictionary.readFloatValues(dictIds, length, _floatValuesSV);
     } else {
-      switch (resultMetadata.getDataType()) {
+      switch (getResultMetadata().getDataType()) {
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _floatValuesSV, length);
@@ -180,12 +180,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
     }
 
     int length = projectionBlock.getNumDocs();
-    TransformResultMetadata resultMetadata = getResultMetadata();
-    if (resultMetadata.hasDictionary()) {
+    Dictionary dictionary = getDictionary();
+    if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
-      getDictionary().readDoubleValues(dictIds, length, _doubleValuesSV);
+      dictionary.readDoubleValues(dictIds, length, _doubleValuesSV);
     } else {
-      switch (resultMetadata.getDataType()) {
+      switch (getResultMetadata().getDataType()) {
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _doubleValuesSV, length);
@@ -216,12 +216,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
     }
 
     int length = projectionBlock.getNumDocs();
-    TransformResultMetadata resultMetadata = getResultMetadata();
-    if (resultMetadata.hasDictionary()) {
+    Dictionary dictionary = getDictionary();
+    if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
-      getDictionary().readStringValues(dictIds, length, _stringValuesSV);
+      dictionary.readStringValues(dictIds, length, _stringValuesSV);
     } else {
-      switch (resultMetadata.getDataType()) {
+      switch (getResultMetadata().getDataType()) {
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _stringValuesSV, length);
@@ -255,12 +255,12 @@ public abstract class BaseTransformFunction implements TransformFunction {
     }
 
     int length = projectionBlock.getNumDocs();
-    TransformResultMetadata resultMetadata = getResultMetadata();
-    if (resultMetadata.hasDictionary()) {
+    Dictionary dictionary = getDictionary();
+    if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
-      getDictionary().readBytesValues(dictIds, length, _byteValuesSV);
+      dictionary.readIntValues(dictIds, length, _intValuesSV);
     } else {
-      Preconditions.checkState(resultMetadata.getDataType() == DataType.STRING);
+      Preconditions.checkState(getResultMetadata().getDataType() == DataType.STRING);
       String[] stringValues = transformToStringValuesSV(projectionBlock);
       ArrayCopyUtils.copy(stringValues, _byteValuesSV, length);
     }
@@ -274,10 +274,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
     }
 
     int length = projectionBlock.getNumDocs();
-    TransformResultMetadata resultMetadata = getResultMetadata();
-    if (resultMetadata.hasDictionary()) {
+    Dictionary dictionary = getDictionary();
+    if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
-      Dictionary dictionary = getDictionary();
       for (int i = 0; i < length; i++) {
         int[] dictIds = dictIdsMV[i];
         int numValues = dictIds.length;
@@ -341,10 +340,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
     }
 
     int length = projectionBlock.getNumDocs();
-    TransformResultMetadata resultMetadata = getResultMetadata();
-    if (resultMetadata.hasDictionary()) {
+    Dictionary dictionary = getDictionary();
+    if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
-      Dictionary dictionary = getDictionary();
       for (int i = 0; i < length; i++) {
         int[] dictIds = dictIdsMV[i];
         int numValues = dictIds.length;
@@ -408,10 +406,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
     }
 
     int length = projectionBlock.getNumDocs();
-    TransformResultMetadata resultMetadata = getResultMetadata();
-    if (resultMetadata.hasDictionary()) {
+    Dictionary dictionary = getDictionary();
+    if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
-      Dictionary dictionary = getDictionary();
       for (int i = 0; i < length; i++) {
         int[] dictIds = dictIdsMV[i];
         int numValues = dictIds.length;
@@ -475,10 +472,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
     }
 
     int length = projectionBlock.getNumDocs();
-    TransformResultMetadata resultMetadata = getResultMetadata();
-    if (resultMetadata.hasDictionary()) {
+    Dictionary dictionary = getDictionary();
+    if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
-      Dictionary dictionary = getDictionary();
       for (int i = 0; i < length; i++) {
         int[] dictIds = dictIdsMV[i];
         int numValues = dictIds.length;
@@ -542,10 +538,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
     }
 
     int length = projectionBlock.getNumDocs();
-    TransformResultMetadata resultMetadata = getResultMetadata();
-    if (resultMetadata.hasDictionary()) {
+    Dictionary dictionary = getDictionary();
+    if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
-      Dictionary dictionary = getDictionary();
       for (int i = 0; i < length; i++) {
         int[] dictIds = dictIdsMV[i];
         int numValues = dictIds.length;

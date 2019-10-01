@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -59,7 +60,7 @@ public interface TransformFunction {
    */
 
   /**
-   * Returns the dictionary that the dictionary Ids based on.
+   * Returns the dictionary for the transform result if the result is dictionary-encoded, or {@code null} if not.
    *
    * @return Dictionary
    */

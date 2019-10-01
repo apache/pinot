@@ -151,13 +151,13 @@ public final class ColumnDataSource extends DataSource {
   }
 
   @Override
-  public InvertedIndexReader getInvertedIndex() {
-    return _invertedIndex;
+  public Dictionary getDictionary() {
+    return _dictionary;
   }
 
   @Override
-  public Dictionary getDictionary() {
-    return _dictionary;
+  public InvertedIndexReader getInvertedIndex() {
+    return _invertedIndex;
   }
 
   @Override

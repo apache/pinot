@@ -49,6 +49,7 @@ public class MapValueTransformFunction extends BaseTransformFunction {
   private TransformFunction _keyColumnFunction;
   private int _keyDictId;
   private TransformFunction _valueColumnFunction;
+  private Dictionary _valueColumnDictionary;
   private TransformResultMetadata _resultMetadata;
 
   private int[] _dictIds;
@@ -65,18 +66,20 @@ public class MapValueTransformFunction extends BaseTransformFunction {
 
     _keyColumnFunction = arguments.get(0);
     TransformResultMetadata keyColumnMetadata = _keyColumnFunction.getResultMetadata();
-    Preconditions.checkState(!keyColumnMetadata.isSingleValue() && keyColumnMetadata.hasDictionary(),
+    Dictionary keyColumnDictionary = _keyColumnFunction.getDictionary();
+    Preconditions.checkState(!keyColumnMetadata.isSingleValue() && keyColumnDictionary != null,
         "Key column must be dictionary-encoded multi-value column");
 
     TransformFunction keyValueFunction = arguments.get(1);
     Preconditions.checkState(keyValueFunction instanceof LiteralTransformFunction,
         "Key value must be a literal (number or string)");
     String keyValue = ((LiteralTransformFunction) keyValueFunction).getLiteral();
-    _keyDictId = _keyColumnFunction.getDictionary().indexOf(keyValue);
+    _keyDictId = keyColumnDictionary.indexOf(keyValue);
 
     _valueColumnFunction = arguments.get(2);
     TransformResultMetadata valueColumnMetadata = _valueColumnFunction.getResultMetadata();
-    Preconditions.checkState(!valueColumnMetadata.isSingleValue() && valueColumnMetadata.hasDictionary(),
+    _valueColumnDictionary = _valueColumnFunction.getDictionary();
+    Preconditions.checkState(!valueColumnMetadata.isSingleValue() && _valueColumnDictionary != null,
         "Value column must be dictionary-encoded multi-value column");
     _resultMetadata = new TransformResultMetadata(valueColumnMetadata.getDataType(), true, true);
   }
@@ -88,7 +91,7 @@ public class MapValueTransformFunction extends BaseTransformFunction {
 
   @Override
   public Dictionary getDictionary() {
-    return _valueColumnFunction.getDictionary();
+    return _valueColumnDictionary;
   }
 
   @Override
