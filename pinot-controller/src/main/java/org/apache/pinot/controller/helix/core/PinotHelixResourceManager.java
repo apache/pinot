@@ -2084,11 +2084,11 @@ public class PinotHelixResourceManager {
   }
 
   public PinotResourceManagerResponse enableInstance(String instanceName) {
-    return toggleInstance(instanceName, true, 10);
+    return enableInstance(instanceName, true, 10_000L);
   }
 
   public PinotResourceManagerResponse disableInstance(String instanceName) {
-    return toggleInstance(instanceName, false, 10);
+    return enableInstance(instanceName, false, 10_000L);
   }
 
   /**
@@ -2140,52 +2140,71 @@ public class PinotHelixResourceManager {
    * Keeps checking until ideal-state is successfully updated or times out.
    *
    * @param instanceName: Name of Instance for which the status needs to be toggled.
-   * @param toggle: 'True' for ONLINE 'False' for OFFLINE.
-   * @param timeOutInSeconds: Time-out for setting ideal-state.
+   * @param enableInstance: 'True' for enabling the instance and 'False' for disabling the instance.
+   * @param timeOutMs: Time-out for setting ideal-state.
    * @return
    */
-  public PinotResourceManagerResponse toggleInstance(String instanceName, boolean toggle, int timeOutInSeconds) {
+  private PinotResourceManagerResponse enableInstance(String instanceName, boolean enableInstance, long timeOutMs) {
     if (!instanceExists(instanceName)) {
       return PinotResourceManagerResponse.failure("Instance " + instanceName + " not found");
     }
 
-    _helixAdmin.enableInstance(_helixClusterName, instanceName, toggle);
-    long deadline = System.currentTimeMillis() + 1000 * timeOutInSeconds;
-    boolean toggleSucceed = false;
-    String beforeToggleStates =
-        (toggle) ? SegmentOnlineOfflineStateModel.OFFLINE : SegmentOnlineOfflineStateModel.ONLINE;
+    _helixAdmin.enableInstance(_helixClusterName, instanceName, enableInstance);
+    long intervalWaitTimeMs = 500L;
+    long deadline = System.currentTimeMillis() + timeOutMs;
+    String offlineState = SegmentOnlineOfflineStateModel.OFFLINE;
 
     while (System.currentTimeMillis() < deadline) {
-      toggleSucceed = true;
       PropertyKey liveInstanceKey = _keyBuilder.liveInstance(instanceName);
       LiveInstance liveInstance = _helixDataAccessor.getProperty(liveInstanceKey);
       if (liveInstance == null) {
-        return toggle ? PinotResourceManagerResponse.FAILURE : PinotResourceManagerResponse.SUCCESS;
-      }
-      PropertyKey instanceCurrentStatesKey = _keyBuilder.currentStates(instanceName, liveInstance.getSessionId());
-      List<CurrentState> instanceCurrentStates = _helixDataAccessor.getChildValues(instanceCurrentStatesKey);
-      if (instanceCurrentStates == null) {
-        return PinotResourceManagerResponse.SUCCESS;
+        if (!enableInstance) {
+          // If we disable the instance, we actually don't care whether live instance being null. Thus, returning success should be good.
+          // Otherwise, wait until timeout.
+          return PinotResourceManagerResponse.SUCCESS;
+        }
       } else {
-        for (CurrentState currentState : instanceCurrentStates) {
-          for (String state : currentState.getPartitionStateMap().values()) {
-            if (beforeToggleStates.equals(state)) {
-              toggleSucceed = false;
+        boolean toggleSucceeded = true;
+        // Checks all the current states fall into the target states
+        PropertyKey instanceCurrentStatesKey = _keyBuilder.currentStates(instanceName, liveInstance.getSessionId());
+        List<CurrentState> instanceCurrentStates = _helixDataAccessor.getChildValues(instanceCurrentStatesKey);
+        if (instanceCurrentStates.isEmpty()) {
+          return PinotResourceManagerResponse.SUCCESS;
+        } else {
+          for (CurrentState currentState : instanceCurrentStates) {
+            for (String state : currentState.getPartitionStateMap().values()) {
+              // If instance is enabled, all the partitions should not eventually be offline.
+              // If instance is disabled, all the partitions should eventually be offline.
+              // TODO: Handle the case when realtime segments are in OFFLINE state because there're some problem with realtime segment consumption,
+              //  and realtime segment will mark itself as OFFLINE in ideal state.
+              //  Issue: https://github.com/apache/incubator-pinot/issues/4653
+              if ((enableInstance && !offlineState.equals(state)) || (!enableInstance && offlineState.equals(state))) {
+                toggleSucceeded = false;
+                break;
+              }
+            }
+            if (!toggleSucceeded) {
+              break;
             }
           }
         }
-      }
-      if (toggleSucceed) {
-        return (toggle) ? PinotResourceManagerResponse.success("Instance " + instanceName + " enabled")
-            : PinotResourceManagerResponse.success("Instance " + instanceName + " disabled");
-      } else {
-        try {
-          Thread.sleep(500);
-        } catch (InterruptedException e) {
+        if (toggleSucceeded) {
+          return (enableInstance) ? PinotResourceManagerResponse.success("Instance " + instanceName + " enabled")
+              : PinotResourceManagerResponse.success("Instance " + instanceName + " disabled");
         }
       }
+
+      try {
+        Thread.sleep(intervalWaitTimeMs);
+      } catch (InterruptedException e) {
+        LOGGER.warn("Got interrupted when sleeping for {}ms to wait until the current state matched for instance: {}",
+            intervalWaitTimeMs, instanceName);
+        return PinotResourceManagerResponse
+            .failure("Got interrupted when waiting for instance to be " + (enableInstance ? "enabled" : "disabled"));
+      }
     }
-    return PinotResourceManagerResponse.failure("Instance enable/disable failed, timeout");
+    return PinotResourceManagerResponse
+        .failure("Instance " + (enableInstance ? "enable" : "disable") + " failed, timeout");
   }
 
   public RebalanceResult rebalanceTable(String tableNameWithType, Configuration rebalanceConfig)
