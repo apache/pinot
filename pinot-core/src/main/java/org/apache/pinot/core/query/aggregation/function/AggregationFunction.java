@@ -80,16 +80,19 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
 
   /**
    * Extracts the intermediate result from the aggregation result holder (aggregation only).
+   * TODO: Support serializing/deserializing null values in DataTable and use null as the empty intermediate result
    */
   IntermediateResult extractAggregationResult(AggregationResultHolder aggregationResultHolder);
 
   /**
    * Extracts the intermediate result from the group-by result holder for the given group key (aggregation group-by).
+   * TODO: Support serializing/deserializing null values in DataTable and use null as the empty intermediate result
    */
   IntermediateResult extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey);
 
   /**
    * Merges two intermediate results.
+   * TODO: Support serializing/deserializing null values in DataTable and use null as the empty intermediate result
    */
   IntermediateResult merge(IntermediateResult intermediateResult1, IntermediateResult intermediateResult2);
 
@@ -106,6 +109,7 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
 
   /**
    * Extracts the final result used in the broker response from the given intermediate result.
+   * TODO: Support serializing/deserializing null values in DataTable and use null as the empty intermediate result
    */
   FinalResult extractFinalResult(IntermediateResult intermediateResult);
 }
