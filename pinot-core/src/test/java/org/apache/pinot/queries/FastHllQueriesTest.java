@@ -21,17 +21,23 @@ package org.apache.pinot.queries;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import java.io.File;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
+import org.apache.pinot.core.data.readers.AvroRecordReader;
+import org.apache.pinot.core.data.readers.GenericRowRecordReader;
+import org.apache.pinot.core.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
@@ -42,8 +48,8 @@ import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
-import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.startree.hll.HllUtil;
 import org.apache.pinot.startree.hll.HllConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -83,6 +89,9 @@ public class FastHllQueriesTest extends BaseQueriesTest {
   private static final String QUERY_FILTER =
       " WHERE column1 > 100000000" + " AND column3 BETWEEN 20000000 AND 1000000000" + " AND column5 = 'gFuH'"
           + " AND (column6 < 500000000 OR column11 NOT IN ('t', 'P'))" + " AND daysSinceEpoch = 126164076";
+
+  private static final String BASE_DISTINCT_COUNT_QUERY =
+      "SELECT DISTINCTCOUNTHLL(newColumn17HLL), DISTINCTCOUNTHLL(newColumn18HLL) FROM testTable";
 
   private IndexSegment _indexSegment;
   // Contains 2 identical index segments
@@ -185,17 +194,40 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(((HyperLogLog) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).cardinality(), 691L);
 
     // Test inter segments base query
+    long startTime = System.currentTimeMillis();
     BrokerResponseNative brokerResponse = getBrokerResponseForQuery(BASE_QUERY);
+    long timeForFastHLLQuery = System.currentTimeMillis() - startTime;
     QueriesTestUtils
         .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L, new String[]{"21", "1762"});
+
+    startTime = System.currentTimeMillis();
+    getBrokerResponseForQuery(BASE_DISTINCT_COUNT_QUERY);
+    long timeForDistinctCountHLLQuery = System.currentTimeMillis() - startTime;
+    Assert.assertTrue(timeForFastHLLQuery > timeForDistinctCountHLLQuery);
+
     // Test inter segments query with filter
+    startTime = System.currentTimeMillis();
     brokerResponse = getBrokerResponseForQueryWithFilter(BASE_QUERY);
+    timeForFastHLLQuery = System.currentTimeMillis() - startTime;
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
         new String[]{"17", "1197"});
+
+    startTime = System.currentTimeMillis();
+    getBrokerResponseForQueryWithFilter(BASE_DISTINCT_COUNT_QUERY);
+    timeForDistinctCountHLLQuery = System.currentTimeMillis() - startTime;
+    Assert.assertTrue(timeForFastHLLQuery > timeForDistinctCountHLLQuery);
+
     // Test inter segments query with group-by
+    startTime = System.currentTimeMillis();
     brokerResponse = getBrokerResponseForQuery(BASE_QUERY + GROUP_BY);
+    timeForFastHLLQuery = System.currentTimeMillis() - startTime;
     QueriesTestUtils
         .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L, new String[]{"21", "1762"});
+
+    startTime = System.currentTimeMillis();
+    getBrokerResponseForQuery(BASE_DISTINCT_COUNT_QUERY + GROUP_BY);
+    timeForDistinctCountHLLQuery = System.currentTimeMillis() - startTime;
+    Assert.assertTrue(timeForFastHLLQuery > timeForDistinctCountHLLQuery);
 
     deleteSegment();
   }
@@ -253,8 +285,29 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     }
 
     // Build the index segment
-    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-    driver.init(segmentGeneratorConfig);
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    RecordReader recordReader = new AvroRecordReader(new File(filePath), segmentGeneratorConfig.getSchema());
+
+    List<GenericRow> segmentRecords = new ArrayList<>();
+    while (recordReader.hasNext()) {
+      GenericRow segmentRecord = recordReader.next();
+      Object column17Hll = segmentRecord.getValue("column17_HLL");
+      HyperLogLog logLog = HllUtil.convertStringToHll((String) column17Hll);
+      segmentRecord.putField("newColumn17HLL", logLog.getBytes());
+
+      Object column18Hll = segmentRecord.getValue("column18_HLL");
+      HyperLogLog logLog2 = HllUtil.convertStringToHll((String) column18Hll);
+      segmentRecord.putField("newColumn18HLL", logLog2.getBytes());
+
+      segmentRecords.add(segmentRecord);
+    }
+
+    FieldSpec column17Hll = new MetricFieldSpec("newColumn17HLL", FieldSpec.DataType.BYTES);
+    segmentGeneratorConfig.getSchema().addField(column17Hll);
+    FieldSpec column18Hll = new MetricFieldSpec("newColumn18HLL", FieldSpec.DataType.BYTES);
+    segmentGeneratorConfig.getSchema().addField(column18Hll);
+
+    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(segmentRecords, segmentGeneratorConfig.getSchema()));
     driver.build();
 
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
