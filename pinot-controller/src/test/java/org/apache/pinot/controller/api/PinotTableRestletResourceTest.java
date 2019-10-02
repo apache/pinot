@@ -325,6 +325,17 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         sendPostRequest(_createTableUrl, offlineConfig2.toJsonConfigString());
     Assert.assertEquals(creationResponse, "{\"status\":\"Table table2_OFFLINE succesfully added\"}");
 
+    // The conflict between param type and table name suffix causes no table being deleted.
+    try {
+      sendDeleteRequest(
+          StringUtil.join("/", this._controllerBaseApiUrl, "tables", "table2_OFFLINE?type=realtime"));
+      Assert.fail("Deleting an existing table should fail.");
+    } catch (Exception e) {
+      Assert.assertTrue(e instanceof IOException);
+      // The server returns status 500 indicating error.
+      Assert.assertTrue(e.getMessage().contains("500"));
+    }
+
     deleteResponse = sendDeleteRequest(StringUtil.join("/", this._controllerBaseApiUrl,
         "tables", "table2?type=realtime"));
     Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table2_REALTIME] deleted\"}");
@@ -343,6 +354,25 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       // The server returns status 500 indicating error.
       Assert.assertTrue(e.getMessage().contains("500"));
     }
+
+    // Case 6: Create REALTIME and OFFLINE tables and delete the realtime/offline table using query params and suffixes.
+    TableConfig rtConfig3 = _realtimeBuilder.setTableName("table3").build();
+    creationResponse =
+        sendPostRequest(_createTableUrl, rtConfig3.toJsonConfigString());
+    Assert.assertEquals(creationResponse, "{\"status\":\"Table table3_REALTIME succesfully added\"}");
+
+    TableConfig offlineConfig3 = _offlineBuilder.setTableName("table3").build();
+    creationResponse =
+        sendPostRequest(_createTableUrl, offlineConfig3.toJsonConfigString());
+    Assert.assertEquals(creationResponse, "{\"status\":\"Table table3_OFFLINE succesfully added\"}");
+
+    deleteResponse = sendDeleteRequest(StringUtil.join("/", this._controllerBaseApiUrl,
+        "tables", "table3_REALTIME?type=realtime"));
+    Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table3_REALTIME] deleted\"}");
+
+    deleteResponse = sendDeleteRequest(StringUtil.join("/", this._controllerBaseApiUrl,
+        "tables", "table3_OFFLINE?type=offline"));
+    Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table3_OFFLINE] deleted\"}");
   }
 
   @AfterClass
