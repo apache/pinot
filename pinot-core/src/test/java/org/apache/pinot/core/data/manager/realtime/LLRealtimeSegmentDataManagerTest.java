@@ -452,6 +452,15 @@ public class LLRealtimeSegmentDataManagerTest {
       Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
     }
+
+    {
+      FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.RETAINING);
+      segmentDataManager.goOnlineFromConsuming(metadata);
+      Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
+      Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
+    }
   }
 
   @Test
