@@ -177,7 +177,7 @@ public class ThirdEyeAnomalyApplication
         }
         if (config.isDetectionPipeline()) {
           detectionPipelineScheduler = new DetectionPipelineScheduler(DAORegistry.getInstance().getDetectionConfigManager());
-          detectionPipelineScheduler.start();
+          //detectionPipelineScheduler.start();
         }
         if (config.isDetectionAlert()) {
           detectionAlertScheduler = new DetectionAlertScheduler();

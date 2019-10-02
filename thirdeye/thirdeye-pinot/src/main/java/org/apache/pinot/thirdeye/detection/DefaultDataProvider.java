@@ -125,8 +125,9 @@ public class DefaultDataProvider implements DataProvider {
               }
               Map<MetricSlice, DataFrame> r = loadTimeseries(slices, configId);
               Map<LoadTimeseriesRequestContainer, DataFrame> result = new HashMap<>();
-              for(Map.Entry<MetricSlice, DataFrame> entry : r.entrySet()) {
-                result.put(new LoadTimeseriesRequestContainer(entry.getKey(), configId), entry.getValue());
+
+              for (LoadTimeseriesRequestContainer rc : requestContainers) {
+                result.put(rc, r.get(rc.getSlice()));
               }
               return result;
             }
@@ -162,11 +163,13 @@ public class DefaultDataProvider implements DataProvider {
       boolean runBryanPoC = true;
 
       if (runBryanPoC) {
-        // find the max window and fetch it
-        Map<Long, MetricSlice> ranges = CacheUtils.findMaxRangeInterval(slices);
-        for (MetricSlice slice : ranges.values()) {
-          timeseriesLoader.prefetchTimeSeriesWindowRangeIntoCache(slice, configId);
-        }
+        //if (configId != -1) {
+          // find the max window and fetch it
+          Map<Long, MetricSlice> ranges = CacheUtils.findMaxRangeInterval(slices);
+          for (MetricSlice slice : ranges.values()) {
+            timeseriesLoader.prefetchTimeSeriesWindowRangeIntoCache(slice, configId);
+          }
+        //}
       }
 
       for (final MetricSlice slice : slices) {
@@ -200,7 +203,8 @@ public class DefaultDataProvider implements DataProvider {
       Map<MetricSlice, DataFrame> timeseriesResult = new HashMap<>();
       for (Map.Entry<LoadTimeseriesRequestContainer, DataFrame> entry : cacheResult.entrySet()){
         // make a copy of the result so that cache won't be contaminated by client code
-        timeseriesResult.put(alignedMetricSlicesToOriginalSlice.get(entry.getKey().getSlice()), entry.getValue().copy());
+        MetricSlice currentSlice = alignedMetricSlicesToOriginalSlice.get(entry.getKey());
+        timeseriesResult.put(currentSlice, entry.getValue().copy());
       }
       return timeseriesResult;
     } catch (Exception e) {

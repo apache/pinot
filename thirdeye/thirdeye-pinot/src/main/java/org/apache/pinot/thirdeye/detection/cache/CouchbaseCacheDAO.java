@@ -34,7 +34,7 @@ public class CouchbaseCacheDAO {
   //private static final String HOSTNAME = "localhost";
   private static final String AUTH_USERNAME = "thirdeye";
   private static final String AUTH_PASSWORD = "thirdeye";
-  private static final String BUCKET_NAME = "thirdeye_test";
+  private static final String BUCKET_NAME = "travel-sample";
 
   private static final String METRICS_KEY = "metrics";
   private static final String START_KEY = "start";
