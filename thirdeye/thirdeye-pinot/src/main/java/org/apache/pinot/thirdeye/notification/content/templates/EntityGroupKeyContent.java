@@ -95,8 +95,8 @@ public class EntityGroupKeyContent extends BaseNotificationContent {
   }
 
   @Override
-  public Map<String, Object> format(Long groupId, String groupName, Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
-    Map<String, Object> templateData = super.getTemplateData(context.getAlertConfig(), groupId, groupName, anomalies);
+  public Map<String, Object> format(Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
+    Map<String, Object> templateData = super.getTemplateData(context.getAlertConfig(), anomalies);
 
     DetectionConfigDTO config = null;
     Preconditions.checkArgument(anomalies != null && !anomalies.isEmpty(), "Report has empty anomalies");

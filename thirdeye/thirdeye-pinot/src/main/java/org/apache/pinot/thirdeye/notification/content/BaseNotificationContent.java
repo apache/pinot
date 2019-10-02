@@ -142,12 +142,9 @@ public abstract class BaseNotificationContent implements NotificationContent {
   /**
    * Generate subject based on configuration.
    */
-  public static String makeSubject(String baseSubject, String groupName, AlertConfigBean.SubjectType type, Map<String, Object> templateData) {
+  public static String makeSubject(String baseSubject, AlertConfigBean.SubjectType type, Map<String, Object> templateData) {
     switch (type) {
       case ALERT:
-        if (StringUtils.isNotBlank(groupName)) {
-          return baseSubject + " - " + groupName;
-        }
         return baseSubject;
 
       case METRICS:
@@ -186,8 +183,7 @@ public abstract class BaseNotificationContent implements NotificationContent {
     templateData.put("metricsMap", metricsMap);
   }
 
-  protected Map<String, Object> getTemplateData(AlertConfigDTO alertConfigDTO, Long groupId, String groupName,
-      Collection<AnomalyResult> anomalies) {
+  protected Map<String, Object> getTemplateData(AlertConfigDTO alertConfigDTO, Collection<AnomalyResult> anomalies) {
     Map<String, Object> templateData = new HashMap<>();
 
     DateTimeZone timeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(DEFAULT_TIME_ZONE));
@@ -224,16 +220,6 @@ public abstract class BaseNotificationContent implements NotificationContent {
     templateData.put("alertConfigName", alertConfigDTO.getName());
     templateData.put("includeSummary", includeSummary);
     templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
-    if (groupId != null) {
-      templateData.put("isGroupedAnomaly", true);
-      templateData.put("groupId", Long.toString(groupId));
-    } else {
-      templateData.put("isGroupedAnomaly", false);
-      templateData.put("groupId", Long.toString(-1));
-    }
-    if (StringUtils.isNotBlank(groupName)) {
-      templateData.put("groupName", groupName);
-    }
     if(precisionRecallEvaluator.getTotalResponses() > 0) {
       templateData.put("precision", precisionRecallEvaluator.getPrecisionInResponse());
       templateData.put("recall", precisionRecallEvaluator.getRecall());

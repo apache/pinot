@@ -230,7 +230,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     ADContentFormatterContext context = new ADContentFormatterContext();
     context.setAlertConfig(alertConfig);
     EmailEntity emailEntity = emailContentFormatter.getEmailEntity(null,
-        "Thirdeye Alert : " + this.config.getName(), null, null, anomalyResultListOfGroup,
+        "Thirdeye Alert : " + this.config.getName(), anomalyResultListOfGroup,
         context);
     if (emailEntity.getContent() == null) {
       // Ignore, nothing to send

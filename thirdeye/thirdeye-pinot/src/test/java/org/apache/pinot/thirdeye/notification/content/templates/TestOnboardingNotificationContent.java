@@ -127,7 +127,7 @@ public class TestOnboardingNotificationContent {
         contentFormatter = new EmailContentFormatter(new OnboardingNotificationContent(), thirdeyeAnomalyConfig);
     DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
         EmailUtils.getValidEmailAddresses("a@b.com"));
-    EmailEntity emailEntity = contentFormatter.getEmailEntity(recipients, TEST, null, "", anomalies, context);
+    EmailEntity emailEntity = contentFormatter.getEmailEntity(recipients, TEST, anomalies, context);
 
     String htmlPath = ClassLoader.getSystemResource("test-onboard-notification-email-content-formatter.html").getPath();
     Assert.assertEquals(
