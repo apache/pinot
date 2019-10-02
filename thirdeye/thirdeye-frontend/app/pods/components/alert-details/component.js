@@ -202,7 +202,7 @@ export default Component.extend({
         granularity,
         dimensionExploration
       } = this.getProperties('isPreviewMode', 'granularity', 'dimensionExploration');
-      return (isPreviewMode || (!dimensionExploration && (granularity === 'DAYS')));
+      return (isPreviewMode || (!dimensionExploration && (granularity.includes('DAYS'))));
     }
   ),
 
@@ -672,7 +672,7 @@ export default Component.extend({
     let firstDimension;
     try {
       if(showRules){
-        applicationAnomalies = (granularity === 'DAYS') ? yield getBounds(alertId, startAnomalies, endAnomalies) : yield getYamlPreviewAnomalies(alertYaml, startAnomalies, endAnomalies, alertId);
+        applicationAnomalies = (granularity.includes('DAYS')) ? yield getBounds(alertId, startAnomalies, endAnomalies) : yield getYamlPreviewAnomalies(alertYaml, startAnomalies, endAnomalies, alertId);
         if (applicationAnomalies && applicationAnomalies.diagnostics && applicationAnomalies.diagnostics['0']) {
           metricUrnList = Object.keys(applicationAnomalies.diagnostics['0']);
           set(this, 'metricUrnList', metricUrnList);
@@ -690,7 +690,7 @@ export default Component.extend({
           set(this, 'metricUrn', metricUrnList[0]);
         }
         // In the case of Alert Overview, the anomalies returned by getBounds may not be valid, so get anomalies from different endpoint
-        anomalies = (granularity === 'DAYS') ? yield getAnomaliesByAlertId(alertId, start, end) : applicationAnomalies.anomalies;
+        anomalies = (granularity.includes('DAYS')) ? yield getAnomaliesByAlertId(alertId, start, end) : applicationAnomalies.anomalies;
         uniqueTimeSeries = applicationAnomalies.predictions;
       } else {
         applicationAnomalies = yield getAnomaliesByAlertId(alertId, start, end);
@@ -759,7 +759,7 @@ export default Component.extend({
         duration: (timeWindowSize === 172800000) ? '48h' : 'custom',
         selectedDimension: 'Choose a dimension',
         // For now, we will only show predicted and bounds on daily metrics with no dimensions, for the Alert Overview page
-        selectedBaseline: (granularity === 'DAYS' && !dimensionExploration) ? 'predicted' : 'wo1w'
+        selectedBaseline: (granularity.includes('DAYS') && !dimensionExploration) ? 'predicted' : 'wo1w'
       });
       this._fetchAnomalies();
     } else {
