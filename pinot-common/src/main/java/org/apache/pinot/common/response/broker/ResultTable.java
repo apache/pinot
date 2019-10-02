@@ -30,8 +30,8 @@ import java.util.List;
  */
 @JsonPropertyOrder({"columns", "rows"})
 public class ResultTable {
-  private List<String> _columns;
-  private List<Serializable[]> _rows;
+  final private List<String> _columns;
+  final private List<Serializable[]> _rows;
 
   @JsonCreator
   public ResultTable(@JsonProperty("columns") List<String> columns,
@@ -45,18 +45,8 @@ public class ResultTable {
     return _columns;
   }
 
-  @JsonProperty("columns")
-  public void setColumns(List<String> columns) {
-    _columns = columns;
-  }
-
   @JsonProperty("results")
   public List<Serializable[]> getRows() {
     return _rows;
-  }
-
-  @JsonProperty("results")
-  public void setRows(List<Serializable[]> rows) {
-    _rows = rows;
   }
 }

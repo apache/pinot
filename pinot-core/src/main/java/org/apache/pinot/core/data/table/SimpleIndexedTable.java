@@ -52,24 +52,24 @@ public class SimpleIndexedTable extends IndexedTable {
   private Comparator<Record> _orderByComparator;
 
   private boolean _noMoreNewRecords = false;
-  private LongAdder _numResizes = new LongAdder();
-  private LongAccumulator _resizeTime = new LongAccumulator(Long::sum, 0);
+  private int _numResizes = 0;
+  private long _resizeTime = 0;
 
   /**
    * Initializes the data structures and comparators needed for this Table
    * @param dataSchema data schema of the record's keys and values
    * @param aggregationInfos aggregation infors for the aggregations in record'd values
    * @param orderBy list of {@link SelectionSort} defining the order by
-   * @param maxCapacity the max number of records to hold
+   * @param capacity the max number of records to hold
    * @param sort does final result need to be sorted
    */
   @Override
   public void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
-      int maxCapacity, boolean sort) {
-    super.init(dataSchema, aggregationInfos, orderBy, maxCapacity, sort);
+      int capacity, boolean sort) {
+    super.init(dataSchema, aggregationInfos, orderBy, capacity, sort);
 
-    _records = new ArrayList<>(maxCapacity);
-    _lookupTable = new HashMap<>(maxCapacity);
+    _records = new ArrayList<>(capacity);
+    _lookupTable = new HashMap<>(capacity);
 
     _isOrderBy = CollectionUtils.isNotEmpty(orderBy);
     if (_isOrderBy) {
@@ -90,7 +90,7 @@ public class SimpleIndexedTable extends IndexedTable {
     if (_noMoreNewRecords) { // only update existing records
       if (index != null) {
         Record existingRecord = _records.get(index);
-        for (int i = 0; i < _aggregationFunctions.size(); i++) {
+        for (int i = 0; i < _numAggregations; i++) {
           existingRecord.getValues()[i] = _aggregationFunctions.get(i).merge(existingRecord.getValues()[i], newRecord.getValues()[i]);
         }
       }
@@ -101,7 +101,7 @@ public class SimpleIndexedTable extends IndexedTable {
         _records.add(index, newRecord);
       } else {
         Record existingRecord = _records.get(index);
-        for (int i = 0; i < _aggregationFunctions.size(); i++) {
+        for (int i = 0; i < _numAggregations; i++) {
           existingRecord.getValues()[i] = _aggregationFunctions.get(i).merge(existingRecord.getValues()[i], newRecord.getValues()[i]);
         }
       }
@@ -139,8 +139,8 @@ public class SimpleIndexedTable extends IndexedTable {
     long endTime = System.currentTimeMillis();
     long timeElapsed = endTime - startTime;
 
-    _numResizes.increment();
-    _resizeTime.accumulate(timeElapsed);
+    _numResizes++;
+    _resizeTime += timeElapsed;
   }
 
 
@@ -166,10 +166,8 @@ public class SimpleIndexedTable extends IndexedTable {
   @Override
   public void finish() {
     sortAndResize(_maxCapacity);
-    long numResizes = _numResizes.sum();
-    long resizeTime = _resizeTime.get();
-    LOGGER.info("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", numResizes, resizeTime,
-        numResizes == 0 ? 0 : resizeTime / numResizes);
+    LOGGER.info("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", _numResizes, _resizeTime,
+        _numResizes == 0 ? 0 : _resizeTime / _numResizes);
   }
 
   @Override

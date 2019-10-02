@@ -109,12 +109,10 @@ public final class OrderByUtils {
   }
 
   public static List<Integer> getAggregationIndexes(List<SelectionSort> orderBy, List<AggregationInfo> aggregationInfos) {
-    Map<String, Integer> aggregationColumnToIndex = new HashMap<>(aggregationInfos.size());
+    Map<String, Integer> aggregationColumnToIndex = new HashMap<>();
     for (int i = 0; i < aggregationInfos.size(); i++) {
       AggregationInfo aggregationInfo = aggregationInfos.get(i);
-      String aggregationColumn =
-          aggregationInfo.getAggregationType().toLowerCase() + "(" + AggregationFunctionUtils.getColumn(aggregationInfo)
-              + ")";
+      String aggregationColumn = AggregationFunctionUtils.getAggregationColumnName(aggregationInfo);
       aggregationColumnToIndex.put(aggregationColumn, i);
     }
 
@@ -148,9 +146,7 @@ public final class OrderByUtils {
     Map<String, AggregationInfo> aggregationColumnToInfo = new HashMap<>(aggregationInfos.size());
     for (int i = 0; i < aggregationInfos.size(); i++) {
       AggregationInfo aggregationInfo = aggregationInfos.get(i);
-      String aggregationColumn =
-          aggregationInfo.getAggregationType().toLowerCase() + "(" + AggregationFunctionUtils.getColumn(aggregationInfo)
-              + ")";
+      String aggregationColumn = AggregationFunctionUtils.getAggregationColumnName(aggregationInfo);
       aggregationColumnToIndex.put(aggregationColumn, i);
       aggregationColumnToInfo.put(aggregationColumn, aggregationInfo);
     }

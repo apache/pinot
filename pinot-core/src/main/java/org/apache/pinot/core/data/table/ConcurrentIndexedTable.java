@@ -27,8 +27,8 @@ import java.util.PriorityQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.LongAccumulator;
-import java.util.concurrent.atomic.LongAdder;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nonnull;
 import org.apache.commons.collections.CollectionUtils;
@@ -56,21 +56,21 @@ public class ConcurrentIndexedTable extends IndexedTable {
   private List<Integer> _aggregationIndexes;
 
   private AtomicBoolean _noMoreNewRecords = new AtomicBoolean();
-  private LongAdder _numResizes = new LongAdder();
-  private LongAccumulator _resizeTime = new LongAccumulator(Long::sum, 0);
+  private final AtomicInteger _numResizes = new AtomicInteger();
+  private final AtomicLong _resizeTime = new AtomicLong();
 
   /**
    * Initializes the data structures and comparators needed for this Table
    * @param dataSchema data schema of the record's keys and values
    * @param aggregationInfos aggregation infors for the aggregations in record'd values
    * @param orderBy list of {@link SelectionSort} defining the order by
-   * @param maxCapacity the max number of records to hold
+   * @param capacity the max number of records to hold
    * @param sort does final result need to be sorted
    */
   @Override
   public void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
-      int maxCapacity, boolean sort) {
-    super.init(dataSchema, aggregationInfos, orderBy, maxCapacity, sort);
+      int capacity, boolean sort) {
+    super.init(dataSchema, aggregationInfos, orderBy, capacity, sort);
 
     _lookupMap = new ConcurrentHashMap<>();
     _readWriteLock = new ReentrantReadWriteLock();
@@ -94,7 +94,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
     if (_noMoreNewRecords.get()) { // allow only existing record updates
       _lookupMap.computeIfPresent(key, (k, v) -> {
-        for (int i = 0; i < _aggregationFunctions.size(); i++) {
+        for (int i = 0; i < _numAggregations; i++) {
           v.getValues()[i] = _aggregationFunctions.get(i).merge(v.getValues()[i], newRecord.getValues()[i]);
         }
         return v;
@@ -104,7 +104,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
       Record existingRecord = _lookupMap.putIfAbsent(key, newRecord);
       if (existingRecord != null) {
         _lookupMap.compute(key, (k, v) -> {
-          for (int i = 0; i < _aggregationFunctions.size(); i++) {
+          for (int i = 0; i < _numAggregations; i++) {
             v.getValues()[i] = _aggregationFunctions.get(i).merge(v.getValues()[i], newRecord.getValues()[i]);
           }
           return v;
@@ -206,15 +206,15 @@ public class ConcurrentIndexedTable extends IndexedTable {
       long endTime = System.currentTimeMillis();
       long timeElapsed = endTime - startTime;
 
-      _numResizes.increment();
-      _resizeTime.accumulate(timeElapsed);
+      _numResizes.incrementAndGet();
+      _resizeTime.addAndGet(timeElapsed);
     }
   }
 
   @Override
   public void finish() {
     resize(_maxCapacity);
-    long numResizes = _numResizes.sum();
+    int numResizes = _numResizes.get();
     long resizeTime = _resizeTime.get();
     LOGGER.info("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", numResizes, resizeTime,
         numResizes == 0 ? 0 : resizeTime / numResizes);

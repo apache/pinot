@@ -49,6 +49,11 @@ public class AggregationFunctionUtils {
     return aggregationInfo.getAggregationParams().get(COLUMN_KEY);
   }
 
+  public static String getAggregationColumnName(@Nonnull AggregationInfo aggregationInfo) {
+    return aggregationInfo.getAggregationType().toLowerCase() + "(" + AggregationFunctionUtils.getColumn(aggregationInfo)
+        + ")";
+  }
+
   /**
    * Creates an {@link AggregationFunctionColumnPair} from the {@link AggregationInfo}.
    */

@@ -60,7 +60,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.common.utils.CommonConstants.Broker.*;
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.*;
 
 
 @ThreadSafe
@@ -220,19 +219,19 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // Set extra settings into broker request
-    if (request.has(TRACE) && request.get(TRACE).asBoolean()) {
+    if (request.has(Request.TRACE) && request.get(Request.TRACE).asBoolean()) {
       LOGGER.debug("Enable trace for request {}: {}", requestId, query);
       brokerRequest.setEnableTrace(true);
     }
 
-    if (request.has(DEBUG_OPTIONS)) {
-      Map<String, String> debugOptions = getOptionsFromRequest(request, DEBUG_OPTIONS);
+    if (request.has(Request.DEBUG_OPTIONS)) {
+      Map<String, String> debugOptions = getOptionsFromRequest(request, Request.DEBUG_OPTIONS);
       LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
       brokerRequest.setDebugOptions(debugOptions);
     }
 
-    if (request.has(QUERY_OPTIONS)) {
-      Map<String, String> queryOptions = getOptionsFromRequest(request, QUERY_OPTIONS);
+    if (request.has(Request.QUERY_OPTIONS)) {
+      Map<String, String> queryOptions = getOptionsFromRequest(request, Request.QUERY_OPTIONS);
       LOGGER.debug("Query options are set to: {} for request {}: {}", queryOptions, requestId, query);
       brokerRequest.setQueryOptions(queryOptions);
     }
@@ -352,10 +351,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   private PinotQueryRequest getPinotQueryRequest(JsonNode request) {
-    if (request.has(SQL)) {
-      return new PinotQueryRequest(SQL, request.get(SQL).asText());
+    if (request.has(Request.SQL)) {
+      return new PinotQueryRequest(Request.SQL, request.get(Request.SQL).asText());
     }
-    return new PinotQueryRequest(PQL, request.get(PQL).asText());
+    return new PinotQueryRequest(Request.PQL, request.get(Request.PQL).asText());
   }
 
   /**

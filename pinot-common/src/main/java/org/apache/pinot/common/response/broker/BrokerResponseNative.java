@@ -101,17 +101,6 @@ public class BrokerResponseNative implements BrokerResponse {
     _selectionResults = selectionResults;
   }
 
-  @JsonProperty("resultTable")
-  @JsonInclude(JsonInclude.Include.NON_NULL)
-  public ResultTable getResultTable() {
-    return _resultTable;
-  }
-
-  @JsonProperty("resultTable")
-  public void setResultTable(ResultTable resultTable) {
-    _resultTable = resultTable;
-  }
-
   @JsonProperty("aggregationResults")
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public List<AggregationResult> getAggregationResults() {
@@ -121,6 +110,17 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("aggregationResults")
   public void setAggregationResults(List<AggregationResult> aggregationResults) {
     _aggregationResults = aggregationResults;
+  }
+
+  @JsonProperty("resultTable")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public ResultTable getResultTable() {
+    return _resultTable;
+  }
+
+  @JsonProperty("resultTable")
+  public void setResultTable(ResultTable resultTable) {
+    _resultTable = resultTable;
   }
 
   @JsonProperty("exceptions")

@@ -34,6 +34,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 public abstract class IndexedTable implements Table {
 
   List<AggregationFunction> _aggregationFunctions;
+  int _numAggregations;
   DataSchema _dataSchema;
   boolean _sort;
 
@@ -42,11 +43,12 @@ public abstract class IndexedTable implements Table {
 
   @Override
   public void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
-      int maxCapacity, boolean sort) {
+      int capacity, boolean sort) {
     _dataSchema = dataSchema;
     _sort = sort;
 
-    _aggregationFunctions = new ArrayList<>(aggregationInfos.size());
+    _numAggregations = aggregationInfos.size();
+    _aggregationFunctions = new ArrayList<>(_numAggregations);
     for (AggregationInfo aggregationInfo : aggregationInfos) {
       _aggregationFunctions.add(
           AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction());
@@ -62,14 +64,14 @@ public abstract class IndexedTable implements Table {
      * the table resize and evict bottom records, resizing it to {@link IndexedTable::_maxCapacity}
      * The assumption here is that {@link IndexedTable::_maxCapacity} already has a buffer added by the caller (typically, we do max(top * 5, 5000))
      */
-    if (maxCapacity > 50000) {
+    if (capacity > 50000) {
       // if max capacity is large, buffer capacity is kept smaller, so that we do not accumulate too many records for sorting/resizing
       bufferFactor = 1.2;
     } else {
       // if max capacity is small, buffer capacity is kept larger, so that we avoid frequent resizing
       bufferFactor = 2.0;
     }
-    _maxCapacity = maxCapacity;
-    _bufferedCapacity = (int) (maxCapacity * bufferFactor);
+    _maxCapacity = capacity;
+    _bufferedCapacity = (int) (capacity * bufferFactor);
   }
 }
