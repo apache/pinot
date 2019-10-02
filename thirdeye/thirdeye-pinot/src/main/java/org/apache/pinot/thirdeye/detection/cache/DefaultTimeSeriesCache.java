@@ -34,7 +34,7 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
   }
 
   public ThirdEyeResponse fetchTimeSeries(ThirdEyeCacheRequestContainer rc) throws Exception {
-    LOG.info("trying to fetch data from cache...");
+    LOG.info("trying to fetch data from cache with id {}...", rc.getDetectionId());
 
     ThirdEyeResponse response;
     ThirdEyeCacheResponse cacheResponse = cacheDAO.tryFetchExistingTimeSeries(rc);
@@ -50,6 +50,7 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
       executor.execute(() -> insertTimeSeriesIntoCache(rc.getDetectionId(), response));
       //this.insertTimeSeriesIntoCache(rc.getDetectionId(), response);
     } else {
+      LOG.info("cache fetch success :)");
 
       TimeSpec responseSpec = cacheResponse.getTimeSpec();
       Period granularityPeriod = responseSpec.getDataGranularity().toPeriod();
@@ -57,33 +58,37 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
       DateTime cacheStart = new DateTime(Long.valueOf(cacheResponse.getStart()), start.getZone());
       DateTime cacheEnd = new DateTime(Long.valueOf(cacheResponse.getEnd()), end.getZone());
 
-      // keep adding from beginning
-      int startIndexOffset = 0;
-      while (!cacheStart.isEqual(start)) {
-        cacheStart = cacheStart.withPeriodAdded(granularityPeriod,1);
-        startIndexOffset++;
+      try {
+        // keep adding from beginning
+        int startIndexOffset = 0;
+        while (!cacheStart.isEqual(start)) {
+          cacheStart = cacheStart.withPeriodAdded(granularityPeriod, 1);
+          startIndexOffset++;
+        }
+
+        // keep subtracting from end
+        int endIndexOffset = 0;
+        while (!cacheEnd.isEqual(end)) {
+          cacheEnd = cacheEnd.withPeriodAdded(granularityPeriod, -1);
+          endIndexOffset++;
+        }
+
+        List<String[]> rowList = cacheResponse.getMetrics();
+
+        List<String[]> rows = rowList.subList(startIndexOffset, rowList.size() - 1 - endIndexOffset);
+
+        response = new RelationalThirdEyeResponse(rc.getRequest(), rows, responseSpec);
+      } catch (Exception e) {
+        LOG.info("requested slice between {} and {}", start, end);
+        LOG.info("cache contained slice between {} and {}", cacheStart, cacheEnd);
+        throw e;
       }
-
-      // keep subtracting from end
-      int endIndexOffset = 0;
-      while (!cacheEnd.isEqual(end)) {
-        cacheEnd = cacheEnd.withPeriodAdded(granularityPeriod,-1);
-        endIndexOffset++;
-      }
-
-      List<String[]> rowList = cacheResponse.getMetrics();
-
-      List<String[]> rows = rowList
-          .subList(startIndexOffset, rowList.size() - 1 - endIndexOffset);
-
-      response = new RelationalThirdEyeResponse(rc.getRequest(), rows, responseSpec);
     }
 
     // TODO: Write logic to grab missing slices and merge rows later.
     // TODO: for now, just fetch the whole series and work on that logic.
     // fetch start to cacheStart - 1 => append to beginning
     // fetch cacheEnd to end => append to end
-    LOG.info("cache fetch success :)");
     return response;
   }
 

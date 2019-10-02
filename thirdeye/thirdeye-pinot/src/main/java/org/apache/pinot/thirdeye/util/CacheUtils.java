@@ -79,17 +79,9 @@ public class CacheUtils {
     ThirdEyeCacheResponse val = null;
 
     try {
-      //Map<String, Object> responseMap = new ObjectMapper().readValue(jsonObject.toString(), new TypeReference<Map<String, Object>>(){});
-      //String start = responseMap.get("start").toString();
       String start = jsonObject.get("start").toString();
       String end = jsonObject.get("end").toString();
       List<String[]> metrics = new ObjectMapper().readValue(jsonObject.get("metrics").toString(), new TypeReference<List<String[]>>(){});
-      //List<String[]> metrics = new ArrayList<>();
-      /*List<Object> metricsArray = ((JsonArray)jsonObject.get("metrics")).toList();
-      for (Object o : metricsArray) {
-        List<String> inner = (List<String>)o;
-        metrics.add(inner.toArray(new String[inner.size()]));
-      }*/
       Map<String, String> timeSpec = new ObjectMapper().readValue(jsonObject.get("timeSpec").toString(), new TypeReference<Map<String, String>>(){});
 
       val = new ThirdEyeCacheResponse(start, end, metrics, timeSpec);
