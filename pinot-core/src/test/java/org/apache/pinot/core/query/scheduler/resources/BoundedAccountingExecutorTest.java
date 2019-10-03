@@ -18,22 +18,17 @@
  */
 package org.apache.pinot.core.query.scheduler.resources;
 
-import com.google.common.base.Function;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
-import javax.annotation.Nullable;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.testng.Assert.assertEquals;
+import static org.mockito.Mockito.*;
+import static org.testng.Assert.*;
 
 
 public class BoundedAccountingExecutorTest {
@@ -109,16 +104,8 @@ public class BoundedAccountingExecutorTest {
     // have not yet gotten to execute running.decrementAndGet(), but the pending jobs have already
     // done the increment. So, we need to wait until we check the running counter to equal the
     // pending jobs.
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        if (running.get() == pendingJobs) {
-          return Boolean.TRUE;
-        }
-        return Boolean.FALSE;
-      }
-    }, 10_000, "Invalid number of running jobs" + running.get());
+    TestUtils.waitForCondition(aVoid -> running.get() == pendingJobs,
+        10_000, "Invalid number of running jobs" + running.get());
 
     // Now that there are no jobs running, we can let the new ones in.
     // All the pending jobs will wait on the validationBarrier after we let them pass
