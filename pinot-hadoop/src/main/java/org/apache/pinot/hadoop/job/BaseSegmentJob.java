@@ -107,8 +107,14 @@ public abstract class BaseSegmentJob extends Configured {
   protected List<Path> getDataFilePaths(Path pathPattern)
       throws IOException {
     List<Path> tarFilePaths = new ArrayList<>();
-    FileSystem fileSystem = FileSystem.get(_conf);
-    getDataFilePathsHelper(fileSystem, fileSystem.globStatus(pathPattern), tarFilePaths);
+    FileSystem fileSystem = FileSystem.get(pathPattern.toUri(), _conf);
+    _logger.info("Using filesystem: {}", fileSystem);
+    FileStatus[] fileStatuses = fileSystem.globStatus(pathPattern);
+    if (fileStatuses == null) {
+      _logger.warn("Unable to match file status from file path pattern: {}", pathPattern);
+    } else {
+      getDataFilePathsHelper(fileSystem, fileStatuses, tarFilePaths);
+    }
     return tarFilePaths;
   }
 

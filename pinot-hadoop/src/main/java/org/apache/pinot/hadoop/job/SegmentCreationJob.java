@@ -63,7 +63,8 @@ public class SegmentCreationJob extends BaseSegmentJob {
   protected final String _defaultPermissionsMask;
   protected final List<PushLocation> _pushLocations;
 
-  protected FileSystem _fileSystem;
+  // Output Directory FileSystem
+  protected FileSystem _outputDirFileSystem;
 
   public SegmentCreationJob(Properties properties) {
     super(properties);
@@ -116,11 +117,11 @@ public class SegmentCreationJob extends BaseSegmentJob {
     _logger.info("Starting {}", getClass().getSimpleName());
 
     // Initialize all directories
-    _fileSystem = FileSystem.get(_conf);
-    JobPreparationHelper.mkdirs(_fileSystem, _outputDir, _defaultPermissionsMask);
-    JobPreparationHelper.mkdirs(_fileSystem, _stagingDir, _defaultPermissionsMask);
+    _outputDirFileSystem = FileSystem.get(_outputDir.toUri(), _conf);
+    JobPreparationHelper.mkdirs(_outputDirFileSystem, _outputDir, _defaultPermissionsMask);
+    JobPreparationHelper.mkdirs(_outputDirFileSystem, _stagingDir, _defaultPermissionsMask);
     Path stagingInputDir = new Path(_stagingDir, "input");
-    JobPreparationHelper.mkdirs(_fileSystem, stagingInputDir, _defaultPermissionsMask);
+    JobPreparationHelper.mkdirs(_outputDirFileSystem, stagingInputDir, _defaultPermissionsMask);
 
     // Gather all data files
     List<Path> dataFilePaths = getDataFilePaths(_inputPattern);
@@ -133,7 +134,7 @@ public class SegmentCreationJob extends BaseSegmentJob {
       _logger.info("Creating segments with data files: {}", dataFilePaths);
       for (int i = 0; i < numDataFiles; i++) {
         Path dataFilePath = dataFilePaths.get(i);
-        try (DataOutputStream dataOutputStream = _fileSystem.create(new Path(stagingInputDir, Integer.toString(i)))) {
+        try (DataOutputStream dataOutputStream = _outputDirFileSystem.create(new Path(stagingInputDir, Integer.toString(i)))) {
           dataOutputStream.write(StringUtil.encodeUtf8(dataFilePath.toString() + " " + i));
           dataOutputStream.flush();
         }
@@ -190,7 +191,7 @@ public class SegmentCreationJob extends BaseSegmentJob {
 
     // Delete the staging directory
     _logger.info("Deleting the staging directory: {}", _stagingDir);
-    _fileSystem.delete(_stagingDir, true);
+    _outputDirFileSystem.delete(_stagingDir, true);
   }
 
   @Override
@@ -200,7 +201,8 @@ public class SegmentCreationJob extends BaseSegmentJob {
       if (controllerRestApi != null) {
         return controllerRestApi.getSchema();
       } else {
-        try (InputStream inputStream = _fileSystem.open(_schemaFile)) {
+        // Schema file could be stored local or remotely.
+        try (InputStream inputStream = FileSystem.get(_schemaFile.toUri(), getConf()).open(_schemaFile)) {
           return Schema.fromInputSteam(inputStream);
         }
       }
@@ -227,7 +229,7 @@ public class SegmentCreationJob extends BaseSegmentJob {
   protected void addDepsJarToDistributedCache(Job job)
       throws IOException {
     if (_depsJarDir != null) {
-      JobPreparationHelper.addDepsJarToDistributedCacheHelper(_fileSystem, job, _depsJarDir);
+      JobPreparationHelper.addDepsJarToDistributedCacheHelper(FileSystem.get(_depsJarDir.toUri(), getConf()), job, _depsJarDir);
     }
   }
 
@@ -241,11 +243,11 @@ public class SegmentCreationJob extends BaseSegmentJob {
   protected void moveSegmentsToOutputDir()
       throws IOException {
     Path segmentTarDir = new Path(new Path(_stagingDir, "output"), JobConfigConstants.SEGMENT_TAR_DIR);
-    for (FileStatus segmentTarStatus : _fileSystem.listStatus(segmentTarDir)) {
+    for (FileStatus segmentTarStatus : _outputDirFileSystem.listStatus(segmentTarDir)) {
       Path segmentTarPath = segmentTarStatus.getPath();
       Path dest = new Path(_outputDir, segmentTarPath.getName());
       _logger.info("Moving segment tar file from: {} to: {}", segmentTarPath, dest);
-      _fileSystem.rename(segmentTarPath, dest);
+      _outputDirFileSystem.rename(segmentTarPath, dest);
     }
   }
 }
