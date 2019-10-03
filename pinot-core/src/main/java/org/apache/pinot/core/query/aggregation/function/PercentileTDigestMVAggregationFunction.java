@@ -49,7 +49,7 @@ public class PercentileTDigestMVAggregationFunction extends PercentileTDigestAgg
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
     double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
-    TDigest tDigest = getTDigest(aggregationResultHolder);
+    TDigest tDigest = getDefaultTDigest(aggregationResultHolder);
     for (int i = 0; i < length; i++) {
       for (double value : valuesArray[i]) {
         tDigest.add(value);
@@ -62,7 +62,7 @@ public class PercentileTDigestMVAggregationFunction extends PercentileTDigestAgg
       BlockValSet... blockValSets) {
     double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
     for (int i = 0; i < length; i++) {
-      TDigest tDigest = getTDigest(groupByResultHolder, groupKeyArray[i]);
+      TDigest tDigest = getDefaultTDigest(groupByResultHolder, groupKeyArray[i]);
       for (double value : valuesArray[i]) {
         tDigest.add(value);
       }
@@ -76,7 +76,7 @@ public class PercentileTDigestMVAggregationFunction extends PercentileTDigestAgg
     for (int i = 0; i < length; i++) {
       double[] values = valuesArray[i];
       for (int groupKey : groupKeysArray[i]) {
-        TDigest tDigest = getTDigest(groupByResultHolder, groupKey);
+        TDigest tDigest = getDefaultTDigest(groupByResultHolder, groupKey);
         for (double value : values) {
           tDigest.add(value);
         }

@@ -62,27 +62,8 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
     DataType valueType = blockValSets[0].getValueType();
-    if (valueType == DataType.BYTES) {
-      // Serialized HyperLogLog
-      byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
-      try {
-        HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
-        if (hyperLogLog == null) {
-          hyperLogLog = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[0]);
-          aggregationResultHolder.setValue(hyperLogLog);
-          for (int i = 1; i < length; i++) {
-            hyperLogLog.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
-            hyperLogLog.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
-          }
-        }
-      } catch (Exception e) {
-        throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
-      }
-    } else {
-      HyperLogLog hyperLogLog = getHyperLogLog(aggregationResultHolder);
+    if (valueType != DataType.BYTES) {
+      HyperLogLog hyperLogLog = getDefaultHyperLogLog(aggregationResultHolder);
       switch (valueType) {
         case INT:
           int[] intValues = blockValSets[0].getIntValuesSV();
@@ -118,6 +99,25 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
           throw new IllegalStateException(
               "Illegal data type for DISTINCT_COUNT_HLL aggregation function: " + valueType);
       }
+    } else {
+      // Serialized HyperLogLog
+      byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+      try {
+        HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
+        if (hyperLogLog != null) {
+          for (int i = 0; i < length; i++) {
+            hyperLogLog.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
+          }
+        } else {
+          hyperLogLog = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[0]);
+          aggregationResultHolder.setValue(hyperLogLog);
+          for (int i = 1; i < length; i++) {
+            hyperLogLog.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
+          }
+        }
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
+      }
     }
   }
 
@@ -129,39 +129,49 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
       case INT:
         int[] intValues = blockValSets[0].getIntValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], intValues[i]);
+          getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(intValues[i]);
         }
         break;
       case LONG:
         long[] longValues = blockValSets[0].getLongValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], longValues[i]);
+          getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(longValues[i]);
         }
         break;
       case FLOAT:
         float[] floatValues = blockValSets[0].getFloatValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], floatValues[i]);
+          getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(floatValues[i]);
         }
         break;
       case DOUBLE:
         double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], doubleValues[i]);
+          getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(doubleValues[i]);
         }
         break;
       case STRING:
         String[] stringValues = blockValSets[0].getStringValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], stringValues[i]);
+          getDefaultHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(stringValues[i]);
         }
         break;
       case BYTES:
         // Serialized HyperLogLog
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
-        for (int i = 0; i < length; i++) {
-          setValueForGroupKey(groupByResultHolder, groupKeyArray[i],
-              ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
+        try {
+          for (int i = 0; i < length; i++) {
+            HyperLogLog value = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]);
+            int groupKey = groupKeyArray[i];
+            HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
+            if (hyperLogLog != null) {
+              hyperLogLog.addAll(value);
+            } else {
+              groupByResultHolder.setValueForKey(groupKey, value);
+            }
+          }
+        } catch (Exception e) {
+          throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
         }
         break;
       default:
@@ -177,39 +187,67 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
       case INT:
         int[] intValues = blockValSets[0].getIntValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], intValues[i]);
+          int value = intValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            getDefaultHyperLogLog(groupByResultHolder, groupKey).offer(value);
+          }
         }
         break;
       case LONG:
         long[] longValues = blockValSets[0].getLongValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], longValues[i]);
+          long value = longValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            getDefaultHyperLogLog(groupByResultHolder, groupKey).offer(value);
+          }
         }
         break;
       case FLOAT:
         float[] floatValues = blockValSets[0].getFloatValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], floatValues[i]);
+          float value = floatValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            getDefaultHyperLogLog(groupByResultHolder, groupKey).offer(value);
+          }
         }
         break;
       case DOUBLE:
         double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], doubleValues[i]);
+          double value = doubleValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            getDefaultHyperLogLog(groupByResultHolder, groupKey).offer(value);
+          }
         }
         break;
       case STRING:
-        String[] singleValues = blockValSets[0].getStringValuesSV();
+        String[] stringValues = blockValSets[0].getStringValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], singleValues[i]);
+          String value = stringValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            getDefaultHyperLogLog(groupByResultHolder, groupKey).offer(value);
+          }
         }
         break;
       case BYTES:
         // Serialized HyperLogLog
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
-        for (int i = 0; i < length; i++) {
-          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i],
-              ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
+        try {
+          for (int i = 0; i < length; i++) {
+            HyperLogLog value = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]);
+            for (int groupKey : groupKeysArray[i]) {
+              HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
+              if (hyperLogLog != null) {
+                hyperLogLog.addAll(value);
+              } else {
+                // Create a new HyperLogLog for the group
+                groupByResultHolder
+                    .setValueForKey(groupKey, ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
+              }
+            }
+          }
+        } catch (Exception e) {
+          throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
         }
         break;
       default:
@@ -273,71 +311,12 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   }
 
   /**
-   * Helper method to set value for a groupKey into the result holder.
-   *
-   * @param groupByResultHolder Result holder
-   * @param groupKey Group-key for which to set the value
-   * @param value Value for the group key
-   */
-  private static void setValueForGroupKey(GroupByResultHolder groupByResultHolder, int groupKey, Object value) {
-    HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
-    hyperLogLog.offer(value);
-  }
-
-  /**
-   * Helper method to set HyperLogLog value for a groupKey into the result holder.
-   *
-   * @param groupByResultHolder Result holder
-   * @param groupKey Group-key for which to set the value
-   * @param value HyperLogLog value for the group key
-   */
-  private static void setValueForGroupKey(GroupByResultHolder groupByResultHolder, int groupKey, HyperLogLog value) {
-    HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
-    if (hyperLogLog == null) {
-      groupByResultHolder.setValueForKey(groupKey, value);
-    } else {
-      try {
-        hyperLogLog.addAll(value);
-      } catch (Exception e) {
-        throw new RuntimeException("Caught exception while merging HyperLogLogs", e);
-      }
-    }
-  }
-
-  /**
-   * Helper method to set value for a given array of group keys.
-   *
-   * @param groupByResultHolder Result Holder
-   * @param groupKeys Group keys for which to set the value
-   * @param value Value to set
-   */
-  private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, Object value) {
-    for (int groupKey : groupKeys) {
-      setValueForGroupKey(groupByResultHolder, groupKey, value);
-    }
-  }
-
-  /**
-   * Helper method to set HyperLogLog value for a given array of group keys.
-   *
-   * @param groupByResultHolder Result Holder
-   * @param groupKeys Group keys for which to set the value
-   * @param value HyperLogLog value to set
-   */
-  private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys,
-      HyperLogLog value) {
-    for (int groupKey : groupKeys) {
-      setValueForGroupKey(groupByResultHolder, groupKey, value);
-    }
-  }
-
-  /**
-   * Returns the HyperLogLog from the result holder or creates a new one if it does not exist.
+   * Returns the HyperLogLog from the result holder or creates a new one with default log2m if it does not exist.
    *
    * @param aggregationResultHolder Result holder
    * @return HyperLogLog from the result holder
    */
-  protected static HyperLogLog getHyperLogLog(AggregationResultHolder aggregationResultHolder) {
+  protected static HyperLogLog getDefaultHyperLogLog(AggregationResultHolder aggregationResultHolder) {
     HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
     if (hyperLogLog == null) {
       hyperLogLog = new HyperLogLog(DEFAULT_LOG2M);
@@ -347,13 +326,13 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   }
 
   /**
-   * Returns the HyperLogLog for the given group key. If one does not exist, creates a new one and returns that.
+   * Returns the HyperLogLog for the given group key if exists, or creates a new one with default log2m.
    *
    * @param groupByResultHolder Result holder
    * @param groupKey Group key for which to return the HyperLogLog
    * @return HyperLogLog for the group key
    */
-  protected static HyperLogLog getHyperLogLog(GroupByResultHolder groupByResultHolder, int groupKey) {
+  protected static HyperLogLog getDefaultHyperLogLog(GroupByResultHolder groupByResultHolder, int groupKey) {
     HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
     if (hyperLogLog == null) {
       hyperLogLog = new HyperLogLog(DEFAULT_LOG2M);

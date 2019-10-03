@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -66,90 +66,81 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
-    QuantileDigest quantileDigest = getQuantileDigest(aggregationResultHolder);
-
-    FieldSpec.DataType valueType = blockValSets[0].getValueType();
-    switch (valueType) {
-      case INT:
-      case LONG:
-      case FLOAT:
-      case DOUBLE:
-        double[] valueArray = blockValSets[0].getDoubleValuesSV();
-        for (int i = 0; i < length; i++) {
-          quantileDigest.add((long) valueArray[i]);
-        }
-        break;
-      case BYTES:
-        // Serialized QuantileDigest
-        byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+    if (blockValSets[0].getValueType() != DataType.BYTES) {
+      long[] longValues = blockValSets[0].getLongValuesSV();
+      QuantileDigest quantileDigest = getDefaultQuantileDigest(aggregationResultHolder);
+      for (int i = 0; i < length; i++) {
+        quantileDigest.add(longValues[i]);
+      }
+    } else {
+      // Serialized QuantileDigest
+      byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+      QuantileDigest quantileDigest = aggregationResultHolder.getResult();
+      if (quantileDigest != null) {
         for (int i = 0; i < length; i++) {
           quantileDigest.merge(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]));
         }
-        break;
-      default:
-        throw new IllegalStateException("Illegal data type for PERCENTILE_EST aggregation function: " + valueType);
+      } else {
+        quantileDigest = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[0]);
+        aggregationResultHolder.setValue(quantileDigest);
+        for (int i = 1; i < length; i++) {
+          quantileDigest.merge(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]));
+        }
+      }
     }
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       BlockValSet... blockValSets) {
-    FieldSpec.DataType valueType = blockValSets[0].getValueType();
-    switch (valueType) {
-      case INT:
-      case LONG:
-      case FLOAT:
-      case DOUBLE:
-        double[] valueArray = blockValSets[0].getDoubleValuesSV();
-        for (int i = 0; i < length; i++) {
-          QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKeyArray[i]);
-          quantileDigest.add((long) valueArray[i]);
+    if (blockValSets[0].getValueType() != DataType.BYTES) {
+      long[] longValues = blockValSets[0].getLongValuesSV();
+      for (int i = 0; i < length; i++) {
+        getDefaultQuantileDigest(groupByResultHolder, groupKeyArray[i]).add(longValues[i]);
+      }
+    } else {
+      // Serialized QuantileDigest
+      byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+      for (int i = 0; i < length; i++) {
+        QuantileDigest value = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]);
+        int groupKey = groupKeyArray[i];
+        QuantileDigest quantileDigest = groupByResultHolder.getResult(groupKey);
+        if (quantileDigest != null) {
+          quantileDigest.merge(value);
+        } else {
+          groupByResultHolder.setValueForKey(groupKey, value);
         }
-        break;
-      case BYTES:
-        // Serialized QuantileDigest
-        byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
-        for (int i = 0; i < length; i++) {
-          QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKeyArray[i]);
-          quantileDigest.merge(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]));
-        }
-        break;
-      default:
-        throw new IllegalStateException("Illegal data type for PERCENTILE_EST aggregation function: " + valueType);
+      }
     }
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       BlockValSet... blockValSets) {
-    FieldSpec.DataType valueType = blockValSets[0].getValueType();
-    switch (valueType) {
-      case INT:
-      case LONG:
-      case FLOAT:
-      case DOUBLE:
-        double[] valueArray = blockValSets[0].getDoubleValuesSV();
-        for (int i = 0; i < length; i++) {
-          double value = valueArray[i];
-          for (int groupKey : groupKeysArray[i]) {
-            QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKey);
-            quantileDigest.add((long) value);
-          }
+    if (blockValSets[0].getValueType() != DataType.BYTES) {
+      long[] longValues = blockValSets[0].getLongValuesSV();
+      for (int i = 0; i < length; i++) {
+        long value = longValues[i];
+        for (int groupKey : groupKeysArray[i]) {
+          getDefaultQuantileDigest(groupByResultHolder, groupKey).add(value);
         }
-        break;
-      case BYTES:
-        // Serialized QuantileDigest
-        byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
-        for (int i = 0; i < length; i++) {
-          QuantileDigest value = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]);
-          for (int groupKey : groupKeysArray[i]) {
-            QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKey);
+      }
+    } else {
+      // Serialized QuantileDigest
+      byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+      for (int i = 0; i < length; i++) {
+        QuantileDigest value = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]);
+        for (int groupKey : groupKeysArray[i]) {
+          QuantileDigest quantileDigest = groupByResultHolder.getResult(groupKey);
+          if (quantileDigest != null) {
             quantileDigest.merge(value);
+          } else {
+            // Create a new QuantileDigest for the group
+            groupByResultHolder
+                .setValueForKey(groupKey, ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]));
           }
         }
-        break;
-      default:
-        throw new IllegalStateException("Illegal data type for PERCENTILE_EST aggregation function: " + valueType);
+      }
     }
   }
 
@@ -175,6 +166,12 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
 
   @Override
   public QuantileDigest merge(QuantileDigest intermediateResult1, QuantileDigest intermediateResult2) {
+    if (intermediateResult1.getCount() == 0.0) {
+      return intermediateResult2;
+    }
+    if (intermediateResult2.getCount() == 0.0) {
+      return intermediateResult1;
+    }
     intermediateResult1.merge(intermediateResult2);
     return intermediateResult1;
   }
@@ -195,12 +192,12 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
   }
 
   /**
-   * Returns the QuantileDigest from the result holder or creates a new one if it does not exist.
+   * Returns the QuantileDigest from the result holder or creates a new one with default max error if it does not exist.
    *
    * @param aggregationResultHolder Result holder
    * @return QuantileDigest from the result holder
    */
-  protected static QuantileDigest getQuantileDigest(AggregationResultHolder aggregationResultHolder) {
+  protected static QuantileDigest getDefaultQuantileDigest(AggregationResultHolder aggregationResultHolder) {
     QuantileDigest quantileDigest = aggregationResultHolder.getResult();
     if (quantileDigest == null) {
       quantileDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
@@ -210,13 +207,13 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
   }
 
   /**
-   * Returns the QuantileDigest for the given group key. If one does not exist, creates a new one and returns that.
+   * Returns the QuantileDigest for the given group key if exists, or creates a new one with default max error.
    *
    * @param groupByResultHolder Result holder
    * @param groupKey Group key for which to return the QuantileDigest
    * @return QuantileDigest for the group key
    */
-  protected static QuantileDigest getQuantileDigest(GroupByResultHolder groupByResultHolder, int groupKey) {
+  protected static QuantileDigest getDefaultQuantileDigest(GroupByResultHolder groupByResultHolder, int groupKey) {
     QuantileDigest quantileDigest = groupByResultHolder.getResult(groupKey);
     if (quantileDigest == null) {
       quantileDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
