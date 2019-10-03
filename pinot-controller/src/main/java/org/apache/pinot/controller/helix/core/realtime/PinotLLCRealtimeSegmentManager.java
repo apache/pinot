@@ -78,6 +78,7 @@ import org.apache.pinot.controller.util.SegmentCompletionUtils;
 import org.apache.pinot.core.realtime.segment.ConsumingSegmentAssignmentStrategy;
 import org.apache.pinot.core.realtime.segment.RealtimeSegmentAssignmentStrategy;
 import org.apache.pinot.core.realtime.stream.OffsetCriteria;
+import org.apache.pinot.core.realtime.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.core.realtime.stream.PartitionOffsetFetcher;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
@@ -585,10 +586,12 @@ public class PinotLLCRealtimeSegmentManager {
             newLLCSegmentName, partitionAssignment.getNumPartitions());
     final LLCRealtimeSegmentZKMetadata newSegmentZKMetadata = new LLCRealtimeSegmentZKMetadata(newZnRecord);
 
+    PartitionLevelStreamConfig streamConfig =
+        new PartitionLevelStreamConfig(realtimeTableName, realtimeTableConfig.getIndexingConfig().getStreamConfigs());
     FlushThresholdUpdater flushThresholdUpdater =
-        _flushThresholdUpdateManager.getFlushThresholdUpdater(realtimeTableConfig);
+        _flushThresholdUpdateManager.getFlushThresholdUpdater(streamConfig);
     flushThresholdUpdater
-        .updateFlushThreshold(newSegmentZKMetadata, committingSegmentZKMetadata, committingSegmentDescriptor,
+        .updateFlushThreshold(newSegmentZKMetadata, streamConfig, committingSegmentZKMetadata, committingSegmentDescriptor,
             partitionAssignment);
 
     newZnRecord = newSegmentZKMetadata.toZNRecord();
