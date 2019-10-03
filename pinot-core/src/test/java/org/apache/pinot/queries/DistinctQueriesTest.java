@@ -27,7 +27,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.data.FieldSpec;
@@ -35,7 +34,6 @@ import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
@@ -71,7 +69,6 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   private static String D2 = "STRING_COL2";
   private static String M1 = "INT_COL";
   private static String M2 = "LONG_COL";
-  private static String TIME = "TIME_COL";
 
   // in the custom data set, each row is repeated after 20 rows
   private static final int TUPLE_REPEAT_INTERVAL = 20;
@@ -83,8 +80,6 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   private static final int INT_INCREMENT = 500;
   private static final long LONG_BASE_VALUE = 100000000;
   private static final long LONG_INCREMENT = 5500;
-  private static final String STRING_BASE_VALUE1 = "Distinct";
-  private static final String STRING_BASE_VALUE2 = "PinotFeature";
 
   private static final String TABLE_NAME = "DistinctTestTable";
   private static final int NUM_SEGMENTS = 2;
@@ -119,8 +114,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     _schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
             .addSingleValueDimension(D2, FieldSpec.DataType.STRING).addMetric(M1, FieldSpec.DataType.INT)
-            .addMetric(M2, FieldSpec.DataType.LONG).addTime(TIME, TimeUnit.MILLISECONDS, FieldSpec.DataType.LONG)
-            .build();
+            .addMetric(M2, FieldSpec.DataType.LONG).build();
   }
 
   /**
@@ -279,8 +273,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       throws Exception {
     try {
       // put all the generated dataset in a single segment
-      try (RecordReader _recordReader = new GenericRowRecordReader(_rows, _schema)) {
-        createSegment(_schema, _recordReader, SEGMENT_NAME_1, TABLE_NAME);
+      try (RecordReader recordReader = new GenericRowRecordReader(_rows, _schema)) {
+        createSegment(_schema, recordReader, SEGMENT_NAME_1, TABLE_NAME);
         final ImmutableSegment immutableSegment = loadSegment(SEGMENT_NAME_1);
         _indexSegments.add(immutableSegment);
 
@@ -507,7 +501,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       Schema schema = new Schema.SchemaBuilder().setSchemaName(tableName)
           .addSingleValueDimension("State", FieldSpec.DataType.STRING)
           .addSingleValueDimension("City", FieldSpec.DataType.STRING).addMetric("SaleAmount", FieldSpec.DataType.INT)
-          .addTime(TIME, TimeUnit.MILLISECONDS, FieldSpec.DataType.LONG).build();
+          .build();
 
       final String query1 = "SELECT DISTINCT(State, City) FROM " + tableName + " WHERE SaleAmount >= 200000";
       final String query2 = "SELECT DISTINCT(State, City) FROM " + tableName + " WHERE SaleAmount >= 400000";
@@ -595,7 +589,6 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     row.putField("State", columns[0]);
     row.putField("City", columns[1]);
     row.putField("SaleAmount", columns[2]);
-    row.putField(TIME, random.nextLong(TimeUtils.getValidMinTimeMillis(), TimeUtils.getValidMaxTimeMillis()));
     rows.add(row);
 
     Key key = new Key(new Object[]{columns[0], columns[1]});
@@ -611,7 +604,6 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     row.putField("State", columns[0]);
     row.putField("City", columns[1]);
     row.putField("SaleAmount", columns[2]);
-    row.putField(TIME, random.nextLong(TimeUtils.getValidMinTimeMillis(), TimeUtils.getValidMaxTimeMillis()));
     rows.add(row);
 
     key = new Key(new Object[]{columns[0], columns[1], columns[2]});
@@ -624,7 +616,6 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     row.putField("State", columns[0]);
     row.putField("City", columns[1]);
     row.putField("SaleAmount", columns[2]);
-    row.putField(TIME, random.nextLong(TimeUtils.getValidMinTimeMillis(), TimeUtils.getValidMaxTimeMillis()));
     rows.add(row);
 
     key = new Key(new Object[]{columns[0], columns[1]});
@@ -638,7 +629,6 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     row.putField("State", columns[0]);
     row.putField("City", columns[1]);
     row.putField("SaleAmount", columns[2]);
-    row.putField(TIME, random.nextLong(TimeUtils.getValidMinTimeMillis(), TimeUtils.getValidMaxTimeMillis()));
     rows.add(row);
 
     // ROW 5
@@ -647,7 +637,6 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     row.putField("State", columns[0]);
     row.putField("City", columns[1]);
     row.putField("SaleAmount", columns[2]);
-    row.putField(TIME, random.nextLong(TimeUtils.getValidMinTimeMillis(), TimeUtils.getValidMaxTimeMillis()));
     rows.add(row);
 
     key = new Key(new Object[]{columns[0], columns[1]});
@@ -663,7 +652,6 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     row.putField("State", columns[0]);
     row.putField("City", columns[1]);
     row.putField("SaleAmount", columns[2]);
-    row.putField(TIME, random.nextLong(TimeUtils.getValidMinTimeMillis(), TimeUtils.getValidMaxTimeMillis()));
     rows.add(row);
 
     // ROW 7
@@ -672,7 +660,6 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     row.putField("State", columns[0]);
     row.putField("City", columns[1]);
     row.putField("SaleAmount", columns[2]);
-    row.putField(TIME, random.nextLong(TimeUtils.getValidMinTimeMillis(), TimeUtils.getValidMaxTimeMillis()));
     rows.add(row);
 
     key = new Key(new Object[]{columns[0], columns[1], columns[2]});
@@ -684,7 +671,6 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     row.putField("State", columns[0]);
     row.putField("City", columns[1]);
     row.putField("SaleAmount", columns[2]);
-    row.putField(TIME, random.nextLong(TimeUtils.getValidMinTimeMillis(), TimeUtils.getValidMaxTimeMillis()));
     rows.add(row);
 
     // ROW 9
@@ -693,7 +679,6 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     row.putField("State", columns[0]);
     row.putField("City", columns[1]);
     row.putField("SaleAmount", columns[2]);
-    row.putField(TIME, random.nextLong(TimeUtils.getValidMinTimeMillis(), TimeUtils.getValidMaxTimeMillis()));
     rows.add(row);
 
     // ROW 10
@@ -702,7 +687,6 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     row.putField("State", columns[0]);
     row.putField("City", columns[1]);
     row.putField("SaleAmount", columns[2]);
-    row.putField(TIME, random.nextLong(TimeUtils.getValidMinTimeMillis(), TimeUtils.getValidMaxTimeMillis()));
     rows.add(row);
 
     return rows;

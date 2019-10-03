@@ -45,16 +45,17 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
   @Override
   public SegmentPreIndexStatsCollector gatherStats(StatsCollectorConfig statsCollectorConfig) {
     try {
-      RecordTransformer recordTransformer = CompositeTransformer.getDefaultTransformer(statsCollectorConfig.getSchema());
+      RecordTransformer recordTransformer =
+          CompositeTransformer.getDefaultTransformer(statsCollectorConfig.getSchema());
 
       SegmentPreIndexStatsCollector collector = new SegmentPreIndexStatsCollectorImpl(statsCollectorConfig);
       collector.init();
 
       // Gather the stats
-      GenericRow readRow = null;
+      GenericRow reuse = new GenericRow();
       while (_recordReader.hasNext()) {
-        readRow = GenericRow.createOrReuseRow(readRow);
-        GenericRow transformedRow = recordTransformer.transform(_recordReader.next(readRow));
+        reuse.clear();
+        GenericRow transformedRow = recordTransformer.transform(_recordReader.next(reuse));
         if (transformedRow != null) {
           collector.collectRow(transformedRow);
         }
