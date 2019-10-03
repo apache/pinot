@@ -26,7 +26,9 @@ import java.util.List;
 
 
 /**
- * Hosts the results in a standard tabular structure
+ * Holds the results in a standard tabular structure
+ *
+ * FIXME: Column types and Multi-value support are missing, and deserialize might not work properly
  */
 @JsonPropertyOrder({"columns", "rows"})
 public class ResultTable {
