@@ -16,6 +16,20 @@
 
 package org.apache.pinot.thirdeye.notification.content.templates;
 
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
+import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
+import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
+import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
 import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.apache.pinot.thirdeye.notification.formatter.channels.EmailContentFormatter;
@@ -27,12 +41,9 @@ import org.apache.pinot.thirdeye.anomaly.utils.EmailUtils;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datalayer.DaoTestUtils;
-import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
-import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
@@ -50,24 +61,48 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.*;
+import static org.apache.pinot.thirdeye.datalayer.DaoTestUtils.*;
 
 
 public class TestMetricAnomaliesContent {
   private static final String TEST = "test";
   private int id = 0;
   private String dashboardHost = "http://localhost:8080/dashboard";
+  private String detectionConfigFile = "/sample-detection-config.yml";
   private DAOTestBase testDAOProvider;
-  private AnomalyFunctionManager anomalyFunctionDAO;
+  private DetectionConfigManager detectionConfigDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
   private MetricConfigManager metricDAO;
+  private DatasetConfigManager datasetDAO;
+  private EventManager eventDAO;
+  private MergedAnomalyResultManager anomalyDAO;
+  private TaskManager taskDAO;
+  private EvaluationManager evaluationDAO;
+  private DetectionPipelineLoader detectionPipelineLoader;
+  private DataProvider provider;
 
   @BeforeClass
   public void beforeClass(){
     testDAOProvider = DAOTestBase.getInstance();
     DAORegistry daoRegistry = DAORegistry.getInstance();
-    anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
+    detectionConfigDAO = daoRegistry.getDetectionConfigManager();
     mergedAnomalyResultDAO = daoRegistry.getMergedAnomalyResultDAO();
     metricDAO = daoRegistry.getMetricConfigDAO();
+    datasetDAO = daoRegistry.getDatasetConfigDAO();
+    eventDAO = daoRegistry.getEventDAO();
+    taskDAO = daoRegistry.getTaskDAO();
+    anomalyDAO = daoRegistry.getMergedAnomalyResultDAO();
+    evaluationDAO = daoRegistry.getEvaluationManager();
+    detectionPipelineLoader = new DetectionPipelineLoader();
+
+    TimeSeriesLoader timeseriesLoader =
+        new DefaultTimeSeriesLoader(daoRegistry.getMetricConfigDAO(), datasetDAO, null);
+    AggregationLoader aggregationLoader =
+        new DefaultAggregationLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(),
+            ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
+
+    provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, evaluationDAO,
+        timeseriesLoader, aggregationLoader, detectionPipelineLoader);
   }
 
   @AfterClass(alwaysRun = true)
@@ -98,15 +133,18 @@ public class TestMetricAnomaliesContent {
     alerters.put("smtpConfiguration", smtpProps);
     thirdeyeAnomalyConfig.setAlerterConfiguration(alerters);
 
+    // create test dataset config
+    datasetDAO.save(getTestDatasetConfig("test-collection"));
+    metricDAO.save(getTestMetricConfig("test-collection", "cost", null));
 
     List<AnomalyResult> anomalies = new ArrayList<>();
-    AnomalyFunctionDTO anomalyFunction = DaoTestUtils.getTestFunctionSpec(TEST, TEST);
-    anomalyFunctionDAO.save(anomalyFunction);
+    DetectionConfigDTO detectionConfigDTO = DaoTestUtils.getTestDetectionConfig(provider, detectionConfigFile);
+    detectionConfigDAO.save(detectionConfigDTO);
     MergedAnomalyResultDTO anomaly = DaoTestUtils.getTestMergedAnomalyResult(
         new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis(),
         new DateTime(2017, 11, 6, 13, 0, dateTimeZone).getMillis(),
         TEST, TEST, 0.1, 1l, new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis());
-    anomaly.setFunction(anomalyFunction);
+    anomaly.setDetectionConfigId(detectionConfigDTO.getId());
     anomaly.setAvgCurrentVal(1.1);
     anomaly.setAvgBaselineVal(1.0);
     mergedAnomalyResultDAO.save(anomaly);
@@ -115,7 +153,7 @@ public class TestMetricAnomaliesContent {
         new DateTime(2017, 11, 7, 10, 0, dateTimeZone).getMillis(),
         new DateTime(2017, 11, 7, 17, 0, dateTimeZone).getMillis(),
         TEST, TEST, 0.1, 1l, new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis());
-    anomaly.setFunction(anomalyFunction);
+    anomaly.setDetectionConfigId(detectionConfigDTO.getId());
     anomaly.setAvgCurrentVal(0.9);
     anomaly.setAvgBaselineVal(1.0);
     mergedAnomalyResultDAO.save(anomaly);
@@ -127,12 +165,10 @@ public class TestMetricAnomaliesContent {
     metric.setAlias(TEST + "::" + TEST);
     metricDAO.save(metric);
 
-    AlertConfigDTO alertConfigDTO = DaoTestUtils.getTestAlertConfiguration("Test Config");
-
     EmailContentFormatter
         contentFormatter = new EmailContentFormatter(new MetricAnomaliesContent(), thirdeyeAnomalyConfig);
     ADContentFormatterContext context = new ADContentFormatterContext();
-    context.setAlertConfig(alertConfigDTO);
+    context.setNotificationConfig(DaoTestUtils.getTestNotificationConfig("Test Config"));
     DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
         EmailUtils.getValidEmailAddresses("a@b.com"));
     EmailEntity emailEntity = contentFormatter.getEmailEntity(recipients, TEST, anomalies, context);

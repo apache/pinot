@@ -48,7 +48,7 @@ import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.AnomaliesResource;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
-import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -183,7 +183,7 @@ public abstract class BaseNotificationContent implements NotificationContent {
     templateData.put("metricsMap", metricsMap);
   }
 
-  protected Map<String, Object> getTemplateData(AlertConfigDTO alertConfigDTO, Collection<AnomalyResult> anomalies) {
+  protected Map<String, Object> getTemplateData(DetectionAlertConfigDTO notificationConfig, Collection<AnomalyResult> anomalies) {
     Map<String, Object> templateData = new HashMap<>();
 
     DateTimeZone timeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(DEFAULT_TIME_ZONE));
@@ -217,7 +217,7 @@ public abstract class BaseNotificationContent implements NotificationContent {
     templateData.put("trueAlertCount", precisionRecallEvaluator.getTrueAnomalies());
     templateData.put("falseAlertCount", precisionRecallEvaluator.getFalseAlarm());
     templateData.put("newTrendCount", precisionRecallEvaluator.getTrueAnomalyNewTrend());
-    templateData.put("alertConfigName", alertConfigDTO.getName());
+    templateData.put("alertConfigName", notificationConfig.getName());
     templateData.put("includeSummary", includeSummary);
     templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
     if(precisionRecallEvaluator.getTotalResponses() > 0) {
@@ -225,8 +225,8 @@ public abstract class BaseNotificationContent implements NotificationContent {
       templateData.put("recall", precisionRecallEvaluator.getRecall());
       templateData.put("falseNegative", precisionRecallEvaluator.getFalseNegativeRate());
     }
-    if (alertConfigDTO.getReferenceLinks() != null) {
-      templateData.put("referenceLinks", alertConfigDTO.getReferenceLinks());
+    if (notificationConfig.getReferenceLinks() != null) {
+      templateData.put("referenceLinks", notificationConfig.getReferenceLinks());
     }
 
     return templateData;

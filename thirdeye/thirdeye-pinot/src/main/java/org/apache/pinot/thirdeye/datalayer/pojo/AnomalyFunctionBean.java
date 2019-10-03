@@ -24,7 +24,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.Multimap;
 import org.apache.pinot.thirdeye.anomaly.merge.AnomalyMergeConfig;
-import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardJobStatus;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
@@ -96,8 +95,6 @@ public class AnomalyFunctionBean extends AbstractBean {
   private Map<String, String> alertFilter;
 
   private AnomalyMergeConfig anomalyMergeConfig;
-
-  private DetectionOnboardJobStatus onboardJobStatus;
 
   /**
    * This flag always true.
@@ -334,14 +331,6 @@ public class AnomalyFunctionBean extends AbstractBean {
     this.windowDelay = windowDelay;
   }
 
-  public DetectionOnboardJobStatus getOnboardJobStatus() {
-    return onboardJobStatus;
-  }
-
-  public void setOnboardJobStatus(DetectionOnboardJobStatus onboardJobStatus) {
-    this.onboardJobStatus = onboardJobStatus;
-  }
-
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -362,7 +351,7 @@ public class AnomalyFunctionBean extends AbstractBean {
         && Objects.equals(windowDelay, that.windowDelay) && windowDelayUnit == that.windowDelayUnit && Objects.equals(
         exploreDimensions, that.exploreDimensions) && Objects.equals(filters, that.filters) && Objects.equals(
         dataFilter, that.dataFilter) && Objects.equals(alertFilter, that.alertFilter) && Objects.equals(
-        anomalyMergeConfig, that.anomalyMergeConfig) && Objects.equals(onboardJobStatus, that.onboardJobStatus);
+        anomalyMergeConfig, that.anomalyMergeConfig);
   }
 
   @Override
@@ -370,6 +359,6 @@ public class AnomalyFunctionBean extends AbstractBean {
     return Objects.hash(collection, functionName, metric, metrics, metricFunction, type, isActive, globalMetric,
         globalMetricFilters, properties, cron, frequency, bucketSize, bucketUnit, windowSize, windowUnit, windowDelay,
         windowDelayUnit, exploreDimensions, filters, metricId, dataFilter, alertFilter, anomalyMergeConfig,
-        onboardJobStatus, requiresCompletenessCheck);
+        requiresCompletenessCheck);
   }
 }

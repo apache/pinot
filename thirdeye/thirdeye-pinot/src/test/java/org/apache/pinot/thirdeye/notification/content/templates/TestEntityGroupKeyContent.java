@@ -161,7 +161,7 @@ public class TestEntityGroupKeyContent {
     EmailContentFormatter
         contentFormatter = new EmailContentFormatter(new EntityGroupKeyContent(), thirdeyeAnomalyConfig);
     ADContentFormatterContext context = new ADContentFormatterContext();
-    context.setAlertConfig(DaoTestUtils.getTestAlertConfiguration("Test Config"));
+    context.setNotificationConfig(DaoTestUtils.getTestNotificationConfig("Test Config"));
     EmailEntity emailEntity = contentFormatter.getEmailEntity(
         new DetectionAlertFilterRecipients(EmailUtils.getValidEmailAddresses("a@b.com")), TEST, anomalies, context);
     String htmlPath = ClassLoader.getSystemResource("test-entity-groupby-email-content-formatter.html").getPath();
@@ -279,7 +279,7 @@ public class TestEntityGroupKeyContent {
     EmailContentFormatter
         contentFormatter = new EmailContentFormatter(new EntityGroupKeyContent(), props, thirdeyeAnomalyConfig);
     ADContentFormatterContext context = new ADContentFormatterContext();
-    context.setAlertConfig(DaoTestUtils.getTestAlertConfiguration("Test Config"));
+    context.setNotificationConfig(DaoTestUtils.getTestNotificationConfig("Test Config"));
     EmailEntity emailEntity = contentFormatter.getEmailEntity(
         new DetectionAlertFilterRecipients(EmailUtils.getValidEmailAddresses("a@b.com")), TEST, anomalies, context);
     String htmlPath = ClassLoader.getSystemResource("test-entity-groupby-with-whitelist-email-content-formatter.html").getPath();

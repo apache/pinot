@@ -72,7 +72,7 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
 
   @Override
   public Map<String, Object> format(Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
-    Map<String, Object> templateData = super.getTemplateData(context.getAlertConfig(), anomalies);
+    Map<String, Object> templateData = super.getTemplateData(context.getNotificationConfig(), anomalies);
     enrichMetricInfo(templateData, anomalies);
 
     DateTime windowStart = DateTime.now();
@@ -118,10 +118,7 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
       String funcDescription = "";
       Long id = -1L;
 
-      if (anomaly.getFunction() != null){
-        functionName = anomaly.getFunction().getFunctionName();
-        id = anomaly.getFunction().getId();
-      } else if ( anomaly.getDetectionConfigId() != null){
+      if ( anomaly.getDetectionConfigId() != null) {
         DetectionConfigDTO config = this.configDAO.findById(anomaly.getDetectionConfigId());
         Preconditions.checkNotNull(config, String.format("Cannot find detection config %d", anomaly.getDetectionConfigId()));
         functionName = config.getName();

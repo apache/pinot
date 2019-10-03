@@ -20,7 +20,6 @@
 package org.apache.pinot.thirdeye.detection.alert.scheme;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.SetMultimap;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -37,7 +36,6 @@ import org.apache.commons.mail.HtmlEmail;
 import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
-import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
@@ -193,7 +191,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   /**
    * Plug the appropriate email subject style based on configuration
    */
-  private AlertConfigBean.SubjectType makeSubject(Map<String, Object> emailParams) {
+  private AlertConfigBean.SubjectType makeEmailSubjectType(Map<String, Object> emailParams) {
     AlertConfigBean.SubjectType subjectType;
     if (emailParams != null && emailParams.containsKey(PROP_EMAIL_SUBJECT_STYLE)) {
       subjectType = AlertConfigBean.SubjectType.valueOf(emailParams.get(PROP_EMAIL_SUBJECT_STYLE).toString());
@@ -212,6 +210,8 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     validateAlert(recipients, anomalies);
 
     Map<String, Object> emailParams = ConfigUtils.getMap(this.config.getAlertSchemes().get(PROP_EMAIL_SCHEME));
+    this.config.setSubjectType(makeEmailSubjectType(emailParams));
+
     Properties emailProps = new Properties();
     emailProps.putAll(emailParams);
     BaseNotificationContent content = makeTemplate(emailParams);
@@ -221,14 +221,8 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>(anomalies);
     anomalyResultListOfGroup.sort(COMPARATOR_DESC);
 
-    AlertConfigDTO alertConfig = new AlertConfigDTO();
-    alertConfig.setName(this.config.getName());
-    alertConfig.setFromAddress(this.config.getFrom());
-    alertConfig.setSubjectType(makeSubject(emailParams));
-    alertConfig.setReferenceLinks(this.config.getReferenceLinks());
-
     ADContentFormatterContext context = new ADContentFormatterContext();
-    context.setAlertConfig(alertConfig);
+    context.setNotificationConfig(this.config);
     EmailEntity emailEntity = emailContentFormatter.getEmailEntity(null,
         "Thirdeye Alert : " + this.config.getName(), anomalyResultListOfGroup,
         context);

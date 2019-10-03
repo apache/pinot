@@ -16,6 +16,7 @@
 
 package org.apache.pinot.thirdeye.notification.content.templates;
 
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
 import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.apache.pinot.thirdeye.notification.formatter.channels.EmailContentFormatter;
@@ -146,12 +147,12 @@ public class TestHierarchicalAnomaliesContent {
     anomalies.add(anomaly);
     mergedAnomalyResultDAO.save(anomaly);
 
-    AlertConfigDTO alertConfigDTO = DaoTestUtils.getTestAlertConfiguration("Test Config");
+    DetectionAlertConfigDTO notificationConfigDTO = DaoTestUtils.getTestNotificationConfig("Test Config");
 
     EmailContentFormatter
         contentFormatter = new EmailContentFormatter(new HierarchicalAnomaliesContent(), thirdeyeAnomalyConfig);
     ADContentFormatterContext context = new ADContentFormatterContext();
-    context.setAlertConfig(alertConfigDTO);
+    context.setNotificationConfig(notificationConfigDTO);
     DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
         EmailUtils.getValidEmailAddresses("a@b.com"));
     EmailEntity emailEntity = contentFormatter.getEmailEntity(recipients, TEST, anomalies, context);
