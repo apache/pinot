@@ -112,8 +112,12 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
     for (String metricUrn : metricUrns) {
       metricUrnToMetricDTOs.put(metricUrn, getMetricConfigForMetricUrn(metricUrn));
     }
-    Map<String, Object> yamlObject = ConfigUtils.getMap(this.yaml.load(config.getYaml()));
 
+    Map<String, Object> yamlObject;
+    // synchronize on yaml parser because it is not thread safe
+    synchronized (this.yaml) {
+      yamlObject = ConfigUtils.getMap(this.yaml.load(config.getYaml()));
+    }
     Map<String, DatasetConfigDTO> metricUrnToDatasets = metricUrns.stream().collect(Collectors.toMap(metricUrn -> metricUrn,
       metricUrn -> getDatasetForMetricUrn(metricUrn, metricUrnToMetricDTOs), (d1, d2) -> d1));
 

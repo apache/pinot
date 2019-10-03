@@ -879,6 +879,6 @@ public class YamlResource {
     } else {
       detectionConfigDTOs = Collections.singletonList(this.detectionConfigDAO.findById(id));
     }
-    return detectionConfigDTOs.stream().map(this.detectionConfigFormatter::format).collect(Collectors.toList());
+    return detectionConfigDTOs.parallelStream().map(this.detectionConfigFormatter::format).collect(Collectors.toList());
   }
 }
