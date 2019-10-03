@@ -59,7 +59,6 @@ export default Component.extend({
   errorBaseline: null,
   compareMode: 'wo1w',
   baseline: null,
-  errorAnomalies: null,
   showDetails: false,
   componentId: 'timeseries-chart',
   anomaliesOld: [],
@@ -82,6 +81,7 @@ export default Component.extend({
   granularity: null,
   alertYaml: null,
   dimensionExploration: null,
+  getAnomaliesError:false, // stops the component from fetching more anomalies until user changes state
   detectionHealth: null, // result of call to detection/health/{id}, passed in by parent
   timeWindowSize: null, // passed in by parent, which retrieves from endpoint.  Do not set
   originalYaml: null, // passed by parent in Edit Alert Preview only. Do not set
@@ -190,7 +190,7 @@ export default Component.extend({
         granularity,
         dimensionExploration
       } = this.getProperties('isPreviewMode', 'granularity', 'dimensionExploration');
-      return (isPreviewMode || (!dimensionExploration && (granularity.includes('DAYS'))));
+      return (isPreviewMode || (!dimensionExploration && ((granularity || '').includes('DAYS'))));
     }
   ),
 
@@ -257,6 +257,7 @@ export default Component.extend({
    * 2 - set to new (Edit Alert Preview with old or Create Alert Preview w/o new)
    * 3 - shuffle then set to new (Create Alert Preview with 2 sets already)
    * 4 - get originalYaml then get updated (Edit Alert Preview w/o any anomalies loaded yet)
+   * 5 - error getting anomalies
    * @type {Number}
    */
   stateOfAnomaliesAndTimeSeries: computed(
@@ -264,6 +265,7 @@ export default Component.extend({
     'anomaliesOld',
     'anomaliesNew',
     'isEditMode',
+    'getAnomaliesError',
     function() {
       let state = 1;
       if (this.get('isPreviewMode')) {
@@ -281,6 +283,9 @@ export default Component.extend({
           // Edit Alert Preview w/o any anomalies
           state = 4;
         }
+      }
+      if (this.get('getAnomaliesError')) {
+        state = 5;
       }
       return state;
     }
@@ -883,7 +888,7 @@ export default Component.extend({
     let firstDimension;
     try {
       if(showRules){
-        applicationAnomalies = (granularity.includes('DAYS')) ? yield getBounds(alertId, startAnomalies, endAnomalies) : yield getYamlPreviewAnomalies(alertYaml, startAnomalies, endAnomalies, alertId);
+        applicationAnomalies = ((granularity || '').includes('DAYS')) ? yield getBounds(alertId, startAnomalies, endAnomalies) : yield getYamlPreviewAnomalies(alertYaml, startAnomalies, endAnomalies, alertId);
         if (applicationAnomalies && applicationAnomalies.diagnostics && applicationAnomalies.diagnostics['0']) {
           metricUrnList = Object.keys(applicationAnomalies.diagnostics['0']);
           set(this, 'metricUrnList', metricUrnList);
@@ -924,9 +929,8 @@ export default Component.extend({
         anomalies = applicationAnomalies;
       }
     } catch (error) {
-      if (error.body) {
-        notifications.error(error.body.message, 'Error', toastOptions);
-      }
+      notifications.error(`_getAnomalies failed: ${error}`, 'Error', toastOptions);
+      this.set('getAnomaliesError', true);
     }
 
     return {
@@ -950,7 +954,7 @@ export default Component.extend({
         duration: (timeWindowSize === 172800000) ? '48h' : 'custom',
         selectedDimension: 'Choose a dimension',
         // For now, we will only show predicted and bounds on daily metrics with no dimensions, for the Alert Overview page
-        selectedBaseline: (granularity.includes('DAYS') && !dimensionExploration) ? 'predicted' : 'wo1w'
+        selectedBaseline: ((granularity || '').includes('DAYS') && !dimensionExploration) ? 'predicted' : 'wo1w'
       });
       this._fetchAnomalies();
     } else {
@@ -1056,14 +1060,14 @@ export default Component.extend({
 
   _fetchAnomalies() {
     this.setProperties({
-      errorAnomalies: null,
+      getAnomaliesError: false,
       isLoading: true
     });
 
     try {
       // in Edit Alert Preview, we want the original yaml used for comparisons
       const content = (get(this, 'isEditMode') && _.isEmpty(get(this, 'anomaliesOld'))) ? get(this, 'originalYaml') : get(this, 'alertYaml');
-      this.get('_getAnomalies').perform(content)
+      return this.get('_getAnomalies').perform(content)
         .then(results => this._setAnomaliesAndTimeSeries(results))
         .then(() => {
           if (get(this, 'metricUrn')) {
@@ -1071,6 +1075,10 @@ export default Component.extend({
           } else {
             throw new Error('Unable to get MetricUrn from response');
           }
+        })
+        .catch(error => {
+          set(this, 'isLoading', false);
+          this.get('notifications').error(error, 'Error', toastOptions);
         });
     } catch (error) {
       set(this, 'isLoading', false);
@@ -1115,6 +1123,9 @@ export default Component.extend({
           anomaliesNew: []
         });
         this._fetchAnomalies();
+        break;
+      // don't set props if there was an error with _getAnomalies
+      default:
         break;
     }
   },
