@@ -239,9 +239,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
               SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(),
                   cachedDataSchema);
           brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, new ArrayList<>(0)));
-        } else if (brokerRequest.isSetOrderBy() && queryOptions != null && SQL.equals(
-            queryOptions.get(QueryOptionKey.GROUP_BY_MODE)) && SQL.equals(
-            queryOptions.get(QueryOptionKey.RESPONSE_FORMAT))) {
+        } else if (brokerRequest.isSetGroupBy() && GroupByUtils.isGroupByMode(SQL, queryOptions)
+            && GroupByUtils.isResponseFormat(SQL, queryOptions)) {
           setSQLGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
               brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap, preserveType);
         }
@@ -288,56 +287,41 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
               preserveType);
         } else {
           // Aggregation group-by query.
-          if (brokerRequest.isSetOrderBy()) {
+          // read results as records if  GROUP_BY_MODE is explicitly set to SQL
 
-            setGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
-                brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap, preserveType);
-          }
-        }
-      }
+          if (GroupByUtils.isGroupByMode(SQL, queryOptions)) {
+            // sql + order by
 
-      assert cachedDataSchema != null;
+            int resultSize = 0;
 
-      AggregationFunction[] aggregationFunctions =
-          AggregationFunctionUtils.getAggregationFunctions(brokerRequest.getAggregationsInfo());
-      if (!brokerRequest.isSetGroupBy()) {
-        // Aggregation only query.
-        setAggregationResults(brokerResponseNative, aggregationFunctions, dataTableMap, cachedDataSchema, preserveType);
-      } else { // Aggregation group-by query.
-
-        // process group by ORDER BY results only if GROUP_BY_MODE is explicitly set to SQL
-        if (brokerRequest.isSetOrderBy() && queryOptions != null && SQL.equals(
-            queryOptions.get(QueryOptionKey.GROUP_BY_MODE))) {
-          // sql + order by
-
-          int resultSize = 0;
-          // if RESPONSE_FORMAT is SQL, return results in {@link ResultTable}
-          if (SQL.equals(queryOptions.get(QueryOptionKey.RESPONSE_FORMAT))) {
-            setSQLGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
-                brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap, preserveType);
-            resultSize = brokerResponseNative.getResultTable().getRows().size();
-          } else {
-            setPQLGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
-                brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap, preserveType);
-            if (!brokerResponseNative.getAggregationResults().isEmpty()) {
-              resultSize = brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size();
+            // if RESPONSE_FORMAT is SQL, return results in {@link ResultTable}
+            if (GroupByUtils.isResponseFormat(SQL, queryOptions)) {
+              setSQLGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
+                  brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap, preserveType);
+              resultSize = brokerResponseNative.getResultTable().getRows().size();
+            } else {
+              setPQLGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
+                  brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap, preserveType);
+              if (!brokerResponseNative.getAggregationResults().isEmpty()) {
+                resultSize = brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size();
+              }
             }
-          }
-          if (brokerMetrics != null && resultSize > 0) {
-            brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.GROUP_BY_SIZE, resultSize);
-          }
-        } else {
+            if (brokerMetrics != null && resultSize > 0) {
+              brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.GROUP_BY_SIZE, resultSize);
+            }
+          } else {
 
-          boolean[] aggregationFunctionSelectStatus =
-              AggregationFunctionUtils.getAggregationFunctionsSelectStatus(brokerRequest.getAggregationsInfo());
-          setGroupByHavingResults(brokerResponseNative, aggregationFunctions, aggregationFunctionSelectStatus,
-              brokerRequest.getGroupBy(), dataTableMap, brokerRequest.getHavingFilterQuery(),
-              brokerRequest.getHavingFilterSubQueryMap(), preserveType);
-          if (brokerMetrics != null && (!brokerResponseNative.getAggregationResults().isEmpty())) {
-            // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the same.
-            // Thus, we can just emit the one from the 1st result.
-            brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.GROUP_BY_SIZE,
-                brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size());
+            boolean[] aggregationFunctionSelectStatus =
+                AggregationFunctionUtils.getAggregationFunctionsSelectStatus(brokerRequest.getAggregationsInfo());
+            setGroupByHavingResults(brokerResponseNative, aggregationFunctions, aggregationFunctionSelectStatus,
+                brokerRequest.getGroupBy(), dataTableMap, brokerRequest.getHavingFilterQuery(),
+                brokerRequest.getHavingFilterSubQueryMap(), preserveType);
+            if (brokerMetrics != null && (!brokerResponseNative.getAggregationResults().isEmpty())) {
+              // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the same.
+              // Thus, we can just emit the one from the 1st result.
+              brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.GROUP_BY_SIZE,
+                  brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size());
+            }
           }
         }
       }

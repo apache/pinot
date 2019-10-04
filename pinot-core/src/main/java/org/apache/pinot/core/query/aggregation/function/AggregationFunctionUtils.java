@@ -49,7 +49,7 @@ public class AggregationFunctionUtils {
     return aggregationInfo.getAggregationParams().get(COLUMN_KEY);
   }
 
-  public static String getAggregationColumnName(@Nonnull AggregationInfo aggregationInfo) {
+  public static String getAggregationColumnName(AggregationInfo aggregationInfo) {
     return aggregationInfo.getAggregationType().toLowerCase() + "(" + AggregationFunctionUtils.getColumn(aggregationInfo)
         + ")";
   }
