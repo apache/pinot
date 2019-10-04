@@ -118,7 +118,7 @@ import org.slf4j.LoggerFactory;
 public class PinotHelixResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixResourceManager.class);
   private static final long DEFAULT_EXTERNAL_VIEW_UPDATE_RETRY_INTERVAL_MILLIS = 500L;
-  private static final long CACHE_TIMEOUT_HR = 6L;
+  private static final long CACHE_ENTRY_EXPIRE_TIME_HOURS = 6L;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   public static final String APPEND = "APPEND";
 
@@ -153,19 +153,20 @@ public class PinotHelixResourceManager {
     _isSingleTenantCluster = isSingleTenantCluster;
     _enableBatchMessageMode = enableBatchMessageMode;
     _allowHLCTables = allowHLCTables;
-    _instanceAdminEndpointCache = CacheBuilder.newBuilder().expireAfterWrite(CACHE_TIMEOUT_HR, TimeUnit.HOURS)
-        .build(new CacheLoader<String, String>() {
-          @Override
-          public String load(@Nonnull String instanceId) {
-            InstanceConfig helixInstanceConfig = getHelixInstanceConfig(instanceId);
-            ZNRecord record = helixInstanceConfig.getRecord();
-            String[] hostnameSplit = helixInstanceConfig.getHostName().split("_");
-            Preconditions.checkState(hostnameSplit.length >= 2);
-            String adminPort =
-                record.getStringField(Helix.Instance.ADMIN_PORT_KEY, Integer.toString(Server.DEFAULT_ADMIN_API_PORT));
-            return hostnameSplit[1] + ":" + adminPort;
-          }
-        });
+    _instanceAdminEndpointCache =
+        CacheBuilder.newBuilder().expireAfterWrite(CACHE_ENTRY_EXPIRE_TIME_HOURS, TimeUnit.HOURS)
+            .build(new CacheLoader<String, String>() {
+              @Override
+              public String load(@Nonnull String instanceId) {
+                InstanceConfig helixInstanceConfig = getHelixInstanceConfig(instanceId);
+                ZNRecord record = helixInstanceConfig.getRecord();
+                String[] hostnameSplit = helixInstanceConfig.getHostName().split("_");
+                Preconditions.checkState(hostnameSplit.length >= 2);
+                String adminPort = record
+                    .getStringField(Helix.Instance.ADMIN_PORT_KEY, Integer.toString(Server.DEFAULT_ADMIN_API_PORT));
+                return hostnameSplit[1] + ":" + adminPort;
+              }
+            });
   }
 
   public PinotHelixResourceManager(@Nonnull ControllerConf controllerConf) {
