@@ -1285,7 +1285,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
   static class FakePinotLLCRealtimeSegmentManager extends PinotLLCRealtimeSegmentManager {
 
     private static final ControllerConf CONTROLLER_CONF = new ControllerConf();
-    private static final LeadControllerManager _mockLeadControllerManager = mock(LeadControllerManager.class);
     private List<String> _existingLLCSegments = new ArrayList<>(1);
 
     public List<String> _paths = new ArrayList<>(16);
@@ -1322,7 +1321,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     protected FakePinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager,
         List<String> existingLLCSegments, ControllerMetrics controllerMetrics) {
-      super(pinotHelixResourceManager, CONTROLLER_CONF, controllerMetrics, _mockLeadControllerManager);
+      super(pinotHelixResourceManager, CONTROLLER_CONF, controllerMetrics, mock(LeadControllerManager.class));
 
       try {
         TableConfigCache mockCache = mock(TableConfigCache.class);
