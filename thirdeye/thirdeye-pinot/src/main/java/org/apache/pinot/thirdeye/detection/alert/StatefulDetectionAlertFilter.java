@@ -113,10 +113,7 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
 
   protected Map<String, Object> generateNotificationSchemeProps(DetectionAlertConfigDTO config,
       Set<String> to, Set<String> cc, Set<String> bcc) {
-    Map<String, Set<String>> recipients = new HashMap<>();
-    recipients.put(PROP_TO, cleanupRecipients(to));
-    recipients.put(PROP_CC, cleanupRecipients(cc));
-    recipients.put(PROP_BCC, cleanupRecipients(bcc));
+    Map<String, Object> notificationSchemeProps = new HashMap<>();
 
     if (config.getAlertSchemes() == null) {
       Map<String, Map<String, Object>> alertSchemes = new HashMap<>();
@@ -124,11 +121,17 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
       config.setAlertSchemes(alertSchemes);
     }
 
-    Map<String, Object> notificationSchemeProps = new HashMap<>();
     for (Map.Entry<String, Map<String, Object>> schemeProps : config.getAlertSchemes().entrySet()) {
       notificationSchemeProps.put(schemeProps.getKey(), new HashMap<>(schemeProps.getValue()));
     }
-    ((Map<String, Object>) notificationSchemeProps.get(PROP_EMAIL_SCHEME)).put(PROP_RECIPIENTS, recipients);
+
+    if (notificationSchemeProps.get(PROP_EMAIL_SCHEME) != null) {
+      Map<String, Set<String>> recipients = new HashMap<>();
+      recipients.put(PROP_TO, cleanupRecipients(to));
+      recipients.put(PROP_CC, cleanupRecipients(cc));
+      recipients.put(PROP_BCC, cleanupRecipients(bcc));
+      ((Map<String, Object>) notificationSchemeProps.get(PROP_EMAIL_SCHEME)).put(PROP_RECIPIENTS, recipients);
+    }
 
     return notificationSchemeProps;
   }
