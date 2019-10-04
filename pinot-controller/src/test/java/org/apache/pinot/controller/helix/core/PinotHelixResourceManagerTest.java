@@ -160,8 +160,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     zkClient.writeData(instanceConfigPath, znRecord);
   }
 
-  private void addAndRemoveNewInstanceConfig(ZkClient zkClient)
-      throws Exception {
+  private void addAndRemoveNewInstanceConfig(ZkClient zkClient) {
     int biggerRandomNumber = NUM_INSTANCES + new Random().nextInt(NUM_INSTANCES);
     String instanceName = "Server_localhost_" + biggerRandomNumber;
     String instanceConfigPath = PropertyPathBuilder.instanceConfig(getHelixClusterName(), instanceName);
@@ -173,24 +172,18 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     ZNRecord znRecord = new ZNRecord(instanceName);
     zkClient.createPersistent(instanceConfigPath, znRecord);
 
-    List<String> latestAllInstances = _helixResourceManager.getAllInstances();
-    long maxTime = System.currentTimeMillis() + MAX_TIMEOUT_IN_MILLISECOND;
-    while (!latestAllInstances.contains(instanceName) && System.currentTimeMillis() < maxTime) {
-      Thread.sleep(100L);
-      latestAllInstances = _helixResourceManager.getAllInstances();
-    }
-    Assert.assertTrue(System.currentTimeMillis() < maxTime, "Timeout when waiting for adding instance config");
+    TestUtils.waitForCondition(aVoid -> {
+      List<String> allInstances = _helixResourceManager.getAllInstances();
+      return allInstances.contains(instanceName);
+    }, TIMEOUT_IN_MS, "Timeout when waiting for adding instance config");
 
     // Remove new ZNode.
     zkClient.delete(instanceConfigPath);
 
-    latestAllInstances = _helixResourceManager.getAllInstances();
-    maxTime = System.currentTimeMillis() + MAX_TIMEOUT_IN_MILLISECOND;
-    while (latestAllInstances.contains(instanceName) && System.currentTimeMillis() < maxTime) {
-      Thread.sleep(100L);
-      latestAllInstances = _helixResourceManager.getAllInstances();
-    }
-    Assert.assertTrue(System.currentTimeMillis() < maxTime, "Timeout when waiting for removing instance config");
+    TestUtils.waitForCondition(aVoid -> {
+      List<String> allInstances = _helixResourceManager.getAllInstances();
+      return !allInstances.contains(instanceName);
+    }, TIMEOUT_IN_MS, "Timeout when waiting for removing instance config");
   }
 
   @Test
