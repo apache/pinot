@@ -187,13 +187,11 @@ public class PinotHelixResourceManager {
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     _propertyStore = _helixZkManager.getHelixPropertyStore();
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
-    // Cache instance zk paths.
-    BaseDataAccessor<ZNRecord> baseDataAccessor = _helixDataAccessor.getBaseDataAccessor();
+    _keyBuilder = _helixDataAccessor.keyBuilder();
 
     // Add instance group tag for controller
     addInstanceGroupTagIfNeeded();
 
-    _keyBuilder = _helixDataAccessor.keyBuilder();
     _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
   }
@@ -302,7 +300,7 @@ public class PinotHelixResourceManager {
    * @return Helix instance config
    */
   public InstanceConfig getHelixInstanceConfig(@Nonnull String instanceId) {
-    return _helixAdmin.getInstanceConfig(_helixClusterName, instanceId);
+    return _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceId));
   }
 
   /**
@@ -2220,9 +2218,7 @@ public class PinotHelixResourceManager {
    * @return True if instance exists in the Helix cluster, False otherwise.
    */
   public boolean instanceExists(String instanceName) {
-    HelixDataAccessor helixDataAccessor = _helixZkManager.getHelixDataAccessor();
-    InstanceConfig config = helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
-    return (config != null);
+    return getHelixInstanceConfig(instanceName) != null;
   }
 
   public boolean isSingleTenantCluster() {
