@@ -21,6 +21,7 @@ package org.apache.pinot.core.data;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -45,7 +46,8 @@ public class GenericRow {
   private final Set<String> _nullValueFields = new HashSet<>();
 
   /**
-   * Initializes the generic row from the given generic row (shallow copy).
+   * Initializes the generic row from the given generic row (shallow copy). The row should be new created or cleared
+   * before calling this method.
    */
   public void init(GenericRow row) {
     _fieldToValueMap.putAll(row._fieldToValueMap);
@@ -58,7 +60,7 @@ public class GenericRow {
    * the value for the field can be {@code null}.
    */
   public Map<String, Object> getFieldToValueMap() {
-    return _fieldToValueMap;
+    return Collections.unmodifiableMap(_fieldToValueMap);
   }
 
   /**
@@ -67,7 +69,7 @@ public class GenericRow {
    * {@link #putDefaultNullValue(String, Object)}.
    */
   public Set<String> getNullValueFields() {
-    return _nullValueFields;
+    return Collections.unmodifiableSet(_nullValueFields);
   }
 
   /**
