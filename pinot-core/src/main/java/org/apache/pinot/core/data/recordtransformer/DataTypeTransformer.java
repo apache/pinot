@@ -58,13 +58,13 @@ public class DataTypeTransformer implements RecordTransformer {
     MULTI_VALUE_TYPE_MAP.put(String.class, PinotDataType.STRING_ARRAY);
   }
 
-  private final Schema _schema;
   private final Map<String, PinotDataType> _dataTypes = new HashMap<>();
 
   public DataTypeTransformer(Schema schema) {
-    _schema = schema;
-    for (Map.Entry<String, FieldSpec> entry : schema.getFieldSpecMap().entrySet()) {
-      _dataTypes.put(entry.getKey(), PinotDataType.getPinotDataType(entry.getValue()));
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (!fieldSpec.isVirtualColumn()) {
+        _dataTypes.put(fieldSpec.getName(), PinotDataType.getPinotDataType(fieldSpec));
+      }
     }
   }
 
@@ -72,46 +72,35 @@ public class DataTypeTransformer implements RecordTransformer {
   public GenericRow transform(GenericRow record) {
     for (Map.Entry<String, PinotDataType> entry : _dataTypes.entrySet()) {
       String column = entry.getKey();
-      PinotDataType dest = entry.getValue();
-
       Object value = record.getValue(column);
-      if (value == null || (value instanceof Object[] && ((Object[]) value).length == 0) || (value instanceof List
-          && ((List) value).isEmpty())) {
-        // Set default null value
-        FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
-        Object defaultNullValue = fieldSpec.getDefaultNullValue();
-        if (fieldSpec.isSingleValueField()) {
-          value = defaultNullValue;
-        } else {
-          value = new Object[]{defaultNullValue};
+
+      // Convert List value to Object[]
+      if (value instanceof List) {
+        value = ((List) value).toArray();
+      }
+
+      // Convert data type if necessary
+      PinotDataType source;
+      if (value instanceof Object[]) {
+        // Multi-value column
+        Object[] values = (Object[]) value;
+        source = MULTI_VALUE_TYPE_MAP.get(values[0].getClass());
+        if (source == null) {
+          source = PinotDataType.OBJECT_ARRAY;
         }
       } else {
-        // Convert List value to Object[]
-        if (value instanceof List) {
-          value = ((List) value).toArray();
-        }
-
-        // Convert data type if necessary
-        PinotDataType source;
-        if (value instanceof Object[]) {
-          // Multi-valued column
-          Object[] values = (Object[]) value;
-          source = MULTI_VALUE_TYPE_MAP.get(values[0].getClass());
-          if (source == null) {
-            source = PinotDataType.OBJECT_ARRAY;
-          }
-        } else {
-          // Single-valued column
-          source = SINGLE_VALUE_TYPE_MAP.get(value.getClass());
-          if (source == null) {
-            source = PinotDataType.OBJECT;
-          }
-        }
-        if (source != dest) {
-          value = dest.convert(value, source);
+        // Single-value column
+        source = SINGLE_VALUE_TYPE_MAP.get(value.getClass());
+        if (source == null) {
+          source = PinotDataType.OBJECT;
         }
       }
-      record.putField(column, value);
+      PinotDataType dest = entry.getValue();
+      if (source != dest) {
+        value = dest.convert(value, source);
+      }
+
+      record.putValue(column, value);
     }
     return record;
   }

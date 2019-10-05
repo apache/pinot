@@ -33,7 +33,8 @@ public class CompositeTransformer implements RecordTransformer {
   private final List<RecordTransformer> _transformers;
 
   /**
-   * Returns a record transformer that performs time transform, expressions transform and data type transform.
+   * Returns a record transformer that performs null value handling, time/expression/data-type transformation and record
+   * sanitization.
    * <p>NOTE: DO NOT CHANGE THE ORDER OF THE RECORD TRANSFORMERS
    * <ul>
    *   <li>
@@ -48,8 +49,8 @@ public class CompositeTransformer implements RecordTransformer {
    */
   public static CompositeTransformer getDefaultTransformer(Schema schema) {
     return new CompositeTransformer(Arrays
-        .asList(new NullValueTransformer(schema), new TimeTransformer(schema), new ExpressionTransformer(schema), new DataTypeTransformer(schema),
-            new SanitizationTransformer(schema)));
+        .asList(new NullValueTransformer(schema), new TimeTransformer(schema), new ExpressionTransformer(schema),
+            new DataTypeTransformer(schema), new SanitizationTransformer(schema)));
   }
 
   /**

@@ -18,30 +18,40 @@
  */
 package org.apache.pinot.core.data.recordtransformer;
 
-import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.FieldType;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 
 
 public class NullValueTransformer implements RecordTransformer {
-  private final Collection<FieldSpec> _fieldSpecs;
+  private final Map<String, Object> _defaultNullValues = new HashMap<>();
 
   public NullValueTransformer(Schema schema) {
-    _fieldSpecs = schema.getAllFieldSpecs();
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (!fieldSpec.isVirtualColumn() && fieldSpec.getFieldType() != FieldType.TIME) {
+        String fieldName = fieldSpec.getName();
+        Object defaultNullValue = fieldSpec.getDefaultNullValue();
+        if (fieldSpec.isSingleValueField()) {
+          _defaultNullValues.put(fieldName, defaultNullValue);
+        } else {
+          _defaultNullValues.put(fieldName, new Object[]{defaultNullValue});
+        }
+      }
+    }
   }
 
   @Override
   public GenericRow transform(GenericRow record) {
-    for (FieldSpec fieldSpec : _fieldSpecs) {
-      String fieldName = fieldSpec.getName();
-      // Do not allow default value for time column
-      if (record.getValue(fieldName) == null && fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
-        if (fieldSpec.isSingleValueField()) {
-          record.putField(fieldName, fieldSpec.getDefaultNullValue());
-        } else {
-          record.putField(fieldName, new Object[]{fieldSpec.getDefaultNullValue()});
-        }
+    for (Map.Entry<String, Object> entry : _defaultNullValues.entrySet()) {
+      String fieldName = entry.getKey();
+      Object value = record.getValue(fieldName);
+      if (value == null || (value instanceof Object[] && ((Object[]) value).length == 0) || (value instanceof List
+          && ((List) value).isEmpty())) {
+        record.putDefaultNullValue(fieldName, entry.getValue());
       }
     }
     return record;

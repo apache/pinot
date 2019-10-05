@@ -20,7 +20,6 @@ package org.apache.pinot.core.data.recordtransformer;
 
 import java.util.HashMap;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
@@ -40,27 +39,28 @@ public class ExpressionTransformer implements RecordTransformer {
   private final Map<String, FunctionExpressionEvaluator> _expressionEvaluators = new HashMap<>();
 
   public ExpressionTransformer(Schema schema) {
-    for (Map.Entry<String, FieldSpec> entry : schema.getFieldSpecMap().entrySet()) {
-      FieldSpec fieldSpec = entry.getValue();
-      String expression = fieldSpec.getTransformFunction();
-      if (expression != null) {
-        try {
-          _expressionEvaluators.put(entry.getKey(), new FunctionExpressionEvaluator(expression));
-        } catch (Exception e) {
-          LOGGER.error("Caught exception while constructing expression evaluator for: {}, skipping", expression, e);
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (!fieldSpec.isVirtualColumn()) {
+        String expression = fieldSpec.getTransformFunction();
+        if (expression != null) {
+          try {
+            _expressionEvaluators.put(fieldSpec.getName(), new FunctionExpressionEvaluator(expression));
+          } catch (Exception e) {
+            LOGGER.error("Caught exception while constructing expression evaluator for: {}, skipping", expression, e);
+          }
         }
       }
     }
   }
 
-  @Nullable
+  @Override
   public GenericRow transform(GenericRow record) {
     for (Map.Entry<String, FunctionExpressionEvaluator> entry : _expressionEvaluators.entrySet()) {
       String column = entry.getKey();
       // Skip transformation if column value already exist
       // NOTE: column value might already exist for OFFLINE data
       if (record.getValue(column) == null) {
-        record.putField(column, entry.getValue().evaluate(record));
+        record.putValue(column, entry.getValue().evaluate(record));
       }
     }
     return record;

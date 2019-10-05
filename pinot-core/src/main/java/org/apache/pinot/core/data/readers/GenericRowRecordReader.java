@@ -19,7 +19,6 @@
 package org.apache.pinot.core.data.readers;
 
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -58,9 +57,7 @@ public class GenericRowRecordReader implements RecordReader {
 
   @Override
   public GenericRow next(GenericRow reuse) {
-    for (Map.Entry<String, Object> entry : _rows.get(_nextRowId++).getEntrySet()) {
-      reuse.putField(entry.getKey(), entry.getValue());
-    }
+    reuse.init(_rows.get(_nextRowId++));
     return reuse;
   }
 

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.recordtransformer;
 
+import com.google.common.base.Preconditions;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.TimeFieldSpec;
 import org.apache.pinot.common.data.TimeGranularitySpec;
@@ -43,11 +44,11 @@ public class TimeTransformer implements RecordTransformer {
     if (timeFieldSpec != null) {
       TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
       TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
+      _outgoingTimeColumn = outgoingGranularitySpec.getName();
 
       // Perform time conversion only if incoming and outgoing granularity spec are different
       if (!incomingGranularitySpec.equals(outgoingGranularitySpec)) {
         _incomingTimeColumn = incomingGranularitySpec.getName();
-        _outgoingTimeColumn = outgoingGranularitySpec.getName();
         _incomingTimeConverter = new TimeConverter(incomingGranularitySpec);
         _outgoingTimeConverter = new TimeConverter(outgoingGranularitySpec);
       }
@@ -57,6 +58,10 @@ public class TimeTransformer implements RecordTransformer {
   @Override
   public GenericRow transform(GenericRow record) {
     if (_incomingTimeColumn == null) {
+      if (_outgoingTimeColumn != null) {
+        Preconditions.checkState(record.getValue(_outgoingTimeColumn) != null,
+            "No value found for time column: " + _outgoingTimeColumn);
+      }
       return record;
     }
 
@@ -81,14 +86,13 @@ public class TimeTransformer implements RecordTransformer {
       _isValidated = true;
     }
 
-    record.putField(_outgoingTimeColumn,
+    record.putValue(_outgoingTimeColumn,
         _outgoingTimeConverter.fromMillisSinceEpoch(_incomingTimeConverter.toMillisSinceEpoch(incomingTimeValue)));
     return record;
   }
 
   private void disableConversion() {
     _incomingTimeColumn = null;
-    _outgoingTimeColumn = null;
     _incomingTimeConverter = null;
     _outgoingTimeConverter = null;
   }

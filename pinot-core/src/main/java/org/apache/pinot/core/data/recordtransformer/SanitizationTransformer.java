@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.recordtransformer;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.data.GenericRow;
@@ -30,7 +31,7 @@ import org.apache.pinot.core.data.GenericRow;
  * The {@code SanitizationTransformer} class will sanitize the values to follow certain rules including:
  * <ul>
  *   <li>No {@code null} characters in string values</li>
- *   <li>Values are within the length limit</li>
+ *   <li>String values are within the length limit</li>
  *   TODO: add length limit to BYTES values if necessary
  * </ul>
  * <p>NOTE: should put this after the {@link DataTypeTransformer} so that all values follow the data types in
@@ -40,10 +41,9 @@ public class SanitizationTransformer implements RecordTransformer {
   private final Map<String, Integer> _stringColumnMaxLengthMap = new HashMap<>();
 
   public SanitizationTransformer(Schema schema) {
-    for (Map.Entry<String, FieldSpec> entry : schema.getFieldSpecMap().entrySet()) {
-      FieldSpec fieldSpec = entry.getValue();
-      if (fieldSpec.getDataType() == FieldSpec.DataType.STRING) {
-        _stringColumnMaxLengthMap.put(entry.getKey(), fieldSpec.getMaxLength());
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (!fieldSpec.isVirtualColumn() && fieldSpec.getDataType() == DataType.STRING) {
+        _stringColumnMaxLengthMap.put(fieldSpec.getName(), fieldSpec.getMaxLength());
       }
     }
   }
@@ -61,7 +61,7 @@ public class SanitizationTransformer implements RecordTransformer {
         // NOTE: reference comparison
         //noinspection StringEquality
         if (sanitizedValue != stringValue) {
-          record.putField(stringColumn, sanitizedValue);
+          record.putValue(stringColumn, sanitizedValue);
         }
       } else {
         // Multi-valued column
