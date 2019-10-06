@@ -52,7 +52,7 @@ items:
         spec:
           terminationGracePeriodSeconds: 30
           containers:
-          - image: winedepot/pinot:kafka2
+          - image: winedepot/pinot:0.1.13-SNAPSHOT
             imagePullPolicy: Always
             name: pinot-broker
             args: [
