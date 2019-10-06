@@ -197,11 +197,6 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
       return false;
     }
 
-    if (conf.getControllerHost() == null) {
-      LOGGER.error("Error: missing hostname, please specify 'controller.host' property in config file.");
-      return false;
-    }
-
     if (conf.getControllerPort() == null) {
       LOGGER.error("Error: missing controller port, please specify 'controller.port' property in config file.");
       return false;
