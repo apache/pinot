@@ -103,15 +103,16 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
       _readWriteLock.readLock().lock();
       try {
-        Record existingRecord = _lookupMap.putIfAbsent(key, newRecord);
-        if (existingRecord != null) {
-          _lookupMap.compute(key, (k, v) -> {
+        _lookupMap.compute(key, (k, v) -> {
+          if (v == null) {
+            return newRecord;
+          } else {
             for (int i = 0; i < _numAggregations; i++) {
               v.getValues()[i] = _aggregationFunctions.get(i).merge(v.getValues()[i], newRecord.getValues()[i]);
             }
             return v;
-          });
-        }
+          }
+        });
       } finally {
         _readWriteLock.readLock().unlock();
       }
