@@ -1559,7 +1559,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     @Override
     public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName,
         Stat stat) {
-      LLCRealtimeSegmentZKMetadata metadata = super.getRealtimeSegmentZKMetadata(realtimeTableName, segmentName, stat);
+      LLCRealtimeSegmentZKMetadata metadata = _metadataMap.get(segmentName);
       switch (_scenario) {
         case SCENARIO_1_ZK_VERSION_NUM_HAS_CHANGE:
           // Mock another controller has already updated the segment metadata, which makes the version number self increase.
