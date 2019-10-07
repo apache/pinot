@@ -44,6 +44,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
@@ -105,6 +106,7 @@ public abstract class ControllerTest {
   protected PinotHelixResourceManager _helixResourceManager;
   protected HelixManager _helixManager;
   protected HelixAdmin _helixAdmin;
+  protected HelixDataAccessor _helixDataAccessor;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
@@ -156,6 +158,7 @@ public abstract class ControllerTest {
     _controllerStarter.start();
     _helixResourceManager = _controllerStarter.getHelixResourceManager();
     _helixManager = _controllerStarter.getHelixControllerManager();
+    _helixDataAccessor = _helixManager.getHelixDataAccessor();
 
     // HelixResourceManager is null in Helix only mode, while HelixManager is null in Pinot only mode.
     switch (_controllerStarter.getControllerMode()) {
