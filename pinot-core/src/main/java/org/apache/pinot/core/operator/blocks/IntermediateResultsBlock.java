@@ -96,6 +96,15 @@ public class IntermediateResultsBlock implements Block {
    * Constructor for aggregation group-by result with {@link AggregationGroupByResult}.
    */
   public IntermediateResultsBlock(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
+      @Nullable AggregationGroupByResult aggregationGroupByResults) {
+    _aggregationFunctionContexts = aggregationFunctionContexts;
+    _aggregationGroupByResult = aggregationGroupByResults;
+  }
+
+  /**
+   * Constructor for aggregation group-by order-by result with {@link AggregationGroupByResult}.
+   */
+  public IntermediateResultsBlock(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
       @Nullable AggregationGroupByResult aggregationGroupByResults, DataSchema dataSchema) {
     _aggregationFunctionContexts = aggregationFunctionContexts;
     _aggregationGroupByResult = aggregationGroupByResults;

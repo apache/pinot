@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.CombineGroupByOperator;
 import org.apache.pinot.core.operator.CombineGroupByOrderByOperator;
@@ -34,8 +35,6 @@ import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.trace.TraceCallable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.*;
 
 
 /**
@@ -148,7 +147,7 @@ public class CombinePlanNode implements PlanNode {
       // Aggregation group-by query
       Map<String, String> queryOptions = _brokerRequest.getQueryOptions();
       // new Combine operator only when GROUP_BY_MODE explicitly set to SQL
-      if (GroupByUtils.isGroupByMode(SQL, queryOptions)) {
+      if (GroupByUtils.isGroupByMode(Request.SQL, queryOptions)) {
         return new CombineGroupByOrderByOperator(operators, _brokerRequest, _executorService, _timeOutMs);
       }
       return new CombineGroupByOperator(operators, _brokerRequest, _executorService, _timeOutMs, _numGroupsLimit);

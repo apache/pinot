@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.GroupBy;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -39,8 +38,10 @@ import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 /**
  * The <code>AggregationOperator</code> class provides the operator for aggregation group-by query on a single segment.
  */
-public class AggregationGroupByOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final String OPERATOR_NAME = "AggregationGroupByOperator";
+public class AggregationGroupByOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
+  private static final String OPERATOR_NAME = "AggregationGroupByOrderByOperator";
+
+  private final DataSchema _dataSchema;
 
   private final AggregationFunctionContext[] _functionContexts;
   private final GroupBy _groupBy;
@@ -52,7 +53,7 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
 
   private ExecutionStatistics _executionStatistics;
 
-  public AggregationGroupByOperator(@Nonnull AggregationFunctionContext[] functionContexts, @Nonnull GroupBy groupBy,
+  public AggregationGroupByOrderByOperator(@Nonnull AggregationFunctionContext[] functionContexts, @Nonnull GroupBy groupBy,
       int maxInitialResultHolderCapacity, int numGroupsLimit, @Nonnull TransformOperator transformOperator,
       long numTotalRawDocs, boolean useStarTree) {
     _functionContexts = functionContexts;
@@ -62,6 +63,34 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
     _transformOperator = transformOperator;
     _numTotalRawDocs = numTotalRawDocs;
     _useStarTree = useStarTree;
+
+    int numColumns = groupBy.getExpressionsSize() + _functionContexts.length;
+    String[] columnNames = new String[numColumns];
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
+
+    Map<String, DataSchema.ColumnDataType> columnToDataType = new HashMap<>(numColumns);
+    /*for (TransformExpressionTree transformExpression : _transformOperator.getExpressions()) {
+      columnToDataType.put(transformExpression.toString(), DataSchema.ColumnDataType.fromDataType(
+          _transformOperator.getResultMetadata(transformExpression).getDataType(), true));
+    }*/
+
+    // extract column names and data types for group by keys
+    int index = 0;
+    for (String groupByColumn : groupBy.getExpressions()) {
+      columnNames[index] = groupByColumn;
+      columnDataTypes[index] = columnToDataType.get(groupByColumn);
+      index++;
+    }
+
+    // extract column names and data types for aggregations
+    for (AggregationFunctionContext functionContext : functionContexts) {
+      columnNames[index] = functionContext.getAggregationFunction().getType().toString().toLowerCase() + "("
+          + functionContext.getColumn() + ")";
+      columnDataTypes[index] = functionContext.getAggregationFunction().getIntermediateResultColumnType();
+      index++;
+    }
+
+    _dataSchema = new DataSchema(columnNames, columnDataTypes);
   }
 
   @Override
@@ -94,7 +123,7 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
             _numTotalRawDocs);
 
     // Build intermediate result block based on aggregation group-by result from the executor
-    return new IntermediateResultsBlock(_functionContexts, groupByResult);
+    return new IntermediateResultsBlock(_functionContexts, groupByResult, _dataSchema);
   }
 
   @Override

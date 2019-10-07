@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -58,16 +57,17 @@ import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request.*;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.data.order.OrderByUtils;
-import org.apache.pinot.core.query.aggregation.DistinctTable;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.query.aggregation.DistinctTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
@@ -76,9 +76,6 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.*;
-
 
 /**
  * The <code>BrokerReduceService</code> class provides service to reduce data tables gathered from multiple servers
@@ -239,8 +236,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
               SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(),
                   cachedDataSchema);
           brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, new ArrayList<>(0)));
-        } else if (brokerRequest.isSetGroupBy() && GroupByUtils.isGroupByMode(SQL, queryOptions)
-            && GroupByUtils.isResponseFormat(SQL, queryOptions)) {
+        } else if (brokerRequest.isSetGroupBy() && GroupByUtils.isGroupByMode(Request.SQL, queryOptions)
+            && GroupByUtils.isResponseFormat(Request.SQL, queryOptions)) {
           setSQLGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
               brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap, preserveType);
         }
@@ -289,13 +286,13 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           // Aggregation group-by query.
           // read results as records if  GROUP_BY_MODE is explicitly set to SQL
 
-          if (GroupByUtils.isGroupByMode(SQL, queryOptions)) {
+          if (GroupByUtils.isGroupByMode(Request.SQL, queryOptions)) {
             // sql + order by
 
             int resultSize = 0;
 
             // if RESPONSE_FORMAT is SQL, return results in {@link ResultTable}
-            if (GroupByUtils.isResponseFormat(SQL, queryOptions)) {
+            if (GroupByUtils.isResponseFormat(Request.SQL, queryOptions)) {
               setSQLGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
                   brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap, preserveType);
               resultSize = brokerResponseNative.getResultTable().getRows().size();
