@@ -210,8 +210,6 @@ public class IndexedTableTest {
 
     // resized to 5
     Assert.assertEquals(indexedTable.size(), 5);
-    checkEvicted(indexedTable, "a", "b", "c", "d", "e");
-    checkAggregations(indexedTable, 30d, 20d);
 
     // filling up again
     indexedTable.upsert(getRecord(new Object[]{"k", 11, 110d}, new Object[]{10d, 1100d}));
@@ -234,30 +232,20 @@ public class IndexedTableTest {
     // insert new record n
     mergeTable.upsert(getRecord(new Object[]{"n", 14, 140d}, new Object[]{10d, 1400d}));
     Assert.assertEquals(mergeTable.size(), 4);
+    mergeTable.finish(false);
 
     // merge with table
     indexedTable.merge(mergeTable);
     Assert.assertEquals(indexedTable.size(), 5);
-    checkEvicted(indexedTable, "b", "j", "k", "f", "g");
 
     indexedTable.upsert(getRecord(new Object[]{"h", 8, 80d}, new Object[]{100d, 800d}));
     indexedTable.upsert(getRecord(new Object[]{"i", 9, 90d}, new Object[]{50d, 900d}));
-    mergeTable.upsert(getRecord(new Object[]{"n", 14, 140d}, new Object[]{600d, 1400d}));
+    indexedTable.upsert(getRecord(new Object[]{"n", 14, 140d}, new Object[]{600d, 1400d}));
 
     // finish
     indexedTable.finish(false);
+    checkEvicted(indexedTable, "a", "c", "d", "e", "b", "j", "k", "f", "g");
     Assert.assertEquals(indexedTable.size(), 5);
-  }
-
-  private void checkAggregations(Table indexedTable, double... evicted) {
-    Iterator<Record> iterator = indexedTable.iterator();
-    Set<Double> actualAgg = new HashSet<>();
-    while (iterator.hasNext()) {
-      actualAgg.add((double) iterator.next().getValues()[0]);
-    }
-    for (double d : evicted) {
-      Assert.assertFalse(actualAgg.contains(d));
-    }
   }
 
   private void checkEvicted(Table indexedTable, String... evicted) {
@@ -324,12 +312,14 @@ public class IndexedTableTest {
     indexedTable.upsert(getRecord(new Object[]{"k", 11, 110d}, new Object[]{10d, 1100d}));
     indexedTable.upsert(getRecord(new Object[]{"l", 12, 120d}, new Object[]{10d, 1200d}));
     Assert.assertEquals(indexedTable.size(), 10);
-    checkEvicted(indexedTable, "k", "l");
 
     // existing row allowed
     indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
     Assert.assertEquals(indexedTable.size(), 10);
 
+    indexedTable.finish(false);
+
+    checkEvicted(indexedTable, "k", "l");
 
   }
 }

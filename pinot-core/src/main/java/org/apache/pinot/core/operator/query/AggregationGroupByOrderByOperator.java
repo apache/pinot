@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import java.util.HashMap;
-import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.GroupBy;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -68,17 +67,13 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     String[] columnNames = new String[numColumns];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
 
-    Map<String, DataSchema.ColumnDataType> columnToDataType = new HashMap<>(numColumns);
-    /*for (TransformExpressionTree transformExpression : _transformOperator.getExpressions()) {
-      columnToDataType.put(transformExpression.toString(), DataSchema.ColumnDataType.fromDataType(
-          _transformOperator.getResultMetadata(transformExpression).getDataType(), true));
-    }*/
-
     // extract column names and data types for group by keys
     int index = 0;
     for (String groupByColumn : groupBy.getExpressions()) {
       columnNames[index] = groupByColumn;
-      columnDataTypes[index] = columnToDataType.get(groupByColumn);
+      TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(groupByColumn);
+      columnDataTypes[index] =
+          DataSchema.ColumnDataType.fromDataType(_transformOperator.getResultMetadata(expression).getDataType(), true);
       index++;
     }
 
