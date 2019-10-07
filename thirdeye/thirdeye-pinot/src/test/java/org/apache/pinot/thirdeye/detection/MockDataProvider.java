@@ -22,7 +22,6 @@ package org.apache.pinot.thirdeye.detection;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
-import java.util.HashSet;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.Grouping;
 import org.apache.pinot.thirdeye.dataframe.Series;
@@ -130,31 +129,21 @@ public class MockDataProvider implements DataProvider {
     return result;
   }
 
-  private Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, boolean isLegacy) {
+  @Override
+  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices) {
     Multimap<AnomalySlice, MergedAnomalyResultDTO> result = ArrayListMultimap.create();
     for (AnomalySlice slice : slices) {
       for (MergedAnomalyResultDTO anomaly : this.anomalies) {
         if (slice.match(anomaly)) {
-          if (isLegacy) {
-            if (slice.getDetectionId() >= 0 && (anomaly.getFunctionId() == null || anomaly.getFunctionId() != slice.getDetectionId())) {
-              continue;
-            }
-          } else {
-            if (slice.getDetectionId() >= 0 && (anomaly.getDetectionConfigId() == null
-                || anomaly.getDetectionConfigId() != slice.getDetectionId())) {
-              continue;
-            }
+          if (slice.getDetectionId() >= 0 && (anomaly.getDetectionConfigId() == null
+              || anomaly.getDetectionConfigId() != slice.getDetectionId())) {
+            continue;
           }
           result.put(slice, anomaly);
         }
       }
     }
     return result;
-  }
-
-  @Override
-  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices) {
-    return fetchAnomalies(slices, false);
   }
 
   @Override

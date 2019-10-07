@@ -42,8 +42,6 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
-import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
-import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipeline;
@@ -84,14 +82,11 @@ public class GridSearchTuningAlgorithm implements TuningAlgorithm {
     EvaluationManager evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
 
-    TimeSeriesLoader timeseriesLoader =
-        new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getTimeSeriesCache());
-
     AggregationLoader aggregationLoader =
         new DefaultAggregationLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(),
             ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
 
-    this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, evaluationDAO, timeseriesLoader, aggregationLoader, loader);
+    this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, evaluationDAO, aggregationLoader, loader);
     this.scores = new HashMap<>();
     this.results = new LinkedHashMap<>();
     this.scoreFunction = new TimeBucketF1ScoreFunction();

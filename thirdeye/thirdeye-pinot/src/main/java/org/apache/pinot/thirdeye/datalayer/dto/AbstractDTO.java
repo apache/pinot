@@ -19,10 +19,11 @@
 
 package org.apache.pinot.thirdeye.datalayer.dto;
 
+import java.io.Serializable;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
-public abstract class AbstractDTO {
+public abstract class AbstractDTO implements Serializable {
   private Long id;
   private int version;
   protected String createdBy;

@@ -39,8 +39,6 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
-import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
-import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
 import org.joda.time.Instant;
 import org.slf4j.Logger;
@@ -72,17 +70,13 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
     DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     EventManager eventDAO = DAORegistry.getInstance().getEventDAO();
 
-    TimeSeriesLoader timeseriesLoader =
-        new DefaultTimeSeriesLoader(metricDAO, datasetDAO,
-            ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getTimeSeriesCache());
-
     AggregationLoader aggregationLoader =
         new DefaultAggregationLoader(metricDAO, datasetDAO,
             ThirdEyeCacheRegistry.getInstance().getQueryCache(),
             ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
 
     this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, this.anomalyDAO, this.evaluationDAO,
-        timeseriesLoader, aggregationLoader, this.loader);
+        aggregationLoader, this.loader);
     this.maintenanceFlow = new ModelRetuneFlow(this.provider, DetectionRegistry.getInstance());
   }
 

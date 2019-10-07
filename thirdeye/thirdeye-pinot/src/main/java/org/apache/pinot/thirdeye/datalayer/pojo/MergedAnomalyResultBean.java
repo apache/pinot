@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.datalayer.pojo;
 
+import java.io.Serializable;
 import org.apache.pinot.thirdeye.anomaly.AnomalyType;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
@@ -30,7 +31,7 @@ import java.util.Set;
 import org.apache.commons.lang3.ObjectUtils;
 
 
-public class MergedAnomalyResultBean extends AbstractBean implements Comparable<MergedAnomalyResultBean> {
+public class MergedAnomalyResultBean extends AbstractBean implements Comparable<MergedAnomalyResultBean>, Serializable {
   private Long functionId;
   private Long anomalyFeedbackId;
   private String collection;

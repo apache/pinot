@@ -31,7 +31,6 @@ import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.anomaly.AnomalyType;
-import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -50,8 +49,10 @@ import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeDataSource;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
 import org.apache.pinot.thirdeye.datasource.csv.CSVThirdEyeDataSource;
-import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
-import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
+import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
+import org.apache.pinot.thirdeye.detection.cache.builder.AnomaliesCacheBuilder;
+import org.apache.pinot.thirdeye.detection.cache.builder.TimeSeriesCacheBuilder;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
 import org.testng.Assert;
@@ -72,7 +73,6 @@ public class DataProviderTest {
   private EvaluationManager evaluationDAO;
   private DetectionConfigManager detectionDAO;
   private QueryCache cache;
-  private TimeSeriesLoader timeseriesLoader;
 
   private DataFrame data;
 
@@ -157,12 +157,13 @@ public class DataProviderTest {
     ThirdEyeCacheRegistry.getInstance().registerQueryCache(this.cache);
     ThirdEyeCacheRegistry.initMetaDataCaches();
 
-    // loaders
-    this.timeseriesLoader = new DefaultTimeSeriesLoader(this.metricDAO, this.datasetDAO, this.cache, null);
-
+    AggregationLoader aggregationLoader = new DefaultAggregationLoader(metricDAO, datasetDAO,
+        ThirdEyeCacheRegistry.getInstance().getQueryCache(),
+        ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
     // provider
     this.provider = new DefaultDataProvider(this.metricDAO, this.datasetDAO, this.eventDAO, this.anomalyDAO, this.evaluationDAO,
-        this.timeseriesLoader, null, null);
+        aggregationLoader, new DetectionPipelineLoader(), TimeSeriesCacheBuilder.getInstance(false), AnomaliesCacheBuilder
+        .getInstance(false));
   }
 
   @AfterClass(alwaysRun = true)
@@ -257,7 +258,7 @@ public class DataProviderTest {
   // anomalies
   //
 
-  @Test(expectedExceptions = IllegalArgumentException.class)
+  @Test(expectedExceptions = RuntimeException.class)
   public void testAnomalyInvalid() {
     this.provider.fetchAnomalies(Collections.singleton(new AnomalySlice()));
   }
@@ -269,7 +270,8 @@ public class DataProviderTest {
     Collection<MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(Collections.singleton(slice)).get(slice);
 
     Assert.assertEquals(anomalies.size(), 1);
-    Assert.assertTrue(anomalies.contains(makeAnomaly(this.anomalyIds.get(2), detectionIds.get(1), 604800000L, 1209600000L, Collections.<String>emptyList())));
+    MergedAnomalyResultDTO an = makeAnomaly(this.anomalyIds.get(2), detectionIds.get(1), 604800000L, 1209600000L, Collections.<String>emptyList());
+    Assert.assertTrue(anomalies.contains(an));
   }
 
   @Test

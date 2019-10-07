@@ -190,7 +190,7 @@ public class AnomaliesResource {
     this.loader = new DetectionPipelineLoader();
 
     this.provider = new DefaultDataProvider(this.metricConfigDAO, this.datasetConfigDAO, this.eventDAO, this.anomalyDAO, this.evaluationDAO,
-        this.timeSeriesLoader, this.aggregationLoader, this.loader);
+        this.aggregationLoader, this.loader);
   }
 
   @GET

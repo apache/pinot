@@ -16,12 +16,15 @@
 
 package org.apache.pinot.thirdeye.detection.algorithm;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.StringSeries;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.MockPipeline;
@@ -86,8 +89,27 @@ public class DimensionWrapperTest {
 
     this.outputs = new ArrayList<>();
 
+    DatasetConfigDTO dataset = new DatasetConfigDTO();
+    dataset.setDataset("TEST");
+    dataset.setNonAdditiveBucketSize(5);
+    dataset.setNonAdditiveBucketUnit(TimeUnit.MILLISECONDS);
+    MetricConfigDTO metric1 = new MetricConfigDTO();
+    metric1.setDataset("TEST");
+    metric1.setId(2L);
+    MetricConfigDTO metric2 = new MetricConfigDTO();
+    metric2.setDataset("TEST");
+    metric2.setId(10L);
+    MetricConfigDTO metric3 = new MetricConfigDTO();
+    metric3.setDataset("TEST");
+    metric3.setId(11L);
+    MetricConfigDTO metric4 = new MetricConfigDTO();
+    metric4.setDataset("TEST");
+    metric4.setId(12L);
     this.provider = new MockDataProvider()
         .setAggregates(this.aggregates)
+        .setMetrics(Arrays.asList(metric1, metric2, metric3, metric4))
+        .setDatasets(Collections.singletonList(dataset))
+        .setAnomalies(Collections.emptyList())
         .setLoader(new MockPipelineLoader(this.runs, this.outputs));
 
     this.nestedProperties = new HashMap<>();
@@ -211,6 +233,24 @@ public class DimensionWrapperTest {
     this.properties.put(PROP_DIMENSIONS, Collections.singleton("b"));
     this.properties.put(PROP_MIN_VALUE, 16.0d);
     this.properties.put(PROP_NESTED_METRIC_URNS, Arrays.asList("thirdeye:metric:10", "thirdeye:metric:11"));
+
+    DatasetConfigDTO dataset = new DatasetConfigDTO();
+    dataset.setDataset("TEST");
+    dataset.setNonAdditiveBucketSize(5);
+    dataset.setNonAdditiveBucketUnit(TimeUnit.MILLISECONDS);
+    MetricConfigDTO metric1 = new MetricConfigDTO();
+    metric1.setDataset("TEST");
+    metric1.setId(10L);
+    MetricConfigDTO metric2 = new MetricConfigDTO();
+    metric2.setDataset("TEST");
+    metric2.setId(11L);
+
+    this.provider = new MockDataProvider()
+        .setAggregates(this.aggregates)
+        .setMetrics(Arrays.asList(metric1, metric2))
+        .setDatasets(Collections.singletonList(dataset))
+        .setAnomalies(Collections.emptyList())
+        .setLoader(new MockPipelineLoader(this.runs, this.outputs));
 
     this.wrapper = new DimensionWrapper(this.provider, this.config, 10, 15);
     this.wrapper.run();

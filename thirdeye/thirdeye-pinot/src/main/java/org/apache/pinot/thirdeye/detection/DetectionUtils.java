@@ -39,6 +39,7 @@ import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.detection.components.RuleBaselineProvider;
 import org.apache.pinot.thirdeye.detection.spec.RuleBaselineProviderSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.BaseComponent;
@@ -331,5 +332,26 @@ public class DetectionUtils {
       df = df.filter(df.getLongs(COL_TIME).neq(latestAggregationStartTimeStamp)).dropNull();
     }
     return df;
+  }
+
+  public static long makeTimeout(long deadline) {
+    long diff = deadline - System.currentTimeMillis();
+    return diff > 0 ? diff : 0;
+  }
+
+  public static Predicate AND(Collection<Predicate> predicates) {
+    return Predicate.AND(predicates.toArray(new Predicate[predicates.size()]));
+  }
+
+  public static List<Predicate> buildPredicatesOnTime(long start, long end) {
+    List<Predicate> predicates = new ArrayList<>();
+    if (end >= 0) {
+      predicates.add(Predicate.LT("startTime", end));
+    }
+    if (start >= 0) {
+      predicates.add(Predicate.GT("endTime", start));
+    }
+
+    return predicates;
   }
 }

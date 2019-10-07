@@ -70,8 +70,6 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
-import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
-import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.finetune.GridSearchTuningAlgorithm;
 import org.apache.pinot.thirdeye.detection.finetune.TuningAlgorithm;
 import org.apache.pinot.thirdeye.detection.health.DetectionHealth;
@@ -124,16 +122,13 @@ public class DetectionResource {
     this.evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
     this.taskDAO = DAORegistry.getInstance().getTaskDAO();
 
-    TimeSeriesLoader timeseriesLoader =
-        new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getTimeSeriesCache());
-
     AggregationLoader aggregationLoader =
         new DefaultAggregationLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(),
             ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
 
     this.loader = new DetectionPipelineLoader();
 
-    this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, evaluationDAO, timeseriesLoader, aggregationLoader, loader);
+    this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, evaluationDAO, aggregationLoader, loader);
     this.detectionConfigFormatter = new DetectionConfigFormatter(metricDAO, datasetDAO);
     this.subscriptionConfigFormatter = new DetectionAlertConfigFormatter();
   }
@@ -248,7 +243,7 @@ public class DetectionResource {
 
     LinkedHashMap<String, List<Number>> parameters = (LinkedHashMap<String, List<Number>>) json.get("parameters");
 
-    AnomalySlice slice = new AnomalySlice().withStart(start).withEnd(end);
+    AnomalySlice slice = new AnomalySlice().withDetectionId(configId).withStart(start).withEnd(end);
 
     TuningAlgorithm gridSearch = new GridSearchTuningAlgorithm(OBJECT_MAPPER.writeValueAsString(json.get("properties")), parameters);
     gridSearch.fit(slice, configId);

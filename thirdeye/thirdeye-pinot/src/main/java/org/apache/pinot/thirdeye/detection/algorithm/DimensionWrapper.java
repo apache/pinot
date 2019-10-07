@@ -51,6 +51,8 @@ import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.PredictionResult;
 import org.apache.pinot.thirdeye.detection.cache.CacheConfig;
 import org.apache.pinot.thirdeye.detection.spi.exception.DetectorDataInsufficientException;
+import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
+import org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTime;
@@ -281,6 +283,8 @@ public class DimensionWrapper extends DetectionPipeline {
     Map<String, Object> diagnostics = new HashMap<>();
     Set<Long> lastTimeStamps = new HashSet<>();
 
+    warmUpAnomaliesCache(nestedMetrics);
+
     long totalNestedMetrics = nestedMetrics.size();
     long successNestedMetrics = 0; // record the number of successfully explored dimensions
     List<Exception> exceptions = new ArrayList<>();
@@ -325,6 +329,33 @@ public class DimensionWrapper extends DetectionPipeline {
     checkNestedMetricsStatus(totalNestedMetrics, successNestedMetrics, exceptions, predictionResults);
     return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps),
         predictionResults, calculateEvaluationMetrics(predictionResults)).setDiagnostics(diagnostics);
+  }
+
+  private DatasetConfigDTO retrieveDatasetConfig(List<MetricEntity> nestedMetrics) {
+    // All nested metrics after dimension explore belong to the same dataset
+    long metricId = nestedMetrics.get(0).getId();
+    MetricConfigDTO metricConfigDTO = this.provider.fetchMetrics(Collections.singletonList(metricId)).get(metricId);
+
+    return this.provider.fetchDatasets(Collections.singletonList(metricConfigDTO.getDataset()))
+        .get(metricConfigDTO.getDataset());
+  }
+
+  private void warmUpAnomaliesCache(List<MetricEntity> nestedMetrics) {
+    DatasetConfigDTO dataset = retrieveDatasetConfig(nestedMetrics);
+    long cachingPeriodLookback = config.getProperties().containsKey(PROP_CACHE_PERIOD_LOOKBACK) ?
+        MapUtils.getLong(config.getProperties(), PROP_CACHE_PERIOD_LOOKBACK) : ThirdEyeUtils
+        .getCachingPeriodLookback(dataset.bucketTimeGranularity());
+
+    long paddingBuffer = TimeUnit.DAYS.toMillis(1); // 100000
+    AnomalySlice anomalySlice = new AnomalySlice()
+        .withDetectionId(this.config.getId())
+        .withStart(startTime - cachingPeriodLookback - paddingBuffer)
+        .withEnd(endTime + paddingBuffer);
+    //.withFilters(this.metricEntity.getFilters())
+    //.withDetectionCompNames(Collections.singletonList(this.detectorName));
+    Multimap<AnomalySlice, MergedAnomalyResultDTO> warmUpResults = this.provider.fetchAnomalies(Collections.singleton(anomalySlice));
+    LOG.info("Warmed up anomalies cache for detection {} with {} anomalies - start: {} end: {}", config.getId(),
+        warmUpResults.values().size(), (startTime - cachingPeriodLookback), endTime);
   }
 
   private List<EvaluationDTO> calculateEvaluationMetrics(List<PredictionResult> predictionResults) {

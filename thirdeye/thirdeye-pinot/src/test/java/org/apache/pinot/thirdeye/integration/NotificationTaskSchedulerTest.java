@@ -32,8 +32,6 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
-import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
-import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
@@ -124,14 +122,12 @@ public class NotificationTaskSchedulerTest {
     datasetDAO.save(getTestDatasetConfig(collection));
     metricDAO.save(getTestMetricConfig(collection, metric, null));
 
-    TimeSeriesLoader timeseriesLoader =
-        new DefaultTimeSeriesLoader(daoRegistry.getMetricConfigDAO(), datasetDAO, null, null);
     AggregationLoader aggregationLoader =
         new DefaultAggregationLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(),
             ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
 
     DataProvider provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, evaluationDAO,
-        timeseriesLoader, aggregationLoader, detectionPipelineLoader);
+        aggregationLoader, detectionPipelineLoader);
 
     detectionId = daoRegistry.getDetectionConfigManager().save(DaoTestUtils.getTestDetectionConfig(provider, detectionConfigFile));
     // create test alert configuration

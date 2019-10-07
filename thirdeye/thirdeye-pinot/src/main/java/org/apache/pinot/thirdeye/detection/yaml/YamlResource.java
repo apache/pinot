@@ -79,17 +79,12 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
-import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
-import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
-import org.apache.pinot.thirdeye.detection.cache.CouchbaseCacheDAO;
-import org.apache.pinot.thirdeye.detection.cache.DefaultTimeSeriesCache;
-import org.apache.pinot.thirdeye.detection.cache.TimeSeriesCache;
 import org.apache.pinot.thirdeye.detection.onboard.YamlOnboardingTaskInfo;
 import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
@@ -162,16 +157,13 @@ public class YamlResource {
     this.executor = Executors.newFixedThreadPool(previewConfig.getParallelism());
     this.previewTimeout = previewConfig.getTimeout();
 
-    TimeSeriesLoader timeseriesLoader =
-        new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getTimeSeriesCache());
-
     AggregationLoader aggregationLoader =
         new DefaultAggregationLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(),
             ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
 
     this.loader = new DetectionPipelineLoader();
 
-    this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, evaluationDAO, timeseriesLoader, aggregationLoader, loader);
+    this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, evaluationDAO, aggregationLoader, loader);
 
     this.detectionValidator = new DetectionConfigValidator(this.provider);
     this.subscriptionValidator = new SubscriptionConfigValidator();
