@@ -37,10 +37,9 @@ public interface Table {
    * @param aggregationInfos the aggregation info for the values if applicable
    * @param orderBy the order by information if applicable
    * @param maxCapacity the max capacity the table should have
-   * @param sort should the results be sorted in finish
    */
   void init(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
-      int maxCapacity, boolean sort);
+      int maxCapacity);
 
   /**
    * Update the table with the given record
@@ -64,8 +63,9 @@ public interface Table {
 
   /**
    * Finish any pre exit processing
+   * @param sort sort the final results if true
    */
-  void finish();
+  void finish(boolean sort);
 
   /**
    * Returns the data schema of the table

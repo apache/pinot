@@ -118,9 +118,7 @@ public class BenchmarkCombineGroupBy {
     _numAggregationFunctions = 2;
     _aggregationFunctions = new AggregationFunction[_numAggregationFunctions];
     for (int i = 0; i < _numAggregationFunctions; i++) {
-      AggregationInfo aggregationInfo = _aggregationInfos.get(i);
-      String functionName = aggregationInfo.getAggregationType();
-      _aggregationFunctions[i] = AggregationFunctionFactory.getAggregationFunction(functionName);
+      _aggregationFunctions[i] = AggregationFunctionFactory.getAggregationFunction(_aggregationInfos.get(i), null);
     }
 
     SelectionSort orderBy = new SelectionSort();
@@ -158,7 +156,7 @@ public class BenchmarkCombineGroupBy {
 
     // make 1 concurrent table
     IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable();
-    concurrentIndexedTable.init(_dataSchema, _aggregationInfos, _orderBy, capacity, false);
+    concurrentIndexedTable.init(_dataSchema, _aggregationInfos, _orderBy, capacity);
 
     List<Callable<Void>> innerSegmentCallables = new ArrayList<>(NUM_SEGMENTS);
 
@@ -181,7 +179,7 @@ public class BenchmarkCombineGroupBy {
       future.get(30, TimeUnit.SECONDS);
     }
 
-    concurrentIndexedTable.finish();
+    concurrentIndexedTable.finish(false);
   }
 
 

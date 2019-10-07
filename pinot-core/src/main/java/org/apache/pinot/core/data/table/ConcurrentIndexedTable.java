@@ -54,6 +54,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
   private Comparator<Record> _orderByComparator;
   private Comparator<Record> _finalOrderByComparator;
   private int[] _aggregationIndexes;
+  private Iterator<Record> _iterator;
 
   private AtomicBoolean _noMoreNewRecords = new AtomicBoolean();
   private final AtomicInteger _numResizes = new AtomicInteger();
@@ -62,15 +63,14 @@ public class ConcurrentIndexedTable extends IndexedTable {
   /**
    * Initializes the data structures and comparators needed for this Table
    * @param dataSchema data schema of the record's keys and values
-   * @param aggregationInfos aggregation infors for the aggregations in record'd values
+   * @param aggregationInfos aggregation infos for the aggregations in record's values
    * @param orderBy list of {@link SelectionSort} defining the order by
    * @param capacity the max number of records to hold
-   * @param sort does final result need to be sorted
    */
   @Override
   public void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
-      int capacity, boolean sort) {
-    super.init(dataSchema, aggregationInfos, orderBy, capacity, sort);
+      int capacity) {
+    super.init(dataSchema, aggregationInfos, orderBy, capacity);
 
     _lookupMap = new ConcurrentHashMap<>();
     _readWriteLock = new ReentrantReadWriteLock();
@@ -148,12 +148,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
   @Override
   public Iterator<Record> iterator() {
-    if (_sort && _isOrderBy) {
-      List<Record> sortedList = new ArrayList<>(_lookupMap.values());
-      sortedList.sort(_finalOrderByComparator);
-      return sortedList.iterator();
-    }
-    return _lookupMap.values().iterator();
+    return _iterator;
   }
 
   private void resize(int trimToSize) {
@@ -212,12 +207,19 @@ public class ConcurrentIndexedTable extends IndexedTable {
   }
 
   @Override
-  public void finish() {
+  public void finish(boolean sort) {
     resize(_maxCapacity);
     int numResizes = _numResizes.get();
     long resizeTime = _resizeTime.get();
     LOGGER.info("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", numResizes, resizeTime,
         numResizes == 0 ? 0 : resizeTime / numResizes);
+
+    _iterator = _lookupMap.values().iterator();
+    if (sort && _isOrderBy) {
+      List<Record> sortedList = new ArrayList<>(_lookupMap.values());
+      sortedList.sort(_finalOrderByComparator);
+      _iterator = sortedList.iterator();
+    }
   }
 
   @Override

@@ -25,8 +25,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.LongAccumulator;
-import java.util.concurrent.atomic.LongAdder;
 import javax.annotation.Nonnull;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
@@ -50,6 +48,7 @@ public class SimpleIndexedTable extends IndexedTable {
 
   private boolean _isOrderBy;
   private Comparator<Record> _orderByComparator;
+  private Iterator<Record> _iterator;
 
   private boolean _noMoreNewRecords = false;
   private int _numResizes = 0;
@@ -61,12 +60,11 @@ public class SimpleIndexedTable extends IndexedTable {
    * @param aggregationInfos aggregation infors for the aggregations in record'd values
    * @param orderBy list of {@link SelectionSort} defining the order by
    * @param capacity the max number of records to hold
-   * @param sort does final result need to be sorted
    */
   @Override
   public void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
-      int capacity, boolean sort) {
-    super.init(dataSchema, aggregationInfos, orderBy, capacity, sort);
+      int capacity) {
+    super.init(dataSchema, aggregationInfos, orderBy, capacity);
 
     _records = new ArrayList<>(capacity);
     _lookupTable = new HashMap<>(capacity);
@@ -160,14 +158,16 @@ public class SimpleIndexedTable extends IndexedTable {
 
   @Override
   public Iterator<Record> iterator() {
-    return _records.iterator();
+    return _iterator;
   }
 
   @Override
-  public void finish() {
+  public void finish(boolean sort) {
     sortAndResize(_maxCapacity);
     LOGGER.info("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", _numResizes, _resizeTime,
         _numResizes == 0 ? 0 : _resizeTime / _numResizes);
+
+    _iterator = _records.iterator();
   }
 
   @Override

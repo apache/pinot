@@ -542,7 +542,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     int indexedTableCapacity = 1_000_000;
     // FIXME: indexedTableCapacity should be derived from TOP. Hardcoding this value to a higher number until we can tune the resize
     // int capacity = GroupByUtils.getTableCapacity((int) groupBy.getTopN());
-    indexedTable.init(dataSchema, aggregationInfos, orderBy, indexedTableCapacity, true);
+    indexedTable.init(dataSchema, aggregationInfos, orderBy, indexedTableCapacity);
 
     for (DataTable dataTable : dataTableMap.values()) {
       CheckedFunction2[] functions = new CheckedFunction2[dataSchema.size()];
@@ -588,7 +588,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         indexedTable.upsert(record);
       }
     }
-    indexedTable.finish();
+    indexedTable.finish(true);
     return indexedTable;
   }
 

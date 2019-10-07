@@ -36,16 +36,14 @@ public abstract class IndexedTable implements Table {
   List<AggregationFunction> _aggregationFunctions;
   int _numAggregations;
   DataSchema _dataSchema;
-  boolean _sort;
 
   int _maxCapacity;
   int _bufferedCapacity;
 
   @Override
   public void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
-      int capacity, boolean sort) {
+      int capacity) {
     _dataSchema = dataSchema;
-    _sort = sort;
 
     _numAggregations = aggregationInfos.size();
     _aggregationFunctions = new ArrayList<>(_numAggregations);

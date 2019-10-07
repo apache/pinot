@@ -132,7 +132,7 @@ public class BenchmarkIndexedTable {
 
     // make 1 concurrent table
     IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable();
-    concurrentIndexedTable.init(_dataSchema, _aggregationInfos, _orderBy, CAPACITY, false);
+    concurrentIndexedTable.init(_dataSchema, _aggregationInfos, _orderBy, CAPACITY);
 
     // 10 parallel threads putting 10k records into the table
 
@@ -156,7 +156,7 @@ public class BenchmarkIndexedTable {
       if (!opCompleted) {
         System.out.println("Timed out............");
       }
-      concurrentIndexedTable.finish();
+      concurrentIndexedTable.finish(false);
     } catch (Exception e) {
       throw e;
     } finally {
@@ -184,7 +184,7 @@ public class BenchmarkIndexedTable {
 
       // make 10 indexed tables
       IndexedTable simpleIndexedTable = new SimpleIndexedTable();
-      simpleIndexedTable.init(_dataSchema, _aggregationInfos, _orderBy, CAPACITY, false);
+      simpleIndexedTable.init(_dataSchema, _aggregationInfos, _orderBy, CAPACITY);
       simpleIndexedTables.add(simpleIndexedTable);
 
       // put 10k records in each indexed table, in parallel
@@ -192,7 +192,7 @@ public class BenchmarkIndexedTable {
         for (int r = 0; r < NUM_RECORDS; r++) {
           simpleIndexedTable.upsert(getNewRecord());
         }
-        simpleIndexedTable.finish();
+        simpleIndexedTable.finish(false);
         return null;
       };
       innerSegmentCallables.add(callable);
@@ -212,7 +212,7 @@ public class BenchmarkIndexedTable {
         mergedTable.merge(indexedTable);
       }
     }
-    mergedTable.finish();
+    mergedTable.finish(false);
   }
 
   public static void main(String[] args) throws Exception {

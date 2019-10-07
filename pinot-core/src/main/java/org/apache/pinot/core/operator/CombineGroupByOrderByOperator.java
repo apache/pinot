@@ -124,7 +124,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
               if (_dataSchema == null) {
                 _dataSchema = intermediateResultsBlock.getDataSchema();
                 _indexedTable.init(_dataSchema, _brokerRequest.getAggregationsInfo(), _brokerRequest.getOrderBy(),
-                    _indexedTableCapacity, false);
+                    _indexedTableCapacity);
               }
             } finally {
               _initLock.unlock();
@@ -183,7 +183,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
         return new IntermediateResultsBlock(new TimeoutException(errorMessage));
       }
 
-      _indexedTable.finish();
+      _indexedTable.finish(false);
       IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(_indexedTable);
 
       // Set the processing exceptions.

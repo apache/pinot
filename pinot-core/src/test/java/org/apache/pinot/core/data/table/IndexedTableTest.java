@@ -72,7 +72,7 @@ public class IndexedTableTest {
     List<SelectionSort> orderBy = Lists.newArrayList(sel);
 
     // max capacity 5, buffered capacity at 10
-    indexedTable.init(dataSchema, aggregationInfos, orderBy, 5, false);
+    indexedTable.init(dataSchema, aggregationInfos, orderBy, 5);
 
     // 3 threads upsert together
     // a inserted 6 times (60), b inserted 5 times (50), d inserted 2 times (20)
@@ -123,7 +123,7 @@ public class IndexedTableTest {
         future.get(10, TimeUnit.SECONDS);
       }
 
-      indexedTable.finish();
+      indexedTable.finish(false);
       Assert.assertEquals(indexedTable.size(), 5);
       checkEvicted(indexedTable, "c", "f");
 
@@ -159,17 +159,17 @@ public class IndexedTableTest {
 
     IndexedTable simpleIndexedTable = new SimpleIndexedTable();
     // max capacity 5, buffered capacity 10
-    simpleIndexedTable.init(dataSchema, aggregationInfos, orderBy, 5, false);
+    simpleIndexedTable.init(dataSchema, aggregationInfos, orderBy, 5);
     // merge table
     IndexedTable mergeTable = new SimpleIndexedTable();
-    mergeTable.init(dataSchema, aggregationInfos, orderBy, 10, false);
+    mergeTable.init(dataSchema, aggregationInfos, orderBy, 10);
     testNonConcurrent(simpleIndexedTable, mergeTable);
 
     IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable();
     // max capacity 5, buffered capacity 10
-    concurrentIndexedTable.init(dataSchema, aggregationInfos, orderBy, 5, false);
+    concurrentIndexedTable.init(dataSchema, aggregationInfos, orderBy, 5);
     mergeTable = new SimpleIndexedTable();
-    mergeTable.init(dataSchema, aggregationInfos, orderBy, 10, false);
+    mergeTable.init(dataSchema, aggregationInfos, orderBy, 10);
     testNonConcurrent(concurrentIndexedTable, mergeTable);
 
   }
@@ -245,7 +245,7 @@ public class IndexedTableTest {
     mergeTable.upsert(getRecord(new Object[]{"n", 14, 140d}, new Object[]{600d, 1400d}));
 
     // finish
-    indexedTable.finish();
+    indexedTable.finish(false);
     Assert.assertEquals(indexedTable.size(), 5);
   }
 
@@ -294,11 +294,11 @@ public class IndexedTableTest {
     List<AggregationInfo> aggregationInfos = Lists.newArrayList(agg1, agg2);
 
     IndexedTable indexedTable = new SimpleIndexedTable();
-    indexedTable.init(dataSchema, aggregationInfos, null, 5, false);
+    indexedTable.init(dataSchema, aggregationInfos, null, 5);
     testNoMoreNewRecordsInTable(indexedTable);
 
     indexedTable = new ConcurrentIndexedTable();
-    indexedTable.init(dataSchema, aggregationInfos, null, 5, false);
+    indexedTable.init(dataSchema, aggregationInfos, null, 5);
     testNoMoreNewRecordsInTable(indexedTable);
   }
 
