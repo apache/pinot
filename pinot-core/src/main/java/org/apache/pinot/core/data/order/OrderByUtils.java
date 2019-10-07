@@ -108,7 +108,13 @@ public final class OrderByUtils {
     return globalComparator;
   }
 
-  public static List<Integer> getAggregationIndexes(List<SelectionSort> orderBy, List<AggregationInfo> aggregationInfos) {
+  /**
+   * Gets the indices from Record which have aggregations that are present in the order by
+   * @param orderBy order by information
+   * @param aggregationInfos aggregation information
+   * @return indices of aggregations in the record
+   */
+  public static int[] getAggregationIndexes(List<SelectionSort> orderBy, List<AggregationInfo> aggregationInfos) {
     Map<String, Integer> aggregationColumnToIndex = new HashMap<>();
     for (int i = 0; i < aggregationInfos.size(); i++) {
       AggregationInfo aggregationInfo = aggregationInfos.get(i);
@@ -116,15 +122,15 @@ public final class OrderByUtils {
       aggregationColumnToIndex.put(aggregationColumn, i);
     }
 
-    List<Integer> aggregationIndexes = new ArrayList<>();
+    List<Integer> indexes = new ArrayList<>();
     for (SelectionSort orderByInfo : orderBy) {
       String column = orderByInfo.getColumn();
 
       if (aggregationColumnToIndex.containsKey(column)) {
-        aggregationIndexes.add(aggregationColumnToIndex.get(column));
+        indexes.add(aggregationColumnToIndex.get(column));
       }
     }
-    return aggregationIndexes;
+    return indexes.stream().mapToInt(i->i).toArray();
   }
 
   /**

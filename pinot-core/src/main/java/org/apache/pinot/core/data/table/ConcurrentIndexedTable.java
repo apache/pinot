@@ -53,7 +53,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
   private boolean _isOrderBy;
   private Comparator<Record> _orderByComparator;
   private Comparator<Record> _finalOrderByComparator;
-  private List<Integer> _aggregationIndexes;
+  private int[] _aggregationIndexes;
 
   private AtomicBoolean _noMoreNewRecords = new AtomicBoolean();
   private final AtomicInteger _numResizes = new AtomicInteger();
@@ -171,9 +171,9 @@ public class ConcurrentIndexedTable extends IndexedTable {
         for (Record record : _lookupMap.values()) {
 
           // extract final results before hand for comparisons on aggregations
-          if (!_aggregationIndexes.isEmpty()) {
+          if (_aggregationIndexes.length > 0) {
             Object[] values = record.getValues();
-            for (Integer index : _aggregationIndexes) {
+            for (int index : _aggregationIndexes) {
               values[index] = _aggregationFunctions.get(index).extractFinalResult(values[index]);
             }
           }
