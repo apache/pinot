@@ -101,14 +101,19 @@ public class ConcurrentIndexedTable extends IndexedTable {
       });
     } else { // allow all records
 
-      Record existingRecord = _lookupMap.putIfAbsent(key, newRecord);
-      if (existingRecord != null) {
-        _lookupMap.compute(key, (k, v) -> {
-          for (int i = 0; i < _numAggregations; i++) {
-            v.getValues()[i] = _aggregationFunctions.get(i).merge(v.getValues()[i], newRecord.getValues()[i]);
-          }
-          return v;
-        });
+      _readWriteLock.readLock().lock();
+      try {
+        Record existingRecord = _lookupMap.putIfAbsent(key, newRecord);
+        if (existingRecord != null) {
+          _lookupMap.compute(key, (k, v) -> {
+            for (int i = 0; i < _numAggregations; i++) {
+              v.getValues()[i] = _aggregationFunctions.get(i).merge(v.getValues()[i], newRecord.getValues()[i]);
+            }
+            return v;
+          });
+        }
+      } finally {
+        _readWriteLock.readLock().unlock();
       }
 
       // resize if exceeds capacity

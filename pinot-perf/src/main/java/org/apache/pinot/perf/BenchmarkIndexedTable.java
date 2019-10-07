@@ -21,9 +21,11 @@ package org.apache.pinot.perf;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -77,10 +79,12 @@ public class BenchmarkIndexedTable {
   public void setup() {
     // create data
     int cardinalityD1 = 100;
-    _d1 = new ArrayList<>(cardinalityD1);
-    for (int i = 0; i < cardinalityD1; i++) {
-      _d1.add(RandomStringUtils.randomAlphabetic(3));
+    Set<String> d1 = new HashSet<>(cardinalityD1);
+    while (d1.size() < cardinalityD1) {
+      d1.add(RandomStringUtils.randomAlphabetic(3));
     }
+    _d1 = new ArrayList<>(cardinalityD1);
+    _d1.addAll(d1);
 
     int cardinalityD2 = 100;
     _d2 = new ArrayList<>(cardinalityD2);

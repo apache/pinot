@@ -168,7 +168,7 @@ public final class OrderByUtils {
       if (keyIndexMap.containsKey(column)) {
         int index = keyIndexMap.get(column);
         ColumnDataType columnDataType = keyColumnDataTypeMap.get(column);
-        comparator = OrderByUtils.getKeysComparator(ascending, index, columnDataType);
+        comparator = getKeysComparator(ascending, index, columnDataType);
       } else if (aggregationColumnToIndex.containsKey(column)) {
         int index = aggregationColumnToIndex.get(column);
         AggregationFunction aggregationFunction =

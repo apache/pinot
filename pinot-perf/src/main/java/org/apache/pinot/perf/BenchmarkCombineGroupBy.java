@@ -22,9 +22,11 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -45,6 +47,7 @@ import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.utils.Pair;
 import org.apache.pinot.core.util.GroupByUtils;
@@ -89,10 +92,12 @@ public class BenchmarkCombineGroupBy {
   public void setup() {
 
     // create data
-    _d1 = new ArrayList<>(CARDINALITY_D1);
-    for (int i = 0; i < CARDINALITY_D1; i++) {
-      _d1.add(RandomStringUtils.randomAlphabetic(4));
+    Set<String> d1 = new HashSet<>(CARDINALITY_D1);
+    while (d1.size() < CARDINALITY_D1) {
+      d1.add(RandomStringUtils.randomAlphabetic(3));
     }
+    _d1 = new ArrayList<>(CARDINALITY_D1);
+    _d1.addAll(d1);
 
     _d2 = new ArrayList<>(CARDINALITY_D2);
     for (int i = 0; i < CARDINALITY_D2; i++) {
@@ -152,7 +157,7 @@ public class BenchmarkCombineGroupBy {
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public void concurrentIndexedTableForCombineGroupBy() throws InterruptedException, ExecutionException, TimeoutException {
 
-    int capacity = GroupByUtils.getTableCapacity(TOP_N);
+    int capacity = 200_000;//GroupByUtils.getTableCapacity(TOP_N);
 
     // make 1 concurrent table
     IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable();
@@ -227,9 +232,9 @@ public class BenchmarkCombineGroupBy {
       future.get(30, TimeUnit.SECONDS);
     }
 
-    //AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
-      //  new AggregationGroupByTrimmingService(_aggregationFunctions, TOP_N);
-    //List<Map<String, Object>> trimmedResults = aggregationGroupByTrimmingService.trimIntermediateResultsMap(resultsMap);
+    AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
+        new AggregationGroupByTrimmingService(_aggregationFunctions, TOP_N);
+    List<Map<String, Object>> trimmedResults = aggregationGroupByTrimmingService.trimIntermediateResultsMap(resultsMap);
   }
 
   public static void main(String[] args) throws Exception {
