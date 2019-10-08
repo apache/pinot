@@ -329,11 +329,9 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     try {
       sendDeleteRequest(
           StringUtil.join("/", this._controllerBaseApiUrl, "tables", "table2_OFFLINE?type=realtime"));
-      Assert.fail("Deleting an existing table should fail.");
+      Assert.fail("Deleting a realtime table with OFFLINE suffix.");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof IOException);
-      // The server returns status 500 indicating error.
-      Assert.assertTrue(e.getMessage().contains("500"));
     }
 
     deleteResponse = sendDeleteRequest(StringUtil.join("/", this._controllerBaseApiUrl,
@@ -348,11 +346,9 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     try {
       deleteResponse = sendDeleteRequest(
           StringUtil.join("/", this._controllerBaseApiUrl, "tables", "no_such_table_OFFLINE"));
-      Assert.fail("Deleting an existing table should fail.");
+      Assert.fail("Deleting a non-existing table should fail.");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof IOException);
-      // The server returns status 500 indicating error.
-      Assert.assertTrue(e.getMessage().contains("500"));
     }
 
     // Case 6: Create REALTIME and OFFLINE tables and delete the realtime/offline table using query params and suffixes.
