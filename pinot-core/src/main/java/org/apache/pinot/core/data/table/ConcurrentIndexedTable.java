@@ -172,6 +172,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
         for (Record record : _lookupMap.values()) {
 
           // extract final results before hand for comparisons on aggregations
+          // FIXME: at instance level, extract final results only if intermediate result is non-comparable
           if (_aggregationIndexes.length > 0) {
             Object[] values = record.getValues();
             for (int index : _aggregationIndexes) {

@@ -165,6 +165,8 @@ public final class OrderByUtils {
       String column = orderByInfo.getColumn();
       boolean ascending = orderByInfo.isIsAsc();
 
+      // TODO: avoid the index computation and index lookup in the comparison.
+      // we can achieve this by making order by operate on Object[], which contains only order by fields
       if (keyIndexMap.containsKey(column)) {
         int index = keyIndexMap.get(column);
         ColumnDataType columnDataType = keyColumnDataTypeMap.get(column);
