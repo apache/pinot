@@ -318,8 +318,12 @@ public class DimensionWrapper extends DetectionPipeline {
     if (successNestedMetrics == 0 && totalNestedMetrics > 0) {
       // if all exceptions are caused by DetectorDataInsufficientException and
       // there are other detectors run successfully, keep the detection running
-      if (!exceptions.stream().allMatch(e -> e.getCause() instanceof DetectorDataInsufficientException)
-          || predictions.size() == 0) {
+      if (exceptions.stream().allMatch(e -> e.getCause() instanceof DetectorDataInsufficientException)
+          && predictions.size() != 0) {
+        LOG.warn(
+            "The detection pipeline {} for monitoring window {} to {} is having detectors throwing the DataInsufficientException, "
+                + "but the result for other successful detectors are preserved", this.config.getId(), this.getStartTime(), this.getEndTime());
+      } else {
         throw new DetectionPipelineException(String.format(
             "Detection failed for all nested dimensions for detection config id %d for monitoring window %d to %d.",
             this.config.getId(), this.getStartTime(), this.getEndTime()), Iterables.getLast(exceptions));
