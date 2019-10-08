@@ -254,18 +254,47 @@ public class PinotTableRestletResource {
 
     List<String> tablesDeleted = new LinkedList<>();
     try {
-      if (tableType != TableType.REALTIME && !TableNameBuilder.REALTIME.tableHasTypeSuffix(tableName)) {
+      boolean tableExist = false;
+      if (verifyTableType(tableName, tableType, tableType.OFFLINE)) {
+        tableExist = _pinotHelixResourceManager.hasOfflineTable(tableName);
+        // Even the table name does not exist, still go on to delete remaining table metadata in case a previous delete
+        // did not complete.
         _pinotHelixResourceManager.deleteOfflineTable(tableName);
-        tablesDeleted.add(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+        if (tableExist) {
+          tablesDeleted.add(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+        }
       }
-      if (tableType != TableType.OFFLINE && !TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableName)) {
+      if (verifyTableType(tableName, tableType, tableType.REALTIME)) {
+        tableExist = _pinotHelixResourceManager.hasRealtimeTable(tableName);
+        // Even the table name does not exist, still go on to delete remaining table metadata in case a previous delete
+        // did not complete.
         _pinotHelixResourceManager.deleteRealtimeTable(tableName);
-        tablesDeleted.add(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+        if (tableExist) {
+          tablesDeleted.add(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+        }
       }
-      return new SuccessResponse("Tables: " + tablesDeleted + " deleted");
+      if (!tablesDeleted.isEmpty()) {
+        return new SuccessResponse("Tables: " + tablesDeleted + " deleted");
+      }
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
+    throw new ControllerApplicationException(LOGGER,
+          "Table '" + tableName + "' with type " + tableType + " does not exist", Response.Status.NOT_FOUND);
+  }
+
+  //   Return true iff the table is of the expectedType based on the given tableName and tableType. The truth table:
+  //        tableType   TableNameBuilder.getTableTypeFromTableName(tableName)   Return value
+  //     1. null      null (i.e., table has no type suffix)           true
+  //     2. null      not_null                              typeFromTableName == expectedType
+  //     3. not_null      null                                    tableType == expectedType
+  //     4. not_null      not_null                          tableType==typeFromTableName==expectedType
+  private boolean verifyTableType(String tableName, TableType tableType, TableType expectedType) {
+    if (tableType != null && tableType != expectedType) {
+      return false;
+    }
+    TableType typeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
+    return typeFromTableName == null || typeFromTableName == expectedType;
   }
 
   @PUT
