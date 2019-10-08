@@ -160,7 +160,7 @@ public class DefaultDataProvider implements DataProvider {
       Map<MetricSlice, Future<DataFrame>> futures = new HashMap<>();
 
       // work on getting the detectionId
-      boolean runBryanPoC = true;
+      boolean runBryanPoC = false;
 
       if (runBryanPoC) {
         //if (configId != -1) {
@@ -201,7 +201,7 @@ public class DefaultDataProvider implements DataProvider {
       }
       Map<LoadTimeseriesRequestContainer, DataFrame> cacheResult = DETECTION_TIME_SERIES_CACHE.getAll(alignedMetricSlicesToOriginalSlice.keySet());
       Map<MetricSlice, DataFrame> timeseriesResult = new HashMap<>();
-      for (Map.Entry<LoadTimeseriesRequestContainer, DataFrame> entry : cacheResult.entrySet()){
+      for (Map.Entry<LoadTimeseriesRequestContainer, DataFrame> entry : cacheResult.entrySet()) {
         // make a copy of the result so that cache won't be contaminated by client code
         MetricSlice currentSlice = alignedMetricSlicesToOriginalSlice.get(entry.getKey());
         timeseriesResult.put(currentSlice, entry.getValue().copy());
