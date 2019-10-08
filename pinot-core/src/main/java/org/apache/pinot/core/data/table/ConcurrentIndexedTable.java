@@ -51,8 +51,8 @@ public class ConcurrentIndexedTable extends IndexedTable {
   private ReentrantReadWriteLock _readWriteLock;
 
   private boolean _isOrderBy;
-  private Comparator<Record> _orderByComparator;
-  private Comparator<Record> _finalOrderByComparator;
+  private Comparator<Record> _resizeOrderByComparator;
+  private Comparator<Record> _finishOrderByComparator;
   private int[] _aggregationIndexes;
   private Iterator<Record> _iterator;
 
@@ -76,10 +76,13 @@ public class ConcurrentIndexedTable extends IndexedTable {
     _readWriteLock = new ReentrantReadWriteLock();
     _isOrderBy = CollectionUtils.isNotEmpty(orderBy);
     if (_isOrderBy) {
-      _orderByComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos, false);
-      _finalOrderByComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos, true);
       // get indices of aggregations to extract final results upfront
+      // FIXME: at instance level, extract final results only if intermediate result is non-comparable, instead of for all aggregations
       _aggregationIndexes = OrderByUtils.getAggregationIndexes(orderBy, aggregationInfos);
+      // resize comparator doesn't need to extract final results, because it will be done before hand when adding Records to the PQ.
+      _resizeOrderByComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos, false);
+      // finish comparator needs to extract final results, as it cannot be done before hand. The _lookupMap will get modified if it is done before hand
+      _finishOrderByComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos, true);
     }
   }
 
@@ -167,12 +170,12 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
         // make min heap of elements to evict
         int heapSize = _lookupMap.size() - trimToSize;
-        PriorityQueue<Record> minHeap = new PriorityQueue<>(heapSize, _orderByComparator);
+        PriorityQueue<Record> minHeap = new PriorityQueue<>(heapSize, _resizeOrderByComparator);
 
         for (Record record : _lookupMap.values()) {
 
           // extract final results before hand for comparisons on aggregations
-          // FIXME: at instance level, extract final results only if intermediate result is non-comparable
+          // FIXME: at instance level, extract final results only if intermediate result is non-comparable, instead of for all aggregations
           if (_aggregationIndexes.length > 0) {
             Object[] values = record.getValues();
             for (int index : _aggregationIndexes) {
@@ -223,8 +226,13 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
     _iterator = _lookupMap.values().iterator();
     if (sort && _isOrderBy) {
+      // TODO: in this final sort, we can optimize again by extracting final results before hand.
+      // This could be done by adding another parameter to finish(sort, extractFinalResults)
+      // The caller then does not have to extract final results again, if extractFinalResults=true was passed to finish.
+      // Typically, at instance level, we will not need to sort, nor do we want final results - finish(true, true).
+      // At broker level we need to sort, and we also want final results - finish(true, true)
       List<Record> sortedList = new ArrayList<>(_lookupMap.values());
-      sortedList.sort(_finalOrderByComparator);
+      sortedList.sort(_finishOrderByComparator);
       _iterator = sortedList.iterator();
     }
   }
