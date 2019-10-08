@@ -251,27 +251,27 @@ public class DimensionWrapper extends DetectionPipeline {
       checkEarlyStop(totalNestedMetrics, successNestedMetrics, i, exceptions);
       MetricEntity metric = nestedMetrics.get(i);
       List<Exception> exceptionsForNestedMetric = new ArrayList<>();
-        LOG.info("running detection for metric urn {}. {}/{}", metric.getUrn(), i + 1, totalNestedMetrics);
-        for (Map<String, Object> properties : this.nestedProperties) {
-          DetectionPipelineResult intermediate;
-          try {
-            intermediate = this.runNested(metric, properties);
-          } catch (Exception e) {
-            LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed for metric urn {}.",
-                this.config.getId(), this.start, this.end, metric.getUrn(), e);
-            exceptionsForNestedMetric.add(e);
-            continue;
-          }
-          lastTimeStamps.add(intermediate.getLastTimestamp());
-          anomalies.addAll(intermediate.getAnomalies());
-          diagnostics.put(metric.getUrn(), intermediate.getDiagnostics());
-          predictionResults.addAll(intermediate.getPredictions());
+      LOG.info("running detection for metric urn {}. {}/{}", metric.getUrn(), i + 1, totalNestedMetrics);
+      for (Map<String, Object> properties : this.nestedProperties) {
+        DetectionPipelineResult intermediate;
+        try {
+          intermediate = this.runNested(metric, properties);
+        } catch (Exception e) {
+          LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed for metric urn {}.",
+              this.config.getId(), this.start, this.end, metric.getUrn(), e);
+          exceptionsForNestedMetric.add(e);
+          continue;
         }
-        // if either one detector run successfully, mark the dimension as successful
-        if (exceptionsForNestedMetric.size() != this.nestedMetricUrns.size()) {
-          successNestedMetrics++;
-        }
-        exceptions.addAll(exceptionsForNestedMetric);
+        lastTimeStamps.add(intermediate.getLastTimestamp());
+        anomalies.addAll(intermediate.getAnomalies());
+        diagnostics.put(metric.getUrn(), intermediate.getDiagnostics());
+        predictionResults.addAll(intermediate.getPredictions());
+      }
+      // if either one detector run successfully, mark the dimension as successful
+      if (exceptionsForNestedMetric.size() != this.nestedProperties.size()) {
+        successNestedMetrics++;
+      }
+      exceptions.addAll(exceptionsForNestedMetric);
     }
 
     checkNestedMetricsStatus(totalNestedMetrics, successNestedMetrics, exceptions, predictionResults);
@@ -316,7 +316,7 @@ public class DimensionWrapper extends DetectionPipeline {
       List<PredictionResult> predictions) throws DetectionPipelineException {
     // if all nested metrics failed, throw an exception
     if (successNestedMetrics == 0 && totalNestedMetrics > 0) {
-      // if all exceptions are AnomalyDetectorWrapperException and caused by DetectorDataInsufficientException and
+      // if all exceptions are caused by DetectorDataInsufficientException and
       // there are other detectors run successfully, keep the detection running
       if (!exceptions.stream().allMatch(e -> e.getCause() instanceof DetectorDataInsufficientException)
           || predictions.size() == 0) {
