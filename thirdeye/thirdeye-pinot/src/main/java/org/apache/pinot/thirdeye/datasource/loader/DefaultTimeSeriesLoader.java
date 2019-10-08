@@ -64,7 +64,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
     TimeSeriesRequestContainer rc = DataFrameUtils.makeTimeSeriesRequestAligned(slice, "ref", this.metricDAO, this.datasetDAO);
     ThirdEyeResponse response;
 
-    boolean runBryanPoC = true;
+    boolean runBryanPoC = false;
     if (runBryanPoC) {
       response = timeSeriesCache.fetchTimeSeries(new ThirdEyeCacheRequestContainer(String.valueOf(configId), rc.getRequest()));
     } else {
