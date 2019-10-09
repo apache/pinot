@@ -117,13 +117,7 @@ public class RoutingTableBuilderFactory {
 
         // Check that replica group strategy config is correctly set
         boolean hasReplicaGroupStrategyConfig = (validationConfig.getReplicaGroupStrategyConfig() != null);
-
-        // Check that the table push type is not 'refresh'.
-        boolean isNotRefreshPush =
-            (validationConfig.getSegmentPushType() != null) && !validationConfig.getSegmentPushType()
-                .equalsIgnoreCase("REFRESH");
-
-        if (isSegmentAssignmentStrategyCorrect && hasReplicaGroupStrategyConfig && isNotRefreshPush) {
+        if (isSegmentAssignmentStrategyCorrect && hasReplicaGroupStrategyConfig) {
           builder = new PartitionAwareOfflineRoutingTableBuilder();
         } else {
           builder = new DefaultOfflineRoutingTableBuilder();
