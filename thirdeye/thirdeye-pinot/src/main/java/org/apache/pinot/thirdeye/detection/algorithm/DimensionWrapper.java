@@ -267,8 +267,8 @@ public class DimensionWrapper extends DetectionPipeline {
         diagnostics.put(metric.getUrn(), intermediate.getDiagnostics());
         predictionResults.addAll(intermediate.getPredictions());
       }
-      // if either one detector run successfully, mark the dimension as successful
-      if (exceptionsForNestedMetric.size() != this.nestedProperties.size()) {
+      // for one dimension, if all detectors run successfully, mark the dimension as successful
+      if (exceptionsForNestedMetric.isEmpty()) {
         successNestedMetrics++;
       }
       exceptions.addAll(exceptionsForNestedMetric);
@@ -307,7 +307,7 @@ public class DimensionWrapper extends DetectionPipeline {
    * thrown by one detector should not block other detectors's result.
    *
    * @param totalNestedMetrics the total number of nested metrics
-   * @param successNestedMetrics the successfully generated nested metrics
+   * @param successNestedMetrics the successfully run nested metrics
    * @param exceptions the list of all exceptions
    * @param predictions the prediction results generated, which can tell us whether there are detectors run successfully.
    * @throws DetectionPipelineException the exception to throw
