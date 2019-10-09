@@ -41,8 +41,6 @@ import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegment;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.core.realtime.converter.RealtimeSegmentConverter;
@@ -290,10 +288,6 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           long segStartTime = realtimeSegment.getMinTime();
           long segEndTime = realtimeSegment.getMaxTime();
 
-          TimeUnit timeUnit = schema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType();
-          ImmutableSegment segment =
-              ImmutableSegmentLoader.load(new File(resourceDir, segmentMetatdaZk.getSegmentName()), indexLoadingConfig);
-
           segmentLogger.info("Committing {} offsets", _streamConfig.getType());
           boolean commitSuccessful = false;
           try {
@@ -368,9 +362,9 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             metadataToOverwrite.setStatus(Status.DONE);
             metadataToOverwrite.setStartTime(segStartTime);
             metadataToOverwrite.setEndTime(segEndTime);
-            metadataToOverwrite.setTimeUnit(timeUnit);
+            metadataToOverwrite.setTimeUnit(schema.getOutgoingTimeUnit());
             metadataToOverwrite.setTotalRawDocs(realtimeSegment.getNumDocsIndexed());
-            notifier.notifySegmentCommitted(tableNameWithType, metadataToOverwrite, segment);
+            notifier.replaceHLSegment(metadataToOverwrite, indexLoadingConfig);
             segmentLogger
                 .info("Completed write of segment completion to Helix, waiting for controller to assign a new segment");
           } catch (Exception e) {
