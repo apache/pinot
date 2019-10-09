@@ -44,7 +44,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.AccessOption;
-import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
 import org.apache.helix.HelixAdmin;
@@ -801,10 +800,9 @@ public class PinotHelixResourceManager {
 
   public Set<String> getAllBrokerTenantNames() {
     Set<String> tenantSet = new HashSet<>();
-    List<String> instancesInCluster = _helixAdmin.getInstancesInCluster(_helixClusterName);
-    for (String instanceName : instancesInCluster) {
-      InstanceConfig config = _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
-      for (String tag : config.getTags()) {
+    List<InstanceConfig> instanceConfigs = getAllHelixInstanceConfigs();
+    for (InstanceConfig instanceConfig : instanceConfigs) {
+      for (String tag : instanceConfig.getTags()) {
         if (TagNameUtils.isBrokerTag(tag)) {
           tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
         }
@@ -815,10 +813,9 @@ public class PinotHelixResourceManager {
 
   public Set<String> getAllServerTenantNames() {
     Set<String> tenantSet = new HashSet<>();
-    List<String> instancesInCluster = _helixAdmin.getInstancesInCluster(_helixClusterName);
-    for (String instanceName : instancesInCluster) {
-      InstanceConfig config = _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
-      for (String tag : config.getTags()) {
+    List<InstanceConfig> instanceConfigs = getAllHelixInstanceConfigs();
+    for (InstanceConfig instanceConfig : instanceConfigs) {
+      for (String tag : instanceConfig.getTags()) {
         if (TagNameUtils.isServerTag(tag)) {
           tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
         }
