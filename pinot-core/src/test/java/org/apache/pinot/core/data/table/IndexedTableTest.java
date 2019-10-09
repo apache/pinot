@@ -71,12 +71,11 @@ public class IndexedTableTest {
     sel.setIsAsc(true);
     List<SelectionSort> orderBy = Lists.newArrayList(sel);
 
-    // max capacity 10, evict at 12, evict until 11
-    indexedTable.init(dataSchema, aggregationInfos, orderBy, 10);
+    // max capacity 5, buffered capacity at 10
+    indexedTable.init(dataSchema, aggregationInfos, orderBy, 5);
 
     // 3 threads upsert together
     // a inserted 6 times (60), b inserted 5 times (50), d inserted 2 times (20)
-    // buffered capacity 12.
     // inserting 14 unique records
     // c (10000) and f (20000) should be trimmed out no matter what
     // a (60) and i (500) trimmed out after size()
@@ -124,9 +123,9 @@ public class IndexedTableTest {
         future.get(10, TimeUnit.SECONDS);
       }
 
-      indexedTable.finish();
-      Assert.assertEquals(indexedTable.size(), 10);
-      checkSurvivors(indexedTable, "c", "f");
+      indexedTable.finish(false);
+      Assert.assertEquals(indexedTable.size(), 5);
+      checkEvicted(indexedTable, "c", "f");
 
     } finally {
       executorService.shutdown();
@@ -159,16 +158,16 @@ public class IndexedTableTest {
     List<SelectionSort> orderBy = Lists.newArrayList(sel);
 
     IndexedTable simpleIndexedTable = new SimpleIndexedTable();
-    // max capacity 10, evict at 12, evict until 11
-    simpleIndexedTable.init(dataSchema, aggregationInfos, orderBy, 10);
+    // max capacity 5, buffered capacity 10
+    simpleIndexedTable.init(dataSchema, aggregationInfos, orderBy, 5);
     // merge table
     IndexedTable mergeTable = new SimpleIndexedTable();
     mergeTable.init(dataSchema, aggregationInfos, orderBy, 10);
     testNonConcurrent(simpleIndexedTable, mergeTable);
 
     IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable();
-    // max capacity 10, evict at 12, evict until 11
-    concurrentIndexedTable.init(dataSchema, aggregationInfos, orderBy, 10);
+    // max capacity 5, buffered capacity 10
+    concurrentIndexedTable.init(dataSchema, aggregationInfos, orderBy, 5);
     mergeTable = new SimpleIndexedTable();
     mergeTable.init(dataSchema, aggregationInfos, orderBy, 10);
     testNonConcurrent(concurrentIndexedTable, mergeTable);
@@ -189,76 +188,67 @@ public class IndexedTableTest {
     Assert.assertEquals(indexedTable.size(), 2);
 
     indexedTable.upsert(getRecord(new Object[]{"c", 3, 30d}, new Object[]{10d, 300d}));
+    indexedTable.upsert(getRecord(new Object[]{"c", 3, 30d}, new Object[]{10d, 300d}));
     indexedTable.upsert(getRecord(new Object[]{"d", 4, 40d}, new Object[]{10d, 400d}));
+    indexedTable.upsert(getRecord(new Object[]{"d", 4, 40d}, new Object[]{10d, 400d}));
+    indexedTable.upsert(getRecord(new Object[]{"e", 5, 50d}, new Object[]{10d, 500d}));
     indexedTable.upsert(getRecord(new Object[]{"e", 5, 50d}, new Object[]{10d, 500d}));
     indexedTable.upsert(getRecord(new Object[]{"f", 6, 60d}, new Object[]{10d, 600d}));
     indexedTable.upsert(getRecord(new Object[]{"g", 7, 70d}, new Object[]{10d, 700d}));
     indexedTable.upsert(getRecord(new Object[]{"h", 8, 80d}, new Object[]{10d, 800d}));
     indexedTable.upsert(getRecord(new Object[]{"i", 9, 90d}, new Object[]{10d, 900d}));
-    indexedTable.upsert(getRecord(new Object[]{"j", 10, 100d}, new Object[]{10d, 1000d}));
 
     // reached max capacity
-    Assert.assertEquals(indexedTable.size(), 10);
+    Assert.assertEquals(indexedTable.size(), 9);
 
     // repeat row b
     indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
-    Assert.assertEquals(indexedTable.size(), 10);
+    Assert.assertEquals(indexedTable.size(), 9);
 
-    // insert 2 more rows to reach buffer limit
+    // insert 1 more rows to reach buffer limit
+    indexedTable.upsert(getRecord(new Object[]{"j", 10, 100d}, new Object[]{10d, 1000d}));
+
+    // resized to 5
+    Assert.assertEquals(indexedTable.size(), 5);
+
+    // filling up again
     indexedTable.upsert(getRecord(new Object[]{"k", 11, 110d}, new Object[]{10d, 1100d}));
     indexedTable.upsert(getRecord(new Object[]{"l", 12, 120d}, new Object[]{10d, 1200d}));
-    // resized to evict capacity (evict a)
-    Assert.assertEquals(indexedTable.size(), 11);
-    checkSurvivors(indexedTable, "a");
-    checkAggregations(indexedTable, 30d);
-
-    // repeat row b
-    indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
-    Assert.assertEquals(indexedTable.size(), 11);
-
-    // new row, reorder and evict lowest 1 record (b)
     indexedTable.upsert(getRecord(new Object[]{"m", 13, 130d}, new Object[]{10d, 1300d}));
-    Assert.assertEquals(indexedTable.size(), 11);
-    checkSurvivors(indexedTable, "b");
-    checkAggregations(indexedTable, 30d);
+    indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
+    // repeat f
+    indexedTable.upsert(getRecord(new Object[]{"f", 6, 60d}, new Object[]{10d, 600d}));
+    // repeat g
+    indexedTable.upsert(getRecord(new Object[]{"g", 7, 70d}, new Object[]{10d, 700d}));
+    Assert.assertEquals(indexedTable.size(), 9);
+
 
     // repeat record j
     mergeTable.upsert(getRecord(new Object[]{"j", 10, 100d}, new Object[]{10d, 1000d}));
-    // repeat record c
-    mergeTable.upsert(getRecord(new Object[]{"c", 3, 30d}, new Object[]{10d, 300d}));
-    // insert evicted record b
+    // repeat record k
+    mergeTable.upsert(getRecord(new Object[]{"k", 11, 110d}, new Object[]{10d, 1100d}));
+    // repeat record b
     mergeTable.upsert(getRecord(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
-    // insert new record
+    // insert new record n
     mergeTable.upsert(getRecord(new Object[]{"n", 14, 140d}, new Object[]{10d, 1400d}));
     Assert.assertEquals(mergeTable.size(), 4);
+    mergeTable.finish(false);
 
     // merge with table
     indexedTable.merge(mergeTable);
-    Assert.assertEquals(indexedTable.size(), 11);
+    Assert.assertEquals(indexedTable.size(), 5);
 
-    // check survivors, a and j should be evicted
-    checkSurvivors(indexedTable, "c", "j");
-
-    // check aggregations
-    checkAggregations(indexedTable, 20d);
+    indexedTable.upsert(getRecord(new Object[]{"h", 8, 80d}, new Object[]{100d, 800d}));
+    indexedTable.upsert(getRecord(new Object[]{"i", 9, 90d}, new Object[]{50d, 900d}));
+    indexedTable.upsert(getRecord(new Object[]{"n", 14, 140d}, new Object[]{600d, 1400d}));
 
     // finish
-    indexedTable.finish();
-    Assert.assertEquals(indexedTable.size(), 10);
+    indexedTable.finish(false);
+    checkEvicted(indexedTable, "a", "c", "d", "e", "b", "j", "k", "f", "g");
+    Assert.assertEquals(indexedTable.size(), 5);
   }
 
-  private void checkAggregations(Table indexedTable, double... evicted) {
-    Iterator<Record> iterator = indexedTable.iterator();
-    Set<Double> actualAgg = new HashSet<>();
-    while (iterator.hasNext()) {
-      actualAgg.add((double) iterator.next().getValues()[0]);
-    }
-    for (double d : evicted) {
-      Assert.assertFalse(actualAgg.contains(d));
-    }
-  }
-
-  private void checkSurvivors(Table indexedTable, String... evicted) {
+  private void checkEvicted(Table indexedTable, String... evicted) {
     Iterator<Record> iterator = indexedTable.iterator();
     List<String> d1 = new ArrayList<>();
     while (iterator.hasNext()) {
@@ -271,5 +261,65 @@ public class IndexedTableTest {
 
   private Record getRecord(Object[] keys, Object[] values) {
     return new Record(new Key(keys), values);
+  }
+
+  @Test
+  public void testNoMoreNewRecords() {
+    DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE,
+            ColumnDataType.DOUBLE});
+
+    AggregationInfo agg1 = new AggregationInfo();
+    Map<String, String> params1 = new HashMap<>();
+    params1.put("column", "m1");
+    agg1.setAggregationParams(params1);
+    agg1.setAggregationType("sum");
+    AggregationInfo agg2 = new AggregationInfo();
+    Map<String, String> params2 = new HashMap<>();
+    params2.put("column", "m2");
+    agg2.setAggregationParams(params2);
+    agg2.setAggregationType("max");
+    List<AggregationInfo> aggregationInfos = Lists.newArrayList(agg1, agg2);
+
+    IndexedTable indexedTable = new SimpleIndexedTable();
+    indexedTable.init(dataSchema, aggregationInfos, null, 5);
+    testNoMoreNewRecordsInTable(indexedTable);
+
+    indexedTable = new ConcurrentIndexedTable();
+    indexedTable.init(dataSchema, aggregationInfos, null, 5);
+    testNoMoreNewRecordsInTable(indexedTable);
+  }
+
+  private void testNoMoreNewRecordsInTable(IndexedTable indexedTable) {
+    // Insert 14 records. Check that last 2 never made it.
+    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
+    indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
+    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
+    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
+    Assert.assertEquals(indexedTable.size(), 2);
+
+    indexedTable.upsert(getRecord(new Object[]{"c", 3, 30d}, new Object[]{10d, 300d}));
+    indexedTable.upsert(getRecord(new Object[]{"d", 4, 40d}, new Object[]{10d, 400d}));
+    indexedTable.upsert(getRecord(new Object[]{"e", 5, 50d}, new Object[]{10d, 500d}));
+    indexedTable.upsert(getRecord(new Object[]{"f", 6, 60d}, new Object[]{10d, 600d}));
+    indexedTable.upsert(getRecord(new Object[]{"g", 7, 70d}, new Object[]{10d, 700d}));
+    indexedTable.upsert(getRecord(new Object[]{"h", 8, 80d}, new Object[]{10d, 800d}));
+    indexedTable.upsert(getRecord(new Object[]{"i", 9, 90d}, new Object[]{10d, 900d}));
+    Assert.assertEquals(indexedTable.size(), 9);
+
+    indexedTable.upsert(getRecord(new Object[]{"j", 10, 100d}, new Object[]{10d, 1000d}));
+    // no resize. no more records allowed
+    indexedTable.upsert(getRecord(new Object[]{"k", 11, 110d}, new Object[]{10d, 1100d}));
+    indexedTable.upsert(getRecord(new Object[]{"l", 12, 120d}, new Object[]{10d, 1200d}));
+    Assert.assertEquals(indexedTable.size(), 10);
+
+    // existing row allowed
+    indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
+    Assert.assertEquals(indexedTable.size(), 10);
+
+    indexedTable.finish(false);
+
+    checkEvicted(indexedTable, "k", "l");
+
   }
 }

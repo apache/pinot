@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.perf;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,13 +28,15 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
@@ -42,10 +45,15 @@ import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.data.table.SimpleIndexedTable;
-import org.apache.pinot.core.util.trace.TraceRunnable;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
+import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.core.query.utils.Pair;
+import org.apache.pinot.core.util.GroupByUtils;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
+import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
@@ -59,36 +67,40 @@ import org.openjdk.jmh.runner.options.TimeValue;
 
 
 @State(Scope.Benchmark)
-public class BenchmarkIndexedTable {
+@Fork(value = 1, jvmArgs = {"-server", "-Xmx8G", "-XX:MaxDirectMemorySize=16G"})
+public class BenchmarkCombineGroupBy {
 
-  private int CAPACITY = 800;
-  private int NUM_RECORDS = 1000;
+  private static final int TOP_N = 500;
+  private static final int NUM_SEGMENTS = 4;
+  private static final int NUM_RECORDS_PER_SEGMENT = 100_000;
+  private static final int CARDINALITY_D1 = 500;
+  private static final int CARDINALITY_D2 = 500;
   private Random _random = new Random();
 
   private DataSchema _dataSchema;
   private List<AggregationInfo> _aggregationInfos;
+  private AggregationFunction[] _aggregationFunctions;
   private List<SelectionSort> _orderBy;
+  private int _numAggregationFunctions;
 
   private List<String> _d1;
   private List<Integer> _d2;
 
   private ExecutorService _executorService;
 
-
   @Setup
   public void setup() {
+
     // create data
-    int cardinalityD1 = 100;
-    Set<String> d1 = new HashSet<>(cardinalityD1);
-    while (d1.size() < cardinalityD1) {
+    Set<String> d1 = new HashSet<>(CARDINALITY_D1);
+    while (d1.size() < CARDINALITY_D1) {
       d1.add(RandomStringUtils.randomAlphabetic(3));
     }
-    _d1 = new ArrayList<>(cardinalityD1);
+    _d1 = new ArrayList<>(CARDINALITY_D1);
     _d1.addAll(d1);
 
-    int cardinalityD2 = 100;
-    _d2 = new ArrayList<>(cardinalityD2);
-    for (int i = 0; i < cardinalityD2; i++) {
+    _d2 = new ArrayList<>(CARDINALITY_D2);
+    for (int i = 0; i < CARDINALITY_D2; i++) {
       _d2.add(i);
     }
 
@@ -108,6 +120,12 @@ public class BenchmarkIndexedTable {
     agg2.setAggregationType("max");
     _aggregationInfos = Lists.newArrayList(agg1, agg2);
 
+    _numAggregationFunctions = 2;
+    _aggregationFunctions = new AggregationFunction[_numAggregationFunctions];
+    for (int i = 0; i < _numAggregationFunctions; i++) {
+      _aggregationFunctions[i] = AggregationFunctionFactory.getAggregationFunction(_aggregationInfos.get(i), null);
+    }
+
     SelectionSort orderBy = new SelectionSort();
     orderBy.setColumn("sum(m1)");
     orderBy.setIsAsc(true);
@@ -121,82 +139,41 @@ public class BenchmarkIndexedTable {
     _executorService.shutdown();
   }
 
-  private Record getNewRecord() {
+  private Record getRecord() {
     Object[] keys = new Object[]{_d1.get(_random.nextInt(_d1.size())), _d2.get(_random.nextInt(_d2.size()))};
     Object[] values = new Object[]{(double) _random.nextInt(1000), (double) _random.nextInt(1000)};
     return new Record(new Key(keys), values);
   }
 
+  private Pair<String, Object[]> getOriginalRecord() {
+    String stringKey = Joiner.on(GroupKeyGenerator.DELIMITER)
+        .join(_d1.get(_random.nextInt(_d1.size())), _d2.get(_random.nextInt(_d2.size())));
+    Object[] values = new Object[]{(double) _random.nextInt(1000), (double) _random.nextInt(1000)};
+    return new Pair<>(stringKey, values);
+  }
+
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public void concurrentIndexedTable() throws InterruptedException, ExecutionException, TimeoutException {
+  public void concurrentIndexedTableForCombineGroupBy() throws InterruptedException, ExecutionException, TimeoutException {
 
-    int numSegments = 10;
+    int capacity = 200_000;//GroupByUtils.getTableCapacity(TOP_N);
 
     // make 1 concurrent table
     IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable();
-    concurrentIndexedTable.init(_dataSchema, _aggregationInfos, _orderBy, CAPACITY);
+    concurrentIndexedTable.init(_dataSchema, _aggregationInfos, _orderBy, capacity);
+
+    List<Callable<Void>> innerSegmentCallables = new ArrayList<>(NUM_SEGMENTS);
 
     // 10 parallel threads putting 10k records into the table
 
-    CountDownLatch operatorLatch = new CountDownLatch(numSegments);
-    Future[] futures = new Future[numSegments];
-    for (int i = 0; i < numSegments; i++) {
-      futures[i] = _executorService.submit(new TraceRunnable() {
-        @SuppressWarnings("unchecked")
-        @Override
-        public void runJob() {
-          for (int r = 0; r < NUM_RECORDS; r++) {
-            concurrentIndexedTable.upsert(getNewRecord());
-          }
-          operatorLatch.countDown();
-        }
-      });
-    }
+    for (int i = 0; i < NUM_SEGMENTS; i++) {
 
-    try {
-      boolean opCompleted = operatorLatch.await(30, TimeUnit.SECONDS);
-      if (!opCompleted) {
-        System.out.println("Timed out............");
-      }
-      concurrentIndexedTable.finish(false);
-    } catch (Exception e) {
-      throw e;
-    } finally {
-      // Cancel all ongoing jobs
-      for (Future future : futures) {
-        if (!future.isDone()) {
-          future.cancel(true);
-        }
-      }
-    }
-  }
-
-
-  @Benchmark
-  @BenchmarkMode(Mode.AverageTime)
-  @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public void simpleIndexedTable() throws InterruptedException, TimeoutException, ExecutionException {
-
-    int numSegments = 10;
-
-    List<IndexedTable> simpleIndexedTables = new ArrayList<>(numSegments);
-    List<Callable<Void>> innerSegmentCallables = new ArrayList<>(numSegments);
-
-    for (int i = 0; i < numSegments; i++) {
-
-      // make 10 indexed tables
-      IndexedTable simpleIndexedTable = new SimpleIndexedTable();
-      simpleIndexedTable.init(_dataSchema, _aggregationInfos, _orderBy, CAPACITY);
-      simpleIndexedTables.add(simpleIndexedTable);
-
-      // put 10k records in each indexed table, in parallel
       Callable<Void> callable = () -> {
-        for (int r = 0; r < NUM_RECORDS; r++) {
-          simpleIndexedTable.upsert(getNewRecord());
+
+        for (int r = 0; r < NUM_RECORDS_PER_SEGMENT; r++) {
+          concurrentIndexedTable.upsert(getRecord());
         }
-        simpleIndexedTable.finish(false);
         return null;
       };
       innerSegmentCallables.add(callable);
@@ -204,23 +181,64 @@ public class BenchmarkIndexedTable {
 
     List<Future<Void>> futures = _executorService.invokeAll(innerSegmentCallables);
     for (Future<Void> future : futures) {
-      future.get(10, TimeUnit.SECONDS);
+      future.get(30, TimeUnit.SECONDS);
     }
 
-    // merge all indexed tables into 1
-    IndexedTable mergedTable = null;
-    for (IndexedTable indexedTable : simpleIndexedTables) {
-      if (mergedTable == null) {
-        mergedTable = indexedTable;
-      } else {
-        mergedTable.merge(indexedTable);
-      }
+    concurrentIndexedTable.finish(false);
+  }
+
+
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  @OutputTimeUnit(TimeUnit.MICROSECONDS)
+  public void originalCombineGroupBy() throws InterruptedException, TimeoutException, ExecutionException {
+
+    AtomicInteger numGroups = new AtomicInteger();
+    int _interSegmentNumGroupsLimit = 200_000;
+
+    ConcurrentMap<String, Object[]> resultsMap = new ConcurrentHashMap<>();
+    List<Callable<Void>> innerSegmentCallables = new ArrayList<>(NUM_SEGMENTS);
+    for (int i = 0; i < NUM_SEGMENTS; i++) {
+      Callable<Void> callable = () -> {
+        for (int r = 0; r < NUM_RECORDS_PER_SEGMENT; r++) {
+
+          Pair<String, Object[]> newRecordOriginal = getOriginalRecord();
+          String stringKey = newRecordOriginal.getFirst();
+          final Object[] value = newRecordOriginal.getSecond();
+
+          resultsMap.compute(stringKey, (k, v) -> {
+            if (v == null) {
+              if (numGroups.getAndIncrement() < _interSegmentNumGroupsLimit) {
+                v = new Object[_numAggregationFunctions];
+                for (int j = 0; j < _numAggregationFunctions; j++) {
+                  v[j] = value[j];
+                }
+              }
+            } else {
+              for (int j = 0; j < _numAggregationFunctions; j++) {
+                v[j] = _aggregationFunctions[j].merge(v[j], value[j]);
+              }
+            }
+            return v;
+          });
+        }
+        return null;
+      };
+      innerSegmentCallables.add(callable);
     }
-    mergedTable.finish(false);
+
+    List<Future<Void>> futures = _executorService.invokeAll(innerSegmentCallables);
+    for (Future<Void> future : futures) {
+      future.get(30, TimeUnit.SECONDS);
+    }
+
+    AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
+        new AggregationGroupByTrimmingService(_aggregationFunctions, TOP_N);
+    List<Map<String, Object>> trimmedResults = aggregationGroupByTrimmingService.trimIntermediateResultsMap(resultsMap);
   }
 
   public static void main(String[] args) throws Exception {
-    ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkIndexedTable.class.getSimpleName())
+    ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkCombineGroupBy.class.getSimpleName())
         .warmupTime(TimeValue.seconds(10))
         .warmupIterations(1)
         .measurementTime(TimeValue.seconds(30))

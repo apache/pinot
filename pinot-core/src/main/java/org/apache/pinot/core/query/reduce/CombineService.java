@@ -93,8 +93,8 @@ public class CombineService {
 
       // Data schema will be null if exceptions caught during query processing.
       // Result set size will be zero if no row matches the predicate.
-      DataSchema mergedBlockSchema = mergedBlock.getSelectionDataSchema();
-      DataSchema blockToMergeSchema = blockToMerge.getSelectionDataSchema();
+      DataSchema mergedBlockSchema = mergedBlock.getDataSchema();
+      DataSchema blockToMergeSchema = blockToMerge.getDataSchema();
       Collection<Serializable[]> mergedBlockResultSet = mergedBlock.getSelectionResult();
       Collection<Serializable[]> blockToMergeResultSet = blockToMerge.getSelectionResult();
 
@@ -103,7 +103,7 @@ public class CombineService {
 
         // If block to merge schema is not null, set its data schema and result to the merged block.
         if (blockToMergeSchema != null) {
-          mergedBlock.setSelectionDataSchema(blockToMergeSchema);
+          mergedBlock.setDataSchema(blockToMergeSchema);
           mergedBlock.setSelectionResult(blockToMergeResultSet);
         }
       } else {

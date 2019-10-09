@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.order;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -108,11 +109,36 @@ public final class OrderByUtils {
   }
 
   /**
+   * Gets the indices from Record which have aggregations that are present in the order by
+   * @param orderBy order by information
+   * @param aggregationInfos aggregation information
+   * @return indices of aggregations in the record
+   */
+  public static int[] getAggregationIndexes(List<SelectionSort> orderBy, List<AggregationInfo> aggregationInfos) {
+    Map<String, Integer> aggregationColumnToIndex = new HashMap<>();
+    for (int i = 0; i < aggregationInfos.size(); i++) {
+      AggregationInfo aggregationInfo = aggregationInfos.get(i);
+      String aggregationColumn = AggregationFunctionUtils.getAggregationColumnName(aggregationInfo);
+      aggregationColumnToIndex.put(aggregationColumn, i);
+    }
+
+    List<Integer> indexes = new ArrayList<>();
+    for (SelectionSort orderByInfo : orderBy) {
+      String column = orderByInfo.getColumn();
+
+      if (aggregationColumnToIndex.containsKey(column)) {
+        indexes.add(aggregationColumnToIndex.get(column));
+      }
+    }
+    return indexes.stream().mapToInt(i->i).toArray();
+  }
+
+  /**
    * Constructs the comparator for ordering by a combination of keys from {@link Record::_keys}
    * and aggregation values from {@link Record::values}
    */
   public static Comparator<Record> getKeysAndValuesComparator(DataSchema dataSchema, List<SelectionSort> orderBy,
-      List<AggregationInfo> aggregationInfos) {
+      List<AggregationInfo> aggregationInfos, boolean extractFinalResults) {
 
     int numKeys = dataSchema.size() - aggregationInfos.size();
     Map<String, Integer> keyIndexMap = new HashMap<>();
@@ -126,9 +152,7 @@ public final class OrderByUtils {
     Map<String, AggregationInfo> aggregationColumnToInfo = new HashMap<>(aggregationInfos.size());
     for (int i = 0; i < aggregationInfos.size(); i++) {
       AggregationInfo aggregationInfo = aggregationInfos.get(i);
-      String aggregationColumn =
-          aggregationInfo.getAggregationType().toLowerCase() + "(" + AggregationFunctionUtils.getColumn(aggregationInfo)
-              + ")";
+      String aggregationColumn = AggregationFunctionUtils.getAggregationColumnName(aggregationInfo);
       aggregationColumnToIndex.put(aggregationColumn, i);
       aggregationColumnToInfo.put(aggregationColumn, aggregationInfo);
     }
@@ -141,16 +165,18 @@ public final class OrderByUtils {
       String column = orderByInfo.getColumn();
       boolean ascending = orderByInfo.isIsAsc();
 
+      // TODO: avoid the index computation and index lookup in the comparison.
+      // we can achieve this by making order by operate on Object[], which contains only order by fields
       if (keyIndexMap.containsKey(column)) {
         int index = keyIndexMap.get(column);
         ColumnDataType columnDataType = keyColumnDataTypeMap.get(column);
-        comparator = OrderByUtils.getKeysComparator(ascending, index, columnDataType);
+        comparator = getKeysComparator(ascending, index, columnDataType);
       } else if (aggregationColumnToIndex.containsKey(column)) {
         int index = aggregationColumnToIndex.get(column);
         AggregationFunction aggregationFunction =
             AggregationFunctionUtils.getAggregationFunctionContext(aggregationColumnToInfo.get(column))
                 .getAggregationFunction();
-        comparator = getAggregationComparator(ascending, index, aggregationFunction);
+        comparator = getAggregationComparator(ascending, index, aggregationFunction, extractFinalResults);
       } else {
         throw new UnsupportedOperationException("Could not find column " + column + " in data schema");
       }
@@ -275,18 +301,27 @@ public final class OrderByUtils {
   }
 
   private static Comparator<Record> getAggregationComparator(boolean ascending, int index,
-      AggregationFunction aggregationFunction) {
+      AggregationFunction aggregationFunction, boolean extractFinalResults) {
 
     Comparator<Record> comparator;
-    // TODO: extract the final results and cache them, so that we do it n times and avoid doing it nlogn times
-    if (ascending) {
-      comparator = (v1, v2) -> ComparableComparator.getInstance()
-          .compare(aggregationFunction.extractFinalResult(v1.getValues()[index]),
-              aggregationFunction.extractFinalResult(v2.getValues()[index]));
+    if (extractFinalResults) {
+      if (ascending) {
+        comparator = (v1, v2) -> ComparableComparator.getInstance()
+            .compare(aggregationFunction.extractFinalResult(v1.getValues()[index]),
+                aggregationFunction.extractFinalResult(v2.getValues()[index]));
+      } else {
+        comparator = (v1, v2) -> ComparableComparator.getInstance()
+            .compare(aggregationFunction.extractFinalResult(v2.getValues()[index]),
+                aggregationFunction.extractFinalResult(v1.getValues()[index]));
+      }
     } else {
-      comparator = (v1, v2) -> ComparableComparator.getInstance()
-          .compare(aggregationFunction.extractFinalResult(v2.getValues()[index]),
-              aggregationFunction.extractFinalResult(v1.getValues()[index]));
+      if (ascending) {
+        comparator =
+            (v1, v2) -> ComparableComparator.getInstance().compare(v1.getValues()[index], v2.getValues()[index]);
+      } else {
+        comparator =
+            (v1, v2) -> ComparableComparator.getInstance().compare(v2.getValues()[index], v1.getValues()[index]);
+      }
     }
     return comparator;
   }

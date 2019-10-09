@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.data.table;
 
+import java.util.Arrays;
+
+
 /**
  * Defines a single record in Pinot comprising of keys and values
  */
@@ -42,5 +45,10 @@ public class Record {
    */
   public Object[] getValues() {
     return _values;
+  }
+
+  @Override
+  public String toString() {
+    return _key.toString() + " " + Arrays.deepToString(_values);
   }
 }

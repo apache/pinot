@@ -427,7 +427,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       StringBuilder groupKeyBuilder = new StringBuilder(_dictionaries[0].getStringValue(rawKey % cardinality));
       rawKey /= cardinality;
       for (int i = 1; i < _numGroupByExpressions; i++) {
-        groupKeyBuilder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
+        groupKeyBuilder.append(GroupKeyGenerator.DELIMITER);
         cardinality = _cardinalities[i];
         groupKeyBuilder.append(_dictionaries[i].getStringValue(rawKey % cardinality));
         rawKey /= cardinality;
@@ -598,7 +598,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     StringBuilder groupKeyBuilder = new StringBuilder(_dictionaries[0].get((int) (rawKey % cardinality)).toString());
     rawKey /= cardinality;
     for (int i = 1; i < _numGroupByExpressions; i++) {
-      groupKeyBuilder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
+      groupKeyBuilder.append(GroupKeyGenerator.DELIMITER);
       cardinality = _cardinalities[i];
       groupKeyBuilder.append(_dictionaries[i].get((int) (rawKey % cardinality)));
       rawKey /= cardinality;
@@ -770,7 +770,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private String getGroupKey(IntArray rawKey) {
     StringBuilder groupKeyBuilder = new StringBuilder(_dictionaries[0].get(rawKey._elements[0]).toString());
     for (int i = 1; i < _numGroupByExpressions; i++) {
-      groupKeyBuilder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
+      groupKeyBuilder.append(GroupKeyGenerator.DELIMITER);
       groupKeyBuilder.append(_dictionaries[i].get(rawKey._elements[i]));
     }
     return groupKeyBuilder.toString();

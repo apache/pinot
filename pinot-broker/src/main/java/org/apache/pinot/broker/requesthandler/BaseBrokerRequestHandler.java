@@ -55,15 +55,10 @@ import org.apache.pinot.common.request.FilterQueryMap;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Broker;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.common.utils.CommonConstants.Broker.*;
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.DEBUG_OPTIONS;
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.PQL;
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.SQL;
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.TRACE;
 
 
 @ThreadSafe
@@ -100,12 +95,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _queryQuotaManager = queryQuotaManager;
     _brokerMetrics = brokerMetrics;
 
-    _brokerId = config.getString(CONFIG_OF_BROKER_ID, getDefaultBrokerId());
-    _brokerTimeoutMs = config.getLong(CONFIG_OF_BROKER_TIMEOUT_MS, DEFAULT_BROKER_TIMEOUT_MS);
-    _queryResponseLimit = config.getInt(CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
-    _queryLogLength = config.getInt(CONFIG_OF_BROKER_QUERY_LOG_LENGTH, DEFAULT_BROKER_QUERY_LOG_LENGTH);
-    _queryLogRateLimiter = RateLimiter.create(
-        config.getDouble(CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND, DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND));
+    _brokerId = config.getString(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
+    _brokerTimeoutMs = config.getLong(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
+    _queryResponseLimit =
+        config.getInt(Broker.CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
+    _queryLogLength = config.getInt(Broker.CONFIG_OF_BROKER_QUERY_LOG_LENGTH, Broker.DEFAULT_BROKER_QUERY_LOG_LENGTH);
+    _queryLogRateLimiter = RateLimiter.create(config.getDouble(Broker.CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND,
+        Broker.DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND));
 
     _numDroppedLog = new AtomicInteger(0);
     _numDroppedLogRateLimiter = RateLimiter.create(1.0);
@@ -223,15 +219,21 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // Set extra settings into broker request
-    if (request.has(TRACE) && request.get(TRACE).asBoolean()) {
+    if (request.has(Broker.Request.TRACE) && request.get(Broker.Request.TRACE).asBoolean()) {
       LOGGER.debug("Enable trace for request {}: {}", requestId, query);
       brokerRequest.setEnableTrace(true);
     }
-    if (request.has(DEBUG_OPTIONS)) {
-      Map<String, String> debugOptions = Splitter.on(';').omitEmptyStrings().trimResults().withKeyValueSeparator('=')
-          .split(request.get(DEBUG_OPTIONS).asText());
+
+    if (request.has(Broker.Request.DEBUG_OPTIONS)) {
+      Map<String, String> debugOptions = getOptionsFromRequest(request, Broker.Request.DEBUG_OPTIONS);
       LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
       brokerRequest.setDebugOptions(debugOptions);
+    }
+
+    if (request.has(Broker.Request.QUERY_OPTIONS)) {
+      Map<String, String> queryOptions = getOptionsFromRequest(request, Broker.Request.QUERY_OPTIONS);
+      LOGGER.debug("Query options are set to: {} for request {}: {}", queryOptions, requestId, query);
+      brokerRequest.setQueryOptions(queryOptions);
     }
 
     // Optimize the query
@@ -340,11 +342,19 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return brokerResponse;
   }
 
+  private Map<String, String> getOptionsFromRequest(JsonNode request, String optionsKey) {
+    return Splitter.on(';')
+        .omitEmptyStrings()
+        .trimResults()
+        .withKeyValueSeparator('=')
+        .split(request.get(optionsKey).asText());
+  }
+
   private PinotQueryRequest getPinotQueryRequest(JsonNode request) {
-    if (request.has(SQL)) {
-      return new PinotQueryRequest(SQL, request.get(SQL).asText());
+    if (request.has(Broker.Request.SQL)) {
+      return new PinotQueryRequest(Broker.Request.SQL, request.get(Broker.Request.SQL).asText());
     }
-    return new PinotQueryRequest(PQL, request.get(PQL).asText());
+    return new PinotQueryRequest(Broker.Request.PQL, request.get(Broker.Request.PQL).asText());
   }
 
   /**

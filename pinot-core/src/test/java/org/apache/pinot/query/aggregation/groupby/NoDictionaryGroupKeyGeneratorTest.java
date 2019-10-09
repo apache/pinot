@@ -181,7 +181,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
       for (int i = 0; i < groupByColumns.length; i++) {
         stringBuilder.append(row.getValue(groupByColumns[i]));
         if (i < groupByColumns.length - 1) {
-          stringBuilder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
+          stringBuilder.append(GroupKeyGenerator.DELIMITER);
         }
       }
       groupKeys.add(stringBuilder.toString());
