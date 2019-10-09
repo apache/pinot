@@ -36,6 +36,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.creator.impl.inv.text.LuceneTextIndexCreator;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
@@ -81,6 +82,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
 
     createMetadataFile(v2SegmentDirectory, v3TempDirectory);
     copyCreationMetadataIfExists(v2SegmentDirectory, v3TempDirectory);
+    copyLuceneTextIndexIfExists(v2SegmentDirectory, v3TempDirectory);
     copyIndexData(v2SegmentDirectory, v2Metadata, v3TempDirectory);
 
     File newLocation = SegmentDirectoryPaths.segmentDirectoryFor(v2SegmentDirectory, SegmentVersion.v3);
@@ -89,7 +91,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     deleteV2Files(v2SegmentDirectory);
   }
 
-  private void deleteV2Files(File v2SegmentDirectory) {
+  private void deleteV2Files(File v2SegmentDirectory) throws IOException {
     LOGGER.info("Deleting files in v1 segment directory: {}", v2SegmentDirectory);
     File[] files = v2SegmentDirectory.listFiles();
     if (files == null) {
@@ -100,6 +102,9 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     for (File file : files) {
       if (file.isFile() && file.exists()) {
         FileUtils.deleteQuietly(file);
+      }
+      if (file.isDirectory() && file.getName().endsWith(LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION)) {
+        FileUtils.deleteDirectory(file);
       }
     }
   }
@@ -230,6 +235,25 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     if (v2CreationFile.exists()) {
       File v3CreationFile = new File(v3Dir, V1Constants.SEGMENT_CREATION_META);
       Files.copy(v2CreationFile.toPath(), v3CreationFile.toPath());
+    }
+  }
+
+  private void copyLuceneTextIndexIfExists(File segmentDirectory, File v3Dir) throws IOException {
+    String suffix = LuceneTextIndexCreator.LUCENE_TEXT_INDEX_FILE_EXTENSION;
+    File[] textIndexFiles = segmentDirectory.listFiles(new FilenameFilter() {
+      @Override
+      public boolean accept(File dir, String name) {
+        return name.endsWith(suffix);
+      }
+    });
+    for (File textIndexFile : textIndexFiles) {
+      File[] indexFiles = textIndexFile.listFiles();
+      File v3LuceneIndexDir = new File(v3Dir, textIndexFile.getName());
+      v3LuceneIndexDir.mkdir();
+      for (File indexFile : indexFiles) {
+        File v3LuceneIndexFile = new File(v3LuceneIndexDir, indexFile.getName());
+        Files.copy(indexFile.toPath(), v3LuceneIndexFile.toPath());
+      }
     }
   }
 

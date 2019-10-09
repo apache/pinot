@@ -80,6 +80,16 @@ public class TestUtils {
    */
   public static void waitForCondition(Function<Void, Boolean> condition, long checkIntervalMs, long timeoutMs,
       @Nullable String errorMessage) {
+    waitForCondition(condition, checkIntervalMs, timeoutMs, errorMessage, true);
+  }
+
+  public static void waitForCondition(Function<Void, Boolean> condition, long timeoutMs,
+      @Nullable String errorMessage) {
+    waitForCondition(condition, 100L, timeoutMs, errorMessage);
+  }
+
+  public static void waitForCondition(Function<Void, Boolean> condition, long checkIntervalMs, long timeoutMs,
+      @Nullable String errorMessage, boolean raiseError) {
     long endTime = System.currentTimeMillis() + timeoutMs;
     String errorMessageSuffix = errorMessage != null ? ", error message: " + errorMessage : "";
     while (System.currentTimeMillis() < endTime) {
@@ -92,11 +102,8 @@ public class TestUtils {
         Assert.fail("Caught exception while checking the condition" + errorMessageSuffix, e);
       }
     }
-    Assert.fail("Failed to meet condition in " + timeoutMs + "ms" + errorMessageSuffix);
-  }
-
-  public static void waitForCondition(Function<Void, Boolean> condition, long timeoutMs,
-      @Nullable String errorMessage) {
-    waitForCondition(condition, 100L, timeoutMs, errorMessage);
+    if (raiseError) {
+      Assert.fail("Failed to meet condition in " + timeoutMs + "ms" + errorMessageSuffix);
+    }
   }
 }

@@ -45,6 +45,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpStatus;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
+import org.apache.pinot.common.config.FieldConfig;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.config.TableConfig;
@@ -395,6 +396,17 @@ public abstract class ClusterTest extends ControllerTest {
       List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
       TableTaskConfig taskConfig, String streamConsumerFactoryName, int numReplicas)
       throws Exception {
+    addRealtimeTable(tableName, useLlc, kafkaBrokerList, kafkaZkUrl, kafkaTopic, realtimeSegmentFlushRows, avroFile,
+        timeColumnName, timeType, schemaName, brokerTenant, serverTenant, loadMode, sortedColumn, invertedIndexColumns,
+        bloomFilterColumns, noDictionaryColumns, taskConfig, streamConsumerFactoryName, numReplicas, null);
+  }
+
+  protected void addRealtimeTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,
+      String kafkaTopic, int realtimeSegmentFlushRows, File avroFile, String timeColumnName, String timeType,
+      String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
+      List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
+      TableTaskConfig taskConfig, String streamConsumerFactoryName, int numReplicas, List<FieldConfig> fieldConfigListForTextColumns)
+      throws Exception {
     Map<String, String> streamConfigs = new HashMap<>();
     String streamType = "kafka";
     streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);
@@ -436,7 +448,7 @@ public abstract class ClusterTest extends ControllerTest {
         .setServerTenant(serverTenant).setLoadMode(loadMode).setSortedColumn(sortedColumn)
         .setInvertedIndexColumns(invertedIndexColumns).setBloomFilterColumns(bloomFilterColumns)
         .setNoDictionaryColumns(noDictionaryColumns).setStreamConfigs(streamConfigs).setTaskConfig(taskConfig)
-        .setNumReplicas(numReplicas).build();
+        .setNumReplicas(numReplicas).setFieldConfigList(fieldConfigListForTextColumns).build();
 
     // save the realtime table config
     _realtimeTableConfig = tableConfig;

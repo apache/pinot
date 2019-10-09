@@ -20,6 +20,7 @@ package org.apache.pinot.core.indexsegment.mutable;
 
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrays;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -34,6 +35,7 @@ import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.core.indexsegment.IndexSegmentUtils;
 import org.apache.pinot.core.io.reader.DataFileReader;
+import org.apache.pinot.core.io.readerwriter.BaseSingleColumnSingleValueReaderWriter;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
@@ -44,11 +46,15 @@ import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
 import org.apache.pinot.core.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
 import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionaryFactory;
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeInvertedIndexReader;
+import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
+import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders;
+import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneTextIndexReader;
 import org.apache.pinot.core.realtime.impl.nullvalue.RealtimeNullValueVectorReaderWriter;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
+import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
@@ -96,7 +102,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Map<String, BaseMutableDictionary> _dictionaryMap = new HashMap<>();
   private final Map<String, DataFileReader> _indexReaderWriterMap = new HashMap<>();
   private final Map<String, Integer> _maxNumValuesMap = new HashMap<>();
-  private final Map<String, RealtimeInvertedIndexReader> _invertedIndexMap = new HashMap<>();
+  private final Map<String, InvertedIndexReader> _invertedIndexMap = new HashMap<>();
   private final Map<String, BloomFilterReader> _bloomFilterMap = new HashMap<>();
   private final Map<String, RealtimeNullValueVectorReaderWriter> _nullValueVectorMap = new HashMap<>();
   private final IdMap<FixedIntArray> _recordIdMap;
@@ -117,6 +123,8 @@ public class MutableSegmentImpl implements MutableSegment {
   // default message metadata
   private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
   private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
+
+  private RealtimeLuceneReaders _realtimeLuceneReaders;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config) {
     _segmentName = config.getSegmentName();
@@ -179,6 +187,8 @@ public class MutableSegmentImpl implements MutableSegment {
     Set<String> noDictionaryColumns = config.getNoDictionaryColumns();
 
     Set<String> invertedIndexColumns = config.getInvertedIndexColumns();
+    Set<String> textIndexColumns = config.getTextIndexColumns();
+
     int avgNumMultiValues = config.getAvgNumMultiValues();
 
     // Initialize for each column
@@ -192,7 +202,7 @@ public class MutableSegmentImpl implements MutableSegment {
       FieldSpec.DataType dataType = fieldSpec.getDataType();
       boolean isFixedWidthColumn = dataType.isFixedWidth();
       int forwardIndexColumnSize = -1;
-      if (isNoDictionaryColumn(noDictionaryColumns, invertedIndexColumns, fieldSpec, column)) {
+      if (isNoDictionaryColumn(noDictionaryColumns, invertedIndexColumns, textIndexColumns, fieldSpec, column)) {
         // no dictionary
         // each forward index entry will be equal to size of data for that row
         // For INT, LONG, FLOAT, DOUBLE it is equal to the number of fixed bytes used to store the value,
@@ -266,6 +276,21 @@ public class MutableSegmentImpl implements MutableSegment {
       if (_nullHandlingEnabled) {
         _nullValueVectorMap.put(column, new RealtimeNullValueVectorReaderWriter());
       }
+
+      if (textIndexColumns.contains(column)) {
+        RealtimeLuceneTextIndexReader realtimeLuceneIndexReader = new RealtimeLuceneTextIndexReader(column, new File(config.getConsumerDir()), _segmentName);
+        _invertedIndexMap.put(column, realtimeLuceneIndexReader);
+        if (_realtimeLuceneReaders == null) {
+          _realtimeLuceneReaders= new RealtimeLuceneReaders(_segmentName);
+        }
+        _realtimeLuceneReaders.addReader(realtimeLuceneIndexReader);
+      }
+    }
+
+    if (_realtimeLuceneReaders != null) {
+      // add the realtime lucene index readers to the global queue for refresh task to pick up
+      RealtimeLuceneIndexRefreshState realtimeLuceneIndexRefreshState = RealtimeLuceneIndexRefreshState.getInstance();
+      realtimeLuceneIndexRefreshState.addRealtimeReadersToQueue(_realtimeLuceneReaders);
     }
 
     // Metric aggregation can be enabled only if config is specified, and all dimensions have dictionary,
@@ -282,9 +307,9 @@ public class MutableSegmentImpl implements MutableSegment {
    * @return true if column is no-dictionary, false if dictionary encoded
    */
   private boolean isNoDictionaryColumn(Set<String> noDictionaryColumns, Set<String> invertedIndexColumns,
-      FieldSpec fieldSpec, String column) {
-    return noDictionaryColumns.contains(column) && fieldSpec.isSingleValueField()
-        && !invertedIndexColumns.contains(column);
+      Set<String> textIndexColumns, FieldSpec fieldSpec, String column) {
+    return textIndexColumns.contains(column) || (noDictionaryColumns.contains(column) && fieldSpec.isSingleValueField()
+        && !invertedIndexColumns.contains(column));
   }
 
   public SegmentPartitionConfig getSegmentPartitionConfig() {
@@ -301,7 +326,6 @@ public class MutableSegmentImpl implements MutableSegment {
 
   @Override
   public boolean index(GenericRow row, @Nullable RowMetadata rowMetadata) {
-
     boolean canTakeMore;
     // Update dictionary first
     Map<String, Object> dictIdMap = updateDictionary(row);
@@ -316,7 +340,7 @@ public class MutableSegmentImpl implements MutableSegment {
     if (docId == numDocs) {
       // Add forward and inverted indices for new document.
       addForwardIndex(row, docId, dictIdMap);
-      addInvertedIndex(docId, dictIdMap);
+      addInvertedIndex(row, docId, dictIdMap);
       if (_nullHandlingEnabled) {
         handleNullValues(row, docId);
       }
@@ -384,11 +408,11 @@ public class MutableSegmentImpl implements MutableSegment {
       Object value = row.getValue(column);
       if (fieldSpec.isSingleValueField()) {
         // SV column
-        FixedByteSingleColumnSingleValueReaderWriter indexReaderWriter =
-            (FixedByteSingleColumnSingleValueReaderWriter) _indexReaderWriterMap.get(column);
+        BaseSingleColumnSingleValueReaderWriter indexReaderWriter =
+            (BaseSingleColumnSingleValueReaderWriter) _indexReaderWriterMap.get(column);
         Integer dictId = (Integer) dictIdMap.get(column);
         if (dictId != null) {
-          // SV column with dictionary
+          // SV Column with dictionary
           indexReaderWriter.setInt(docId, dictId);
         } else {
           // No-dictionary SV column
@@ -418,28 +442,35 @@ public class MutableSegmentImpl implements MutableSegment {
           }
         }
       } else {
+        // MV column: always dictionary encoded
         int[] dictIds = (int[]) dictIdMap.get(column);
         ((FixedByteSingleColumnMultiValueReaderWriter) _indexReaderWriterMap.get(column)).setIntArray(docId, dictIds);
       }
     }
   }
 
-  private void addInvertedIndex(int docId, Map<String, Object> dictIdMap) {
+  private void addInvertedIndex(GenericRow row, int docId, Map<String, Object> dictIdMap) {
     // Update inverted index at last
     // NOTE: inverted index have to be updated at last because once it gets updated, the latest record will become
     // queryable
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       String column = fieldSpec.getName();
-      RealtimeInvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
+      InvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
       if (invertedIndex != null) {
-        if (fieldSpec.isSingleValueField()) {
-          invertedIndex.add(((Integer) dictIdMap.get(column)), docId);
+        if (invertedIndex instanceof RealtimeLuceneTextIndexReader) {
+          ((RealtimeLuceneTextIndexReader)invertedIndex).addDoc(row.getValue(column), docId);
         } else {
-          int[] dictIds = (int[]) dictIdMap.get(column);
-          for (int dictId : dictIds) {
-            invertedIndex.add(dictId, docId);
+          RealtimeInvertedIndexReader realtimeInvertedIndexReader = (RealtimeInvertedIndexReader)invertedIndex;
+          if (fieldSpec.isSingleValueField()) {
+            realtimeInvertedIndexReader.add(((Integer) dictIdMap.get(column)), docId);
+          } else {
+            int[] dictIds = (int[]) dictIdMap.get(column);
+            for (int dictId : dictIds) {
+              realtimeInvertedIndexReader.add(dictId, docId);
+            }
           }
         }
+
       }
     }
   }
@@ -608,8 +639,27 @@ public class MutableSegmentImpl implements MutableSegment {
     // clear map now that index is closed to prevent accidental usage
     _indexReaderWriterMap.clear();
 
-    for (RealtimeInvertedIndexReader index : _invertedIndexMap.values()) {
-      index.close();
+    for (InvertedIndexReader index : _invertedIndexMap.values()) {
+      if (index instanceof RealtimeInvertedIndexReader) {
+        ((RealtimeInvertedIndexReader)index).close();
+      }
+    }
+
+    if (_realtimeLuceneReaders != null) {
+      // set this to true as a way of signalling the refresh task thread to
+      // not attempt refresh on this segment here onwards
+      _realtimeLuceneReaders.getLock().lock();
+      _realtimeLuceneReaders.setSegmentDestroyed();
+      try {
+        for (RealtimeLuceneTextIndexReader realtimeLuceneReader : _realtimeLuceneReaders.getRealtimeLuceneReaders()) {
+          // close each realtime lucene reader for this segment
+          realtimeLuceneReader.close();
+        }
+        // clear the list.
+        _realtimeLuceneReaders.clearRealtimeReaderList();
+      } finally {
+        _realtimeLuceneReaders.getLock().unlock();
+      }
     }
 
     for (Map.Entry<String, BaseMutableDictionary> entry : _dictionaryMap.entrySet()) {
@@ -650,7 +700,7 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     IntArrays.quickSort(dictIds, (dictId1, dictId2) -> dictionary.compare(dictId1, dictId2));
-    RealtimeInvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
+    RealtimeInvertedIndexReader invertedIndex = (RealtimeInvertedIndexReader)_invertedIndexMap.get(column);
     int[] docIds = new int[_numDocsIndexed];
     int docIdIndex = 0;
     for (int dictId : dictIds) {

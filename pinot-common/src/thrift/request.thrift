@@ -33,7 +33,8 @@ enum FilterOperator {
   NOT_IN,
   IN,
   IS_NULL,
-  IS_NOT_NULL
+  IS_NOT_NULL,
+  TEXT_MATCH
 }
 
 /**

@@ -19,12 +19,19 @@
 package org.apache.pinot.core.segment.index.readers;
 
 import java.io.Closeable;
+import org.apache.pinot.core.common.Predicate;
 
 
 public interface InvertedIndexReader<T> extends Closeable {
 
   /**
    * Get the document ids for the given dictionary id.
+   * @param dictId dictionary ID
    */
   T getDocIds(int dictId);
+
+  /**
+   * Get the document ids for a given value
+   */
+  T getDocIds(Object value);
 }

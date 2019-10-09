@@ -351,6 +351,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected void waitForAllDocsLoaded(long timeoutMs)
       throws Exception {
+    waitForDocsLoaded(timeoutMs, true);
+  }
+
+  protected void waitForDocsLoaded(long timeoutMs, boolean raiseError) {
     final long countStarResult = getCountStarResult();
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
       @Nullable
@@ -362,7 +366,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
           return null;
         }
       }
-    }, timeoutMs, "Failed to load " + countStarResult + " documents");
+    }, 100L, timeoutMs, "Failed to load " + countStarResult + " documents", raiseError);
   }
 
   /**

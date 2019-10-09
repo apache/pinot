@@ -57,6 +57,11 @@ public class FilterOperatorUtils {
     // Use inverted index if the predicate type is not RANGE or REGEXP_LIKE for efficiency
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     Predicate.Type predicateType = predicateEvaluator.getPredicateType();
+
+    if (predicateType == Predicate.Type.TEXT_MATCH) {
+      return new TextMatchFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
+    }
+
     if (dataSourceMetadata.hasInvertedIndex() && (predicateType != Predicate.Type.REGEXP_LIKE)) {
       if (dataSource.getDataSourceMetadata().isSorted()) {
         return new SortedInvertedIndexBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
@@ -142,14 +147,17 @@ public class FilterOperatorUtils {
         if (filterOperator instanceof BitmapBasedFilterOperator) {
           return 1;
         }
-        if (filterOperator instanceof AndFilterOperator) {
+        if (filterOperator instanceof TextMatchFilterOperator) {
           return 2;
         }
-        if (filterOperator instanceof OrFilterOperator) {
+        if (filterOperator instanceof AndFilterOperator) {
           return 3;
         }
+        if (filterOperator instanceof OrFilterOperator) {
+          return 4;
+        }
         if (filterOperator instanceof ScanBasedFilterOperator) {
-          return getScanBasedFilterPriority((ScanBasedFilterOperator) filterOperator, 4, debugOptions);
+          return getScanBasedFilterPriority((ScanBasedFilterOperator) filterOperator, 5, debugOptions);
         }
         if (filterOperator instanceof ExpressionFilterOperator) {
           return 10;

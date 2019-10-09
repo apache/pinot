@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.config.FieldConfig;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.segment.ReadMode;
@@ -44,6 +45,7 @@ public class IndexLoadingConfig {
   private ReadMode _readMode = ReadMode.DEFAULT_MODE;
   private List<String> _sortedColumns = Collections.emptyList();
   private Set<String> _invertedIndexColumns = new HashSet<>();
+  private Set<String> _textIndexColumns = new HashSet<>();
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
   private Map<String, String> _noDictionaryConfig = new HashMap<>();
   private Set<String> _varLengthDictionaryColumns = new HashSet<>();
@@ -81,6 +83,8 @@ public class IndexLoadingConfig {
       _invertedIndexColumns.addAll(invertedIndexColumns);
     }
 
+    extractTextIndexColumnsFromTableConfig(tableConfig);
+
     List<String> bloomFilterColumns = indexingConfig.getBloomFilterColumns();
     if (bloomFilterColumns != null) {
       _bloomFilterColumns.addAll(bloomFilterColumns);
@@ -115,6 +119,25 @@ public class IndexLoadingConfig {
     if (columnMinMaxValueGeneratorMode != null) {
       _columnMinMaxValueGeneratorMode =
           ColumnMinMaxValueGeneratorMode.valueOf(columnMinMaxValueGeneratorMode.toUpperCase());
+    }
+  }
+
+  /**
+   * Text index creation info for each column is specified
+   * using {@link FieldConfig} model of indicating per column
+   * encoding and indexing information. Since IndexLoadingConfig
+   * is created from TableConfig, we extract the text index info
+   * from fieldConfigList in TableConfig.
+   * @param tableConfig table config
+   */
+  private void extractTextIndexColumnsFromTableConfig(TableConfig tableConfig) {
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
+          _textIndexColumns.add(fieldConfig.getName());
+        }
+      }
     }
   }
 
@@ -170,11 +193,37 @@ public class IndexLoadingConfig {
   }
 
   /**
+   * Used in two places:
+   * (1) In {@link org.apache.pinot.core.segment.index.column.PhysicalColumnIndexContainer}
+   * to create the index loading info for immutable segments
+   * (2) In {@link org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager}
+   * to create the {@link org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig}.
+   * RealtimeSegmentConfig is used to specify the text index column info for newly
+   * to-be-created Mutable Segments
+   * @return a set containing names of text index columns
+   */
+  @Nonnull
+  public Set<String> getTextIndexColumns() {
+    return _textIndexColumns;
+  }
+
+  /**
    * For tests only.
    */
   @VisibleForTesting
   public void setInvertedIndexColumns(@Nonnull Set<String> invertedIndexColumns) {
     _invertedIndexColumns = invertedIndexColumns;
+  }
+
+  /**
+   * Used directly from text search unit test code since the test code
+   * doesn't really have a table config and is directly testing the
+   * query execution code of text search using data from generated segments
+   * and then loading those segments.
+   */
+  @VisibleForTesting
+  public void setTextIndexColumns(@Nonnull Set<String> textIndexColumns) {
+    _textIndexColumns = textIndexColumns;
   }
 
   @VisibleForTesting

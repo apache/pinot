@@ -20,6 +20,7 @@ package org.apache.pinot.core.segment.virtualcolumn;
 
 import java.io.IOException;
 import org.apache.pinot.common.utils.Pairs;
+import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
@@ -76,6 +77,13 @@ public abstract class SingleStringVirtualColumnProvider extends BaseVirtualColum
       } else {
         return new Pairs.IntPair(-1, -1);
       }
+    }
+
+    @Override
+    public Pairs.IntPair getDocIds(Object value) {
+      // This should not be called from anywhere. If it happens, there is a bug
+      // and that's why we throw illegal state exception
+      throw new IllegalStateException("sorted inverted index reader supports lookup only on dictionary id");
     }
 
     @Override

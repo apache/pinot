@@ -323,6 +323,7 @@ public class PinotQuery2BrokerRequestConverter {
           case REGEXP_LIKE:
           case NOT_IN:
           case IN:
+          case TEXT_MATCH:
             //first operand is the always the column
             String column = null;
             //remaining operands are arguments to the function
@@ -401,5 +402,6 @@ public class PinotQuery2BrokerRequestConverter {
     filterOperatorMapping.put(FilterKind.IN, FilterOperator.IN);
     filterOperatorMapping.put(FilterKind.NOT_IN, FilterOperator.NOT_IN);
     filterOperatorMapping.put(FilterKind.REGEXP_LIKE, FilterOperator.REGEXP_LIKE);
+    filterOperatorMapping.put(FilterKind.TEXT_MATCH, FilterOperator.TEXT_MATCH);
   }
 }

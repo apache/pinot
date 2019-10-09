@@ -123,6 +123,7 @@
     <hadoop.version>2.7.0</hadoop.version>
     <antlr.version>4.6</antlr.version>
     <calcite.version>1.19.0</calcite.version>
+    <lucene.version>8.2.0</lucene.version>
     <!-- commons-configuration, hadoop-common, hadoop-client use commons-lang -->
     <commons-lang.version>2.6</commons-lang.version>
     <!-- pinot-common, commons-configuration, hadoop-common, hadoop-client use commons-logging-->

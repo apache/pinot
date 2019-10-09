@@ -58,6 +58,7 @@ import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
@@ -101,6 +102,7 @@ public class HelixServerStarter {
   private final HelixAdmin _helixAdmin;
   private final ServerInstance _serverInstance;
   private final AdminApiApplication _adminApiApplication;
+  private final RealtimeLuceneIndexRefreshState _realtimeLuceneIndexRefreshState;
 
   public HelixServerStarter(String helixClusterName, String zkAddress, Configuration serverConf)
       throws Exception {
@@ -186,6 +188,9 @@ public class HelixServerStarter {
     serverMetrics.addCallbackGauge("memory.mmapBufferCount", PinotDataBuffer::getMmapBufferCount);
     serverMetrics.addCallbackGauge("memory.mmapBufferUsage", PinotDataBuffer::getMmapBufferUsage);
     serverMetrics.addCallbackGauge("memory.allocationFailureCount", PinotDataBuffer::getAllocationFailureCount);
+
+    _realtimeLuceneIndexRefreshState = RealtimeLuceneIndexRefreshState.getInstance();
+    _realtimeLuceneIndexRefreshState.start();
   }
 
   /**
@@ -380,6 +385,7 @@ public class HelixServerStarter {
     if (_serverConf.getBoolean(CONFIG_OF_SHUTDOWN_ENABLE_RESOURCE_CHECK, DEFAULT_SHUTDOWN_ENABLE_RESOURCE_CHECK)) {
       shutdownResourceCheck(endTimeMs);
     }
+    _realtimeLuceneIndexRefreshState.stop();
   }
 
   /**

@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.segment.index.column;
 
+import java.io.File;
 import java.io.IOException;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
@@ -39,16 +39,18 @@ import org.apache.pinot.core.segment.index.readers.FloatDictionary;
 import org.apache.pinot.core.segment.index.readers.IntDictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.LongDictionary;
+import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
 import org.apache.pinot.core.segment.index.readers.OnHeapDoubleDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapFloatDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapIntDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapLongDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapStringDictionary;
-import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
 import org.apache.pinot.core.segment.index.readers.StringDictionary;
+import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,16 +65,18 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   private final NullValueVectorReaderImpl _nullValueVectorReader;
 
   public PhysicalColumnIndexContainer(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
-      IndexLoadingConfig indexLoadingConfig)
+      IndexLoadingConfig indexLoadingConfig, File segmentIndexDir)
       throws IOException {
     String columnName = metadata.getColumnName();
     boolean loadInvertedIndex = false;
+    boolean loadTextIndex = false;
     boolean loadOnHeapDictionary = false;
     boolean loadBloomFilter = false;
     if (indexLoadingConfig != null) {
       loadInvertedIndex = indexLoadingConfig.getInvertedIndexColumns().contains(columnName);
       loadOnHeapDictionary = indexLoadingConfig.getOnHeapDictionaryColumns().contains(columnName);
       loadBloomFilter = indexLoadingConfig.getBloomFilterColumns().contains(columnName);
+      loadTextIndex = indexLoadingConfig.getTextIndexColumns().contains(columnName);
     }
 
     if(segmentReader.hasIndexFor(columnName, ColumnIndexType.NULLVALUE_VECTOR)) {
@@ -124,9 +128,13 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     } else {
       // Raw index
       _forwardIndex = loadRawForwardIndex(fwdIndexBuffer, metadata.getDataType());
-      _invertedIndex = null;
       _dictionary = null;
       _bloomFilterReader = null;
+      if (loadTextIndex) {
+        _invertedIndex = new LuceneTextIndexReader(columnName, segmentIndexDir);
+      } else {
+        _invertedIndex = null;
+      }
     }
   }
 

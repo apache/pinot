@@ -36,11 +36,13 @@ import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.common.config.FieldConfig;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.StarTreeIndexConfig;
 import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
@@ -77,6 +79,7 @@ public class SegmentGeneratorConfig {
   private Set<String> _rawIndexCreationColumns = new HashSet<>();
   private Map<String, ChunkCompressorFactory.CompressionType> _rawIndexCompressionType = new HashMap<>();
   private List<String> _invertedIndexCreationColumns = new ArrayList<>();
+  private List<String> _textIndexCreationColumns = new ArrayList<>();
   private List<String> _columnSortOrder = new ArrayList<>();
   private List<String> _varLengthDictionaryColumns = new ArrayList<>();
   private String _dataDir = null;
@@ -128,6 +131,7 @@ public class SegmentGeneratorConfig {
     _rawIndexCreationColumns.addAll(config._rawIndexCreationColumns);
     _rawIndexCompressionType.putAll(config._rawIndexCompressionType);
     _invertedIndexCreationColumns.addAll(config._invertedIndexCreationColumns);
+    _textIndexCreationColumns.addAll(config._textIndexCreationColumns);
     _columnSortOrder.addAll(config._columnSortOrder);
     _varLengthDictionaryColumns.addAll(config._varLengthDictionaryColumns);
     _dataDir = config._dataDir;
@@ -216,10 +220,36 @@ public class SegmentGeneratorConfig {
       _invertedIndexCreationColumns = indexingConfig.getInvertedIndexColumns();
     }
 
+    extractTextIndexColumnsFromTableConfig(tableConfig);
+
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     _hllConfig = validationConfig.getHllConfig();
 
     _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
+  }
+
+  /**
+   * Text index creation info for each column is specified
+   * using {@link FieldConfig} model of indicating per column
+   * encoding and indexing information. Since SegmentGeneratorConfig
+   * is created from TableConfig, we extract the text index info
+   * from fieldConfigList in TableConfig.
+   * @param tableConfig table config
+   */
+  private void extractTextIndexColumnsFromTableConfig(TableConfig tableConfig) {
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
+          if (!Pql2Compiler.ENABLE_TEXT_MATCH) {
+            // TODO: TEXT index is currently disabled until support segment reload is added
+            // remove this check once support for segment reload is added.
+            throw new UnsupportedOperationException("TEXT_MATCH is currently not supported");
+          }
+          _textIndexCreationColumns.add(fieldConfig.getName());
+        }
+      }
+    }
   }
 
   public SegmentGeneratorConfig(Schema schema) {
@@ -266,6 +296,15 @@ public class SegmentGeneratorConfig {
     return _invertedIndexCreationColumns;
   }
 
+  /**
+   * Used by {@link org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator}
+   * to get the list of text index columns.
+   * @return list of text index columns.
+   */
+  public List<String> getTextIndexCreationColumns() {
+    return _textIndexCreationColumns;
+  }
+
   public List<String> getColumnSortOrder() {
     return _columnSortOrder;
   }
@@ -278,6 +317,18 @@ public class SegmentGeneratorConfig {
   public void setInvertedIndexCreationColumns(List<String> indexCreationColumns) {
     Preconditions.checkNotNull(indexCreationColumns);
     _invertedIndexCreationColumns.addAll(indexCreationColumns);
+  }
+
+  /**
+   * Used by {@link org.apache.pinot.core.realtime.converter.RealtimeSegmentConverter}
+   * and text search functional tests
+   * @param textIndexCreationColumns list of columns with text index creation enabled
+   */
+  public void setTextIndexCreationColumns(List<String> textIndexCreationColumns) {
+    if (textIndexCreationColumns != null) {
+      _textIndexCreationColumns.addAll(textIndexCreationColumns);
+      _rawIndexCreationColumns.addAll(textIndexCreationColumns);
+    }
   }
 
   public void setColumnSortOrder(List<String> sortOrder) {

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.realtime.impl;
 
+import java.util.HashSet;
 import java.util.Set;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -34,6 +35,7 @@ public class RealtimeSegmentConfig {
   private final Set<String> _noDictionaryColumns;
   private final Set<String> _varLengthDictionaryColumns;
   private final Set<String> _invertedIndexColumns;
+  private final Set<String> _textIndexColumns;
   private final RealtimeSegmentZKMetadata _realtimeSegmentZKMetadata;
   private final boolean _offHeap;
   private final PinotDataBufferMemoryManager _memoryManager;
@@ -41,13 +43,14 @@ public class RealtimeSegmentConfig {
   private final SegmentPartitionConfig _segmentPartitionConfig;
   private final boolean _aggregateMetrics;
   private final boolean _nullHandlingEnabled;
+  private final String _consumerDir;
 
   private RealtimeSegmentConfig(String segmentName, String streamName, Schema schema, int capacity,
       int avgNumMultiValues, Set<String> noDictionaryColumns, Set<String> varLengthDictionaryColumns,
-      Set<String> invertedIndexColumns, RealtimeSegmentZKMetadata realtimeSegmentZKMetadata,
-      boolean offHeap, PinotDataBufferMemoryManager memoryManager,
-      RealtimeSegmentStatsHistory statsHistory, SegmentPartitionConfig segmentPartitionConfig,
-      boolean aggregateMetrics, boolean nullHandlingEnabled) {
+      Set<String> invertedIndexColumns, Set<String> textIndexColumns, RealtimeSegmentZKMetadata realtimeSegmentZKMetadata,
+      boolean offHeap, PinotDataBufferMemoryManager memoryManager, RealtimeSegmentStatsHistory statsHistory,
+      SegmentPartitionConfig segmentPartitionConfig, boolean aggregateMetrics, boolean nullHandlingEnabled,
+      String consumerDir) {
     _segmentName = segmentName;
     _streamName = streamName;
     _schema = schema;
@@ -56,6 +59,7 @@ public class RealtimeSegmentConfig {
     _noDictionaryColumns = noDictionaryColumns;
     _varLengthDictionaryColumns = varLengthDictionaryColumns;
     _invertedIndexColumns = invertedIndexColumns;
+    _textIndexColumns = textIndexColumns;
     _realtimeSegmentZKMetadata = realtimeSegmentZKMetadata;
     _offHeap = offHeap;
     _memoryManager = memoryManager;
@@ -63,6 +67,7 @@ public class RealtimeSegmentConfig {
     _segmentPartitionConfig = segmentPartitionConfig;
     _aggregateMetrics = aggregateMetrics;
     _nullHandlingEnabled = nullHandlingEnabled;
+    _consumerDir = consumerDir;
   }
 
   public String getSegmentName() {
@@ -97,6 +102,15 @@ public class RealtimeSegmentConfig {
     return _invertedIndexColumns;
   }
 
+  /**
+   * Used by {@link org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl} when
+   * it starts consuming/indexing.
+   * @return
+   */
+  public Set<String> getTextIndexColumns() {
+    return _textIndexColumns;
+  }
+
   public RealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata() {
     return _realtimeSegmentZKMetadata;
   }
@@ -125,6 +139,10 @@ public class RealtimeSegmentConfig {
     return _nullHandlingEnabled;
   }
 
+  public String getConsumerDir() {
+    return _consumerDir;
+  }
+
   public static class Builder {
     private String _segmentName;
     private String _streamName;
@@ -134,6 +152,7 @@ public class RealtimeSegmentConfig {
     private Set<String> _noDictionaryColumns;
     private Set<String> _varLengthDictionaryColumns;
     private Set<String> _invertedIndexColumns;
+    private Set<String> _textIndexColumns = new HashSet<>();
     private RealtimeSegmentZKMetadata _realtimeSegmentZKMetadata;
     private boolean _offHeap;
     private PinotDataBufferMemoryManager _memoryManager;
@@ -141,6 +160,7 @@ public class RealtimeSegmentConfig {
     private SegmentPartitionConfig _segmentPartitionConfig;
     private boolean _aggregateMetrics = false;
     private boolean _nullHandlingEnabled = false;
+    private String _consumerDir;
 
     public Builder() {
     }
@@ -185,6 +205,19 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    /**
+     * Used by {@link org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager}
+     * to set the list of text index creation columns. This list is later used by
+     * {@link org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl} when
+     * it starts consuming/indexing.
+     * @param textIndexColumns set of text index enabled columns
+     * @return builder
+     */
+    public Builder setTextIndexColumns(Set<String> textIndexColumns) {
+      _textIndexColumns = textIndexColumns;
+      return this;
+    }
+
     public Builder setRealtimeSegmentZKMetadata(RealtimeSegmentZKMetadata realtimeSegmentZKMetadata) {
       _realtimeSegmentZKMetadata = realtimeSegmentZKMetadata;
       return this;
@@ -220,11 +253,16 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setConsumerDir(String consumerDir) {
+      _consumerDir = consumerDir;
+      return this;
+    }
+
     public RealtimeSegmentConfig build() {
       return new RealtimeSegmentConfig(_segmentName, _streamName, _schema, _capacity, _avgNumMultiValues,
-          _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
-          _realtimeSegmentZKMetadata, _offHeap, _memoryManager,
-          _statsHistory, _segmentPartitionConfig, _aggregateMetrics, _nullHandlingEnabled);
+          _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns, _textIndexColumns,
+          _realtimeSegmentZKMetadata, _offHeap, _memoryManager, _statsHistory, _segmentPartitionConfig,
+          _aggregateMetrics, _nullHandlingEnabled, _consumerDir);
     }
   }
 }
