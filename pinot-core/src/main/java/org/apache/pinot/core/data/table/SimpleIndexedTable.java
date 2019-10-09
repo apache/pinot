@@ -165,7 +165,7 @@ public class SimpleIndexedTable extends IndexedTable {
   public void finish(boolean sort) {
     // TODO: support resize without sort
     sortAndResize(_maxCapacity);
-    LOGGER.info("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", _numResizes, _resizeTime,
+    LOGGER.debug("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", _numResizes, _resizeTime,
         _numResizes == 0 ? 0 : _resizeTime / _numResizes);
 
     _iterator = _records.iterator();

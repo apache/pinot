@@ -221,7 +221,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
     resize(_maxCapacity);
     int numResizes = _numResizes.get();
     long resizeTime = _resizeTime.get();
-    LOGGER.info("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", numResizes, resizeTime,
+    LOGGER.debug("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", numResizes, resizeTime,
         numResizes == 0 ? 0 : resizeTime / numResizes);
 
     _iterator = _lookupMap.values().iterator();
