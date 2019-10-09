@@ -318,6 +318,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
     let sessionUpdatedBy = '';
     let sessionUpdatedTime = '';
     let sessionModified = true;
+    let sessionTableSettings = null;
+    let sessionUserCustomized = false;
     let setupMode = ROOTCAUSE_SETUP_MODE_CONTEXT;
     let routeErrors = new Set();
 
@@ -398,7 +400,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
     // session-initialized context
     if (sessionId) {
       if (!_.isEmpty(session)) {
-        const { name, text, updatedBy, updated, owner, permissions } = model.session;
+        const { name, text, updatedBy, updated, owner, permissions,
+        isUserCustomizingRequest, customTableSettings } = model.session;
         context = {
           urns: new Set(session.contextUrns),
           anomalyRange: [session.anomalyRangeStart, session.anomalyRangeEnd],
@@ -417,6 +420,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
         sessionUpdatedTime = updated;
         sessionModified = false;
         setupMode = ROOTCAUSE_SETUP_MODE_NONE;
+        sessionTableSettings = customTableSettings;
+        sessionUserCustomized = isUserCustomizingRequest;
 
       } else {
         routeErrors.add(`Could not find sessionId ${sessionId}`);
@@ -454,6 +459,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
       sessionUpdatedBy,
       sessionUpdatedTime,
       sessionModified,
+      sessionTableSettings,
+      sessionUserCustomized,
       selectedUrns,
       sizeMetricUrns,
       setupMode,

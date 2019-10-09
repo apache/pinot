@@ -181,6 +181,17 @@ export default Component.extend({
   init() {
     this._super(...arguments);
     this._resetSettings(['initialTableSettings', 'savedSettings'], 'customTableSettings');
+    const {
+      sessionTableSettings,
+      sessionUserCustomized
+    } = this.getProperties('sessionTableSettings', 'sessionUserCustomized');
+    if (sessionTableSettings && sessionUserCustomized) {
+      set(this, 'customTableSettings', sessionTableSettings);
+      this.send('onSave');
+    } else {
+      // send table settings to parent so session can store them
+      this.get('sendTableSettings')(this.get('customTableSettings'), this.get('isUserCustomizingRequest'));
+    }
   },
 
   /**
@@ -395,14 +406,17 @@ export default Component.extend({
     // Concatenate incoming settings for bulk comparison
     const newMetricSettings = `${metricUrn}:${range[0]}:${range[1]}:${mode}`;
     const newCustomSettings = Object.values(customTableSettings).join(':');
-    // Compare current and incoming settings
-    const isSameMetricSettings = (previousMetricSettings === newMetricSettings);
+    // Compare current and incoming metric settings if there are previous settings
+    const isSameMetricSettings = previousMetricSettings ? (previousMetricSettings === newMetricSettings) : true;
+    // Compare current and incoming custom settings
     const isSameCustomSettings = (previousCustomSettings === newCustomSettings);
 
     // Reset settings if metrics have changed
     if (!isSameMetricSettings) {
       isUserCustomizingRequest = true;
       this._resetSettings(['customTableSettings', 'savedSettings'], 'initialTableSettings');
+      // send table settings to parent so session can store them
+      this.get('sendTableSettings')(this.get('customTableSettings'), this.get('isUserCustomizingRequest'));
     }
 
     // Abort if metric with exclusion filters
@@ -549,6 +563,8 @@ export default Component.extend({
       });
       // Cache saved state
       this._resetSettings(['savedSettings'], 'customTableSettings');
+      // send table settings to parent so session can store them
+      this.get('sendTableSettings')(this.get('customTableSettings'), this.get('isUserCustomizingRequest'));
       this._fetchIfNewContext();
     },
 
@@ -557,6 +573,8 @@ export default Component.extend({
      */
     onCancel() {
       this._resetSettings(['customTableSettings'], 'savedSettings');
+      // send table settings to parent so session can store them
+      this.get('sendTableSettings')(this.get('customTableSettings'), this.get('isUserCustomizingRequest'));
       set(this, 'openSettingsModal', false);
     },
 
