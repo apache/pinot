@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.index.column;
 
+import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.core.io.reader.DataFileReader;
@@ -28,6 +29,7 @@ import org.apache.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
 import org.apache.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
+import org.apache.pinot.core.segment.creator.TextIndexCreator;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
@@ -39,12 +41,14 @@ import org.apache.pinot.core.segment.index.readers.FloatDictionary;
 import org.apache.pinot.core.segment.index.readers.IntDictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.LongDictionary;
+import org.apache.pinot.core.segment.index.readers.LuceneTextIndexReader;
 import org.apache.pinot.core.segment.index.readers.OnHeapDoubleDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapFloatDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapIntDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapLongDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapStringDictionary;
 import org.apache.pinot.core.segment.index.readers.StringDictionary;
+import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
@@ -57,24 +61,28 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
 
   private final DataFileReader _forwardIndex;
   private final InvertedIndexReader _invertedIndex;
+  private final TextIndexReader _textIndexReader;
   private final BaseImmutableDictionary _dictionary;
   private final BloomFilterReader _bloomFilterReader;
 
   public PhysicalColumnIndexContainer(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
-      IndexLoadingConfig indexLoadingConfig)
+      IndexLoadingConfig indexLoadingConfig, File segmentIndexDir)
       throws IOException {
     String columnName = metadata.getColumnName();
     boolean loadInvertedIndex = false;
+    boolean loadTextIndex = false;
     boolean loadOnHeapDictionary = false;
     boolean loadBloomFilter = false;
     if (indexLoadingConfig != null) {
       loadInvertedIndex = indexLoadingConfig.getInvertedIndexColumns().contains(columnName);
       loadOnHeapDictionary = indexLoadingConfig.getOnHeapDictionaryColumns().contains(columnName);
       loadBloomFilter = indexLoadingConfig.getBloomFilterColumns().contains(columnName);
+      loadTextIndex = indexLoadingConfig.getTextSearchColumns().contains(columnName);
     }
     PinotDataBuffer fwdIndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
 
     if (metadata.hasDictionary()) {
+      _textIndexReader = null;
       //bloom filter
       if (loadBloomFilter) {
         PinotDataBuffer bloomFilterBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.BLOOM_FILTER);
@@ -117,6 +125,11 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       _invertedIndex = null;
       _dictionary = null;
       _bloomFilterReader = null;
+      if (loadTextIndex) {
+        _textIndexReader = new LuceneTextIndexReader(columnName, segmentIndexDir);
+      } else {
+        _textIndexReader = null;
+      }
     }
   }
 
@@ -128,6 +141,11 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   @Override
   public InvertedIndexReader getInvertedIndex() {
     return _invertedIndex;
+  }
+
+  @Override
+  public TextIndexReader getTextIndex() {
+    return _textIndexReader;
   }
 
   @Override

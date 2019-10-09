@@ -30,6 +30,7 @@ import org.apache.pinot.core.operator.blocks.SingleValueBlock;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
@@ -110,6 +111,11 @@ public class StarTreeMetricDataSource extends DataSource {
 
   @Override
   public InvertedIndexReader getInvertedIndex() {
+    return null;
+  }
+
+  @Override
+  public TextIndexReader getTextIndex() {
     return null;
   }
 

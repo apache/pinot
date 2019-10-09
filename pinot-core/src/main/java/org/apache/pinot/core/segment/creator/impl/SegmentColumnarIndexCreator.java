@@ -52,6 +52,7 @@ import org.apache.pinot.core.segment.creator.SegmentCreator;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.core.segment.creator.SingleValueForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.SingleValueRawIndexCreator;
+import org.apache.pinot.core.segment.creator.TextIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
@@ -59,6 +60,7 @@ import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForward
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.startree.hll.HllConfig;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
@@ -82,6 +84,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
   private Map<String, ForwardIndexCreator> _forwardIndexCreatorMap = new HashMap<>();
   private Map<String, InvertedIndexCreator> _invertedIndexCreatorMap = new HashMap<>();
+  private Map<String, TextIndexCreator> _textIndexCreatorMap = new HashMap<>();
   private String segmentName;
   private Schema schema;
   private File _indexDir;
@@ -115,6 +118,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Preconditions.checkState(schema.hasColumn(columnName),
           "Cannot create inverted index for column: %s because it is not in schema", columnName);
       invertedIndexColumns.add(columnName);
+    }
+
+    Set<String> textSearchColumns = new HashSet<>();
+    for (String columnName : config.getTextSearchColumns()) {
+      Preconditions.checkState(schema.hasColumn(columnName),
+          "Cannot create text inverted index for column: %s because it is not in schema", columnName);
+      textSearchColumns.add(columnName);
     }
 
     // Initialize creators for dictionary, forward index and inverted index
@@ -189,6 +199,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         _forwardIndexCreatorMap.put(columnName,
             getRawIndexCreatorForColumn(_indexDir, compressionType, columnName, fieldSpec.getDataType(), totalDocs,
                 indexCreationInfo.getLengthOfLongestEntry()));
+
+        // Initialize text index creator
+        if (textSearchColumns.contains(columnName)) {
+          _textIndexCreatorMap.put(columnName, new LuceneTextIndexCreator(columnName, _indexDir));
+        }
       }
     }
   }
@@ -261,19 +276,30 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         throw new RuntimeException("Null value for column:" + columnName);
       }
 
+      boolean isSingleValue = schema.getFieldSpecFor(columnName).isSingleValueField();
       SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
-      if (schema.getFieldSpecFor(columnName).isSingleValueField()) {
+
+      if (isSingleValue) {
+        // SV column
         if (dictionaryCreator != null) {
+          // dictionary encoded SV column
           int dictId = dictionaryCreator.indexOfSV(columnValueToIndex);
           ((SingleValueForwardIndexCreator) _forwardIndexCreatorMap.get(columnName)).index(docIdCounter, dictId);
           if (_invertedIndexCreatorMap.containsKey(columnName)) {
             _invertedIndexCreatorMap.get(columnName).add(dictId);
           }
         } else {
+          // non-dictionary encoded SV column
           ((SingleValueRawIndexCreator) _forwardIndexCreatorMap.get(columnName))
               .index(docIdCounter, columnValueToIndex);
+          // text-search enabled column
+          TextIndexCreator textIndexCreator = _textIndexCreatorMap.get(columnName);
+          if (textIndexCreator != null) {
+            textIndexCreator.addDoc(columnValueToIndex, docIdCounter);
+          }
         }
       } else {
+        // MV column (always dictionary encoded)
         int[] dictIds = dictionaryCreator.indexOfMV(columnValueToIndex);
         ((MultiValueForwardIndexCreator) _forwardIndexCreatorMap.get(columnName)).index(docIdCounter, dictIds);
         if (_invertedIndexCreatorMap.containsKey(columnName)) {
@@ -294,6 +320,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       throws ConfigurationException, IOException {
     for (InvertedIndexCreator invertedIndexCreator : _invertedIndexCreatorMap.values()) {
       invertedIndexCreator.seal();
+    }
+    for (TextIndexCreator textIndexCreator : _textIndexCreatorMap.values()) {
+      textIndexCreator.seal();
     }
     writeMetadata();
   }
@@ -662,6 +691,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   public void close()
       throws IOException {
     FileUtils.close(Iterables
-        .concat(_dictionaryCreatorMap.values(), _forwardIndexCreatorMap.values(), _invertedIndexCreatorMap.values()));
+        .concat(_dictionaryCreatorMap.values(), _forwardIndexCreatorMap.values(), _invertedIndexCreatorMap.values(), _textIndexCreatorMap.values()));
   }
 }

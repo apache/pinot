@@ -79,6 +79,7 @@ public class SegmentGeneratorConfig {
   private Set<String> _rawIndexCreationColumns = new HashSet<>();
   private Map<String, ChunkCompressorFactory.CompressionType> _rawIndexCompressionType = new HashMap<>();
   private List<String> _invertedIndexCreationColumns = new ArrayList<>();
+  private List<String> _textSearchColumns = new ArrayList<>();
   private List<String> _columnSortOrder = new ArrayList<>();
   private List<String> _varLengthDictionaryColumns = new ArrayList<>();
   private String _dataDir = null;
@@ -129,6 +130,7 @@ public class SegmentGeneratorConfig {
     _rawIndexCreationColumns.addAll(config._rawIndexCreationColumns);
     _rawIndexCompressionType.putAll(config._rawIndexCompressionType);
     _invertedIndexCreationColumns.addAll(config._invertedIndexCreationColumns);
+    _textSearchColumns.addAll(config._textSearchColumns);
     _columnSortOrder.addAll(config._columnSortOrder);
     _varLengthDictionaryColumns.addAll(config._varLengthDictionaryColumns);
     _dataDir = config._dataDir;
@@ -216,6 +218,8 @@ public class SegmentGeneratorConfig {
       _invertedIndexCreationColumns = indexingConfig.getInvertedIndexColumns();
     }
 
+    setTextSearchColumns(indexingConfig.getTextSearchColumns());
+
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     _hllConfig = validationConfig.getHllConfig();
   }
@@ -264,6 +268,10 @@ public class SegmentGeneratorConfig {
     return _invertedIndexCreationColumns;
   }
 
+  public List<String> getTextSearchColumns() {
+    return _textSearchColumns;
+  }
+
   public List<String> getColumnSortOrder() {
     return _columnSortOrder;
   }
@@ -276,6 +284,15 @@ public class SegmentGeneratorConfig {
   public void setInvertedIndexCreationColumns(List<String> indexCreationColumns) {
     Preconditions.checkNotNull(indexCreationColumns);
     _invertedIndexCreationColumns.addAll(indexCreationColumns);
+  }
+
+  public void setTextSearchColumns(List<String> textSearchColumns) {
+    Preconditions.checkNotNull(textSearchColumns);
+    _textSearchColumns.addAll(textSearchColumns);
+  }
+
+  public boolean isTextSearchEnabledOnColumn(String column) {
+    return _textSearchColumns.contains(column);
   }
 
   public void setColumnSortOrder(List<String> sortOrder) {

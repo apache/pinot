@@ -22,6 +22,7 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 
 
 public abstract class DataSource extends BaseOperator {
@@ -35,6 +36,8 @@ public abstract class DataSource extends BaseOperator {
    * Returns the dictionary for the data source if the data is dictionary-encoded, or {@code null} if not.
    */
   public abstract Dictionary getDictionary();
+
+  public abstract TextIndexReader getTextIndex();
 
   /**
    * Returns the inverted index for the data source if exists, or {@code null} if not.

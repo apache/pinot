@@ -33,6 +33,7 @@ import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.apache.pinot.core.startree.v2.store.StarTreeIndexContainer;
@@ -70,6 +71,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Override
   public InvertedIndexReader getInvertedIndex(String column) {
     return _indexContainerMap.get(column).getInvertedIndex();
+  }
+
+  @Override
+  public TextIndexReader getTextIndex(String column) {
+    return _indexContainerMap.get(column).getTextIndex();
   }
 
   @Override

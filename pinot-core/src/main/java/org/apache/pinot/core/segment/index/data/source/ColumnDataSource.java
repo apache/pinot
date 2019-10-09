@@ -36,6 +36,7 @@ import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 
 
 public final class ColumnDataSource extends DataSource {
@@ -47,6 +48,7 @@ public final class ColumnDataSource extends DataSource {
   private final int _maxNumMultiValues;
   private final DataFileReader _forwardIndex;
   private final InvertedIndexReader _invertedIndex;
+  private final TextIndexReader _textIndexReader;
   private final Dictionary _dictionary;
   private final BloomFilterReader _bloomFilter;
   private final int _cardinality;
@@ -58,7 +60,7 @@ public final class ColumnDataSource extends DataSource {
   public ColumnDataSource(ColumnIndexContainer indexContainer, ColumnMetadata metadata) {
     this(metadata.getColumnName(), metadata.getDataType(), metadata.isSingleValue(), metadata.isSorted(),
         metadata.getTotalDocs(), metadata.getMaxNumberOfMultiValues(), indexContainer.getForwardIndex(),
-        indexContainer.getInvertedIndex(), indexContainer.getDictionary(), indexContainer.getBloomFilter(),
+        indexContainer.getInvertedIndex(), indexContainer.getTextIndex(), indexContainer.getDictionary(), indexContainer.getBloomFilter(),
         metadata.getCardinality());
   }
 
@@ -68,12 +70,12 @@ public final class ColumnDataSource extends DataSource {
   public ColumnDataSource(FieldSpec fieldSpec, int numDocs, int maxNumMultiValues, DataFileReader forwardIndex,
       InvertedIndexReader invertedIndex, BaseMutableDictionary dictionary, BloomFilterReader bloomFilter) {
     this(fieldSpec.getName(), fieldSpec.getDataType(), fieldSpec.isSingleValueField(), false, numDocs,
-        maxNumMultiValues, forwardIndex, invertedIndex, dictionary, bloomFilter, Constants.UNKNOWN_CARDINALITY);
+        maxNumMultiValues, forwardIndex, invertedIndex, null, dictionary, bloomFilter, Constants.UNKNOWN_CARDINALITY);
   }
 
   private ColumnDataSource(String columnName, FieldSpec.DataType dataType, boolean isSingleValue, boolean isSorted,
       int numDocs, int maxNumMultiValues, DataFileReader forwardIndex, InvertedIndexReader invertedIndex,
-      Dictionary dictionary, BloomFilterReader bloomFilterReader, int cardinality) {
+      TextIndexReader textIndexReader, Dictionary dictionary, BloomFilterReader bloomFilterReader, int cardinality) {
     // Sanity check
     if (isSingleValue) {
       Preconditions.checkState(forwardIndex instanceof SingleColumnSingleValueReader);
@@ -98,6 +100,7 @@ public final class ColumnDataSource extends DataSource {
     _maxNumMultiValues = maxNumMultiValues;
     _forwardIndex = forwardIndex;
     _invertedIndex = invertedIndex;
+    _textIndexReader = textIndexReader;
     _dictionary = dictionary;
     _bloomFilter = bloomFilterReader;
     _cardinality = cardinality;
@@ -158,6 +161,11 @@ public final class ColumnDataSource extends DataSource {
   @Override
   public InvertedIndexReader getInvertedIndex() {
     return _invertedIndex;
+  }
+
+  @Override
+  public TextIndexReader getTextIndex() {
+    return _textIndexReader;
   }
 
   @Override

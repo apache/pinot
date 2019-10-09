@@ -31,7 +31,8 @@ enum FilterOperator {
   RANGE,
   REGEXP_LIKE,
   NOT_IN,
-  IN
+  IN,
+  TEXT_MATCH
 }
 
 /**

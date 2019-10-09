@@ -49,6 +49,7 @@ import org.apache.pinot.pql.parsers.pql2.ast.StarColumnListAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.StarExpressionAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.TableNameAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.TextMatchPredicateAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.TopAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.WhereAstNode;
 
@@ -427,6 +428,16 @@ public class Pql2AstListener extends PQL2BaseListener {
 
   @Override
   public void exitOptions(PQL2Parser.OptionsContext ctx) {
+    popNode();
+  }
+
+  @Override
+  public void enterTextMatchPredicate(@NotNull PQL2Parser.TextMatchPredicateContext ctx) {
+    pushNode(new TextMatchPredicateAstNode());
+  }
+
+  @Override
+  public void exitTextMatchPredicate(@NotNull PQL2Parser.TextMatchPredicateContext ctx) {
     popNode();
   }
 }

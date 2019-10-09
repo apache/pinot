@@ -22,6 +22,7 @@ import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 
 
 public interface ImmutableSegment extends IndexSegment {
@@ -49,6 +50,14 @@ public interface ImmutableSegment extends IndexSegment {
    * @return Inverted index for the given column, or null if the given column does not have one
    */
   InvertedIndexReader getInvertedIndex(String column);
+
+  /**
+   * Returns the text index for the given column.
+   *
+   * @param column Column name
+   * @return Text index for the given column, or null if the given column does not have one
+   */
+  TextIndexReader getTextIndex(String column);
 
   /**
    * Returns the total size of the segment in bytes.

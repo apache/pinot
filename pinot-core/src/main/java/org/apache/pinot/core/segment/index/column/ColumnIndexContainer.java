@@ -22,6 +22,7 @@ import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 
 
 /**
@@ -38,6 +39,11 @@ public interface ColumnIndexContainer {
    * Returns the inverted index for the column, or {@code null} if it does not exist.
    */
   InvertedIndexReader getInvertedIndex();
+
+  /**
+   * Returns the text search index
+   */
+  TextIndexReader getTextIndex();
 
   /**
    * Returns the dictionary for the column, or {@code null} if it does not exist.
