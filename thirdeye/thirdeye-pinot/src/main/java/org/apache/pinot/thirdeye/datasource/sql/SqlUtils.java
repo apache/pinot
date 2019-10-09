@@ -582,11 +582,10 @@ public class SqlUtils {
   }
 
   private static String timeFormatToVerticaFormat(String timeFormat) {
-    if(timeFormat.contains("mm")){
-        return timeFormat.replace("mm","mi");
-    }
-    else{
-        return timeFormat;
+    if (timeFormat.contains("mm")) {
+      return timeFormat.replaceAll("(?i):mm", ":mi");
+    } else {
+      return timeFormat;
     }
   }
 
