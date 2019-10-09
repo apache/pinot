@@ -32,8 +32,8 @@ import java.util.List;
  */
 @JsonPropertyOrder({"columns", "rows"})
 public class ResultTable {
-  final private List<String> _columns;
-  final private List<Serializable[]> _rows;
+  private final List<String> _columns;
+  private final List<Serializable[]> _rows;
 
   @JsonCreator
   public ResultTable(@JsonProperty("columns") List<String> columns,

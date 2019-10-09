@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.reduce;
 
 import com.google.common.base.Preconditions;
-import io.vavr.CheckedFunction2;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -32,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.config.TableNameBuilder;
@@ -57,9 +57,8 @@ import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
-import org.apache.pinot.common.utils.CommonConstants.Broker.Request.*;
+import org.apache.pinot.common.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
@@ -210,10 +209,10 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     if (brokerMetrics != null) {
       brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.DOCUMENTS_SCANNED, numDocsScanned);
-      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER,
-          numEntriesScannedInFilter);
-      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER,
-          numEntriesScannedPostFilter);
+      brokerMetrics
+          .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
+      brokerMetrics
+          .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
 
       if (numConsumingSegmentsProcessed > 0 && minConsumingFreshnessTimeMs > 0) {
         brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
@@ -490,18 +489,13 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     int numGroupBy = groupBy.getExpressionsSize();
     int numAggregations = aggregationInfos.size();
 
-    IndexedTable indexedTable;
-    try {
-      indexedTable =
-          getIndexedTable(numGroupBy, numAggregations, groupBy, aggregationInfos, orderBy, dataSchema, dataTableMap);
-    } catch (Throwable throwable) {
-      throw new IllegalStateException(throwable);
-    }
+    IndexedTable indexedTable =
+        getIndexedTable(numGroupBy, numAggregations, groupBy, aggregationInfos, orderBy, dataSchema, dataTableMap);
 
     List<AggregationFunction> aggregationFunctions = new ArrayList<>(aggregationInfos.size());
     for (AggregationInfo aggregationInfo : aggregationInfos) {
-      aggregationFunctions.add(
-          AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction());
+      aggregationFunctions
+          .add(AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction());
     }
 
     List<Serializable[]> rows = new ArrayList<>();
@@ -514,7 +508,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       Serializable[] row = new Serializable[numColumns];
       int index = 0;
       for (Object keyColumn : nextRecord.getKey().getColumns()) {
-        row[index ++] = getSerializableValue(keyColumn);
+        row[index++] = getSerializableValue(keyColumn);
       }
       int aggNum = 0;
       for (Object valueColumn : nextRecord.getValues()) {
@@ -522,7 +516,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         if (preserveType) {
           row[index] = AggregationFunctionUtils.formatValue(row[index]);
         }
-        index ++;
+        index++;
       }
       rows.add(row);
       numRows++;
@@ -532,8 +526,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
   }
 
   private IndexedTable getIndexedTable(int numGroupBy, int numAggregations, GroupBy groupBy,
-      List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy, DataSchema dataSchema, Map<ServerInstance, DataTable> dataTableMap)
-      throws Throwable {
+      List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy, DataSchema dataSchema,
+      Map<ServerInstance, DataTable> dataTableMap) {
 
     IndexedTable indexedTable = new ConcurrentIndexedTable();
     int indexedTableCapacity = 1_000_000;
@@ -542,29 +536,29 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     indexedTable.init(dataSchema, aggregationInfos, orderBy, indexedTableCapacity);
 
     for (DataTable dataTable : dataTableMap.values()) {
-      CheckedFunction2[] functions = new CheckedFunction2[dataSchema.size()];
+      BiFunction[] functions = new BiFunction[dataSchema.size()];
       for (int i = 0; i < dataSchema.size(); i++) {
         ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
-        CheckedFunction2<Integer, Integer, Object> function;
+        BiFunction<Integer, Integer, Object> function;
         switch (columnDataType) {
 
           case INT:
-            function = (CheckedFunction2<Integer, Integer, Object>) dataTable::getInt;
+            function = dataTable::getInt;
             break;
           case LONG:
-            function = (CheckedFunction2<Integer, Integer, Object>) dataTable::getLong;
+            function = dataTable::getLong;
             break;
           case FLOAT:
-            function = (CheckedFunction2<Integer, Integer, Object>) dataTable::getFloat;
+            function = dataTable::getFloat;
             break;
           case DOUBLE:
-            function = (CheckedFunction2<Integer, Integer, Object>) dataTable::getDouble;
+            function = dataTable::getDouble;
             break;
           case STRING:
-            function = (CheckedFunction2<Integer, Integer, Object>) dataTable::getString;
+            function = dataTable::getString;
             break;
           default:
-            function = (CheckedFunction2<Integer, Integer, Object>) dataTable::getObject;
+            function = dataTable::getObject;
         }
         functions[i] = function;
       }
@@ -574,12 +568,12 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         int col = 0;
         for (int j = 0; j < numGroupBy; j++) {
           key[j] = functions[col].apply(row, col);
-          col ++;
+          col++;
         }
         Object[] value = new Object[numAggregations];
         for (int j = 0; j < numAggregations; j++) {
           value[j] = functions[col].apply(row, col);
-          col ++;
+          col++;
         }
         Record record = new Record(new Key(key), value);
         indexedTable.upsert(record);
@@ -618,23 +612,18 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
     List<AggregationFunction> aggregationFunctions = new ArrayList<>(aggregationInfos.size());
     for (AggregationInfo aggregationInfo : aggregationInfos) {
-      aggregationFunctions.add(
-          AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction());
+      aggregationFunctions
+          .add(AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction());
     }
 
     List<List<GroupByResult>> groupByResults = new ArrayList<>(numAggregations);
-    for (int i = 0; i < numAggregations; i ++) {
+    for (int i = 0; i < numAggregations; i++) {
       groupByResults.add(new ArrayList<>());
     }
 
     if (!dataTableMap.isEmpty()) {
-      IndexedTable indexedTable;
-      try {
-        indexedTable =
-            getIndexedTable(numGroupBy, numAggregations, groupBy, aggregationInfos, orderBy, dataSchema, dataTableMap);
-      } catch (Throwable throwable) {
-        throw new IllegalStateException(throwable);
-      }
+      IndexedTable indexedTable =
+          getIndexedTable(numGroupBy, numAggregations, groupBy, aggregationInfos, orderBy, dataSchema, dataTableMap);
 
       Iterator<Record> sortedIterator = indexedTable.iterator();
       int numRows = 0;
@@ -648,7 +637,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         }
 
         Object[] values = nextRecord.getValues();
-        for (int i = 0; i < numAggregations; i ++) {
+        for (int i = 0; i < numAggregations; i++) {
           Serializable serializableValue =
               getSerializableValue(aggregationFunctions.get(i).extractFinalResult(values[i]));
           if (preserveType) {
@@ -665,8 +654,9 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     }
 
     List<AggregationResult> aggregationResults = new ArrayList<>(numAggregations);
-    for (int i = 0; i < numAggregations; i ++) {
-      AggregationResult aggregationResult = new AggregationResult(groupByResults.get(i), groupByColumns, aggregationColumns.get(i));
+    for (int i = 0; i < numAggregations; i++) {
+      AggregationResult aggregationResult =
+          new AggregationResult(groupByResults.get(i), groupByColumns, aggregationColumns.get(i));
       aggregationResults.add(aggregationResult);
     }
     brokerResponseNative.setAggregationResults(aggregationResults);

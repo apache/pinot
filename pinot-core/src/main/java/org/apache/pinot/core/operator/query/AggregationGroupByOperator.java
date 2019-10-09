@@ -18,12 +18,8 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import java.util.HashMap;
-import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.GroupBy;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
