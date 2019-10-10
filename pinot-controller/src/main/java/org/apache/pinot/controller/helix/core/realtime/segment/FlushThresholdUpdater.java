@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.realtime.segment;
 import javax.annotation.Nonnull;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.partition.PartitionAssignment;
+import org.apache.pinot.core.realtime.stream.StreamConfig;
 
 
 /**
@@ -32,11 +33,12 @@ public interface FlushThresholdUpdater {
   /**
    * Updated the flush threshold of the segment metadata
    * @param newSegmentZKMetadata - new segment metadata for which the thresholds need to be set
+   * @param streamConfig - the StreamConfig object from the tableConfig
    * @param committingSegmentZKMetadata - metadata of the committing segment
    * @param committingSegmentDescriptor
    * @param partitionAssignment - partition assignment for the table
    */
-  void updateFlushThreshold(@Nonnull LLCRealtimeSegmentZKMetadata newSegmentZKMetadata,
+  void updateFlushThreshold(@Nonnull LLCRealtimeSegmentZKMetadata newSegmentZKMetadata, StreamConfig streamConfig,
       LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata, CommittingSegmentDescriptor committingSegmentDescriptor,
       PartitionAssignment partitionAssignment);
 }

@@ -21,9 +21,7 @@ package org.apache.pinot.controller.helix.core.realtime.segment;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.core.realtime.stream.PartitionLevelStreamConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.pinot.core.realtime.stream.StreamConfig;
 
 
 /**
@@ -40,18 +38,15 @@ public class FlushThresholdUpdateManager {
    * If flush size > 0, create a new DefaultFlushThresholdUpdater with given flush size.
    * If flush size == 0, create new SegmentSizeBasedFlushThresholdUpdater if not already created. Create only 1 per table, because we want to maintain tuning information for the table in the updater
    */
-  public FlushThresholdUpdater getFlushThresholdUpdater(TableConfig realtimeTableConfig) {
-    final String tableName = realtimeTableConfig.getTableName();
-    PartitionLevelStreamConfig streamConfig =
-        new PartitionLevelStreamConfig(tableName, realtimeTableConfig.getIndexingConfig().getStreamConfigs());
-
+  public FlushThresholdUpdater getFlushThresholdUpdater(StreamConfig streamConfig) {
+    final String tableName = streamConfig.getTableNameWithType();
     final int tableFlushSize = streamConfig.getFlushThresholdRows();
 
     if (tableFlushSize == 0) {
-      final long desiredSegmentSize = streamConfig.getFlushSegmentDesiredSizeBytes();
-      final int flushAutotuneInitialRows = streamConfig.getFlushAutotuneInitialRows();
-      return _flushThresholdUpdaterMap.computeIfAbsent(tableName,
-          k -> new SegmentSizeBasedFlushThresholdUpdater(desiredSegmentSize, flushAutotuneInitialRows));
+      FlushThresholdUpdater updater =  _flushThresholdUpdaterMap.computeIfAbsent(tableName,
+          k -> new SegmentSizeBasedFlushThresholdUpdater());
+      // In case the table config has changed, update it
+      return updater;
     } else {
       _flushThresholdUpdaterMap.remove(tableName);
       return new DefaultFlushThresholdUpdater(tableFlushSize);
