@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.controller.helix.core.realtime;
 
+import com.google.common.base.Preconditions;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.lang.reflect.Field;
-import java.util.List;
 import java.util.Map;
 import org.apache.helix.HelixManager;
-import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -1139,7 +1138,6 @@ public class SegmentCompletionTest {
   }
 
   public static class MockPinotLLCRealtimeSegmentManager extends PinotLLCRealtimeSegmentManager {
-    public static final String clusterName = "someCluster";
     public LLCRealtimeSegmentZKMetadata _segmentMetadata;
     public MockSegmentCompletionManager _segmentCompletionMgr;
     private static final ControllerConf CONTROLLER_CONF = new ControllerConf();
@@ -1153,44 +1151,32 @@ public class SegmentCompletionTest {
 
     protected MockPinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager,
         ControllerMetrics controllerMetrics) {
-      super(pinotHelixResourceManager, CONTROLLER_CONF, controllerMetrics,
-          new LeadControllerManager(pinotHelixResourceManager.getHelixZkManager(), controllerMetrics));
+      super(pinotHelixResourceManager, CONTROLLER_CONF, controllerMetrics);
     }
 
     @Override
-    public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName,
-        Stat stat) {
+    public LLCRealtimeSegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName, Stat stat) {
       return _segmentMetadata;
     }
 
     @Override
-    public boolean commitSegmentMetadata(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
+    public void commitSegmentMetadata(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
       _segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
       _segmentMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset());
       _segmentMetadata.setDownloadUrl(URIUtils.constructDownloadUrl(CONTROLLER_CONF.generateVipUrl(), rawTableName,
           committingSegmentDescriptor.getSegmentName()));
       _segmentMetadata.setEndTime(_segmentCompletionMgr.getCurrentTimeMs());
-      return true;
     }
 
     @Override
-    public boolean commitSegmentFile(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
-      if (committingSegmentDescriptor.getSegmentLocation().equals("doNotCommitMe")) {
-        return false;
-      } else {
-        return true;
-      }
+    public void commitSegmentFile(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
+      Preconditions.checkState(!committingSegmentDescriptor.getSegmentLocation().equals("doNotCommitMe"));
     }
 
     @Override
-    protected void writeSegmentsToPropertyStore(List<String> paths, List<ZNRecord> records, String realtimeTableName) {
-      _segmentMetadata = new LLCRealtimeSegmentZKMetadata(records.get(0));  // Updated record that we are writing to ZK
-    }
-
-    @Override
-    public void segmentStoppedConsuming(final LLCSegmentName segmentName, final String instance) {
-      _stoppedSegmentName = segmentName;
-      _stoppedInstance = instance;
+    public void segmentStoppedConsuming(final LLCSegmentName llcSegmentName, final String instanceName) {
+      _stoppedSegmentName = llcSegmentName;
+      _stoppedInstance = instanceName;
     }
   }
 

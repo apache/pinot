@@ -274,29 +274,6 @@ public class TableConfigTest {
       checkTableConfigWithCompletionConfig(tableConfig, tableConfigToCompare);
     }
     {
-      // With default StreamConsumptionConfig
-      TableConfig tableConfig = tableConfigBuilder.build();
-      assertEquals(tableConfig.getIndexingConfig().getStreamConsumptionConfig().getStreamPartitionAssignmentStrategy(),
-          "UniformStreamPartitionAssignment");
-
-      // with streamConsumptionConfig set
-      tableConfig =
-          tableConfigBuilder.setStreamPartitionAssignmentStrategy("BalancedStreamPartitionAssignment").build();
-      assertEquals(tableConfig.getIndexingConfig().getStreamConsumptionConfig().getStreamPartitionAssignmentStrategy(),
-          "BalancedStreamPartitionAssignment");
-
-      // Serialize then de-serialize
-      TableConfig tableConfigToCompare = TableConfig.fromJsonConfig(tableConfig.toJsonConfig());
-      assertEquals(
-          tableConfigToCompare.getIndexingConfig().getStreamConsumptionConfig().getStreamPartitionAssignmentStrategy(),
-          "BalancedStreamPartitionAssignment");
-
-      tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
-      assertEquals(
-          tableConfigToCompare.getIndexingConfig().getStreamConsumptionConfig().getStreamPartitionAssignmentStrategy(),
-          "BalancedStreamPartitionAssignment");
-    }
-    {
       // With star tree config
       StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
       Set<String> dims = new HashSet<>();

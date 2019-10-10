@@ -19,12 +19,11 @@
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import com.google.common.annotations.VisibleForTesting;
-import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import org.apache.pinot.common.partition.PartitionAssignment;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.time.TimeUtils;
-import org.apache.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.core.realtime.stream.PartitionLevelStreamConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,23 +36,12 @@ import org.slf4j.LoggerFactory;
  * This ensures that we take into account the history of the segment size and number rows
  */
 public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpdater {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentSizeBasedFlushThresholdUpdater.class);
 
-  private static final double CURRENT_SEGMENT_RATIO_WEIGHT = 0.1;
-  private static final double PREVIOUS_SEGMENT_RATIO_WEIGHT = 0.9;
-  private static final double ROWS_MULTIPLIER_WHEN_TIME_THRESHOLD_HIT = 1.1;
-  private static final int MINIMUM_NUM_ROWS_THRESHOLD = 10_000;
-
-  @VisibleForTesting
-  double getRowsMultiplierWhenTimeThresholdHit() {
-    return ROWS_MULTIPLIER_WHEN_TIME_THRESHOLD_HIT;
-  }
-
-  @VisibleForTesting
-  int getMinimumNumRowsThreshold() {
-    return MINIMUM_NUM_ROWS_THRESHOLD;
-  }
+  static final double CURRENT_SEGMENT_RATIO_WEIGHT = 0.1;
+  static final double PREVIOUS_SEGMENT_RATIO_WEIGHT = 0.9;
+  static final double ROWS_MULTIPLIER_WHEN_TIME_THRESHOLD_HIT = 1.1;
+  static final int MINIMUM_NUM_ROWS_THRESHOLD = 10_000;
 
   @VisibleForTesting
   double getLatestSegmentRowsToSizeRatio() {
@@ -63,15 +51,11 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
   // num rows to segment size ratio of last committed segment for this table
   private double _latestSegmentRowsToSizeRatio = 0;
 
-  public SegmentSizeBasedFlushThresholdUpdater() {
-  }
-
   // synchronized since this method could be called for multiple partitions of the same table in different threads
   @Override
-  public synchronized void updateFlushThreshold(@Nonnull LLCRealtimeSegmentZKMetadata newSegmentZKMetadata,
-      StreamConfig streamConfig, LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata,
-      @Nonnull CommittingSegmentDescriptor committingSegmentDescriptor, PartitionAssignment partitionAssignment) {
-
+  public synchronized void updateFlushThreshold(PartitionLevelStreamConfig streamConfig,
+      LLCRealtimeSegmentZKMetadata newSegmentZKMetadata, CommittingSegmentDescriptor committingSegmentDescriptor,
+      @Nullable LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata, int maxNumPartitionsPerInstance) {
     final long desiredSegmentSizeBytes = streamConfig.getFlushSegmentDesiredSizeBytes();
     final long timeThresholdMillis = streamConfig.getFlushThresholdTimeMillis();
     final int autotuneInitialRows = streamConfig.getFlushAutotuneInitialRows();
@@ -99,7 +83,7 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
     if (committingSegmentSizeBytes <= 0) { // repair segment case
       final int targetNumRows = committingSegmentZKMetadata.getSizeThresholdToFlushSegment();
       LOGGER.info("Committing segment size is not available, setting thresholds from previous segment for {} as {}",
-          newSegmentZKMetadata.getSegmentName(), targetNumRows);
+          newSegmentName, targetNumRows);
       newSegmentZKMetadata.setSizeThresholdToFlushSegment(targetNumRows);
       return;
     }
@@ -118,8 +102,7 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
     // less same characteristics at any one point in time).
     // However, when we start a new table or change controller mastership, we can have any partition completing first.
     // It is best to learn the ratio as quickly as we can, so we allow any partition to supply the value.
-    if (new LLCSegmentName(committingSegmentZKMetadata.getSegmentName()).getPartitionId() == 0
-        || _latestSegmentRowsToSizeRatio == 0) {
+    if (new LLCSegmentName(newSegmentName).getPartitionId() == 0 || _latestSegmentRowsToSizeRatio == 0) {
       if (_latestSegmentRowsToSizeRatio > 0) {
         _latestSegmentRowsToSizeRatio =
             CURRENT_SEGMENT_RATIO_WEIGHT * currentRatio + PREVIOUS_SEGMENT_RATIO_WEIGHT * _latestSegmentRowsToSizeRatio;
@@ -148,9 +131,9 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
       if (timeThresholdMillis < timeConsumed) {
         // The administrator has reduced the time threshold. Adjust the
         // number of rows to match the average consumption rate on the partition.
-        currentNumRows = (long) (timeThresholdMillis * numRowsConsumed / timeConsumed);
-        logStringBuilder.append(" Detected lower time threshold, adjusting numRowsConsumed to ")
-            .append(currentNumRows).append(". ");
+        currentNumRows = timeThresholdMillis * numRowsConsumed / timeConsumed;
+        logStringBuilder.append(" Detected lower time threshold, adjusting numRowsConsumed to ").append(currentNumRows)
+            .append(". ");
       }
       targetSegmentNumRows = (long) (currentNumRows * ROWS_MULTIPLIER_WHEN_TIME_THRESHOLD_HIT);
       targetSegmentNumRows = capNumRowsIfOverflow(targetSegmentNumRows);

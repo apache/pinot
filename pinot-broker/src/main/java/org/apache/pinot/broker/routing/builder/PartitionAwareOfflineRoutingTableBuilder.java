@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.routing.builder;
 
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -28,14 +29,15 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.InstancePartitionsType;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignment;
-import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
 import org.apache.pinot.common.utils.CommonConstants;
 
 
@@ -88,14 +90,16 @@ public class PartitionAwareOfflineRoutingTableBuilder extends BasePartitionAware
     RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigs);
     Set<String> segmentSet = externalView.getPartitionSet();
 
-    // Fetch the partition to replica group mapping table from the property store
-    ReplicaGroupPartitionAssignmentGenerator partitionAssignmentGenerator =
-        new ReplicaGroupPartitionAssignmentGenerator(_propertyStore);
-    ReplicaGroupPartitionAssignment partitionAssignment =
-        partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableName);
+    // Fetch the instance partitions from the property store
+    String instancePartitionsName =
+        InstancePartitionsUtils.getInstancePartitionsName(tableName, InstancePartitionsType.OFFLINE);
+    InstancePartitions instancePartitions =
+        InstancePartitionsUtils.fetchInstancePartitions(_propertyStore, instancePartitionsName);
+    Preconditions
+        .checkState(instancePartitions != null, "Failed to find instance partitions: %s", instancePartitionsName);
 
     // Update numReplicas if the replica group partition assignment has been changed.
-    int numReplicas = partitionAssignment.getNumReplicaGroups();
+    int numReplicas = instancePartitions.getNumReplicaGroups();
     if (_numReplicas != numReplicas) {
       _numReplicas = numReplicas;
     }
@@ -121,8 +125,7 @@ public class PartitionAwareOfflineRoutingTableBuilder extends BasePartitionAware
     Map<Integer, Map<String, Integer>> partitionToServerToReplicaMap = new HashMap<>();
     for (Integer partitionId : partitionIds) {
       for (int replicaId = 0; replicaId < _numReplicas; replicaId++) {
-        List<String> serversForPartitionAndReplica =
-            partitionAssignment.getInstancesFromReplicaGroup(partitionId, replicaId);
+        List<String> serversForPartitionAndReplica = instancePartitions.getInstances(partitionId, replicaId);
         for (String serverName : serversForPartitionAndReplica) {
           Map<String, Integer> serverToReplicaMap =
               partitionToServerToReplicaMap.computeIfAbsent(partitionId, k -> new HashMap<>());

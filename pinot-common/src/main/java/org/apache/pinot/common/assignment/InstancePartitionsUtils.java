@@ -27,9 +27,10 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.config.OfflineTagConfig;
+import org.apache.pinot.common.config.RealtimeTagConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 
@@ -89,18 +90,33 @@ public class InstancePartitionsUtils {
   }
 
   /**
-   * Computes the default instance partitions.
-   * <p>For backward-compatibility, sort all enabled instances with the server tag, rotate the list based on the table
-   * name name to prevent creating hotspot servers.
+   * Computes the default instance partitions. Sort all qualified instances and rotate the list based on the table name
+   * to prevent creating hotspot servers.
+   * <p>Choose both enabled and disabled instances with the server tag as the qualified instances to avoid unexpected
+   * data shuffling when instances get disabled.
    */
   public static InstancePartitions computeDefaultInstancePartitions(HelixManager helixManager, TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
-    String tableNameWithType = tableConfig.getTableName();
-    String serverTag =
-        TagNameUtils.getServerTagFromTableConfigAndInstancePartitionsType(tableConfig, instancePartitionsType);
-    List<String> instances = HelixHelper.getEnabledInstancesWithTag(helixManager, serverTag);
+    String serverTag;
+    switch (instancePartitionsType) {
+      case OFFLINE:
+        serverTag = new OfflineTagConfig(tableConfig).getOfflineServerTag();
+        break;
+      case CONSUMING:
+        serverTag = new RealtimeTagConfig(tableConfig).getConsumingServerTag();
+        break;
+      case COMPLETED:
+        serverTag = new RealtimeTagConfig(tableConfig).getCompletedServerTag();
+        break;
+      default:
+        throw new IllegalStateException();
+    }
+    List<String> instances = HelixHelper.getInstancesWithTag(helixManager, serverTag);
+
+    // Sort the instances and rotate the list based on the table name
     instances.sort(null);
     int numInstances = instances.size();
+    String tableNameWithType = tableConfig.getTableName();
     Collections.rotate(instances, -(Math.abs(tableNameWithType.hashCode()) % numInstances));
     InstancePartitions instancePartitions =
         new InstancePartitions(getInstancePartitionsName(tableNameWithType, instancePartitionsType));

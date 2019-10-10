@@ -56,9 +56,6 @@ public class IndexingConfig {
   @UseChildKeyHandler(SimpleMapChildKeyHandler.class)
   private Map<String, String> _streamConfigs = new HashMap<>();
 
-  @ConfigKey("streamConsumptionConfig")
-  private StreamConsumptionConfig _streamConsumptionConfig;
-
   @ConfigKey("segmentFormatVersion")
   private String _segmentFormatVersion;
 
@@ -149,14 +146,6 @@ public class IndexingConfig {
 
   public void setStreamConfigs(Map<String, String> streamConfigs) {
     _streamConfigs = streamConfigs;
-  }
-
-  public StreamConsumptionConfig getStreamConsumptionConfig() {
-    return _streamConsumptionConfig;
-  }
-
-  public void setStreamConsumptionConfig(StreamConsumptionConfig streamConsumptionConfig) {
-    _streamConsumptionConfig = streamConsumptionConfig;
   }
 
   public String getSegmentFormatVersion() {
