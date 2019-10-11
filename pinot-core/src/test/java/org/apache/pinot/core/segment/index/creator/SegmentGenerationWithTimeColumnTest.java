@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.core.segment.index.creator;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.DimensionFieldSpec;
@@ -43,6 +43,7 @@ import org.joda.time.LocalDateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -56,12 +57,19 @@ public class SegmentGenerationWithTimeColumnTest {
   private static final String SEGMENT_NAME = "testSegment";
   private static final int NUM_ROWS = 10000;
 
-  private Random _random = new Random(System.nanoTime());
+  private long seed = System.nanoTime();
+  private Random _random = new Random(seed);
 
   private long validMinTime = TimeUtils.getValidMinTimeMillis();
+  private long validMaxTime = TimeUtils.getValidMaxTimeMillis();
   private long minTime;
   private long maxTime;
   private long startTime = System.currentTimeMillis();
+
+  @BeforeClass
+  public void printSeed() {
+    System.out.println("Seed is: "+ seed);
+  }
 
   @BeforeMethod
   public void reset() {
@@ -180,7 +188,8 @@ public class SegmentGenerationWithTimeColumnTest {
   }
 
   private Object getRandomValueForTimeColumn(boolean isSimpleDate, boolean isInvalidDate) {
-    long randomMs = ThreadLocalRandom.current().nextLong(validMinTime, startTime);
+    long randomMs = validMinTime + (long)(_random.nextDouble() * (startTime - validMinTime));
+    Preconditions.checkArgument(TimeUtils.timeValueInValidRange(randomMs), "Value " + randomMs +" out of range");
     long dateColVal = randomMs;
     Object result;
     if (isInvalidDate) {
