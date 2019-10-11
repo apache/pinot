@@ -166,22 +166,11 @@ public class SegmentGenerationWithTimeColumnTest {
   @Test
   public void testMinAllowedValue() {
     long millis = validMinTime; // is in UTC from epoch (19710101)
-
-    // if we don't use timezone, it will use System default or JDK default (PST)
-    DateTime dateTime = new DateTime(millis);
+    DateTime dateTime = new DateTime(millis, DateTimeZone.UTC);
     LocalDateTime localDateTime = dateTime.toLocalDateTime();
     int year = localDateTime.getYear();
     int month = localDateTime.getMonthOfYear();
     int day = localDateTime.getDayOfMonth();
-    Assert.assertEquals(year, 1970);
-    Assert.assertEquals(month, 12);
-    Assert.assertEquals(day, 31);
-
-    dateTime = new DateTime(millis, DateTimeZone.UTC);
-    localDateTime = dateTime.toLocalDateTime();
-    year = localDateTime.getYear();
-    month = localDateTime.getMonthOfYear();
-    day = localDateTime.getDayOfMonth();
     Assert.assertEquals(year, 1971);
     Assert.assertEquals(month, 1);
     Assert.assertEquals(day, 1);
