@@ -112,7 +112,7 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
             .getJiraEntity(anomalyResultListOfGroup);
 
         String issueKey = createIssue(jiraIssueInput);
-        LOG.info("Jira created/updated with issue key {}", issueKey);
+        LOG.info("Jira ticket created with issue key {} : anomalies reported = {}", issueKey, result.getValue().size());
       } catch (IllegalArgumentException e) {
         LOG.warn("Skipping! Found illegal arguments while sending {} anomalies for alert {}."
             + " Exception message: ", result.getValue().size(), this.adContext.getNotificationConfig().getId(), e);

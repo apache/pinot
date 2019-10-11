@@ -114,6 +114,21 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
     return dimensionMap;
   }
 
+  // Check if this dimension map contains filters configured in that
+  public boolean contains(Map<String, String> that) {
+    if (that == null || that.size() == 0) {
+      return this.size() == 0;
+    }
+
+    for (Entry<String, String> filter : that.entrySet()) {
+      if (this.get(filter.getKey()) == null || !filter.getValue().equalsIgnoreCase(this.get(filter.getKey()))) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   /**
    * Returns if this dimension map equals or is a child of the given dimension map, i.e., the given dimension map is
    * a subset of this dimension map.

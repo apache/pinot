@@ -562,7 +562,7 @@ public class YamlResource {
     return Response.ok().entity(responseMessage).build();
   }
 
-  long createSubscriptionGroup(String yamlConfig) throws IllegalArgumentException {
+  public long createSubscriptionGroup(String yamlConfig) throws IllegalArgumentException {
     Preconditions.checkArgument(StringUtils.isNotBlank(yamlConfig),
         "The Yaml Payload in the request is empty.");
 
