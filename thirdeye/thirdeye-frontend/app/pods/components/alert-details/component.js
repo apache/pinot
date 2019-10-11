@@ -1079,10 +1079,12 @@ export default Component.extend({
         .catch(error => {
           set(this, 'isLoading', false);
           this.get('notifications').error(error, 'Error', toastOptions);
+          set(this, 'getAnomaliesError', true);
         });
     } catch (error) {
       set(this, 'isLoading', false);
-      throw new Error(`Unable to retrieve anomaly data. ${error}`);
+      this.get('notifications').error(error, 'Error', toastOptions);
+      set(this, 'getAnomaliesError', true);
     }
   },
 
