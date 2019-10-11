@@ -101,7 +101,7 @@ public class EmailContentFormatter extends AlertContentFormatter {
 
       String alertEmailHtml = new String(baos.toByteArray(), CHARSET);
 
-      String subject = BaseNotificationContent.makeSubject(getSubjectType(alertClientConfig), adContext.getNotificationConfig(), templateValues);
+      String subject = BaseNotificationContent.makeSubject(super.getSubjectType(alertClientConfig), adContext.getNotificationConfig(), templateValues);
       emailEntity.setSubject(subject);
       email.setHtmlMsg(alertEmailHtml);
       emailEntity.setContent(email);

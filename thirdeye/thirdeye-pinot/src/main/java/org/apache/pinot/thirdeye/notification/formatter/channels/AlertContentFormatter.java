@@ -7,6 +7,9 @@ import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
 import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 
 
+/**
+ * This generic class is responsible for formatting the contents across notification channels
+ */
 public abstract class AlertContentFormatter {
   protected static final String PROP_SUBJECT_STYLE = "subject";
 

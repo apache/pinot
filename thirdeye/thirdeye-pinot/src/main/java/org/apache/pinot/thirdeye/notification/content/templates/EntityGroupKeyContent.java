@@ -36,7 +36,6 @@ import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.alert.util.AlertScreenshotHelper;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
-import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
@@ -125,7 +124,7 @@ public class EntityGroupKeyContent extends BaseNotificationContent {
     if (whitelistMetricToAnomaliesMap.size() == 1 && whitelistMetricToAnomaliesMap.values().size() == 1) {
       AnomalyReportEntity singleAnomaly = whitelistMetricToAnomaliesMap.values().iterator().next();
       try {
-        imgPath = AlertScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), thirdEyeAnomalyConfig);
+        this.imgPath = AlertScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), thirdEyeAnomalyConfig);
       } catch (Exception e) {
         LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
       }

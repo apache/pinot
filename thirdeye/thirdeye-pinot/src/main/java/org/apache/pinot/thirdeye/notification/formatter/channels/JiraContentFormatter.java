@@ -100,7 +100,7 @@ public class JiraContentFormatter extends AlertContentFormatter {
    * Apply the parameter map to given email template, and format it as EmailEntity
    */
   private IssueInput buildJiraEntity(String jiraTemplate, Map<String, Object> templateValues) {
-    String issueSummary = BaseNotificationContent.makeSubject(getSubjectType(alertClientConfig), this.adContext.getNotificationConfig(), templateValues);
+    String issueSummary = BaseNotificationContent.makeSubject(super.getSubjectType(alertClientConfig), this.adContext.getNotificationConfig(), templateValues);
 
     // Fetch the jira project and issue type fields if overridden by user
     String jiraProject = MapUtils.getString(alertClientConfig, PROP_PROJECT, this.jiraAdminConfig.getJiraDefaultProjectKey());
