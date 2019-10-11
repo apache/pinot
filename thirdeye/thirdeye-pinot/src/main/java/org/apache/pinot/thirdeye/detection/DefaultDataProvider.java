@@ -248,7 +248,7 @@ public class DefaultDataProvider implements DataProvider {
       // filter all child anomalies. those are kept in the parent anomaly children set.
       anomalies = Collections2.filter(anomalies, mergedAnomaly -> mergedAnomaly != null && !mergedAnomaly.isChild());
 
-      LOG.info("Fetched {} anomalies between (startTime = {}, endTime = {}) with confid Id = {}", anomalies.size(), slice.getStart(), slice.getEnd(), configId);
+      LOG.info("Fetched {} anomalies between (startTime = {}, endTime = {}) with config Id = {}", anomalies.size(), slice.getStart(), slice.getEnd(), configId);
       output.putAll(slice, anomalies);
     }
     return output;
