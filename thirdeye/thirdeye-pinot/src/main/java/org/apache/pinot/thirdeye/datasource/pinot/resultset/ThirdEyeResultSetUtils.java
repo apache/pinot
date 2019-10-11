@@ -107,9 +107,12 @@ public class ThirdEyeResultSetUtils {
           boolean skipRowDueToError = false;
           String[] groupKeys;
           if (hasGroupBy) {
-            groupKeys = new String[resultSet.getGroupKeyLength()];
+
+            // TODO: CHANGE BACK?
+            groupKeys = new String[resultSet.getGroupKeyLength() + 1];
             for (int grpKeyIdx = 0; grpKeyIdx < resultSet.getGroupKeyLength(); grpKeyIdx++) {
               String groupKeyVal = "";
+              String timestamp = "";
               try {
                 groupKeyVal = resultSet.getGroupKeyColumnValue(r, grpKeyIdx);
               } catch (Exception e) {

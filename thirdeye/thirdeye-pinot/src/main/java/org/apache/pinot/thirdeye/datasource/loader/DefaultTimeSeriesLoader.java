@@ -78,13 +78,13 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
   public void prefetchTimeSeriesWindowRangeIntoCache(MetricSlice slice, long detectionId) throws Exception {
 
     // TODO: Reenable this once we get the detectionId
-    if (!timeSeriesCache.detectionIdExistsInCache(detectionId)) {
+    //if (!timeSeriesCache.detectionIdExistsInCache(detectionId)) {
       TimeSeriesRequestContainer rc = DataFrameUtils.makeTimeSeriesRequestAligned(slice, "ref", this.metricDAO, this.datasetDAO);
       ThirdEyeResponse response = this.cache.getQueryResult(rc.getRequest());
 
       // fire and forget
       ExecutorService executor = Executors.newCachedThreadPool();
       executor.execute(() -> timeSeriesCache.insertTimeSeriesIntoCache(String.valueOf(detectionId), response));
-    }
+    //}
   }
 }

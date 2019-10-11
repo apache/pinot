@@ -6,6 +6,10 @@ import com.couchbase.client.java.CouchbaseCluster;
 import com.couchbase.client.java.document.JsonDocument;
 import com.couchbase.client.java.document.json.JsonArray;
 import com.couchbase.client.java.document.json.JsonObject;
+import com.couchbase.client.java.query.N1qlQuery;
+import com.couchbase.client.java.query.N1qlQueryResult;
+import com.couchbase.client.java.query.N1qlQueryRow;
+import com.couchbase.client.java.query.SimpleN1qlQuery;
 import com.couchbase.client.java.subdoc.DocumentFragment;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -16,12 +20,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.auto.onboard.AutoOnboardUtility;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;
 import org.apache.pinot.thirdeye.datasource.RelationalThirdEyeResponse;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
 import org.apache.pinot.thirdeye.util.CacheUtils;
+import org.joda.time.DateTime;
+import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,14 +72,64 @@ public class CouchbaseCacheDAO {
 
   //public MetricCacheResponse fetchExistingTimeSeries(long detectionId, MetricSlice slice) throws Exception {
   public ThirdEyeCacheResponse tryFetchExistingTimeSeries(ThirdEyeCacheRequestContainer request) {
-    JsonDocument doc = bucket.get(request.getDetectionId());
+    //JsonDocument doc = bucket.get(request.getDetectionId());
 
-    if (doc == null) {
+    // parametrize this later
+
+    // need to figure out how detections with multiple metrics will be stored
+
+    StringBuilder sb = new StringBuilder("SELECT `time`, `value` FROM `" + BUCKET_NAME + "` WHERE `metric_name` = `");
+    List<String> metricNames = request.getRequest().getMetricNames();
+
+    for (int i = 0; i < metricNames.size() - 1; i++) {
+      sb.append(metricNames.get(i)).append("` OR `metric_name` = `");
+    }
+
+    // either this or use the metricId in the request instead
+    sb.append(metricNames.get(metricNames.size() - 1) + "`");
+    sb.append(" AND dataset = " + request.getRequest().getDataSource());
+    sb.append(" AND time BETWEEN ");
+    sb.append("\"" + request.getRequest().getStartTimeInclusive().toString() + "\"");
+    sb.append(" AND ");
+    sb.append("\"" + request.getRequest().getEndTimeExclusive().toString() + "\"");
+    sb.append(" ORDER BY date asc;");
+
+    N1qlQueryResult result = bucket.query(N1qlQuery.simple(sb.toString()));
+
+    // if query failed or no results were returned
+    if (!result.finalSuccess() || result.allRows().isEmpty()) {
       LOG.info("cache fetch for detection {} failed, retrieving from source", request.getDetectionId());
       return null;
     }
 
-    return CacheUtils.mapJsonToCacheResponse(doc.content());
+    List<String[]> rowList = new ArrayList<>();
+
+    int i = 0;
+    DateTime startDate = request.getRequest().getStartTimeInclusive();
+    Period period = request.getRequest().getGroupByTimeGranularity().toPeriod();
+
+    // TODO: figure out a way to get around the relational ThirdEyeResponse data not having dates
+
+    //startDate.withPeriodAdded()
+    for (N1qlQueryRow row : result.allRows()) {
+      JsonObject dataPoint = row.value();
+      String[] pair = new String[2];
+
+      // since it's in sorted order, time bucket id will just be equal to the counter.
+      // however, we can consider changing the query to not return in sorted order
+      // and just store the time bucket value with it, which should also work.
+      String bucketNumber = String.valueOf(i);
+      String value = String.valueOf(dataPoint.get("value"));
+
+      // ignore "bubbles"/"nops"/nulls, since they represent missing data in the source
+      if (!value.equals("null")) {
+        pair[0] = bucketNumber;
+        pair[1] = value;
+        rowList.add(pair);
+      }
+    }
+
+    return null;
   }
 
   public void insertRelationalTimeSeries(String detectionId, ThirdEyeResponse responseData) {
