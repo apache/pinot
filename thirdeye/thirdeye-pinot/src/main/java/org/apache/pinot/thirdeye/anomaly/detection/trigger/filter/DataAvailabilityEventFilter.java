@@ -17,12 +17,10 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.datalayer.bao;
+package org.apache.pinot.thirdeye.anomaly.detection.trigger.filter;
 
-import java.util.List;
-import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.anomaly.detection.trigger.DataAvailabilityEvent;
 
-
-public interface DetectionConfigManager extends AbstractManager<DetectionConfigDTO> {
-  List<DetectionConfigDTO> findAllActive();
+public interface DataAvailabilityEventFilter {
+  boolean isPassed(DataAvailabilityEvent e);
 }

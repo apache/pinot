@@ -230,6 +230,7 @@ public class DaoTestUtils {
     datasetConfigDTO.setActive(true);
     datasetConfigDTO.setRequiresCompletenessCheck(false);
     datasetConfigDTO.setDataSource(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
+    datasetConfigDTO.setLastRefreshTime(System.currentTimeMillis());
     return datasetConfigDTO;
   }
 

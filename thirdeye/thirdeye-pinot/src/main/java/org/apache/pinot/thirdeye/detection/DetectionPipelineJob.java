@@ -34,6 +34,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
@@ -48,7 +49,6 @@ public class DetectionPipelineJob implements Job {
   private DetectionConfigManager detectionDAO = DAORegistry.getInstance().getDetectionConfigManager();
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final long DETECTION_TASK_TIMEOUT = TimeUnit.DAYS.toMillis(1);
-  private static final long DETECTION_TASK_MAX_LOOKBACK_WINDOW = TimeUnit.DAYS.toMillis(7);
 
   @Override
   public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
@@ -58,7 +58,7 @@ public class DetectionPipelineJob implements Job {
 
     // Make sure start time is not out of DETECTION_TASK_MAX_LOOKBACK_WINDOW
     long end = System.currentTimeMillis();
-    long start = Math.max(configDTO.getLastTimestamp(), end  - DETECTION_TASK_MAX_LOOKBACK_WINDOW);
+    long start = Math.max(configDTO.getLastTimestamp(), end  - ThirdEyeUtils.DETECTION_TASK_MAX_LOOKBACK_WINDOW);
     DetectionPipelineTaskInfo taskInfo = new DetectionPipelineTaskInfo(configDTO.getId(), start, end);
 
     String jobName = String.format("%s_%d", TaskConstants.TaskType.DETECTION, id);

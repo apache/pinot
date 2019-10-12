@@ -24,6 +24,7 @@ import org.apache.pinot.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
 import org.apache.pinot.thirdeye.anomaly.classification.ClassificationJobScheduler;
 import org.apache.pinot.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
 import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobScheduler;
+import org.apache.pinot.thirdeye.anomaly.detection.trigger.DataAvailabilityEventListenerDriver;
 import org.apache.pinot.thirdeye.anomaly.events.HolidayEventResource;
 import org.apache.pinot.thirdeye.anomaly.events.HolidayEventsLoader;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorJobScheduler;
@@ -73,6 +74,7 @@ public class ThirdEyeAnomalyApplication
   private RequestStatisticsLogger requestStatisticsLogger = null;
   private DetectionPipelineScheduler detectionPipelineScheduler = null;
   private DetectionAlertScheduler detectionAlertScheduler = null;
+  private DataAvailabilityEventListenerDriver dataAvailabilityEventListenerDriver = null;
 
   public static void main(final String[] args) throws Exception {
     List<String> argList = new ArrayList<>(Arrays.asList(args));
@@ -183,6 +185,10 @@ public class ThirdEyeAnomalyApplication
           detectionAlertScheduler = new DetectionAlertScheduler();
           detectionAlertScheduler.start();
         }
+        if (config.isTriggerEventListener()) {
+          dataAvailabilityEventListenerDriver = new DataAvailabilityEventListenerDriver(config.getDataAvailabilityListenerConfiguration());
+          dataAvailabilityEventListenerDriver.start();
+        }
       }
 
       @Override
@@ -216,6 +222,9 @@ public class ThirdEyeAnomalyApplication
         }
         if (detectionPipelineScheduler != null) {
           detectionPipelineScheduler.shutdown();
+        }
+        if (dataAvailabilityEventListenerDriver != null) {
+          dataAvailabilityEventListenerDriver.shutdown();
         }
       }
     });

@@ -120,6 +120,7 @@ create table if not exists dataset_config_index (
     display_name varchar(200),
     active boolean,
     requires_completeness_check boolean,
+    last_refresh_time bigint(20) default 0,
     base_id bigint(20) not null,
     create_time timestamp,
     update_time timestamp default current_timestamp,
@@ -131,6 +132,7 @@ create index dataset_config_active_idx on dataset_config_index(active);
 create index dataset_config_requires_completeness_check_idx on dataset_config_index(requires_completeness_check);
 create index dataset_config_base_id_idx ON dataset_config_index(base_id);
 create index dataset_config_display_name_idx on dataset_config_index(display_name);
+create index dataset_config_last_refresh_time_idx on dataset_config_index(last_refresh_time);
 
 create table if not exists metric_config_index (
     name varchar(200) not null,
