@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.plan;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -32,6 +31,7 @@ import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,58 +60,65 @@ public class TransformPlanNode implements PlanNode {
    */
   private void extractColumnsAndTransforms(BrokerRequest brokerRequest, IndexSegment indexSegment) {
     if (brokerRequest.isSetAggregationsInfo()) {
+      // Extract aggregation expressions
       for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
         if (aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
-          // handle DISTINCT (col1, col2 ...) as an aggregate function
-          String multiColumnExpression = AggregationFunctionUtils.getColumn(aggregationInfo);
-          String[] distinctColumnExpressions =
-              multiColumnExpression.split(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR);
-          for (String distinctColumnExpr : distinctColumnExpressions) {
-            TransformExpressionTree transformExpressionTree =
-                TransformExpressionTree.compileToExpressionTree(distinctColumnExpr);
-            transformExpressionTree.getColumns(_projectionColumns);
-            _expressions.add(transformExpressionTree);
+          // 'DISTINCT(col1, col2 ...)' is modeled as one single aggregation function
+          String[] distinctColumns = AggregationFunctionUtils.getColumn(aggregationInfo)
+              .split(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR);
+          for (String column : distinctColumns) {
+            addExpressionColumn(column);
           }
         } else if (!aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-          // handle all other aggregate functions (except count(*))
-          String expression = AggregationFunctionUtils.getColumn(aggregationInfo);
-          TransformExpressionTree transformExpressionTree = TransformExpressionTree.compileToExpressionTree(expression);
-          transformExpressionTree.getColumns(_projectionColumns);
-          _expressions.add(transformExpressionTree);
+          addExpressionColumn(AggregationFunctionUtils.getColumn(aggregationInfo));
         }
       }
 
-      // Process all group-by expressions
+      // Extract group-by expressions
       if (brokerRequest.isSetGroupBy()) {
-        for (String expression : brokerRequest.getGroupBy().getExpressions()) {
-          TransformExpressionTree transformExpressionTree = TransformExpressionTree.compileToExpressionTree(expression);
-          transformExpressionTree.getColumns(_projectionColumns);
-          _expressions.add(transformExpressionTree);
+        for (String column : brokerRequest.getGroupBy().getExpressions()) {
+          addExpressionColumn(column);
         }
       }
     } else {
       Selection selection = brokerRequest.getSelections();
-      List<String> columns = selection.getSelectionColumns();
-      if (columns.size() == 1 && columns.get(0).equals("*")) {
-        columns = new ArrayList<>(indexSegment.getPhysicalColumnNames());
-      }
-      List<SelectionSort> sortSequence = selection.getSelectionSortSequence();
-      if (sortSequence == null) {
-        // For selection only queries, select minimum number of documents. Fetch at least 1 document per
-        // DocIdSetPlanNode's requirement.
-        // TODO: Skip the filtering phase and document fetching for LIMIT 0 case
-        _maxDocPerNextCall = Math.max(Math.min(selection.getSize(), _maxDocPerNextCall), 1);
+
+      // Extract selection expressions
+      List<String> selectionColumns = selection.getSelectionColumns();
+      if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
+        for (String column : indexSegment.getPhysicalColumnNames()) {
+          _projectionColumns.add(column);
+          _expressions.add(new TransformExpressionTree(new IdentifierAstNode(column)));
+        }
       } else {
-        for (SelectionSort selectionSort : sortSequence) {
-          columns.add(selectionSort.getColumn());
+        for (String column : selectionColumns) {
+          addExpressionColumn(column);
         }
       }
-      for (String column : columns) {
-        TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(column);
-        expression.getColumns(_projectionColumns);
-        _expressions.add(expression);
+
+      // Extract order-by expressions and update maxDocPerNextCall
+      if (selection.getSize() > 0) {
+        List<SelectionSort> sortSequence = selection.getSelectionSortSequence();
+        if (sortSequence == null) {
+          // For selection only queries, select minimum number of documents
+          _maxDocPerNextCall = Math.min(selection.getSize(), _maxDocPerNextCall);
+        } else {
+          for (SelectionSort selectionSort : sortSequence) {
+            addExpressionColumn(selectionSort.getColumn());
+          }
+        }
+      } else {
+        // For LIMIT 0 queries, fetch at least 1 document per DocIdSetPlanNode's requirement
+        // TODO: Skip the filtering phase and document fetching for LIMIT 0 case
+        _maxDocPerNextCall = 1;
       }
     }
+  }
+
+  private void addExpressionColumn(String column) {
+    TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(column);
+    expression.getColumns(_projectionColumns);
+    _expressions.add(expression);
   }
 
   @Override
