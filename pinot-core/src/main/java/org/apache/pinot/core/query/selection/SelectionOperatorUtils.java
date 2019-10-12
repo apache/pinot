@@ -23,6 +23,7 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -42,6 +43,7 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.util.ArrayCopyUtils;
+import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 
 
 /**
@@ -106,15 +108,23 @@ public class SelectionOperatorUtils {
     }
 
     if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
+      // For 'SELECT *', sort all physical columns so that the order is deterministic
       selectionColumns = new ArrayList<>(indexSegment.getPhysicalColumnNames());
-      // Sort the columns so that the order is deterministic
       selectionColumns.sort(null);
-    }
 
-    for (String selectionColumn : selectionColumns) {
-      TransformExpressionTree selectionExpression = TransformExpressionTree.compileToExpressionTree(selectionColumn);
-      if (expressionSet.add(selectionExpression)) {
-        expressions.add(selectionExpression);
+      for (String selectionColumn : selectionColumns) {
+        TransformExpressionTree selectionExpression =
+            new TransformExpressionTree(new IdentifierAstNode(selectionColumn));
+        if (expressionSet.add(selectionExpression)) {
+          expressions.add(selectionExpression);
+        }
+      }
+    } else {
+      for (String selectionColumn : selectionColumns) {
+        TransformExpressionTree selectionExpression = TransformExpressionTree.compileToExpressionTree(selectionColumn);
+        if (expressionSet.add(selectionExpression)) {
+          expressions.add(selectionExpression);
+        }
       }
     }
 
@@ -167,6 +177,7 @@ public class SelectionOperatorUtils {
 
   /**
    * Merge two partial results for selection queries with <code>ORDER BY</code>. (Server side)
+   * TODO: Should use type compatible comparator to compare the rows
    *
    * @param mergedRows partial results 1.
    * @param rowsToMerge partial results 2.
@@ -566,6 +577,33 @@ public class SelectionOperatorUtils {
     } else if (queue.comparator().compare(queue.peek(), value) < 0) {
       queue.poll();
       queue.offer(value);
+    }
+  }
+
+  /**
+   * Helper class to compare rows.
+   */
+  public static class RowComparator implements Comparator<Serializable[]> {
+    private final int[] _valueIndices;
+    private final Comparator[] _valueComparators;
+
+    public RowComparator(int[] valueIndices, Comparator[] valueComparators) {
+      _valueIndices = valueIndices;
+      _valueComparators = valueComparators;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public int compare(Serializable[] o1, Serializable[] o2) {
+      int numValuesToCompare = _valueIndices.length;
+      for (int i = 0; i < numValuesToCompare; i++) {
+        int valueIndex = _valueIndices[i];
+        int result = _valueComparators[i].compare(o1[valueIndex], o2[valueIndex]);
+        if (result != 0) {
+          return result;
+        }
+      }
+      return 0;
     }
   }
 }
