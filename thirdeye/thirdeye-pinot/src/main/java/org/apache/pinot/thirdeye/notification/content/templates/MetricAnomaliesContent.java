@@ -31,7 +31,6 @@ import org.apache.pinot.thirdeye.anomaly.alert.util.AlertScreenshotHelper;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
-import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -54,7 +53,6 @@ import org.slf4j.LoggerFactory;
 public class MetricAnomaliesContent extends BaseNotificationContent {
   private static final Logger LOG = LoggerFactory.getLogger(MetricAnomaliesContent.class);
 
-  private static final String TEMPLATE = "metric-anomalies-template.ftl";
   private DetectionConfigManager configDAO = null;
 
   public MetricAnomaliesContent() {}
@@ -67,7 +65,7 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
 
   @Override
   public String getTemplate() {
-    return TEMPLATE;
+    return MetricAnomaliesContent.class.getSimpleName();
   }
 
   @Override
@@ -178,7 +176,7 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
     if (anomalyDetails.size() == 1) {
       AnomalyReportEntity singleAnomaly = anomalyDetails.get(0);
       try {
-        imgPath = AlertScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), thirdEyeAnomalyConfig);
+        this.imgPath = AlertScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), thirdEyeAnomalyConfig);
       } catch (Exception e) {
         LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
       }

@@ -19,19 +19,66 @@
 
 package org.apache.pinot.thirdeye.detection.alert.scheme;
 
+import java.util.Comparator;
+import java.util.Properties;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
+import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
+import org.apache.pinot.thirdeye.notification.content.templates.EntityGroupKeyContent;
+import org.apache.pinot.thirdeye.notification.content.templates.MetricAnomaliesContent;
+import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public abstract class DetectionAlertScheme {
+  private static final Logger LOG = LoggerFactory.getLogger(DetectionAlertScheme.class);
 
-  protected final DetectionAlertConfigDTO config;
+  protected final ADContentFormatterContext adContext;
   protected final DetectionAlertFilterResult result;
 
-  public DetectionAlertScheme(DetectionAlertConfigDTO config, DetectionAlertFilterResult result) {
-    this.config = config;
+  public static final String PROP_TEMPLATE = "template";
+
+  protected static final Comparator<AnomalyResult> COMPARATOR_DESC =
+      (o1, o2) -> -1 * Long.compare(o1.getStartTime(), o2.getStartTime());
+
+  public enum AlertTemplate {
+    DEFAULT_EMAIL,
+    ENTITY_GROUPBY_REPORT
+  }
+
+  public DetectionAlertScheme(ADContentFormatterContext adContext, DetectionAlertFilterResult result) {
+    this.adContext = adContext;
     this.result = result;
   }
 
   public abstract void run() throws Exception;
+
+  /**
+   * Plug the appropriate template based on configuration.
+   */
+  public static BaseNotificationContent buildNotificationContent(Properties alertSchemeClientConfigs) {
+    AlertTemplate template = AlertTemplate.DEFAULT_EMAIL;
+    if (alertSchemeClientConfigs != null && alertSchemeClientConfigs.containsKey(PROP_TEMPLATE)) {
+      template = AlertTemplate.valueOf(alertSchemeClientConfigs.get(PROP_TEMPLATE).toString());
+    }
+
+    BaseNotificationContent content;
+    switch (template) {
+      case DEFAULT_EMAIL:
+        content = new MetricAnomaliesContent();
+        break;
+
+      case ENTITY_GROUPBY_REPORT:
+        content =  new EntityGroupKeyContent();
+        break;
+
+      default:
+        throw new IllegalArgumentException(String.format("Unknown email template '%s'", template));
+    }
+
+    LOG.info("Using " + content.getClass().getSimpleName() + " to render the template.");
+    return content;
+  }
 }

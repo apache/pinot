@@ -142,8 +142,10 @@ public abstract class BaseNotificationContent implements NotificationContent {
   /**
    * Generate subject based on configuration.
    */
-  public static String makeSubject(String baseSubject, AlertConfigBean.SubjectType type, Map<String, Object> templateData) {
-    switch (type) {
+  public static String makeSubject(AlertConfigBean.SubjectType subjectType, DetectionAlertConfigDTO notificationConfig, Map<String, Object> templateData) {
+    String baseSubject = "Thirdeye Alert : " + notificationConfig.getName();
+
+    switch (subjectType) {
       case ALERT:
         return baseSubject;
 
@@ -154,7 +156,7 @@ public abstract class BaseNotificationContent implements NotificationContent {
         return baseSubject + " - " + templateData.get("datasets");
 
       default:
-        throw new IllegalArgumentException(String.format("Unknown type '%s'", type));
+        throw new IllegalArgumentException(String.format("Unknown type '%s'", notificationConfig.getSubjectType()));
     }
   }
 

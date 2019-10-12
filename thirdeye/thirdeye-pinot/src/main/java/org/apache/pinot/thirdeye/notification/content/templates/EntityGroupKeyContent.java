@@ -36,7 +36,6 @@ import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.alert.util.AlertScreenshotHelper;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
-import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
@@ -54,8 +53,6 @@ import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfi
  */
 public class EntityGroupKeyContent extends BaseNotificationContent {
   private static final Logger LOG = LoggerFactory.getLogger(EntityGroupKeyContent.class);
-
-  private static final String TEMPLATE = "entity-groupkey-anomaly-report.ftl";
 
   // Give some kind of special status to this metric entity. Anomalies from this whitelisted metric entity
   // will appear at the top of the alert report. Specify the entity name of the metric alert here.
@@ -91,7 +88,7 @@ public class EntityGroupKeyContent extends BaseNotificationContent {
 
   @Override
   public String getTemplate() {
-    return TEMPLATE;
+    return EntityGroupKeyContent.class.getSimpleName();
   }
 
   @Override
@@ -127,7 +124,7 @@ public class EntityGroupKeyContent extends BaseNotificationContent {
     if (whitelistMetricToAnomaliesMap.size() == 1 && whitelistMetricToAnomaliesMap.values().size() == 1) {
       AnomalyReportEntity singleAnomaly = whitelistMetricToAnomaliesMap.values().iterator().next();
       try {
-        imgPath = AlertScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), thirdEyeAnomalyConfig);
+        this.imgPath = AlertScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), thirdEyeAnomalyConfig);
       } catch (Exception e) {
         LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
       }

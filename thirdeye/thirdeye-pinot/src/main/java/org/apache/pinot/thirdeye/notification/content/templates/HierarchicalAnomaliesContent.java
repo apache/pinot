@@ -67,7 +67,6 @@ public class HierarchicalAnomaliesContent extends BaseNotificationContent {
 
   private static final String PRESENT_SEASONAL_VALUES = "presentSeasonalValues";
   private static final String DEFAULT_PRESENT_SEASONAL_VALUES = "false";
-  private static final String TEMPLATE = "hierarchical-anomalies-email-template.ftl";
 
   private boolean presentSeasonalValues;
   private Set<EventDTO> relatedEvents;
@@ -83,7 +82,7 @@ public class HierarchicalAnomaliesContent extends BaseNotificationContent {
 
   @Override
   public String getTemplate() {
-    return TEMPLATE;
+    return HierarchicalAnomaliesContent.class.getSimpleName();
   }
 
   @Override
