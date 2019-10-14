@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.selection;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -89,32 +90,32 @@ public class SelectionOperatorService {
    * @return flexible {@link Comparator} for selection rows.
    */
   private Comparator<Serializable[]> getTypeCompatibleComparator() {
-    return (o1, o2) -> {
-      int numOrderByExpressions = _sortSequence.size();
-      for (int i = 0; i < numOrderByExpressions; i++) {
-        Serializable v1 = o1[i];
-        Serializable v2 = o2[i];
-
-        int result;
-        // Only compare single-value columns
-        if (v1 instanceof Number) {
-          result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
-        } else if (v1 instanceof String) {
-          result = ((String) v1).compareTo((String) v2);
-        } else {
-          continue;
-        }
-
-        if (result != 0) {
-          if (_sortSequence.get(i).isIsAsc()) {
-            return -result;
-          } else {
-            return result;
-          }
-        }
+    // Compare all single-value columns
+    int numOrderByExpressions = _sortSequence.size();
+    List<Integer> valueIndexList = new ArrayList<>(numOrderByExpressions);
+    for (int i = 0; i < numOrderByExpressions; i++) {
+      if (!_dataSchema.getColumnDataType(i).isArray()) {
+        valueIndexList.add(i);
       }
-      return 0;
-    };
+    }
+
+    int numValuesToCompare = valueIndexList.size();
+    int[] valueIndices = new int[numValuesToCompare];
+    Comparator[] valueComparators = new Comparator[numValuesToCompare];
+    for (int i = 0; i < numValuesToCompare; i++) {
+      int valueIndex = valueIndexList.get(i);
+      valueIndices[i] = valueIndex;
+      if (_dataSchema.getColumnDataType(i).isNumber()) {
+        valueComparators[i] = Comparator.comparingDouble(Number::doubleValue);
+      } else {
+        valueComparators[i] = Comparator.naturalOrder();
+      }
+      if (_sortSequence.get(valueIndex).isIsAsc()) {
+        valueComparators[i] = valueComparators[i].reversed();
+      }
+    }
+
+    return new SelectionOperatorUtils.RowComparator(valueIndices, valueComparators);
   }
 
   /**
