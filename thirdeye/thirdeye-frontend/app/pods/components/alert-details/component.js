@@ -62,7 +62,11 @@ export default Component.extend({
   showDetails: false,
   componentId: 'timeseries-chart',
   anomaliesOld: [],
+  // flag for knowing the state of old anomalies, needed since there may be no anomalies
+  anomaliesOldSet: false,
   anomaliesNew: [],
+  // flag for knowing the state of old anomalies, needed since there may be no anomalies
+  anomaliesNewSet: false,
   selectedBaseline: null,
   pageSize: 10,
   currentPage: 1,
@@ -262,17 +266,17 @@ export default Component.extend({
    */
   stateOfAnomaliesAndTimeSeries: computed(
     'isPreviewMode',
-    'anomaliesOld',
-    'anomaliesNew',
+    'anomaliesOldSet',
+    'anomaliesNewSet',
     'isEditMode',
     'getAnomaliesError',
     function() {
       let state = 1;
       if (this.get('isPreviewMode')) {
         // Not Alert Preview
-        if (!_.isEmpty(this.get('anomaliesOld'))) {
+        if ((this.get('anomaliesOldSet'))) {
           // At least one set of anomalies already loaded
-          if (this.get('isEditMode') || _.isEmpty(this.get('anomaliesNew'))) {
+          if (this.get('isEditMode') || !(this.get('anomaliesNewSet'))) {
             // replace new if Edit Alert Preview or it's Create Alert Preview with only one set
             state = 2;
           } else {
@@ -1066,7 +1070,7 @@ export default Component.extend({
 
     try {
       // in Edit Alert Preview, we want the original yaml used for comparisons
-      const content = (get(this, 'isEditMode') && _.isEmpty(get(this, 'anomaliesOld'))) ? get(this, 'originalYaml') : get(this, 'alertYaml');
+      const content = (get(this, 'isEditMode') && !(get(this, 'anomaliesOldSet'))) ? get(this, 'originalYaml') : get(this, 'alertYaml');
       return this.get('_getAnomalies').perform(content)
         .then(results => this._setAnomaliesAndTimeSeries(results))
         .then(() => {
@@ -1100,6 +1104,7 @@ export default Component.extend({
       case 1:
         this.setProperties({
           anomaliesOld: results.anomalies,
+          anomaliesOldSet: true,
           uniqueTimeSeries: results.uniqueTimeSeries,
           isLoading: false
         });
@@ -1107,6 +1112,7 @@ export default Component.extend({
       case 2:
         this.setProperties({
           anomaliesNew: results.anomalies,
+          anomaliesNewSet: true,
           uniqueTimeSeries: results.uniqueTimeSeries,
           isLoading: false
         });
@@ -1115,6 +1121,7 @@ export default Component.extend({
         set(this, 'anomaliesOld', this.get('anomaliesNew'));
         this.setProperties({
           anomaliesNew: results.anomalies,
+          anomaliesNewSet: true,
           uniqueTimeSeries: results.uniqueTimeSeries,
           isLoading: false
         });
@@ -1122,7 +1129,9 @@ export default Component.extend({
       case 4:
         this.setProperties({
           anomaliesOld: results.anomalies,
-          anomaliesNew: []
+          anomaliesOldSet: true,
+          anomaliesNew: [],
+          anomaliesNewSet: false
         });
         this._fetchAnomalies();
         break;
@@ -1283,7 +1292,9 @@ export default Component.extend({
         if (get(this, 'isPreviewMode')) {
           this.setProperties({
             anomaliesOld: [],
-            anomaliesNew: []
+            anomaliesOldSet: false,
+            anomaliesNew: [],
+            anomaliesNewSet: false
           });
         }
         this._fetchAnomalies();
