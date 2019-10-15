@@ -79,10 +79,6 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
 
   REQUEST_DROPPED_DUE_TO_ACCESS_ERROR("requestsDropped", false),
 
-  // Number of queries served by LLC and HLC routing tables
-  LLC_QUERY_COUNT("queries", false),
-  HLC_QUERY_COUNT("queries", false),
-
   ROUTING_TABLE_REBUILD_FAILURES("failures", false),
 
   GROUP_BY_SIZE("queries", false),
