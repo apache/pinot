@@ -106,7 +106,13 @@ public class DetectionAlertJob implements Job {
 
   /**
    * Check if we need to create a notification task.
-   * If there is no anomaly generated between last notification time till now then no need to create this task.
+   * If there is no anomaly generated (by looking at anomaly start_time) between last notification time
+   * till now (left inclusive, right exclusive) then no need to create this task.
+   *
+   * The reason we use start_time is end_time is not accurate due to anomaly merge.
+   * The timestamp stored in vectorLock is anomaly end_time, which should be fine.
+   * For example, if previous anomaly is from t1 to t2, then the timestamp in vectorLock is t2.
+   * If there is a new anomaly generated from t2 to t3 then we can still get this anomaly.
    *
    * @param configDTO The DetectionAlert Configuration.
    * @return true if it needs notification task. false otherwise.
