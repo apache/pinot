@@ -26,7 +26,6 @@ import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.zip.Adler32;
@@ -89,7 +88,7 @@ public class CrcUtils {
       }
     }
     long crc = checksum.getValue();
-    LOGGER.info("Computed crc = {}, based on files {}", crc, Arrays.toString(_files.toArray()));
+    LOGGER.info("Computed crc = {}, based on files {}", crc, _files);
     return crc;
   }
 
@@ -107,7 +106,7 @@ public class CrcUtils {
       }
     }
     String md5Value = toHexaDecimal(digest.digest());
-    LOGGER.info("Computed MD5 = {}, based on files {}", md5Value, Arrays.toString(_files.toArray()));
+    LOGGER.info("Computed MD5 = {}, based on files {}", md5Value, _files);
     return md5Value;
   }
 
