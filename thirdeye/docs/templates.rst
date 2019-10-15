@@ -117,7 +117,7 @@ Example of multiple rules:
      
     - detection:
       - name: detection_rule_3
-        type: HOLT_WINTERS
+        type: HOLT_WINTERS_RULE
         params:
           sensitivity: 5
 
