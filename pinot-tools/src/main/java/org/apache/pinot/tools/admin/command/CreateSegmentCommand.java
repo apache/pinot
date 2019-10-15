@@ -448,20 +448,20 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   }
 
   private boolean verifySegment(File indexDir) {
-    File localTempDir = FileUtils.getTempDirectory();
+    File localTempDir = new File(FileUtils.getTempDirectory(), org.apache.pinot.common.utils.FileUtils.getRandomFileName());
     try {
       try {
         localTempDir.getParentFile().mkdirs();
         FileSystem.get(URI.create(indexDir.toString()), new Configuration())
             .copyToLocalFile(new Path(indexDir.toString()), new Path(localTempDir.toString()));
       } catch (IOException e) {
-        LOGGER.error("Failed to copy segment {} to local directory for verification.", indexDir, e);
+        LOGGER.error("Failed to copy segment {} to local directory {} for verification.", indexDir, localTempDir, e);
         return false;
       }
       try {
         ImmutableSegment segment = ImmutableSegmentLoader.load(localTempDir, ReadMode.mmap);
-        LOGGER.info("Successfully loaded Pinot segment {} (size: {} Bytes).", segment.getSegmentName(),
-            segment.getSegmentSizeBytes());
+        LOGGER.info("Successfully loaded Pinot segment {} (size: {} Bytes) from {}.", segment.getSegmentName(),
+            segment.getSegmentSizeBytes(), localTempDir);
         segment.destroy();
       } catch (Exception e) {
         LOGGER.error("Failed to load segment from {}.", localTempDir, e);

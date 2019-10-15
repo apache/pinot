@@ -26,6 +26,7 @@ import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.zip.Adler32;
@@ -63,6 +64,7 @@ public class CrcUtils {
     Preconditions.checkNotNull(files);
     for (File file : files) {
       if (file.isFile()) {
+        // Certain file systems, e.g. HDFS will create .crc files when perform data copy.
         // We should ignore both SEGMENT_CREATION_META and generated '.crc' files.
         if (!file.getName().equals(V1Constants.SEGMENT_CREATION_META) && !file.getName().endsWith(CRC_FILE_EXTENSTION)) {
           normalFiles.add(file);
@@ -87,7 +89,7 @@ public class CrcUtils {
       }
     }
     long crc = checksum.getValue();
-    LOGGER.info("Computed crc = {}", crc);
+    LOGGER.info("Computed crc = {}, based on files {}", crc, Arrays.toString(_files.toArray()));
     return crc;
   }
 
@@ -105,7 +107,7 @@ public class CrcUtils {
       }
     }
     String md5Value = toHexaDecimal(digest.digest());
-    LOGGER.info("Computed MD5 = {}", md5Value);
+    LOGGER.info("Computed MD5 = {}, based on files {}", md5Value, Arrays.toString(_files.toArray()));
     return md5Value;
   }
 
