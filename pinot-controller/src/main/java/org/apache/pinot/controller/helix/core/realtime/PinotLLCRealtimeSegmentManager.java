@@ -199,6 +199,7 @@ public class PinotLLCRealtimeSegmentManager {
     // Make sure all the existing segments are HLC segments
     List<String> currentSegments = getAllSegments(realtimeTableName);
     for (String segmentName : currentSegments) {
+      // TODO: Should return 4xx HTTP status code. Currently all exceptions are returning 500
       Preconditions.checkState(SegmentName.isHighLevelConsumerSegmentName(segmentName),
           "Cannot set up new LLC table: %s with existing non-HLC segment: %s", realtimeTableName, segmentName);
     }
@@ -762,7 +763,13 @@ public class PinotLLCRealtimeSegmentManager {
   boolean isExceededMaxSegmentCompletionTime(String realtimeTableName, String segmentName, long currentTimeMs) {
     Stat stat = new Stat();
     getSegmentZKMetadata(realtimeTableName, segmentName, stat);
-    return currentTimeMs > stat.getMtime() + MAX_SEGMENT_COMPLETION_TIME_MILLIS;
+    if (currentTimeMs > stat.getMtime() + MAX_SEGMENT_COMPLETION_TIME_MILLIS) {
+      LOGGER.info("Segment: {} exceeds the max completion time: {}ms, metadata update time: {}, current time: {}",
+          segmentName, MAX_SEGMENT_COMPLETION_TIME_MILLIS, stat.getMtime(), currentTimeMs);
+      return true;
+    } else {
+      return false;
+    }
   }
 
   private boolean isAllInstancesInState(Map<String, String> instanceStateMap, String state) {
@@ -890,6 +897,10 @@ public class PinotLLCRealtimeSegmentManager {
             updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, newSegmentName, segmentAssignment,
                 instancePartitionsMap);
           } else {
+            // If we get here, that means in IdealState, the latest segment has no CONSUMING replicas, but has replicas
+            // not OFFLINE. That is an unexpected state which cannot be fixed by the validation manager currently. In
+            // that case, we need to either extend this part to handle the state, or prevent segments from getting into
+            // such state.
             LOGGER.error("Got unexpected instance state map: {} for segment: {}", instanceStateMap, latestSegmentName);
           }
         }

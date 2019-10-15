@@ -31,6 +31,8 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
 
+// TODO: In SegmentSizeBasedFlushThresholdUpdater, timeConsumed is calculated based on System.currentTimeMillis(). Mock
+//       the time if necessary.
 public class FlushThresholdUpdaterTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);

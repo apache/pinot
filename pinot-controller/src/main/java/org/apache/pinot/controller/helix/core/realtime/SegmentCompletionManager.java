@@ -975,7 +975,7 @@ public class SegmentCompletionManager {
         _segmentManager.segmentStoppedConsuming(_segmentName, instanceId);
       } catch (Exception e) {
         LOGGER.error("Caught exception while processing stopped CONSUMING segment: {} on instance: {}",
-            _segmentName.getSegmentName(), instanceId);
+            _segmentName.getSegmentName(), instanceId, e);
         return SegmentCompletionProtocol.RESP_FAILED;
       }
       return SegmentCompletionProtocol.RESP_PROCESSED;
@@ -1037,7 +1037,8 @@ public class SegmentCompletionManager {
         try {
           _segmentManager.commitSegmentFile(_realtimeTableName, committingSegmentDescriptor);
         } catch (Exception e) {
-          LOGGER.error("Caught exception while committing segment file for segment: {}", _segmentName.getSegmentName());
+          LOGGER.error("Caught exception while committing segment file for segment: {}", _segmentName.getSegmentName(),
+              e);
           return SegmentCompletionProtocol.RESP_FAILED;
         }
       }
@@ -1045,7 +1046,8 @@ public class SegmentCompletionManager {
         _segmentManager.commitSegmentMetadata(_realtimeTableName, committingSegmentDescriptor);
       } catch (Exception e) {
         LOGGER
-            .error("Caught exception while committing segment metadata for segment: {}", _segmentName.getSegmentName());
+            .error("Caught exception while committing segment metadata for segment: {}", _segmentName.getSegmentName(),
+                e);
         return SegmentCompletionProtocol.RESP_FAILED;
       }
 
