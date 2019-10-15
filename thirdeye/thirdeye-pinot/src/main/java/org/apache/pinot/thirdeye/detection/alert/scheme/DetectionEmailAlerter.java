@@ -202,14 +202,16 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
         anomalyResultListOfGroup.sort(COMPARATOR_DESC);
 
         if (emailClientConfigs.get(PROP_RECIPIENTS) != null) {
-          Map<String, Set<String>> emailRecipients = (Map<String, Set<String>>) emailClientConfigs.get(PROP_RECIPIENTS);
+          Map<String, List<String>> emailRecipients = (Map<String, List<String>>) emailClientConfigs.get(PROP_RECIPIENTS);
           if (emailRecipients.get(PROP_TO) == null || emailRecipients.get(PROP_TO).isEmpty()) {
             LOG.warn("Skipping! No email recipients found for alert {}.", this.adContext.getNotificationConfig().getId());
             return;
           }
 
-          DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(emailRecipients.get(PROP_TO),
-              emailRecipients.get(PROP_CC), emailRecipients.get(PROP_BCC));
+          DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
+              new HashSet<>(emailRecipients.get(PROP_TO)),
+              new HashSet<>(emailRecipients.get(PROP_CC)),
+              new HashSet<>(emailRecipients.get(PROP_BCC)));
           sendEmail(emailClientConfigs, anomalyResultListOfGroup, recipients);
         }
       } catch (IllegalArgumentException e) {

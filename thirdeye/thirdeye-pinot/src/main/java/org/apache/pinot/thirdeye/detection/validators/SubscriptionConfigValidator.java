@@ -68,12 +68,6 @@ public class SubscriptionConfigValidator implements ConfigValidator<DetectionAle
     Preconditions.checkArgument((alertConfig.getAlertSchemes() != null && !alertConfig.getAlertSchemes().isEmpty()),
         "Alert scheme cannot be left empty");
 
-    // At least one recipient must be specified
-    Map<String, Object> recipients = ConfigUtils.getMap(alertConfig.getProperties().get(PROP_RECIPIENTS));
-    Preconditions.checkArgument((!recipients.isEmpty() && !ConfigUtils.getList(recipients.get("to")).isEmpty()),
-        "Please specify at least one recipient in the notification group. If you wish to unsubscribe, set"
-            + " active to false.");
-
     // Properties cannot be empty
     Preconditions.checkArgument((alertConfig.getProperties() != null && !alertConfig.getProperties().isEmpty()),
         "Alert properties cannot be left empty. Please specify the recipients, subscribed detections, and"
