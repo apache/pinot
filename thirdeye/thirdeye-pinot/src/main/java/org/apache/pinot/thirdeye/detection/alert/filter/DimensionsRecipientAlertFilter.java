@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection.alert.filter;
 
+import com.google.common.collect.Multimap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -33,6 +34,7 @@ import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotificatio
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.apache.pinot.thirdeye.detection.alert.StatefulDetectionAlertFilter;
 import org.apache.pinot.thirdeye.detection.annotation.AlertFilter;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 
 
 /**
@@ -96,7 +98,8 @@ public class DimensionsRecipientAlertFilter extends StatefulDetectionAlertFilter
       Map<String, String> dimensionFilters = ConfigUtils.getMap(dimensionRecipient.get(PROP_DIMENSION));
       Set<MergedAnomalyResultDTO> notifyAnomalies = new HashSet<>();
       for (MergedAnomalyResultDTO anomaly : anomalies) {
-        if (anomaly.getDimensions().contains(dimensionFilters)) {
+        Multimap<String, String> anamolousDims = MetricEntity.fromURN(anomaly.getMetricUrn()).getFilters();
+        if (anamolousDims.entries().containsAll(dimensionFilters.entrySet())) {
           notifyAnomalies.add(anomaly);
         }
       }

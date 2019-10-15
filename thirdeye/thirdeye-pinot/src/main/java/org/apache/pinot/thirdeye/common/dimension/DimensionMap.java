@@ -47,6 +47,7 @@ import org.slf4j.LoggerFactory;
  * converting to/from Json string in Map format, i.e., instead of storing {"sortedDimensionMap":{"country":"US",
  * "page_name":"front_page"}}, we only need to store {"country":"US","page_name":"front_page"}.
  */
+@Deprecated
 public class DimensionMap implements SortedMap<String, String>, Comparable<DimensionMap>, Serializable {
   private static final Logger LOG = LoggerFactory.getLogger(DimensionMap.class);
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();

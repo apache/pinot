@@ -136,10 +136,17 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
     this.endTime = endTime;
   }
 
+  /**
+   * DimensionMap class is deprecated.
+   *
+   * Please use MetricEntity.fromURN(anomaly.getMetricUrn()).getFilters()
+   */
+  @Deprecated
   public DimensionMap getDimensions() {
     return dimensions;
   }
 
+  @Deprecated
   public void setDimensions(DimensionMap dimensions) {
     this.dimensions = dimensions;
   }
