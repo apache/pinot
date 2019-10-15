@@ -85,10 +85,10 @@ public class CrcUtils {
           checksum.update(buffer, 0, len);
         }
       }
-      LOGGER.info("Current file = {}, computed crc = {}", file, checksum.getValue());
     }
-
-    return checksum.getValue();
+    long crc = checksum.getValue();
+    LOGGER.info("Computed crc = {}", crc);
+    return crc;
   }
 
   public String computeMD5()
@@ -104,8 +104,9 @@ public class CrcUtils {
         }
       }
     }
-
-    return toHexaDecimal(digest.digest());
+    String md5Value = toHexaDecimal(digest.digest());
+    LOGGER.info("Computed MD5 = {}", md5Value);
+    return md5Value;
   }
 
   public static String toHexaDecimal(byte[] bytesToConvert) {

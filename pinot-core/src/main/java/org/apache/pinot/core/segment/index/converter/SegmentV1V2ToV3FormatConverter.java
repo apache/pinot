@@ -200,9 +200,9 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
       ColumnIndexType indexType)
       throws IOException {
     PinotDataBuffer oldBuffer = reader.getIndexFor(column, indexType);
-    PinotDataBuffer newBuffer = writer.newIndexFor(column, indexType, oldBuffer.size());
-    oldBuffer.copyTo(0, newBuffer, 0, oldBuffer.size());
-    newBuffer.flush();
+    long oldBufferSize = oldBuffer.size();
+    PinotDataBuffer newBuffer = writer.newIndexFor(column, indexType, oldBufferSize);
+    oldBuffer.copyTo(0, newBuffer, 0, oldBufferSize);
   }
 
   private void createMetadataFile(File currentDir, File v3Dir)
