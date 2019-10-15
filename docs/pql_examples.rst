@@ -295,3 +295,41 @@ will be the same as the combining results from the following queries:
     TOP 50
 
 where we don't put the results for the same group together.
+
+
+* We are beginning work on standard sql support. As a first step, we have introduced ``ORDER BY``. 
+
+In order to use ``ORDER BY`` certain options need to be set in the request json payload:
+
+1. ``groupByMode`` - Setting this to ``sql`` will take the code path of standard sql, and hence accept ``ORDER BY``. By default, this is ``pql``
+
+.. code-block:: json
+
+  { 
+    "pql" : "SELECT COUNT(*) from myTable GROUP BY foo ORDER BY foo DESC TOP 100", 
+    "queryOptions" : "groupByMode=sql" 
+  }
+
+2. ``responseFormat`` - Setting this to ``sql`` will present results in the standard sql way i.e. tabular, with same keys across all aggregations. This only works when used in combination with ``groupByMode=sql``. By default, this is ``pql``
+
+.. code-block:: json
+
+  { 
+    "pql" : "SELECT SUM(foo), SUM(bar) from myTable GROUP BY moo ORDER BY SUM(bar) ASC, moo DESC TOP 10", 
+    "queryOptions" : "groupByMode=sql;responseFormat=sql"
+  }
+
+ResultTable looks as follows:
+
+.. code-block:: json
+
+  {
+    "resultTable": {
+      "columns":["moo", "SUM(foo)","SUM(bar)"],
+      "results":[["abc", 10, 100],
+                 ["pqr", 20, 200],
+                 ["efg", 20, 200],
+                 ["lmn", 30, 300]]
+  }
+
+These options are also available on the query console (checkboxes ``Group By Mode: SQL`` and ``Response Format: SQL``)
