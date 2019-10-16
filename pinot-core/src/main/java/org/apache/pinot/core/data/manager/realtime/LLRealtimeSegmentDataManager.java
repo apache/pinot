@@ -781,7 +781,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return true;
   }
 
-  private SegmentCompletionProtocol.Response commit(SegmentCompletionProtocol.Response response, boolean isSplitCommit) {
+  protected SegmentCompletionProtocol.Response commit(SegmentCompletionProtocol.Response response, boolean isSplitCommit) {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
 
     params.withSegmentName(_segmentNameStr).withOffset(_currentOffset).withNumRows(_numRowsConsumed)
