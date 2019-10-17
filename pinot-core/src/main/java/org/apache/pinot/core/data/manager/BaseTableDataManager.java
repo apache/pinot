@@ -23,7 +23,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -55,8 +55,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected Logger _logger;
 
   @Override
-  public void init(@Nonnull TableDataManagerConfig tableDataManagerConfig, @Nonnull String instanceId,
-      @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull ServerMetrics serverMetrics) {
+  public void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics) {
     LOGGER.info("Initializing table data manager for table: {}", tableDataManagerConfig.getTableName());
 
     _tableDataManagerConfig = tableDataManagerConfig;
@@ -108,7 +108,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * @param immutableSegment Immutable segment to add
    */
   @Override
-  public void addSegment(@Nonnull ImmutableSegment immutableSegment) {
+  public void addSegment(ImmutableSegment immutableSegment) {
     String segmentName = immutableSegment.getSegmentName();
     _logger.info("Adding immutable segment: {} to table: {}", segmentName, _tableNameWithType);
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.DOCUMENT_COUNT,
@@ -126,14 +126,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public void addSegment(@Nonnull File indexDir, @Nonnull IndexLoadingConfig indexLoadingConfig)
+  public void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public void addSegment(@Nonnull String segmentName, @Nonnull TableConfig tableConfig,
-      @Nonnull IndexLoadingConfig indexLoadingConfig)
+  public void addSegment(String segmentName, TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     throw new UnsupportedOperationException();
   }
@@ -145,7 +144,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * @param segmentName name of the segment to remove.
    */
   @Override
-  public void removeSegment(@Nonnull String segmentName) {
+  public void removeSegment(String segmentName) {
     _logger.info("Removing segment: {} from table: {}", segmentName, _tableNameWithType);
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.remove(segmentName);
     if (segmentDataManager != null) {
@@ -156,7 +155,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  @Nonnull
   @Override
   public List<SegmentDataManager> acquireAllSegments() {
     List<SegmentDataManager> segmentDataManagers = new ArrayList<>();
@@ -168,46 +166,37 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return segmentDataManagers;
   }
 
-  @Nonnull
   @Override
-  public List<SegmentDataManager> acquireSegments(@Nonnull List<String> segmentNames) {
+  public List<SegmentDataManager> acquireSegments(List<String> segmentNames) {
     List<SegmentDataManager> segmentDataManagers = new ArrayList<>();
     for (String segmentName : segmentNames) {
       SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
       if (segmentDataManager != null && segmentDataManager.increaseReferenceCount()) {
         segmentDataManagers.add(segmentDataManager);
-      } else {
-        handleMissingSegment(segmentName);
       }
     }
     return segmentDataManagers;
   }
 
+  @Nullable
   @Override
-  public SegmentDataManager acquireSegment(@Nonnull String segmentName) {
+  public SegmentDataManager acquireSegment(String segmentName) {
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager != null && segmentDataManager.increaseReferenceCount()) {
       return segmentDataManager;
     } else {
-      handleMissingSegment(segmentName);
       return null;
     }
   }
 
-  private void handleMissingSegment(String segmentName) {
-    // could not find segment
-    LOGGER.error("Could not find segment " + segmentName + " for table " + _tableNameWithType);
-    _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, 1);
-  }
-
   @Override
-  public void releaseSegment(@Nonnull SegmentDataManager segmentDataManager) {
+  public void releaseSegment(SegmentDataManager segmentDataManager) {
     if (segmentDataManager.decreaseReferenceCount()) {
       closeSegment(segmentDataManager);
     }
   }
 
-  private void closeSegment(@Nonnull SegmentDataManager segmentDataManager) {
+  private void closeSegment(SegmentDataManager segmentDataManager) {
     String segmentName = segmentDataManager.getSegmentName();
     _logger.info("Closing segment: {} of table: {}", segmentName, _tableNameWithType);
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, -1L);
@@ -218,7 +207,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _logger.info("Closed segment: {} of table: {}", segmentName, _tableNameWithType);
   }
 
-  @Nonnull
   @Override
   public String getTableName() {
     return _tableNameWithType;
