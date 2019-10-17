@@ -74,13 +74,11 @@ import org.testng.annotations.Test;
 
 public class TestTextSearchQueriesTest extends BaseQueriesTest {
 
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TextSearchQueryTest");
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TextSearchQueriesTest");
   private static final String TABLE_NAME = "MyTable";
   private static final String SEGMENT_NAME = TABLE_NAME + "_100000000_200000000";
   private static final String QUERY_LOG_TEXT_COL_NAME = "QUERY_LOG_TEXT_COL";
-  private static final String QUERY_LOG_STRING_COL_NAME = "QUERY_LOG_STRING_COL";
   private static final String SKILLS_TEXT_COL_NAME = "SKILLS_TEXT_COL";
-  private static final String SKILLS_STRING_COL_NAME = "SKILLS_STRING_COL";
   private static final String INT_COL_NAME = "INT_COL";
   private static final List<String> textSearchColumns = new ArrayList<>();
   private static final List<String> rawIndexCreationColumns = new ArrayList<>();
@@ -131,9 +129,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
   private void createPinotTableSchema() {
     _schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(QUERY_LOG_TEXT_COL_NAME, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(QUERY_LOG_STRING_COL_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(SKILLS_TEXT_COL_NAME, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(SKILLS_STRING_COL_NAME, FieldSpec.DataType.STRING)
         .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
   }
 
@@ -185,7 +181,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
       }
     }
 
-    // read the pql query log file and build dataset
+    // read the pql query log file (24k queries) and build dataset
     resourceUrl = getClass().getClassLoader().getResource("data/text_search_data/pql_query1.txt");
     File logFile = new File(resourceUrl.getFile());
     int counter = 0;
@@ -196,13 +192,10 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
         GenericRow row = new GenericRow();
         row.putField(INT_COL_NAME, INT_BASE_VALUE + counter);
         row.putField(QUERY_LOG_TEXT_COL_NAME, line);
-        row.putField(QUERY_LOG_STRING_COL_NAME, line);
         if (counter >= skillCount) {
           row.putField(SKILLS_TEXT_COL_NAME, "software engineering");
-          row.putField(SKILLS_STRING_COL_NAME, "software engineering");
         } else {
           row.putField(SKILLS_TEXT_COL_NAME, skills[counter]);
-          row.putField(SKILLS_STRING_COL_NAME, skills[counter]);
         }
         _rows.add(row);
         counter++;
@@ -212,7 +205,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testTextSearch() throws Exception {
-    // TEST: phrase query
+    // TEST 1: phrase query
     // search in QUERY_TEXT_COL to
     // look for documents where each document MUST contain phrase
     // "SELECT activity_id" as is.
@@ -224,7 +217,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(QUERY_LOG_TEXT_COL, '\"SELECT dimensionCol2\"')";
     testTextSearchAggregationQueryHelper(query, 11787);
 
-    // TEST: phrase query
+    // TEST 2: phrase query
     // search in QUERY_TEXT_LOG column to
     // look for documents where each document MUST
     // contain phrase "SELECT count" as is.
@@ -236,7 +229,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(QUERY_LOG_TEXT_COL, '\"SELECT count\"')";
     testTextSearchAggregationQueryHelper(query, 12363);
 
-    // TEST: phrase query
+    // TEST 3: phrase query
     // search in QUERY_LOG_TEXT_COL to
     // look for documents where each document MUST contain phrase
     // "GROUP BY" as is
@@ -248,7 +241,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(QUERY_LOG_TEXT_COL, '\"GROUP BY\"')";
     testTextSearchAggregationQueryHelper(query, 26);
 
-    // TEST: phrase query
+    // TEST 4: phrase query
     // search in SKILL_TEXT_COL column to
     // look for documents where each document MUST contain phrase
     // "distributed systems" as is
@@ -267,7 +260,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"distributed systems\"') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
-    // TEST: phrase query
+    // TEST 5: phrase query
     // search in SKILLS_TEXT_COL column to
     // look for documents where each document MUST contain phrase
     // "query processing" as is
@@ -282,7 +275,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"query processing\"') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
-    // TEST: phrase query
+    // TEST 6: phrase query
     // search in SKILLS_TEXT_COL column to
     // look for documents where each document MUST contain phrase
     // "machine learning" as is
@@ -305,7 +298,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"Machine learning\"') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
-    // TEST: composite phrase query using boolean operator AND
+    // TEST 7: composite phrase query using boolean operator AND
     // search in SKILLS_TEXT_COL column to
     // look for documents where each document MUST contain
     // two independent phrases
@@ -322,7 +315,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"Machine learning\" AND \"Tensor flow\"') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
-    // TEST: term query
+    // TEST 8: term query
     // search in SKILLS_TEXT_COL column to
     // look for documents where each document MUST contain term 'Java'
 
@@ -346,7 +339,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, 'Java') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
-    // TEST: composite term query using BOOLEAN operator AND
+    // TEST 9: composite term query using BOOLEAN operator AND
     // search in SKILLS_TEXT_COL column to
     // look for documents where each document MUST contain two independent
     // terms 'Java' and 'C++'
@@ -367,7 +360,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, 'Java AND C++') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
-    // TEST: phrase query
+    // TEST 10: phrase query
     // search in SKILLS_TEXT_COL column to
     // look for documents where each document MUST contain phrase "Java C++" as is.
     // notice the difference in results with previous term query.
@@ -390,7 +383,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"Java C++\"') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
-    // TEST: composite phrase query using boolean operator AND.
+    // TEST 11: composite phrase query using boolean operator AND.
     // search in SKILLS_TEXT_COL column to
     // look for documents where each document MUST contain two independent phrases
     // "machine learning" and "gpu processing" as is
@@ -404,7 +397,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"Machine learning\" AND \"gpu processing\"') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
-    // TEST: composite phrase and term query using boolean operator AND.
+    // TEST 12: composite phrase and term query using boolean operator AND.
     // search in SKILLS_TEXT_COL column to
     // look for documents where each document MUST contain
     // phrase "machine learning" as is
@@ -423,7 +416,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"Machine learning\" AND gpu') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
-    // TEST: composite phrase and term query using boolean operator AND
+    // TEST 13: composite phrase and term query using boolean operator AND
     // search in SKILLS_TEXT_COL column to
     // look for documents where each document MUST contain
     // phrase "machine learning" as is
@@ -442,7 +435,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"Machine learning\" AND gpu AND python') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
-    // TEST: term query
+    // TEST 14: term query
     // search in SKILLS_TEXT_COL column to
     // look for documents that MUST contain term 'apache'
 
@@ -459,7 +452,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, 'apache') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
-    // TEST: composite phrase and term query using boolean operator AND.
+    // TEST 15: composite phrase and term query using boolean operator AND.
     // search in SKILLS_TEXT_COL column to
     // look for documents where each document MUST contain
     // phrase "distributed systems" as is
@@ -480,7 +473,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"distributed systems\" AND apache') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
-    // TEST: term query
+    // TEST 16: term query
     // search in SKILLS_TEXT_COL column to
     // look for documents where each document MUST contain term 'database'
 
@@ -498,7 +491,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, 'database') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
-    // TEST: phrase query
+    // TEST 17: phrase query
     // search in SKILLS_TEXT_COL column to
     // look for documents where each document MUST contain phrase "database engine" as is
 
@@ -512,7 +505,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"database engine\"') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
-    // TEST: phrase query
+    // TEST 18: phrase query
     // search in SKILLS_TEXT_COL column to
     // look for documents where each document MUST contain phrase "publish subscribe" as is.
     // this is where we see the power of lucene's in-built parser.
@@ -530,7 +523,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"publish subscribe\"') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
-    // TEST: phrase query
+    // TEST 19: phrase query
     // search in SKILLS_TEXT_COL column to
     // look for documents where each document MUST contain phrase
     // "accounts banking insurance" as is.
@@ -544,7 +537,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"accounts banking insurance\"') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
-    // TEST: composite term query with boolean operator AND
+    // TEST 20: composite term query with boolean operator AND
     // search in SKILLS_TEXT_COL column to
     // look for documents where each document MUST contain terms
     // 'accounts' 'banking' and 'insurance'
@@ -563,7 +556,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, 'accounts AND banking AND insurance') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
-    // TEST: composite phrase and term query using boolean operator AND.
+    // TEST 21: composite phrase and term query using boolean operator AND.
     // search in SKILLS_TEXT_COL column to
     // look for documents where each document MUST contain ALL the following skills:
     // phrase "distributed systems" as is
@@ -580,7 +573,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"distributed systems\" AND Java AND C++') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
-    // TEST: composite phrase and term query using boolean operator OR
+    // TEST 22: composite phrase and term query using boolean operator OR
     // search in SKILLS_TEXT_COL column to
     // look for documents where each document MUST contain ANY of the following skills:
     // phrase "distributed systems" as is
@@ -611,7 +604,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"distributed systems\" Java C++') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
 
-    // TEST: composite phrase and term query using both AND and OR
+    // TEST 23: composite phrase and term query using both AND and OR
     // search in SKILLS_TEXT_COL column to
     // look for documents where each document MUST contain phrase "distributed systems" as is
     // and any of the following terms 'Java' or 'C++'
@@ -627,17 +620,36 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
 
     query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"distributed systems\" AND (Java C++)') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
-  }
 
-  @Test
-  public void testCorrectness() {
-    String query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE text_match(SKILLS_TEXT_COL, '\"java c++\"') LIMIT 1000000";
-    String query1 = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE regexp_like(SKILLS_TEXT_COL, 'java, c++') LIMIT 1000000";
-    SelectionOnlyOperator operator1 = getOperatorForQuery(query);
-    IntermediateResultsBlock block1 = operator1.nextBlock();
-    SelectionOnlyOperator operator2 = getOperatorForQuery(query1);
-    IntermediateResultsBlock block2 = operator2.nextBlock();
-    System.out.println("dfef");
+    // TEST 24: prefix query
+    // look for all documents that have stream*
+    expected = new ArrayList<>();
+    expected.add(new Serializable[]{1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed storage, concurrency, multi-threading"});
+    expected.add(new Serializable[]{1015, "Big data stream processing, Apache Flink, Apache Beam, database kernel, distributed query engines for analytics and data warehouses"});
+    expected.add(new Serializable[]{1018, "Realtime stream processing, publish subscribe, columnar processing for data warehouses, concurrency, Java, multi-threading, C++,"});
+    expected.add(new Serializable[]{1019, "C++, Java, Python, realtime streaming systems, Machine learning, spark, Kubernetes, transaction processing, distributed storage, concurrency, multi-threading, apache airflow"});
+
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, 'stream*') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
+
+    query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, 'stream*') LIMIT 50000";
+    testTextSearchAggregationQueryHelper(query, expected.size());
+
+    // TEST 25: regex query
+    // look for all documents that have exception
+    // since exception is not tokenized into an individual
+    // indexable token/term it won't be available in the
+    // in the index on its own. it will present as part
+    // of larger token depending on where the word
+    // boundary is. so we have to use regex query
+    expected = new ArrayList<>();
+    expected.add(new Serializable[]{1022, "GET /administrator/ HTTP/1.1 200 4263 - Mozilla/5.0 (Windows NT 6.0; rv:34.0) Gecko/20100101 Firefox/34.0 - NullPointerException"});
+
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '/.*exception/') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
+
+    query = "SELECT COUNT(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '/.*exception/') LIMIT 50000";
+    testTextSearchAggregationQueryHelper(query, expected.size());
   }
 
   @Test

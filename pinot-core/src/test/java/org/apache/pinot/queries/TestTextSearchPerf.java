@@ -219,6 +219,8 @@ public class TestTextSearchPerf extends BaseQueriesTest {
     }
   }
 
+  // TODO: move all these to JMH
+
   @Test
   public void testPerf1() {
     String luceneQuery = "SELECT INT_COL FROM MyTable WHERE text_match(QUERY_LOG_TEXT_COL, '\"GROUP BY\"') LIMIT 1000000";
