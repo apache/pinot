@@ -201,10 +201,6 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
       List<String[]> resultRows = ThirdEyeResultSetUtils.parseResultSets(request, metricFunctionToResultSetList,
           PINOT);
 
-
-      // TODO: BRYAN EDIT
-      //Collections.sort(resultRows, (a, b) -> Long.valueOf(a[0]).compareTo(Long.valueOf(b[0])));
-
       return new RelationalThirdEyeResponse(request, resultRows, timeSpec);
 
     } catch (Exception e) {

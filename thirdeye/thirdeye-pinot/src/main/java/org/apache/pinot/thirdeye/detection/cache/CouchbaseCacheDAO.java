@@ -25,6 +25,7 @@ import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;
 import org.apache.pinot.thirdeye.datasource.RelationalThirdEyeResponse;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
 import org.apache.pinot.thirdeye.util.CacheUtils;
 import org.joda.time.DateTime;
@@ -64,14 +65,14 @@ public class CouchbaseCacheDAO {
     this.bucket = cluster.openBucket(BUCKET_NAME);
   }
 
-  public boolean checkIfDetectionIdExistsInCache(String detectionId) {
-    return bucket.exists(String.valueOf(detectionId));
+  public boolean checkIfDetectionIdExistsInCache(String key) {
+    return bucket.exists(key);
   }
 
   // rework this once we figure out how we're going to store data in couchbase
 
   //public MetricCacheResponse fetchExistingTimeSeries(long detectionId, MetricSlice slice) throws Exception {
-  public ThirdEyeCacheResponse tryFetchExistingTimeSeries(ThirdEyeCacheRequestContainer request) {
+  public ThirdEyeCacheResponse tryFetchExistingTimeSeries(ThirdEyeRequest request) {
     //JsonDocument doc = bucket.get(request.getDetectionId());
 
     // parametrize this later
@@ -79,7 +80,7 @@ public class CouchbaseCacheDAO {
     // need to figure out how detections with multiple metrics will be stored
 
     StringBuilder sb = new StringBuilder("SELECT `time`, `value` FROM `" + BUCKET_NAME + "` WHERE `metric_name` = `");
-    List<String> metricNames = request.getRequest().getMetricNames();
+    List<String> metricNames = request.getMetricNames();
 
     for (int i = 0; i < metricNames.size() - 1; i++) {
       sb.append(metricNames.get(i)).append("` OR `metric_name` = `");
@@ -87,26 +88,26 @@ public class CouchbaseCacheDAO {
 
     // either this or use the metricId in the request instead
     sb.append(metricNames.get(metricNames.size() - 1) + "`");
-    sb.append(" AND dataset = " + request.getRequest().getDataSource());
+    sb.append(" AND dataset = " + request.getDataSource());
     sb.append(" AND time BETWEEN ");
-    sb.append("\"" + request.getRequest().getStartTimeInclusive().toString() + "\"");
+    sb.append("\"" + request.getStartTimeInclusive().toString() + "\"");
     sb.append(" AND ");
-    sb.append("\"" + request.getRequest().getEndTimeExclusive().toString() + "\"");
+    sb.append("\"" + request.getEndTimeExclusive().toString() + "\"");
     sb.append(" ORDER BY date asc;");
 
     N1qlQueryResult result = bucket.query(N1qlQuery.simple(sb.toString()));
 
     // if query failed or no results were returned
     if (!result.finalSuccess() || result.allRows().isEmpty()) {
-      LOG.info("cache fetch for detection {} failed, retrieving from source", request.getDetectionId());
+      LOG.info("cache fetch missed or errored, retrieving data from source");
       return null;
     }
 
     List<String[]> rowList = new ArrayList<>();
 
     int i = 0;
-    DateTime startDate = request.getRequest().getStartTimeInclusive();
-    Period period = request.getRequest().getGroupByTimeGranularity().toPeriod();
+    DateTime startDate = request.getStartTimeInclusive();
+    Period period = request.getGroupByTimeGranularity().toPeriod();
 
     // TODO: figure out a way to get around the relational ThirdEyeResponse data not having dates
 
@@ -132,7 +133,7 @@ public class CouchbaseCacheDAO {
     return null;
   }
 
-  public void insertRelationalTimeSeries(String detectionId, ThirdEyeResponse responseData) {
+  public void insertRelationalTimeSeries(ThirdEyeResponse responseData) {
 
     List<List<String>> jsonRows = new ArrayList<>();
     List<String[]> rowList = new ArrayList<>();
@@ -164,7 +165,11 @@ public class CouchbaseCacheDAO {
         .put("timeSpec", timeSpecMap);
 
     // this function needs to take in detection id as well and make that the key.
-    bucket.upsert(JsonDocument.create(detectionId, TIMEOUT, jsonObject));
+    bucket.upsert(JsonDocument.create("0", TIMEOUT, jsonObject));
+
+  }
+
+  public void insertTimeSeriesDataPoint(ThirdEyeResponse response, int i) {
 
   }
 }

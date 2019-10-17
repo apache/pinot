@@ -47,6 +47,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
     this.cache = cache;
+
     this.timeSeriesCache = new DefaultTimeSeriesCache(metricDAO, datasetDAO, cache);
   }
 
@@ -58,7 +59,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
    * @throws Exception
    */
   @Override
-  public DataFrame load(MetricSlice slice, long configId) throws Exception {
+  public DataFrame load(MetricSlice slice) throws Exception {
     LOG.info("Loading time series for '{}'", slice);
 
     TimeSeriesRequestContainer rc = DataFrameUtils.makeTimeSeriesRequestAligned(slice, "ref", this.metricDAO, this.datasetDAO);
@@ -66,7 +67,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
 
     boolean runBryanPoC = false;
     if (runBryanPoC) {
-      response = timeSeriesCache.fetchTimeSeries(new ThirdEyeCacheRequestContainer(String.valueOf(configId), rc.getRequest()));
+      response = timeSeriesCache.fetchTimeSeries(rc.getRequest());
     } else {
       response = this.cache.getQueryResult(rc.getRequest());
     }
@@ -75,16 +76,23 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
     return DataFrameUtils.evaluateResponse(response, rc);
   }
 
-  public void prefetchTimeSeriesWindowRangeIntoCache(MetricSlice slice, long detectionId) throws Exception {
+  public void prefetchTimeSeriesWindowRangeIntoCache(MetricSlice slice) throws Exception {
 
-    // TODO: Reenable this once we get the detectionId
-    //if (!timeSeriesCache.detectionIdExistsInCache(detectionId)) {
-      TimeSeriesRequestContainer rc = DataFrameUtils.makeTimeSeriesRequestAligned(slice, "ref", this.metricDAO, this.datasetDAO);
-      ThirdEyeResponse response = this.cache.getQueryResult(rc.getRequest());
+    // TODO: add a check if TimeSeries already exists in cache.
 
-      // fire and forget
-      ExecutorService executor = Executors.newCachedThreadPool();
-      executor.execute(() -> timeSeriesCache.insertTimeSeriesIntoCache(String.valueOf(detectionId), response));
-    //}
+    TimeSeriesRequestContainer rc = DataFrameUtils.makeTimeSeriesRequestAligned(slice, "ref", this.metricDAO, this.datasetDAO);
+    ThirdEyeResponse response = this.cache.getQueryResult(rc.getRequest());
+
+    // fire and forget
+    ExecutorService executor = Executors.newCachedThreadPool();
+
+    // insert the time series in parallel
+
+
+    /*for (int i = 0; i < response.getNumRows(); i++) {
+      executor.execute(() -> timeSeriesCache.insertTimeSeriesIntoCache(response, i));
+    }*/
+    executor.execute(() -> timeSeriesCache.insertTimeSeriesIntoCache(response));
+    executor.shutdown();
   }
 }

@@ -9,6 +9,7 @@ import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datasource.RelationalThirdEyeResponse;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
 import org.joda.time.DateTime;
@@ -33,21 +34,21 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
     this.cacheDAO = new CouchbaseCacheDAO();
   }
 
-  public ThirdEyeResponse fetchTimeSeries(ThirdEyeCacheRequestContainer rc) throws Exception {
-    LOG.info("trying to fetch data from cache with id {}...", rc.getDetectionId());
+  public ThirdEyeResponse fetchTimeSeries(ThirdEyeRequest request) throws Exception {
+    LOG.info("trying to fetch data from cache with id {}...", request);
 
     ThirdEyeResponse response;
-    ThirdEyeCacheResponse cacheResponse = cacheDAO.tryFetchExistingTimeSeries(rc);
+    ThirdEyeCacheResponse cacheResponse = cacheDAO.tryFetchExistingTimeSeries(request);
 
-    DateTime start = rc.getRequest().getStartTimeInclusive();
-    DateTime end = rc.getRequest().getEndTimeExclusive();
+    DateTime start = request.getStartTimeInclusive();
+    DateTime end = request.getEndTimeExclusive();
 
     if (cacheResponse == null || cacheResponse.isMissingSlice(start, end)) {
       LOG.info("cache miss or bad cache response received");
-      response = this.cache.getQueryResult(rc.getRequest());
+      response = this.cache.getQueryResult(request);
       // fire and forget
       ExecutorService executor = Executors.newCachedThreadPool();
-      executor.execute(() -> insertTimeSeriesIntoCache(rc.getDetectionId(), response));
+      executor.execute(() -> insertTimeSeriesIntoCache(response));
       //this.insertTimeSeriesIntoCache(rc.getDetectionId(), response);
     } else {
       LOG.info("cache fetch success :)");
@@ -77,7 +78,7 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
 
         List<String[]> rows = rowList.subList(startIndexOffset, rowList.size() - 1 - endIndexOffset);
 
-        response = new RelationalThirdEyeResponse(rc.getRequest(), rows, responseSpec);
+        response = new RelationalThirdEyeResponse(request, rows, responseSpec);
       } catch (Exception e) {
         LOG.info("requested slice between {} and {}", start, end);
         LOG.info("cache contained slice between {} and {}", cacheStart, cacheEnd);
@@ -93,19 +94,24 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
   }
 
 
-  public void insertTimeSeriesIntoCache(String detectionId, ThirdEyeResponse response) {
+  public void insertTimeSeriesIntoCache(ThirdEyeResponse response) {
 
     String dataSourceType = response.getClass().getSimpleName();
 
     switch (dataSourceType) {
       case "RelationalThirdEyeResponse":
-        cacheDAO.insertRelationalTimeSeries(detectionId, response);
+        cacheDAO.insertRelationalTimeSeries(response);
       case "CSVThirdEyeResponse":
         // do something
     }
   }
 
-  public boolean detectionIdExistsInCache(long detectionId) {
-    return cacheDAO.checkIfDetectionIdExistsInCache(String.valueOf(detectionId));
+  public void insertTimeSeriesPointIntoCache(ThirdEyeResponse response, int index) {
+    // also need the timestamp.
+    //cacheDAO.
+  }
+
+  public boolean detectionIdExistsInCache(String key) {
+    return cacheDAO.checkIfDetectionIdExistsInCache(key);
   }
 }
