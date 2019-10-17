@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import kafka.common.Config;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.mail.DefaultAuthenticator;
 import org.apache.commons.mail.EmailException;
@@ -138,35 +139,15 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     }
   }
 
-  /** Sends email according to the provided config. */
-  private void sendEmail(SmtpConfiguration config, EmailEntity entity) throws EmailException {
-    HtmlEmail email = entity.getContent();
-    email.setHostName(config.getSmtpHost());
-    email.setSmtpPort(config.getSmtpPort());
-    if (config.getSmtpUser() != null && config.getSmtpPassword() != null) {
-      email.setAuthenticator(new DefaultAuthenticator(config.getSmtpUser(), config.getSmtpPassword()));
-      email.setSSLOnConnect(true);
-      email.setSslSmtpPort(Integer.toString(config.getSmtpPort()));
-    }
-    email.send();
-
-    int recipientCount = email.getToAddresses().size() + email.getCcAddresses().size() + email.getBccAddresses().size();
-    LOG.info("Email sent with subject '{}' to {} recipients", email.getSubject(), recipientCount);
-  }
-
-  private void sendEmail(Properties emailClientConfigs, List<AnomalyResult> anomalies, DetectionAlertFilterRecipients recipients) throws Exception {
+  private HtmlEmail prepareEmailContent(Properties emailClientConfigs, List<AnomalyResult> anomalies, DetectionAlertFilterRecipients recipients) throws Exception {
     configureAdminRecipients(recipients);
     whitelistRecipients(recipients);
     blacklistRecipients(recipients);
     validateAlert(recipients, anomalies);
 
-    BaseNotificationContent content = super.buildNotificationContent(emailClientConfigs);
+    BaseNotificationContent content = buildNotificationContent(emailClientConfigs);
     EmailEntity emailEntity = new EmailContentFormatter(emailClientConfigs, content, this.teConfig, adContext)
         .getEmailEntity(anomalies);
-    if (emailEntity.getContent() == null) {
-      // Ignore, nothing to send
-      return;
-    }
     if (Strings.isNullOrEmpty(this.adContext.getNotificationConfig().getFrom())) {
       throw new IllegalArgumentException("Invalid sender's email");
     }
@@ -182,7 +163,27 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
       email.setBcc(AlertUtils.toAddress(recipients.getBcc()));
     }
 
-    sendEmail(this.smtpConfig, emailEntity);
+    return getHtmlContent(emailEntity);
+  }
+
+  protected HtmlEmail getHtmlContent(EmailEntity emailEntity) {
+    return emailEntity.getContent();
+  }
+
+  /** Sends email according to the provided config. */
+  private void sendEmail(HtmlEmail email) throws EmailException {
+    SmtpConfiguration config = this.smtpConfig;
+    email.setHostName(config.getSmtpHost());
+    email.setSmtpPort(config.getSmtpPort());
+    if (config.getSmtpUser() != null && config.getSmtpPassword() != null) {
+      email.setAuthenticator(new DefaultAuthenticator(config.getSmtpUser(), config.getSmtpPassword()));
+      email.setSSLOnConnect(true);
+      email.setSslSmtpPort(Integer.toString(config.getSmtpPort()));
+    }
+    email.send();
+
+    int recipientCount = email.getToAddresses().size() + email.getCcAddresses().size() + email.getBccAddresses().size();
+    LOG.info("Email sent with subject '{}' to {} recipients", email.getSubject(), recipientCount);
   }
 
   private void generateAndSendEmails(DetectionAlertFilterResult results) throws Exception {
@@ -202,17 +203,17 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
         anomalyResultListOfGroup.sort(COMPARATOR_DESC);
 
         if (emailClientConfigs.get(PROP_RECIPIENTS) != null) {
-          Map<String, List<String>> emailRecipients = (Map<String, List<String>>) emailClientConfigs.get(PROP_RECIPIENTS);
-          if (emailRecipients.get(PROP_TO) == null || emailRecipients.get(PROP_TO).isEmpty()) {
+          Map<String, Object> emailRecipients = ConfigUtils.getMap(emailClientConfigs.get(PROP_RECIPIENTS));
+          if (emailRecipients.get(PROP_TO) == null || ConfigUtils.getList(emailRecipients.get(PROP_TO)).isEmpty()) {
             LOG.warn("Skipping! No email recipients found for alert {}.", this.adContext.getNotificationConfig().getId());
             return;
           }
 
           DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
-              new HashSet<>(emailRecipients.get(PROP_TO)),
-              new HashSet<>(emailRecipients.get(PROP_CC)),
-              new HashSet<>(emailRecipients.get(PROP_BCC)));
-          sendEmail(emailClientConfigs, anomalyResultListOfGroup, recipients);
+              new HashSet<>(ConfigUtils.getList(emailRecipients.get(PROP_TO))),
+              new HashSet<>(ConfigUtils.getList(emailRecipients.get(PROP_CC))),
+              new HashSet<>(ConfigUtils.getList(emailRecipients.get(PROP_BCC))));
+          sendEmail(prepareEmailContent(emailClientConfigs, anomalyResultListOfGroup, recipients));
         }
       } catch (IllegalArgumentException e) {
         LOG.warn("Skipping! Found illegal arguments while sending {} anomalies for alert {}."
