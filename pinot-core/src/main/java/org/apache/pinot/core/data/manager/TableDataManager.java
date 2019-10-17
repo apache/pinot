@@ -20,7 +20,7 @@ package org.apache.pinot.core.data.manager;
 
 import java.io.File;
 import java.util.List;
-import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -40,8 +40,8 @@ public interface TableDataManager {
   /**
    * Initializes the table data manager. Should be called only once and before calling any other method.
    */
-  void init(@Nonnull TableDataManagerConfig tableDataManagerConfig, @Nonnull String instanceId,
-      @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull ServerMetrics serverMetrics);
+  void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics);
 
   /**
    * Starts the table data manager. Should be called only once after table data manager gets initialized but before
@@ -58,41 +58,25 @@ public interface TableDataManager {
   /**
    * Adds a loaded immutable segment into the table.
    */
-  void addSegment(@Nonnull ImmutableSegment immutableSegment);
+  void addSegment(ImmutableSegment immutableSegment);
 
   /**
    * Adds a segment from local disk into the OFFLINE table.
    */
-  void addSegment(@Nonnull File indexDir, @Nonnull IndexLoadingConfig indexLoadingConfig)
+  void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception;
 
   /**
    * Adds a segment into the REALTIME table.
    * <p>The segment could be committed or under consuming.
    */
-  void addSegment(@Nonnull String segmentName, @Nonnull TableConfig tableConfig,
-      @Nonnull IndexLoadingConfig indexLoadingConfig)
+  void addSegment(String segmentName, TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig)
       throws Exception;
 
   /**
    * Removes a segment from the table.
    */
-  void removeSegment(@Nonnull String segmentName);
-
-  /**
-   * Track a deleted segment.
-   */
-  void notifySegmentDeleted(@Nonnull String segmentName);
-
-  /**
-   * Track addition of a segment
-   */
-  void notifySegmentAdded(@Nonnull String segmentName);
-
-  /**
-   * Check if a segment is recently deleted.
-   */
-  boolean isRecentlyDeleted(@Nonnull String segmentName);
+  void removeSegment(String segmentName);
 
   /**
    * Acquires all segments of the table.
@@ -100,7 +84,6 @@ public interface TableDataManager {
    *
    * @return List of segment data managers
    */
-  @Nonnull
   List<SegmentDataManager> acquireAllSegments();
 
   /**
@@ -110,8 +93,7 @@ public interface TableDataManager {
    * @param segmentNames List of names of the segment to acquire
    * @return List of segment data managers
    */
-  @Nonnull
-  List<SegmentDataManager> acquireSegments(@Nonnull List<String> segmentNames);
+  List<SegmentDataManager> acquireSegments(List<String> segmentNames);
 
   /**
    * Acquires the segments with the given segment name.
@@ -120,18 +102,18 @@ public interface TableDataManager {
    * @param segmentName Name of the segment to acquire
    * @return Segment data manager with the given name, or <code>null</code> if no segment matches the name
    */
-  SegmentDataManager acquireSegment(@Nonnull String segmentName);
+  @Nullable
+  SegmentDataManager acquireSegment(String segmentName);
 
   /**
    * Releases the acquired segment.
    *
    * @param segmentDataManager Segment data manager
    */
-  void releaseSegment(@Nonnull SegmentDataManager segmentDataManager);
+  void releaseSegment(SegmentDataManager segmentDataManager);
 
   /**
    * Returns the table name managed by this instance.
    */
-  @Nonnull
   String getTableName();
 }

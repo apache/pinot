@@ -23,7 +23,7 @@ PQL
 ===
 
 * PQL is a derivative of SQL derivative that supports selection, projection, aggregation, grouping aggregation.
-  There is no support for Joins.
+  There is no support for Joins or Subqueries.
 
 * Specifically, for Pinot:
 
@@ -235,11 +235,16 @@ Supported transform functions
    Quotient of two values
 
 ``TIMECONVERT``
-   Takes 3 arguments, converts the value into another time unit. E.g. ``TIMECONVERT(time, 'MILLISECONDS', 'SECONDS')``
+   Takes 3 arguments, converts the value into another time unit. *e.g.* ``TIMECONVERT(time, 'MILLISECONDS', 'SECONDS')``
+   This expression converts the value of coulumn ``time`` (taken to be in milliseconds) to the nearest seconds
+   (*i.e.* the nearest seconds that is lower than the value of ``date`` column)
 
 ``DATETIMECONVERT``
    Takes 4 arguments, converts the value into another date time format, and buckets time based on the given time granularity.
    *e.g.* ``DATETIMECONVERT(date, '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '15:MINUTES')``
+   This expression converts the column ``date`` which is formatted as ``1:MILLISECONDS:EPOCH``, and converts it into 
+   format ``1:SECONDS:EPOCH`` with a granularity of ``15:MINUTES`` (*i.e.* nearest 15-minute value lower than the value
+   of ``date`` column.
 
 ``VALUEIN``
    Takes at least 2 arguments, where the first argument is a multi-valued column, and the following arguments are constant values.
@@ -290,3 +295,41 @@ will be the same as the combining results from the following queries:
     TOP 50
 
 where we don't put the results for the same group together.
+
+
+* We are beginning work on standard sql support. As a first step, we have introduced ``ORDER BY``. 
+
+In order to use ``ORDER BY`` certain options need to be set in the request json payload:
+
+1. ``groupByMode`` - Setting this to ``sql`` will take the code path of standard sql, and hence accept ``ORDER BY``. By default, this is ``pql``
+
+.. code-block:: json
+
+  { 
+    "pql" : "SELECT COUNT(*) from myTable GROUP BY foo ORDER BY foo DESC TOP 100", 
+    "queryOptions" : "groupByMode=sql" 
+  }
+
+2. ``responseFormat`` - Setting this to ``sql`` will present results in the standard sql way i.e. tabular, with same keys across all aggregations. This only works when used in combination with ``groupByMode=sql``. By default, this is ``pql``
+
+.. code-block:: json
+
+  { 
+    "pql" : "SELECT SUM(foo), SUM(bar) from myTable GROUP BY moo ORDER BY SUM(bar) ASC, moo DESC TOP 10", 
+    "queryOptions" : "groupByMode=sql;responseFormat=sql"
+  }
+
+ResultTable looks as follows:
+
+.. code-block:: json
+
+  {
+    "resultTable": {
+      "columns":["moo", "SUM(foo)","SUM(bar)"],
+      "results":[["abc", 10, 100],
+                 ["pqr", 20, 200],
+                 ["efg", 20, 200],
+                 ["lmn", 30, 300]]
+  }
+
+These options are also available on the query console (checkboxes ``Group By Mode: SQL`` and ``Response Format: SQL``)

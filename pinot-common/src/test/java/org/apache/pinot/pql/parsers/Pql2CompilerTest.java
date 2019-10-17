@@ -428,25 +428,34 @@ public class Pql2CompilerTest {
    */
   @Test
   public void testOrderBy() {
+    testOrderBy("select * from table order by d2 asc, d3 desc", Arrays.asList("d2", "d3"), Arrays.asList(true, false));
 
-    testOrderBy("select d1, d2, d3 from table order by d2 asc, d3 desc", Arrays.asList("d2", "d3"),
+    testOrderBy("select * from table order by d2, d3 desc", Arrays.asList("d2", "d3"), Arrays.asList(true, false));
+
+    testOrderBy("select * from table order by d2 asc, d2 desc", Collections.singletonList("d2"),
+        Collections.singletonList(true));
+
+    testOrderBy("select * from table order by d2, d2 desc", Collections.singletonList("d2"),
+        Collections.singletonList(true));
+
+    testOrderBy("select * from table order by d2, add(d3, 1) desc, add(d3, 1)", Arrays.asList("d2", "add(d3,'1')"),
         Arrays.asList(true, false));
 
-    testOrderBy("select sum(m1), d2, d3 from table order by d2 desc, d3 asc", Arrays.asList("d2", "d3"),
+    testOrderBy("select sum(m1) from table group by d2, d3 order by d2 desc, d3", Arrays.asList("d2", "d3"),
         Arrays.asList(false, true));
 
-    testOrderBy("select sum(m1), d2, d3 from table order by sum(m1) asc, d3 desc", Arrays.asList("sum(m1)", "d3"),
+    testOrderBy("select sum(m1) from table group by d2, d3 order by sum(m1), d3 desc", Arrays.asList("sum(m1)", "d3"),
         Arrays.asList(true, false));
 
-    testOrderBy("select sum(m1), sum(m2), d3 from table order by sum(m1) desc, sum(m2) asc", Arrays.asList("sum(m1)", "sum(m2)"),
-        Arrays.asList(false, true));
+    testOrderBy("select sum(m1), sum(m2) from table group by d1 order by sum(m1) desc, sum(m2) asc",
+        Arrays.asList("sum(m1)", "sum(m2)"), Arrays.asList(false, true));
 
-    testOrderBy("select sum(m1), sum(m2), foo(bar(x, y), z) from table order by sum(m1) desc, foo(bar(x, y), z) asc",
+    testOrderBy(
+        "select sum(m1), max(foo(bar(x, y), z)) from table group by d1 order by sum(m1) desc, max(foo(bar(x, y), z))",
+        Arrays.asList("sum(m1)", "max(foo(bar(x,y),z))"), Arrays.asList(false, true));
+
+    testOrderBy("select sum(m1) from table group by foo(bar(x, y), z) order by sum(m1) desc, foo(bar(x, y), z) asc",
         Arrays.asList("sum(m1)", "foo(bar(x,y),z)"), Arrays.asList(false, true));
-
-    testOrderBy("select sum(m1), sum(m2), x, y, z from table order by sum(m1) desc, foo(bar(x, y), z) asc",
-        Arrays.asList("sum(m1)", "foo(bar(x,y),z)"), Arrays.asList(false, true));
-
   }
 
   /**
@@ -457,8 +466,7 @@ public class Pql2CompilerTest {
    * @param isAscs Expected isAsc boolean values
    */
   private void testOrderBy(String pql, List<String> orderBys, List<Boolean> isAscs) {
-    BrokerRequest brokerRequest =
-        COMPILER.compileToBrokerRequest(pql);
+    BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(pql);
     List<SelectionSort> orderByList = brokerRequest.getOrderBy();
 
     for (int i = 0; i < orderByList.size(); i++) {

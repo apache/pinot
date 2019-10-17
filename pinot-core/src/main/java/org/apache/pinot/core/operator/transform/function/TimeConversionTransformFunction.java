@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.transform.function;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -43,7 +42,7 @@ public class TimeConversionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(@Nonnull List<TransformFunction> arguments, @Nonnull Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     // Check that there are exactly 3 arguments
     if (arguments.size() != 3) {
       throw new IllegalArgumentException("Exactly 3 arguments are required for TIME_CONVERT transform function");
@@ -67,7 +66,7 @@ public class TimeConversionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public long[] transformToLongValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
     if (_outputTimes == null) {
       _outputTimes = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }

@@ -22,7 +22,6 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -142,14 +141,12 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
       GenericRow currentRow = genericRowComparable.getRow();
 
       // Fill reuse with the information from the currentRow
-      reuse.clear();
-      for (Map.Entry<String, Object> entry : currentRow.getEntrySet()) {
-        reuse.putField(entry.getKey(), entry.getValue());
-      }
+      reuse.init(currentRow);
 
       // If the record reader has more rows left, put back the next minimum value to the queue
       PinotSegmentRecordReader recordReader = genericRowComparable.getRecordReader();
       if (recordReader.hasNext()) {
+        currentRow.clear();
         genericRowComparable.setRow(recordReader.next(currentRow));
         genericRowComparable.setRecordReader(recordReader);
         _priorityQueue.add(genericRowComparable);

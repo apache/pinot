@@ -19,6 +19,7 @@
 package org.apache.pinot.controller;
 
 import com.yammer.metrics.core.MetricsRegistry;
+import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
@@ -47,7 +48,7 @@ public class LeadControllerManagerTest {
 
   @BeforeMethod
   public void setup() {
-    _controllerMetrics =  new ControllerMetrics(new MetricsRegistry());
+    _controllerMetrics = new ControllerMetrics(new MetricsRegistry());
     _helixManager = mock(HelixManager.class);
     HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
     when(_helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
@@ -60,13 +61,13 @@ public class LeadControllerManagerTest {
     _liveInstance = mock(LiveInstance.class);
     when(helixDataAccessor.getProperty(controllerLeader)).thenReturn(_liveInstance);
 
-    PropertyKey resourceConfigPropertyKey = mock(PropertyKey.class);
-    when(keyBuilder.resourceConfig(any())).thenReturn(resourceConfigPropertyKey);
-    _resourceConfig = mock(ResourceConfig.class);
-    when(helixDataAccessor.getProperty(resourceConfigPropertyKey)).thenReturn(_resourceConfig);
-
     String instanceId = LeadControllerUtils.generateParticipantInstanceId(CONTROLLER_HOST, CONTROLLER_PORT);
     when(_helixManager.getInstanceName()).thenReturn(instanceId);
+
+    ConfigAccessor configAccessor = mock(ConfigAccessor.class);
+    when(_helixManager.getConfigAccessor()).thenReturn(configAccessor);
+    _resourceConfig = mock(ResourceConfig.class);
+    when(configAccessor.getResourceConfig(any(), anyString())).thenReturn(_resourceConfig);
   }
 
   @Test
@@ -87,7 +88,7 @@ public class LeadControllerManagerTest {
 
     // Even resource config is enabled, leadControllerManager should return false because no index is cached yet.
     Assert.assertFalse(leadControllerManager.isLeaderForTable(tableName));
-    Assert.assertTrue(leadControllerManager.isLeadControllerResourceEnabled());
+    Assert.assertTrue(LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager));
 
     // After the target partition index is cached, leadControllerManager should return true.
     leadControllerManager.addPartitionLeader(partitionName);
@@ -102,7 +103,7 @@ public class LeadControllerManagerTest {
     enableResourceConfig(false);
     leadControllerManager.onResourceConfigChange();
 
-    Assert.assertFalse(leadControllerManager.isLeadControllerResourceEnabled());
+    Assert.assertFalse(LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager));
     Assert.assertFalse(leadControllerManager.isLeaderForTable(tableName));
     leadControllerManager.addPartitionLeader(partitionName);
     Assert.assertFalse(leadControllerManager.isLeaderForTable(tableName));

@@ -23,18 +23,19 @@ import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
-import org.apache.pinot.core.operator.query.SelectionOperator;
+import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
+import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
+import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * The <code>SelectionPlanNode</code> class provides the execution plan for selection query on a
- * single segment.
+ * The <code>SelectionPlanNode</code> class provides the execution plan for selection query on a single segment.
  */
 public class SelectionPlanNode implements PlanNode {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(SelectionPlanNode.class);
+
   private final IndexSegment _indexSegment;
   private final Selection _selection;
   private TransformPlanNode _transformPlanNode;
@@ -42,19 +43,21 @@ public class SelectionPlanNode implements PlanNode {
   public SelectionPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     _indexSegment = indexSegment;
     _selection = brokerRequest.getSelections();
-    if (_selection.getSize() > 0) {
-      _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest);
-    } else {
-      _transformPlanNode = null;
-    }
+    _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest);
   }
 
   @Override
   public Operator run() {
-    if (_selection.getSize() <= 0) {
-      return new EmptySelectionOperator(_indexSegment, _selection);
+    TransformOperator transformOperator = _transformPlanNode.run();
+    if (_selection.getSize() > 0) {
+      if (_selection.getSelectionSortSequence() == null) {
+        return new SelectionOnlyOperator(_indexSegment, _selection, transformOperator);
+      } else {
+        return new SelectionOrderByOperator(_indexSegment, _selection, transformOperator);
+      }
+    } else {
+      return new EmptySelectionOperator(_indexSegment, _selection, transformOperator);
     }
-    return new SelectionOperator(_indexSegment, _selection, _transformPlanNode.run());
   }
 
   @Override
@@ -71,9 +74,7 @@ public class SelectionPlanNode implements PlanNode {
     }
     LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
     LOGGER.debug(prefix + "Argument 1: Selections - " + _selection);
-    if (_selection.getSize() > 0) {
-      LOGGER.debug(prefix + "Argument 2: Transform -");
-      _transformPlanNode.showTree(prefix + "    ");
-    }
+    LOGGER.debug(prefix + "Argument 2: Transform -");
+    _transformPlanNode.showTree(prefix + "    ");
   }
 }

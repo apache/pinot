@@ -24,13 +24,13 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import java.util.Properties;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.alert.util.AlertScreenshotHelper;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
-import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -53,7 +53,6 @@ import org.slf4j.LoggerFactory;
 public class MetricAnomaliesContent extends BaseNotificationContent {
   private static final Logger LOG = LoggerFactory.getLogger(MetricAnomaliesContent.class);
 
-  private static final String TEMPLATE = "metric-anomalies-template.ftl";
   private DetectionConfigManager configDAO = null;
 
   public MetricAnomaliesContent() {}
@@ -61,16 +60,17 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
   @Override
   public void init(Properties properties, ThirdEyeAnomalyConfiguration configuration) {
     super.init(properties, configuration);
+    this.configDAO = DAORegistry.getInstance().getDetectionConfigManager();
   }
 
   @Override
   public String getTemplate() {
-    return TEMPLATE;
+    return MetricAnomaliesContent.class.getSimpleName();
   }
 
   @Override
-  public Map<String, Object> format(Long groupId, String groupName, Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
-    Map<String, Object> templateData = super.getTemplateData(context.getAlertConfig(), groupId, groupName, anomalies);
+  public Map<String, Object> format(Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
+    Map<String, Object> templateData = super.getTemplateData(context.getNotificationConfig(), anomalies);
     enrichMetricInfo(templateData, anomalies);
 
     DateTime windowStart = DateTime.now();
@@ -116,14 +116,11 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
       String funcDescription = "";
       Long id = -1L;
 
-      if (anomaly.getFunction() != null){
-        functionName = anomaly.getFunction().getFunctionName();
-        id = anomaly.getFunction().getId();
-      } else if ( anomaly.getDetectionConfigId() != null){
+      if ( anomaly.getDetectionConfigId() != null) {
         DetectionConfigDTO config = this.configDAO.findById(anomaly.getDetectionConfigId());
         Preconditions.checkNotNull(config, String.format("Cannot find detection config %d", anomaly.getDetectionConfigId()));
         functionName = config.getName();
-        funcDescription = config.getDescription();
+        funcDescription = config.getDescription() == null ? "" : config.getDescription();
         id = config.getId();
       }
 
@@ -179,7 +176,7 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
     if (anomalyDetails.size() == 1) {
       AnomalyReportEntity singleAnomaly = anomalyDetails.get(0);
       try {
-        imgPath = AlertScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), thirdEyeAnomalyConfig);
+        this.imgPath = AlertScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), thirdEyeAnomalyConfig);
       } catch (Exception e) {
         LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
       }

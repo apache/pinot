@@ -462,8 +462,8 @@ public class SegmentCompletionManager {
       synchronized (this) {
         LOGGER.info("Processing segmentConsumed({}, {})", instanceId, offset);
         if (_excludedServerStateMap.contains(instanceId)) {
-          // Could be that the server was restarted, and it started consuning again,and somehow got to complete
-          // consumption up to this point. We will acccept it.
+          // Could be that the server was restarted, and it started consuming again, and somehow got to complete
+          // consumption up to this point. We will accept it.
           LOGGER.info("Marking instance {} alive again", instanceId);
           _excludedServerStateMap.remove(instanceId);
         }

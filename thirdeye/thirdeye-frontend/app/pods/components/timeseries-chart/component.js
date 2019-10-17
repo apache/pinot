@@ -53,7 +53,7 @@ export default Component.extend({
   },
 
   legend: {
-    hide: 'lowerBound'
+    hide: ['lowerBound', 'old-anomaly-edges', 'new-anomaly-edges']
   },
 
   axis: {
@@ -153,7 +153,7 @@ export default Component.extend({
     const axes = {};
     loadKeys.filter(sid => 'axis' in series[sid]).forEach(sid => axes[sid] = series[sid].axis);
     // keep the lower bound line in graph but remove in from the legend
-    legend.hide = 'lowerBound';
+    legend.hide = ['lowerBound', 'old-anomaly-edges', 'new-anomaly-edges'];
     const config = { unload, xs, columns, types, regions, tooltip, focusedIds, colors, axis, axes, legend };
     return config;
   },

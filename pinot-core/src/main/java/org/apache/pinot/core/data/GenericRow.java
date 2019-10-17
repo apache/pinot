@@ -18,85 +18,150 @@
  */
 package org.apache.pinot.core.data;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.common.data.RowEvent;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.data.recordtransformer.NullValueTransformer;
+import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
 
 
 /**
- * A plain implementation of RowEvent based on HashMap. Should be reused as much as possible via
- * {@link GenericRow#createOrReuseRow(GenericRow)}
+ * The generic row is the value holder returned from {@link RecordReader#next()} and
+ * {@link RecordReader#next(GenericRow)}, and can be modified with {@link RecordTransformer}. The generic row returned
+ * from the {@link NullValueTransformer} should have {@code defaultNullValue} filled to the fields with {@code null}
+ * value, so that for fields with {@code null} value, {@link #getValue(String)} will return the {@code defaultNullValue}
+ * and {@link #isNullValue(String)} will return {@code true}.
  */
-public class GenericRow implements RowEvent {
-  private Map<String, Object> _fieldMap = new HashMap<>();
+public class GenericRow {
+  private final Map<String, Object> _fieldToValueMap = new HashMap<>();
+  private final Set<String> _nullValueFields = new HashSet<>();
 
-  @Override
-  public void init(Map<String, Object> field) {
-    _fieldMap = field;
+  /**
+   * Initializes the generic row from the given generic row (shallow copy). The row should be new created or cleared
+   * before calling this method.
+   */
+  public void init(GenericRow row) {
+    _fieldToValueMap.putAll(row._fieldToValueMap);
+    _nullValueFields.addAll(row._nullValueFields);
   }
 
-  public Set<Map.Entry<String, Object>> getEntrySet() {
-    return _fieldMap.entrySet();
+  /**
+   * Returns the map from fields to values.
+   * <p>Before setting the {@code defaultNullValue} for a field by calling {@link #putDefaultNullValue(String, Object)},
+   * the value for the field can be {@code null}.
+   */
+  public Map<String, Object> getFieldToValueMap() {
+    return Collections.unmodifiableMap(_fieldToValueMap);
   }
 
-  @Override
-  public String[] getFieldNames() {
-    return _fieldMap.keySet().toArray(new String[_fieldMap.size()]);
+  /**
+   * Returns the fields with {@code null} value.
+   * <p>The {@code nullField} will be set when setting the {@code nullDefaultValue} for field by calling
+   * {@link #putDefaultNullValue(String, Object)}.
+   */
+  public Set<String> getNullValueFields() {
+    return Collections.unmodifiableSet(_nullValueFields);
   }
 
-  @Override
+  /**
+   * Returns the value for the given field.
+   * <p>Before setting the {@code defaultNullValue} for a field by calling {@link #putDefaultNullValue(String, Object)},
+   * the value for the field can be {@code null}.
+   */
   public Object getValue(String fieldName) {
-    return _fieldMap.get(fieldName);
+    return _fieldToValueMap.get(fieldName);
   }
 
-  public void putField(String key, Object value) {
-    _fieldMap.put(key, value);
+  /**
+   * Returns whether the value is {@code null} for the given field.
+   * <p>The {@code nullField} will be set when setting the {@code nullDefaultValue} for field by calling
+   * {@link #putDefaultNullValue(String, Object)}.
+   */
+  public boolean isNullValue(String fieldName) {
+    return _nullValueFields.contains(fieldName);
   }
 
-  @Override
-  public String toString() {
-    StringBuilder b = new StringBuilder();
-    for (String key : _fieldMap.keySet()) {
-      Object value = _fieldMap.get(key);
-      b.append(key);
-      b.append(" : ");
-      if (value instanceof Object[]) {
-        b.append(Arrays.toString((Object[]) value));
-      } else {
-        b.append(value);
-      }
-      b.append(", ");
-    }
-    return b.toString();
+  /**
+   * Sets the value for the given field.
+   */
+  public void putValue(String fieldName, @Nullable Object value) {
+    _fieldToValueMap.put(fieldName, value);
+  }
+
+  /**
+   * Sets the {@code defaultNullValue} for the given {@code nullField}.
+   */
+  public void putDefaultNullValue(String fieldName, Object defaultNullValue) {
+    _fieldToValueMap.put(fieldName, defaultNullValue);
+    _nullValueFields.add(fieldName);
+  }
+
+  /**
+   * Removes all the fields from the row.
+   */
+  public void clear() {
+    _fieldToValueMap.clear();
+    _nullValueFields.clear();
   }
 
   @Override
   public int hashCode() {
-    return _fieldMap.hashCode();
+    return EqualityUtils.hashCodeOf(_fieldToValueMap.hashCode(), _nullValueFields.hashCode());
   }
 
   @Override
-  public boolean equals(Object o) {
-    if (!(o instanceof GenericRow)) {
-      return false;
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
     }
-    GenericRow r = (GenericRow) o;
-    return _fieldMap.equals(r._fieldMap);
+    if (obj instanceof GenericRow) {
+      GenericRow that = (GenericRow) obj;
+      return _fieldToValueMap.equals(that._fieldToValueMap) && _nullValueFields.equals(that._nullValueFields);
+    }
+    return false;
   }
 
-  /**
-   * Empties the values of this generic row, keeping the keys and hash map nodes to minimize object allocation.
-   */
-  public void clear() {
-    for (Map.Entry<String, Object> mapEntry : getEntrySet()) {
-      mapEntry.setValue(null);
+  @Override
+  public String toString() {
+    try {
+      return JsonUtils.objectToPrettyString(this);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
     }
   }
 
+  @Deprecated
+  public void init(Map<String, Object> fieldToValueMap) {
+    _fieldToValueMap.putAll(fieldToValueMap);
+  }
+
+  @Deprecated
+  @JsonIgnore
+  public Set<Map.Entry<String, Object>> getEntrySet() {
+    return _fieldToValueMap.entrySet();
+  }
+
+  @Deprecated
+  @JsonIgnore
+  public String[] getFieldNames() {
+    return _fieldToValueMap.keySet().toArray(new String[0]);
+  }
+
+  @Deprecated
+  public void putField(String fieldName, @Nullable Object value) {
+    _fieldToValueMap.put(fieldName, value);
+  }
+
+  @Deprecated
   public static GenericRow fromBytes(byte[] buffer)
       throws IOException {
     Map<String, Object> fieldMap = JsonUtils.bytesToObject(buffer, Map.class);
@@ -105,18 +170,13 @@ public class GenericRow implements RowEvent {
     return genericRow;
   }
 
+  @Deprecated
   public byte[] toBytes()
       throws IOException {
-    return JsonUtils.objectToBytes(_fieldMap);
+    return JsonUtils.objectToBytes(_fieldToValueMap);
   }
 
-  /**
-   * Creates a new row if the row given is null, otherwise just {@link GenericRow#clear()} the row so that it can be
-   * reused.
-   *
-   * @param row The row to potentially reuse.
-   * @return A cleared or new row.
-   */
+  @Deprecated
   public static GenericRow createOrReuseRow(GenericRow row) {
     if (row == null) {
       return new GenericRow();

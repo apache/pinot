@@ -31,11 +31,15 @@ import java.util.List;
 import java.util.zip.Adler32;
 import java.util.zip.Checksum;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 @SuppressWarnings("Duplicates")
 public class CrcUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(CrcUtils.class);
   private static final int BUFFER_SIZE = 65536;
+  private static final String CRC_FILE_EXTENSTION = ".crc";
 
   private final List<File> _files;
 
@@ -59,7 +63,9 @@ public class CrcUtils {
     Preconditions.checkNotNull(files);
     for (File file : files) {
       if (file.isFile()) {
-        if (!file.getName().equals(V1Constants.SEGMENT_CREATION_META)) {
+        // Certain file systems, e.g. HDFS will create .crc files when perform data copy.
+        // We should ignore both SEGMENT_CREATION_META and generated '.crc' files.
+        if (!file.getName().equals(V1Constants.SEGMENT_CREATION_META) && !file.getName().endsWith(CRC_FILE_EXTENSTION)) {
           normalFiles.add(file);
         }
       } else {
@@ -81,8 +87,9 @@ public class CrcUtils {
         }
       }
     }
-
-    return checksum.getValue();
+    long crc = checksum.getValue();
+    LOGGER.info("Computed crc = {}, based on files {}", crc, _files);
+    return crc;
   }
 
   public String computeMD5()
@@ -98,8 +105,9 @@ public class CrcUtils {
         }
       }
     }
-
-    return toHexaDecimal(digest.digest());
+    String md5Value = toHexaDecimal(digest.digest());
+    LOGGER.info("Computed MD5 = {}, based on files {}", md5Value, _files);
+    return md5Value;
   }
 
   public static String toHexaDecimal(byte[] bytesToConvert) {

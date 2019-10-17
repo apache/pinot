@@ -90,8 +90,14 @@ public class PinotControllerModeTest extends ControllerTest {
     Assert.assertTrue(firstLeadControllerManager.isLeaderForTable(secondTableName));
 
     enableResourceConfigForLeadControllerResource(true);
-    TestUtils.waitForCondition(aVoid -> firstLeadControllerManager.isLeadControllerResourceEnabled(), TIMEOUT_IN_MS,
-        "Failed to mark lead controller resource as enabled");
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager);
+      } catch (Exception e) {
+        Assert.fail("Exception when checking whether lead controller resource is enabled or not.");
+        return false;
+      }
+    }, TIMEOUT_IN_MS, "Failed to mark lead controller resource as enabled");
     // The first controller should still be the leader for both tables, which is the partition leader, after the resource is enabled.
     Assert.assertTrue(firstLeadControllerManager.isLeaderForTable(firstTableName));
     Assert.assertTrue(firstLeadControllerManager.isLeaderForTable(secondTableName));
@@ -109,7 +115,7 @@ public class PinotControllerModeTest extends ControllerTest {
     checkInstanceState(_helixAdmin);
 
     LeadControllerManager secondLeadControllerManager = secondDualModeController.getLeadControllerManager();
-    Assert.assertTrue(secondLeadControllerManager.isLeadControllerResourceEnabled());
+    Assert.assertTrue(LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager));
 
     // Either one of the controllers is the only leader for a given table name.
     TestUtils.waitForCondition(aVoid -> {
@@ -161,8 +167,15 @@ public class PinotControllerModeTest extends ControllerTest {
     enableResourceConfigForLeadControllerResource(false);
     final LeadControllerManager thirdLeadControllerManager = thirdDualModeController.getLeadControllerManager();
 
-    TestUtils.waitForCondition(aVoid -> !thirdLeadControllerManager.isLeadControllerResourceEnabled(), TIMEOUT_IN_MS,
-        "Lead controller resource should be disabled.");
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return !LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager);
+      } catch (Exception e) {
+        // Exception caught.
+        Assert.fail("Exception when checking whether lead controller resource is enabled or not.");
+        return false;
+      }
+    }, TIMEOUT_IN_MS, "Lead controller resource should be disabled.");
 
     // After disabling lead controller resource, helix leader should be the leader for both tables.
     TestUtils.waitForCondition(

@@ -53,7 +53,7 @@
           {{/each}}
         </div>
       </div>
-      {{#if isWarning}}
+      {{#if warningValue}}
       <div class="diffcurrent-alert alert alert-warning fade in">
         <h4><i class="glyphicon glyphicon-exclamation-sign"></i> Data has been changed since anomaly detected</h4>
         At the time when anomaly was detected, the data has changed from <strong>{{humanizedAnomalyCurrent}}</strong> to <strong>{{warningChangedTo}}</strong>.<br>
@@ -62,7 +62,7 @@
       {{/if}}
     {{/unless}}
 
-    {{#unless isWarning}}
+    {{#unless warningValue}}
       <div class="rootcause-anomaly__body">
         <div class="row">
           <div class="col-xs-2 rootcause-anomaly__title rootcause-anomaly__title--small">

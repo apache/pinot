@@ -18,94 +18,35 @@
  */
 package org.apache.pinot.core.realtime.impl.dictionary;
 
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.ints.IntSets;
 import java.util.Arrays;
-import javax.annotation.Nonnull;
+import org.apache.pinot.core.common.predicate.RangePredicate;
 
 
+@SuppressWarnings("Duplicates")
 public class LongOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
-  private long _min = Long.MAX_VALUE;
-  private long _max = Long.MIN_VALUE;
+  private volatile long _min = Long.MAX_VALUE;
+  private volatile long _max = Long.MIN_VALUE;
 
   @Override
-  public int indexOf(Object rawValue) {
-    if (rawValue instanceof String) {
-      return getDictId(Long.valueOf((String) rawValue));
-    } else {
-      return getDictId(rawValue);
-    }
+  public int index(Object value) {
+    Long longValue = (Long) value;
+    updateMinMax(longValue);
+    return indexValue(longValue);
   }
 
   @Override
-  public void index(@Nonnull Object rawValue) {
-    if (rawValue instanceof Long) {
-      // Single value
-      indexValue(rawValue);
-      updateMinMax((Long) rawValue);
-    } else {
-      // Multi value
-      Object[] values = (Object[]) rawValue;
-      for (Object value : values) {
-        indexValue(value);
-        updateMinMax((Long) value);
-      }
-    }
-  }
-
-  @SuppressWarnings("Duplicates")
-  @Override
-  public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare, boolean includeLower,
-      boolean includeUpper) {
-    long lowerLong = Long.parseLong(lower);
-    long upperLong = Long.parseLong(upper);
-    long valueToCompare = (Long) get(dictIdToCompare);
-
-    if (includeLower) {
-      if (valueToCompare < lowerLong) {
-        return false;
-      }
-    } else {
-      if (valueToCompare <= lowerLong) {
-        return false;
-      }
-    }
-
-    if (includeUpper) {
-      if (valueToCompare > upperLong) {
-        return false;
-      }
-    } else {
-      if (valueToCompare >= upperLong) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  @Nonnull
-  @Override
-  public Long getMinVal() {
-    return _min;
-  }
-
-  @Nonnull
-  @Override
-  public Long getMaxVal() {
-    return _max;
-  }
-
-  @Nonnull
-  @Override
-  public long[] getSortedValues() {
-    int numValues = length();
-    long[] sortedValues = new long[numValues];
-
+  public int[] index(Object[] values) {
+    int numValues = values.length;
+    int[] dictIds = new int[numValues];
     for (int i = 0; i < numValues; i++) {
-      sortedValues[i] = (Long) get(i);
+      Long longValue = (Long) values[i];
+      updateMinMax(longValue);
+      dictIds[i] = indexValue(longValue);
     }
-
-    Arrays.sort(sortedValues);
-    return sortedValues;
+    return dictIds;
   }
 
   @Override
@@ -114,8 +55,114 @@ public class LongOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   }
 
   @Override
+  public IntSet getDictIdsInRange(String lower, String upper, boolean includeLower, boolean includeUpper) {
+    int numValues = length();
+    if (numValues == 0) {
+      return IntSets.EMPTY_SET;
+    }
+    IntSet dictIds = new IntOpenHashSet();
+
+    if (lower.equals(RangePredicate.UNBOUNDED)) {
+      long upperValue = Long.parseLong(upper);
+      if (includeUpper) {
+        for (int dictId = 0; dictId < numValues; dictId++) {
+          long value = getLongValue(dictId);
+          if (value <= upperValue) {
+            dictIds.add(dictId);
+          }
+        }
+      } else {
+        for (int dictId = 0; dictId < numValues; dictId++) {
+          long value = getLongValue(dictId);
+          if (value < upperValue) {
+            dictIds.add(dictId);
+          }
+        }
+      }
+    } else if (upper.equals(RangePredicate.UNBOUNDED)) {
+      long lowerValue = Long.parseLong(lower);
+      if (includeLower) {
+        for (int dictId = 0; dictId < numValues; dictId++) {
+          long value = getLongValue(dictId);
+          if (value >= lowerValue) {
+            dictIds.add(dictId);
+          }
+        }
+      } else {
+        for (int dictId = 0; dictId < numValues; dictId++) {
+          long value = getLongValue(dictId);
+          if (value > lowerValue) {
+            dictIds.add(dictId);
+          }
+        }
+      }
+    } else {
+      long lowerValue = Long.parseLong(lower);
+      long upperValue = Long.parseLong(upper);
+      if (includeLower && includeUpper) {
+        for (int dictId = 0; dictId < numValues; dictId++) {
+          long value = getLongValue(dictId);
+          if (value >= lowerValue && value <= upperValue) {
+            dictIds.add(dictId);
+          }
+        }
+      } else if (includeLower) {
+        for (int dictId = 0; dictId < numValues; dictId++) {
+          long value = getLongValue(dictId);
+          if (value >= lowerValue && value < upperValue) {
+            dictIds.add(dictId);
+          }
+        }
+      } else if (includeUpper) {
+        for (int dictId = 0; dictId < numValues; dictId++) {
+          long value = getLongValue(dictId);
+          if (value > lowerValue && value <= upperValue) {
+            dictIds.add(dictId);
+          }
+        }
+      } else {
+        for (int dictId = 0; dictId < numValues; dictId++) {
+          long value = getLongValue(dictId);
+          if (value > lowerValue && value < upperValue) {
+            dictIds.add(dictId);
+          }
+        }
+      }
+    }
+    return dictIds;
+  }
+
+  @Override
+  public Long getMinVal() {
+    return _min;
+  }
+
+  @Override
+  public Long getMaxVal() {
+    return _max;
+  }
+
+  @Override
+  public long[] getSortedValues() {
+    int numValues = length();
+    long[] sortedValues = new long[numValues];
+
+    for (int dictId = 0; dictId < numValues; dictId++) {
+      sortedValues[dictId] = getLongValue(dictId);
+    }
+
+    Arrays.sort(sortedValues);
+    return sortedValues;
+  }
+
+  @Override
+  public int indexOf(String stringValue) {
+    return getDictId(Long.valueOf(stringValue));
+  }
+
+  @Override
   public int getIntValue(int dictId) {
-    return ((Long) get(dictId)).intValue();
+    return (int) getLongValue(dictId);
   }
 
   @Override
@@ -125,12 +172,17 @@ public class LongOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
 
   @Override
   public float getFloatValue(int dictId) {
-    return (Long) get(dictId);
+    return getLongValue(dictId);
   }
 
   @Override
   public double getDoubleValue(int dictId) {
-    return (Long) get(dictId);
+    return getLongValue(dictId);
+  }
+
+  @Override
+  public String getStringValue(int dictId) {
+    return Long.toString(getLongValue(dictId));
   }
 
   private void updateMinMax(long value) {

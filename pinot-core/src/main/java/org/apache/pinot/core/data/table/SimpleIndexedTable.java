@@ -32,6 +32,8 @@ import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.order.OrderByUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -39,17 +41,39 @@ import org.apache.pinot.core.data.order.OrderByUtils;
  */
 @NotThreadSafe
 public class SimpleIndexedTable extends IndexedTable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SimpleIndexedTable.class);
 
   private List<Record> _records;
   private Map<Key, Integer> _lookupTable;
 
+  private boolean _isOrderBy;
+  private Comparator<Record> _orderByComparator;
+  private Iterator<Record> _iterator;
+
+  private boolean _noMoreNewRecords = false;
+  private int _numResizes = 0;
+  private long _resizeTime = 0;
+
+  /**
+   * Initializes the data structures and comparators needed for this Table
+   * @param dataSchema data schema of the record's keys and values
+   * @param aggregationInfos aggregation infors for the aggregations in record'd values
+   * @param orderBy list of {@link SelectionSort} defining the order by
+   * @param capacity the max number of records to hold
+   */
   @Override
   public void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
-      int maxCapacity) {
-    super.init(dataSchema, aggregationInfos, orderBy, maxCapacity);
+      int capacity) {
+    super.init(dataSchema, aggregationInfos, orderBy, capacity);
 
-    _records = new ArrayList<>(maxCapacity);
-    _lookupTable = new HashMap<>(maxCapacity);
+    _records = new ArrayList<>(capacity);
+    _lookupTable = new HashMap<>(capacity);
+
+    _isOrderBy = CollectionUtils.isNotEmpty(orderBy);
+    if (_isOrderBy) {
+      // final results not extracted upfront
+      _orderByComparator = OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos, true);
+    }
   }
 
   /**
@@ -61,33 +85,45 @@ public class SimpleIndexedTable extends IndexedTable {
     Preconditions.checkNotNull(keys, "Cannot upsert record with null keys");
 
     Integer index = _lookupTable.get(keys);
-    if (index == null) {
-      index = size();
-      _lookupTable.put(keys, index);
-      _records.add(index, newRecord);
-    } else {
-      Record existingRecord = _records.get(index);
-      for (int i = 0; i < _aggregationFunctions.size(); i++) {
-        existingRecord.getValues()[i] =
-            _aggregationFunctions.get(i).merge(existingRecord.getValues()[i], newRecord.getValues()[i]);
+    if (_noMoreNewRecords) { // only update existing records
+      if (index != null) {
+        Record existingRecord = _records.get(index);
+        for (int i = 0; i < _numAggregations; i++) {
+          existingRecord.getValues()[i] = _aggregationFunctions.get(i).merge(existingRecord.getValues()[i], newRecord.getValues()[i]);
+        }
       }
-    }
+    } else { // allow all records
+      if (index == null) {
+        index = size();
+        _lookupTable.put(keys, index);
+        _records.add(index, newRecord);
+      } else {
+        Record existingRecord = _records.get(index);
+        for (int i = 0; i < _numAggregations; i++) {
+          existingRecord.getValues()[i] = _aggregationFunctions.get(i).merge(existingRecord.getValues()[i], newRecord.getValues()[i]);
+        }
+      }
 
-    if (size() >= _bufferedCapacity) {
-      resize(_evictCapacity);
+      if (size() >= _bufferedCapacity) {
+        if (_isOrderBy) { // capacity reached, order and resize
+          sortAndResize(_maxCapacity);
+        } else { // capacity reached, but no order by. Allow no more records
+          _noMoreNewRecords = true;
+        }
+      }
     }
     return true;
   }
 
-  private void resize(int trimToSize) {
+  private void sortAndResize(int trimToSize) {
+    long startTime = System.currentTimeMillis();
+
     // sort
-    if (CollectionUtils.isNotEmpty(_orderBy)) {
-      Comparator<Record> comparator;
-      comparator = OrderByUtils.getKeysAndValuesComparator(_dataSchema, _orderBy, _aggregationInfos);
-      _records.sort(comparator);
+    if (_isOrderBy) {
+      _records.sort(_orderByComparator);
     }
 
-    // evict lowest
+    // evict lowest (or whatever's at the bottom if sort didnt happen)
     if (_records.size() > trimToSize) {
       _records = new ArrayList<>(_records.subList(0, trimToSize));
     }
@@ -97,6 +133,12 @@ public class SimpleIndexedTable extends IndexedTable {
     for (int i = 0; i < _records.size(); i++) {
       _lookupTable.put(_records.get(i).getKey(), i);
     }
+
+    long endTime = System.currentTimeMillis();
+    long timeElapsed = endTime - startTime;
+
+    _numResizes++;
+    _resizeTime += timeElapsed;
   }
 
 
@@ -116,11 +158,21 @@ public class SimpleIndexedTable extends IndexedTable {
 
   @Override
   public Iterator<Record> iterator() {
-    return _records.iterator();
+    return _iterator;
   }
 
   @Override
-  public void finish() {
-    resize(_maxCapacity);
+  public void finish(boolean sort) {
+    // TODO: support resize without sort
+    sortAndResize(_maxCapacity);
+    LOGGER.debug("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", _numResizes, _resizeTime,
+        _numResizes == 0 ? 0 : _resizeTime / _numResizes);
+
+    _iterator = _records.iterator();
+  }
+
+  @Override
+  public DataSchema getDataSchema() {
+    return _dataSchema;
   }
 }

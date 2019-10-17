@@ -1,19 +1,16 @@
 package org.apache.pinot.thirdeye.detection.alert;
 
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import org.apache.pinot.thirdeye.anomaly.task.TaskContext;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.alert.scheme.DetectionAlertScheme;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -22,6 +19,8 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration.*;
 
 
 public class DetectionAlertTaskFactoryTest {
@@ -104,7 +103,11 @@ public class DetectionAlertTaskFactoryTest {
   @Test(expectedExceptions = NullPointerException.class)
   public void testDefaultAlertSchemes() throws Exception {
     DetectionAlertTaskFactory detectionAlertTaskFactory = new DetectionAlertTaskFactory();
-    detectionAlertTaskFactory.loadAlertSchemes(null, new ThirdEyeAnomalyConfiguration(), null);
+
+    ThirdEyeAnomalyConfiguration teConfig = new ThirdEyeAnomalyConfiguration();
+    teConfig.setAlerterConfiguration(new HashMap<>());
+
+    detectionAlertTaskFactory.loadAlertSchemes(null, teConfig, null);
   }
 
   /**
@@ -115,8 +118,12 @@ public class DetectionAlertTaskFactoryTest {
     DetectionAlertConfigDTO alertConfig = createAlertConfig(Collections.emptyMap(),
         "org.apache.pinot.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
     DetectionAlertTaskFactory detectionAlertTaskFactory = new DetectionAlertTaskFactory();
+
+    ThirdEyeAnomalyConfiguration teConfig = new ThirdEyeAnomalyConfiguration();
+    teConfig.setAlerterConfiguration(new HashMap<>());
+
     Set<DetectionAlertScheme> detectionAlertSchemes = detectionAlertTaskFactory.loadAlertSchemes(alertConfig,
-        new ThirdEyeAnomalyConfiguration(), null);
+        teConfig, null);
 
     Assert.assertEquals(detectionAlertSchemes.size(), 1);
     Assert.assertEquals(detectionAlertSchemes.iterator().next().getClass().getSimpleName(), "DetectionEmailAlerter");

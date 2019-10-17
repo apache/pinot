@@ -60,29 +60,23 @@ public class MutableDictionaryTest {
   @Test
   public void testSingleReaderSingleWriter() {
     try {
-      {
-        MutableDictionary dictionary = new IntOnHeapMutableDictionary();
+      try (BaseMutableDictionary dictionary = new IntOnHeapMutableDictionary()) {
         testSingleReaderSingleWriter(dictionary, FieldSpec.DataType.INT);
-        dictionary.close();
       }
-      {
-        MutableDictionary dictionary =
-            new IntOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager, "intColumn");
+      try (BaseMutableDictionary dictionary = new IntOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager,
+          "intColumn")) {
         testSingleReaderSingleWriter(dictionary, FieldSpec.DataType.INT);
-        dictionary.close();
       }
-      {
-        MutableDictionary dictionary =
-            new StringOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager, "stringColumn", 32);
+      try (BaseMutableDictionary dictionary = new StringOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager,
+          "stringColumn", 32)) {
         testSingleReaderSingleWriter(dictionary, FieldSpec.DataType.STRING);
-        dictionary.close();
       }
     } catch (Throwable t) {
       Assert.fail("Failed with random seed: " + RANDOM_SEED, t);
     }
   }
 
-  private void testSingleReaderSingleWriter(MutableDictionary dictionary, FieldSpec.DataType dataType)
+  private void testSingleReaderSingleWriter(BaseMutableDictionary dictionary, FieldSpec.DataType dataType)
       throws Exception {
     Future<Void> readerFuture = _executorService.submit(new Reader(dictionary, dataType));
     Future<Void> writerFuture = _executorService.submit(new Writer(dictionary, dataType));
@@ -94,29 +88,23 @@ public class MutableDictionaryTest {
   @Test
   public void testMultiReadersSingleWriter() {
     try {
-      {
-        MutableDictionary dictionary = new IntOnHeapMutableDictionary();
+      try (BaseMutableDictionary dictionary = new IntOnHeapMutableDictionary()) {
         testMultiReadersSingleWriter(dictionary, FieldSpec.DataType.INT);
-        dictionary.close();
       }
-      {
-        MutableDictionary dictionary =
-            new IntOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager, "intColumn");
+      try (BaseMutableDictionary dictionary = new IntOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager,
+          "intColumn")) {
         testMultiReadersSingleWriter(dictionary, FieldSpec.DataType.INT);
-        dictionary.close();
       }
-      {
-        MutableDictionary dictionary =
-            new StringOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager, "stringColumn", 32);
+      try (BaseMutableDictionary dictionary = new StringOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager,
+          "stringColumn", 32)) {
         testMultiReadersSingleWriter(dictionary, FieldSpec.DataType.STRING);
-        dictionary.close();
       }
     } catch (Throwable t) {
       Assert.fail("Failed with random seed: " + RANDOM_SEED, t);
     }
   }
 
-  private void testMultiReadersSingleWriter(MutableDictionary dictionary, FieldSpec.DataType dataType)
+  private void testMultiReadersSingleWriter(BaseMutableDictionary dictionary, FieldSpec.DataType dataType)
       throws Exception {
     Future[] readerFutures = new Future[NUM_READERS];
     for (int i = 0; i < NUM_READERS; i++) {
@@ -134,26 +122,9 @@ public class MutableDictionaryTest {
   public void testOnHeapMutableDictionary() {
     try {
       for (FieldSpec.DataType dataType : DATA_TYPES) {
-        MutableDictionary dictionary = MutableDictionaryFactory.getMutableDictionary(dataType, false, null, 0, 0, null);
-        testMutableDictionary(dictionary, dataType);
-        dictionary.close();
-      }
-    } catch (Throwable t) {
-      Assert.fail("Failed with random seed: " + RANDOM_SEED, t);
-    }
-  }
-
-  @Test
-  public void testOffHeapMutableDictionary()
-      throws Exception {
-    int[] maxOverflowSizes = {0, 2000};
-
-    try {
-      for (FieldSpec.DataType dataType : DATA_TYPES) {
-        for (int maxOverflowSize : maxOverflowSizes) {
-          MutableDictionary dictionary = makeOffHeapDictionary(EST_CARDINALITY, maxOverflowSize, dataType);
+        try (BaseMutableDictionary dictionary = MutableDictionaryFactory
+            .getMutableDictionary(dataType, false, null, 0, 0, null)) {
           testMutableDictionary(dictionary, dataType);
-          dictionary.close();
         }
       }
     } catch (Throwable t) {
@@ -161,7 +132,24 @@ public class MutableDictionaryTest {
     }
   }
 
-  private void testMutableDictionary(MutableDictionary dictionary, FieldSpec.DataType dataType) {
+  @Test
+  public void testOffHeapMutableDictionary() {
+    int[] maxOverflowSizes = {0, 2000};
+
+    try {
+      for (FieldSpec.DataType dataType : DATA_TYPES) {
+        for (int maxOverflowSize : maxOverflowSizes) {
+          try (BaseMutableDictionary dictionary = makeOffHeapDictionary(EST_CARDINALITY, maxOverflowSize, dataType)) {
+            testMutableDictionary(dictionary, dataType);
+          }
+        }
+      }
+    } catch (Throwable t) {
+      Assert.fail("Failed with random seed: " + RANDOM_SEED, t);
+    }
+  }
+
+  private void testMutableDictionary(BaseMutableDictionary dictionary, FieldSpec.DataType dataType) {
     Map<Object, Integer> valueToDictId = new HashMap<>();
     int numEntries = 0;
 
@@ -174,13 +162,15 @@ public class MutableDictionaryTest {
       Comparable value =
           (i == 0 && dataType == FieldSpec.DataType.INT) ? Integer.MIN_VALUE : makeRandomObjectOfType(dataType);
 
-      Object rawValue = dataType == FieldSpec.DataType.BYTES ? ((i % 2 == 0) ? ((ByteArray) value).getBytes()
-          : ((ByteArray) value).toHexString()) : value;
       if (valueToDictId.containsKey(value)) {
-        Assert.assertEquals(dictionary.indexOf(rawValue), (int) valueToDictId.get(value));
+        Assert.assertEquals(dictionary.indexOf(value.toString()), (int) valueToDictId.get(value));
       } else {
-        dictionary.index(rawValue);
-        int dictId = dictionary.indexOf(rawValue);
+        int dictId;
+        if (dataType != FieldSpec.DataType.BYTES) {
+          dictId = dictionary.index(value);
+        } else {
+          dictId = dictionary.index(((ByteArray) value).getBytes());
+        }
         Assert.assertEquals(dictId, numEntries++);
         valueToDictId.put(value, dictId);
 
@@ -206,15 +196,11 @@ public class MutableDictionaryTest {
             .asList((Comparable[]) dictionary.getSortedValues()) : primitiveArrayToList(dataType, sortedValues);
     Assert.assertEquals(actualSortedValues, expectedSortedValues);
 
-    // Bytes do not support string comparison.
-    if (!dataType.equals(FieldSpec.DataType.BYTES)) {
-      for (int i = 0; i < dictionary.length(); i++) {
-        Assert.assertTrue(dictionary.inRange(expectedMin.toString(), expectedMax.toString(), i, true, true));
-      }
-    }
+    Assert.assertEquals(dictionary.getDictIdsInRange(expectedMin.toString(), expectedMax.toString(), true, true).size(),
+        dictionary.length());
   }
 
-  private MutableDictionary makeOffHeapDictionary(int estCardinality, int maxOverflowSize,
+  private BaseMutableDictionary makeOffHeapDictionary(int estCardinality, int maxOverflowSize,
       FieldSpec.DataType dataType) {
     switch (dataType) {
       case INT:
@@ -267,21 +253,20 @@ public class MutableDictionaryTest {
    * <p>We can assume that we always first get the index of a value, then use the index to fetch the value.
    */
   private class Reader implements Callable<Void> {
-    private final MutableDictionary _dictionary;
+    private final BaseMutableDictionary _dictionary;
     private final FieldSpec.DataType _dataType;
 
-    private Reader(MutableDictionary dictionary, FieldSpec.DataType dataType) {
+    private Reader(BaseMutableDictionary dictionary, FieldSpec.DataType dataType) {
       _dictionary = dictionary;
       _dataType = dataType;
     }
 
     @Override
-    public Void call()
-        throws Exception {
+    public Void call() {
       for (int i = 0; i < NUM_ENTRIES; i++) {
         int dictId;
         do {
-          dictId = _dictionary.indexOf(makeObject(i + 1, _dataType));
+          dictId = _dictionary.indexOf(Integer.toString(i + 1));
         } while (dictId < 0);
         Assert.assertEquals(dictId, i);
         checkEquals(_dictionary, dictId, _dataType);
@@ -297,17 +282,16 @@ public class MutableDictionaryTest {
    * Writer to index value into dictionary, then check the index of the value.
    */
   private class Writer implements Callable<Void> {
-    private final MutableDictionary _dictionary;
+    private final BaseMutableDictionary _dictionary;
     private final FieldSpec.DataType _dataType;
 
-    private Writer(MutableDictionary dictionary, FieldSpec.DataType dataType) {
+    private Writer(BaseMutableDictionary dictionary, FieldSpec.DataType dataType) {
       _dictionary = dictionary;
       _dataType = dataType;
     }
 
     @Override
-    public Void call()
-        throws Exception {
+    public Void call() {
       for (int i = 0; i < NUM_ENTRIES; i++) {
         Object value = makeObject(i + 1, _dataType);
         _dictionary.index(value);
@@ -337,7 +321,7 @@ public class MutableDictionaryTest {
   /**
    * Helper method to check whether the value of the given dictId is one larger than the dictId.
    */
-  private static void checkEquals(MutableDictionary dictionary, int dictId, FieldSpec.DataType dataType) {
+  private static void checkEquals(BaseMutableDictionary dictionary, int dictId, FieldSpec.DataType dataType) {
     switch (dataType) {
       case INT:
         Assert.assertEquals(dictionary.getIntValue(dictId), dictId + 1);

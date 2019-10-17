@@ -20,6 +20,7 @@ package org.apache.pinot.common.utils;
 
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
+import org.apache.pinot.common.utils.primitive.ByteArray;
 
 
 public class BytesUtils {
@@ -27,21 +28,27 @@ public class BytesUtils {
   }
 
   /**
-   * Converts Hex encoded string to byte[] if necessary.
+   * Converts a Hex encoded string to a byte array.
    *
-   * @param rawValue byte array or Hex encoded string
-   * @return value itself if byte array is provided, or decoded byte array if Hex encoded string is provided
+   * @param stringValue Hex encoded string
+   * @return Decoded byte array
    */
-  public static byte[] toBytes(Object rawValue) {
-    if (rawValue instanceof String) {
-      try {
-        return Hex.decodeHex(((String) rawValue).toCharArray());
-      } catch (DecoderException e) {
-        throw new IllegalArgumentException("Value: " + rawValue + " is not Hex encoded", e);
-      }
-    } else {
-      return (byte[]) rawValue;
+  public static byte[] toBytes(String stringValue) {
+    try {
+      return Hex.decodeHex(stringValue.toCharArray());
+    } catch (DecoderException e) {
+      throw new IllegalArgumentException("Value: " + stringValue + " is not Hex encoded", e);
     }
+  }
+
+  /**
+   * Converts a Hex encoded string to a {@link ByteArray}.
+   *
+   * @param stringValue Hex encoded string
+   * @return Decoded {@link ByteArray}
+   */
+  public static ByteArray toByteArray(String stringValue) {
+    return new ByteArray(toBytes(stringValue));
   }
 
   /**

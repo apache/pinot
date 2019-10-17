@@ -18,36 +18,14 @@
  */
 package org.apache.pinot.core.segment.creator.impl;
 
-/**
- * Jun 30, 2014
- *
- */
 public class V1Constants {
-  public static final String QUERY_RHS_DELIMITER = "\t\t";
   public static final String SEGMENT_CREATION_META = "creation.meta";
   public static final String STAR_TREE_INDEX_DIR = "star-tree";
   public static final String STAR_TREE_INDEX_FILE = "star-tree.bin";
-  public static final String STAR_TREE_ON_HEAP_INDEX_FILE = "star-tree-on-heap.bin";
-  public static final String STAR_TREE_OFF_HEAP_INDEX_FILE = "star-tree-off-heap.bin";
-  public static final String VERSIONS_FILE = "versions.vr";
-  public static final String SEGMENT_DOWNLOAD_URL = "segment.download.url";
-  public static final String SEGMENT_PUSH_TIME = "segment.push.time";
-  public static final String SEGMENT_REFRESH_TIME = "segment.refresh.time";
-
-  public static class Numbers {
-    // null representatives
-    public static final Integer NULL_INT = Integer.MIN_VALUE;
-    public static final Long NULL_LONG = Long.MIN_VALUE;
-    public static final Float NULL_FLOAT = Float.MIN_VALUE;
-    public static final Double NULL_DOUBLE = Double.MIN_VALUE;
-  }
 
   public static class Str {
     public static final char DEFAULT_STRING_PAD_CHAR = '\0';
     public static final char LEGACY_STRING_PAD_CHAR = '%';
-    public static final java.lang.String CHAR_SET = "UTF-8";
-    public static final String NULL_STRING = "nil";
-    public static final String NULL_BOOLEAN = Boolean.toString(false);
   }
 
   public static class Dict {
@@ -85,29 +63,16 @@ public class V1Constants {
       public static final String TABLE_NAME = "segment.table.name";
       public static final String DIMENSIONS = "segment.dimension.column.names";
       public static final String METRICS = "segment.metric.column.names";
-      public static final String UNKNOWN_COLUMNS = "segment.unknown.column.names";
       public static final String TIME_COLUMN_NAME = "segment.time.column.name";
       public static final String TIME_UNIT = "segment.time.unit";
-      public static final String TIME_INTERVAL = "segment.time.interval";
+      public static final String SEGMENT_START_TIME = "segment.start.time";
+      public static final String SEGMENT_END_TIME = "segment.end.time";
       public static final String DATETIME_COLUMNS = "segment.datetime.column.names";
-      public static final String CUSTOM_PROPERTIES_PREFIX = "segment.custom";
       public static final String SEGMENT_TOTAL_DOCS = "segment.total.docs";
       public static final String SEGMENT_TOTAL_RAW_DOCS = "segment.total.raw.docs";
       public static final String SEGMENT_TOTAL_AGGREGATE_DOCS = "segment.total.aggregate.docs";
-      public static final String SEGMENT_CRC = "segment.crc";
-      public static final String SEGMENT_CREATION_TIME = "segment.creation.time";
       public static final String SEGMENT_PADDING_CHARACTER = "segment.padding.character";
-      public static final String SEGMENT_TOTAL_ERRORS = "segment.total.errors";
-      public static final String SEGMENT_TOTAL_NULLS = "segment.total.nulls";
-      public static final String SEGMENT_TOTAL_CONVERSIONS = "segment.total.conversions";
-      public static final String SEGMENT_TOTAL_NULL_COLS = "segment.total.null.cols";
       public static final String SEGMENT_HLL_LOG2M = "segment.hll.log2m";
-
-      // not using currently
-      public static final String SEGMENT_INDEX_TYPE = "segment.index.type";
-      public static final String SEGMENT_START_TIME = "segment.start.time";
-      public static final String SEGMENT_END_TIME = "segment.end.time";
-      public static final String SEGMENT_TIME_GRANULARITY = "segment.time.granularity";
     }
 
     public static class Column {

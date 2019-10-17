@@ -20,86 +20,53 @@ package org.apache.pinot.core.segment.index.readers;
 
 public abstract class BaseDictionary implements Dictionary {
 
-  @Override
-  public Object get(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public int getIntValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public long getLongValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public float getFloatValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public double getDoubleValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public String getStringValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
+  /**
+   * Should be overridden by dictionary of type STRING and BYTES.
+   */
   @Override
   public byte[] getBytesValue(int dictId) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public void readIntValues(int[] dictIds, int inStartPos, int length, int[] outValues, int outStartPos) {
-    int inEndPos = inStartPos + length;
-    for (int i = inStartPos; i < inEndPos; i++) {
-      outValues[outStartPos++] = getIntValue(dictIds[i]);
+  public void readIntValues(int[] dictIds, int length, int[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getIntValue(dictIds[i]);
     }
   }
 
   @Override
-  public void readLongValues(int[] dictIds, int inStartPos, int length, long[] outValues, int outStartPos) {
-    int inEndPos = inStartPos + length;
-    for (int i = inStartPos; i < inEndPos; i++) {
-      outValues[outStartPos++] = getLongValue(dictIds[i]);
+  public void readLongValues(int[] dictIds, int length, long[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getLongValue(dictIds[i]);
     }
   }
 
   @Override
-  public void readFloatValues(int[] dictIds, int inStartPos, int length, float[] outValues, int outStartPos) {
-    int inEndPos = inStartPos + length;
-    for (int i = inStartPos; i < inEndPos; i++) {
-      outValues[outStartPos++] = getFloatValue(dictIds[i]);
+  public void readFloatValues(int[] dictIds, int length, float[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getFloatValue(dictIds[i]);
     }
   }
 
   @Override
-  public void readDoubleValues(int[] dictIds, int inStartPos, int length, double[] outValues, int outStartPos) {
-    int inEndPos = inStartPos + length;
-    for (int i = inStartPos; i < inEndPos; i++) {
-      outValues[outStartPos++] = getDoubleValue(dictIds[i]);
+  public void readDoubleValues(int[] dictIds, int length, double[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getDoubleValue(dictIds[i]);
     }
   }
 
   @Override
-  public void readStringValues(int[] dictIds, int inStartPos, int length, String[] outValues, int outStartPos) {
-    int inEndPos = inStartPos + length;
-    for (int i = inStartPos; i < inEndPos; i++) {
-      outValues[outStartPos++] = getStringValue(dictIds[i]);
+  public void readStringValues(int[] dictIds, int length, String[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getStringValue(dictIds[i]);
     }
   }
 
   @Override
-  public void readBytesValues(int[] dictIds, int inStartPos, int length, byte[][] outValues, int outStartPos) {
-    int inEndPos = inStartPos + length;
-    for (int i = inStartPos; i < inEndPos; i++) {
-      outValues[outStartPos++] = getBytesValue(dictIds[i]);
+  public void readBytesValues(int[] dictIds, int length, byte[][] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getBytesValue(dictIds[i]);
     }
   }
 }

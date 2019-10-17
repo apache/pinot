@@ -8,10 +8,36 @@
     stroke-dasharray: 2,2;
   }
   .c3-target-Upper-and-lower-bound{
-    opacity: 0.5 !important;
+    // opacity: 0.5 !important;
+    visibility: hidden !important;
   }
   .c3-target-lowerBound {
-    opacity: 0.5 !important;
+    // opacity: 0.5 !important;
+    visibility: hidden !important;
+  }
+  .c3-circles-old-anomaly-edges > .c3-circle {
+    opacity: 1.0 !important;
+  }
+  .c3-circles-new-anomaly-edges > .c3-circle {
+    opacity: 1.0 !important;
+  }
+  .c3-tooltip-name--old-anomaly-edges {
+    display: none !important;
+  }
+  .c3-tooltip-name--new-anomaly-edges {
+    display: none !important;
+  }
+  .c3-tooltip-name--New-Settings-Anomalies {
+    display: none !important;
+  }
+  .c3-tooltip-name--Current-Anomalies {
+    display: none !important;
+  }
+  .c3-tooltip-name--Current-Settings-Anomalies {
+    display: none !important;
+  }
+  .c3-tooltip-name--Old-Settings-Anomalies {
+    display: none !important;
   }
   path.confidence-bounds {
     stroke: #1CAFED;

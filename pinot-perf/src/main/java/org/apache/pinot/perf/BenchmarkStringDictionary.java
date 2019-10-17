@@ -121,10 +121,11 @@ public class BenchmarkStringDictionary {
       throws IOException {
     try (StringOffHeapMutableDictionary offHeapDictionary = new StringOffHeapMutableDictionary(CARDINALITY,
         CARDINALITY / 10, _memoryManager, null, _maxValueLength / 2)) {
+      int value = 0;
       for (String stringValue : _values) {
-        offHeapDictionary.index(stringValue);
+        value += offHeapDictionary.index(stringValue);
       }
-      return offHeapDictionary.length();
+      return value;
     }
   }
 
@@ -132,10 +133,11 @@ public class BenchmarkStringDictionary {
   public int onHeapStringDictionaryWrite()
       throws IOException {
     try (StringOnHeapMutableDictionary onHeapDictionary = new StringOnHeapMutableDictionary()) {
+      int value = 0;
       for (String stringValue : _values) {
-        onHeapDictionary.index(stringValue);
+        value += onHeapDictionary.index(stringValue);
       }
-      return onHeapDictionary.length();
+      return value;
     }
   }
 

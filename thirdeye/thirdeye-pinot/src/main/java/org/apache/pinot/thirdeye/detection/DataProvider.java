@@ -23,6 +23,7 @@ import com.google.common.collect.Multimap;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -149,4 +150,8 @@ public interface DataProvider {
    * @return a multimap of evaluations (keyed by the evaluations slice)
    */
   Multimap<EvaluationSlice, EvaluationDTO> fetchEvaluations(Collection<EvaluationSlice> evaluationSlices, long configId);
+
+  default List<DatasetConfigDTO> fetchDatasetByDisplayName(String datasetDisplayName) {
+    throw new NotImplementedException("the method is not implemented");
+  }
 }

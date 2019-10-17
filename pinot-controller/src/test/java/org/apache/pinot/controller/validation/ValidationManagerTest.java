@@ -116,7 +116,7 @@ public class ValidationManagerTest extends ControllerTest {
   public void testPushTimePersistence() {
     SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
 
-    _helixResourceManager.addNewSegment(TEST_TABLE_NAME, segmentMetadata, "http://dummy/");
+    _helixResourceManager.addNewSegment(TEST_TABLE_NAME, segmentMetadata, "downloadUrl");
     OfflineSegmentZKMetadata offlineSegmentZKMetadata =
         _helixResourceManager.getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
     long pushTime = offlineSegmentZKMetadata.getPushTime();
@@ -133,7 +133,8 @@ public class ValidationManagerTest extends ControllerTest {
       return externalView != null && externalView.getPartitionSet().contains(TEST_SEGMENT_NAME);
     }, 30_000L, "Failed to find the segment in the ExternalView");
     Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
-    _helixResourceManager.refreshSegment(TEST_TABLE_NAME, segmentMetadata, offlineSegmentZKMetadata);
+    _helixResourceManager
+        .refreshSegment(TEST_TABLE_NAME, segmentMetadata, offlineSegmentZKMetadata, "downloadUrl", null);
 
     offlineSegmentZKMetadata = _helixResourceManager.getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
     // Check that the segment still has the same push time

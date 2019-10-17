@@ -41,7 +41,7 @@ public interface NotificationContent {
   /**
    * Generate the template dictionary from the list of anomaly results to render in the template
    */
-  Map<String, Object> format(Long groupId, String groupName, Collection<AnomalyResult> anomalies, ADContentFormatterContext context);
+  Map<String, Object> format(Collection<AnomalyResult> anomalies, ADContentFormatterContext context);
 
   /**
    * Retrieves the template file (.ftl)

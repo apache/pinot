@@ -20,7 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -46,7 +46,7 @@ public interface TransformFunction {
    * @param arguments Arguments for the transform function
    * @param dataSourceMap Map from column to data source
    */
-  void init(@Nonnull List<TransformFunction> arguments, @Nonnull Map<String, DataSource> dataSourceMap);
+  void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap);
 
   /**
    * Returns the metadata for the result of the transform function.
@@ -60,7 +60,7 @@ public interface TransformFunction {
    */
 
   /**
-   * Returns the dictionary that the dictionary Ids based on.
+   * Returns the dictionary for the transform result if the result is dictionary-encoded, or {@code null} if not.
    *
    * @return Dictionary
    */
@@ -72,7 +72,7 @@ public interface TransformFunction {
    * @param projectionBlock Projection block
    * @return Transformation result
    */
-  int[] transformToDictIdsSV(@Nonnull ProjectionBlock projectionBlock);
+  int[] transformToDictIdsSV(ProjectionBlock projectionBlock);
 
   /**
    * Transforms the data from the given projection block to multi-valued dictionary Ids.
@@ -80,7 +80,7 @@ public interface TransformFunction {
    * @param projectionBlock Projection block
    * @return Transformation result
    */
-  int[][] transformToDictIdsMV(@Nonnull ProjectionBlock projectionBlock);
+  int[][] transformToDictIdsMV(ProjectionBlock projectionBlock);
 
   /**
    * SINGLE-VALUED APIs
@@ -92,7 +92,7 @@ public interface TransformFunction {
    * @param projectionBlock Projection result
    * @return Transformation result
    */
-  int[] transformToIntValuesSV(@Nonnull ProjectionBlock projectionBlock);
+  int[] transformToIntValuesSV(ProjectionBlock projectionBlock);
 
   /**
    * Transforms the data from the given projection block to single-valued long values.
@@ -100,7 +100,7 @@ public interface TransformFunction {
    * @param projectionBlock Projection result
    * @return Transformation result
    */
-  long[] transformToLongValuesSV(@Nonnull ProjectionBlock projectionBlock);
+  long[] transformToLongValuesSV(ProjectionBlock projectionBlock);
 
   /**
    * Transforms the data from the given projection block to single-valued float values.
@@ -108,7 +108,7 @@ public interface TransformFunction {
    * @param projectionBlock Projection result
    * @return Transformation result
    */
-  float[] transformToFloatValuesSV(@Nonnull ProjectionBlock projectionBlock);
+  float[] transformToFloatValuesSV(ProjectionBlock projectionBlock);
 
   /**
    * Transforms the data from the given projection block to single-valued double values.
@@ -116,7 +116,7 @@ public interface TransformFunction {
    * @param projectionBlock Projection result
    * @return Transformation result
    */
-  double[] transformToDoubleValuesSV(@Nonnull ProjectionBlock projectionBlock);
+  double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock);
 
   /**
    * Transforms the data from the given projection block to single-valued string values.
@@ -124,7 +124,15 @@ public interface TransformFunction {
    * @param projectionBlock Projection result
    * @return Transformation result
    */
-  String[] transformToStringValuesSV(@Nonnull ProjectionBlock projectionBlock);
+  String[] transformToStringValuesSV(ProjectionBlock projectionBlock);
+
+  /**
+   * Transforms the data from the given projection block to single-valued bytes values.
+   *
+   * @param projectionBlock Projection result
+   * @return Transformation result
+   */
+  byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock);
 
   /**
    * MULTI-VALUED APIs
@@ -136,7 +144,7 @@ public interface TransformFunction {
    * @param projectionBlock Projection result
    * @return Transformation result
    */
-  int[][] transformToIntValuesMV(@Nonnull ProjectionBlock projectionBlock);
+  int[][] transformToIntValuesMV(ProjectionBlock projectionBlock);
 
   /**
    * Transforms the data from the given projection block to multi-valued long values.
@@ -144,7 +152,7 @@ public interface TransformFunction {
    * @param projectionBlock Projection result
    * @return Transformation result
    */
-  long[][] transformToLongValuesMV(@Nonnull ProjectionBlock projectionBlock);
+  long[][] transformToLongValuesMV(ProjectionBlock projectionBlock);
 
   /**
    * Transforms the data from the given projection block to multi-valued float values.
@@ -152,7 +160,7 @@ public interface TransformFunction {
    * @param projectionBlock Projection result
    * @return Transformation result
    */
-  float[][] transformToFloatValuesMV(@Nonnull ProjectionBlock projectionBlock);
+  float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock);
 
   /**
    * Transforms the data from the given projection block to multi-valued double values.
@@ -160,7 +168,7 @@ public interface TransformFunction {
    * @param projectionBlock Projection result
    * @return Transformation result
    */
-  double[][] transformToDoubleValuesMV(@Nonnull ProjectionBlock projectionBlock);
+  double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock);
 
   /**
    * Transforms the data from the given projection block to multi-valued string values.
@@ -168,5 +176,5 @@ public interface TransformFunction {
    * @param projectionBlock Projection result
    * @return Transformation result
    */
-  String[][] transformToStringValuesMV(@Nonnull ProjectionBlock projectionBlock);
+  String[][] transformToStringValuesMV(ProjectionBlock projectionBlock);
 }

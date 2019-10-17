@@ -21,11 +21,7 @@ package org.apache.pinot.controller;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
-import org.apache.helix.PropertyKey;
-import org.apache.helix.model.LiveInstance;
-import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -122,7 +118,8 @@ public class LeadControllerManager {
     LOGGER.info("Add Partition: {} to LeadControllerManager", partitionName);
     int partitionId = LeadControllerUtils.extractPartitionId(partitionName);
     _leadForPartitions.add(partitionId);
-    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_PARTITION_LEADER, partitionName, 1L);
+    _controllerMetrics
+        .setValueOfGlobalGauge(ControllerGauge.CONTROLLER_LEADER_PARTITION_COUNT, _leadForPartitions.size());
   }
 
   /**
@@ -133,35 +130,22 @@ public class LeadControllerManager {
     LOGGER.info("Remove Partition: {} from LeadControllerManager", partitionName);
     int partitionId = LeadControllerUtils.extractPartitionId(partitionName);
     _leadForPartitions.remove(partitionId);
-    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_PARTITION_LEADER, partitionName, 0L);
+    _controllerMetrics
+        .setValueOfGlobalGauge(ControllerGauge.CONTROLLER_LEADER_PARTITION_COUNT, _leadForPartitions.size());
   }
 
   /**
    * Checks from ZK if the current controller host is Helix cluster leader.
    */
   private boolean isHelixLeader() {
-    HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
-    PropertyKey propertyKey = helixDataAccessor.keyBuilder().controllerLeader();
-    LiveInstance liveInstance = helixDataAccessor.getProperty(propertyKey);
-    if (liveInstance == null) {
+    String helixLeaderInstanceId = LeadControllerUtils.getHelixClusterLeader(_helixManager);
+    if (helixLeaderInstanceId == null) {
       LOGGER.warn("Helix leader ZNode is missing");
       return false;
     }
-    String helixLeaderInstanceId = liveInstance.getInstanceName();
     // The instance name from Helix leader ZNode is without controller prefix.
     // It is essential to convert to participant id for fair comparison.
     return _instanceId.equals(Helix.PREFIX_OF_CONTROLLER_INSTANCE + helixLeaderInstanceId);
-  }
-
-  /**
-   * Checks from ZK if resource config of leadControllerResource is enabled.
-   */
-  public boolean isLeadControllerResourceEnabled() {
-    HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
-    PropertyKey propertyKey = helixDataAccessor.keyBuilder().resourceConfig(Helix.LEAD_CONTROLLER_RESOURCE_NAME);
-    ResourceConfig resourceConfig = helixDataAccessor.getProperty(propertyKey);
-    String enableResource = resourceConfig.getSimpleConfig(Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY);
-    return Boolean.parseBoolean(enableResource);
   }
 
   /**
@@ -226,7 +210,18 @@ public class LeadControllerManager {
     if (_isShuttingDown) {
       return;
     }
-    if (isLeadControllerResourceEnabled()) {
+
+    boolean leadControllerResourceEnabled;
+    try {
+      leadControllerResourceEnabled = LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager);
+    } catch (Exception e) {
+      LOGGER.error("Exception when checking whether lead controller resource is enabled or not.", e);
+      _isLeadControllerResourceEnabled = false;
+      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_LEAD_CONTROLLER_RESOURCE_ENABLED, 0L);
+      return;
+    }
+
+    if (leadControllerResourceEnabled) {
       LOGGER.info("Lead controller resource is enabled.");
       _isLeadControllerResourceEnabled = true;
       _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_LEAD_CONTROLLER_RESOURCE_ENABLED, 1L);

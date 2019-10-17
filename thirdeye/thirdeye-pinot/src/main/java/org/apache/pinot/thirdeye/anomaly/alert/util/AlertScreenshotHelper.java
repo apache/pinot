@@ -20,9 +20,6 @@
 package org.apache.pinot.thirdeye.anomaly.alert.util;
 
 import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -70,25 +67,9 @@ public class AlertScreenshotHelper {
     LOG.info("imgPath {}", imgPath);
     Process proc = Runtime.getRuntime().exec(new String[]{phantomJsPath, "phantomjs", "--ssl-protocol=any", "--ignore-ssl-errors=true",
         phantomScript, imgRoute, imgPath});
-
-    StringBuilder sbError = new StringBuilder();
-    try (
-      InputStream stderr = proc.getErrorStream();
-      InputStreamReader isr = new InputStreamReader(stderr);
-      BufferedReader br = new BufferedReader(isr);
-    ) {
-      // exhaust the error stream before waiting for the process to exit
-      String line = br.readLine();
-      if (line != null) {
-        do {
-          sbError.append(line);
-          sbError.append('\n');
-
-          line = br.readLine();
-        } while (line != null);
-      }
-    }
+    LOG.info("Waiting for phantomjs...");
     boolean isComplete = proc.waitFor(2, TimeUnit.MINUTES);
+    LOG.info("phantomjs complete status after waiting: {}", isComplete);
     if (!isComplete) {
       proc.destroyForcibly();
       throw new Exception("PhantomJS process timeout");

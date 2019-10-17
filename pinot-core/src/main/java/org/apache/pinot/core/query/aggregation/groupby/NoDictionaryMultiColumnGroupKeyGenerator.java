@@ -212,7 +212,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       }
 
       if (i > 0) {
-        builder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
+        builder.append(GroupKeyGenerator.DELIMITER);
       }
       builder.append(key);
     }

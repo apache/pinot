@@ -19,6 +19,8 @@
 package org.apache.pinot.controller.api;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
 import org.apache.pinot.common.data.DimensionFieldSpec;
@@ -51,6 +53,34 @@ public class PinotSchemaRestletResourceTest extends ControllerTest {
     }
     // should not reach here
     Assert.fail("Should have caught an exception");
+  }
+
+  @Test
+  public void testPostJson() {
+    String schemaString = "{\n" + "  \"schemaName\" : \"transcript\",\n" + "  \"dimensionFieldSpecs\" : [ {\n"
+        + "    \"name\" : \"studentID\",\n" + "    \"dataType\" : \"STRING\"\n" + "  }, {\n"
+        + "    \"name\" : \"firstName\",\n" + "    \"dataType\" : \"STRING\"\n" + "  }, {\n"
+        + "    \"name\" : \"lastName\",\n" + "    \"dataType\" : \"STRING\"\n" + "  }, {\n"
+        + "    \"name\" : \"gender\",\n" + "    \"dataType\" : \"STRING\"\n" + "  }, {\n"
+        + "    \"name\" : \"subject\",\n" + "    \"dataType\" : \"STRING\"\n" + "  } ],\n"
+        + "  \"metricFieldSpecs\" : [ {\n" + "    \"name\" : \"score\",\n" + "    \"dataType\" : \"FLOAT\"\n"
+        + "  } ]}";
+    try {
+      Map<String, String> header = new HashMap<>();
+      sendPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schemaString, header);
+    } catch (IOException e) {
+      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 415"), e.getMessage());
+    }
+
+    try {
+      Map<String, String> header = new HashMap<>();
+      header.put("Content-Type", "application/json");
+      final String response = sendPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schemaString, header);
+      Assert.assertEquals(response, "{\"status\":\"transcript successfully added\"}");
+    } catch (IOException e) {
+      // should not reach here
+      Assert.fail("Shouldn't have caught an exception");
+    }
   }
 
   @Test

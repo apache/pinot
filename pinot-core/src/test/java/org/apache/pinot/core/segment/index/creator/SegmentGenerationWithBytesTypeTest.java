@@ -38,6 +38,7 @@ import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
@@ -49,7 +50,7 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.core.util.AvroUtils;
 import org.testng.Assert;
@@ -150,29 +151,30 @@ public class SegmentGenerationWithBytesTypeTest {
 
   @Test
   public void testDictionary() {
-    ImmutableDictionaryReader dictionary = (ImmutableDictionaryReader) _segment.getDictionary(FIXED_BYTE_SORTED_COLUMN);
+    BaseImmutableDictionary dictionary = (BaseImmutableDictionary) _segment.getDictionary(FIXED_BYTE_SORTED_COLUMN);
     Assert.assertEquals(dictionary.length(), NUM_SORTED_VALUES);
 
     // Test dictionary indexing.
     for (int i = 0; i < NUM_ROWS; i++) {
       int value = (i * NUM_SORTED_VALUES) / NUM_ROWS;
       // For sorted columns, values are written as 0, 0, 0.., 1, 1, 1...n, n, n
-      Assert.assertEquals(dictionary.indexOf(Ints.toByteArray(value)), value % NUM_SORTED_VALUES);
+      Assert
+          .assertEquals(dictionary.indexOf(BytesUtils.toHexString(Ints.toByteArray(value))), value % NUM_SORTED_VALUES);
     }
 
     // Test value not in dictionary.
-    Assert.assertEquals(dictionary.indexOf(Ints.toByteArray(NUM_SORTED_VALUES + 1)), -1);
-    Assert
-        .assertEquals(dictionary.insertionIndexOf(Ints.toByteArray(NUM_SORTED_VALUES + 1)), -(dictionary.length() + 1));
+    Assert.assertEquals(dictionary.indexOf(BytesUtils.toHexString(Ints.toByteArray(NUM_SORTED_VALUES + 1))), -1);
+    Assert.assertEquals(dictionary.insertionIndexOf(BytesUtils.toHexString(Ints.toByteArray(NUM_SORTED_VALUES + 1))),
+        -(NUM_SORTED_VALUES + 1));
 
-    int[] dictIds = new int[dictionary.length()];
-    for (int i = 0; i < dictIds.length; i++) {
+    int[] dictIds = new int[NUM_SORTED_VALUES];
+    for (int i = 0; i < NUM_SORTED_VALUES; i++) {
       dictIds[i] = i;
     }
 
-    byte[][] values = new byte[dictIds.length][];
-    dictionary.readBytesValues(dictIds, 0, dictIds.length, values, 0);
-    for (int expected = 0; expected < values.length; expected++) {
+    byte[][] values = new byte[NUM_SORTED_VALUES][];
+    dictionary.readBytesValues(dictIds, NUM_SORTED_VALUES, values);
+    for (int expected = 0; expected < NUM_SORTED_VALUES; expected++) {
       int actual = ByteBuffer.wrap(values[expected]).asIntBuffer().get();
       Assert.assertEquals(actual, expected);
     }

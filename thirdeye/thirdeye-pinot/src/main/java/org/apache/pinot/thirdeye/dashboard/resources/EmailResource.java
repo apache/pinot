@@ -20,7 +20,7 @@
 package org.apache.pinot.thirdeye.dashboard.resources;
 
 import com.google.common.base.Strings;
-import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
+import org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import org.apache.pinot.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
@@ -53,7 +53,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.*;
 
-import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.*;
+import static org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration.*;
 
 
 @Path("thirdeye/email")

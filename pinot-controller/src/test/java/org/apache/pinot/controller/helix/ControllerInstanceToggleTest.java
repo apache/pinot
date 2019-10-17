@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix;
 
+import java.io.IOException;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.config.TableConfig;
@@ -26,6 +27,7 @@ import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -34,6 +36,7 @@ import org.testng.annotations.Test;
 
 public class ControllerInstanceToggleTest extends ControllerTest {
   private static final String RAW_TABLE_NAME = "testTable";
+  private static final long TIMEOUT_MS = 10_000L;
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final String SERVER_TAG_NAME = TagNameUtils.getOfflineTagForTenant(null);
   private static final String BROKER_TAG_NAME = TagNameUtils.getBrokerTagForTenant(null);
@@ -75,25 +78,25 @@ public class ControllerInstanceToggleTest extends ControllerTest {
     // Disable server instances
     int numEnabledInstances = NUM_INSTANCES;
     for (String instanceName : _helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), SERVER_TAG_NAME)) {
-      sendPostRequest(_controllerRequestURLBuilder.forInstanceState(instanceName), "disable");
+      toggleInstanceState(instanceName, "disable");
       checkNumOnlineInstancesFromExternalView(OFFLINE_TABLE_NAME, --numEnabledInstances);
     }
 
     // Enable server instances
     for (String instanceName : _helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), SERVER_TAG_NAME)) {
-      sendPostRequest(_controllerRequestURLBuilder.forInstanceState(instanceName), "ENABLE");
+      toggleInstanceState(instanceName, "ENABLE");
       checkNumOnlineInstancesFromExternalView(OFFLINE_TABLE_NAME, ++numEnabledInstances);
     }
 
     // Disable broker instances
     for (String instanceName : _helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), BROKER_TAG_NAME)) {
-      sendPostRequest(_controllerRequestURLBuilder.forInstanceState(instanceName), "Disable");
+      toggleInstanceState(instanceName, "Disable");
       checkNumOnlineInstancesFromExternalView(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, --numEnabledInstances);
     }
 
     // Enable broker instances
     for (String instanceName : _helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), BROKER_TAG_NAME)) {
-      sendPostRequest(_controllerRequestURLBuilder.forInstanceState(instanceName), "Enable");
+      toggleInstanceState(instanceName, "Enable");
       checkNumOnlineInstancesFromExternalView(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, ++numEnabledInstances);
     }
 
@@ -104,9 +107,22 @@ public class ControllerInstanceToggleTest extends ControllerTest {
             .getPartitionSet().size(), 0);
   }
 
+  private void toggleInstanceState(String instanceName, String state) {
+    // It may take time for an instance to toggle the state.
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        sendPostRequest(_controllerRequestURLBuilder.forInstanceState(instanceName), state);
+      } catch (IOException ioe) {
+        // receive non-200 status code
+        return false;
+      }
+      return true;
+    }, TIMEOUT_MS, "Failed to toggle instance state: '" + state + "' for instance: " + instanceName);
+  }
+
   private void checkNumOnlineInstancesFromExternalView(String resourceName, int expectedNumOnlineInstances)
       throws InterruptedException {
-    long endTime = System.currentTimeMillis() + 10_000L;
+    long endTime = System.currentTimeMillis() + TIMEOUT_MS;
     while (System.currentTimeMillis() < endTime) {
       ExternalView resourceExternalView = _helixAdmin.getResourceExternalView(getHelixClusterName(), resourceName);
       Set<String> instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);

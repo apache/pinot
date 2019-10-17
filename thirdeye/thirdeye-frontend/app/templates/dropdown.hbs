@@ -1,0 +1,29 @@
+<div class="{{classes.columnsDropdownWrapper}}">
+  <div class="{{classes.columnsDropdownButtonWrapper}}">
+    {{#bs-dropdown as |dd|}}
+      {{#dd.button}}
+        {{messages.columns-title}}<span class="caret"></span>
+      {{/dd.button}}
+      {{#dd.menu as |ddm|}}
+        {{#ddm.item}}
+          <a {{action "showAllColumns" column bubbles=false}} href="#">{{messages.columns-showAll}}</a>
+        {{/ddm.item}}
+        {{#ddm.item}}
+          <a {{action "hideAllColumns" column bubbles=false}} href="#">{{messages.columns-hideAll}}</a>
+        {{/ddm.item}}
+        {{#ddm.item}}
+          <a {{action "restoreDefaultVisibility" column bubbles=false}} href="#">{{messages.columns-restoreDefaults}}</a>
+        {{/ddm.item}}
+        {{#each processedColumns as |column|}}
+          {{#if column.mayBeHidden}}
+            {{#ddm.item}}
+              <a {{action "toggleHidden" column bubbles=false}} href="#">
+                  <span class="{{if column.isVisible icons.column-visible icons.column-hidden}}"></span> {{column.title}}
+              </a>
+            {{/ddm.item}}
+          {{/if}}
+        {{/each}}
+      {{/dd.menu}}
+    {{/bs-dropdown}}
+  </div>
+</div>

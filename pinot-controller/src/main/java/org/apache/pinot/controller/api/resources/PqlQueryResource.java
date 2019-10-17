@@ -76,8 +76,12 @@ public class PqlQueryResource {
       if (requestJson.has("trace")) {
         traceEnabled = requestJson.get("trace").toString();
       }
+      String queryOptions = null;
+      if (requestJson.has("queryOptions")) {
+        queryOptions = requestJson.get("queryOptions").asText();
+      }
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, pqlQuery);
-      return getQueryResponse(pqlQuery, traceEnabled, httpHeaders);
+      return getQueryResponse(pqlQuery, traceEnabled, queryOptions, httpHeaders);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing post request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -87,17 +91,19 @@ public class PqlQueryResource {
   @GET
   @Path("pql")
   public String get(@QueryParam("pql") String pqlQuery, @QueryParam("trace") String traceEnabled,
+      @QueryParam("queryOptions") String queryOptions,
       @Context HttpHeaders httpHeaders) {
     try {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, pqlQuery);
-      return getQueryResponse(pqlQuery, traceEnabled, httpHeaders);
+      return getQueryResponse(pqlQuery, traceEnabled, queryOptions, httpHeaders);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
     }
   }
 
-  public String getQueryResponse(String pqlQuery, String traceEnabled, HttpHeaders httpHeaders) {
+  public String getQueryResponse(String pqlQuery, String traceEnabled, String queryOptions,
+      HttpHeaders httpHeaders) {
     // Get resource table name.
     BrokerRequest brokerRequest;
     try {
@@ -137,7 +143,7 @@ public class PqlQueryResource {
     String url =
         "http://" + hostNameWithPrefix.substring(hostNameWithPrefix.indexOf("_") + 1) + ":" + instanceConfig.getPort()
             + "/query";
-    return sendPQLRaw(url, pqlQuery, traceEnabled);
+    return sendPQLRaw(url, pqlQuery, traceEnabled, queryOptions);
   }
 
   public String sendPostRaw(String urlStr, String requestStr, Map<String, String> headers) {
@@ -219,12 +225,15 @@ public class PqlQueryResource {
     }
   }
 
-  public String sendPQLRaw(String url, String pqlRequest, String traceEnabled) {
+  public String sendPQLRaw(String url, String pqlRequest, String traceEnabled, String queryOptions) {
     try {
       final long startTime = System.currentTimeMillis();
       ObjectNode bqlJson = JsonUtils.newObjectNode().put("pql", pqlRequest);
       if (traceEnabled != null && !traceEnabled.isEmpty()) {
         bqlJson.put("trace", traceEnabled);
+      }
+      if (queryOptions != null && !queryOptions.isEmpty()) {
+        bqlJson.put("queryOptions", queryOptions);
       }
 
       final String pinotResultString = sendPostRaw(url, bqlJson.toString(), null);

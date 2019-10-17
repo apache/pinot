@@ -30,6 +30,7 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+
 /**
  * Unit test for {@link VarLengthBytesValueReaderWriter}
  */
@@ -82,7 +83,7 @@ public class VarLengthBytesValueReaderWriterTest {
       Assert.assertTrue(VarLengthBytesValueReaderWriter.isVarLengthBytesDictBuffer(buffer));
       VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer);
       Assert.assertEquals(readerWriter.getNumElements(), 1);
-      byte[] newArray = readerWriter.getBytes(0, -1, null);
+      byte[] newArray = readerWriter.getBytes(0, 4);
       Assert.assertTrue(Arrays.equals(array, newArray));
     } finally {
       FileUtils.forceDelete(tempFile);
@@ -115,7 +116,7 @@ public class VarLengthBytesValueReaderWriterTest {
       Assert.assertEquals(byteArrays.length, readerWriter.getNumElements());
       for (int i = 0; i < byteArrays.length; i++) {
         byte[] array = byteArrays[i];
-        byte[] newArray = readerWriter.getBytes(i, -1, null);
+        byte[] newArray = readerWriter.getBytes(i, numByteArrays);
         Assert.assertTrue(Arrays.equals(array, newArray));
       }
     } finally {
@@ -151,8 +152,9 @@ public class VarLengthBytesValueReaderWriterTest {
       Assert.assertTrue(VarLengthBytesValueReaderWriter.isVarLengthBytesDictBuffer(buffer));
       VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer);
       Assert.assertEquals(byteArrays.length, readerWriter.getNumElements());
+      byte[] bytesBuffer = new byte[MAX_STRING_LENGTH];
       for (int i = 0; i < strings.length; i++) {
-        String value = readerWriter.getUnpaddedString(i, -1, (byte) 0, null);
+        String value = readerWriter.getUnpaddedString(i, MAX_STRING_LENGTH, (byte) 0, bytesBuffer);
         Assert.assertEquals(value, strings[i]);
       }
 

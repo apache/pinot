@@ -21,6 +21,7 @@ package org.apache.pinot.realtime.converter;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.TimeFieldSpec;
 import org.apache.pinot.core.realtime.converter.RealtimeSegmentConverter;
@@ -50,5 +51,20 @@ public class RealtimeSegmentConverterTest {
     Schema newSchema = converter.getUpdatedSchema(schema);
     Assert.assertEquals(newSchema.getColumnNames().size(), 2);
     Assert.assertEquals(newSchema.getTimeFieldSpec().getIncomingGranularitySpec().getTimeType(), TimeUnit.DAYS);
+  }
+
+  @Test
+  public void testNoTimeColumnsInSchema() {
+    Schema schema = new Schema();
+    schema.addField(new DimensionFieldSpec("col1", FieldSpec.DataType.STRING, true));
+    schema.addField(new DimensionFieldSpec("col2", FieldSpec.DataType.STRING, true));
+    schema.addField(new DimensionFieldSpec("col3", FieldSpec.DataType.STRING, true));
+    schema.addField(new MetricFieldSpec("met1", FieldSpec.DataType.DOUBLE, 0));
+    schema.addField(new MetricFieldSpec("met2", FieldSpec.DataType.LONG, 0));
+    Assert.assertEquals(schema.getColumnNames().size(), 5);
+    RealtimeSegmentConverter converter =
+        new RealtimeSegmentConverter(null, "", schema, "testTable", "col1", "segment1", "col1");
+    Schema newSchema = converter.getUpdatedSchema(schema);
+    Assert.assertEquals(newSchema.getColumnNames().size(), 5);
   }
 }

@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.util;
 
+import org.apache.pinot.common.utils.BytesUtils;
+
+
 /**
  * The class <code>ArrayCopyUtils</code> provides methods to copy values across arrays of different types.
  */
@@ -142,6 +145,18 @@ public class ArrayCopyUtils {
   public static void copy(String[] src, double[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = Double.parseDouble(src[i]);
+    }
+  }
+
+  public static void copy(String[] src, byte[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = BytesUtils.toBytes(src[i]);
+    }
+  }
+
+  public static void copy(byte[][] src, String[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = BytesUtils.toHexString(src[i]);
     }
   }
 }

@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.util;
 
+import it.unimi.dsi.fastutil.ints.IntSet;
 import java.io.IOException;
 import java.util.Arrays;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleValueMultiColumnReaderWriter;
@@ -30,9 +30,8 @@ import org.apache.pinot.core.realtime.impl.dictionary.BaseOffHeapMutableDictiona
 /**
  * Implementation of {@link IdMap} with {@link FixedIntArray} as key.
  *
- * This implementation also extends the {@link BaseOffHeapMutableDictionary} for code-reuse of off-heap functionality.
- * However, it is not a full dictionary implementation (for example, does not implement getMin/Max etc).
- *
+ * This implementation extends the {@link BaseOffHeapMutableDictionary} for code-reuse of off-heap functionality. The
+ * dictionary related APIs are not supported.
  */
 public class FixedIntArrayOffHeapIdMap extends BaseOffHeapMutableDictionary implements IdMap<FixedIntArray> {
   private final FixedByteSingleValueMultiColumnReaderWriter _dictIdToValue;
@@ -52,20 +51,22 @@ public class FixedIntArrayOffHeapIdMap extends BaseOffHeapMutableDictionary impl
   }
 
   @Override
-  public int put(FixedIntArray fixedIntArray) {
-    index(fixedIntArray);
-    return indexOf(fixedIntArray);
+  public int put(FixedIntArray key) {
+    return indexValue(key, null);
   }
 
   @Override
-  public int getId(FixedIntArray fixedIntArray) {
-    int id = indexOf(fixedIntArray);
-    return (id != NULL_VALUE_INDEX) ? id : INVALID_ID;
+  public int getId(FixedIntArray key) {
+    return getDictId(key, null);
   }
 
   @Override
   public FixedIntArray getKey(int id) {
-    return (FixedIntArray) get(id);
+    int[] value = new int[_numColumns];
+    for (int i = 0; i < _numColumns; i++) {
+      value[i] = _dictIdToValue.getInt(id, i);
+    }
+    return new FixedIntArray(value);
   }
 
   @Override
@@ -84,17 +85,17 @@ public class FixedIntArrayOffHeapIdMap extends BaseOffHeapMutableDictionary impl
   }
 
   @Override
-  public FixedIntArray get(int dictId) {
-    int[] value = new int[_numColumns];
-    for (int col = 0; col < _numColumns; col++) {
-      value[col] = _dictIdToValue.getInt(dictId, col);
+  protected void setValue(int dictId, Object value, byte[] serializedValue) {
+    FixedIntArray intArray = (FixedIntArray) value;
+    int[] values = intArray.elements();
+    for (int i = 0; i < _numColumns; i++) {
+      _dictIdToValue.setInt(dictId, i, values[i]);
     }
-    return new FixedIntArray(value);
   }
 
   @Override
-  public int indexOf(Object rawValue) {
-    return getDictId(rawValue, null);
+  protected boolean equalsValueAt(int dictId, Object value, byte[] serializedValue) {
+    return getKey(dictId).equals(value);
   }
 
   @Override
@@ -104,41 +105,72 @@ public class FixedIntArrayOffHeapIdMap extends BaseOffHeapMutableDictionary impl
   }
 
   @Override
-  protected void setRawValueAt(int dictId, Object value, byte[] serializedValue) {
-    FixedIntArray intArray = (FixedIntArray) value; // Avoiding type check for efficiency.
-    int[] values = intArray.elements();
-
-    for (int col = 0; col < values.length; col++) {
-      _dictIdToValue.setInt(dictId, col, values[col]);
-    }
-  }
-
-  @Override
-  public void index(@Nonnull Object value) {
-    indexValue(value, null);
-  }
-
-  @Override
-  public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare, boolean includeLower,
-      boolean includeUpper) {
+  public int index(Object value) {
     throw new UnsupportedOperationException();
   }
 
-  @Nonnull
+  @Override
+  public int[] index(Object[] values) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public int compare(int dictId1, int dictId2) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public IntSet getDictIdsInRange(String lower, String upper, boolean includeLower, boolean includeUpper) {
+    throw new UnsupportedOperationException();
+  }
+
   @Override
   public Object getMinVal() {
     throw new UnsupportedOperationException();
   }
 
-  @Nonnull
   @Override
   public Object getMaxVal() {
     throw new UnsupportedOperationException();
   }
 
-  @Nonnull
   @Override
   public Object getSortedValues() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public int indexOf(String stringValue) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Object get(int dictId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public int getIntValue(int dictId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public long getLongValue(int dictId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public float getFloatValue(int dictId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public double getDoubleValue(int dictId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String getStringValue(int dictId) {
     throw new UnsupportedOperationException();
   }
 
@@ -148,7 +180,7 @@ public class FixedIntArrayOffHeapIdMap extends BaseOffHeapMutableDictionary impl
   }
 
   @Override
-  public int compare(int dictId1, int dictId2) {
+  public long getTotalOffHeapMemUsed() {
     throw new UnsupportedOperationException();
   }
 }
