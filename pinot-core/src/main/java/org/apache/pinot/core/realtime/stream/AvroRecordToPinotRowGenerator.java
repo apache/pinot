@@ -28,7 +28,6 @@ import org.apache.pinot.core.util.AvroUtils;
 
 
 public class AvroRecordToPinotRowGenerator {
-
   private final Schema _schema;
   private final FieldSpec _incomingTimeFieldSpec;
 

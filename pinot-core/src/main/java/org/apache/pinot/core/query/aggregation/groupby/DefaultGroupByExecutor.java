@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.util.List;
 import javax.annotation.Nonnull;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
@@ -29,7 +30,6 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.common.function.AggregationFunctionType;
 
 
 /**

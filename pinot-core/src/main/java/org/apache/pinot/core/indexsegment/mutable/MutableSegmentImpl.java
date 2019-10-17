@@ -46,7 +46,8 @@ import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValu
 import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
-import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionary;
+import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
+import org.apache.pinot.core.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
 import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionaryFactory;
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeInvertedIndexReader;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -86,7 +87,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final RealtimeSegmentStatsHistory _statsHistory;
   private final SegmentPartitionConfig _segmentPartitionConfig;
 
-  private final Map<String, MutableDictionary> _dictionaryMap = new HashMap<>();
+  private final Map<String, BaseMutableDictionary> _dictionaryMap = new HashMap<>();
   private final Map<String, DataFileReader> _indexReaderWriterMap = new HashMap<>();
   private final Map<String, Integer> _maxNumValuesMap = new HashMap<>();
   private final Map<String, RealtimeInvertedIndexReader> _invertedIndexMap = new HashMap<>();
@@ -196,7 +197,7 @@ public class MutableSegmentImpl implements MutableSegment {
         // NOTE: preserve 10% buffer for cardinality to reduce the chance of re-sizing the dictionary
         int estimatedCardinality = (int) (_statsHistory.getEstimatedCardinality(column) * 1.1);
         String allocationContext = buildAllocationContext(_segmentName, column, V1Constants.Dict.FILE_EXTENSION);
-        MutableDictionary dictionary = MutableDictionaryFactory
+        BaseMutableDictionary dictionary = MutableDictionaryFactory
             .getMutableDictionary(dataType, _offHeap, _memoryManager, dictionaryColumnSize,
                 Math.min(estimatedCardinality, _capacity), allocationContext);
         _dictionaryMap.put(column, dictionary);
@@ -284,30 +285,25 @@ public class MutableSegmentImpl implements MutableSegment {
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       String column = fieldSpec.getName();
       Object value = row.getValue(column);
-      MutableDictionary dictionary = _dictionaryMap.get(column);
+
+      BaseMutableDictionary dictionary = _dictionaryMap.get(column);
       if (dictionary != null) {
-        dictionary.index(value);
+        if (fieldSpec.isSingleValueField()) {
+          dictIdMap.put(column, dictionary.index(value));
+        } else {
+          int[] dictIds = dictionary.index((Object[]) value);
+          dictIdMap.put(column, dictIds);
+          int numValues = dictIds.length;
+          // Update max number of values for multi-value column
+          if (_maxNumValuesMap.get(column) < numValues) {
+            _maxNumValuesMap.put(column, numValues);
+          }
+
+          // No need to update min/max time value as time column cannot be multi-valued
+          continue;
+        }
       }
-      // Update max number of values for multi-value column
-      if (fieldSpec.isSingleValueField()) {
-        if (dictionary != null) {
-          dictIdMap.put(column, dictionary.indexOf(value));
-        }
-      } else {
-        // No-dictionary not supported for multi-valued columns.
-        int i = 0;
-        Object[] values = (Object[]) value;
-        int[] dictIds = new int[values.length];
-        for (Object object : values) {
-          dictIds[i++] = dictionary.indexOf(object);
-        }
-        dictIdMap.put(column, dictIds);
-        int numValues = ((Object[]) value).length;
-        if (_maxNumValuesMap.get(column) < numValues) {
-          _maxNumValuesMap.put(column, numValues);
-        }
-        continue;
-      }
+
       // Update min/max value for time column
       if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
         long timeValue;
@@ -496,11 +492,13 @@ public class MutableSegmentImpl implements MutableSegment {
                 numSeconds);
 
         RealtimeSegmentStatsHistory.SegmentStats segmentStats = new RealtimeSegmentStatsHistory.SegmentStats();
-        for (Map.Entry<String, MutableDictionary> entry : _dictionaryMap.entrySet()) {
+        for (Map.Entry<String, BaseMutableDictionary> entry : _dictionaryMap.entrySet()) {
+          String columnName = entry.getKey();
+          BaseOffHeapMutableDictionary dictionary = (BaseOffHeapMutableDictionary) entry.getValue();
           RealtimeSegmentStatsHistory.ColumnStats columnStats = new RealtimeSegmentStatsHistory.ColumnStats();
-          columnStats.setCardinality(entry.getValue().length());
-          columnStats.setAvgColumnSize(entry.getValue().getAvgValueSize());
-          segmentStats.setColumnStats(entry.getKey(), columnStats);
+          columnStats.setCardinality(dictionary.length());
+          columnStats.setAvgColumnSize(dictionary.getAvgValueSize());
+          segmentStats.setColumnStats(columnName, columnStats);
         }
         segmentStats.setNumRowsConsumed(_numDocsIndexed);
         segmentStats.setNumRowsIndexed(_numDocsIndexed);
@@ -525,7 +523,7 @@ public class MutableSegmentImpl implements MutableSegment {
       index.close();
     }
 
-    for (Map.Entry<String, MutableDictionary> entry : _dictionaryMap.entrySet()) {
+    for (Map.Entry<String, BaseMutableDictionary> entry : _dictionaryMap.entrySet()) {
       try {
         entry.getValue().close();
       } catch (IOException e) {
@@ -554,7 +552,7 @@ public class MutableSegmentImpl implements MutableSegment {
    * @return The docIds to use for iteration
    */
   public int[] getSortedDocIdIterationOrderWithSortedColumn(String column) {
-    MutableDictionary dictionary = _dictionaryMap.get(column);
+    BaseMutableDictionary dictionary = _dictionaryMap.get(column);
     int numValues = dictionary.length();
 
     int[] dictIds = new int[numValues];

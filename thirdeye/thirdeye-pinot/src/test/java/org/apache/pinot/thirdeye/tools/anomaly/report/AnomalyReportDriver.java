@@ -20,7 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.dropwizard.configuration.ConfigurationFactory;
 import io.dropwizard.configuration.YamlConfigurationFactory;
-import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
+import org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import io.dropwizard.jackson.Jackson;
 import java.io.File;
@@ -33,7 +33,7 @@ import java.util.concurrent.TimeUnit;
 import javax.validation.Validation;
 import org.quartz.CronExpression;
 
-import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+import static org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration.SMTP_CONFIG_KEY;
 
 
 public class AnomalyReportDriver {

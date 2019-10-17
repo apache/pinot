@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.RateLimiter;
 import java.net.InetAddress;
@@ -42,9 +43,11 @@ import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
 import org.apache.pinot.broker.routing.TimeBoundaryService;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
+import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.FilterQuery;
@@ -52,15 +55,10 @@ import org.apache.pinot.common.request.FilterQueryMap;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Broker;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.common.utils.CommonConstants.Broker.*;
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.DEBUG_OPTIONS;
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.PQL;
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.SQL;
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.TRACE;
 
 
 @ThreadSafe
@@ -97,12 +95,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _queryQuotaManager = queryQuotaManager;
     _brokerMetrics = brokerMetrics;
 
-    _brokerId = config.getString(CONFIG_OF_BROKER_ID, getDefaultBrokerId());
-    _brokerTimeoutMs = config.getLong(CONFIG_OF_BROKER_TIMEOUT_MS, DEFAULT_BROKER_TIMEOUT_MS);
-    _queryResponseLimit = config.getInt(CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
-    _queryLogLength = config.getInt(CONFIG_OF_BROKER_QUERY_LOG_LENGTH, DEFAULT_BROKER_QUERY_LOG_LENGTH);
-    _queryLogRateLimiter = RateLimiter.create(
-        config.getDouble(CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND, DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND));
+    _brokerId = config.getString(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
+    _brokerTimeoutMs = config.getLong(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
+    _queryResponseLimit =
+        config.getInt(Broker.CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
+    _queryLogLength = config.getInt(Broker.CONFIG_OF_BROKER_QUERY_LOG_LENGTH, Broker.DEFAULT_BROKER_QUERY_LOG_LENGTH);
+    _queryLogRateLimiter = RateLimiter.create(config.getDouble(Broker.CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND,
+        Broker.DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND));
 
     _numDroppedLog = new AtomicInteger(0);
     _numDroppedLogRateLimiter = RateLimiter.create(1.0);
@@ -211,7 +210,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // Validate the request
     try {
-      validateRequest(brokerRequest);
+      validateRequest(brokerRequest, _queryResponseLimit);
     } catch (Exception e) {
       LOGGER.info("Caught exception while validating request {}: {}, {}", requestId, query, e.getMessage());
       requestStatistics.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
@@ -220,15 +219,21 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // Set extra settings into broker request
-    if (request.has(TRACE) && request.get(TRACE).asBoolean()) {
+    if (request.has(Broker.Request.TRACE) && request.get(Broker.Request.TRACE).asBoolean()) {
       LOGGER.debug("Enable trace for request {}: {}", requestId, query);
       brokerRequest.setEnableTrace(true);
     }
-    if (request.has(DEBUG_OPTIONS)) {
-      Map<String, String> debugOptions = Splitter.on(';').omitEmptyStrings().trimResults().withKeyValueSeparator('=')
-          .split(request.get(DEBUG_OPTIONS).asText());
+
+    if (request.has(Broker.Request.DEBUG_OPTIONS)) {
+      Map<String, String> debugOptions = getOptionsFromRequest(request, Broker.Request.DEBUG_OPTIONS);
       LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
       brokerRequest.setDebugOptions(debugOptions);
+    }
+
+    if (request.has(Broker.Request.QUERY_OPTIONS)) {
+      Map<String, String> queryOptions = getOptionsFromRequest(request, Broker.Request.QUERY_OPTIONS);
+      LOGGER.debug("Query options are set to: {} for request {}: {}", queryOptions, requestId, query);
+      brokerRequest.setQueryOptions(queryOptions);
     }
 
     // Optimize the query
@@ -337,11 +342,19 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return brokerResponse;
   }
 
+  private Map<String, String> getOptionsFromRequest(JsonNode request, String optionsKey) {
+    return Splitter.on(';')
+        .omitEmptyStrings()
+        .trimResults()
+        .withKeyValueSeparator('=')
+        .split(request.get(optionsKey).asText());
+  }
+
   private PinotQueryRequest getPinotQueryRequest(JsonNode request) {
-    if (request.has(SQL)) {
-      return new PinotQueryRequest(SQL, request.get(SQL).asText());
+    if (request.has(Broker.Request.SQL)) {
+      return new PinotQueryRequest(Broker.Request.SQL, request.get(Broker.Request.SQL).asText());
     }
-    return new PinotQueryRequest(PQL, request.get(PQL).asText());
+    return new PinotQueryRequest(Broker.Request.PQL, request.get(Broker.Request.PQL).asText());
   }
 
   /**
@@ -369,27 +382,110 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   /**
    * Broker side validation on the broker request.
-   * <p>Throw RuntimeException if query does not pass validation.
+   * <p>Throw exception if query does not pass validation.
    * <p>Current validations are:
    * <ul>
    *   <li>Value for 'TOP' for aggregation group-by query <= configured value</li>
-   *   <li>Value for 'LIMIT' for selection query <= configured value</li>
+   *   <li>Value for 'LIMIT' for selection/distinct query <= configured value</li>
+   *   <li>Unsupported DISTINCT queries</li>
    * </ul>
+   *
+   * NOTES on validation for DISTINCT queries:
+   *
+   * These DISTINCT queries are not supported
+   * (1) SELECT sum(col1), min(col2), DISTINCT(col3, col4) FROM foo
+   * (2) SELECT sum(col1), DISTINCT(col2, col3), min(col4) FROM foo
+   * (3) SELECT DISTINCT(col1, col2), DISTINCT(col3) FROM foo
+   *
+   * (4) SELECT DISTINCT(col1, col2), sum(col3), min(col4) FROM foo
+   *
+   * (5) SELECT DISTINCT(col1, col2) FROM foo ORDER BY col1, col2
+   * (6) SELECT DISTINCT(col1, col2) FROM foo GROUP BY col1
+   *
+   * (1), (2) and (3) are not valid SQL queries and so PQL won't support
+   * them too.
+   *
+   * (4) is a valid SQL query for multi column distinct. It will output
+   * exactly 1 row by taking [col1, col2, sum(col3) and min(col4)] as one entire column
+   * set as an input into DISTINCT. However, we can't support it
+   * since DISTINCT, sum and min are implemented as independent aggregation
+   * functions. So unless the output of sum and min is piped into DISTINCT,
+   * we can't execute this query.
+   *
+   * DISTINCT is currently not supported with ORDER BY and GROUP BY and
+   * so we throw exceptions for (5) and (6)
+   *
+   * NOTE: There are other two other types of queries that should ideally not be
+   * supported but we let them go through since that behavior has been there
+   * from a long time
+   *
+   * SELECT DISTINCT(col1), col2, col3 FROM foo
+   *
+   * The above query is both a selection and aggregation query.
+   * The reason this is a bad query is that DISTINCT(col1) will output
+   * potentially less number of rows than entire dataset, whereas all
+   * column values from col2 and col3 will be selected. So the output
+   * does not make sense.
+   *
+   * However, when the broker request is built in {@link org.apache.pinot.pql.parsers.pql2.ast.SelectAstNode},
+   * we check if it has both aggregation and selections and set the latter to NULL.
+   * Thus we execute such queries as if the user had only specified the aggregation in
+   * the query.
+   *
+   * SELECT DISTINCT(COL1), transform_func(col2) FROM foo
+   *
+   * The same reason is applicable to the above query too. It is a combination
+   * of aggregation (DISTINCT) and selection (transform) and we just execute
+   * the aggregation.
+   *
+   * Note that DISTINCT(transform_func(col)) is supported as in this case,
+   * the output of transform_func(col) is piped into DISTINCT.
+   * See {@link org.apache.pinot.queries.DistinctQueriesTest} for tests.
    */
-  private void validateRequest(BrokerRequest brokerRequest) {
-    if (brokerRequest.isSetAggregationsInfo()) {
-      if (brokerRequest.isSetGroupBy()) {
-        long topN = brokerRequest.getGroupBy().getTopN();
-        if (topN > _queryResponseLimit) {
-          throw new RuntimeException(
-              "Value for 'TOP' (" + topN + ") exceeds maximum allowed value of " + _queryResponseLimit);
-        }
+  @VisibleForTesting
+  static void validateRequest(BrokerRequest brokerRequest, int queryResponseLimit) {
+    // verify LIMIT
+    // LIMIT is applicable to selection query or DISTINCT query
+    // LIMIT is store in BrokerRequest
+    int limit = brokerRequest.getLimit();
+    if (limit > queryResponseLimit) {
+      throw new IllegalStateException(
+          "Value for 'LIMIT' (" + limit + ") exceeds maximum allowed value of " + queryResponseLimit);
+    }
+
+    boolean groupBy = false;
+
+    // verify TOP
+    if (brokerRequest.isSetGroupBy()) {
+      groupBy = true;
+      long topN = brokerRequest.getGroupBy().getTopN();
+      if (topN > queryResponseLimit) {
+        throw new IllegalStateException(
+            "Value for 'TOP' (" + topN + ") exceeds maximum allowed value of " + queryResponseLimit);
       }
-    } else {
-      int limit = brokerRequest.getSelections().getSize();
-      if (limit > _queryResponseLimit) {
-        throw new RuntimeException(
-            "Value for 'LIMIT' (" + limit + ") exceeds maximum allowed value of " + _queryResponseLimit);
+    }
+
+    // verify the following for DISTINCT queries:
+    // (1) User query does not have DISTINCT() along with any other aggregation function
+    // (2) User query does not have DISTINCT() along with ORDER BY
+    // (3) User query does not have DISTINCT() along with GROUP BY
+    if (brokerRequest.isSetAggregationsInfo()) {
+      List<AggregationInfo> aggregationInfos = brokerRequest.getAggregationsInfo();
+      int numAggFunctions = aggregationInfos.size();
+      for (AggregationInfo aggregationInfo : aggregationInfos) {
+        if (aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
+          if (numAggFunctions > 1) {
+            throw new UnsupportedOperationException("Aggregation functions cannot be used with DISTINCT");
+          }
+          if (groupBy) {
+            // TODO: Explore if DISTINCT should be supported with GROUP BY
+            throw new UnsupportedOperationException("DISTINCT with GROUP BY is currently not supported");
+          }
+          if (brokerRequest.isSetOrderBy()) {
+            // TODO: Add support for ORDER BY with DISTINCT
+            throw new UnsupportedOperationException("DISTINCT with ORDER BY is currently not supported");
+          }
+        }
       }
     }
   }

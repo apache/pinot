@@ -21,7 +21,9 @@ package org.apache.pinot.controller.helix.core;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.Lists;
@@ -36,12 +38,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.AccessOption;
-import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
 import org.apache.helix.HelixAdmin;
@@ -51,10 +53,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
-import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZkBaseDataAccessor;
-import org.apache.helix.manager.zk.ZkCacheBaseDataAccessor;
 import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -92,6 +91,7 @@ import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerOnlineOfflineStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
@@ -117,11 +117,13 @@ import org.slf4j.LoggerFactory;
 public class PinotHelixResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixResourceManager.class);
   private static final long DEFAULT_EXTERNAL_VIEW_UPDATE_RETRY_INTERVAL_MILLIS = 500L;
+  private static final long CACHE_ENTRY_EXPIRE_TIME_HOURS = 6L;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   public static final String APPEND = "APPEND";
 
   private final Map<String, Map<String, Long>> _segmentCrcMap = new HashMap<>();
   private final Map<String, Map<String, Integer>> _lastKnownSegmentMetadataVersionMap = new HashMap<>();
+  private final LoadingCache<String, String> _instanceAdminEndpointCache;
 
   private final String _helixZkURL;
   private final String _helixClusterName;
@@ -136,7 +138,6 @@ public class PinotHelixResourceManager {
   private HelixAdmin _helixAdmin;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private HelixDataAccessor _helixDataAccessor;
-  private ZkCacheBaseDataAccessor<ZNRecord> _cacheInstanceConfigsDataAccessor;
   private Builder _keyBuilder;
   private SegmentDeletionManager _segmentDeletionManager;
   private PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
@@ -151,6 +152,20 @@ public class PinotHelixResourceManager {
     _isSingleTenantCluster = isSingleTenantCluster;
     _enableBatchMessageMode = enableBatchMessageMode;
     _allowHLCTables = allowHLCTables;
+    _instanceAdminEndpointCache =
+        CacheBuilder.newBuilder().expireAfterWrite(CACHE_ENTRY_EXPIRE_TIME_HOURS, TimeUnit.HOURS)
+            .build(new CacheLoader<String, String>() {
+              @Override
+              public String load(@Nonnull String instanceId) {
+                InstanceConfig helixInstanceConfig = getHelixInstanceConfig(instanceId);
+                ZNRecord record = helixInstanceConfig.getRecord();
+                String[] hostnameSplit = helixInstanceConfig.getHostName().split("_");
+                Preconditions.checkState(hostnameSplit.length >= 2);
+                String adminPort = record
+                    .getStringField(Helix.Instance.ADMIN_PORT_KEY, Integer.toString(Server.DEFAULT_ADMIN_API_PORT));
+                return hostnameSplit[1] + ":" + adminPort;
+              }
+            });
   }
 
   public PinotHelixResourceManager(@Nonnull ControllerConf controllerConf) {
@@ -171,18 +186,11 @@ public class PinotHelixResourceManager {
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     _propertyStore = _helixZkManager.getHelixPropertyStore();
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
-    // Cache instance zk paths.
-    BaseDataAccessor<ZNRecord> baseDataAccessor = _helixDataAccessor.getBaseDataAccessor();
-
-    String instanceConfigs = PropertyPathBuilder.instanceConfig(_helixClusterName);
-    _cacheInstanceConfigsDataAccessor =
-        new ZkCacheBaseDataAccessor<>((ZkBaseDataAccessor<ZNRecord>) baseDataAccessor, instanceConfigs, null,
-            Collections.singletonList(instanceConfigs));
+    _keyBuilder = _helixDataAccessor.keyBuilder();
 
     // Add instance group tag for controller
     addInstanceGroupTagIfNeeded();
 
-    _keyBuilder = _helixDataAccessor.keyBuilder();
     _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
   }
@@ -274,27 +282,14 @@ public class PinotHelixResourceManager {
    */
   @Nonnull
   public List<String> getAllInstances() {
-    return _cacheInstanceConfigsDataAccessor.getChildNames("/", AccessOption.PERSISTENT);
+    return _helixAdmin.getInstancesInCluster(_helixClusterName);
   }
 
   /**
    * Returns the config for all the Helix instances in the cluster.
    */
   public List<InstanceConfig> getAllHelixInstanceConfigs() {
-    List<ZNRecord> znRecords = _cacheInstanceConfigsDataAccessor.getChildren("/", null, AccessOption.PERSISTENT);
-    int numZNRecords = znRecords.size();
-    List<InstanceConfig> instanceConfigs = new ArrayList<>(numZNRecords);
-    for (ZNRecord znRecord : znRecords) {
-      // NOTE: it is possible that znRecord is null if the record gets removed while calling this method
-      if (znRecord != null) {
-        instanceConfigs.add(new InstanceConfig(znRecord));
-      }
-    }
-    int numNullZNRecords = numZNRecords - instanceConfigs.size();
-    if (numNullZNRecords > 0) {
-      LOGGER.warn("Failed to read {}/{} instance configs", numZNRecords - numNullZNRecords, numZNRecords);
-    }
-    return instanceConfigs;
+    return HelixHelper.getInstanceConfigs(_helixZkManager);
   }
 
   /**
@@ -304,8 +299,7 @@ public class PinotHelixResourceManager {
    * @return Helix instance config
    */
   public InstanceConfig getHelixInstanceConfig(@Nonnull String instanceId) {
-    ZNRecord znRecord = _cacheInstanceConfigsDataAccessor.get("/" + instanceId, null, AccessOption.PERSISTENT);
-    return znRecord != null ? new InstanceConfig(znRecord) : null;
+    return _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceId));
   }
 
   /**
@@ -806,10 +800,9 @@ public class PinotHelixResourceManager {
 
   public Set<String> getAllBrokerTenantNames() {
     Set<String> tenantSet = new HashSet<>();
-    List<String> instancesInCluster = _helixAdmin.getInstancesInCluster(_helixClusterName);
-    for (String instanceName : instancesInCluster) {
-      InstanceConfig config = _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
-      for (String tag : config.getTags()) {
+    List<InstanceConfig> instanceConfigs = getAllHelixInstanceConfigs();
+    for (InstanceConfig instanceConfig : instanceConfigs) {
+      for (String tag : instanceConfig.getTags()) {
         if (TagNameUtils.isBrokerTag(tag)) {
           tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
         }
@@ -820,10 +813,9 @@ public class PinotHelixResourceManager {
 
   public Set<String> getAllServerTenantNames() {
     Set<String> tenantSet = new HashSet<>();
-    List<String> instancesInCluster = _helixAdmin.getInstancesInCluster(_helixClusterName);
-    for (String instanceName : instancesInCluster) {
-      InstanceConfig config = _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
-      for (String tag : config.getTags()) {
+    List<InstanceConfig> instanceConfigs = getAllHelixInstanceConfigs();
+    for (InstanceConfig instanceConfig : instanceConfigs) {
+      for (String tag : instanceConfig.getTags()) {
         if (TagNameUtils.isServerTag(tag)) {
           tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
         }
@@ -1574,8 +1566,8 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineTableName, segmentMetadata);
   }
 
-  public void refreshSegment(@Nonnull String offlineTableName, @Nonnull SegmentMetadata segmentMetadata,
-      @Nonnull OfflineSegmentZKMetadata offlineSegmentZKMetadata) {
+  public void refreshSegment(String offlineTableName, SegmentMetadata segmentMetadata,
+      OfflineSegmentZKMetadata offlineSegmentZKMetadata, String downloadUrl, @Nullable String crypter) {
     String segmentName = segmentMetadata.getName();
 
     // NOTE: must first set the segment ZK metadata before trying to refresh because server will pick up the
@@ -1583,6 +1575,8 @@ public class PinotHelixResourceManager {
     // segment or load from local
     ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
     offlineSegmentZKMetadata.setRefreshTime(System.currentTimeMillis());
+    offlineSegmentZKMetadata.setDownloadUrl(downloadUrl);
+    offlineSegmentZKMetadata.setCrypterName(crypter);
     if (!ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineTableName, offlineSegmentZKMetadata)) {
       throw new RuntimeException(
           "Failed to update ZK metadata for segment: " + segmentName + " of table: " + offlineTableName);
@@ -2082,11 +2076,11 @@ public class PinotHelixResourceManager {
   }
 
   public PinotResourceManagerResponse enableInstance(String instanceName) {
-    return toggleInstance(instanceName, true, 10);
+    return enableInstance(instanceName, true, 10_000L);
   }
 
   public PinotResourceManagerResponse disableInstance(String instanceName) {
-    return toggleInstance(instanceName, false, 10);
+    return enableInstance(instanceName, false, 10_000L);
   }
 
   /**
@@ -2138,52 +2132,71 @@ public class PinotHelixResourceManager {
    * Keeps checking until ideal-state is successfully updated or times out.
    *
    * @param instanceName: Name of Instance for which the status needs to be toggled.
-   * @param toggle: 'True' for ONLINE 'False' for OFFLINE.
-   * @param timeOutInSeconds: Time-out for setting ideal-state.
+   * @param enableInstance: 'True' for enabling the instance and 'False' for disabling the instance.
+   * @param timeOutMs: Time-out for setting ideal-state.
    * @return
    */
-  public PinotResourceManagerResponse toggleInstance(String instanceName, boolean toggle, int timeOutInSeconds) {
+  private PinotResourceManagerResponse enableInstance(String instanceName, boolean enableInstance, long timeOutMs) {
     if (!instanceExists(instanceName)) {
       return PinotResourceManagerResponse.failure("Instance " + instanceName + " not found");
     }
 
-    _helixAdmin.enableInstance(_helixClusterName, instanceName, toggle);
-    long deadline = System.currentTimeMillis() + 1000 * timeOutInSeconds;
-    boolean toggleSucceed = false;
-    String beforeToggleStates =
-        (toggle) ? SegmentOnlineOfflineStateModel.OFFLINE : SegmentOnlineOfflineStateModel.ONLINE;
+    _helixAdmin.enableInstance(_helixClusterName, instanceName, enableInstance);
+    long intervalWaitTimeMs = 500L;
+    long deadline = System.currentTimeMillis() + timeOutMs;
+    String offlineState = SegmentOnlineOfflineStateModel.OFFLINE;
 
     while (System.currentTimeMillis() < deadline) {
-      toggleSucceed = true;
       PropertyKey liveInstanceKey = _keyBuilder.liveInstance(instanceName);
       LiveInstance liveInstance = _helixDataAccessor.getProperty(liveInstanceKey);
       if (liveInstance == null) {
-        return toggle ? PinotResourceManagerResponse.FAILURE : PinotResourceManagerResponse.SUCCESS;
-      }
-      PropertyKey instanceCurrentStatesKey = _keyBuilder.currentStates(instanceName, liveInstance.getSessionId());
-      List<CurrentState> instanceCurrentStates = _helixDataAccessor.getChildValues(instanceCurrentStatesKey);
-      if (instanceCurrentStates == null) {
-        return PinotResourceManagerResponse.SUCCESS;
+        if (!enableInstance) {
+          // If we disable the instance, we actually don't care whether live instance being null. Thus, returning success should be good.
+          // Otherwise, wait until timeout.
+          return PinotResourceManagerResponse.SUCCESS;
+        }
       } else {
-        for (CurrentState currentState : instanceCurrentStates) {
-          for (String state : currentState.getPartitionStateMap().values()) {
-            if (beforeToggleStates.equals(state)) {
-              toggleSucceed = false;
+        boolean toggleSucceeded = true;
+        // Checks all the current states fall into the target states
+        PropertyKey instanceCurrentStatesKey = _keyBuilder.currentStates(instanceName, liveInstance.getSessionId());
+        List<CurrentState> instanceCurrentStates = _helixDataAccessor.getChildValues(instanceCurrentStatesKey);
+        if (instanceCurrentStates.isEmpty()) {
+          return PinotResourceManagerResponse.SUCCESS;
+        } else {
+          for (CurrentState currentState : instanceCurrentStates) {
+            for (String state : currentState.getPartitionStateMap().values()) {
+              // If instance is enabled, all the partitions should not eventually be offline.
+              // If instance is disabled, all the partitions should eventually be offline.
+              // TODO: Handle the case when realtime segments are in OFFLINE state because there're some problem with realtime segment consumption,
+              //  and realtime segment will mark itself as OFFLINE in ideal state.
+              //  Issue: https://github.com/apache/incubator-pinot/issues/4653
+              if ((enableInstance && !offlineState.equals(state)) || (!enableInstance && offlineState.equals(state))) {
+                toggleSucceeded = false;
+                break;
+              }
+            }
+            if (!toggleSucceeded) {
+              break;
             }
           }
         }
-      }
-      if (toggleSucceed) {
-        return (toggle) ? PinotResourceManagerResponse.success("Instance " + instanceName + " enabled")
-            : PinotResourceManagerResponse.success("Instance " + instanceName + " disabled");
-      } else {
-        try {
-          Thread.sleep(500);
-        } catch (InterruptedException e) {
+        if (toggleSucceeded) {
+          return (enableInstance) ? PinotResourceManagerResponse.success("Instance " + instanceName + " enabled")
+              : PinotResourceManagerResponse.success("Instance " + instanceName + " disabled");
         }
       }
+
+      try {
+        Thread.sleep(intervalWaitTimeMs);
+      } catch (InterruptedException e) {
+        LOGGER.warn("Got interrupted when sleeping for {}ms to wait until the current state matched for instance: {}",
+            intervalWaitTimeMs, instanceName);
+        return PinotResourceManagerResponse
+            .failure("Got interrupted when waiting for instance to be " + (enableInstance ? "enabled" : "disabled"));
+      }
     }
-    return PinotResourceManagerResponse.failure("Instance enable/disable failed, timeout");
+    return PinotResourceManagerResponse
+        .failure("Instance " + (enableInstance ? "enable" : "disable") + " failed, timeout");
   }
 
   public RebalanceResult rebalanceTable(String tableNameWithType, Configuration rebalanceConfig)
@@ -2202,8 +2215,7 @@ public class PinotHelixResourceManager {
    * @return True if instance exists in the Helix cluster, False otherwise.
    */
   public boolean instanceExists(String instanceName) {
-    ZNRecord znRecord = _cacheInstanceConfigsDataAccessor.get("/" + instanceName, null, AccessOption.PERSISTENT);
-    return (znRecord != null);
+    return getHelixInstanceConfig(instanceName) != null;
   }
 
   public boolean isSingleTenantCluster() {
@@ -2241,7 +2253,7 @@ public class PinotHelixResourceManager {
    * Provides admin endpoints for the provided data instances
    * @param instances instances for which to read endpoints
    * @return returns map of instances to their admin endpoints.
-   * The return value is a bimap because admin instances are typically used for
+   * The return value is a biMap because admin instances are typically used for
    * http requests. So, on response, we need mapping from the endpoint to the
    * server instances. With BiMap, both mappings are easily available
    */
@@ -2251,23 +2263,17 @@ public class PinotHelixResourceManager {
     Preconditions.checkNotNull(instances);
     BiMap<String, String> endpointToInstance = HashBiMap.create(instances.size());
     for (String instance : instances) {
-      InstanceConfig helixInstanceConfig = getHelixInstanceConfig(instance);
-      if (helixInstanceConfig == null) {
-        LOGGER.warn("Instance {} not found", instance);
-        continue;
+      String instanceAdminEndpoint;
+      try {
+        instanceAdminEndpoint = _instanceAdminEndpointCache.get(instance);
+      } catch (ExecutionException e) {
+        String errorMessage = String
+            .format("ExecutionException when getting instance admin endpoint for instance: %s. Error message: %s",
+                instance, e.getMessage());
+        LOGGER.error(errorMessage, e);
+        throw new InvalidConfigException(errorMessage);
       }
-      ZNRecord record = helixInstanceConfig.getRecord();
-      String[] hostnameSplit = helixInstanceConfig.getHostName().split("_");
-      Preconditions.checkState(hostnameSplit.length >= 2);
-      String adminPort = record.getSimpleField(Helix.Instance.ADMIN_PORT_KEY);
-      // If admin port is missing, there's no point to calculate the remaining table size.
-      // Thus, throwing an exception will be good here.
-      if (Strings.isNullOrEmpty(adminPort)) {
-        String message = String.format("Admin port is missing for host: %s", helixInstanceConfig.getHostName());
-        LOGGER.error(message);
-        throw new InvalidConfigException(message);
-      }
-      endpointToInstance.put(instance, hostnameSplit[1] + ":" + adminPort);
+      endpointToInstance.put(instance, instanceAdminEndpoint);
     }
     return endpointToInstance;
   }

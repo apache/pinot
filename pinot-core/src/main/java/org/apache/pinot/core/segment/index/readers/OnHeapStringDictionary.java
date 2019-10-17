@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
@@ -36,9 +36,8 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 public class OnHeapStringDictionary extends OnHeapDictionary {
   private final byte _paddingByte;
   private final String[] _unpaddedStrings;
+  private final Object2IntOpenHashMap<String> _unPaddedStringToIdMap;
   private final String[] _paddedStrings;
-  private final Map<String, Integer> _paddedStringToIdMap;
-  private final Map<String, Integer> _unPaddedStringToIdMap;
 
   public OnHeapStringDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
     super(dataBuffer, length, numBytesPerValue, paddingByte);
@@ -46,43 +45,46 @@ public class OnHeapStringDictionary extends OnHeapDictionary {
     _paddingByte = paddingByte;
     byte[] buffer = new byte[numBytesPerValue];
     _unpaddedStrings = new String[length];
-    _unPaddedStringToIdMap = new HashMap<>(length);
+    _unPaddedStringToIdMap = new Object2IntOpenHashMap<>(length);
+    _unPaddedStringToIdMap.defaultReturnValue(NULL_VALUE_INDEX);
 
     for (int i = 0; i < length; i++) {
-      _unpaddedStrings[i] = getUnpaddedString(i, buffer);
-      _unPaddedStringToIdMap.put(_unpaddedStrings[i], i);
+      String unpaddedString = getUnpaddedString(i, buffer);
+      _unpaddedStrings[i] = unpaddedString;
+      _unPaddedStringToIdMap.put(unpaddedString, i);
     }
 
     if (paddingByte == 0) {
       _paddedStrings = null;
-      _paddedStringToIdMap = null;
     } else {
       _paddedStrings = new String[length];
-      _paddedStringToIdMap = new HashMap<>(length);
-
       for (int i = 0; i < length; i++) {
         _paddedStrings[i] = getPaddedString(i, buffer);
-        _paddedStringToIdMap.put(_paddedStrings[i], i);
       }
     }
   }
 
+  /**
+   * WARNING: With non-zero padding byte, binary search result might not reflect the real insertion index for the value.
+   * E.g. with padding byte 'b', if unpadded value "aa" is in the dictionary, and stored as "aab", then unpadded value
+   * "a" will be mis-positioned after value "aa"; unpadded value "aab" will return positive value even if value "aab" is
+   * not in the dictionary.
+   * TODO: Clean up the segments with legacy non-zero padding byte, and remove the support for non-zero padding byte
+   */
   @Override
-  public int indexOf(Object rawValue) {
-    Map<String, Integer> stringToIdMap = (_paddingByte == 0) ? _unPaddedStringToIdMap : _paddedStringToIdMap;
-    Integer index = stringToIdMap.get(rawValue);
-    return (index != null) ? index : -1;
+  public int insertionIndexOf(String stringValue) {
+    int index = _unPaddedStringToIdMap.getInt(stringValue);
+    if (index != NULL_VALUE_INDEX) {
+      return index;
+    } else {
+      return _paddingByte == 0 ? Arrays.binarySearch(_unpaddedStrings, stringValue)
+          : Arrays.binarySearch(_paddedStrings, padString(stringValue));
+    }
   }
 
   @Override
-  public int insertionIndexOf(Object rawValue) {
-    if (_paddingByte == 0) {
-      Integer id = _unPaddedStringToIdMap.get(rawValue);
-      return (id != null) ? id : Arrays.binarySearch(_unpaddedStrings, rawValue);
-    } else {
-      String paddedValue = padString((String) rawValue);
-      return Arrays.binarySearch(_paddedStrings, paddedValue);
-    }
+  public int indexOf(String stringValue) {
+    return _unPaddedStringToIdMap.getInt(stringValue);
   }
 
   @Override
@@ -91,7 +93,32 @@ public class OnHeapStringDictionary extends OnHeapDictionary {
   }
 
   @Override
+  public int getIntValue(int dictId) {
+    return Integer.parseInt(_unpaddedStrings[dictId]);
+  }
+
+  @Override
+  public long getLongValue(int dictId) {
+    return Long.parseLong(_unpaddedStrings[dictId]);
+  }
+
+  @Override
+  public float getFloatValue(int dictId) {
+    return Float.parseFloat(_unpaddedStrings[dictId]);
+  }
+
+  @Override
+  public double getDoubleValue(int dictId) {
+    return Double.parseDouble(_unpaddedStrings[dictId]);
+  }
+
+  @Override
   public String getStringValue(int dictId) {
     return _unpaddedStrings[dictId];
+  }
+
+  @Override
+  public byte[] getBytesValue(int dictId) {
+    return BytesUtils.toBytes(_unpaddedStrings[dictId]);
   }
 }

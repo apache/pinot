@@ -130,13 +130,17 @@ public class PinotInstanceRestletResource {
     }
 
     if (StateType.ENABLE.name().equalsIgnoreCase(state)) {
-      if (!pinotHelixResourceManager.enableInstance(instanceName).isSuccessful()) {
-        throw new ControllerApplicationException(LOGGER, "Failed to enable instance " + instanceName,
+      PinotResourceManagerResponse response = pinotHelixResourceManager.enableInstance(instanceName);
+      if (!response.isSuccessful()) {
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to enable instance " + instanceName + " - " + response.getMessage(),
             Response.Status.INTERNAL_SERVER_ERROR);
       }
     } else if (StateType.DISABLE.name().equalsIgnoreCase(state)) {
-      if (!pinotHelixResourceManager.disableInstance(instanceName).isSuccessful()) {
-        throw new ControllerApplicationException(LOGGER, "Failed to disable instance " + instanceName,
+      PinotResourceManagerResponse response = pinotHelixResourceManager.disableInstance(instanceName);
+      if (!response.isSuccessful()) {
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to disable instance " + instanceName + " - " + response.getMessage(),
             Response.Status.INTERNAL_SERVER_ERROR);
       }
     } else if (StateType.DROP.name().equalsIgnoreCase(state)) {

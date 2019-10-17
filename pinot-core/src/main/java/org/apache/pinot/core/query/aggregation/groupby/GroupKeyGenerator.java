@@ -27,6 +27,7 @@ import org.apache.pinot.core.operator.blocks.TransformBlock;
  * Interface for generating group keys.
  */
 public interface GroupKeyGenerator {
+  String DELIMITER = "\t";
   int INVALID_ID = -1;
 
   /**

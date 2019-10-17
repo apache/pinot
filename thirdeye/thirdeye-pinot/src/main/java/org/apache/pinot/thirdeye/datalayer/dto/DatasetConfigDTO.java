@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.datalayer.dto;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datalayer.pojo.DatasetConfigBean;
 import java.util.concurrent.TimeUnit;
@@ -45,5 +46,13 @@ public class DatasetConfigDTO extends DatasetConfigBean {
         bucketTimeGranularity = new TimeGranularity(size, timeUnit);
     }
     return bucketTimeGranularity;
+  }
+
+  /**
+   * Get the dataset name for display on UI.
+   * @return the dataset's name. Use display name if it's available, otherwise, use 'dataset' field.
+   */
+  public String getName() {
+    return StringUtils.isNotBlank(getDisplayName()) ? getDisplayName() : getDataset();
   }
 }

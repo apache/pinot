@@ -21,7 +21,6 @@ package org.apache.pinot.core.realtime.impl.dictionary;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import javax.annotation.Nonnull;
 
 
 /**
@@ -32,14 +31,14 @@ import javax.annotation.Nonnull;
  * value later, but not reversely. So whenever we return a valid dictionary id for a value, we need to ensure the value
  * can be fetched by the dictionary id returned.
  */
-public abstract class BaseOnHeapMutableDictionary extends MutableDictionary {
+public abstract class BaseOnHeapMutableDictionary extends BaseMutableDictionary {
   private static final int SHIFT_OFFSET = 13;  // INITIAL_DICTIONARY_SIZE = 8192
   private static final int INITIAL_DICTIONARY_SIZE = 1 << SHIFT_OFFSET;
   private static final int MASK = 0xFFFFFFFF >>> (Integer.SIZE - SHIFT_OFFSET);
 
   private final Map<Object, Integer> _valueToDictId = new ConcurrentHashMap<>(INITIAL_DICTIONARY_SIZE);
   private final Object[][] _dictIdToValue = new Object[INITIAL_DICTIONARY_SIZE][];
-  private int _entriesIndexed = 0;
+  private volatile int _entriesIndexed = 0;
 
   /**
    * For performance, we don't validate the dictId passed in. It should be returned by index() or indexOf().
@@ -55,14 +54,6 @@ public abstract class BaseOnHeapMutableDictionary extends MutableDictionary {
   }
 
   @Override
-  public int getAvgValueSize() {
-    throw new UnsupportedOperationException("Not implemented");
-  }
-
-  public boolean isEmpty() {
-    return _entriesIndexed == 0;
-  }
-
   public void close()
       throws IOException {
   }
@@ -73,10 +64,14 @@ public abstract class BaseOnHeapMutableDictionary extends MutableDictionary {
    *
    * @param value single value already converted to correct type.
    */
-  protected void indexValue(@Nonnull Object value) {
-    if (!_valueToDictId.containsKey(value)) {
-      int arrayIndex = _entriesIndexed >>> SHIFT_OFFSET;
-      int arrayOffset = _entriesIndexed & MASK;
+  protected int indexValue(Object value) {
+    Integer dictId = _valueToDictId.get(value);
+    if (dictId != null) {
+      return dictId;
+    } else {
+      int newValueDictId = _entriesIndexed;
+      int arrayIndex = newValueDictId >>> SHIFT_OFFSET;
+      int arrayOffset = newValueDictId & MASK;
 
       // Create a new array if necessary
       if (arrayOffset == 0) {
@@ -84,10 +79,12 @@ public abstract class BaseOnHeapMutableDictionary extends MutableDictionary {
       }
 
       // First update dictId to value map then value to dictId map
-      // Ensure we can always fetch value by dictId returned by index() or indexOf()
+      // Ensure we can always fetch value by dictId returned by indexOf()
       _dictIdToValue[arrayIndex][arrayOffset] = value;
-      _valueToDictId.put(value, _entriesIndexed);
-      _entriesIndexed++;
+      _valueToDictId.put(value, newValueDictId);
+
+      _entriesIndexed = newValueDictId + 1;
+      return newValueDictId;
     }
   }
 
@@ -98,7 +95,7 @@ public abstract class BaseOnHeapMutableDictionary extends MutableDictionary {
    * @param value single value already converted to correct type.
    * @return dictId of the value.
    */
-  protected int getDictId(@Nonnull Object value) {
+  protected int getDictId(Object value) {
     Integer dictId = _valueToDictId.get(value);
     if (dictId == null) {
       return NULL_VALUE_INDEX;

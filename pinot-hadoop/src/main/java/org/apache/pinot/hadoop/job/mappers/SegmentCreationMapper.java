@@ -81,8 +81,6 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   protected File _localSegmentDir;
   protected File _localSegmentTarDir;
 
-  protected FileSystem _fileSystem;
-
   @Override
   public void setup(Context context)
       throws IOException, InterruptedException {
@@ -148,8 +146,6 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     Preconditions.checkState(_localSegmentDir.mkdir());
     Preconditions.checkState(_localSegmentTarDir.mkdir());
 
-    _fileSystem = FileSystem.get(context.getConfiguration());
-
     _logger.info("*********************************************************************");
     _logger.info("Raw Table Name: {}", _rawTableName);
     _logger.info("Schema: {}", _schema);
@@ -199,7 +195,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     String inputFileName = hdfsInputFile.getName();
     File localInputFile = new File(_localInputDir, inputFileName);
     _logger.info("Copying input file from: {} to: {}", hdfsInputFile, localInputFile);
-    _fileSystem.copyToLocalFile(hdfsInputFile, new Path(localInputFile.getAbsolutePath()));
+    FileSystem.get(hdfsInputFile.toUri(), _jobConf).copyToLocalFile(hdfsInputFile, new Path(localInputFile.getAbsolutePath()));
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, _schema);
     segmentGeneratorConfig.setTableName(_rawTableName);
@@ -256,7 +252,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
 
     Path hdfsSegmentTarFile = new Path(_hdfsSegmentTarDir, segmentTarFileName);
     _logger.info("Copying segment tar file from: {} to: {}", localSegmentTarFile, hdfsSegmentTarFile);
-    _fileSystem.copyFromLocalFile(true, true, new Path(localSegmentTarFile.getAbsolutePath()), hdfsSegmentTarFile);
+    FileSystem.get(hdfsSegmentTarFile.toUri(), _jobConf).copyFromLocalFile(true, true, new Path(localSegmentTarFile.getAbsolutePath()), hdfsSegmentTarFile);
 
     context.write(new LongWritable(sequenceId), new Text(segmentTarFileName));
     _logger.info("Finish generating segment: {} with HDFS input file: {}, sequence id: {}", segmentName, hdfsInputFile,
@@ -284,14 +280,14 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
       throws IOException {
     if (_readerConfigFile != null) {
       if (fileFormat == FileFormat.CSV) {
-        try (InputStream inputStream = _fileSystem.open(_readerConfigFile)) {
+        try (InputStream inputStream = FileSystem.get(_readerConfigFile.toUri(), _jobConf).open(_readerConfigFile)) {
           CSVRecordReaderConfig readerConfig = JsonUtils.inputStreamToObject(inputStream, CSVRecordReaderConfig.class);
           _logger.info("Using CSV record reader config: {}", readerConfig);
           return readerConfig;
         }
       }
       if (fileFormat == FileFormat.THRIFT) {
-        try (InputStream inputStream = _fileSystem.open(_readerConfigFile)) {
+        try (InputStream inputStream = FileSystem.get(_readerConfigFile.toUri(), _jobConf).open(_readerConfigFile)) {
           ThriftRecordReaderConfig readerConfig =
               JsonUtils.inputStreamToObject(inputStream, ThriftRecordReaderConfig.class);
           _logger.info("Using Thrift record reader config: {}", readerConfig);

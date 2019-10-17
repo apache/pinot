@@ -117,6 +117,7 @@ create index merged_anomaly_result_detection_config_id_idx on merged_anomaly_res
 
 create table if not exists dataset_config_index (
     dataset varchar(200) not null,
+    display_name varchar(200),
     active boolean,
     requires_completeness_check boolean,
     base_id bigint(20) not null,
@@ -129,6 +130,7 @@ create index dataset_config_dataset_idx on dataset_config_index(dataset);
 create index dataset_config_active_idx on dataset_config_index(active);
 create index dataset_config_requires_completeness_check_idx on dataset_config_index(requires_completeness_check);
 create index dataset_config_base_id_idx ON dataset_config_index(base_id);
+create index dataset_config_display_name_idx on dataset_config_index(display_name);
 
 create table if not exists metric_config_index (
     name varchar(200) not null,

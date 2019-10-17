@@ -18,12 +18,21 @@
  */
 package org.apache.pinot.common.utils.helix;
 
+import org.apache.helix.ConfigAccessor;
+import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.model.LiveInstance;
+import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.StringUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class LeadControllerUtils {
+  public static final Logger LOGGER = LoggerFactory.getLogger(LeadControllerUtils.class);
 
   /**
    * Given a raw table name and number of partitions, returns the partition id in lead controller resource.
@@ -46,6 +55,13 @@ public class LeadControllerUtils {
   }
 
   /**
+   * Extracts controller instance id, e.g. returns localhost_9000 given Controller_localhost_9000 as the participant instance id.
+   */
+  public static String extractControllerInstanceId(String participantInstanceId) {
+    return participantInstanceId.substring(participantInstanceId.indexOf('_') + 1);
+  }
+
+  /**
    * Generates partition name, e.g. returns leadControllerResource_0 given 0 as partition index.
    */
   public static String generatePartitionName(int partitionId) {
@@ -57,5 +73,38 @@ public class LeadControllerUtils {
    */
   public static int extractPartitionId(String partitionName) {
     return Integer.parseInt(partitionName.substring(partitionName.lastIndexOf('_') + 1));
+  }
+
+  /**
+   * Checks from ZK if resource config of leadControllerResource is enabled.
+   * @param helixManager helix manager
+   */
+  public static boolean isLeadControllerResourceEnabled(HelixManager helixManager) {
+    ConfigAccessor configAccessor = helixManager.getConfigAccessor();
+    ResourceConfig resourceConfig =
+        configAccessor.getResourceConfig(helixManager.getClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+    String resourceEnabled = resourceConfig.getSimpleConfig(Helix.LEAD_CONTROLLER_RESOURCE_ENABLED_KEY);
+    return Boolean.parseBoolean(resourceEnabled);
+  }
+
+  /**
+   * Gets Helix leader in the cluster. Null if there is no leader.
+   * @param helixManager helix manager
+   * @return instance id of Helix cluster leader, e.g. localhost_9000.
+   */
+  public static String getHelixClusterLeader(HelixManager helixManager) {
+    HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
+    PropertyKey propertyKey = helixDataAccessor.keyBuilder().controllerLeader();
+    LiveInstance liveInstance = helixDataAccessor.getProperty(propertyKey);
+    if (liveInstance == null) {
+      LOGGER.warn("Helix leader ZNode is missing");
+      return null;
+    }
+    String helixLeaderInstanceId = liveInstance.getInstanceName();
+    String helixVersion = liveInstance.getHelixVersion();
+    long modifiedTime = liveInstance.getModifiedTime();
+    LOGGER.info("Getting Helix leader: {}, Helix version: {}, mtime: {}", helixLeaderInstanceId, helixVersion,
+        modifiedTime);
+    return helixLeaderInstanceId;
   }
 }

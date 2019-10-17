@@ -21,14 +21,15 @@ package org.apache.pinot.core.plan;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.query.MetadataBasedAggregationOperator;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
-import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,23 +43,25 @@ public class MetadataBasedAggregationPlanNode implements PlanNode {
 
   private final IndexSegment _indexSegment;
   private final List<AggregationInfo> _aggregationInfos;
+  private final BrokerRequest _brokerRequest;
 
   /**
    * Constructor for the class.
    *
    * @param indexSegment Segment to process
-   * @param aggregationInfos List of aggregation info
+   * @param brokerRequest Broker request
    */
-  public MetadataBasedAggregationPlanNode(IndexSegment indexSegment, List<AggregationInfo> aggregationInfos) {
+  public MetadataBasedAggregationPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     _indexSegment = indexSegment;
-    _aggregationInfos = aggregationInfos;
+    _brokerRequest = brokerRequest;
+    _aggregationInfos = brokerRequest.getAggregationsInfo();
   }
 
   @Override
   public Operator run() {
     SegmentMetadata segmentMetadata = _indexSegment.getSegmentMetadata();
     AggregationFunctionContext[] aggregationFunctionContexts =
-        AggregationFunctionUtils.getAggregationFunctionContexts(_aggregationInfos, segmentMetadata);
+        AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest, segmentMetadata);
 
     Map<String, DataSource> dataSourceMap = new HashMap<>();
     for (AggregationFunctionContext aggregationFunctionContext : aggregationFunctionContexts) {

@@ -51,7 +51,7 @@ public class GrouperWrapper extends DetectionPipeline {
   private static final String PROP_NESTED = "nested";
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_GROUPER = "grouper";
-  private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
+  public static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
 
   private final List<Map<String, Object>> nestedProperties;
 

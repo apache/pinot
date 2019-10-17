@@ -37,7 +37,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
-import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.apache.pinot.thirdeye.detection.alert.StatefulDetectionAlertFilter;
 import org.apache.pinot.thirdeye.detection.annotation.AlertFilter;
@@ -55,10 +55,6 @@ import org.apache.pinot.thirdeye.detection.annotation.AlertFilter;
 @AlertFilter(type = "PER_USER_DIMENSION_ALERTER_PIPELINE")
 public class PerUserDimensionAlertFilter extends StatefulDetectionAlertFilter {
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
-  private static final String PROP_TO = "to";
-  private static final String PROP_CC = "cc";
-  private static final String PROP_BCC = "bcc";
-  private static final String PROP_RECIPIENTS = "recipients";
   private static final String PROP_DIMENSION = "dimension";
   private static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
   private static final String PROP_SEND_ONCE = "sendOnce";
@@ -111,12 +107,13 @@ public class PerUserDimensionAlertFilter extends StatefulDetectionAlertFilter {
 
     for (Map.Entry<String, List<MergedAnomalyResultDTO>> userAnomalyMapping : perUserAnomalies.entrySet()) {
       result.addMapping(
-          new DetectionAlertFilterRecipients(
-              this.makeGroupRecipients(userAnomalyMapping.getKey()),
-              this.recipients.get(PROP_CC),
-              this.recipients.get(PROP_BCC)),
-          new HashSet<>(userAnomalyMapping.getValue())
-      );
+          new DetectionAlertFilterNotification(
+              generateNotificationSchemeProps(
+                  this.config,
+                  this.makeGroupRecipients(userAnomalyMapping.getKey()),
+                  this.recipients.get(PROP_CC),
+                  this.recipients.get(PROP_BCC))),
+          new HashSet<>(userAnomalyMapping.getValue()));
     }
 
     return result;

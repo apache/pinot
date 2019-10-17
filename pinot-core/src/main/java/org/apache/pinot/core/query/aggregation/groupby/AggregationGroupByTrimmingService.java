@@ -42,7 +42,6 @@ import org.apache.pinot.core.query.aggregation.function.MinAggregationFunction;
  * The <code>AggregationGroupByTrimmingService</code> class provides trimming service for aggregation group-by queries.
  */
 public class AggregationGroupByTrimmingService {
-  public static final String GROUP_KEY_DELIMITER = "\t";
 
   private final AggregationFunction[] _aggregationFunctions;
   private final int _groupByTopN;
@@ -229,7 +228,7 @@ public class AggregationGroupByTrimmingService {
       GroupKeyResultPair groupKeyResultPair;
       while ((groupKeyResultPair = _heap.poll()) != null) {
         // Set limit to -1 to prevent removing trailing empty strings
-        String[] groupKeys = groupKeyResultPair._groupKey.split(GROUP_KEY_DELIMITER, -1);
+        String[] groupKeys = groupKeyResultPair._groupKey.split(GroupKeyGenerator.DELIMITER, -1);
 
         GroupByResult groupByResult = new GroupByResult();
         groupByResult.setGroup(Arrays.asList(groupKeys));

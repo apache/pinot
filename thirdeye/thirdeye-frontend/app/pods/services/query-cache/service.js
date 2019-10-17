@@ -50,7 +50,9 @@ export default Service.extend({
 
     let cached = this._cache[cacheKey];
     if (!cached || adapterOptions.reload) { // TODO: Add `EXPIRATION` here to purge when possible - lohuynh
-      cached = this._cache[cacheKey] = await this.get('store').query(type, query, adapterOptions);
+      cached = this._cache[cacheKey] = await this.get('store')
+      .query(type, query, adapterOptions)
+      .catch(err => {});
     }
     return cached;
   },
@@ -73,7 +75,9 @@ export default Service.extend({
 
     let cached = this._cache[cacheKey];
     if (!cached || adapterOptions.reload) {// TODO: Add `EXPIRATION` here to purge when possible - lohuynh
-      cached = this._cache[cacheKey] = await this.get('store').queryRecord(type, query, adapterOptions);
+      cached = this._cache[cacheKey] = await this.get('store')
+      .queryRecord(type, query, adapterOptions)
+      .catch(err => {});
     }
     return cached;
   },

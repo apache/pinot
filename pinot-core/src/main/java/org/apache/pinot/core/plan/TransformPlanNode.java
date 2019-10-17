@@ -18,16 +18,10 @@
  */
 package org.apache.pinot.core.plan;
 
-import static org.apache.pinot.core.query.selection.SelectionOperatorUtils.getSelectionColumns;
-
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import javax.annotation.Nonnull;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Selection;
@@ -35,8 +29,9 @@ import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,78 +45,85 @@ public class TransformPlanNode implements PlanNode {
   private final String _segmentName;
   private final ProjectionPlanNode _projectionPlanNode;
   private final Set<String> _projectionColumns = new HashSet<>();
-  private final Set<TransformExpressionTree> _expressionTrees = new LinkedHashSet<>();
+  private final Set<TransformExpressionTree> _expressions = new HashSet<>();
   private int _maxDocPerNextCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
 
-  /**
-   * Constructor for the class
-   *
-   * @param indexSegment Segment to process
-   * @param brokerRequest BrokerRequest to process
-   */
-  public TransformPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull BrokerRequest brokerRequest) {
+  public TransformPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     _segmentName = indexSegment.getSegmentName();
     extractColumnsAndTransforms(brokerRequest, indexSegment);
-    _projectionPlanNode =
-        new ProjectionPlanNode(indexSegment, _projectionColumns, new DocIdSetPlanNode(indexSegment, brokerRequest, _maxDocPerNextCall));
+    _projectionPlanNode = new ProjectionPlanNode(indexSegment, _projectionColumns,
+        new DocIdSetPlanNode(indexSegment, brokerRequest, _maxDocPerNextCall));
   }
 
   /**
    * Helper method to extract projection columns and transform expressions from the given broker request.
-   *
-   * @param brokerRequest Broker request to process
-   * @param indexSegment
    */
-  private void extractColumnsAndTransforms(@Nonnull BrokerRequest brokerRequest,
-      IndexSegment indexSegment) {
+  private void extractColumnsAndTransforms(BrokerRequest brokerRequest, IndexSegment indexSegment) {
     if (brokerRequest.isSetAggregationsInfo()) {
+      // Extract aggregation expressions
       for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
-        if (!aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-          String expression = AggregationFunctionUtils.getColumn(aggregationInfo);
-          TransformExpressionTree transformExpressionTree = TransformExpressionTree.compileToExpressionTree(expression);
-          transformExpressionTree.getColumns(_projectionColumns);
-          _expressionTrees.add(transformExpressionTree);
+        if (aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.DISTINCT.getName())) {
+          // 'DISTINCT(col1, col2 ...)' is modeled as one single aggregation function
+          String[] distinctColumns = AggregationFunctionUtils.getColumn(aggregationInfo)
+              .split(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR);
+          for (String column : distinctColumns) {
+            addExpressionColumn(column);
+          }
+        } else if (!aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
+          addExpressionColumn(AggregationFunctionUtils.getColumn(aggregationInfo));
         }
       }
 
-      // Process all group-by expressions
+      // Extract group-by expressions
       if (brokerRequest.isSetGroupBy()) {
-        for (String expression : brokerRequest.getGroupBy().getExpressions()) {
-          TransformExpressionTree transformExpressionTree = TransformExpressionTree.compileToExpressionTree(expression);
-          transformExpressionTree.getColumns(_projectionColumns);
-          _expressionTrees.add(transformExpressionTree);
+        for (String column : brokerRequest.getGroupBy().getExpressions()) {
+          addExpressionColumn(column);
         }
       }
     } else {
       Selection selection = brokerRequest.getSelections();
-      // No ordering required, select minimum number of documents
-      if (!selection.isSetSelectionSortSequence()) {
-        _maxDocPerNextCall = Math.min(selection.getOffset() + selection.getSize(), _maxDocPerNextCall);
-      }
-      List<String> expressions = selection.getSelectionColumns();
-      if (expressions.size() == 1 && expressions.get(0).equals("*")) {
-        expressions = new LinkedList<>(indexSegment.getPhysicalColumnNames());
-        Collections.sort(expressions);
-      }
-      if (selection.getSelectionSortSequence() != null) {
-        for (SelectionSort selectionSort : selection.getSelectionSortSequence()) {
-          String expression = selectionSort.getColumn();
-          if(!expressions.contains(expression)) {
-            expressions.add(expression);
-          }
+
+      // Extract selection expressions
+      List<String> selectionColumns = selection.getSelectionColumns();
+      if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
+        for (String column : indexSegment.getPhysicalColumnNames()) {
+          _projectionColumns.add(column);
+          _expressions.add(new TransformExpressionTree(new IdentifierAstNode(column)));
+        }
+      } else {
+        for (String column : selectionColumns) {
+          addExpressionColumn(column);
         }
       }
-      for (String expression : expressions) {
-        TransformExpressionTree transformExpressionTree = TransformExpressionTree.compileToExpressionTree(expression);
-        transformExpressionTree.getColumns(_projectionColumns);
-        _expressionTrees.add(transformExpressionTree);
+
+      // Extract order-by expressions and update maxDocPerNextCall
+      if (selection.getSize() > 0) {
+        List<SelectionSort> sortSequence = selection.getSelectionSortSequence();
+        if (sortSequence == null) {
+          // For selection only queries, select minimum number of documents
+          _maxDocPerNextCall = Math.min(selection.getSize(), _maxDocPerNextCall);
+        } else {
+          for (SelectionSort selectionSort : sortSequence) {
+            addExpressionColumn(selectionSort.getColumn());
+          }
+        }
+      } else {
+        // For LIMIT 0 queries, fetch at least 1 document per DocIdSetPlanNode's requirement
+        // TODO: Skip the filtering phase and document fetching for LIMIT 0 case
+        _maxDocPerNextCall = 1;
       }
     }
   }
 
+  private void addExpressionColumn(String column) {
+    TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(column);
+    expression.getColumns(_projectionColumns);
+    _expressions.add(expression);
+  }
+
   @Override
   public TransformOperator run() {
-    return new TransformOperator(_projectionPlanNode.run(), new ArrayList<>(_expressionTrees));
+    return new TransformOperator(_projectionPlanNode.run(), _expressions);
   }
 
   @Override

@@ -18,17 +18,21 @@
  */
 package org.apache.pinot.hadoop.job;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.hadoop.utils.PushLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +41,8 @@ public abstract class BaseSegmentJob extends Configured {
   protected final Logger _logger = LoggerFactory.getLogger(getClass());
   protected final Properties _properties;
   protected final Configuration _conf;
+  protected final List<PushLocation> _pushLocations;
+  protected final String _rawTableName;
 
   protected BaseSegmentJob(Properties properties) {
     _properties = properties;
@@ -44,6 +50,46 @@ public abstract class BaseSegmentJob extends Configured {
     setConf(_conf);
     Utils.logVersions();
     logProperties();
+
+    // Optional push location and table parameters. If set, will use the table config and schema from the push hosts.
+    String pushHostsString = _properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS);
+    String pushPortString = _properties.getProperty(JobConfigConstants.PUSH_TO_PORT);
+    if (pushHostsString != null && pushPortString != null) {
+      _pushLocations =
+          PushLocation.getPushLocations(StringUtils.split(pushHostsString, ','), Integer.parseInt(pushPortString));
+    } else {
+      _pushLocations = null;
+    }
+
+    _rawTableName = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME));
+  }
+
+  @Nullable
+  protected TableConfig getTableConfig()
+      throws IOException {
+    try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
+      return controllerRestApi != null ? controllerRestApi.getTableConfig() : null;
+    }
+  }
+
+  /**
+   * This method is currently implemented in SegmentCreationJob and SegmentPreprocessingJob due to a dependency on
+   * the hadoop filesystem, which we can only get once the job begins to run.
+   * We return null here to make it clear that for now, all implementations of this method have to support
+   * reading from a schema file. In the future, we hope to deprecate reading the schema from the schema file in favor
+   * of mandating that a schema is pushed to the controller.
+   */
+  @Nullable
+  protected org.apache.pinot.common.data.Schema getSchema() throws IOException {
+    return null;
+  }
+
+  /**
+   * Can be overridden to provide custom controller Rest API.
+   */
+  @Nullable
+  protected ControllerRestApi getControllerRestApi() {
+    return _pushLocations != null ? new DefaultControllerRestApi(_pushLocations, _rawTableName) : null;
   }
 
   protected void logProperties() {
@@ -61,8 +107,14 @@ public abstract class BaseSegmentJob extends Configured {
   protected List<Path> getDataFilePaths(Path pathPattern)
       throws IOException {
     List<Path> tarFilePaths = new ArrayList<>();
-    FileSystem fileSystem = FileSystem.get(_conf);
-    getDataFilePathsHelper(fileSystem, fileSystem.globStatus(pathPattern), tarFilePaths);
+    FileSystem fileSystem = FileSystem.get(pathPattern.toUri(), _conf);
+    _logger.info("Using filesystem: {}", fileSystem);
+    FileStatus[] fileStatuses = fileSystem.globStatus(pathPattern);
+    if (fileStatuses == null) {
+      _logger.warn("Unable to match file status from file path pattern: {}", pathPattern);
+    } else {
+      getDataFilePathsHelper(fileSystem, fileStatuses, tarFilePaths);
+    }
     return tarFilePaths;
   }
 

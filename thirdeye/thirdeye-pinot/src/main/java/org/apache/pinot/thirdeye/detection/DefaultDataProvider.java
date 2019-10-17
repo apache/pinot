@@ -73,6 +73,7 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 public class DefaultDataProvider implements DataProvider {
   private static final Logger LOG = LoggerFactory.getLogger(DefaultDataProvider.class);
   private static final long TIMEOUT = 60000;
+  private static final String PROP_DETECTION_CONFIG_ID = "detectionConfigId";
 
   private final ExecutorService executor = Executors.newCachedThreadPool();
 
@@ -227,13 +228,8 @@ public class DefaultDataProvider implements DataProvider {
     }
   }
 
-  private Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices,
-      long configId, boolean isLegacy) {
-    String functionIdKey = "detectionConfigId";
-    if (isLegacy) {
-      functionIdKey = "functionId";
-    }
-
+  @Override
+  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, long configId) {
     Multimap<AnomalySlice, MergedAnomalyResultDTO> output = ArrayListMultimap.create();
     for (AnomalySlice slice : slices) {
       List<Predicate> predicates = new ArrayList<>();
@@ -244,35 +240,22 @@ public class DefaultDataProvider implements DataProvider {
         predicates.add(Predicate.GT("endTime", slice.getStart()));
       }
       if (configId >= 0) {
-        predicates.add(Predicate.EQ(functionIdKey, configId));
+        predicates.add(Predicate.EQ(PROP_DETECTION_CONFIG_ID, configId));
       }
 
-      if (predicates.isEmpty()) throw new IllegalArgumentException("Must provide at least one of start, end, or " + functionIdKey);
+      if (predicates.isEmpty()) throw new IllegalArgumentException("Must provide at least one of start, end, or " + PROP_DETECTION_CONFIG_ID);
 
       Collection<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findByPredicate(AND(predicates));
       anomalies.removeIf(anomaly -> !slice.match(anomaly));
 
-      if (isLegacy) {
-        anomalies.removeIf(anomaly ->
-            (configId >= 0) && (anomaly.getFunctionId() == null || anomaly.getFunctionId() != configId)
-        );
-      } else {
-        anomalies.removeIf(anomaly ->
-            (configId >= 0) && (anomaly.getDetectionConfigId() == null || anomaly.getDetectionConfigId() != configId)
-        );
-      }
-      // filter all child anomalies. those are kept in the parent anomaly children set.
-      anomalies = Collections2.filter(anomalies, mergedAnomaly -> mergedAnomaly != null && !mergedAnomaly.isChild());
+      anomalies.removeIf(anomaly ->
+          (configId >= 0) && (anomaly.getDetectionConfigId() == null || anomaly.getDetectionConfigId() != configId)
+      );
 
       LOG.info("Fetched {} anomalies between (startTime = {}, endTime = {}) with config Id = {}", anomalies.size(), slice.getStart(), slice.getEnd(), configId);
       output.putAll(slice, anomalies);
     }
     return output;
-  }
-
-  @Override
-  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, long configId) {
-    return fetchAnomalies(slices, configId, false);
   }
 
   @Override
@@ -396,6 +379,12 @@ public class DefaultDataProvider implements DataProvider {
     long end = ((slice.getEnd() + timeGranularity - 1) / timeGranularity) * timeGranularity;
 
     return slice.withStart(start).withEnd(end).withGranularity(granularity);
+  }
+
+  @Override
+  public  List<DatasetConfigDTO> fetchDatasetByDisplayName(String datasetDisplayName) {
+    List<DatasetConfigDTO> dataset = this.datasetDAO.findByPredicate(Predicate.EQ("displayName", datasetDisplayName));
+    return dataset;
   }
 
   public static void cleanCache() {

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.tdunning.math.stats.TDigest;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -32,23 +31,25 @@ public class PercentileTDigestMVAggregationFunction extends PercentileTDigestAgg
     super(percentile);
   }
 
-  @Nonnull
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.PERCENTILETDIGESTMV;
   }
 
-  @Nonnull
   @Override
-  public String getColumnName(@Nonnull String column) {
+  public String getColumnName(String column) {
     return AggregationFunctionType.PERCENTILETDIGEST.getName() + _percentile + "MV_" + column;
   }
 
   @Override
-  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull BlockValSet... blockValSets) {
+  public void accept(AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
+
+  @Override
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
     double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
-    TDigest tDigest = getTDigest(aggregationResultHolder);
+    TDigest tDigest = getDefaultTDigest(aggregationResultHolder);
     for (int i = 0; i < length; i++) {
       for (double value : valuesArray[i]) {
         tDigest.add(value);
@@ -57,11 +58,11 @@ public class PercentileTDigestMVAggregationFunction extends PercentileTDigestAgg
   }
 
   @Override
-  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
     for (int i = 0; i < length; i++) {
-      TDigest tDigest = getTDigest(groupByResultHolder, groupKeyArray[i]);
+      TDigest tDigest = getDefaultTDigest(groupByResultHolder, groupKeyArray[i]);
       for (double value : valuesArray[i]) {
         tDigest.add(value);
       }
@@ -69,13 +70,13 @@ public class PercentileTDigestMVAggregationFunction extends PercentileTDigestAgg
   }
 
   @Override
-  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
     for (int i = 0; i < length; i++) {
       double[] values = valuesArray[i];
       for (int groupKey : groupKeysArray[i]) {
-        TDigest tDigest = getTDigest(groupByResultHolder, groupKey);
+        TDigest tDigest = getDefaultTDigest(groupByResultHolder, groupKey);
         for (double value : values) {
           tDigest.add(value);
         }

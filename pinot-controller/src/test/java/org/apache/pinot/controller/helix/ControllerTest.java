@@ -33,6 +33,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
@@ -43,6 +44,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
@@ -104,6 +106,7 @@ public abstract class ControllerTest {
   protected PinotHelixResourceManager _helixResourceManager;
   protected HelixManager _helixManager;
   protected HelixAdmin _helixAdmin;
+  protected HelixDataAccessor _helixDataAccessor;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
@@ -155,6 +158,7 @@ public abstract class ControllerTest {
     _controllerStarter.start();
     _helixResourceManager = _controllerStarter.getHelixResourceManager();
     _helixManager = _controllerStarter.getHelixControllerManager();
+    _helixDataAccessor = _helixManager.getHelixDataAccessor();
 
     // HelixResourceManager is null in Helix only mode, while HelixManager is null in Pinot only mode.
     switch (_controllerStarter.getControllerMode()) {
@@ -466,8 +470,18 @@ public abstract class ControllerTest {
 
   public static String sendPostRequest(String urlString, String payload)
       throws IOException {
+    return sendPostRequest(urlString, payload, Collections.EMPTY_MAP);
+  }
+
+  public static String sendPostRequest(String urlString, String payload, Map<String, String> headers)
+      throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setRequestMethod("POST");
+    if (headers != null) {
+      for (String key : headers.keySet()) {
+        httpConnection.setRequestProperty(key, headers.get(key));
+      }
+    }
 
     if (payload != null && !payload.isEmpty()) {
       httpConnection.setDoOutput(true);

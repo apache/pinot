@@ -26,6 +26,7 @@ import javax.annotation.Nonnull;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.partition.PartitionAssignment;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.core.realtime.stream.StreamConfig;
 
 
 /**
@@ -42,7 +43,7 @@ public class DefaultFlushThresholdUpdater implements FlushThresholdUpdater {
 
   @Override
   public void updateFlushThreshold(@Nonnull LLCRealtimeSegmentZKMetadata newSegmentZKMetadata,
-      LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata, CommittingSegmentDescriptor committingSegmentDescriptor,
+      StreamConfig streamConfig, LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata, CommittingSegmentDescriptor committingSegmentDescriptor,
       @Nonnull PartitionAssignment partitionAssignment) {
 
     // Gather list of instances for this partition

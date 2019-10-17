@@ -109,7 +109,7 @@ public class MetricEntityFormatter extends RootCauseEntityFormatter {
     }
 
     Multimap<String, String> attributes = ArrayListMultimap.create();
-    attributes.put(ATTR_DATASET, metric.getDataset());
+    attributes.put(ATTR_DATASET, dataset.getName());
     attributes.put(ATTR_INVERSE, String.valueOf(metric.isInverseMetric()));
     attributes.put(ATTR_DERIVED, String.valueOf(metric.isDerived()));
     attributes.put(ATTR_ADDITIVE, String.valueOf(dataset.isAdditive()));
@@ -125,7 +125,7 @@ public class MetricEntityFormatter extends RootCauseEntityFormatter {
       attributes.put(entry.getKey(), entry.getValue());
     }
 
-    String label = String.format("%s::%s", metric.getDataset(), metric.getName());
+    String label = String.format("%s::%s", dataset.getName(), metric.getName());
 
     RootCauseEntity out = makeRootCauseEntity(entity, TYPE_METRIC, label, null);
     out.setAttributes(attributes);

@@ -297,6 +297,39 @@
       <artifactId>icu4j</artifactId>
       <version>62.1</version>
     </dependency>
+
+    <!-- Subscription/Notification dependencies -->
+    <!-- https://mvnrepository.com/artifact/com.atlassian.jira/jira-rest-java-client-api -->
+    <dependency>
+      <groupId>com.atlassian.jira</groupId>
+      <artifactId>jira-rest-java-client-core</artifactId>
+      <version>2.0.0-m30</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.sun.jersey</groupId>
+          <artifactId>jersey-client</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.sun.jersey</groupId>
+          <artifactId>jersey-json</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.jettison</groupId>
+      <artifactId>jettison</artifactId>
+      <version>1.1</version>
+    </dependency>
+    <dependency>
+      <groupId>com.atlassian.jira</groupId>
+      <artifactId>jira-rest-java-client-plugin</artifactId>
+      <version>2.0.0-m30</version>
+    </dependency>
+    <dependency>
+      <groupId>com.atlassian.jira</groupId>
+      <artifactId>jira-rest-java-client-api</artifactId>
+      <version>2.0.0-m30</version>
+    </dependency>
   </dependencies>
 
   <build>

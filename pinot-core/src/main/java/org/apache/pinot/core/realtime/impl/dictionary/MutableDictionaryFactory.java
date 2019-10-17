@@ -26,7 +26,7 @@ public class MutableDictionaryFactory {
   private MutableDictionaryFactory() {
   }
 
-  public static MutableDictionary getMutableDictionary(FieldSpec.DataType dataType, boolean isOffHeapAllocation,
+  public static BaseMutableDictionary getMutableDictionary(FieldSpec.DataType dataType, boolean isOffHeapAllocation,
       PinotDataBufferMemoryManager memoryManager, int avgLength, int cardinality, String allocationContext) {
     if (isOffHeapAllocation) {
       // OnHeap allocation

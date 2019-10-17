@@ -23,8 +23,10 @@ import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.AnomalyFunctionBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.DetectionConfigBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -257,7 +259,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   }
 
   @Override
-  public List<MergedAnomalyResultDTO> findByStartTimeInRangeAndDetectionConfigId(long startTime, long endTime,
+  public List<MergedAnomalyResultDTO> findByStartEndTimeInRangeAndDetectionConfigId(long startTime, long endTime,
       long detectionConfigId) {
     Predicate predicate =
         Predicate.AND(Predicate.LT("startTime", endTime), Predicate.GT("endTime", startTime),
@@ -265,6 +267,16 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
     return convertMergedAnomalyBean2DTO(list);
   }
+
+  @Override
+  public List<MergedAnomalyResultDTO> findByStartTimeInRangeAndDetectionConfigId(long startTime, long endTime, long detectionConfigId) {
+    Predicate predicate =
+        Predicate.AND(Predicate.GE("startTime", startTime), Predicate.LT("startTime", endTime),
+            Predicate.EQ("detectionConfigId", detectionConfigId));
+    List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
+    return convertMergedAnomalyBean2DTO(list);
+  }
+
 
   @Override
   public List<MergedAnomalyResultDTO> findByCollectionMetricDimensionsTime(String collection, String metric,

@@ -142,6 +142,34 @@ public class TestMergedAnomalyResultManager{
   }
 
   @Test
+  public void testFindByStartEndTimeInRangeAndDetectionConfigId() {
+    long detectionConfigId = detectionConfigDAO.save(mockDetectionConfig());
+    List<MergedAnomalyResultDTO> anomalies = mockAnomalies(detectionConfigId);
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      this.mergedAnomalyResultDAO.save(anomaly);
+    }
+    List<MergedAnomalyResultDTO> fetchedAnomalies = mergedAnomalyResultDAO
+        .findByStartEndTimeInRangeAndDetectionConfigId(
+            new DateTime(2019, 1, 1, 0, 0).getMillis(),
+            new DateTime(2019, 1, 3, 0, 0).getMillis(),
+            detectionConfigId);
+    Assert.assertEquals(fetchedAnomalies.size(), anomalies.size());
+    for (int i = 0; i < anomalies.size(); i ++) {
+      MergedAnomalyResultDTO actual = fetchedAnomalies.get(i);
+      MergedAnomalyResultDTO expected = anomalies.get(i);
+      Assert.assertNotNull(actual.getId());
+      Assert.assertEquals(actual.getDetectionConfigId(), expected.getDetectionConfigId());
+      Assert.assertEquals(actual.getDimensions(), expected.getDimensions());
+    }
+    // Clean up
+    for (int i = 0; i < anomalies.size(); i++) {
+      this.mergedAnomalyResultDAO.delete(fetchedAnomalies.get(i));
+    }
+    this.detectionConfigDAO.deleteById(detectionConfigId);
+  }
+
+
+  @Test
   public void testFindByStartTimeInRangeAndDetectionConfigId() {
     long detectionConfigId = detectionConfigDAO.save(mockDetectionConfig());
     List<MergedAnomalyResultDTO> anomalies = mockAnomalies(detectionConfigId);
@@ -149,7 +177,7 @@ public class TestMergedAnomalyResultManager{
       this.mergedAnomalyResultDAO.save(anomaly);
     }
     List<MergedAnomalyResultDTO> fetchedAnomalies = mergedAnomalyResultDAO
-        .findByStartTimeInRangeAndDetectionConfigId(
+        .findByStartEndTimeInRangeAndDetectionConfigId(
             new DateTime(2019, 1, 1, 0, 0).getMillis(),
             new DateTime(2019, 1, 3, 0, 0).getMillis(),
             detectionConfigId);

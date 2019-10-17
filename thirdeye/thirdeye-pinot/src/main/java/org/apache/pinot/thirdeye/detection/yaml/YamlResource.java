@@ -41,6 +41,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import javax.annotation.security.PermitAll;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.Consumes;
@@ -94,6 +95,7 @@ import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
 import org.apache.pinot.thirdeye.detection.validators.SubscriptionConfigValidator;
 import org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator;
 import org.apache.pinot.thirdeye.detection.yaml.translator.SubscriptionConfigTranslator;
+import org.apache.pinot.thirdeye.formatter.DetectionConfigFormatter;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -142,6 +144,7 @@ public class YamlResource {
   private final Yaml yaml;
   private final ExecutorService executor;
   private final long previewTimeout;
+  private final DetectionConfigFormatter detectionConfigFormatter;
 
   public YamlResource(DetectionPreviewConfiguration previewConfig) {
     this.detectionConfigDAO = DAORegistry.getInstance().getDetectionConfigManager();
@@ -170,6 +173,7 @@ public class YamlResource {
 
     this.detectionValidator = new DetectionConfigValidator(this.provider);
     this.subscriptionValidator = new SubscriptionConfigValidator();
+    this.detectionConfigFormatter = new DetectionConfigFormatter(metricDAO, datasetDAO);
   }
 
   /*
@@ -558,7 +562,7 @@ public class YamlResource {
     return Response.ok().entity(responseMessage).build();
   }
 
-  long createSubscriptionGroup(String yamlConfig) throws IllegalArgumentException {
+  public long createSubscriptionGroup(String yamlConfig) throws IllegalArgumentException {
     Preconditions.checkArgument(StringUtils.isNotBlank(yamlConfig),
         "The Yaml Payload in the request is empty.");
 
@@ -875,20 +879,6 @@ public class YamlResource {
     } else {
       detectionConfigDTOs = Collections.singletonList(this.detectionConfigDAO.findById(id));
     }
-
-    List<Object> yamlObjects = new ArrayList<>();
-    for (DetectionConfigDTO detectionConfigDTO : detectionConfigDTOs) {
-      if (detectionConfigDTO.getYaml() != null) {
-        Map<String, Object> yamlObject = new HashMap<>();
-        yamlObject.putAll((Map<? extends String, ?>) this.yaml.load(detectionConfigDTO.getYaml()));
-        yamlObject.put("id", detectionConfigDTO.getId());
-        yamlObject.put("cron", detectionConfigDTO.getCron());
-        yamlObject.put("active", detectionConfigDTO.isActive());
-        yamlObject.put("createdBy", detectionConfigDTO.getCreatedBy());
-        yamlObject.put("updatedBy", detectionConfigDTO.getUpdatedBy());
-        yamlObjects.add(yamlObject);
-      }
-    }
-    return yamlObjects;
+    return detectionConfigDTOs.parallelStream().map(this.detectionConfigFormatter::format).collect(Collectors.toList());
   }
 }

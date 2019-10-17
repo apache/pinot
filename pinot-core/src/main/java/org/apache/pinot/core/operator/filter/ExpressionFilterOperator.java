@@ -18,18 +18,15 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import com.google.common.collect.Lists;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.Constants;
-import org.apache.pinot.core.common.DataBlockCache;
-import org.apache.pinot.core.common.DataFetcher;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.indexsegment.IndexSegment;
@@ -37,11 +34,9 @@ import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
-import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
@@ -50,39 +45,34 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.roaringbitmap.IntIterator;
-import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class ExpressionFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "ExpressionFilterOperator";
+
   private final int _numDocs;
-  private TransformFunction _transformFunction;
-  private final PredicateEvaluator _predicateEvaluator;
-  private final TransformResultMetadata _resultMetadata;
+  private final TransformExpressionTree _expression;
   private final Map<String, DataSource> _dataSourceMap;
-  private TransformExpressionTree _expression;
+  private final TransformResultMetadata _expressionMetadata;
+  private final PredicateEvaluator _predicateEvaluator;
 
   public ExpressionFilterOperator(IndexSegment segment, TransformExpressionTree expression, Predicate predicate) {
+    _numDocs = segment.getSegmentMetadata().getTotalRawDocs();
     _expression = expression;
+
+    _dataSourceMap = new HashMap<>();
     Set<String> columns = new HashSet<>();
     expression.getColumns(columns);
-    _dataSourceMap = new HashMap<>();
     for (String column : columns) {
       _dataSourceMap.put(column, segment.getDataSource(column));
     }
-    _transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    _resultMetadata = _transformFunction.getResultMetadata();
 
-    Dictionary dictionary = null;
-    if (_resultMetadata.hasDictionary()) {
-      dictionary = _transformFunction.getDictionary();
-    }
-    _predicateEvaluator =
-        PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dictionary, _resultMetadata.getDataType());
-    _numDocs = segment.getSegmentMetadata().getTotalRawDocs();
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    _expressionMetadata = transformFunction.getResultMetadata();
+    _predicateEvaluator = PredicateEvaluatorProvider
+        .getPredicateEvaluator(predicate, transformFunction.getDictionary(), _expressionMetadata.getDataType());
   }
 
   @Override
@@ -114,7 +104,6 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
         @Override
         public int getMaxDocId() {
           throw new UnsupportedOperationException("This filter block should be used to iterate over a bitmap");
-
         }
 
         @Override
@@ -156,7 +145,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
 
     public ExpressionFilterBlockDocIdSet(ExpressionFilterOperator expressionFilterOperator) {
       _expressionFilterOperator = expressionFilterOperator;
-      if (expressionFilterOperator._resultMetadata.isSingleValue()) {
+      if (expressionFilterOperator._expressionMetadata.isSingleValue()) {
         _blockDocIdIterator = new ExpressionSVBlockDocIdIterator(_expressionFilterOperator);
       } else {
         throw new UnsupportedOperationException("Filter on expressions that return multi-values is not yet supported");
@@ -261,13 +250,13 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
           _currentDocId = Constants.EOF;
           return _currentDocId;
         }
-        if(targetDocId >= _currentBlockStartDocId && targetDocId < _currentBlockEndDocId) {
-          if(_currentDocId == targetDocId) {
+        if (targetDocId >= _currentBlockStartDocId && targetDocId < _currentBlockEndDocId) {
+          if (_currentDocId == targetDocId) {
             return _currentDocId;
           }
-          while(_intIterator.hasNext()) {
+          while (_intIterator.hasNext()) {
             _currentDocId = _intIterator.next();
-            if(_currentDocId >= targetDocId) {
+            if (_currentDocId >= targetDocId) {
               return _currentDocId;
             }
           }
@@ -305,7 +294,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
         ProjectionOperator projectionOperator =
             new ProjectionOperator(_expressionFilterOperator._dataSourceMap, docIdSetOperator);
         TransformOperator operator =
-            new TransformOperator(projectionOperator, Lists.newArrayList(_expressionFilterOperator._expression));
+            new TransformOperator(projectionOperator, Collections.singleton(_expressionFilterOperator._expression));
         TransformBlock transformBlock;
         MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
         while ((transformBlock = operator.nextBlock()) != null) {
@@ -314,7 +303,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
           int length = docIdSetBlock.getSearchableLength();
           _numDocsScanned += length;
           BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expressionFilterOperator._expression);
-          if(_expressionFilterOperator._resultMetadata.hasDictionary()) {
+          if (_expressionFilterOperator._expressionMetadata.hasDictionary()) {
             int[] dictionaryIdsSV = blockValueSet.getDictionaryIdsSV();
             for (int i = 0; i < length; i++) {
               if (_expressionFilterOperator._predicateEvaluator.applySV(dictionaryIdsSV[i])) {
@@ -322,7 +311,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
               }
             }
           } else {
-            switch (_expressionFilterOperator._resultMetadata.getDataType()) {
+            switch (_expressionFilterOperator._expressionMetadata.getDataType()) {
               case INT:
                 int[] intValuesSV = blockValueSet.getIntValuesSV();
                 for (int i = 0; i < length; i++) {

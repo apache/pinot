@@ -236,7 +236,7 @@ public class OrderByUtilsTest {
     s4.setColumn("sum(metric0)");
     orderBy = Lists.newArrayList(s0, s4);
     Comparator<Record> keysAndValuesComparator =
-        OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos);
+        OrderByUtils.getKeysAndValuesComparator(dataSchema, orderBy, aggregationInfos, true);
     records.sort(keysAndValuesComparator);
     expected0 = Lists.newArrayList("abc", "abc", "abc", "bcd", "ghi", "mno", "mno");
     actual0 = records.stream().map(k -> k.getKey().getColumns()[0]).collect(Collectors.toList());

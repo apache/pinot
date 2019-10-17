@@ -23,28 +23,27 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.util.ArrayCopyUtils;
+import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 
 
 /**
@@ -70,113 +69,91 @@ public class SelectionOperatorUtils {
   private SelectionOperatorUtils() {
   }
 
+  public static final int MAX_ROW_HOLDER_INITIAL_CAPACITY = 10_000;
+
   private static final String INT_PATTERN = "##########";
   private static final String LONG_PATTERN = "####################";
   private static final String FLOAT_PATTERN = "#########0.0####";
   private static final String DOUBLE_PATTERN = "###################0.0#########";
   private static final DecimalFormatSymbols DECIMAL_FORMAT_SYMBOLS = DecimalFormatSymbols.getInstance(Locale.US);
 
-  /**
-   * Expand <code>'SELECT *'</code> to select all columns with {@link IndexSegment}, order all columns alphabetically.
-   * (Inner segment)
-   *
-   * @param selectionColumns unexpanded selection columns (may contain '*').
-   * @param indexSegment index segment.
-   * @return expanded selection columns.
-   */
-  @Nonnull
-  public static List<String> getSelectionColumns(@Nonnull List<String> selectionColumns,
-      @Nonnull IndexSegment indexSegment) {
-    if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
-      List<String> allColumns = new LinkedList<>(indexSegment.getPhysicalColumnNames());
-      Collections.sort(allColumns);
-      return allColumns;
-    } else {
-      return selectionColumns;
-    }
-  }
+  private static final ThreadLocal<DecimalFormat> THREAD_LOCAL_INT_FORMAT =
+      ThreadLocal.withInitial(() -> new DecimalFormat(INT_PATTERN, DECIMAL_FORMAT_SYMBOLS));
+  private static final ThreadLocal<DecimalFormat> THREAD_LOCAL_LONG_FORMAT =
+      ThreadLocal.withInitial(() -> new DecimalFormat(LONG_PATTERN, DECIMAL_FORMAT_SYMBOLS));
+  private static final ThreadLocal<DecimalFormat> THREAD_LOCAL_FLOAT_FORMAT =
+      ThreadLocal.withInitial(() -> new DecimalFormat(FLOAT_PATTERN, DECIMAL_FORMAT_SYMBOLS));
+  private static final ThreadLocal<DecimalFormat> THREAD_LOCAL_DOUBLE_FORMAT =
+      ThreadLocal.withInitial(() -> new DecimalFormat(DOUBLE_PATTERN, DECIMAL_FORMAT_SYMBOLS));
 
   /**
-   * Extract all related columns for a selection query with {@link IndexSegment}. (Inner segment)
-   *
-   * @param selection selection query.
-   * @param indexSegment index segment.
-   * @return all related columns.
+   * Extracts the expressions from a selection query, expands {@code 'SELECT *'} to all physical columns if applies.
+   * <p>For selection order-by queries, order-by expressions will be put at the front. The expressions returned are
+   * deduplicated.
+   * <NOTE>DO NOT change the order of the expressions returned because broker relies on that to process the query.
    */
-  @Nonnull
-  public static Set<String> extractSelectionRelatedColumns(@Nonnull Selection selection,
-      @Nonnull IndexSegment indexSegment) {
-    Set<String> selectionColumns = new HashSet<>(getSelectionColumns(selection.getSelectionColumns(), indexSegment));
-    if (selection.getSelectionSortSequence() != null) {
-      for (SelectionSort selectionSort : selection.getSelectionSortSequence()) {
-        selectionColumns.add(selectionSort.getColumn());
-      }
-    }
-    return selectionColumns;
-  }
-
-  /**
-   * Extract the {@link DataSchema} from sort sequence, selection columns and {@link IndexSegment}. (Inner segment)
-   * <p>Inside data schema, we just store each column once (de-duplicated).
-   *
-   * @param sortSequence sort sequence.
-   * @param selectionColumns selection columns.
-   * @param indexSegment index segment.
-   * @return data schema.
-   */
-  @Nonnull
-  public static DataSchema extractDataSchema(@Nullable List<SelectionSort> sortSequence,
-      @Nonnull List<String> selectionColumns, @Nonnull IndexSegment indexSegment) {
-    List<String> columnList = new ArrayList<>();
-    Set<String> columnSet = new HashSet<>();
+  public static List<TransformExpressionTree> extractExpressions(List<String> selectionColumns,
+      IndexSegment indexSegment, @Nullable List<SelectionSort> sortSequence) {
+    Set<TransformExpressionTree> expressionSet = new HashSet<>();
+    List<TransformExpressionTree> expressions = new ArrayList<>();
 
     if (sortSequence != null) {
       for (SelectionSort selectionSort : sortSequence) {
-        String column = selectionSort.getColumn();
-        columnList.add(column);
-        columnSet.add(column);
+        TransformExpressionTree orderByExpression =
+            TransformExpressionTree.compileToExpressionTree(selectionSort.getColumn());
+        if (expressionSet.add(orderByExpression)) {
+          expressions.add(orderByExpression);
+        }
       }
     }
 
-    for (String column : selectionColumns) {
-      if (!columnSet.contains(column)) {
-        columnList.add(column);
-        columnSet.add(column);
+    if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
+      // For 'SELECT *', sort all physical columns so that the order is deterministic
+      selectionColumns = new ArrayList<>(indexSegment.getPhysicalColumnNames());
+      selectionColumns.sort(null);
+
+      for (String selectionColumn : selectionColumns) {
+        TransformExpressionTree selectionExpression =
+            new TransformExpressionTree(new IdentifierAstNode(selectionColumn));
+        if (expressionSet.add(selectionExpression)) {
+          expressions.add(selectionExpression);
+        }
+      }
+    } else {
+      for (String selectionColumn : selectionColumns) {
+        TransformExpressionTree selectionExpression = TransformExpressionTree.compileToExpressionTree(selectionColumn);
+        if (expressionSet.add(selectionExpression)) {
+          expressions.add(selectionExpression);
+        }
       }
     }
 
-    int numColumns = columnList.size();
-    String[] columnNames = new String[numColumns];
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
-    for (int i = 0; i < numColumns; i++) {
-      String columnName = columnList.get(i);
-      columnNames[i] = columnName;
-      DataSourceMetadata columnMetadata = indexSegment.getDataSource(columnName).getDataSourceMetadata();
-      columnDataTypes[i] =
-          DataSchema.ColumnDataType.fromDataType(columnMetadata.getDataType(), columnMetadata.isSingleValue());
-    }
-
-    return new DataSchema(columnNames, columnDataTypes);
+    return expressions;
   }
 
   /**
-   * Expand <code>'SELECT *'</code> to select all columns with {@link DataSchema}, order all columns alphabatically.
-   * (Inter segment)
-   *
-   * @param selectionColumns unexpanded selection columns (may contain '*').
-   * @param dataSchema data schema.
-   * @return expanded selection columns.
+   * Expands {@code 'SELECT *'} to all columns (excluding transform functions) within {@link DataSchema} with
+   * alphabetical order if applies.
    */
-  @Nonnull
-  public static List<String> getSelectionColumns(@Nonnull List<String> selectionColumns,
-      @Nonnull DataSchema dataSchema) {
-    if ((selectionColumns.size() == 1) && selectionColumns.get(0).equals("*")) {
-      int numColumns = dataSchema.size();
-      List<String> allColumns = new ArrayList<>(numColumns);
-      for (int i = 0; i < numColumns; i++) {
-        allColumns.add(dataSchema.getColumnName(i));
+  public static List<String> getSelectionColumns(List<String> selectionColumns, DataSchema dataSchema) {
+    if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
+      String[] columnNames = dataSchema.getColumnNames();
+      int numColumns = columnNames.length;
+
+      // Note: The data schema might be generated from DataTableBuilder.buildEmptyDataTable(), where for 'SELECT *' it
+      // will contain a single column "*". In such case, return as is to build the empty selection result.
+      if (numColumns == 1 && columnNames[0].equals("*")) {
+        return selectionColumns;
       }
-      Collections.sort(allColumns);
+
+      List<String> allColumns = new ArrayList<>(numColumns);
+      for (String column : columnNames) {
+        if (TransformExpressionTree.compileToExpressionTree(column).getExpressionType()
+            == TransformExpressionTree.ExpressionType.IDENTIFIER) {
+          allColumns.add(column);
+        }
+      }
+      allColumns.sort(null);
       return allColumns;
     } else {
       return selectionColumns;
@@ -190,8 +167,8 @@ public class SelectionOperatorUtils {
    * @param rowsToMerge partial results 2.
    * @param selectionSize size of the selection.
    */
-  public static void mergeWithoutOrdering(@Nonnull Collection<Serializable[]> mergedRows,
-      @Nonnull Collection<Serializable[]> rowsToMerge, int selectionSize) {
+  public static void mergeWithoutOrdering(Collection<Serializable[]> mergedRows, Collection<Serializable[]> rowsToMerge,
+      int selectionSize) {
     Iterator<Serializable[]> iterator = rowsToMerge.iterator();
     while (mergedRows.size() < selectionSize && iterator.hasNext()) {
       mergedRows.add(iterator.next());
@@ -200,13 +177,14 @@ public class SelectionOperatorUtils {
 
   /**
    * Merge two partial results for selection queries with <code>ORDER BY</code>. (Server side)
+   * TODO: Should use type compatible comparator to compare the rows
    *
    * @param mergedRows partial results 1.
    * @param rowsToMerge partial results 2.
    * @param maxNumRows maximum number of rows need to be stored.
    */
-  public static void mergeWithOrdering(@Nonnull PriorityQueue<Serializable[]> mergedRows,
-      @Nonnull Collection<Serializable[]> rowsToMerge, int maxNumRows) {
+  public static void mergeWithOrdering(PriorityQueue<Serializable[]> mergedRows, Collection<Serializable[]> rowsToMerge,
+      int maxNumRows) {
     for (Serializable[] row : rowsToMerge) {
       addToPriorityQueue(row, mergedRows, maxNumRows);
     }
@@ -223,8 +201,7 @@ public class SelectionOperatorUtils {
    * @return data table.
    * @throws Exception
    */
-  @Nonnull
-  public static DataTable getDataTableFromRows(@Nonnull Collection<Serializable[]> rows, @Nonnull DataSchema dataSchema)
+  public static DataTable getDataTableFromRows(Collection<Serializable[]> rows, DataSchema dataSchema)
       throws Exception {
     int numColumns = dataSchema.size();
 
@@ -235,7 +212,7 @@ public class SelectionOperatorUtils {
         Serializable columnValue = row[i];
         DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
         switch (columnDataType) {
-          // Single-value column.
+          // Single-value column
           case INT:
             dataTableBuilder.setColumn(i, ((Number) columnValue).intValue());
             break;
@@ -255,19 +232,17 @@ public class SelectionOperatorUtils {
             dataTableBuilder.setColumn(i, BytesUtils.toHexString((byte[]) columnValue));
             break;
 
-          // Multi-value column.
+          // Multi-value column
           case INT_ARRAY:
             dataTableBuilder.setColumn(i, (int[]) columnValue);
             break;
           case LONG_ARRAY:
-            // LONG_ARRAY type covers INT_ARRAY and LONG_ARRAY.
+            // LONG_ARRAY type covers INT_ARRAY and LONG_ARRAY
             if (columnValue instanceof int[]) {
               int[] ints = (int[]) columnValue;
               int length = ints.length;
               long[] longs = new long[length];
-              for (int j = 0; j < length; j++) {
-                longs[j] = ints[j];
-              }
+              ArrayCopyUtils.copy(ints, longs, length);
               dataTableBuilder.setColumn(i, longs);
             } else {
               dataTableBuilder.setColumn(i, (long[]) columnValue);
@@ -277,30 +252,24 @@ public class SelectionOperatorUtils {
             dataTableBuilder.setColumn(i, (float[]) columnValue);
             break;
           case DOUBLE_ARRAY:
-            // DOUBLE_ARRAY type covers INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY and DOUBLE_ARRAY.
+            // DOUBLE_ARRAY type covers INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY and DOUBLE_ARRAY
             if (columnValue instanceof int[]) {
               int[] ints = (int[]) columnValue;
               int length = ints.length;
               double[] doubles = new double[length];
-              for (int j = 0; j < length; j++) {
-                doubles[j] = ints[j];
-              }
+              ArrayCopyUtils.copy(ints, doubles, length);
               dataTableBuilder.setColumn(i, doubles);
             } else if (columnValue instanceof long[]) {
               long[] longs = (long[]) columnValue;
               int length = longs.length;
               double[] doubles = new double[length];
-              for (int j = 0; j < length; j++) {
-                doubles[j] = longs[j];
-              }
+              ArrayCopyUtils.copy(longs, doubles, length);
               dataTableBuilder.setColumn(i, doubles);
             } else if (columnValue instanceof float[]) {
               float[] floats = (float[]) columnValue;
               int length = floats.length;
               double[] doubles = new double[length];
-              for (int j = 0; j < length; j++) {
-                doubles[j] = floats[j];
-              }
+              ArrayCopyUtils.copy(floats, doubles, length);
               dataTableBuilder.setColumn(i, doubles);
             } else {
               dataTableBuilder.setColumn(i, (double[]) columnValue);
@@ -328,8 +297,7 @@ public class SelectionOperatorUtils {
    * @param rowId row id.
    * @return selection row.
    */
-  @Nonnull
-  public static Serializable[] extractRowFromDataTable(@Nonnull DataTable dataTable, int rowId) {
+  public static Serializable[] extractRowFromDataTable(DataTable dataTable, int rowId) {
     DataSchema dataSchema = dataTable.getDataSchema();
     int numColumns = dataSchema.size();
 
@@ -337,7 +305,7 @@ public class SelectionOperatorUtils {
     for (int i = 0; i < numColumns; i++) {
       DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
       switch (columnDataType) {
-        // Single-value column.
+        // Single-value column
         case INT:
           row[i] = dataTable.getInt(rowId, i);
           break;
@@ -351,14 +319,11 @@ public class SelectionOperatorUtils {
           row[i] = dataTable.getDouble(rowId, i);
           break;
         case STRING:
-          row[i] = dataTable.getString(rowId, i);
-          break;
-
         case BYTES:
           row[i] = dataTable.getString(rowId, i);
           break;
 
-        // Multi-value column.
+        // Multi-value column
         case INT_ARRAY:
           row[i] = dataTable.getIntArray(rowId, i);
           break;
@@ -392,8 +357,7 @@ public class SelectionOperatorUtils {
    * @param selectionSize size of the selection.
    * @return reduced results.
    */
-  @Nonnull
-  public static List<Serializable[]> reduceWithoutOrdering(@Nonnull Map<ServerInstance, DataTable> selectionResults,
+  public static List<Serializable[]> reduceWithoutOrdering(Map<ServerInstance, DataTable> selectionResults,
       int selectionSize) {
     List<Serializable[]> rows = new ArrayList<>(selectionSize);
     for (DataTable dataTable : selectionResults.values()) {
@@ -420,13 +384,13 @@ public class SelectionOperatorUtils {
    * @param selectionColumns selection columns.
    * @return {@link SelectionResults} object results.
    */
-  @Nonnull
-  public static SelectionResults renderSelectionResultsWithoutOrdering(@Nonnull List<Serializable[]> rows,
-      @Nonnull DataSchema dataSchema, @Nonnull List<String> selectionColumns) {
-    int[] columnIndices = getColumnIndices(selectionColumns, dataSchema);
+  public static SelectionResults renderSelectionResultsWithoutOrdering(List<Serializable[]> rows, DataSchema dataSchema,
+      List<String> selectionColumns, boolean preserveType) {
     int numRows = rows.size();
-    for (int i = 0; i < numRows; i++) {
-      rows.set(i, extractColumns(rows.get(i), columnIndices));
+    if (!preserveType) {
+      for (int i = 0; i < numRows; i++) {
+        rows.set(i, formatRowWithoutOrdering(rows.get(i), dataSchema));
+      }
     }
     return new SelectionResults(selectionColumns, rows);
   }
@@ -437,18 +401,24 @@ public class SelectionOperatorUtils {
    * @param dataSchema data schema.
    * @return column indices
    */
-  public static int[] getColumnIndices(@Nonnull List<String> selectionColumns, @Nonnull DataSchema dataSchema) {
+  public static int[] getColumnIndices(List<String> selectionColumns, DataSchema dataSchema) {
+    String[] columnNames = dataSchema.getColumnNames();
+    Map<String, Integer> columnToIndexMap = getColumnToIndexMap(columnNames);
     int numSelectionColumns = selectionColumns.size();
     int[] columnIndices = new int[numSelectionColumns];
-    int numColumnsInDataSchema = dataSchema.size();
-    Map<String, Integer> dataSchemaIndices = new HashMap<>(numColumnsInDataSchema);
-    for (int i = 0; i < numColumnsInDataSchema; i++) {
-      dataSchemaIndices.put(dataSchema.getColumnName(i), i);
-    }
     for (int i = 0; i < numSelectionColumns; i++) {
-      columnIndices[i] = dataSchemaIndices.get(selectionColumns.get(i));
+      columnIndices[i] = columnToIndexMap.get(selectionColumns.get(i));
     }
     return columnIndices;
+  }
+
+  public static Map<String, Integer> getColumnToIndexMap(String[] columns) {
+    Map<String, Integer> columnToIndexMap = new HashMap<>();
+    int numColumns = columns.length;
+    for (int i = 0; i < numColumns; i++) {
+      columnToIndexMap.put(columns[i], i);
+    }
+    return columnToIndexMap;
   }
 
   /**
@@ -459,62 +429,20 @@ public class SelectionOperatorUtils {
    * @param columnIndices column indices.
    * @return selection row.
    */
-  @Nonnull
-  public static Serializable[] extractColumns(@Nonnull Serializable[] row, @Nonnull int[] columnIndices) {
+  public static Serializable[] extractColumns(Serializable[] row, int[] columnIndices,
+      @Nullable DataSchema.ColumnDataType[] columnDataTypes) {
     int numColumns = columnIndices.length;
     Serializable[] extractedRow = new Serializable[numColumns];
-    for (int i = 0; i < numColumns; i++) {
-      int columnIndex = columnIndices[i];
-      extractedRow[i] = row[columnIndex];
+    if (columnDataTypes == null) {
+      for (int i = 0; i < numColumns; i++) {
+        extractedRow[i] = row[columnIndices[i]];
+      }
+    } else {
+      for (int i = 0; i < numColumns; i++) {
+        extractedRow[i] = getFormattedValue(row[columnIndices[i]], columnDataTypes[i]);
+      }
     }
     return extractedRow;
-  }
-
-  /**
-   * Helper method to format multiple selections rows for selection queries with <code>ORDER BY</code>
-   * @param rows selection rows to be formatted.
-   * @param dataSchema data schema.
-   */
-  public static List<Serializable[]> formatRowsWithOrdering(@Nonnull List<Serializable[]> rows,
-      @Nonnull int[] columnIndices, @Nonnull DataSchema dataSchema) {
-    int numRows = rows.size();
-    for (int i = 0; i < numRows; i++) {
-      rows.set(i, formatRowWithOrdering(rows.get(i), columnIndices, dataSchema));
-    }
-    return rows;
-  }
-
-  /**
-   * Helper method to format a selection row, make all values string or string array type based on data schema passed in
-   * for selection queries with <code>ORDER BY</code>. (Broker side)
-   * <p>Formatted row is used to build the {@link SelectionResults}.
-   *
-   * @param row selection row to be formatted.
-   * @param columnIndices column indices.
-   * @param dataSchema data schema.
-   */
-  private static Serializable[] formatRowWithOrdering(@Nonnull Serializable[] row, @Nonnull int[] columnIndices,
-      @Nonnull DataSchema dataSchema) {
-    int numColumns = columnIndices.length;
-    for (int i = 0; i < numColumns; i++) {
-      int columnIndex = columnIndices[i];
-      row[i] = getFormattedValue(row[i], dataSchema.getColumnDataType(columnIndex));
-    }
-    return row;
-  }
-
-  /**
-   * Helper method to format multiple selections rows for selection queries without <code>ORDER BY</code>
-   * @param rows selection rows to be formatted.
-   * @param dataSchema data schema.
-   */
-  public static List<Serializable[]> formatRowsWithoutOrdering(@Nonnull List<Serializable[]> rows,
-      @Nonnull DataSchema dataSchema) {
-    int numRows = rows.size();
-    for (int i = 0; i < numRows; i++) {
-      rows.set(i, formatRowWithoutOrdering(rows.get(i), dataSchema));
-    }
-    return rows;
   }
 
   /**
@@ -525,36 +453,12 @@ public class SelectionOperatorUtils {
    * @param row selection row to be formatted.
    * @param dataSchema data schema.
    */
-  private static Serializable[] formatRowWithoutOrdering(@Nonnull Serializable[] row, @Nonnull DataSchema dataSchema) {
+  private static Serializable[] formatRowWithoutOrdering(Serializable[] row, DataSchema dataSchema) {
     int numColumns = row.length;
     for (int i = 0; i < numColumns; i++) {
       row[i] = getFormattedValue(row[i], dataSchema.getColumnDataType(i));
     }
     return row;
-  }
-
-  @Nonnull
-  private static String intFormat(int value) {
-    DecimalFormat intFormatter = new DecimalFormat(INT_PATTERN, DECIMAL_FORMAT_SYMBOLS);
-    return intFormatter.format(value);
-  }
-
-  @Nonnull
-  private static String longFormat(long value) {
-    DecimalFormat longFormatter = new DecimalFormat(LONG_PATTERN, DECIMAL_FORMAT_SYMBOLS);
-    return longFormatter.format(value);
-  }
-
-  @Nonnull
-  private static String floatFormat(float value) {
-    DecimalFormat floatFormatter = new DecimalFormat(FLOAT_PATTERN, DECIMAL_FORMAT_SYMBOLS);
-    return floatFormatter.format(value);
-  }
-
-  @Nonnull
-  private static String doubleFormat(double value) {
-    DecimalFormat doubleFormatter = new DecimalFormat(DOUBLE_PATTERN, DECIMAL_FORMAT_SYMBOLS);
-    return doubleFormatter.format(value);
   }
 
   /**
@@ -566,63 +470,65 @@ public class SelectionOperatorUtils {
    * @param dataType data type.
    * @return formatted value.
    */
-  @Nonnull
-  private static Serializable getFormattedValue(@Nonnull Serializable value,
-      @Nonnull DataSchema.ColumnDataType dataType) {
+  private static Serializable getFormattedValue(Serializable value, DataSchema.ColumnDataType dataType) {
     switch (dataType) {
-      // Single-value column.
+      // Single-value column
       case INT:
-        return intFormat(((Number) value).intValue());
+        return THREAD_LOCAL_INT_FORMAT.get().format(((Number) value).intValue());
       case LONG:
-        return longFormat(((Number) value).longValue());
+        return THREAD_LOCAL_LONG_FORMAT.get().format(((Number) value).longValue());
       case FLOAT:
-        return floatFormat(((Number) value).floatValue());
+        return THREAD_LOCAL_FLOAT_FORMAT.get().format(((Number) value).floatValue());
       case DOUBLE:
-        return doubleFormat(((Number) value).doubleValue());
+        return THREAD_LOCAL_DOUBLE_FORMAT.get().format(((Number) value).doubleValue());
 
-      // Multi-value column.
+      // Multi-value column
       case INT_ARRAY:
+        DecimalFormat intFormat = THREAD_LOCAL_INT_FORMAT.get();
         int[] ints = (int[]) value;
         int length = ints.length;
         String[] formattedValue = new String[length];
         for (int i = 0; i < length; i++) {
-          formattedValue[i] = intFormat(ints[i]);
+          formattedValue[i] = intFormat.format(ints[i]);
         }
         return formattedValue;
       case LONG_ARRAY:
-        // LONG_ARRAY type covers INT_ARRAY and LONG_ARRAY.
+        // LONG_ARRAY type covers INT_ARRAY and LONG_ARRAY
+        DecimalFormat longFormat = THREAD_LOCAL_LONG_FORMAT.get();
         if (value instanceof int[]) {
           ints = (int[]) value;
           length = ints.length;
           formattedValue = new String[length];
           for (int i = 0; i < length; i++) {
-            formattedValue[i] = longFormat(ints[i]);
+            formattedValue[i] = longFormat.format((long) ints[i]);
           }
         } else {
           long[] longs = (long[]) value;
           length = longs.length;
           formattedValue = new String[length];
           for (int i = 0; i < length; i++) {
-            formattedValue[i] = longFormat(longs[i]);
+            formattedValue[i] = longFormat.format(longs[i]);
           }
         }
         return formattedValue;
       case FLOAT_ARRAY:
+        DecimalFormat floatFormat = THREAD_LOCAL_FLOAT_FORMAT.get();
         float[] floats = (float[]) value;
         length = floats.length;
         formattedValue = new String[length];
         for (int i = 0; i < length; i++) {
-          formattedValue[i] = floatFormat(floats[i]);
+          formattedValue[i] = floatFormat.format(floats[i]);
         }
         return formattedValue;
       case DOUBLE_ARRAY:
-        // DOUBLE_ARRAY type covers INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY and DOUBLE_ARRAY.
+        // DOUBLE_ARRAY type covers INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY and DOUBLE_ARRAY
+        DecimalFormat doubleFormat = THREAD_LOCAL_DOUBLE_FORMAT.get();
         if (value instanceof int[]) {
           ints = (int[]) value;
           length = ints.length;
           formattedValue = new String[length];
           for (int i = 0; i < length; i++) {
-            formattedValue[i] = doubleFormat((double) ints[i]);
+            formattedValue[i] = doubleFormat.format((double) ints[i]);
           }
           return formattedValue;
         } else if (value instanceof long[]) {
@@ -630,7 +536,7 @@ public class SelectionOperatorUtils {
           length = longs.length;
           formattedValue = new String[length];
           for (int i = 0; i < length; i++) {
-            formattedValue[i] = doubleFormat((double) longs[i]);
+            formattedValue[i] = doubleFormat.format((double) longs[i]);
           }
           return formattedValue;
         } else if (value instanceof float[]) {
@@ -638,7 +544,7 @@ public class SelectionOperatorUtils {
           length = floats.length;
           formattedValue = new String[length];
           for (int i = 0; i < length; i++) {
-            formattedValue[i] = doubleFormat(floats[i]);
+            formattedValue[i] = doubleFormat.format((double) floats[i]);
           }
           return formattedValue;
         } else {
@@ -646,16 +552,13 @@ public class SelectionOperatorUtils {
           length = doubles.length;
           formattedValue = new String[length];
           for (int i = 0; i < length; i++) {
-            formattedValue[i] = doubleFormat(doubles[i]);
+            formattedValue[i] = doubleFormat.format(doubles[i]);
           }
           return formattedValue;
         }
-      case BYTES:
-        if (value instanceof byte[]) {
-          return BytesUtils.toHexString((byte[]) value);
-        }
+
       default:
-        // For STRING and STRING_ARRAY, no need to format.
+        // For STRING, BYTES and STRING_ARRAY, no need to intFormat
         return value;
     }
   }
@@ -668,7 +571,7 @@ public class SelectionOperatorUtils {
    * @param maxNumValues maximum number of values in the priority queue.
    * @param <T> type for the value.
    */
-  public static <T> void addToPriorityQueue(@Nonnull T value, @Nonnull PriorityQueue<T> queue, int maxNumValues) {
+  public static <T> void addToPriorityQueue(T value, PriorityQueue<T> queue, int maxNumValues) {
     if (queue.size() < maxNumValues) {
       queue.add(value);
     } else if (queue.comparator().compare(queue.peek(), value) < 0) {
@@ -677,13 +580,41 @@ public class SelectionOperatorUtils {
     }
   }
 
-  public static List<String> extractSortColumns(List<SelectionSort> sortSequence) {
-    List<String> columns = new ArrayList<>();
-    if (sortSequence != null) {
-      for (SelectionSort s : sortSequence) {
-        columns.add(s.column);
-      }
+  /**
+   * Helper Comparator class to compare rows.
+   * <p>Two arguments are expected to construct the comparator:
+   * <ul>
+   *   <li>
+   *     Value indices: an array of column indices in each row where the values need to be compared (only the
+   *     single-value order-by columns need to be compared)
+   *   </li>
+   *   <li>
+   *     Value comparators: an array of Comparator, where each element is the Comparator for the corresponding column in
+   *     the value indices array
+   *   </li>
+   * </ul>
+   */
+  public static class RowComparator implements Comparator<Serializable[]> {
+    private final int[] _valueIndices;
+    private final Comparator[] _valueComparators;
+
+    public RowComparator(int[] valueIndices, Comparator[] valueComparators) {
+      _valueIndices = valueIndices;
+      _valueComparators = valueComparators;
     }
-    return columns;
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public int compare(Serializable[] o1, Serializable[] o2) {
+      int numValuesToCompare = _valueIndices.length;
+      for (int i = 0; i < numValuesToCompare; i++) {
+        int valueIndex = _valueIndices[i];
+        int result = _valueComparators[i].compare(o1[valueIndex], o2[valueIndex]);
+        if (result != 0) {
+          return result;
+        }
+      }
+      return 0;
+    }
   }
 }

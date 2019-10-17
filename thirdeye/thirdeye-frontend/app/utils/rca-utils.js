@@ -14,7 +14,7 @@ export const colorMapping = {
   red: '#FF2C33',
   green: '#469A1F',
   pink: '#FF1B90',
-  grey: '#878787',
+  grey: '#B4B4B4',
   'light-blue': '#98D8F4', // 2/10
   'light-green': '#B5D99F',
   'light-red': '#FFBCBA',

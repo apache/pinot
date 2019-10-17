@@ -19,8 +19,8 @@
 
 package org.apache.pinot.thirdeye.notification.formatter;
 
-import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.joda.time.DateTime;
 
 
@@ -29,25 +29,25 @@ import org.joda.time.DateTime;
  * which can be rendered into the alert(email, jira) content.
  */
 public class ADContentFormatterContext {
-  private AnomalyFunctionDTO anomalyFunctionSpec;
-  private AlertConfigDTO alertConfig;
+  private DetectionConfigDTO detectionConfig;
+  private DetectionAlertConfigDTO notificationConfig;
   private DateTime start; // anomaly search region starts
   private DateTime end; // anomaly search region ends
 
-  public AnomalyFunctionDTO getAnomalyFunctionSpec() {
-    return anomalyFunctionSpec;
+  public DetectionConfigDTO getDetectionConfig() {
+    return detectionConfig;
   }
 
-  public void setAnomalyFunctionSpec(AnomalyFunctionDTO anomalyFunctionSpec) {
-    this.anomalyFunctionSpec = anomalyFunctionSpec;
+  public void setDetectionConfig(DetectionConfigDTO detectionConfig) {
+    this.detectionConfig = detectionConfig;
   }
 
-  public AlertConfigDTO getAlertConfig() {
-    return alertConfig;
+  public DetectionAlertConfigDTO getNotificationConfig() {
+    return notificationConfig;
   }
 
-  public void setAlertConfig(AlertConfigDTO alertConfig) {
-    this.alertConfig = alertConfig;
+  public void setNotificationConfig(DetectionAlertConfigDTO notificationConfig) {
+    this.notificationConfig = notificationConfig;
   }
 
   public DateTime getStart() {

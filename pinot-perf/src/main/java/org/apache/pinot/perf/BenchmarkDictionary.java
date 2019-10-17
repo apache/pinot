@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.perf;
 
+import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
@@ -68,103 +69,111 @@ public class BenchmarkDictionary {
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public LongOnHeapMutableDictionary benchmarkOnHeap0ToN() {
-    LongOnHeapMutableDictionary dictionary = new LongOnHeapMutableDictionary();
-
-    for (Long colValue : _colValues) {
-      dictionary.index(colValue);
+  public int benchmarkOnHeap0ToN()
+      throws IOException {
+    try (LongOnHeapMutableDictionary dictionary = new LongOnHeapMutableDictionary()) {
+      int value = 0;
+      for (Long colValue : _colValues) {
+        value += dictionary.index(colValue);
+      }
+      return value;
     }
-
-    return dictionary;
   }
 
   // Start with mid size, with overflow
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public LongOffHeapMutableDictionary benchmarkOffHeapMidSizeWithOverflow() {
-    LongOffHeapMutableDictionary dictionary =
-        new LongOffHeapMutableDictionary(CARDINALITY / 3, 1000, _memoryManager, "longColumn");
-
-    for (Long colValue : _colValues) {
-      dictionary.index(colValue);
+  public int benchmarkOffHeapMidSizeWithOverflow()
+      throws IOException {
+    try (LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY / 3, 1000,
+        _memoryManager, "longColumn")) {
+      int value = 0;
+      for (Long colValue : _colValues) {
+        value += dictionary.index(colValue);
+      }
+      return value;
     }
-
-    return dictionary;
   }
 
   // Start with max size, no overflow
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public LongOffHeapMutableDictionary benchmarkOffHeapMidSizeWithoutOverflow() {
-    LongOffHeapMutableDictionary dictionary =
-        new LongOffHeapMutableDictionary(CARDINALITY / 3, 0, _memoryManager, "longColumn");
-
-    for (Long colValue : _colValues) {
-      dictionary.index(colValue);
+  public int benchmarkOffHeapMidSizeWithoutOverflow()
+      throws IOException {
+    try (LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY / 3, 0, _memoryManager,
+        "longColumn")) {
+      int value = 0;
+      for (Long colValue : _colValues) {
+        value += dictionary.index(colValue);
+      }
+      return value;
     }
-
-    return dictionary;
   }
 
   // Start with max size, with overflow
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public LongOffHeapMutableDictionary benchmarkOffHeapPreSizeWithOverflow() {
-    LongOffHeapMutableDictionary dictionary =
-        new LongOffHeapMutableDictionary(CARDINALITY, 1000, _memoryManager, "longColumn");
-
-    for (Long colValue : _colValues) {
-      dictionary.index(colValue);
+  public int benchmarkOffHeapPreSizeWithOverflow()
+      throws IOException {
+    try (LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY, 1000, _memoryManager,
+        "longColumn")) {
+      int value = 0;
+      for (Long colValue : _colValues) {
+        value += dictionary.index(colValue);
+      }
+      return value;
     }
-
-    return dictionary;
   }
 
   // Start with max size, no overflow
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public LongOffHeapMutableDictionary benchmarkOffHeapPreSizeWithoutOverflow() {
-    LongOffHeapMutableDictionary dictionary =
-        new LongOffHeapMutableDictionary(CARDINALITY, 0, _memoryManager, "longColumn");
-
-    for (Long colValue : _colValues) {
-      dictionary.index(colValue);
+  public int benchmarkOffHeapPreSizeWithoutOverflow()
+      throws IOException {
+    try (LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY, 0, _memoryManager,
+        "longColumn")) {
+      int value = 0;
+      for (Long colValue : _colValues) {
+        value += dictionary.index(colValue);
+      }
+      return value;
     }
-
-    return dictionary;
   }
 
   // Start with min size, and grow to full, no overflow
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public LongOffHeapMutableDictionary benchmarkOffHeapMinSizeWithoutOverflow() {
-    LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(10000, 0, _memoryManager, "longColumn");
-
-    for (Long colValue : _colValues) {
-      dictionary.index(colValue);
+  public int benchmarkOffHeapMinSizeWithoutOverflow()
+      throws IOException {
+    try (LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(10000, 0, _memoryManager,
+        "longColumn")) {
+      int value = 0;
+      for (Long colValue : _colValues) {
+        value += dictionary.index(colValue);
+      }
+      return value;
     }
-
-    return dictionary;
   }
 
   // Start with min size, and grow to full with overflow buffer
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public LongOffHeapMutableDictionary benchmarkOffHeapMinSizeWithOverflow() {
-    LongOffHeapMutableDictionary dictionary =
-        new LongOffHeapMutableDictionary(10000, 1000, _memoryManager, "longColumn");
-
-    for (Long colValue : _colValues) {
-      dictionary.index(colValue);
+  public int benchmarkOffHeapMinSizeWithOverflow()
+      throws IOException {
+    try (LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(10000, 1000, _memoryManager,
+        "longColumn")) {
+      int value = 0;
+      for (Long colValue : _colValues) {
+        value += dictionary.index(colValue);
+      }
+      return value;
     }
-
-    return dictionary;
   }
 
   public static void main(String[] args)

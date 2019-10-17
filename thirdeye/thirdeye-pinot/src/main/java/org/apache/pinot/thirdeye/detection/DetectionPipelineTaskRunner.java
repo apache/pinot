@@ -117,10 +117,12 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
         throw new IllegalArgumentException(String.format("Could not resolve config id %d", info.configId));
       }
 
+      LOG.info("Start detection for config {} between {} and {}", config.getId(), info.start, info.end);
       DetectionPipeline pipeline = this.loader.from(this.provider, config, info.start, info.end);
       DetectionPipelineResult result = pipeline.run();
 
       if (result.getLastTimestamp() < 0) {
+        LOG.info("No detection ran for config {} between {} and {}", config.getId(), info.start, info.end);
         return Collections.emptyList();
       }
 
@@ -145,14 +147,13 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
       }
       this.detectionDAO.update(config);
 
+      ThirdeyeMetricsUtil.detectionTaskSuccessCounter.inc();
+      LOG.info("End detection for config {} between {} and {}. Detected {} anomalies.", config.getId(), info.start,
+          info.end, result.getAnomalies());
       return Collections.emptyList();
-
     } catch(Exception e) {
       ThirdeyeMetricsUtil.detectionTaskExceptionCounter.inc();
       throw e;
-
-    } finally {
-      ThirdeyeMetricsUtil.detectionTaskSuccessCounter.inc();
     }
   }
 }

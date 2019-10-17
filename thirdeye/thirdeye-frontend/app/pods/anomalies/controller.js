@@ -70,7 +70,7 @@ export default Controller.extend({
   /**
    * Filter settings
    */
-  anomalyFilters: [],
+  anomalyFilters: {},
   resetFiltersLocal: null,
   alertFoundByName: null,
 
@@ -234,23 +234,18 @@ export default Controller.extend({
       };
       let filterStr = 'All Anomalies';
       if (isPresent(anomalyFilters)) {
-        if (anomalyFilters.primary) {
-          filterStr = anomalyFilters.primary;
-          set(this, 'primaryFilterVal', filterStr);
-        } else {
-          let filterArr = [get(this, 'primaryFilterVal')];
-          Object.keys(anomalyFilters).forEach((filterKey) => {
-            const value = anomalyFilters[filterKey];
-            const isStatusAll = filterKey === 'status' && Array.isArray(value) && value.length > 1;
-            // Only display valid search filters
-            if (filterKey !== 'triggerType' && value !== null && value.length && !isStatusAll) {
-              let concatVal = filterKey === 'status' && !value.length ? 'Active' : value.join(', ');
-              let abbrevKey = filterAbbrevMap[filterKey] || filterKey;
-              filterArr.push(`${abbrevKey}: ${concatVal}`);
-            }
-          });
-          filterStr = filterArr.join(' | ');
-        }
+        let filterArr = [get(this, 'primaryFilterVal')];
+        Object.keys(anomalyFilters).forEach((filterKey) => {
+          const value = anomalyFilters[filterKey];
+          const isStatusAll = filterKey === 'status' && Array.isArray(value) && value.length > 1;
+          // Only display valid search filters
+          if (filterKey !== 'triggerType' && value !== null && value.length && !isStatusAll) {
+            let concatVal = filterKey === 'status' && !value.length ? 'Active' : value.join(', ');
+            let abbrevKey = filterAbbrevMap[filterKey] || filterKey;
+            filterArr.push(`${abbrevKey}: ${concatVal}`);
+          }
+        });
+        filterStr = filterArr.join(' | ');
       }
       return filterStr;
     }

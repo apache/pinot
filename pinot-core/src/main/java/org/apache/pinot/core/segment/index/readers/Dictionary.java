@@ -21,18 +21,40 @@ package org.apache.pinot.core.segment.index.readers;
 import java.io.Closeable;
 
 
+/**
+ * Interface for the dictionary. For the read APIs, type conversion among INT, LONG, FLOAT, DOUBLE, STRING should be
+ * supported. Type conversion between STRING and BYTES via Hex encoding/decoding should be supported.
+ */
 public interface Dictionary extends Closeable {
   int NULL_VALUE_INDEX = -1;
 
   /**
-   * Returns index of the object in the dictionary.
-   * Returns -1, if the object does not exist in the dictionary.
-   *
-   * @param rawValue Object for which to find the index.
-   * @return Index of object, or -1 if not found.
+   * NOTE: Immutable dictionary is always sorted; mutable dictionary is always unsorted.
    */
-  int indexOf(Object rawValue);
+  boolean isSorted();
 
+  int length();
+
+  /**
+   * Returns the index of the string representation of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if
+   * the value does not exist. This API is for cross-type predicate evaluation.
+   */
+  int indexOf(String stringValue);
+
+  // Single-value read APIs
+
+  /**
+   * Returns the value at the given dictId in the dictionary.
+   * <p>The Object type returned for each value type:
+   * <ul>
+   *   <li>INT -> Integer</li>
+   *   <li>LONG -> Long</li>
+   *   <li>FLOAT -> Float</li>
+   *   <li>DOUBLE -> Double</li>
+   *   <li>STRING -> String</li>
+   *   <li>BYTES -> byte[]</li>
+   * </ul>
+   */
   Object get(int dictId);
 
   int getIntValue(int dictId);
@@ -47,21 +69,17 @@ public interface Dictionary extends Closeable {
 
   byte[] getBytesValue(int dictId);
 
-  int length();
-
-  boolean isSorted();
-
   // Batch read APIs
 
-  void readIntValues(int[] dictIds, int inStartPos, int length, int[] outValues, int outStartPos);
+  void readIntValues(int[] dictIds, int length, int[] outValues);
 
-  void readLongValues(int[] dictIds, int inStartPos, int length, long[] outValues, int outStartPos);
+  void readLongValues(int[] dictIds, int length, long[] outValues);
 
-  void readFloatValues(int[] dictIds, int inStartPos, int length, float[] outValues, int outStartPos);
+  void readFloatValues(int[] dictIds, int length, float[] outValues);
 
-  void readDoubleValues(int[] dictIds, int inStartPos, int length, double[] outValues, int outStartPos);
+  void readDoubleValues(int[] dictIds, int length, double[] outValues);
 
-  void readStringValues(int[] dictIds, int inStartPos, int length, String[] outValues, int outStartPos);
+  void readStringValues(int[] dictIds, int length, String[] outValues);
 
-  void readBytesValues(int[] dictIds, int inStartPos, int length, byte[][] outValues, int outStartPos);
+  void readBytesValues(int[] dictIds, int length, byte[][] outValues);
 }

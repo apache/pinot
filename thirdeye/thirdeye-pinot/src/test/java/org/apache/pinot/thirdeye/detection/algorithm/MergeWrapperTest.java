@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.thirdeye.anomaly.AnomalyType;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
@@ -319,5 +320,30 @@ public class MergeWrapperTest {
     Assert.assertEquals(output.getLastTimestamp(), 3700);
     Assert.assertTrue(output.getAnomalies().contains(setAnomalyId(makeAnomaly(50, 2800), 0)));
     Assert.assertTrue(output.getAnomalies().get(0).getProperties().get(propertyKey).equals(propertyValue));
+  }
+
+  @Test
+  public void testMergerAnomalyType() throws Exception {
+    this.config.getProperties().put(PROP_MAX_GAP, 100);
+
+    MergedAnomalyResultDTO trendAnomaly = makeAnomaly(100, 1000);
+    trendAnomaly.setType(AnomalyType.TREND_CHANGE);
+
+    MergedAnomalyResultDTO deviationAnomaly = makeAnomaly(50, 1200);
+    deviationAnomaly.setType(AnomalyType.DEVIATION);
+
+    this.outputs.add(new MockPipelineOutput(Arrays.asList(trendAnomaly, deviationAnomaly), 3700));
+
+    Map<String, Object> nestedProperties = new HashMap<>();
+    nestedProperties.put(PROP_CLASS_NAME, "none");
+    nestedProperties.put(PROP_METRIC_URN, "thirdeye:metric:3");
+
+    this.nestedProperties.add(nestedProperties);
+
+    this.wrapper = new MergeWrapper(this.provider, this.config, 1000, 3000);
+    DetectionPipelineResult output = this.wrapper.run();
+
+    // trend anomaly was not merged with deviation Anomaly
+    Assert.assertTrue(output.getAnomalies().contains(trendAnomaly));
   }
 }

@@ -22,14 +22,12 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.SchemaBuilder;
@@ -63,7 +61,7 @@ public class AvroUtils {
    * @param timeUnit Time unit
    * @return Pinot schema
    */
-  public static Schema getPinotSchemaFromAvroSchema(@Nonnull org.apache.avro.Schema avroSchema,
+  public static Schema getPinotSchemaFromAvroSchema(org.apache.avro.Schema avroSchema,
       @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit) {
     Schema pinotSchema = new Schema();
 
@@ -107,7 +105,7 @@ public class AvroUtils {
    * @param timeUnit Time unit
    * @return Pinot schema
    */
-  public static Schema getPinotSchemaFromAvroDataFile(@Nonnull File avroDataFile,
+  public static Schema getPinotSchemaFromAvroDataFile(File avroDataFile,
       @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit)
       throws IOException {
     try (DataFileStream<GenericRecord> reader = getAvroReader(avroDataFile)) {
@@ -123,7 +121,7 @@ public class AvroUtils {
    * @param avroDataFile Avro data file
    * @return Pinot schema
    */
-  public static Schema getPinotSchemaFromAvroDataFile(@Nonnull File avroDataFile)
+  public static Schema getPinotSchemaFromAvroDataFile(File avroDataFile)
       throws IOException {
     return getPinotSchemaFromAvroDataFile(avroDataFile, null, null);
   }
@@ -136,7 +134,7 @@ public class AvroUtils {
    * @param timeUnit Time unit
    * @return Pinot schema
    */
-  public static Schema getPinotSchemaFromAvroSchemaFile(@Nonnull File avroSchemaFile,
+  public static Schema getPinotSchemaFromAvroSchemaFile(File avroSchemaFile,
       @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit)
       throws IOException {
     org.apache.avro.Schema avroSchema = new org.apache.avro.Schema.Parser().parse(avroSchemaFile);
@@ -304,31 +302,31 @@ public class AvroUtils {
     }
   }
 
+  @SuppressWarnings("unchecked")
   public static void extractField(FieldSpec fieldSpec, GenericRecord from, GenericRow to) {
     String fieldName = fieldSpec.getName();
-    //Handle MAP types
-    if (fieldName.toUpperCase().endsWith(MAP_KEY_COLUMN_SUFFIX)) {
-      String avroFieldName = fieldName.replaceAll(MAP_KEY_COLUMN_SUFFIX, "");
-      Object o = from.get(avroFieldName);
-      if (o instanceof Map) {
-        Map map = (Map) o;
-        TreeSet sortedKeySet = new TreeSet(map.keySet());
-        to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, sortedKeySet));
+
+    // Handle the Map type
+    if (fieldName.endsWith(MAP_KEY_COLUMN_SUFFIX)) {
+      String avroFieldName = fieldName.substring(0, fieldName.length() - MAP_KEY_COLUMN_SUFFIX.length());
+      Map map = (Map) from.get(avroFieldName);
+      if (map != null) {
+        // Sort the keys so that the order is deterministic
+        TreeSet sortedKeys = new TreeSet(map.keySet());
+        to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, sortedKeys));
+        return;
       }
-    } else if (fieldName.toUpperCase().endsWith(MAP_VALUE_COLUMN_SUFFIX)) {
-      String avroFieldName = fieldName.replaceAll(MAP_VALUE_COLUMN_SUFFIX, "");
-      Object o = from.get(avroFieldName);
-      if (o instanceof Map) {
-        Map map = (Map) o;
-        TreeSet sortedKeySet = new TreeSet(map.keySet());
-        List values = new ArrayList(map.size());
-        for (Object key : sortedKeySet) {
-          values.add(map.get(key));
-        }
-        to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, values));
+    } else if (fieldName.endsWith(MAP_VALUE_COLUMN_SUFFIX)) {
+      String avroFieldName = fieldName.substring(0, fieldName.length() - MAP_VALUE_COLUMN_SUFFIX.length());
+      Map map = (Map) from.get(avroFieldName);
+      if (map != null) {
+        // Sort the keys so that the order is deterministic
+        TreeMap sortedMap = new TreeMap<>(map);
+        to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, sortedMap.values()));
+        return;
       }
-    } else {
-      to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, from.get(fieldName)));
     }
+
+    to.putField(fieldName, RecordReaderUtils.convert(fieldSpec, from.get(fieldName)));
   }
 }

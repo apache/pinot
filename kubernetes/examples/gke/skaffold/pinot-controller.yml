@@ -28,7 +28,6 @@ items:
     data:
       pinot-controller.conf: |-
         controller.helix.cluster.name=pinot-quickstart
-        controller.host=pinot-controller-0.pinot-controller
         controller.port=9000
         controller.vip.host=pinot-controller
         controller.vip.port=9000
@@ -56,7 +55,7 @@ items:
         spec:
           terminationGracePeriodSeconds: 30
           containers:
-          - image: winedepot/pinot:kafka2
+          - image: winedepot/pinot:0.1.13-SNAPSHOT
             imagePullPolicy: Always
             name: pinot-controller
             args: [
