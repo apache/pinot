@@ -109,8 +109,8 @@ public class ThirdEyeResultSetUtils {
           if (hasGroupBy) {
 
             // TODO: CHANGE THIS TO KEEP TIMESTAMPS
-            //groupKeys = new String[resultSet.getGroupKeyLength() + 1];
-            groupKeys = new String[resultSet.getGroupKeyLength()];
+            groupKeys = new String[resultSet.getGroupKeyLength() + 1];
+            //groupKeys = new String[resultSet.getGroupKeyLength()];
 
             for (int grpKeyIdx = 0; grpKeyIdx < resultSet.getGroupKeyLength(); grpKeyIdx++) {
               String groupKeyVal = "";
@@ -144,7 +144,7 @@ public class ThirdEyeResultSetUtils {
                 groupKeyVal = String.valueOf(timeBucket);
               }
               groupKeys[grpKeyIdx] = groupKeyVal;
-              //groupKeys[groupKeys.length - 1] = String.valueOf(timestamp);
+              groupKeys[groupKeys.length - 1] = String.valueOf(timestamp);
             }
             if (skipRowDueToError) {
               continue;
@@ -170,9 +170,9 @@ public class ThirdEyeResultSetUtils {
           countMap.put(countKey, aggCount + 1);
 
           // aggregation of multiple values
-          rowValues[groupKeys.length + position + i] = String.valueOf(
+          rowValues[groupKeys.length - 1 + position + i] = String.valueOf(
               reduce(
-                  Double.parseDouble(rowValues[groupKeys.length + position + i]),
+                  Double.parseDouble(rowValues[groupKeys.length - 1 + position + i]),
                   Double.parseDouble(resultSet.getString(r, 0)),
                   aggCount,
                   metricFunction.getFunctionName(),
