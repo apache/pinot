@@ -130,7 +130,7 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
       List<Pair<Long, Long>> timeIntervals = this.anomalyFunction.getDataRangeIntervals(this.startTime, this.endTime);
       for (Pair<Long, Long> startEndInterval : timeIntervals) {
         MetricSlice slice = MetricSlice.from(this.metricEntity.getId(), startEndInterval.getFirst(), startEndInterval.getSecond(), metricEntity.getFilters());
-        DataFrame currentDf = this.provider.fetchTimeseries(Collections.singleton(slice), this.getConfig().getId()).get(slice);
+        DataFrame currentDf = this.provider.fetchTimeseries(Collections.singleton(slice)).get(slice);
         df = df.append(currentDf);
       }
 

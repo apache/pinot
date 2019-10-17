@@ -108,11 +108,13 @@ public class ThirdEyeResultSetUtils {
           String[] groupKeys;
           if (hasGroupBy) {
 
-            // TODO: CHANGE BACK?
-            groupKeys = new String[resultSet.getGroupKeyLength() + 1];
+            // TODO: CHANGE THIS TO KEEP TIMESTAMPS
+            //groupKeys = new String[resultSet.getGroupKeyLength() + 1];
+            groupKeys = new String[resultSet.getGroupKeyLength()];
+
             for (int grpKeyIdx = 0; grpKeyIdx < resultSet.getGroupKeyLength(); grpKeyIdx++) {
               String groupKeyVal = "";
-              String timestamp = "";
+              long timestamp = 0;
               try {
                 groupKeyVal = resultSet.getGroupKeyColumnValue(r, grpKeyIdx);
               } catch (Exception e) {
@@ -135,12 +137,14 @@ public class ThirdEyeResultSetUtils {
                   skipRowDueToError = true;
                   break;
                 }
+                timestamp = millis;
                 timeBucket = TimeRangeUtils
                     .computeBucketIndex(request.getGroupByTimeGranularity(), startDateTime,
                         new DateTime(millis, dateTimeZone));
                 groupKeyVal = String.valueOf(timeBucket);
               }
               groupKeys[grpKeyIdx] = groupKeyVal;
+              //groupKeys[groupKeys.length - 1] = String.valueOf(timestamp);
             }
             if (skipRowDueToError) {
               continue;

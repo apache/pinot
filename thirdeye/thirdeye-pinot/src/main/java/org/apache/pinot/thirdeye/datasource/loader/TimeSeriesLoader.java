@@ -43,6 +43,6 @@ public interface TimeSeriesLoader {
    * @param slice metric slice to fetch
    * @return dataframe with aligned timestamps and values
    */
-  DataFrame load(MetricSlice slice, long configId) throws Exception;
-  void prefetchTimeSeriesWindowRangeIntoCache(MetricSlice slice, long detectionId) throws Exception;
+  DataFrame load(MetricSlice slice) throws Exception;
+  void prefetchTimeSeriesWindowRangeIntoCache(MetricSlice slice) throws Exception;
 }

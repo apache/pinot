@@ -609,7 +609,7 @@ public class RootCauseMetricResource {
       futures.put(slice, this.executor.submit(new Callable<DataFrame>() {
         @Override
         public DataFrame call() throws Exception {
-          return RootCauseMetricResource.this.timeSeriesLoader.load(slice, -1);
+          return RootCauseMetricResource.this.timeSeriesLoader.load(slice);
         }
       }));
     }

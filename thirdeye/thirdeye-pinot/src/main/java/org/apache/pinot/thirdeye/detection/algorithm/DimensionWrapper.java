@@ -299,7 +299,7 @@ public class DimensionWrapper extends DetectionPipeline {
 
   private boolean checkMinLiveZone(MetricEntity me) {
     MetricSlice slice = MetricSlice.from(me.getId(), this.start.getMillis(), this.end.getMillis(), me.getFilters());
-    DataFrame df = this.provider.fetchTimeseries(Collections.singleton(slice), this.getConfig().getId()).get(slice);
+    DataFrame df = this.provider.fetchTimeseries(Collections.singleton(slice)).get(slice);
     long totalBuckets = df.size();
     df = df.filter(df.getDoubles(COL_VALUE).gt(this.minLiveZone)).dropNull();
     double liveBucketPercentage = (double) df.size() / (double) totalBuckets;

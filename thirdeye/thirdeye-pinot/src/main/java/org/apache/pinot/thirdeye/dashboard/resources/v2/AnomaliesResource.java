@@ -1140,7 +1140,7 @@ public class AnomaliesResource {
       dfAligned.renameSeries(COL_VALUE, COL_BASELINE);
     } else {
       // otherwise fetch current values and join the time series to generate the result
-      DataFrame dfCurrent = this.timeSeriesLoader.load(sliceViewCurrent, config.getId());
+      DataFrame dfCurrent = this.timeSeriesLoader.load(sliceViewCurrent);
       dfAligned = dfCurrent.renameSeries(COL_VALUE, COL_CURRENT).joinOuter(dfBaseline.renameSeries(COL_VALUE, COL_BASELINE));
     }
 
