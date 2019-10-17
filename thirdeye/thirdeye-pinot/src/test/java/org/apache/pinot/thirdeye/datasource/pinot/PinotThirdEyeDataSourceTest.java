@@ -61,7 +61,7 @@ public class PinotThirdEyeDataSourceTest {
 
   @Test
   public void testReduceCount() {
-    Assert.assertEquals(ThirdEyeResultSetUtils.reduce(4, 3, 4, MetricAggFunction.COUNT, "Pinot"), 5.0);
+    Assert.assertEquals(ThirdEyeResultSetUtils.reduce(4, 3, 4, MetricAggFunction.COUNT, "Pinot"), 7.0);
   }
 
   @Test

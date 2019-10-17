@@ -188,9 +188,7 @@ public class ThirdEyeResultSetUtils {
       return (aggregate * prevCount + value) / (prevCount + 1);
     } else if (aggFunction.equals(MetricAggFunction.MAX)) {
       return Math.max(aggregate, value);
-    } else if (aggFunction.equals(MetricAggFunction.COUNT) && sourceName.equals(PINOT)) {
-      return aggregate + 1;
-    } else if (aggFunction.equals(MetricAggFunction.COUNT)) { // For all other COUNT cases
+    } else if (aggFunction.equals(MetricAggFunction.COUNT)) { // For all COUNT cases
       return aggregate + value;
     } else {
       throw new IllegalArgumentException(String.format("Unknown aggregation function '%s'", aggFunction));
