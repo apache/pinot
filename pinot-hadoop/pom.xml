@@ -60,8 +60,8 @@
                   -->
                   <relocations>
                     <relocation>
-                      <pattern>com.google.common.base.Preconditions</pattern>
-                      <shadedPattern>shaded.com.google.common.base.Preconditions</shadedPattern>
+                      <pattern>com.google.common.base</pattern>
+                      <shadedPattern>shaded.com.google.common.base</shadedPattern>
                     </relocation>
                     <relocation>
                       <pattern>com.fasterxml.jackson</pattern>
@@ -102,6 +102,28 @@
       <artifactId>pinot-common</artifactId>
       <version>${project.version}</version>
       <classifier>shaded</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-parquet</artifactId>
+      <version>${project.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-core</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-orc</artifactId>
+      <version>${project.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-core</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
