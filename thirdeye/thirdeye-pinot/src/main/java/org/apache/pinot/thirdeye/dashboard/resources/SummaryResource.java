@@ -53,6 +53,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -83,7 +84,9 @@ public class SummaryResource {
   @GET
   @Path(value = "/summary/autoDimensionOrder")
   @Produces(MediaType.APPLICATION_JSON)
-  public String buildSummary(@QueryParam("dataset") String dataset,
+  public String buildSummary(
+      @QueryParam("metricUrn") String metricUrn,
+      @QueryParam("dataset") String dataset,
       @QueryParam("metric") String metric,
       @QueryParam("currentStart") long currentStartInclusive,
       @QueryParam("currentEnd") long currentEndExclusive,
@@ -99,12 +102,21 @@ public class SummaryResource {
       @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
     if (summarySize < 1) summarySize = 1;
 
+    String metricName = metric;
+    String datasetName = dataset;
     SummaryResponse response = null;
     try {
+      MetricConfigManager metricConfigDAO = DAORegistry.getInstance().getMetricConfigDAO();
+      MetricConfigDTO metricConfigDTO = metricConfigDAO.findById(MetricEntity.fromURN(metricUrn).getId());
+      if (metricConfigDTO != null) {
+        metricName = metricConfigDTO.getName();
+        datasetName = metricConfigDTO.getDataset();
+      }
+
       Dimensions dimensions;
       if (StringUtils.isBlank(groupByDimensions) || JAVASCRIPT_NULL_STRING.equals(groupByDimensions)) {
         dimensions =
-            MultiDimensionalSummaryCLITool.sanitizeDimensions(new Dimensions(Utils.getSchemaDimensionNames(dataset)));
+            MultiDimensionalSummaryCLITool.sanitizeDimensions(new Dimensions(Utils.getSchemaDimensionNames(datasetName)));
       } else {
         dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
       }
@@ -122,30 +134,30 @@ public class SummaryResource {
         filterSetMap = ThirdEyeUtils.convertToMultiMap(filterJsonPayload);
       }
 
-      List<List<String>> hierarchies =
-          OBJECT_MAPPER.readValue(hierarchiesPayload, new TypeReference<List<List<String>>>() {
-          });
-
-      MetricConfigManager metricConfigDAO = DAORegistry.getInstance().getMetricConfigDAO();
-      MetricConfigDTO metricConfigDTO = metricConfigDAO.findByMetricAndDataset(metric, dataset);
+      List<List<String>> hierarchies = OBJECT_MAPPER.readValue(hierarchiesPayload,
+          new TypeReference<List<List<String>>>() {});
 
       DateTimeZone dateTimeZone = DateTimeZone.forID(timeZone);
 
       // Non simple ratio metrics
       if (!isSimpleRatioMetric(metricConfigDTO)) {
         response =
-            runAdditiveCubeAlgorithm(dateTimeZone, dataset, metric, currentStartInclusive,
+            runAdditiveCubeAlgorithm(dateTimeZone, datasetName, metricName, currentStartInclusive,
                 currentEndExclusive, baselineStartInclusive, baselineEndExclusive, dimensions, filterSetMap,
                 summarySize, depth, hierarchies, doOneSideError);
       } else {  // Simple ratio metric such as "A/B". On the contrary, "A*100/B" is not a simple ratio metric.
         response =
-            runRatioCubeAlgorithm(dateTimeZone, dataset, metricConfigDTO, currentStartInclusive,
+            runRatioCubeAlgorithm(dateTimeZone, datasetName, metricConfigDTO, currentStartInclusive,
                 currentEndExclusive, baselineStartInclusive, baselineEndExclusive, dimensions, filterSetMap,
                 summarySize, depth, hierarchies, doOneSideError);
       }
     } catch (Exception e) {
       LOG.error("Exception while generating difference summary", e);
-      response = SummaryResponse.buildNotAvailableResponse(dataset, metric);
+      if (metricUrn != null) {
+        response = SummaryResponse.buildNotAvailableResponse(metricUrn);
+      } else {
+        response = SummaryResponse.buildNotAvailableResponse(datasetName, metricName);
+      }
     }
     return OBJECT_MAPPER.writeValueAsString(response);
   }
@@ -153,7 +165,9 @@ public class SummaryResource {
   @GET
   @Path(value = "/summary/manualDimensionOrder")
   @Produces(MediaType.APPLICATION_JSON)
-  public String buildSummaryManualDimensionOrder(@QueryParam("dataset") String dataset,
+  public String buildSummaryManualDimensionOrder(
+      @QueryParam("metricUrn") String metricUrn,
+      @QueryParam("dataset") String dataset,
       @QueryParam("metric") String metric,
       @QueryParam("currentStart") long currentStartInclusive,
       @QueryParam("currentEnd") long currentEndExclusive,
@@ -166,8 +180,17 @@ public class SummaryResource {
       @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
     if (summarySize < 1) summarySize = 1;
 
+    String metricName = metric;
+    String datasetName = dataset;
     SummaryResponse response = null;
     try {
+      MetricConfigManager metricConfigDAO = DAORegistry.getInstance().getMetricConfigDAO();
+      MetricConfigDTO metricConfigDTO = metricConfigDAO.findById(MetricEntity.fromURN(metricUrn).getId());
+      if (metricConfigDTO != null) {
+        metricName = metricConfigDTO.getName();
+        datasetName = metricConfigDTO.getDataset();
+      }
+
       List<String> allDimensions;
       if (StringUtils.isBlank(groupByDimensions) || JAVASCRIPT_NULL_STRING.equals(groupByDimensions)) {
         allDimensions = Utils.getSchemaDimensionNames(dataset);
@@ -187,26 +210,27 @@ public class SummaryResource {
         filterSets = ThirdEyeUtils.convertToMultiMap(filterJsonPayload);
       }
 
-      MetricConfigManager metricConfigDAO = DAORegistry.getInstance().getMetricConfigDAO();
-      MetricConfigDTO metricConfigDTO = metricConfigDAO.findByMetricAndDataset(metric, dataset);
-
       DateTimeZone dateTimeZone = DateTimeZone.forID(timeZone);
 
       // Non simple ratio metrics
       if (!isSimpleRatioMetric(metricConfigDTO)) {
         response =
-            runAdditiveCubeAlgorithm(dateTimeZone, dataset, metric, currentStartInclusive,
+            runAdditiveCubeAlgorithm(dateTimeZone, datasetName, metricName, currentStartInclusive,
                 currentEndExclusive, baselineStartInclusive, baselineEndExclusive, dimensions, filterSets,
                 summarySize, 0, Collections.emptyList(), doOneSideError);
       } else {  // Simple ratio metric such as "A/B". On the contrary, "A*100/B" is not a simple ratio metric.
         response =
-            runRatioCubeAlgorithm(dateTimeZone, dataset, metricConfigDTO, currentStartInclusive,
+            runRatioCubeAlgorithm(dateTimeZone, datasetName, metricConfigDTO, currentStartInclusive,
                 currentEndExclusive, baselineStartInclusive, baselineEndExclusive, dimensions, filterSets,
                 summarySize, 0, Collections.emptyList(), doOneSideError);
       }
     } catch (Exception e) {
       LOG.error("Exception while generating difference summary", e);
-      response = SummaryResponse.buildNotAvailableResponse(dataset, metric);
+      if (metricUrn != null) {
+        response = SummaryResponse.buildNotAvailableResponse(metricUrn);
+      } else {
+        response = SummaryResponse.buildNotAvailableResponse(datasetName, metricName);
+      }
     }
     return OBJECT_MAPPER.writeValueAsString(response);
   }
