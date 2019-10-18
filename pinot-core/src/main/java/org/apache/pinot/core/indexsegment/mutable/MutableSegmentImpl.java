@@ -115,29 +115,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _segmentName = config.getSegmentName();
     _schema = config.getSchema();
     _capacity = config.getCapacity();
-    _segmentMetadata = new SegmentMetadataImpl(config.getRealtimeSegmentZKMetadata(), _schema) {
-      @Override
-      public int getTotalDocs() {
-        return _numDocsIndexed;
-      }
-
-      @Override
-      public int getTotalRawDocs() {
-        // In realtime total docs and total raw docs are the same currently.
-        return _numDocsIndexed;
-      }
-
-      @Override
-      public long getLastIndexedTimestamp() {
-        return _lastIndexedTimeMs;
-      }
-
-      @Override
-      public long getLatestIngestionTimestamp() {
-        return _latestIngestionTimeMs;
-      }
-    };
-
+    _segmentMetadata = new SegmentMetadataImpl(config.getRealtimeSegmentZKMetadata(), _schema);
     _offHeap = config.isOffHeap();
     _memoryManager = config.getMemoryManager();
     _statsHistory = config.getStatsHistory();
@@ -277,6 +255,13 @@ public class MutableSegmentImpl implements MutableSegment {
     if (rowMetadata != null && rowMetadata.getIngestionTimeMs() != Long.MIN_VALUE) {
       _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, rowMetadata.getIngestionTimeMs());
     }
+
+    // Update segmentMetadata
+    ((SegmentMetadataImpl) _segmentMetadata).setTotalDocs(_numDocsIndexed);
+    // In realtime total docs and total raw docs are the same currently.
+    ((SegmentMetadataImpl) _segmentMetadata).setTotalRawDocs(_numDocsIndexed);
+    ((SegmentMetadataImpl) _segmentMetadata).setLastIndexedTimestamp(_lastIndexedTimeMs);
+    ((SegmentMetadataImpl) _segmentMetadata).setLatestIngestionTimestamp(_latestIngestionTimeMs);
     return canTakeMore;
   }
 

@@ -39,6 +39,7 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.realtime.stream.StreamMessageMetadata;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
 import org.testng.Assert;
@@ -94,6 +95,7 @@ public class MutableSegmentImplTest {
   public void testMetadata() {
     SegmentMetadata actualSegmentMetadata = _mutableSegmentImpl.getSegmentMetadata();
     SegmentMetadata expectedSegmentMetadata = _immutableSegment.getSegmentMetadata();
+    Assert.assertEquals(actualSegmentMetadata.getClass(), SegmentMetadataImpl.class);
     Assert.assertEquals(actualSegmentMetadata.getTotalDocs(), expectedSegmentMetadata.getTotalDocs());
 
     // assert that the last indexed timestamp is close to what we expect

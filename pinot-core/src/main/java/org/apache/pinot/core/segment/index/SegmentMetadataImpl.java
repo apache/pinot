@@ -558,6 +558,22 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
   }
 
+  public void setTotalDocs (int totalDocs) {
+    _totalDocs = totalDocs;
+  }
+
+  public void setTotalRawDocs (int totalRawDocs) {
+    _totalRawDocs = totalRawDocs;
+  }
+
+  public void setLastIndexedTimestamp (long lastIndexedTime) {
+    _lastIndexedTime = lastIndexedTime;
+  }
+
+  public void setLatestIngestionTimestamp (long latestIngestionTime) {
+    _latestIngestionTime = latestIngestionTime;
+  }
+
   /**
    * Converts segment metadata to json
    * @param columnFilter list only  the columns in the set. Lists all the columns if
