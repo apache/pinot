@@ -658,9 +658,6 @@ public class YamlResource {
       }
     }
 
-    if (!properties.containsKey(PROP_CLASS_NAME)) {
-      properties.put(PROP_CLASS_NAME, "DEFAULT_ALERTER_PIPELINE");
-    }
     updatedAlertConfig.setVectorClocks(updatedVectorClocks);
 
     // Validate before updating the config
