@@ -84,8 +84,6 @@ public final class Schema {
   private transient final List<String> _dimensionNames = new ArrayList<>();
   private transient final List<String> _metricNames = new ArrayList<>();
   private transient final List<String> _dateTimeNames = new ArrayList<>();
-  private transient final Map<String, Integer> _columnIdMap = new HashMap<>();
-  private transient int _columnIdCount = 0;
 
   @Nonnull
   public static Schema fromFile(@Nonnull File schemaFile)
@@ -218,7 +216,6 @@ public final class Schema {
     }
 
     _fieldSpecMap.put(columnName, fieldSpec);
-    _columnIdMap.putIfAbsent(columnName, _columnIdCount++);
   }
 
   @Deprecated
@@ -229,7 +226,6 @@ public final class Schema {
 
   public boolean removeField(String columnName) {
     FieldSpec existingFieldSpec = _fieldSpecMap.remove(columnName);
-    _columnIdMap.remove(columnName);
 
     if (existingFieldSpec != null) {
       FieldType fieldType = existingFieldSpec.getFieldType();
@@ -287,12 +283,6 @@ public final class Schema {
       }
     }
     return physicalColumnNames;
-  }
-
-  @JsonIgnore
-  @Nonnull
-  public int getColumnId(String columnName) {
-    return _columnIdMap.get(columnName);
   }
 
   @JsonIgnore

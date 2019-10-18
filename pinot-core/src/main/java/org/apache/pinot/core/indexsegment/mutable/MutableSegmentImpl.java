@@ -398,10 +398,10 @@ public class MutableSegmentImpl implements MutableSegment {
       return;
     }
 
-    RoaringBitmap nullColumnsBitMap = (RoaringBitmap) row.getValue(CommonConstants.Segment.NULL_FIELDS);
+    Set<String> nullColumnsSet = (Set<String>) row.getValue(CommonConstants.Segment.NULL_FIELDS);
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String columnName = fieldSpec.getName();
-      if (nullColumnsBitMap.contains(_schema.getColumnId(columnName))) {
+      if (nullColumnsSet.contains(columnName)) {
         _presenceVectorMap.get(columnName).setNull(docId);
       }
     }
@@ -497,7 +497,11 @@ public class MutableSegmentImpl implements MutableSegment {
    * @return Generic row with physical columns of the specified row.
    */
   public GenericRow getRecord(int docId, GenericRow reuse) {
-    RoaringBitmap nullColumnBitMap = null;
+    // Try and reuse the null columns set
+    Set<String> nullColumnsSet = (Set<String>) reuse.getValue(CommonConstants.Segment.NULL_FIELDS);
+    if (nullColumnsSet != null) {
+      nullColumnsSet.clear();
+    }
 
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       String column = fieldSpec.getName();
@@ -507,14 +511,14 @@ public class MutableSegmentImpl implements MutableSegment {
 
       PresenceVectorReader reader = _presenceVectorMap.get(column);
       if (reader != null && !reader.isPresent(docId)) {
-        if (nullColumnBitMap == null) {
-          nullColumnBitMap = new RoaringBitmap();
+        if (nullColumnsSet == null) {
+          nullColumnsSet = new HashSet<>();
         }
-        nullColumnBitMap.add(_schema.getColumnId(column));
+        nullColumnsSet.add(column);
       }
     }
 
-    reuse.putField(CommonConstants.Segment.NULL_FIELDS, nullColumnBitMap);
+    reuse.putValue(CommonConstants.Segment.NULL_FIELDS, nullColumnsSet);
     return reuse;
   }
 

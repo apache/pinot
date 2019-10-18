@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.indexsegment.mutable;
 
+import java.util.Set;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.JSONRecordReader;
@@ -89,15 +90,16 @@ public class MutableSegmentImplPresenceVectorTest {
     GenericRow reuse = new GenericRow();
     _mutableSegmentImpl.getRecord(0, reuse);
     List<String> nullColumns = new ArrayList<>();
-    RoaringBitmap nullBitmap = (RoaringBitmap) reuse.getValue(NULL_FIELDS);
+    Set<String> nullColumnsSet = (Set<String>) reuse.getValue(NULL_FIELDS);
     for (String colName : _schema.getColumnNames()) {
-      if (nullBitmap.contains(_schema.getColumnId(colName))) {
+      if (nullColumnsSet.contains(colName)) {
         nullColumns.add(colName);
       }
     }
     Assert.assertEquals(nullColumns, _finalNullColumns);
 
     _mutableSegmentImpl.getRecord(1, reuse);
-    Assert.assertNull(reuse.getValue(NULL_FIELDS));
+    nullColumnsSet = (Set<String>) reuse.getValue(NULL_FIELDS);
+    Assert.assertTrue(nullColumnsSet.isEmpty());
   }
 }

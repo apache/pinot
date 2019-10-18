@@ -263,10 +263,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @Override
   public void indexRow(GenericRow row) {
     // Determine if we need to process presence vector per row, per column
-    RoaringBitmap nullColumnsBitMap = null;
-    if (row.getValue(CommonConstants.Segment.NULL_FIELDS) != null) {
-      nullColumnsBitMap = (RoaringBitmap) row.getValue(CommonConstants.Segment.NULL_FIELDS);
-    }
+    Set<String> nullColumnsSet = (Set<String>) row.getValue(CommonConstants.Segment.NULL_FIELDS);
 
     for (String columnName : _forwardIndexCreatorMap.keySet()) {
       Object columnValueToIndex = row.getValue(columnName);
@@ -295,7 +292,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
 
       // If row has null value for given column name, add to presence vector
-      if (null != nullColumnsBitMap && nullColumnsBitMap.contains(schema.getColumnId(columnName))) {
+      if (null != nullColumnsSet && nullColumnsSet.contains(columnName)) {
         _presenceVectorCreatorMap.get(columnName).setNull(docIdCounter);
       }
     }
