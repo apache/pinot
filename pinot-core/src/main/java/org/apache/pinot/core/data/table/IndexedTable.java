@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.data.table;
 
-import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
@@ -33,12 +33,15 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
  */
 public abstract class IndexedTable implements Table {
 
-  List<AggregationFunction> _aggregationFunctions;
+  AggregationFunction[] _aggregationFunctions;
   int _numAggregations;
   DataSchema _dataSchema;
 
   int _maxCapacity;
   int _bufferedCapacity;
+
+  boolean _isOrderBy;
+  IndexedTableResizer _indexedTableResizer;
 
   @Override
   public void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
@@ -46,10 +49,10 @@ public abstract class IndexedTable implements Table {
     _dataSchema = dataSchema;
 
     _numAggregations = aggregationInfos.size();
-    _aggregationFunctions = new ArrayList<>(_numAggregations);
-    for (AggregationInfo aggregationInfo : aggregationInfos) {
-      _aggregationFunctions.add(
-          AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction());
+    _aggregationFunctions = new AggregationFunction[_numAggregations];
+    for (int i = 0; i < _numAggregations; i++) {
+      _aggregationFunctions[i] =
+          AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfos.get(i)).getAggregationFunction();
     }
 
     /* Factor used to add buffer to maxCapacity of the table **/
@@ -71,5 +74,12 @@ public abstract class IndexedTable implements Table {
     }
     _maxCapacity = capacity;
     _bufferedCapacity = (int) (capacity * bufferFactor);
+
+    _isOrderBy = CollectionUtils.isNotEmpty(orderBy);
+    if (_isOrderBy) {
+      _indexedTableResizer = new OrderedIndexedTableResizer(dataSchema, aggregationInfos, orderBy);
+    } else {
+      _indexedTableResizer = new RandomIndexedTableResizer();
+    }
   }
 }
