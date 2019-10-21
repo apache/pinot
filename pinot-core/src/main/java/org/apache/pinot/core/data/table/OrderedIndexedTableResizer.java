@@ -76,10 +76,7 @@ class OrderedIndexedTableResizer extends IndexedTableResizer {
         _orderByInfos.add(createOrderByInfoForKeyColumn(index));
       } else if (aggregationColumnToIndex.containsKey(column)) {
         int index = aggregationColumnToIndex.get(column);
-        AggregationFunction aggregationFunction =
-            AggregationFunctionUtils.getAggregationFunctionContext(aggregationColumnToInfo.get(column))
-                .getAggregationFunction();
-        _orderByInfos.add(createOrderByInfoForAggregationColumn(index, aggregationFunction));
+        _orderByInfos.add(createOrderByInfoForAggregationColumn(index, aggregationColumnToInfo.get(column)));
       } else {
         throw new UnsupportedOperationException("Could not find column " + column + " in data schema");
       }
@@ -231,7 +228,9 @@ class OrderedIndexedTableResizer extends IndexedTableResizer {
     return new OrderByInfo(OrderByType.KEY_COLUMN, index);
   }
 
-  private OrderByInfo createOrderByInfoForAggregationColumn(int index, AggregationFunction aggregationFunction) {
+  private OrderByInfo createOrderByInfoForAggregationColumn(int index, AggregationInfo aggregationInfo) {
+    AggregationFunction aggregationFunction =
+        AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction();
     return new OrderByInfo(OrderByType.AGGREGATION_COLUMN, index, aggregationFunction);
   }
 }

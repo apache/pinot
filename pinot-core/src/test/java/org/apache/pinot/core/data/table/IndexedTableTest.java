@@ -189,20 +189,6 @@ public class IndexedTableTest {
     List<String> survivors;
 
     sel1 = new SelectionSort();
-    sel1.setColumn("sum(m1)");
-    sel1.setIsAsc(true);
-    orderBy = Lists.newArrayList(sel1);
-    survivors = Lists.newArrayList("h", "i", "l", "m", "n");
-    data.add(new Object[]{orderBy, survivors});
-
-    sel1 = new SelectionSort();
-    sel1.setColumn("max(m2)");
-    sel1.setIsAsc(false);
-    orderBy = Lists.newArrayList(sel1);
-    survivors = Lists.newArrayList("j", "k", "l", "m", "n");
-    data.add(new Object[]{orderBy, survivors});
-
-    sel1 = new SelectionSort();
     sel1.setColumn("d1");
     sel1.setIsAsc(false);
     orderBy = Lists.newArrayList(sel1);
