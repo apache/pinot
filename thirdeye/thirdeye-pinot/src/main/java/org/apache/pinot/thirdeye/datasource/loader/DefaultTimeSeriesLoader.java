@@ -76,8 +76,6 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
       response = this.cache.getQueryResult(rc.getRequest());
     }
 
-    System.out.println("show me the magic");
-
     return DataFrameUtils.evaluateResponse(response, rc);
   }
 

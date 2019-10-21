@@ -66,7 +66,7 @@ public class CouchbaseCacheDAO {
     Cluster cluster = CouchbaseCluster.create();
     cluster.authenticate(AUTH_USERNAME, AUTH_PASSWORD);
 
-    this.bucket = cluster.openBucket();
+    this.bucket = cluster.openBucket(BUCKET_NAME);
   }
 
   public boolean checkIfDetectionIdExistsInCache(String key) {
@@ -176,16 +176,29 @@ public class CouchbaseCacheDAO {
 
   public void insertTimeSeriesDataPoint(TimeSeriesDataPoint point) {
 
-    JsonDocument doc = bucket.getAndTouch(point.getDocumentKey(), TIMEOUT);
+//    JsonDocument doc = bucket.getAndTouch(point.getDocumentKey(), TIMEOUT);
+    bucket.async().getAndTouch(point.getDocumentKey(), TIMEOUT)
+        .subscribe(doc -> {
+          if (doc == null) {
+            // if data point doesn't exist in cache, make a new document and insert it
+            JsonObject documentBody = CacheUtils.buildDocumentStructure(point);
+            doc = JsonDocument.create(point.getDocumentKey(), TIMEOUT, documentBody);
+          } else {
+            ((JsonObject)doc.content().get("dims")).put(point.getDimensionKey(), point.getDataValue());
+          }
 
-    if (doc == null) {
-      // if data point doesn't exist in cache, make a new document and insert it
-      JsonObject documentBody = CacheUtils.buildDocumentStructure(point);
-      doc = JsonDocument.create(point.getDocumentKey(), TIMEOUT, documentBody);
-    } else {
-      ((JsonObject)doc.content().get("dims")).put(point.getDimensionKey(), point.getDataValue());
-    }
+          bucket.async().upsert(doc);
+        }
+    );
 
-    bucket.async().upsert(doc);
+//    if (doc == null) {
+//      // if data point doesn't exist in cache, make a new document and insert it
+//      JsonObject documentBody = CacheUtils.buildDocumentStructure(point);
+//      doc = JsonDocument.create(point.getDocumentKey(), TIMEOUT, documentBody);
+//    } else {
+//      ((JsonObject)doc.content().get("dims")).put(point.getDimensionKey(), point.getDataValue());
+//    }
+//
+//    bucket.async().upsert(doc);
   }
 }

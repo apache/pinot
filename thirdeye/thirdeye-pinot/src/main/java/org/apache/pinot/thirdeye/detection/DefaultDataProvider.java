@@ -148,17 +148,12 @@ public class DefaultDataProvider implements DataProvider {
       // if not in cache, fetch from data source
       Map<MetricSlice, Future<DataFrame>> futures = new HashMap<>();
 
-      // work on getting the detectionId
-      boolean runBryanPoC = false;
-
+      boolean runBryanPoC = true;
       if (runBryanPoC) {
-        //if (configId != -1) {
-          // find the max window and fetch it
-          Map<Long, MetricSlice> ranges = CacheUtils.findMaxRangeInterval(slices);
-          for (MetricSlice slice : ranges.values()) {
-            timeseriesLoader.prefetchTimeSeriesWindowRangeIntoCache(slice);
-          }
-        //}
+        Map<Long, MetricSlice> ranges = CacheUtils.findMaxRangeInterval(slices);
+        for (MetricSlice slice : ranges.values()) {
+          timeseriesLoader.prefetchTimeSeriesWindowRangeIntoCache(slice);
+        }
       }
 
       for (final MetricSlice slice : slices) {
