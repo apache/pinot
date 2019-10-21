@@ -1092,6 +1092,7 @@
             <systemPropertyVariables>
               <zookeeper.forceSync>no</zookeeper.forceSync>
             </systemPropertyVariables>
+            <trimStackTrace>false</trimStackTrace>
             <reportFormat>plain</reportFormat>
           </configuration>
         </plugin>
