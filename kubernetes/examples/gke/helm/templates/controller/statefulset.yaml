@@ -1,0 +1,101 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "pinot.controller.fullname" . }}
+  labels:
+    app: {{ include "pinot.name" . }}
+    chart: {{ include "pinot.chart" . }}
+    component: {{ .Values.controller.name }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "pinot.name" . }}
+      release: {{ .Release.Name }}
+      component: {{ .Values.controller.name }}
+  serviceName: controller
+  replicas: {{ .Values.controller.replicaCount }}
+  updateStrategy:
+    type: {{ .Values.controller.updateStrategy.type }}
+  podManagementPolicy: Parallel
+  template:
+    metadata:
+      labels:
+        app: {{ include "pinot.name" . }}
+        release: {{ .Release.Name }}
+        component: {{ .Values.controller.name }}
+      annotations:
+{{ toYaml .Values.controller.podAnnotations | indent 8 }}
+    spec:
+      nodeSelector:
+{{ toYaml .Values.controller.nodeSelector | indent 8 }}
+      affinity:
+{{ toYaml .Values.controller.affinity | indent 8 }}
+      tolerations:
+{{ toYaml .Values.controller.tolerations | indent 8 }}
+      containers:
+      - name: controller
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args: [ "StartController", "-configFileName", "/var/pinot/controller/config/pinot-controller.conf" ]
+        ports:
+          - containerPort: {{ .Values.controller.port }}
+            protocol: TCP
+        volumeMounts:
+          - name: config
+            mountPath: /var/pinot/controller/config
+          - name: data
+            mountPath: "{{ .Values.controller.data.dir }}"
+        resources:
+{{ toYaml .Values.controller.resources | indent 12 }}
+      initContainers:
+      - name: create-zk-root-path
+        image: solsson/kafka:2.1.0@sha256:ac3f06d87d45c7be727863f31e79fbfdcb9c610b51ba9cf03c75a95d602f15e1
+        command: ["bin/zookeeper-shell.sh", "ZooKeeper", "-server", "{{ .Values.cluster.zookeeper }}", "create", "/", "\"\""]
+      restartPolicy: Always
+      volumes:
+      - name: config
+        configMap:
+          name: controller-config
+{{- if not .Values.controller.persistence.enabled }}
+      - name: data
+        emptyDir: {}
+{{- end }}
+{{- if .Values.controller.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - {{ .Values.controller.persistence.accessMode | quote }}
+        {{- if .Values.controller.persistence.storageClass }}
+        {{- if (eq "-" .Values.controller.persistence.storageClass) }}
+        storageClassName: ""
+        {{- else }}
+        storageClassName: {{ .Values.controller.persistence.storageClass }}
+        {{- end }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.controller.persistence.size | quote}}
+{{ end }}

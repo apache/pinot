@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: broker-config
+data:
+  pinot-broker.conf: |-
+    pinot.broker.client.queryPort={{ .Values.broker.port }}
+    pinot.broker.routing.table.builder.class=random
+    pinot.set.instance.id.to.hostname=true
