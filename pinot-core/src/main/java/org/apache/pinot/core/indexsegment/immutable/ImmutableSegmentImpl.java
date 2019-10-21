@@ -135,6 +135,14 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       } catch (Exception e) {
         LOGGER.error("Error when close inverted index for column : " + column, e);
       }
+      try {
+        TextIndexReader textIndex = columnIndexContainer.getTextIndex();
+        if (textIndex != null) {
+          textIndex.close();
+        }
+      } catch (Exception e) {
+        LOGGER.error("Error when closing text index for column: " +  column, e);
+      }
     }
     try {
       _segmentDirectory.close();

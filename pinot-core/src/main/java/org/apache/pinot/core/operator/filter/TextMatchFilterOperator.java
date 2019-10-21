@@ -26,6 +26,7 @@ import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.LuceneIndexDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.TextMatchPredicateEvaluatorFactory;
+import org.apache.pinot.core.segment.index.readers.LuceneTextIndexReader;
 import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 
 public class TextMatchFilterOperator extends BaseFilterOperator {
@@ -48,10 +49,13 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   protected FilterBlock getNextBlock() {
-    TextIndexReader<ScoreDoc[], Document> textIndexReader = _dataSource.getTextIndex();
+    TextIndexReader<LuceneTextIndexReader.LuceneSearchResult> textIndexReader = _dataSource.getTextIndex();
+    if (textIndexReader == null) {
+      System.out.println("null reader");
+    }
     Preconditions.checkState(textIndexReader != null, "Error: expecting text index for column");
-    ScoreDoc[] scoreDocs = textIndexReader.search(_queryString);
-    return new FilterBlock(new LuceneIndexDocIdSet(scoreDocs, _startDocId, _endDocId, textIndexReader));
+    LuceneTextIndexReader.LuceneSearchResult luceneSearchResult = textIndexReader.search(_queryString);
+    return new FilterBlock(new LuceneIndexDocIdSet(luceneSearchResult, _startDocId, _endDocId, textIndexReader));
   }
 
   @Override

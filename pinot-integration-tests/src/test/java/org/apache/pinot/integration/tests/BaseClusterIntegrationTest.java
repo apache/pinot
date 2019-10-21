@@ -380,6 +380,22 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }, timeoutMs, "Failed to load " + countStarResult + " documents");
   }
 
+  protected void waitForDocsLoaded(long timeoutMs)
+      throws Exception {
+    final long countStarResult = getCountStarResult();
+    TestUtils.waitForCondition(new Function<Void, Boolean>() {
+      @Nullable
+      @Override
+      public Boolean apply(@Nullable Void aVoid) {
+        try {
+          return getCurrentCountStarResult() == countStarResult;
+        } catch (Exception e) {
+          return null;
+        }
+      }
+    }, 100L, timeoutMs, "Failed to load " + countStarResult + " documents", false);
+  }
+
   /**
    * Run equivalent Pinot and H2 query and compare the results.
    *

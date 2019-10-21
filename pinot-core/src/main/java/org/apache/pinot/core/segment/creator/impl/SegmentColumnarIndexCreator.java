@@ -120,11 +120,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       invertedIndexColumns.add(columnName);
     }
 
-    Set<String> textSearchColumns = new HashSet<>();
-    for (String columnName : config.getTextSearchColumns()) {
+    Set<String> textIndexColumns = new HashSet<>();
+    for (String columnName : config.getTextIndexCreationColumns()) {
       Preconditions.checkState(schema.hasColumn(columnName),
           "Cannot create text inverted index for column: %s because it is not in schema", columnName);
-      textSearchColumns.add(columnName);
+      textIndexColumns.add(columnName);
     }
 
     // Initialize creators for dictionary, forward index and inverted index
@@ -201,7 +201,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                 indexCreationInfo.getLengthOfLongestEntry()));
 
         // Initialize text index creator
-        if (textSearchColumns.contains(columnName)) {
+        if (textIndexColumns.contains(columnName)) {
           _textIndexCreatorMap.put(columnName, new LuceneTextIndexCreator(columnName, _indexDir));
         }
       }
@@ -283,18 +283,24 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         // SV column
         if (dictionaryCreator != null) {
           // dictionary encoded SV column
+          // get dictID from dictionary
           int dictId = dictionaryCreator.indexOfSV(columnValueToIndex);
+          // store the docID -> dictID mapping in forward index
           ((SingleValueForwardIndexCreator) _forwardIndexCreatorMap.get(columnName)).index(docIdCounter, dictId);
           if (_invertedIndexCreatorMap.containsKey(columnName)) {
+            // if inverted index enabled during segment creation,
+            // then store dictID -> docID mapping in inverted index
             _invertedIndexCreatorMap.get(columnName).add(dictId);
           }
         } else {
           // non-dictionary encoded SV column
+          // store the doct -> raw value mapping in forward index
           ((SingleValueRawIndexCreator) _forwardIndexCreatorMap.get(columnName))
               .index(docIdCounter, columnValueToIndex);
           // text-search enabled column
           TextIndexCreator textIndexCreator = _textIndexCreatorMap.get(columnName);
           if (textIndexCreator != null) {
+            // if text search enabled, add the column value to lucene index
             textIndexCreator.addDoc(columnValueToIndex, docIdCounter);
           }
         }

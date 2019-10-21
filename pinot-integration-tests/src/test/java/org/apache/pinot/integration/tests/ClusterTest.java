@@ -418,6 +418,17 @@ public abstract class ClusterTest extends ControllerTest {
       List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
       TableTaskConfig taskConfig, String streamConsumerFactoryName, int numReplicas)
       throws Exception {
+    addRealtimeTable(tableName, useLlc, kafkaBrokerList, kafkaZkUrl, kafkaTopic, realtimeSegmentFlushRows, avroFile,
+        timeColumnName, timeType, schemaName, brokerTenant, serverTenant, loadMode, sortedColumn, invertedIndexColumns,
+        bloomFilterColumns, noDictionaryColumns, taskConfig, streamConsumerFactoryName, numReplicas, new ArrayList<>());
+  }
+
+  protected void addRealtimeTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,
+      String kafkaTopic, int realtimeSegmentFlushRows, File avroFile, String timeColumnName, String timeType,
+      String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
+      List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
+      TableTaskConfig taskConfig, String streamConsumerFactoryName, int numReplicas, List<String> textIndexColumns)
+      throws Exception {
     Map<String, String> streamConfigs = new HashMap<>();
     String streamType = "kafka";
     streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);
@@ -459,7 +470,7 @@ public abstract class ClusterTest extends ControllerTest {
         .setServerTenant(serverTenant).setLoadMode(loadMode).setSortedColumn(sortedColumn)
         .setInvertedIndexColumns(invertedIndexColumns).setBloomFilterColumns(bloomFilterColumns)
         .setNoDictionaryColumns(noDictionaryColumns).setStreamConfigs(streamConfigs).setTaskConfig(taskConfig)
-        .setNumReplicas(numReplicas).build();
+        .setNumReplicas(numReplicas).setTextIndexColumns(textIndexColumns).build();
 
     // save the realtime table config
     _realtimeTableConfig = tableConfig;

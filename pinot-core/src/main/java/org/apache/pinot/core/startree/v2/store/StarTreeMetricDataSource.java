@@ -23,6 +23,7 @@ import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
+import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.impl.v1.BaseChunkSingleValueReader;
 import org.apache.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
 import org.apache.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
@@ -116,6 +117,11 @@ public class StarTreeMetricDataSource extends DataSource {
 
   @Override
   public TextIndexReader getTextIndex() {
+    return null;
+  }
+
+  @Override
+  public DataFileReader getForwardIndex() {
     return null;
   }
 

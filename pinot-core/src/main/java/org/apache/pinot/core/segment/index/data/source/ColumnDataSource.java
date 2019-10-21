@@ -48,7 +48,7 @@ public final class ColumnDataSource extends DataSource {
   private final int _maxNumMultiValues;
   private final DataFileReader _forwardIndex;
   private final InvertedIndexReader _invertedIndex;
-  private final TextIndexReader _textIndexReader;
+  private final TextIndexReader _textIndex;
   private final Dictionary _dictionary;
   private final BloomFilterReader _bloomFilter;
   private final int _cardinality;
@@ -60,22 +60,23 @@ public final class ColumnDataSource extends DataSource {
   public ColumnDataSource(ColumnIndexContainer indexContainer, ColumnMetadata metadata) {
     this(metadata.getColumnName(), metadata.getDataType(), metadata.isSingleValue(), metadata.isSorted(),
         metadata.getTotalDocs(), metadata.getMaxNumberOfMultiValues(), indexContainer.getForwardIndex(),
-        indexContainer.getInvertedIndex(), indexContainer.getTextIndex(), indexContainer.getDictionary(), indexContainer.getBloomFilter(),
-        metadata.getCardinality());
+        indexContainer.getInvertedIndex(), indexContainer.getTextIndex(), indexContainer.getDictionary(),
+        indexContainer.getBloomFilter(), metadata.getCardinality());
   }
 
   /**
    * For REALTIME segment.
    */
-  public ColumnDataSource(FieldSpec fieldSpec, int numDocs, int maxNumMultiValues, DataFileReader forwardIndex,
-      InvertedIndexReader invertedIndex, BaseMutableDictionary dictionary, BloomFilterReader bloomFilter) {
+  public ColumnDataSource(FieldSpec fieldSpec, int numDocs, int maxNumMultiValues,
+      DataFileReader forwardIndex, InvertedIndexReader invertedIndex,
+      BaseMutableDictionary dictionary, BloomFilterReader bloomFilter, TextIndexReader textIndex) {
     this(fieldSpec.getName(), fieldSpec.getDataType(), fieldSpec.isSingleValueField(), false, numDocs,
-        maxNumMultiValues, forwardIndex, invertedIndex, null, dictionary, bloomFilter, Constants.UNKNOWN_CARDINALITY);
+        maxNumMultiValues, forwardIndex, invertedIndex, textIndex, dictionary, bloomFilter, Constants.UNKNOWN_CARDINALITY);
   }
 
   private ColumnDataSource(String columnName, FieldSpec.DataType dataType, boolean isSingleValue, boolean isSorted,
       int numDocs, int maxNumMultiValues, DataFileReader forwardIndex, InvertedIndexReader invertedIndex,
-      TextIndexReader textIndexReader, Dictionary dictionary, BloomFilterReader bloomFilterReader, int cardinality) {
+      TextIndexReader textIndex, Dictionary dictionary, BloomFilterReader bloomFilterReader, int cardinality) {
     // Sanity check
     if (isSingleValue) {
       Preconditions.checkState(forwardIndex instanceof SingleColumnSingleValueReader);
@@ -100,7 +101,7 @@ public final class ColumnDataSource extends DataSource {
     _maxNumMultiValues = maxNumMultiValues;
     _forwardIndex = forwardIndex;
     _invertedIndex = invertedIndex;
-    _textIndexReader = textIndexReader;
+    _textIndex = textIndex;
     _dictionary = dictionary;
     _bloomFilter = bloomFilterReader;
     _cardinality = cardinality;
@@ -165,7 +166,12 @@ public final class ColumnDataSource extends DataSource {
 
   @Override
   public TextIndexReader getTextIndex() {
-    return _textIndexReader;
+    return _textIndex;
+  }
+
+  @Override
+  public DataFileReader getForwardIndex() {
+    return _forwardIndex;
   }
 
   @Override

@@ -504,7 +504,7 @@ public class TableConfig {
     private String _segmentVersion;
     private String _sortedColumn;
     private List<String> _invertedIndexColumns;
-    private List<String> _textSearchColumns;
+    private List<String> _textIndexColumns;
     private List<String> _noDictionaryColumns;
     private List<String> _onHeapDictionaryColumns;
     private List<String> _bloomFilterColumns;
@@ -622,8 +622,8 @@ public class TableConfig {
       return this;
     }
 
-    public Builder setTextSearchColumns(List<String> textSearchColumns) {
-      _textSearchColumns = textSearchColumns;
+    public Builder setTextIndexColumns(List<String> textIndexColumns) {
+      _textIndexColumns = textIndexColumns;
       return this;
     }
 
@@ -714,7 +714,7 @@ public class TableConfig {
         indexingConfig.setSortedColumn(Collections.singletonList(_sortedColumn));
       }
       indexingConfig.setInvertedIndexColumns(_invertedIndexColumns);
-      indexingConfig.setTextSearchColumns(_textSearchColumns);
+      indexingConfig.setTextIndexColumns(_textIndexColumns);
       indexingConfig.setNoDictionaryColumns(_noDictionaryColumns);
       indexingConfig.setOnHeapDictionaryColumns(_onHeapDictionaryColumns);
       indexingConfig.setBloomFilterColumns(_bloomFilterColumns);

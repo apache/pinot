@@ -52,7 +52,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-
+// TODO: move this to JMH based tests
 public class TestTextSearchPerf extends BaseQueriesTest {
 
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TextSearchPerf");
@@ -133,7 +133,7 @@ public class TestTextSearchPerf extends BaseQueriesTest {
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setRawIndexCreationColumns(rawIndexCreationColumns);
-    segmentGeneratorConfig.setTextSearchColumns(textSearchColumns);
+    segmentGeneratorConfig.setTextIndexCreationColumns(textSearchColumns);
     segmentGeneratorConfig.setCheckTimeColumnValidityDuringGeneration(false);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -151,7 +151,7 @@ public class TestTextSearchPerf extends BaseQueriesTest {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
     Set<String> textColumns = new HashSet<>();
     textColumns.addAll(textSearchColumns);
-    indexLoadingConfig.setTextSearchColumns(textColumns);
+    indexLoadingConfig.setTextIndexColumns(textColumns);
     ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegments.add(segment);
   }

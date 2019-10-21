@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.queries;
 
-import com.google.common.base.Stopwatch;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -30,12 +29,10 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
-import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
-import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
@@ -45,9 +42,7 @@ import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.ControlledRealTimeReopenThread;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
-import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.SearcherManager;
-import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.common.data.FieldSpec;
@@ -60,7 +55,6 @@ import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
@@ -80,7 +74,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
   private static final String QUERY_LOG_TEXT_COL_NAME = "QUERY_LOG_TEXT_COL";
   private static final String SKILLS_TEXT_COL_NAME = "SKILLS_TEXT_COL";
   private static final String INT_COL_NAME = "INT_COL";
-  private static final List<String> textSearchColumns = new ArrayList<>();
+  private static final List<String> textIndexColumns = new ArrayList<>();
   private static final List<String> rawIndexCreationColumns = new ArrayList<>();
   private static final int INT_BASE_VALUE = 1000;
   private List<GenericRow> _rows = new ArrayList<>();
@@ -135,15 +129,15 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
 
   private void createSegment()
       throws Exception {
-    textSearchColumns.add(QUERY_LOG_TEXT_COL_NAME);
-    textSearchColumns.add(SKILLS_TEXT_COL_NAME);
-    rawIndexCreationColumns.addAll(textSearchColumns);
+    textIndexColumns.add(QUERY_LOG_TEXT_COL_NAME);
+    textIndexColumns.add(SKILLS_TEXT_COL_NAME);
+    rawIndexCreationColumns.addAll(textIndexColumns);
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_schema);
     segmentGeneratorConfig.setTableName(TABLE_NAME);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setRawIndexCreationColumns(rawIndexCreationColumns);
-    segmentGeneratorConfig.setTextSearchColumns(textSearchColumns);
+    segmentGeneratorConfig.setTextIndexCreationColumns(textIndexColumns);
     segmentGeneratorConfig.setCheckTimeColumnValidityDuringGeneration(false);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -159,9 +153,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
   private void loadSegment()
       throws Exception {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    Set<String> textColumns = new HashSet<>();
-    textColumns.addAll(textSearchColumns);
-    indexLoadingConfig.setTextSearchColumns(textColumns);
+    indexLoadingConfig.setTextIndexColumns(new HashSet<>(textIndexColumns));
     ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegments.add(segment);
   }
@@ -655,10 +647,10 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
   @Test
   public void testTextSearchWithAdditionalFilter() throws Exception {
     List<Serializable[]> expected = new ArrayList<>();
-    expected.add(new Serializable[]{1010, "Distributed systems, Java"});
-    expected.add(new Serializable[]{1012, "Distributed systems, Java, database engine"});
-    expected.add(new Serializable[]{1017, "Distributed systems, Apache Kafka, publish-subscribe"});
-    expected.add(new Serializable[]{1020, "Databases, columnar query processing, Apache Arrow, distributed systems"});
+    expected.add(new Serializable[]{1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed storage, concurrency, multi-threading"});
+    expected.add(new Serializable[]{1012, "Distributed systems, Java, database engine, cluster management, docker image building and distribution"});
+    expected.add(new Serializable[]{1017, "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems, concurrency, multi-threading, C++, CPU processing, Java"});
+    expected.add(new Serializable[]{1020, "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster management, docker image building and distribution"});
 
     // Notes on multi col filter processing:
     // int_col >= 1010 will create a dictionary based range predicate evaluator.
@@ -682,7 +674,7 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     testTextSearchAggregationQueryHelper(query, expected.size());
 
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1017, "Distributed systems, Apache Kafka, publish-subscribe"});
+    expected.add(new Serializable[]{1017, "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems, concurrency, multi-threading, C++, CPU processing, Java"});
 
     // notes on multi col filter processing:
     // int_col = 1017 is equality predicate and
@@ -694,30 +686,354 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
     testTextSearchAggregationQueryHelper(query, expected.size());
   }
 
+  @Test
+  public void testLuceneRealtimeWithSearcherManager() throws Exception {
+    // create and open an index writer
+    File indexFile = new File(INDEX_DIR.getPath() + "/realtime-test1.index");
+    Directory indexDirectory = FSDirectory.open(indexFile.toPath());
+    StandardAnalyzer standardAnalyzer = new StandardAnalyzer();
+    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
+    indexWriterConfig.setRAMBufferSizeMB(500);
+    IndexWriter indexWriter = new IndexWriter(indexDirectory, indexWriterConfig);
+
+    // create an NRT index reader
+    SearcherManager searcherManager = new SearcherManager(indexWriter, false, false, null);
+
+    QueryParser queryParser = new QueryParser("skill", standardAnalyzer);
+    Query query = queryParser.parse("\"machine learning\"");
+
+    // acquire a searcher
+    // the creation of SearcherManager would have created an IndexReader with a
+    // refcount of 1. manager.acquire would have bumped up the refcount by 1
+    // so the refcount should be 2 now
+    // search() should not see any hits since nothing has been added to the index
+    IndexSearcher searcher1 = searcherManager.acquire();
+    Assert.assertEquals(2, searcher1.getIndexReader().getRefCount());
+    Assert.assertEquals(0, searcher1.search(query, 100).scoreDocs.length);
+
+    // acquire a searcher
+    // since refresh hasn't happenend yet, this should be the same searcher as searcher1
+    // but with refcount incremented. so refcount should be 3 now
+    // search() should not see any hits since nothing has been added to the index
+    IndexSearcher searcher2 = searcherManager.acquire();
+    Assert.assertEquals(3, searcher2.getIndexReader().getRefCount());
+    Assert.assertEquals(0, searcher2.search(query, 100).scoreDocs.length);
+    Assert.assertEquals(searcher1, searcher2);
+    Assert.assertEquals(3, searcher1.getIndexReader().getRefCount());
+    Assert.assertEquals(0, searcher1.search(query, 100).scoreDocs.length);
+
+    // add something to the index but don't commit
+    Document docToIndex = new Document();
+    docToIndex.add(new TextField("skill", "machine learning", Field.Store.NO));
+    indexWriter.addDocument(docToIndex);
+
+    // refresh the searcher inside SearcherManager
+    // this
+    searcherManager.maybeRefresh();
+
+    // acquire a searcher
+    // this should be the refreshed one
+    // the refcount of the reader associated with this searcher
+    // should be 2 (1 as the initial refcount of the reader and +1
+    // due to acquire)
+    IndexSearcher searcher3 = searcherManager.acquire();
+    Assert.assertEquals(2, searcher3.getIndexReader().getRefCount());
+    // this searcher should see the uncommitted document in the index
+    Assert.assertEquals(1, searcher3.search(query, 100).scoreDocs.length);
+    Assert.assertNotEquals(searcher2, searcher3);
+
+    // searcher1 and searcher2 ref count should have gone down by 1 due to refresh
+    // since they were the current searcher before refresh happened and after SearcherManager
+    // got new searcher after refresh, it decrements the ref count for old one.
+    Assert.assertEquals(2, searcher1.getIndexReader().getRefCount());
+    Assert.assertEquals(0, searcher1.search(query, 100).scoreDocs.length);
+    Assert.assertEquals(2, searcher2.getIndexReader().getRefCount());
+    Assert.assertEquals(0, searcher2.search(query, 100).scoreDocs.length);
+
+    // done searching with searcher1
+    // release it -- this should decrement the refcount by 1 for both searcher1
+    // and searcher2 since they are same
+    searcherManager.release(searcher1);
+    Assert.assertEquals(1, searcher1.getIndexReader().getRefCount());
+    Assert.assertEquals(1, searcher2.getIndexReader().getRefCount());
+    // the above release should not have impacted searcher3
+    Assert.assertEquals(2, searcher3.getIndexReader().getRefCount());
+    Assert.assertEquals(1, searcher3.search(query, 100).scoreDocs.length);
+
+    // done searching with searcher2
+    // release it -- this should decrement the refcount by 1 for both searcher1
+    // and searcher2 since they are same
+    // this gets the refcount to 0 and the associated reader is closed
+    searcherManager.release(searcher2);
+    Assert.assertEquals(0, searcher1.getIndexReader().getRefCount());
+    Assert.assertEquals(0, searcher2.getIndexReader().getRefCount());
+    // the above release should not have impacted searcher3
+    Assert.assertEquals(2, searcher3.getIndexReader().getRefCount());
+    Assert.assertEquals(1, searcher3.search(query, 100).scoreDocs.length);
+
+    // add another document to the index but don't commit
+    docToIndex = new Document();
+    docToIndex.add(new TextField("skill", "java, machine learning", Field.Store.NO));
+    indexWriter.addDocument(docToIndex);
+
+    // searcher3 should not see the second document
+    Assert.assertEquals(2, searcher3.getIndexReader().getRefCount());
+    Assert.assertEquals(1, searcher3.search(query, 100).scoreDocs.length);
+
+    // refresh
+    searcherManager.maybeRefresh();
+
+    // refresh would have resulted in a new current searcher inside searcher
+    // manager and decremented the ref count of previous current searcher
+    // (searcher3)
+    Assert.assertEquals(1, searcher3.getIndexReader().getRefCount());
+    Assert.assertEquals(1, searcher3.search(query, 100).scoreDocs.length);
+
+    // acquire a searcher
+    // this should be the refreshed one
+    // the refcount of the reader associated with this searcher
+    // should be 2 (1 as the initial refcount of the reader and +1
+    // due to acquire)
+    IndexSearcher searcher4 = searcherManager.acquire();
+    Assert.assertEquals(2, searcher4.getIndexReader().getRefCount());
+    // we should see both the uncommitted documents with the refreshed searcher
+    Assert.assertEquals(2, searcher4.search(query, 100).scoreDocs.length);
+    // searcher3 should not have been affected by the new acquire
+    Assert.assertEquals(1, searcher3.getIndexReader().getRefCount());
+    Assert.assertEquals(1, searcher3.search(query, 100).scoreDocs.length);
+
+    // done searching with searcher3
+    // release it -- this should decrement its refcount to 0
+    // and close the associated reader
+    searcherManager.release(searcher3);
+    Assert.assertEquals(0, searcher1.getIndexReader().getRefCount());
+    Assert.assertEquals(0, searcher2.getIndexReader().getRefCount());
+    Assert.assertEquals(0, searcher3.getIndexReader().getRefCount());
+    // searcher4 should not have been impacted by above release
+    Assert.assertEquals(2, searcher4.getIndexReader().getRefCount());
+    Assert.assertEquals(2, searcher4.search(query, 100).scoreDocs.length);
+
+    // refresh
+    searcherManager.maybeRefresh();
+
+    // the above refresh is essentially a NOOP since nothing has changed
+    // in the index. so any acquire after the above refresh will return
+    // the same searcher as searcher4 but with 1 more refcount
+    IndexSearcher searcher5 = searcherManager.acquire();
+    Assert.assertEquals(3, searcher4.getIndexReader().getRefCount());
+    Assert.assertEquals(2, searcher4.search(query, 100).scoreDocs.length);
+    Assert.assertEquals(3, searcher5.getIndexReader().getRefCount());
+    Assert.assertEquals(2, searcher5.search(query, 100).scoreDocs.length);
+    Assert.assertEquals(searcher4, searcher5);
+
+    searcherManager.release(searcher4);
+    Assert.assertEquals(0, searcher1.getIndexReader().getRefCount());
+    Assert.assertEquals(0, searcher2.getIndexReader().getRefCount());
+    Assert.assertEquals(0, searcher3.getIndexReader().getRefCount());
+    Assert.assertEquals(2, searcher4.getIndexReader().getRefCount());
+    Assert.assertEquals(2, searcher4.search(query, 100).scoreDocs.length);
+    Assert.assertEquals(2, searcher5.getIndexReader().getRefCount());
+    Assert.assertEquals(2, searcher5.search(query, 100).scoreDocs.length);
+
+    searcherManager.release(searcher5);
+    Assert.assertEquals(0, searcher1.getIndexReader().getRefCount());
+    Assert.assertEquals(0, searcher2.getIndexReader().getRefCount());
+    Assert.assertEquals(0, searcher3.getIndexReader().getRefCount());
+    Assert.assertEquals(1, searcher4.getIndexReader().getRefCount());
+    Assert.assertEquals(2, searcher4.search(query, 100).scoreDocs.length);
+    Assert.assertEquals(1, searcher5.getIndexReader().getRefCount());
+    Assert.assertEquals(2, searcher5.search(query, 100).scoreDocs.length);
+
+    searcherManager.close();
+    Assert.assertEquals(0, searcher4.getIndexReader().getRefCount());
+    Assert.assertEquals(0, searcher5.getIndexReader().getRefCount());
+    indexWriter.close();
+  }
+
+  @Test
+  public void testLuceneRealtimeWithoutSearcherManager() throws Exception {
+    // create and open an index writer
+    File indexFile = new File(INDEX_DIR.getPath() + "/realtime-test2.index");
+    Directory indexDirectory = FSDirectory.open(indexFile.toPath());
+    StandardAnalyzer standardAnalyzer = new StandardAnalyzer();
+    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
+    indexWriterConfig.setRAMBufferSizeMB(50);
+    IndexWriter indexWriter = new IndexWriter(indexDirectory, indexWriterConfig);
+
+    // add a document but don't commit
+    Document docToIndex = new Document();
+    docToIndex.add(new TextField("skill", "distributed systems, machine learning, JAVA, C++", Field.Store.NO));
+    indexWriter.addDocument(docToIndex);
+
+    // create an NRT index reader from the writer -- should see one uncommitted document
+    QueryParser queryParser = new QueryParser("skill", standardAnalyzer);
+    Query query = queryParser.parse("\"distributed systems\" AND (Java C++)");
+    IndexReader indexReader1 = DirectoryReader.open(indexWriter);
+    IndexSearcher searcher1 = new IndexSearcher(indexReader1);
+    Assert.assertEquals(1, searcher1.search(query, 50).scoreDocs.length);
+
+    // add another document but don't commit
+    docToIndex = new Document();
+    docToIndex.add(new TextField("skill", "distributed systems, python, JAVA, C++", Field.Store.NO));
+    indexWriter.addDocument(docToIndex);
+
+    // reopen NRT reader and search -- should see two uncommitted documents
+    IndexReader indexReader2 = DirectoryReader.openIfChanged((DirectoryReader)indexReader1);
+    Assert.assertNotNull(indexReader2);
+    IndexSearcher searcher2 = new IndexSearcher(indexReader2);
+    Assert.assertEquals(2, searcher2.search(query, 50).scoreDocs.length);
+
+    // add another document
+    docToIndex = new Document();
+    docToIndex.add(new TextField("skill", "distributed systems, GPU, JAVA, C++", Field.Store.NO));
+    indexWriter.addDocument(docToIndex);
+
+    // reopen NRT reader and search -- should see three uncommitted documents
+    IndexReader indexReader3 = DirectoryReader.openIfChanged((DirectoryReader)indexReader2);
+    Assert.assertNotNull(indexReader3);
+    IndexSearcher searcher3 = new IndexSearcher(indexReader3);
+    Assert.assertEquals(3, searcher3.search(query, 50).scoreDocs.length);
+
+    indexWriter.close();
+    indexReader1.close();
+    indexReader2.close();
+    indexReader3.close();
+  }
+
+  @Test
+  public void testMultiThreadedLuceneRealtime() throws Exception {
+    File indexFile = new File(INDEX_DIR.getPath() + "/realtime-test3.index");
+    Directory indexDirectory = FSDirectory.open(indexFile.toPath());
+    StandardAnalyzer standardAnalyzer = new StandardAnalyzer();
+    // create and open a writer
+    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
+    indexWriterConfig.setRAMBufferSizeMB(500*1024*1024);
+    IndexWriter indexWriter = new IndexWriter(indexDirectory, indexWriterConfig);
+
+    // create an NRT index reader
+    SearcherManager searcherManager = new SearcherManager(indexWriter, false, false, null);
+
+    // background thread to refresh NRT reader
+    ControlledRealTimeReopenThread controlledRealTimeReopenThread =
+        new ControlledRealTimeReopenThread(indexWriter, searcherManager, 0.01, 0.01);
+    controlledRealTimeReopenThread.start();
+
+    // start writer and reader
+    Thread writer = new Thread(new RealtimeWriter(indexWriter));
+    Thread realtimeReader = new Thread(new RealtimeReader(searcherManager, standardAnalyzer));
+
+    writer.start();
+    realtimeReader.start();
+
+    writer.join();
+    realtimeReader.join();
+    controlledRealTimeReopenThread.join();
+  }
+
+  private static class RealtimeWriter implements Runnable {
+    private final IndexWriter indexWriter;
+
+    RealtimeWriter(IndexWriter indexWriter) {
+      this.indexWriter = indexWriter;
+    }
+
+    @Override
+    public void run() {
+      URL resourceUrl = getClass().getClassLoader().getResource("data/text_search_data/skills.txt");
+      File skillFile = new File(resourceUrl.getFile());
+      String[] skills = new String[100];
+
+      int skillCount = 0;
+      try (InputStream inputStream = new FileInputStream(skillFile);
+          BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+        String line;
+        while ((line = reader.readLine()) != null) {
+          skills[skillCount++] = line;
+        }
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while reading skills file");
+      }
+
+      try {
+        int counter = 0;
+        Random random = new Random();
+        // ingest 500k documents
+        while (counter < 500000) {
+          Document docToIndex = new Document();
+          if (counter >= skillCount) {
+            int index = random.nextInt(skillCount);
+            docToIndex.add(new TextField("skill", skills[index], Field.Store.NO));
+          } else {
+            docToIndex.add(new TextField("skill", skills[counter], Field.Store.NO));
+          }
+          counter++;
+          indexWriter.addDocument(docToIndex);
+        }
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while adding a document to index");
+      } finally {
+        try {
+          indexWriter.commit();
+          indexWriter.close();
+        } catch (Exception e) {
+          throw new RuntimeException("Failed to commit/close the index writer");
+        }
+      }
+    }
+  }
+
+  private static class RealtimeReader implements Runnable {
+    private final QueryParser queryParser;
+    private final SearcherManager searchManager;
+
+    RealtimeReader(SearcherManager searcherManager, StandardAnalyzer standardAnalyzer) {
+      this.queryParser = new QueryParser("skill", standardAnalyzer);
+      this.searchManager = searcherManager;
+    }
+
+    @Override
+    public void run() {
+      try {
+        Query query = queryParser.parse("\"machine learning\" AND spark");
+        int count  = 0;
+        int prevHits = 0;
+        // run the same query 1000 times and see in increasing number of hits
+        // in the index
+        while (count < 1000) {
+          IndexSearcher indexSearcher = searchManager.acquire();
+          int hits = indexSearcher.search(query, Integer.MAX_VALUE).scoreDocs.length;
+          // TODO: see how we can make this more deterministic
+          if (count > 30) {
+            Assert.assertTrue(hits > 0);
+            Assert.assertTrue(hits >= prevHits);
+          }
+          count++;
+          prevHits = hits;
+          searchManager.release(indexSearcher);
+        }
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception in realtime reader");
+      }
+    }
+  }
+
+  /*
+   * Helper methods for tests
+   */
+
   private void testTextSearchSelectQueryHelper(String query, int expectedResultSize, boolean compareGrepOutput,
       List<Serializable[]> expectedResults)
       throws Exception {
-    System.out.println("Query: " + query);
     SelectionOnlyOperator operator = getOperatorForQuery(query);
     IntermediateResultsBlock operatorResult = operator.nextBlock();
     List<Serializable[]> resultset = (List<Serializable[]>) operatorResult.getSelectionResult();
     Assert.assertNotNull(resultset);
-    if (resultset.size() < 50) {
-      // print for debugging/examining
-      // TODO: remove this when checking-in
-      for (Serializable[] row : resultset) {
-        for (Serializable colValue : row) {
-          System.out.print(" COLUMN: " + colValue);
-        }
-        System.out.println();
-      }
-    }
-    // TODO: remove this when checking-in
-    System.out.println("Number of Rows returned: " + resultset.size());
     Assert.assertEquals(resultset.size(), expectedResultSize);
     if (compareGrepOutput) {
+      // compare with grep output
       verifySearchOutputWithGrepResults(resultset);
     } else if (expectedResults != null) {
+      // compare with expected result table
       for (int i = 0; i < expectedResultSize; i++) {
         Serializable[] actualRow = resultset.get(i);
         Serializable[] expectedRow = expectedResults.get(i);
@@ -750,203 +1066,9 @@ public class TestTextSearchQueriesTest extends BaseQueriesTest {
   }
 
   private void testTextSearchAggregationQueryHelper(String query, int expectedCount) {
-    System.out.println("Query: " + query);
     AggregationOperator operator = getOperatorForQuery(query);
     IntermediateResultsBlock operatorResult = operator.nextBlock();
     long count = (Long) operatorResult.getAggregationResult().get(0);
-    // TODO: remove this when checking-in
-    System.out.println("COUNT: " + count);
     Assert.assertEquals(expectedCount, count);
-  }
-
-  // Quick POC for NRT(Near real time) search with Lucene
-  // TODO: move this out to separate test
-
-  public static void main(String[] args) {
-    try {
-      File indexFile = new File("/Users/steotia/text_search/text.index");
-      Directory indexDirectory = FSDirectory.open(indexFile.toPath());
-      System.out.println("Lucene index file: " + indexFile.getAbsolutePath());
-      StandardAnalyzer standardAnalyzer = new StandardAnalyzer();
-      simpleRealtime(standardAnalyzer, indexDirectory);
-      multithreadedRealtime(standardAnalyzer, indexDirectory);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to instantiate Lucene text index creator. Error: " + e);
-    }
-  }
-
-  private static void multithreadedRealtime(StandardAnalyzer standardAnalyzer, Directory indexDirectory) {
-    try {
-      // create and open a writer
-      IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
-      indexWriterConfig.setRAMBufferSizeMB(500*1024*1024);
-      IndexWriter indexWriter = new IndexWriter(indexDirectory, indexWriterConfig);
-
-      // create an NRT index reader
-      SearcherManager searcherManager = new SearcherManager(indexWriter, false, false, null);
-      ControlledRealTimeReopenThread controlledRealTimeReopenThread =
-          new ControlledRealTimeReopenThread(indexWriter, searcherManager, 0.01, 0.01);
-      controlledRealTimeReopenThread.start();
-
-      // start writer and reader
-      new Thread(new RealtimeWriter(indexWriter)).start();
-      new Thread(new RealtimeReader(searcherManager, standardAnalyzer)).start();
-    } catch (Exception e) {
-
-    }
-  }
-
-  private static class RealtimeWriter implements Runnable {
-
-    private final IndexWriter indexWriter;
-
-    RealtimeWriter(IndexWriter indexWriter) {
-      this.indexWriter = indexWriter;
-    }
-
-    @Override
-    public void run() {
-      URL resourceUrl = getClass().getClassLoader().getResource("data/text_search_data/skills.txt");
-      File skillFile = new File(resourceUrl.getFile());
-      String[] skills = new String[100];
-
-      int skillCount = 0;
-      try (InputStream inputStream = new FileInputStream(skillFile);
-          BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
-        String line;
-        while ((line = reader.readLine()) != null) {
-          skills[skillCount++] = line;
-        }
-      } catch (Exception e) {
-        System.out.println("Caught exception while reading skills file");
-      }
-
-      try {
-        int counter = 0;
-        Random random = new Random();
-        while (counter < 1000000) {
-          Document docToIndex = new Document();
-          if (counter >= skillCount) {
-            int index = random.nextInt(skillCount);
-            docToIndex.add(new TextField("skill", skills[index], Field.Store.NO));
-          } else {
-            docToIndex.add(new TextField("skill", skills[counter], Field.Store.NO));
-          }
-          docToIndex.add(new StringField("docid", String.valueOf(counter), Field.Store.YES));
-          counter++;
-          indexWriter.addDocument(docToIndex);
-        }
-      } catch (Exception e) {
-        System.out.println("Caught exception while adding a document to index");
-      } finally {
-        try {
-          indexWriter.commit();
-          System.out.println("index writer committed");
-          indexWriter.close();
-          System.out.println("index writer closed");
-        } catch (Exception e) {
-          System.out.println("Failed to commit/close the index writer");
-        }
-      }
-    }
-  }
-
-  private static class RealtimeReader implements Runnable {
-    private final QueryParser queryParser;
-    private final SearcherManager searchManager;
-
-    RealtimeReader(SearcherManager searcherManager, StandardAnalyzer standardAnalyzer) {
-      this.queryParser = new QueryParser("skill", standardAnalyzer);
-      this.searchManager = searcherManager;
-    }
-
-    @Override
-    public void run() {
-      try {
-        Query query = queryParser.parse("\"machine learning\" AND spark");
-        int count  = 0;
-        while (count < 6500) {
-          System.out.println("running query: " + count);
-          IndexSearcher indexSearcher = searchManager.acquire();
-          TopDocs topDocs = indexSearcher.search(query, Integer.MAX_VALUE);
-          ScoreDoc[] scoreDocs = topDocs.scoreDocs;
-          System.out.println("hits: " + scoreDocs.length);
-          count++;
-        }
-      } catch (Exception e) {
-
-      }
-    }
-  }
-
-  // simple realtime test where each time reader is refreshed, we get one more hit
-  // in the index of the live writer
-  private static void simpleRealtime(StandardAnalyzer standardAnalyzer, Directory indexDirectory) {
-    try {
-      // create and open a writer
-      IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
-      indexWriterConfig.setRAMBufferSizeMB(500*1024*1024);
-      IndexWriter indexWriter = new IndexWriter(indexDirectory, indexWriterConfig);
-
-      //use the writer to add 1 document to the index
-      Document docToIndex = new Document();
-      docToIndex.add(new TextField("text", "distributed systems, machine learning, JAVA, C++", Field.Store.NO));
-      docToIndex.add(new StringField("docid", String.valueOf(0), Field.Store.YES));
-      try {
-        indexWriter.addDocument(docToIndex);
-      } catch (Exception e) {
-        throw new RuntimeException("Failure while adding a new document to index. Error: " + e);
-      }
-
-      // create an NRT index reader and searcher
-      QueryParser queryParser = new QueryParser("text", standardAnalyzer);
-      Query query = queryParser.parse("\"distributed systems\" AND (Java C++)");
-      IndexReader indexReader = DirectoryReader.open(indexWriter);
-      IndexSearcher searcher = new IndexSearcher(indexReader);
-      TopDocs topDocs = searcher.search(query, 1000);
-      ScoreDoc[] scoreDocs = topDocs.scoreDocs;
-      System.out.println("hits: " + scoreDocs.length);
-
-      // use the writer to add another document
-      docToIndex = new Document();
-      docToIndex.add(new TextField("text", "distributed systems, python, JAVA, C++", Field.Store.NO));
-      docToIndex.add(new StringField("docid", String.valueOf(1), Field.Store.YES));
-      try {
-        indexWriter.addDocument(docToIndex);
-      } catch (Exception e) {
-        throw new RuntimeException("Failure while adding a new document to index. Error: " + e);
-      }
-
-      // reopen NRT reader if needed and search
-      IndexReader indexReader1 = DirectoryReader.openIfChanged((DirectoryReader)indexReader);
-      if (indexReader1 != null) {
-        searcher = new IndexSearcher(indexReader1);
-      }
-      topDocs = searcher.search(query, 1000);
-      scoreDocs = topDocs.scoreDocs;
-      System.out.println("hits: " + scoreDocs.length);
-
-      // use the writer to add another document
-      docToIndex = new Document();
-      docToIndex.add(new TextField("text", "distributed systems, GPU, JAVA, C++", Field.Store.NO));
-      docToIndex.add(new StringField("docid", String.valueOf(2), Field.Store.YES));
-      try {
-        indexWriter.addDocument(docToIndex);
-      } catch (Exception e) {
-        throw new RuntimeException("Failure while adding a new document to index. Error: " + e);
-      }
-
-      // reopen NRT reader if needed and search
-      IndexReader indexReader2 = DirectoryReader.openIfChanged((DirectoryReader)indexReader1);
-      if (indexReader2 != null) {
-        searcher = new IndexSearcher(indexReader2);
-      }
-      query = queryParser.parse("\"distributed systems\" AND (gpu or java)");
-      topDocs = searcher.search(query, 1000);
-      scoreDocs = topDocs.scoreDocs;
-      System.out.println("hits: " + scoreDocs.length);
-    } catch (Exception e) {
-
-    }
   }
 }

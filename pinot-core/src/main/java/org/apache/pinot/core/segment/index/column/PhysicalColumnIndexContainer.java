@@ -77,7 +77,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       loadInvertedIndex = indexLoadingConfig.getInvertedIndexColumns().contains(columnName);
       loadOnHeapDictionary = indexLoadingConfig.getOnHeapDictionaryColumns().contains(columnName);
       loadBloomFilter = indexLoadingConfig.getBloomFilterColumns().contains(columnName);
-      loadTextIndex = indexLoadingConfig.getTextSearchColumns().contains(columnName);
+      loadTextIndex = indexLoadingConfig.getTextIndexColumns().contains(columnName);
     }
     PinotDataBuffer fwdIndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
 

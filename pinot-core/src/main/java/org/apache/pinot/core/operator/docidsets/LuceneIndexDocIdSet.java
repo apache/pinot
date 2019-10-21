@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
-import org.apache.lucene.search.ScoreDoc;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.LuceneIndexScanDocIdIterator;
+import org.apache.pinot.core.segment.index.readers.LuceneTextIndexReader;
 import org.apache.pinot.core.segment.index.readers.TextIndexReader;
 
 public class LuceneIndexDocIdSet implements FilterBlockDocIdSet {
@@ -29,10 +29,10 @@ public class LuceneIndexDocIdSet implements FilterBlockDocIdSet {
   private int _endDocId;
   private final LuceneIndexScanDocIdIterator _luceneIndexScanDocIdIterator;
 
-  public LuceneIndexDocIdSet(ScoreDoc[] scoreDocs, int startDocId, int endDocId, TextIndexReader textIndexReader) {
+  public LuceneIndexDocIdSet(LuceneTextIndexReader.LuceneSearchResult luceneSearchResult, int startDocId, int endDocId, TextIndexReader textIndexReader) {
     _startDocId = startDocId;
     _endDocId = endDocId;
-    _luceneIndexScanDocIdIterator = new LuceneIndexScanDocIdIterator(scoreDocs, textIndexReader);
+    _luceneIndexScanDocIdIterator = new LuceneIndexScanDocIdIterator(luceneSearchResult, textIndexReader);
     _luceneIndexScanDocIdIterator.setStartDocId(startDocId);
     _luceneIndexScanDocIdIterator.setEndDocId(endDocId);
   }

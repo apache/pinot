@@ -19,10 +19,11 @@
 package org.apache.pinot.core.segment.index.readers;
 
 import java.io.Closeable;
+import org.apache.lucene.search.IndexSearcher;
 
-public interface TextIndexReader<SearchResults, D> extends Closeable {
+public interface TextIndexReader<SearchResults> extends Closeable {
 
   SearchResults search(String searchQuery);
 
-  D getDocument(int docId);
+  void release(IndexSearcher searcher);
 }

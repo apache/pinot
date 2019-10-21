@@ -22,6 +22,7 @@ import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
+import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
 import org.apache.pinot.core.operator.blocks.SingleValueBlock;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
@@ -119,6 +120,10 @@ public class StarTreeDimensionDataSource extends DataSource {
     return null;
   }
 
+  @Override
+  public DataFileReader getForwardIndex() {
+    return null;
+  }
 
   @Override
   protected Block getNextBlock() {

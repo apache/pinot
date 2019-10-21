@@ -44,7 +44,7 @@ public class IndexLoadingConfig {
   private ReadMode _readMode = ReadMode.DEFAULT_MODE;
   private List<String> _sortedColumns = Collections.emptyList();
   private Set<String> _invertedIndexColumns = new HashSet<>();
-  private Set<String> _textSearchColumns = new HashSet<>();
+  private Set<String> _textIndexColumns = new HashSet<>();
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
   private Map<String, String> _noDictionaryConfig = new HashMap<>();
   private Set<String> _varLengthDictionaryColumns = new HashSet<>();
@@ -82,9 +82,9 @@ public class IndexLoadingConfig {
       _invertedIndexColumns.addAll(invertedIndexColumns);
     }
 
-    List<String> textSearchColumns = indexingConfig.getTextSearchColumns();
+    List<String> textSearchColumns = indexingConfig.getTextIndexColumns();
     if (textSearchColumns != null) {
-      _textSearchColumns.addAll(textSearchColumns);
+      _textIndexColumns.addAll(textSearchColumns);
     }
 
     List<String> bloomFilterColumns = indexingConfig.getBloomFilterColumns();
@@ -184,16 +184,16 @@ public class IndexLoadingConfig {
   }
 
   @Nonnull
-  public Set<String> getTextSearchColumns() {
-    return _textSearchColumns;
+  public Set<String> getTextIndexColumns() {
+    return _textIndexColumns;
   }
 
   /**
    * Only for tests
    */
   @VisibleForTesting
-  public void setTextSearchColumns(Set<String> textSearchColumns) {
-    _textSearchColumns = textSearchColumns;
+  public void setTextIndexColumns(Set<String> textIndexColumns) {
+    _textIndexColumns = textIndexColumns;
   }
 
   @VisibleForTesting

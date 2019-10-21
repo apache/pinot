@@ -34,16 +34,25 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.core.segment.creator.impl.text.LuceneTextIndexCreator;
 
-public class LuceneTextIndexReader implements TextIndexReader<ScoreDoc[], Document> {
+public class LuceneTextIndexReader implements TextIndexReader<LuceneTextIndexReader.LuceneSearchResult> {
   private final IndexReader _indexReader;
+  private final Directory _indexDirectory;
   private final IndexSearcher _indexSearcher;
   private final QueryParser _queryParser;
 
+  /**
+   * As part of loading the segment in ImmutableSegmentLoader,
+   * we load the text index (per column if it exists) and store
+   * the reference in {@link org.apache.pinot.core.segment.index.column.PhysicalColumnIndexContainer}
+   * similar to how it is done for other types of indexes.
+   * @param column column name
+   * @param segmentIndexDir segment index directory
+   */
   public LuceneTextIndexReader(String column, File segmentIndexDir) {
     try {
       File indexFile = new File(segmentIndexDir.getPath() + "/" + column + LuceneTextIndexCreator.DEFAULT_INDEX_FILE_EXTENSION);
-      Directory indexDirectory = FSDirectory.open(indexFile.toPath());
-      _indexReader = DirectoryReader.open(indexDirectory);
+      _indexDirectory = FSDirectory.open(indexFile.toPath());
+      _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
     } catch (Exception e) {
       throw new RuntimeException("Failed to instantiate Lucene text index reader. Error: " + e);
@@ -52,29 +61,58 @@ public class LuceneTextIndexReader implements TextIndexReader<ScoreDoc[], Docume
     _queryParser = new QueryParser(column, analyzer);
   }
 
+  /**
+   * Called during filter operator execution
+   * by {@link org.apache.pinot.core.operator.filter.TextMatchFilterOperator}
+   * @param searchQuery text search query string
+   * @return search results
+   */
   @Override
-  public ScoreDoc[] search(String searchQuery) {
+  public LuceneSearchResult search(String searchQuery) {
     try {
       Query query = _queryParser.parse(searchQuery);
       ConstantScoreQuery constantScoreQuery = new ConstantScoreQuery(query);
       TopDocs topDocs = _indexSearcher.search(constantScoreQuery, Integer.MAX_VALUE);
-      return topDocs.scoreDocs;
+      return new LuceneSearchResult(topDocs.scoreDocs, _indexSearcher);
     } catch (Exception e) {
       throw new RuntimeException("Error: failed to parse search query: " + searchQuery + " " + e);
     }
   }
 
-  @Override
-  public Document getDocument(int docId) {
-    try {
-      return _indexSearcher.doc(docId);
-    } catch (Exception e) {
-      throw new RuntimeException("Error: failed while retrieving document from index: " + e);
-    }
-  }
-
+  /**
+   * When we destroy the loaded ImmutableSegment, all the indexes
+   * (for each column) are destroyed and as part of that
+   * we release the text index
+   * @throws IOException
+   */
   @Override
   public void close() throws IOException {
     _indexReader.close();
+    _indexDirectory.close();
+  }
+
+  @Override
+  public void release(IndexSearcher indexSearcher) {
+    // NO-OP
+    // this interface exists only because of Lucene realtime reader
+    // TODO: fix this
+  }
+
+  public static class LuceneSearchResult {
+    final ScoreDoc[] _scoreDocs;
+    final IndexSearcher _indexSearcher;
+
+    public LuceneSearchResult(ScoreDoc[] scoreDocs, IndexSearcher indexSearcher) {
+      _scoreDocs = scoreDocs;
+      _indexSearcher = indexSearcher;
+    }
+
+    public IndexSearcher getIndexSearcher() {
+      return _indexSearcher;
+    }
+
+    public ScoreDoc[] getScoreDocs() {
+      return _scoreDocs;
+    }
   }
 }

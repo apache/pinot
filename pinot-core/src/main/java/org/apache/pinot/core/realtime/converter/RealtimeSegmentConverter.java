@@ -52,6 +52,7 @@ public class RealtimeSegmentConverter {
   private String segmentName;
   private String sortedColumn;
   private List<String> invertedIndexColumns;
+  private List<String> textIndexColumns;
   private List<String> noDictionaryColumns;
   private StarTreeIndexSpec starTreeIndexSpec;
   private List<String> varLengthDictionaryColumns;
@@ -60,6 +61,14 @@ public class RealtimeSegmentConverter {
       String tableName, String timeColumnName, String segmentName, String sortedColumn,
       List<String> invertedIndexColumns, List<String> noDictionaryColumns,
       List<String> varLengthDictionaryColumns, StarTreeIndexSpec starTreeIndexSpec) {
+    this(realtimeSegment, outputPath, schema, tableName, timeColumnName, segmentName, sortedColumn,
+        invertedIndexColumns, noDictionaryColumns, varLengthDictionaryColumns, starTreeIndexSpec, new ArrayList<>());
+  }
+
+  public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
+      String tableName, String timeColumnName, String segmentName, String sortedColumn,
+      List<String> invertedIndexColumns, List<String> noDictionaryColumns,
+      List<String> varLengthDictionaryColumns, StarTreeIndexSpec starTreeIndexSpec, List<String> textIndexColumns) {
     if (new File(outputPath).exists()) {
       throw new IllegalAccessError("path already exists:" + outputPath);
     }
@@ -77,6 +86,7 @@ public class RealtimeSegmentConverter {
     this.noDictionaryColumns = noDictionaryColumns;
     this.varLengthDictionaryColumns = varLengthDictionaryColumns;
     this.starTreeIndexSpec = starTreeIndexSpec;
+    this.textIndexColumns = textIndexColumns;
   }
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
@@ -133,6 +143,7 @@ public class RealtimeSegmentConverter {
     genConfig.setTableName(tableName);
     genConfig.setOutDir(outputPath);
     genConfig.setSegmentName(segmentName);
+    genConfig.setTextIndexCreationColumns(textIndexColumns);
     SegmentPartitionConfig segmentPartitionConfig = realtimeSegmentImpl.getSegmentPartitionConfig();
     genConfig.setSegmentPartitionConfig(segmentPartitionConfig);
     final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();

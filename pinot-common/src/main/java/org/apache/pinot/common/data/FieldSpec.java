@@ -420,6 +420,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
         case DOUBLE:
           return Double.BYTES;
         case BYTES:
+        case STRING:
           // TODO: Metric size is only used for Star-tree generation, which is not supported yet.
           return MetricFieldSpec.UNDEFINED_METRIC_SIZE;
         default:

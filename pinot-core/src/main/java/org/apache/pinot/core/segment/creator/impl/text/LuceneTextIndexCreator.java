@@ -37,21 +37,34 @@ public class LuceneTextIndexCreator implements TextIndexCreator {
   public static final String DEFAULT_INDEX_FILE_EXTENSION = ".lucene.index";
 
   private final String _textColumn;
+  private final Directory _indexDirectory;
   private final IndexWriter _indexWriter;
 
+  /**
+   * Called by {@link org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator}
+   * when building an offline segment. Similar to how it creates per column
+   * dictionary, forward and inverted index, a text index is also created
+   * if text search is enabled on a column.
+   * @param column column name
+   * @param segmentIndexDir segment index directory
+   */
   public LuceneTextIndexCreator(String column, File segmentIndexDir) {
     _textColumn = column;
     try {
       File indexFile = new File(segmentIndexDir.getPath() + "/" + _textColumn + DEFAULT_INDEX_FILE_EXTENSION);
-      Directory indexDirectory = FSDirectory.open(indexFile.toPath());
+      _indexDirectory = FSDirectory.open(indexFile.toPath());
       System.out.println("Lucene index file: " + indexFile.getAbsolutePath());
       StandardAnalyzer standardAnalyzer = new StandardAnalyzer();
       IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
       indexWriterConfig.setRAMBufferSizeMB(MAX_BUFFER_SIZE_MB);
-      _indexWriter = new IndexWriter(indexDirectory, indexWriterConfig);
+      _indexWriter = new IndexWriter(_indexDirectory, indexWriterConfig);
     } catch (Exception e) {
       throw new RuntimeException("Failed to instantiate Lucene text index creator. Error: " + e);
     }
+  }
+
+  public IndexWriter getIndexWriter() {
+    return _indexWriter;
   }
 
   @Override
@@ -79,6 +92,7 @@ public class LuceneTextIndexCreator implements TextIndexCreator {
   public void close() throws IOException {
     try {
       _indexWriter.close();
+      _indexDirectory.close();
     } catch (Exception e) {
       throw new RuntimeException("Lucene index writer failed to close. Error: " + e);
     }

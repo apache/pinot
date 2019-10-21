@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.common;
 
+import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
@@ -38,6 +39,8 @@ public abstract class DataSource extends BaseOperator {
   public abstract Dictionary getDictionary();
 
   public abstract TextIndexReader getTextIndex();
+
+  public abstract DataFileReader getForwardIndex();
 
   /**
    * Returns the inverted index for the data source if exists, or {@code null} if not.

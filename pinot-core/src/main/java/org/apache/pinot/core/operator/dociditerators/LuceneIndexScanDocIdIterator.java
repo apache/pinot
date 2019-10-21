@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import org.apache.lucene.document.Document;
+import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.segment.creator.impl.text.LuceneTextIndexCreator;
@@ -33,11 +34,13 @@ public class LuceneIndexScanDocIdIterator implements IndexBasedDocIdIterator {
   private int _startDocId;
   private int _endDocId;
   private final ScoreDoc[] _scoreDocs;
-  private final LuceneTextIndexReader _textIndexReader;
+  private final IndexSearcher _indexSearcher;
+  private final TextIndexReader _textIndexReader;
 
-  public LuceneIndexScanDocIdIterator(ScoreDoc[] scoreDocs, TextIndexReader textIndexReader) {
-    _scoreDocs = scoreDocs;
-    _textIndexReader = (LuceneTextIndexReader)textIndexReader;
+  public LuceneIndexScanDocIdIterator(LuceneTextIndexReader.LuceneSearchResult luceneSearchResult, TextIndexReader textIndexReader) {
+    _scoreDocs = luceneSearchResult.getScoreDocs();
+    _indexSearcher = luceneSearchResult.getIndexSearcher();
+    _textIndexReader = textIndexReader;
   }
 
   public void setStartDocId(int startDocId) {
@@ -51,6 +54,7 @@ public class LuceneIndexScanDocIdIterator implements IndexBasedDocIdIterator {
   @Override
   public int next() {
     if (_currentDocId == Constants.EOF || _currentScoreDocIndex >= _scoreDocs.length) {
+      _textIndexReader.release(_indexSearcher);
       return Constants.EOF;
     }
 
@@ -61,9 +65,13 @@ public class LuceneIndexScanDocIdIterator implements IndexBasedDocIdIterator {
     // document ID
     // Advance to startDocId if necessary
 
-    int luceneDocId = _scoreDocs[_currentScoreDocIndex++].doc;
-    Document document = _textIndexReader.getDocument(luceneDocId);
-    _currentDocId = Integer.valueOf(document.get(LuceneTextIndexCreator.DOC_ID_COLUMN_NAME));
+    try {
+      int luceneDocId = _scoreDocs[_currentScoreDocIndex++].doc;
+      Document document = _indexSearcher.doc(luceneDocId);
+      _currentDocId = Integer.valueOf(document.get(LuceneTextIndexCreator.DOC_ID_COLUMN_NAME));
+    } catch (Exception e) {
+      throw new RuntimeException("Error: failed while retrieving document from index: " + e);
+    }
 
     return _currentDocId;
   }

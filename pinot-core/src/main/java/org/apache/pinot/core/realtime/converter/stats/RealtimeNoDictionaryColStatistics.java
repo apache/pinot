@@ -19,9 +19,14 @@
 package org.apache.pinot.core.realtime.converter.stats;
 
 import java.util.Set;
+import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.partition.PartitionFunction;
+import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
+import org.apache.pinot.core.io.reader.DataFileReader;
+import org.apache.pinot.core.io.readerwriter.BaseSingleColumnSingleValueReaderWriter;
+import org.apache.pinot.core.io.readerwriter.impl.VarByteSingleColumnSingleValueReaderWriter;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
 
@@ -30,12 +35,14 @@ import static org.apache.pinot.core.common.Constants.UNKNOWN_CARDINALITY;
 
 public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
 
+  final DataFileReader _forwardIndex;
   final BlockValSet _blockValSet;
   final int _numDocIds;
   final String _operatorName;
 
   public RealtimeNoDictionaryColStatistics(ColumnDataSource dataSource) {
     _operatorName = dataSource.getOperatorName();
+    _forwardIndex = dataSource.getForwardIndex();
     Block block = dataSource.nextBlock();
     _numDocIds = block.getMetadata().getEndDocId() + 1;
     _blockValSet = block.getBlockValueSet();
@@ -63,12 +70,32 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
 
   @Override
   public int getLengthOfShortestElement() {
-    return lengthOfDataType(); // Only fixed length data types supported.
+    if (_blockValSet.getValueType() == FieldSpec.DataType.STRING) {
+      int minLength = Integer.MAX_VALUE;
+      BaseSingleColumnSingleValueReaderWriter readerWriter = (BaseSingleColumnSingleValueReaderWriter)_forwardIndex;
+      for (int i = 0; i < _numDocIds; i++) {
+        String value = readerWriter.getString(i);
+        minLength = Math.min(minLength, value.length());
+      }
+      return minLength;
+    } else {
+      return lengthOfDataType();
+    }
   }
 
   @Override
   public int getLengthOfLargestElement() {
-    return lengthOfDataType(); // Only fixed length data types supported.
+    if (_blockValSet.getValueType() == FieldSpec.DataType.STRING) {
+      int maxLength = 0;
+      BaseSingleColumnSingleValueReaderWriter readerWriter = (BaseSingleColumnSingleValueReaderWriter)_forwardIndex;
+      for (int i = 0; i < _numDocIds; i++) {
+        String value = readerWriter.getString(i);
+        maxLength = Math.max(maxLength, value.length());
+      }
+      return maxLength;
+    } else {
+      return lengthOfDataType();
+    }
   }
 
   @Override
