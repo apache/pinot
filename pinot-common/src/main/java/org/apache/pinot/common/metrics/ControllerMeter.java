@@ -40,6 +40,7 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   CONTROLLER_NOT_LEADER("notLeader", true),
   CONTROLLER_LEADERSHIP_CHANGE_WITHOUT_CALLBACK("leadershipChangeWithoutCallback", true),
   LLC_STATE_MACHINE_ABORTS("aborts", false),
+  LLC_ZOOKEEPER_FETCH_FAILURES("failures", false),
   LLC_ZOOKEEPER_UPDATE_FAILURES("failures", false),
   LLC_KAFKA_DATA_LOSS("dataLoss", false),
   // Introducing a new stream agnostic metric to replace LLC_KAFKA_DATA_LOSS.
@@ -49,8 +50,7 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   CONTROLLER_PERIODIC_TASK_ERROR("periodicTaskError", false),
   NUMBER_TIMES_SCHEDULE_TASKS_CALLED("tasks", true),
   NUMBER_TASKS_SUBMITTED("tasks", false),
-  NUMBER_SEGMENT_UPLOAD_TIMEOUT_EXCEEDED("SegmentUploadTimeouts", true),
-  PARTITION_ASSIGNMENT_GENERATION_ERROR("partitionAssignmentError", false);
+  NUMBER_SEGMENT_UPLOAD_TIMEOUT_EXCEEDED("SegmentUploadTimeouts", true);
 
   private final String brokerMeterName;
   private final String unit;

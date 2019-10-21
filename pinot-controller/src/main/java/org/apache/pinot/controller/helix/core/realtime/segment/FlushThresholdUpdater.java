@@ -18,27 +18,21 @@
  */
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
-import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import org.apache.pinot.common.partition.PartitionAssignment;
-import org.apache.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.core.realtime.stream.PartitionLevelStreamConfig;
 
 
 /**
- * Interface for the flush threshold updation strategies
- * These implementations are responsible for updating the flush threshold (rows/time) in the given segment metadata
+ * Interface for the flush threshold updating strategies
+ * These implementations are responsible for updating the flush threshold (rows/time) for the given segment ZK metadata
  */
 public interface FlushThresholdUpdater {
 
   /**
-   * Updated the flush threshold of the segment metadata
-   * @param newSegmentZKMetadata - new segment metadata for which the thresholds need to be set
-   * @param streamConfig - the StreamConfig object from the tableConfig
-   * @param committingSegmentZKMetadata - metadata of the committing segment
-   * @param committingSegmentDescriptor
-   * @param partitionAssignment - partition assignment for the table
+   * Updates the flush threshold for the given segment ZK metadata
    */
-  void updateFlushThreshold(@Nonnull LLCRealtimeSegmentZKMetadata newSegmentZKMetadata, StreamConfig streamConfig,
-      LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata, CommittingSegmentDescriptor committingSegmentDescriptor,
-      PartitionAssignment partitionAssignment);
+  void updateFlushThreshold(PartitionLevelStreamConfig streamConfig, LLCRealtimeSegmentZKMetadata newSegmentZKMetadata,
+      CommittingSegmentDescriptor committingSegmentDescriptor,
+      @Nullable LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata, int maxNumPartitionsPerInstance);
 }

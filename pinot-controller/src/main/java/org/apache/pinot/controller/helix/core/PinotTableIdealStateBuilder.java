@@ -27,7 +27,6 @@ import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.RealtimeTagConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.utils.StringUtil;
@@ -113,11 +112,7 @@ public class PinotTableIdealStateBuilder {
     if (idealState == null) {
       idealState = buildEmptyRealtimeIdealStateFor(realtimeTableName, nReplicas, enableBatchMessageMode);
     }
-    try {
-      pinotLLCRealtimeSegmentManager.setupNewTable(realtimeTableConfig, idealState);
-    } catch (InvalidConfigException e) {
-      throw new IllegalStateException("Caught exception when creating table " + realtimeTableName, e);
-    }
+    pinotLLCRealtimeSegmentManager.setUpNewTable(realtimeTableConfig, idealState);
   }
 
   public static int getPartitionCount(StreamConfig streamConfig) {
