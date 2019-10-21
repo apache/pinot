@@ -19,8 +19,12 @@
 package org.apache.pinot.core.data.table;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 
 /**
@@ -35,12 +39,14 @@ class RandomIndexedTableResizer extends IndexedTableResizer {
   void resizeRecordsMap(Map<Key, Record> recordsMap, int trimToSize) {
 
     int numRecordsToDrop = recordsMap.size() - trimToSize;
-    for (Key evictKey : recordsMap.keySet()) {
-      recordsMap.remove(evictKey);
-      numRecordsToDrop--;
-      if (numRecordsToDrop == 0) {
-        break;
+    if (numRecordsToDrop > 0) {
+      Set<Key> evictKeys = new HashSet<>(numRecordsToDrop);
+      Iterator<Key> iterator = recordsMap.keySet().iterator();
+      while (numRecordsToDrop > 0) {
+        evictKeys.add(iterator.next());
+        numRecordsToDrop --;
       }
+      recordsMap.keySet().removeAll(evictKeys);
     }
   }
 
@@ -49,6 +55,9 @@ class RandomIndexedTableResizer extends IndexedTableResizer {
    */
   @Override
   List<Record> sortRecordsMap(Map<Key, Record> recordsMap) {
+    if (recordsMap.size() == 0) {
+      return Collections.emptyList();
+    }
     return new ArrayList<>(recordsMap.values());
   }
 }

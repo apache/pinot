@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.table;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -141,24 +142,26 @@ class OrderedIndexedTableResizer extends IndexedTableResizer {
 
     // make min heap of elements to evict
     int heapSize = recordsMap.size() - trimToSize;
-    PriorityQueue<IntermediateRecord> minHeap = new PriorityQueue<>(heapSize, _intermediateRecordComparator);
+    if (heapSize > 0) {
+      PriorityQueue<IntermediateRecord> minHeap = new PriorityQueue<>(heapSize, _intermediateRecordComparator);
 
-    for (Record record : recordsMap.values()) {
+      for (Record record : recordsMap.values()) {
 
-      IntermediateRecord intermediateRecord = getIntermediateRecord(record);
-      if (minHeap.size() < heapSize) {
-        minHeap.offer(intermediateRecord);
-      } else {
-        IntermediateRecord peek = minHeap.peek();
-        if (minHeap.comparator().compare(peek, intermediateRecord) < 0) {
-          minHeap.poll();
+        IntermediateRecord intermediateRecord = getIntermediateRecord(record);
+        if (minHeap.size() < heapSize) {
           minHeap.offer(intermediateRecord);
+        } else {
+          IntermediateRecord peek = minHeap.peek();
+          if (minHeap.comparator().compare(peek, intermediateRecord) < 0) {
+            minHeap.poll();
+            minHeap.offer(intermediateRecord);
+          }
         }
       }
-    }
 
-    for (IntermediateRecord evictRecord : minHeap) {
-      recordsMap.remove(evictRecord.getKey());
+      for (IntermediateRecord evictRecord : minHeap) {
+        recordsMap.remove(evictRecord.getKey());
+      }
     }
   }
 
@@ -168,6 +171,9 @@ class OrderedIndexedTableResizer extends IndexedTableResizer {
   @Override
   List<Record> sortRecordsMap(Map<Key, Record> recordsMap) {
     int numRecords = recordsMap.size();
+    if (numRecords == 0) {
+      return Collections.emptyList();
+    }
     List<Record> sortedRecords = new ArrayList<>(numRecords);
     List<IntermediateRecord> intermediateRecords = new ArrayList<>(numRecords);
     for (Record record : recordsMap.values()) {
