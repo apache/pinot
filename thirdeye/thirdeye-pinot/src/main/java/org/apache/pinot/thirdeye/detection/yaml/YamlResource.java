@@ -562,7 +562,7 @@ public class YamlResource {
     return Response.ok().entity(responseMessage).build();
   }
 
-  long createSubscriptionGroup(String yamlConfig) throws IllegalArgumentException {
+  public long createSubscriptionGroup(String yamlConfig) throws IllegalArgumentException {
     Preconditions.checkArgument(StringUtils.isNotBlank(yamlConfig),
         "The Yaml Payload in the request is empty.");
 
@@ -879,6 +879,6 @@ public class YamlResource {
     } else {
       detectionConfigDTOs = Collections.singletonList(this.detectionConfigDAO.findById(id));
     }
-    return detectionConfigDTOs.stream().map(this.detectionConfigFormatter::format).collect(Collectors.toList());
+    return detectionConfigDTOs.parallelStream().map(this.detectionConfigFormatter::format).collect(Collectors.toList());
   }
 }

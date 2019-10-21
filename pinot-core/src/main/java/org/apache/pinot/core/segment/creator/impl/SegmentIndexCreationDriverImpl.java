@@ -251,10 +251,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       recordReader.rewind();
       LOGGER.info("Start append raw data to star tree builder!");
       totalDocs = 0;
-      GenericRow readRow = null;
+      GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {
-        readRow = GenericRow.createOrReuseRow(readRow);
-        GenericRow transformedRow = _recordTransformer.transform(recordReader.next(readRow));
+        reuse.clear();
+        GenericRow transformedRow = _recordTransformer.transform(recordReader.next(reuse));
         if (transformedRow != null) {
           //must be called after previous step since type conversion for derived values is unnecessary
           populateDefaultDerivedColumnValues(transformedRow);
@@ -334,11 +334,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       // Build the index
       recordReader.rewind();
       LOGGER.info("Start building IndexCreator!");
-      GenericRow readRow = null;
+      GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {
         long start = System.currentTimeMillis();
-        readRow = GenericRow.createOrReuseRow(readRow);
-        GenericRow transformedRow = _recordTransformer.transform(recordReader.next(readRow));
+        reuse.clear();
+        GenericRow transformedRow = _recordTransformer.transform(recordReader.next(reuse));
         long stop = System.currentTimeMillis();
         totalRecordReadTime += (stop - start);
         if (transformedRow != null) {

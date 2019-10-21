@@ -19,16 +19,19 @@
 package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Function;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.config.Instance;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.InstanceType;
 import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.common.config.Instance;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -43,6 +46,8 @@ import static org.testng.Assert.fail;
  */
 public class PinotInstanceRestletResourceTest extends ControllerTest {
 
+  private static final long GET_CALL_TIMEOUT_MS = 10000;
+
   @BeforeClass
   public void setUp() {
     startZk();
@@ -54,9 +59,17 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
       throws Exception {
     // Check that there is only one CONTROLLER instance in the cluster
     String listInstancesUrl = _controllerRequestURLBuilder.forInstanceList();
-    JsonNode instanceList = JsonUtils.stringToJsonNode(sendGetRequest(listInstancesUrl));
-    assertEquals(instanceList.get("instances").size(), 1);
-    assertTrue(instanceList.get("instances").get(0).asText().startsWith(Helix.PREFIX_OF_CONTROLLER_INSTANCE));
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        String getResponse = sendGetRequest(listInstancesUrl);
+        JsonNode jsonNode = JsonUtils.stringToJsonNode(getResponse);
+        return (jsonNode != null) && (jsonNode.get("instances") != null) && (jsonNode.get("instances").size() == 1)
+            && (jsonNode.get("instances").get(0).asText().startsWith(Helix.PREFIX_OF_CONTROLLER_INSTANCE));
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, GET_CALL_TIMEOUT_MS, "Expected one controller instance");
 
     // Create untagged broker and server instances
     String createInstanceUrl = _controllerRequestURLBuilder.forInstanceCreate();
@@ -66,8 +79,8 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     Instance serverInstance = new Instance("1.2.3.4", 2345, InstanceType.SERVER, null, null);
     sendPostRequest(createInstanceUrl, serverInstance.toJsonString());
 
-    // Check that there are 3 instances
-    assertEquals(JsonUtils.stringToJsonNode(sendGetRequest(listInstancesUrl)).get("instances").size(), 3);
+    // Check that there are 3 instances -- controller, broker and server
+    checkNumInstances(listInstancesUrl, 3);
 
     // Create broker and server instances with tags and pools
     brokerInstance = new Instance("2.3.4.5", 1234, InstanceType.BROKER, Collections.singletonList("tag_BROKER"), null);
@@ -81,7 +94,8 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     sendPostRequest(createInstanceUrl, serverInstance.toJsonString());
 
     // Check that there are 5 instances
-    assertEquals(JsonUtils.stringToJsonNode(sendGetRequest(listInstancesUrl)).get("instances").size(), 5);
+    // 1 controller, 2 brokers and 2 servers
+    checkNumInstances(listInstancesUrl, 5);
 
     // Create duplicate broker and server instances should fail
     try {
@@ -99,60 +113,69 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     }
 
     // Check that there are still 5 instances
-    assertEquals(JsonUtils.stringToJsonNode(sendGetRequest(listInstancesUrl)).get("instances").size(), 5);
+    checkNumInstances(listInstancesUrl, 5);
 
     // Check that the instances are properly created
-    JsonNode instance = JsonUtils
-        .stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Broker_1.2.3.4_1234")));
-    assertEquals(instance.get("instanceName").asText(), "Broker_1.2.3.4_1234");
-    assertEquals(instance.get("hostName").asText(), "Broker_1.2.3.4");
-    assertEquals(instance.get("port").asText(), "1234");
-    assertTrue(instance.get("enabled").asBoolean());
-    assertEquals(instance.get("tags").size(), 0);
-    assertTrue(instance.get("pools").isNull());
+    checkInstanceInfo("Broker_1.2.3.4_1234", "Broker_1.2.3.4", 1234, new String[0], null, null);
+    checkInstanceInfo("Server_1.2.3.4_2345", "Server_1.2.3.4", 2345, new String[0], null, null);
+    checkInstanceInfo("Broker_2.3.4.5_1234", "Broker_2.3.4.5", 1234, new String[]{"tag_BROKER"}, null, null);
+    checkInstanceInfo("Server_2.3.4.5_2345", "Server_2.3.4.5", 2345, new String[]{"tag_OFFLINE", "tag_REALTIME"},
+        new String[]{"tag_OFFLINE", "tag_REALTIME"}, new int[]{0, 1});
+  }
 
-    instance = JsonUtils
-        .stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Server_1.2.3.4_2345")));
-    assertEquals(instance.get("instanceName").asText(), "Server_1.2.3.4_2345");
-    assertEquals(instance.get("hostName").asText(), "Server_1.2.3.4");
-    assertEquals(instance.get("port").asText(), "2345");
-    assertTrue(instance.get("enabled").asBoolean());
-    assertEquals(instance.get("tags").size(), 0);
-    assertTrue(instance.get("pools").isNull());
+  private void checkInstanceInfo(String instanceName, String hostName, int port, String[] tags, String[] pools,
+      int[] poolValues) {
+    TestUtils.waitForCondition(new Function<Void, Boolean>() {
+      @Nullable
+      @Override
+      public Boolean apply(@Nullable Void aVoid) {
+        try {
+          String getResponse =
+              sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation(instanceName));
+          JsonNode instance = JsonUtils.stringToJsonNode(getResponse);
+          boolean result =
+              (instance.get("instanceName") != null) && (instance.get("instanceName").asText().equals(instanceName))
+                  && (instance.get("hostName") != null) && (instance.get("hostName").asText().equals(hostName)) && (
+                  instance.get("port") != null) && (instance.get("port").asText().equals(String.valueOf(port)))
+                  && (instance.get("enabled").asBoolean()) && (instance.get("tags") != null) && (
+                  instance.get("tags").size() == tags.length);
 
-    instance = JsonUtils
-        .stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Broker_2.3.4.5_1234")));
-    assertEquals(instance.get("instanceName").asText(), "Broker_2.3.4.5_1234");
-    assertEquals(instance.get("hostName").asText(), "Broker_2.3.4.5");
-    assertEquals(instance.get("port").asText(), "1234");
-    assertTrue(instance.get("enabled").asBoolean());
-    JsonNode tags = instance.get("tags");
-    assertEquals(tags.size(), 1);
-    assertEquals(tags.get(0).asText(), "tag_BROKER");
-    assertTrue(instance.get("pools").isNull());
+          for (int i = 0; i < tags.length; i++) {
+            result = result && instance.get("tags").get(i).asText().equals(tags[i]);
+          }
 
-    instance = JsonUtils
-        .stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Server_2.3.4.5_2345")));
-    assertEquals(instance.get("instanceName").asText(), "Server_2.3.4.5_2345");
-    assertEquals(instance.get("hostName").asText(), "Server_2.3.4.5");
-    assertEquals(instance.get("port").asText(), "2345");
-    assertTrue(instance.get("enabled").asBoolean());
-    tags = instance.get("tags");
-    assertEquals(tags.size(), 2);
-    assertEquals(tags.get(0).asText(), "tag_OFFLINE");
-    assertEquals(tags.get(1).asText(), "tag_REALTIME");
-    JsonNode pools = instance.get("pools");
-    assertEquals(pools.size(), 2);
-    assertEquals(pools.get("tag_OFFLINE").asText(), "0");
-    assertEquals(pools.get("tag_REALTIME").asText(), "1");
+          if (!result) {
+            return false;
+          }
 
-    // Check that an error is given for an instance that does not exist
-    try {
-      sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Server_potato_8126"));
-      fail("Request to get instance information for an instance that does not exist did not fail");
-    } catch (IOException e) {
-      // Expected
-    }
+          if (pools != null) {
+            result = result && (instance.get("pools") != null) && (instance.get("pools").size() == pools.length);
+            for (int i = 0; i < pools.length; i++) {
+              result = result && instance.get("pools").get(pools[i]).asText().equals((String.valueOf(poolValues[i])));
+            }
+          } else {
+            result = result && instance.get("pools").isNull();
+          }
+
+          return result;
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }
+    }, GET_CALL_TIMEOUT_MS, "Failed to retrieve correct information for instance: " + instanceName);
+  }
+
+  private void checkNumInstances(String listInstancesUrl, int numInstances) {
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        String getResponse = sendGetRequest(listInstancesUrl);
+        JsonNode jsonNode = JsonUtils.stringToJsonNode(getResponse);
+        return jsonNode != null && jsonNode.get("instances") != null
+            && jsonNode.get("instances").size() == numInstances;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, GET_CALL_TIMEOUT_MS, "Expected " + numInstances + " instances after creation of tagged instances");
   }
 
   @AfterClass

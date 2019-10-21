@@ -67,7 +67,6 @@ public class HierarchicalAnomaliesContent extends BaseNotificationContent {
 
   private static final String PRESENT_SEASONAL_VALUES = "presentSeasonalValues";
   private static final String DEFAULT_PRESENT_SEASONAL_VALUES = "false";
-  private static final String TEMPLATE = "hierarchical-anomalies-email-template.ftl";
 
   private boolean presentSeasonalValues;
   private Set<EventDTO> relatedEvents;
@@ -83,12 +82,12 @@ public class HierarchicalAnomaliesContent extends BaseNotificationContent {
 
   @Override
   public String getTemplate() {
-    return TEMPLATE;
+    return HierarchicalAnomaliesContent.class.getSimpleName();
   }
 
   @Override
-  public Map<String, Object> format(Long groupId, String groupName, Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
-    Map<String, Object> templateData = super.getTemplateData(context.getAlertConfig(), groupId, groupName, anomalies);
+  public Map<String, Object> format(Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
+    Map<String, Object> templateData = super.getTemplateData(context.getNotificationConfig(), anomalies);
     enrichMetricInfo(templateData, anomalies);
     List<AnomalyReportEntity> rootAnomalyDetails = new ArrayList<>();
     SortedMap<String, List<AnomalyReportEntity>> leafAnomalyDetails = new TreeMap<>();

@@ -26,7 +26,6 @@ import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.readers.RecordReader;
-import org.apache.pinot.core.data.readers.RecordReaderUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 
@@ -101,7 +100,7 @@ public class ReducerRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse) {
     Preconditions.checkState(!_nextRowReturned);
-    RecordReaderUtils.copyRow(_nextRow, reuse);
+    reuse.init(_nextRow);
     _nextRowReturned = true;
     return reuse;
   }

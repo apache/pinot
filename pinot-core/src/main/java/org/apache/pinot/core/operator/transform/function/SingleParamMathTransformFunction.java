@@ -18,18 +18,14 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import java.util.Arrays;
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
-
-import javax.annotation.Nonnull;
-
-import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.core.util.ArrayCopyUtils;
+
 
 /**
  * A group of commonly used math transformation which has only one single parameter,
@@ -40,24 +36,16 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
   protected double[] _results;
 
   @Override
-  public abstract String getName();
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+    Preconditions
+        .checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s", getName());
+    TransformFunction transformFunction = arguments.get(0);
+    Preconditions.checkArgument(!(transformFunction instanceof LiteralTransformFunction),
+        "Argument cannot be literal for transform function: %s", getName());
+    Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
+        "Argument must be single-valued for transform function: %s", getName());
 
-  @Override
-  public void init(@Nonnull List<TransformFunction> arguments, @Nonnull Map<String, DataSource> dataSourceMap) {
-    // Check that there are exactly 1 argument
-    if (arguments.size() != 1) {
-      throw new IllegalArgumentException("Exactly 1 arguments are required for " + getName() + " transform function");
-    }
-
-    TransformFunction firstArgument = arguments.get(0);
-    if (firstArgument instanceof LiteralTransformFunction) {
-      throw new IllegalArgumentException("Argument of " + getName() + " should not be literal");
-    } else {
-      if (!firstArgument.getResultMetadata().isSingleValue()) {
-        throw new IllegalArgumentException("First argument of " + getName() + " transform function must be single-valued");
-      }
-      _transformFunction = firstArgument;
-    }
+    _transformFunction = transformFunction;
   }
 
   @Override
@@ -66,22 +54,13 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
   }
 
   @Override
-  public double[] transformToDoubleValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     if (_results == null) {
       _results = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
 
-    int length = projectionBlock.getNumDocs();
-
-    if (_transformFunction.getResultMetadata().getDataType() == DataType.STRING) {
-      String[] stringValues = _transformFunction.transformToStringValuesSV(projectionBlock);
-      ArrayCopyUtils.copy(stringValues, _results, length);
-      applyMathOperator(_results, length);
-    } else {
-      double[] doubleValues = _transformFunction.transformToDoubleValuesSV(projectionBlock);
-      applyMathOperator(doubleValues, length);
-    }
-
+    double[] values = _transformFunction.transformToDoubleValuesSV(projectionBlock);
+    applyMathOperator(values, projectionBlock.getNumDocs());
     return _results;
   }
 

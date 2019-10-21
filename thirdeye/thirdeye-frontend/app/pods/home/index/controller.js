@@ -171,7 +171,7 @@ export default Controller.extend({
       let falseNegatives = 0;
       Object.keys(anomalyMapping).forEach(function (key) {
         anomalyMapping[key].forEach(function (attr) {
-          const classification = attr.anomaly.data.classification;
+          const classification = ((attr.anomaly || {}).data || {}).classification;
           if (classification != 'NONE') {
             respondedAnomaliesCount++;
             if (classification == 'TRUE_POSITIVE') {

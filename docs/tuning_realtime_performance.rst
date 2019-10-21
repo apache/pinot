@@ -68,10 +68,46 @@ that will help you to come up with an optimal setting for the segment size.
 Moving completed segments to different hosts
 --------------------------------------------
 
-The strutcture of the consuming segments and the completed segments are very different. The memory, CPU, I/O
+This feature is avaialble only if the consumption type is ``LowLevel``.
+
+The structure of the consuming segments and the completed segments are very different. The memory, CPU, I/O
 and GC characteristics could be very different while processing queries on these segments. Therefore it may be
 useful to move the completed segments onto differnt set of hosts in some use cases.
 
 You can host completed segments on a different set of hosts using the ``tagOverrideConfig`` as described in 
 :ref:`table-config-section`. Pinot will automatically move them once the consuming segments are completed.
 
+Controlling segment build vs segment download on Realtime servers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This feature is available only if the consumption type is ``LowLevel``.
+
+When a realtime segment completes, a winner server is chosen as a committer amongst all replicas by the controller. That committer builds the segment and uploads to the controller. The non-committer servers are asked to catchup to the winning offset. If the non-committer servers are able to catch up, they are asked to build the segment and replace the in-memory segment. If they are unable to catchup, they are asked to download the segment from the controller.
+
+Building a segment can cause excessive garbage and may result in GC pauses on the server.
+Long GC pauses can affect query processing. In order to avoid this, we have a configuration
+that allows you to control whether 
+
+It might become desirable to force the non-committer servers to download the segment from the controller, instead of building it again. The ``completionConfig`` as described in :ref:`table-config-section` can be used to configure this.
+
+Fine tuning the segment commit protocol
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This feature is available only if the consumption type is ``LowLevel``.
+
+Once a committer is asked to commit the segment, it builds a segment, and issues an HTTP POST to the controller, with the segment.
+The controller than commits the segment in Zookeeper and starts the next consuming segment.
+
+It is possible to conifigure the servers to do a *split* commit, in which the committer performs the following steps:
+
+    * Build the segment
+    * Start a transaction with the lead controller to commit the segment (CommitStart phase)
+    * Post the completed segment to any of the controllers (and the controller posts it to segment store)
+    * End the transaction with the lead controller (CommentEnd phase). Optionally, this step can be done *with* the segment metadata.
+
+This method of committing can be useful if the network bandwidth on the lead controller is limiting segment uploads.
+
+In order to accomplish this, you will need to set the following configurations:
+   * On the controller, set ``pinot.controller.enable.split.commit`` to ``true`` (default is ``false``).
+   * On the server, set ``pinot.server.enable.split.commit`` to ``true`` (default is ``false``). 
+   * On the server, set ``pinot.server.enable.commitend.metadata`` to ``true`` (default is false).

@@ -24,7 +24,6 @@ import org.apache.pinot.thirdeye.anomaly.alert.AlertTaskInfo;
 import org.apache.pinot.thirdeye.anomaly.classification.ClassificationTaskInfo;
 import org.apache.pinot.thirdeye.anomaly.detection.DetectionTaskInfo;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorTaskInfo;
-import org.apache.pinot.thirdeye.anomaly.onboard.ReplayTaskInfo;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskType;
 import org.apache.pinot.thirdeye.completeness.checker.DataCompletenessTaskInfo;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskInfo;
@@ -74,9 +73,6 @@ public class TaskInfoFactory {
           break;
         case CLASSIFICATION:
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, ClassificationTaskInfo.class);
-          break;
-        case REPLAY:
-          taskInfo = OBJECT_MAPPER.readValue(taskInfoString, ReplayTaskInfo.class);
           break;
         default:
           LOG.error("TaskType must be one of ANOMALY_DETECTION, MONITOR, ALERT, ALERT2, DATA_COMPLETENESS, CLASSIFICATION");

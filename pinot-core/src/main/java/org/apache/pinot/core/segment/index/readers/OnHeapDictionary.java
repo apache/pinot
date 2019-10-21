@@ -22,10 +22,9 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 /**
- * Abstract base class for all on-heap dictionary implementations.
- *
+ * Base class for on-heap immutable dictionary.
  */
-public abstract class OnHeapDictionary extends ImmutableDictionaryReader {
+public abstract class OnHeapDictionary extends BaseImmutableDictionary {
 
   protected OnHeapDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
     super(dataBuffer, length, numBytesPerValue, paddingByte);

@@ -1,4 +1,3 @@
-package org.apache.pinot.common.function;
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,6 +16,7 @@ package org.apache.pinot.common.function;
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.common.function;
 
 /**
  * Place where all functions are registered.
@@ -24,13 +24,11 @@ package org.apache.pinot.common.function;
 public class FunctionDefinitionRegistry {
 
   public static boolean isAggFunc(String functionName) {
-
     try {
       AggregationFunctionType.getAggregationFunctionType(functionName);
       return true;
     } catch (Exception e) {
-      //ignore
+      return false;
     }
-    return false;
   }
 }

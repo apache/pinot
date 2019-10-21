@@ -23,45 +23,51 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 /**
- * Extension of {@link ImmutableDictionaryReader} that implements immutable dictionary for byte[] type.
+ * Extension of {@link BaseImmutableDictionary} that implements immutable dictionary for byte[] type.
  */
-public class BytesDictionary extends ImmutableDictionaryReader {
+public class BytesDictionary extends BaseImmutableDictionary {
 
   public BytesDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
     super(dataBuffer, length, numBytesPerValue, (byte) 0);
   }
 
   @Override
-  public int indexOf(Object rawValue) {
-    int index = insertionIndexOf(rawValue);
-    return (index >= 0) ? index : -1;
-  }
-
-  @Override
-  public int insertionIndexOf(Object rawValue) {
-    return binarySearch(BytesUtils.toBytes(rawValue));
+  public int insertionIndexOf(String stringValue) {
+    return binarySearch(BytesUtils.toBytes(stringValue));
   }
 
   @Override
   public byte[] get(int dictId) {
-    return getBytesValue(dictId);
+    return getBytes(dictId);
+  }
+
+  @Override
+  public int getIntValue(int dictId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public long getLongValue(int dictId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public float getFloatValue(int dictId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public double getDoubleValue(int dictId) {
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public String getStringValue(int dictId) {
-    return BytesUtils.toHexString(getBytesValue(dictId));
+    return BytesUtils.toHexString(getBytes(dictId));
   }
 
   @Override
   public byte[] getBytesValue(int dictId) {
-    return getBytes(dictId, getBuffer());
-  }
-
-  @Override
-  public void readBytesValues(int[] dictIds, int inStartPos, int length, byte[][] outValues, int outStartPos) {
-    int inEndPos = inStartPos + length;
-    for (int i = inStartPos; i < inEndPos; i++) {
-      outValues[outStartPos++] = getBytes(dictIds[i], getBuffer());
-    }
+    return getBytes(dictId);
   }
 }

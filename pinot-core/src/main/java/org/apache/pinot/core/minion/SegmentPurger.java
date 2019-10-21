@@ -23,7 +23,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.data.Schema;
@@ -218,9 +217,7 @@ public class SegmentPurger {
         reuse = _recordReader.next(reuse);
       } else {
         Preconditions.checkState(!_nextRowReturned);
-        for (Map.Entry<String, Object> entry : _nextRow.getEntrySet()) {
-          reuse.putField(entry.getKey(), entry.getValue());
-        }
+        reuse.init(_nextRow);
         _nextRowReturned = true;
       }
 

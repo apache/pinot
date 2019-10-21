@@ -249,9 +249,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
       } else {
         expected = doubleList.getDouble(doubleList.size() * percentile / 100);
       }
-      Assert
-          .assertEquals(PercentileTDigestAggregationFunction.calculatePercentile(tDigest, percentile), expected, DELTA,
-              ERROR_MESSAGE);
+      Assert.assertEquals(tDigest.quantile(percentile / 100.0), expected, DELTA, ERROR_MESSAGE);
     }
   }
 

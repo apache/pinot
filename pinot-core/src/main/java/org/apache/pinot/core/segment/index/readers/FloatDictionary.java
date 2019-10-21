@@ -21,27 +21,15 @@ package org.apache.pinot.core.segment.index.readers;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
-public class FloatDictionary extends ImmutableDictionaryReader {
+public class FloatDictionary extends BaseImmutableDictionary {
 
   public FloatDictionary(PinotDataBuffer dataBuffer, int length) {
     super(dataBuffer, length, Float.BYTES, (byte) 0);
   }
 
   @Override
-  public int indexOf(Object rawValue) {
-    int index = insertionIndexOf(rawValue);
-    return (index >= 0) ? index : -1;
-  }
-
-  @Override
-  public int insertionIndexOf(Object rawValue) {
-    float value;
-    if (rawValue instanceof String) {
-      value = Float.parseFloat((String) rawValue);
-    } else {
-      value = (Float) rawValue;
-    }
-    return binarySearch(value);
+  public int insertionIndexOf(String stringValue) {
+    return binarySearch(Float.parseFloat(stringValue));
   }
 
   @Override

@@ -126,8 +126,25 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
     Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: " + tableNameWithType);
-    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(queryRequest.getSegmentsToQuery());
-    int numSegmentsQueried = segmentDataManagers.size();
+
+    List<String> segmentsToQuery = queryRequest.getSegmentsToQuery();
+    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery);
+
+    // When segment is removed from the IdealState:
+    // 1. Controller schedules a state transition to server to turn segment OFFLINE
+    // 2. Server gets the state transition, removes the segment data manager and update its CurrentState
+    // 3. Controller gathers the CurrentState and update the ExternalView
+    // 4. Broker watches ExternalView change and updates the routing table to stop querying the segment
+    //
+    // After step 2 but before step 4, segment will be missing on server side
+    // TODO: Change broker to watch both IdealState and ExternalView to not query the removed segments
+    int numSegmentsQueried = segmentsToQuery.size();
+    int numSegmentsAcquired = segmentDataManagers.size();
+    if (numSegmentsQueried > numSegmentsAcquired) {
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS,
+          numSegmentsQueried - numSegmentsAcquired);
+    }
+
     boolean enableTrace = queryRequest.isEnableTrace();
     if (enableTrace) {
       TraceContext.register(requestId);
@@ -158,7 +175,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         LOGGER.debug("Did not find valid ingestionTimestamp across consuming segments! Using indexTime instead");
         minConsumingFreshnessTimeMs = minIndexTimeMs;
       }
-      LOGGER.debug("Querying {} consuming segments with min minConsumingFreshnessTimeMs {}", numConsumingSegmentsProcessed, minConsumingFreshnessTimeMs);
+      LOGGER
+          .debug("Querying: {} consuming segments with minConsumingFreshnessTimeMs: {}", numConsumingSegmentsProcessed,
+              minConsumingFreshnessTimeMs);
     }
 
     DataTable dataTable = null;
@@ -227,8 +246,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     dataTable.getMetadata().put(DataTable.TIME_USED_MS_METADATA_KEY, Long.toString(queryProcessingTime));
 
     if (numConsumingSegmentsProcessed > 0) {
-      dataTable.getMetadata().put(DataTable.NUM_CONSUMING_SEGMENTS_PROCESSED, Integer.toString(numConsumingSegmentsProcessed));
-      dataTable.getMetadata().put(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS, Long.toString(minConsumingFreshnessTimeMs));
+      dataTable.getMetadata()
+          .put(DataTable.NUM_CONSUMING_SEGMENTS_PROCESSED, Integer.toString(numConsumingSegmentsProcessed));
+      dataTable.getMetadata()
+          .put(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS, Long.toString(minConsumingFreshnessTimeMs));
     }
 
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);

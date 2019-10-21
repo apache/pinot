@@ -19,10 +19,9 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
@@ -32,38 +31,33 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 
 public class DistinctCountAggregationFunction implements AggregationFunction<IntOpenHashSet, Integer> {
 
-  @Nonnull
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.DISTINCTCOUNT;
   }
 
-  @Nonnull
   @Override
-  public String getColumnName(@Nonnull String column) {
+  public String getColumnName(String column) {
     return AggregationFunctionType.DISTINCTCOUNT.getName() + "_" + column;
   }
 
   @Override
-  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+  public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
 
-  @Nonnull
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
     return new ObjectAggregationResultHolder();
   }
 
-  @Nonnull
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
     return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
   }
 
   @Override
-  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull BlockValSet... blockValSets) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
     IntOpenHashSet valueSet = getValueSet(aggregationResultHolder);
 
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
@@ -104,8 +98,8 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
   }
 
   @Override
-  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
     switch (valueType) {
       case INT:
@@ -144,8 +138,8 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
   }
 
   @Override
-  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
     switch (valueType) {
       case INT:
@@ -183,9 +177,8 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
     }
   }
 
-  @Nonnull
   @Override
-  public IntOpenHashSet extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+  public IntOpenHashSet extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     IntOpenHashSet valueSet = aggregationResultHolder.getResult();
     if (valueSet == null) {
       return new IntOpenHashSet();
@@ -194,9 +187,8 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
     }
   }
 
-  @Nonnull
   @Override
-  public IntOpenHashSet extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+  public IntOpenHashSet extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     IntOpenHashSet valueSet = groupByResultHolder.getResult(groupKey);
     if (valueSet == null) {
       return new IntOpenHashSet();
@@ -205,10 +197,8 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
     }
   }
 
-  @Nonnull
   @Override
-  public IntOpenHashSet merge(@Nonnull IntOpenHashSet intermediateResult1,
-      @Nonnull IntOpenHashSet intermediateResult2) {
+  public IntOpenHashSet merge(IntOpenHashSet intermediateResult1, IntOpenHashSet intermediateResult2) {
     intermediateResult1.addAll(intermediateResult2);
     return intermediateResult1;
   }
@@ -218,15 +208,13 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
     return false;
   }
 
-  @Nonnull
   @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.OBJECT;
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.OBJECT;
   }
 
-  @Nonnull
   @Override
-  public Integer extractFinalResult(@Nonnull IntOpenHashSet intermediateResult) {
+  public Integer extractFinalResult(IntOpenHashSet intermediateResult) {
     return intermediateResult.size();
   }
 
@@ -237,7 +225,7 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
    * @param groupKey Group-key for which to set the value
    * @param value Value for the group key
    */
-  private void setValueForGroupKey(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey, int value) {
+  private void setValueForGroupKey(GroupByResultHolder groupByResultHolder, int groupKey, int value) {
     IntOpenHashSet valueSet = getValueSet(groupByResultHolder, groupKey);
     valueSet.add(value);
   }
@@ -249,7 +237,7 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
    * @param groupKeys Array of group keys for which to set the value
    * @param value Value to be set
    */
-  private void setValueForGroupKeys(@Nonnull GroupByResultHolder groupByResultHolder, int[] groupKeys, int value) {
+  private void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, int value) {
     for (int groupKey : groupKeys) {
       setValueForGroupKey(groupByResultHolder, groupKey, value);
     }
@@ -261,7 +249,7 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
    * @param aggregationResultHolder Result holder
    * @return Value set from the result holder
    */
-  protected static IntOpenHashSet getValueSet(@Nonnull AggregationResultHolder aggregationResultHolder) {
+  protected static IntOpenHashSet getValueSet(AggregationResultHolder aggregationResultHolder) {
     IntOpenHashSet valueSet = aggregationResultHolder.getResult();
     if (valueSet == null) {
       valueSet = new IntOpenHashSet();
@@ -277,7 +265,7 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
    * @param groupKey Group key for which to return the value set
    * @return Value set for the group key
    */
-  protected static IntOpenHashSet getValueSet(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+  protected static IntOpenHashSet getValueSet(GroupByResultHolder groupByResultHolder, int groupKey) {
     IntOpenHashSet valueSet = groupByResultHolder.getResult(groupKey);
     if (valueSet == null) {
       valueSet = new IntOpenHashSet();

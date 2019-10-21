@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.aggregation;
 
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
@@ -31,17 +30,13 @@ import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunct
 import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 
 
-/**
- * Implementation of AggregationExecutor interface, to perform
- * aggregations.
- */
 public class DefaultAggregationExecutor implements AggregationExecutor {
   protected final int _numFunctions;
   protected final AggregationFunction[] _functions;
   protected final AggregationResultHolder[] _resultHolders;
   protected final TransformExpressionTree[] _expressions;
 
-  public DefaultAggregationExecutor(@Nonnull AggregationFunctionContext[] functionContexts) {
+  public DefaultAggregationExecutor(AggregationFunctionContext[] functionContexts) {
     _numFunctions = functionContexts.length;
     _functions = new AggregationFunction[_numFunctions];
     _resultHolders = new AggregationResultHolder[_numFunctions];
@@ -74,7 +69,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
   }
 
   @Override
-  public void aggregate(@Nonnull TransformBlock transformBlock) {
+  public void aggregate(TransformBlock transformBlock) {
     int length = transformBlock.getNumDocs();
     for (int i = 0; i < _numFunctions; i++) {
       AggregationFunction function = _functions[i];

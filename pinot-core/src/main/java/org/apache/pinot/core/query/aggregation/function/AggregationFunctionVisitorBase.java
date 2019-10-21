@@ -19,106 +19,81 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 /**
- * No-op base class for aggregation function visitor
+ * No-op base class for aggregation function visitor.
  */
-// Keeping this base class (instead of interface) makes
-// it easy to create multiple visitors overriding for specific methods
+@SuppressWarnings("unused")
 public class AggregationFunctionVisitorBase {
 
-  public void visit(AggregationFunction function) {
-    visitFunction(function);
-  }
-
   public void visit(AvgAggregationFunction function) {
-    visitFunction(function);
   }
 
   public void visit(AvgMVAggregationFunction function) {
-    visitFunction(function);
   }
 
   public void visit(CountAggregationFunction function) {
-    visitFunction(function);
   }
 
   public void visit(CountMVAggregationFunction function) {
-    visitFunction(function);
+  }
+
+  public void visit(DistinctAggregationFunction function) {
   }
 
   public void visit(DistinctCountAggregationFunction function) {
-    visitFunction(function);
-  }
-
-  public void visit(DistinctCountHLLAggregationFunction function) {
-    visitFunction(function);
-  }
-
-  public void visit(DistinctCountHLLMVAggregationFunction function) {
-    visitFunction(function);
   }
 
   public void visit(DistinctCountMVAggregationFunction function) {
-    visitFunction(function);
+  }
+
+  public void visit(DistinctCountHLLAggregationFunction function) {
+  }
+
+  public void visit(DistinctCountHLLMVAggregationFunction function) {
   }
 
   public void visit(FastHLLAggregationFunction function) {
-    visitFunction(function);
   }
 
   public void visit(MaxAggregationFunction function) {
-    visitFunction(function);
   }
 
   public void visit(MaxMVAggregationFunction function) {
-    visitFunction(function);
   }
 
   public void visit(MinAggregationFunction function) {
-    visitFunction(function);
-  }
-
-  public void visit(MinMaxRangeAggregationFunction function) {
-    visitFunction(function);
-  }
-
-  public void visit(MinMaxRangeMVAggregationFunction function) {
-    visitFunction(function);
   }
 
   public void visit(MinMVAggregationFunction function) {
-    visitFunction(function);
+  }
+
+  public void visit(MinMaxRangeAggregationFunction function) {
+  }
+
+  public void visit(MinMaxRangeMVAggregationFunction function) {
   }
 
   public void visit(PercentileAggregationFunction function) {
-    visitFunction(function);
   }
 
   public void visit(PercentileMVAggregationFunction function) {
-    visitFunction(function);
   }
 
   public void visit(PercentileEstAggregationFunction function) {
-    visitFunction(function);
   }
 
   public void visit(PercentileEstMVAggregationFunction function) {
-    visitFunction(function);
   }
 
   public void visit(PercentileTDigestAggregationFunction function) {
-    visitFunction(function);
+  }
+
+  public void visit(PercentileTDigestMVAggregationFunction function) {
   }
 
   public void visit(SumAggregationFunction function) {
-    visitFunction(function);
   }
 
   public void visit(SumMVAggregationFunction function) {
-    visitFunction(function);
-  }
-
-  public void visitFunction(AggregationFunction function) {
-    // non-op
   }
 }
 

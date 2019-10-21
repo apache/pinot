@@ -414,6 +414,7 @@ export default Component.extend({
       const metricId = metricUrn.match(/^thirdeye:metric:(\d+)/)[1];
       const baselineRange = toBaselineRange(range, mode); // start/end is dependent on 'compareMode' (WoW, Wo2W, etc)
       const requestObj = {
+        metricUrn: metricUrn,
         metric: parsedMetric[1],
         dataset: parsedMetric[0],
         currentStart: range[0],

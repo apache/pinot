@@ -47,7 +47,7 @@ public class OnHeapDoubleDictionary extends OnHeapDictionary {
     super(dataBuffer, length, Double.BYTES, (byte) 0);
 
     _valToDictId = new Double2IntOpenHashMap(length);
-    _valToDictId.defaultReturnValue(-1);
+    _valToDictId.defaultReturnValue(NULL_VALUE_INDEX);
     _dictIdToVal = new double[length];
 
     for (int dictId = 0; dictId < length; dictId++) {
@@ -58,34 +58,35 @@ public class OnHeapDoubleDictionary extends OnHeapDictionary {
   }
 
   @Override
-  public int indexOf(Object rawValue) {
-    double value = getValue(rawValue);
-    return _valToDictId.get(value);
-  }
-
-  private double getValue(Object rawValue) {
-    double value;
-    if (rawValue instanceof String) {
-      value = Double.parseDouble((String) rawValue);
-    } else if (rawValue instanceof Double) {
-      value = (double) rawValue;
-    } else {
-      throw new IllegalArgumentException(
-          "Illegal data type for argument, actual: " + rawValue.getClass().getName() + " expected: " + Double.class
-              .getName());
-    }
-    return value;
+  public int insertionIndexOf(String stringValue) {
+    double doubleValue = Double.parseDouble(stringValue);
+    int index = _valToDictId.get(doubleValue);
+    return (index != NULL_VALUE_INDEX) ? index : Arrays.binarySearch(_dictIdToVal, doubleValue);
   }
 
   @Override
-  public int insertionIndexOf(Object rawValue) {
-    int index = indexOf(rawValue);
-    return (index != -1) ? index : Arrays.binarySearch(_dictIdToVal, getValue(rawValue));
+  public int indexOf(String stringValue) {
+    return _valToDictId.get(Double.parseDouble(stringValue));
   }
 
   @Override
   public Double get(int dictId) {
     return _dictIdToVal[dictId];
+  }
+
+  @Override
+  public int getIntValue(int dictId) {
+    return (int) _dictIdToVal[dictId];
+  }
+
+  @Override
+  public long getLongValue(int dictId) {
+    return (long) _dictIdToVal[dictId];
+  }
+
+  @Override
+  public float getFloatValue(int dictId) {
+    return (float) _dictIdToVal[dictId];
   }
 
   @Override

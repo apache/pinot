@@ -44,9 +44,11 @@
               {{/aitem.title}}
               {{#aitem.body}}
                 {{#alert-details
+                  isEditMode=true
                   isPreviewMode=true
                   alertId=model.alertId
                   alertYaml=detectionYaml
+                  originalYaml=model.detectionYaml
                   dataIsCurrent=alertDataIsCurrent
                   detectionHealth=model.detectionHealth
                   timeWindowSize=model.timeWindowSize

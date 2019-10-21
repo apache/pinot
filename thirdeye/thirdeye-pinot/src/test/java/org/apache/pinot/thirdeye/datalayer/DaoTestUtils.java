@@ -20,6 +20,8 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Set;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.thirdeye.alert.commons.AnomalyFeedConfig;
 import org.apache.pinot.thirdeye.alert.commons.AnomalyFetcherConfig;
@@ -71,6 +73,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
+
+import static org.apache.pinot.thirdeye.detection.alert.StatefulDetectionAlertFilter.*;
 
 
 public class DaoTestUtils {
@@ -136,6 +140,28 @@ public class DaoTestUtils {
     alphaBetaAlertFilter.put(AlphaBetaAlertFilter.THRESHOLD, "0.5");
     functionSpec.setAlertFilter(alphaBetaAlertFilter);
     return functionSpec;
+  }
+
+  public static DetectionAlertConfigDTO getTestNotificationConfig(String name) {
+    DetectionAlertConfigDTO notificationConfigDTO = new DetectionAlertConfigDTO();
+    notificationConfigDTO.setName(name);
+    notificationConfigDTO.setActive(true);
+    notificationConfigDTO.setApplication("test");
+    notificationConfigDTO.setFrom("te@linkedin.com");
+    notificationConfigDTO.setCronExpression("0/10 * * * * ?");
+
+    Map<String, Object> properties = new HashMap<>();
+    Map<String, Set<String>> recipients = new HashMap<>();
+    recipients.put(PROP_TO, Collections.singleton("anomaly-to@linedin.com"));
+    recipients.put(PROP_CC, Collections.singleton("anomaly-cc@linedin.com"));
+    recipients.put(PROP_BCC, Collections.singleton("anomaly-bcc@linedin.com"));
+    properties.put(PROP_RECIPIENTS, recipients);
+    notificationConfigDTO.setProperties(properties);
+
+    Map<Long, Long> vectorClocks = new HashMap<>();
+    notificationConfigDTO.setVectorClocks(vectorClocks);
+
+    return notificationConfigDTO;
   }
 
   public static AlertConfigDTO getTestAlertConfiguration(String name) {

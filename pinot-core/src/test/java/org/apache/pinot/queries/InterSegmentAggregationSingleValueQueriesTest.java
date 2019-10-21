@@ -214,7 +214,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   public void testDistinctCountRawHLL() {
     String query = "SELECT DISTINCTCOUNTRAWHLL(column1), DISTINCTCOUNTRAWHLL(column3) FROM testTable";
     Function<Serializable, String> cardinalityExtractor =
-        value -> String.valueOf(HllUtil.buildHllFromBytes(BytesUtils.toBytes(value)).cardinality());
+        value -> String.valueOf(HllUtil.buildHllFromBytes(BytesUtils.toBytes((String) value)).cardinality());
 
     BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query);
     QueriesTestUtils

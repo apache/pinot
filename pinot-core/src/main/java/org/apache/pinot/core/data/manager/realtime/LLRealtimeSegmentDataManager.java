@@ -414,8 +414,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     int indexedMessageCount = 0;
     int streamMessageCount = 0;
     boolean canTakeMore = true;
-    GenericRow decodedRow = null;
 
+    GenericRow reuse = new GenericRow();
     for (int index = 0; index < messagesAndOffsets.getMessageCount(); index++) {
       if (_shouldStop || endCriteriaReached()) {
         break;
@@ -442,15 +442,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       }
 
       // Index each message
-      decodedRow = GenericRow.createOrReuseRow(decodedRow);
+      reuse.clear();
       // retrieve metadata from the message batch if available
       // this can be overridden by the decoder if there is a better indicator in the message payload
       RowMetadata msgMetadata = messagesAndOffsets.getMetadataAtIndex(index);
 
-      decodedRow = _messageDecoder
+      GenericRow decodedRow = _messageDecoder
           .decode(messagesAndOffsets.getMessageAtIndex(index), messagesAndOffsets.getMessageOffsetAtIndex(index),
-              messagesAndOffsets.getMessageLengthAtIndex(index), decodedRow);
-
+              messagesAndOffsets.getMessageLengthAtIndex(index), reuse);
       if (decodedRow != null) {
         try {
           GenericRow transformedRow = _recordTransformer.transform(decodedRow);
@@ -683,7 +682,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       final long lockAquireTimeMillis = now();
       // Build a segment from in-memory rows.If buildTgz is true, then build the tar.gz file as well
       // TODO Use an auto-closeable object to delete temp resources.
-      File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + _segmentNameStr + "-" + String.valueOf(now()));
+      File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + _segmentNameStr + "-" + now());
       // lets convert the segment now
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), _schema,
@@ -746,8 +745,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         return new SegmentBuildDescriptor(destDir.getAbsolutePath() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION,
             metadataFiles, _currentOffset, null, buildTimeMillis, waitTimeMillis, segmentSizeBytes);
       }
-      return new SegmentBuildDescriptor(null, null, _currentOffset, destDir.getAbsolutePath(),
-          buildTimeMillis, waitTimeMillis, segmentSizeBytes);
+      return new SegmentBuildDescriptor(null, null, _currentOffset, destDir.getAbsolutePath(), buildTimeMillis,
+          waitTimeMillis, segmentSizeBytes);
     } catch (InterruptedException e) {
       segmentLogger.error("Interrupted while waiting for semaphore");
       return null;
@@ -799,7 +798,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
     SegmentCompletionProtocol.Response commitEndResponse;
     if (_indexLoadingConfig.isEnableSplitCommitEndWithMetadata()) {
-      commitEndResponse = _protocolHandler.segmentCommitEndWithMetadata(params, _segmentBuildDescriptor.getMetadataFiles());
+      commitEndResponse =
+          _protocolHandler.segmentCommitEndWithMetadata(params, _segmentBuildDescriptor.getMetadataFiles());
     } else {
       commitEndResponse = _protocolHandler.segmentCommitEnd(params);
     }
@@ -948,12 +948,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               // Allow to catch up upto final offset, and then replace.
               if (_currentOffset > endOffset) {
                 // We moved ahead of the offset that is committed in ZK.
-                segmentLogger.warn("Current offset {} ahead of the offset in zk {}. Downloading to replace", _currentOffset,
-                    endOffset);
+                segmentLogger
+                    .warn("Current offset {} ahead of the offset in zk {}. Downloading to replace", _currentOffset,
+                        endOffset);
                 downloadSegmentAndReplace(llcMetadata);
               } else if (_currentOffset == endOffset) {
-                segmentLogger.info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset,
-                    endOffset);
+                segmentLogger
+                    .info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset, endOffset);
                 buildSegmentAndReplace();
               } else {
                 segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
@@ -963,7 +964,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                   segmentLogger.info("Caught up to offset {}", _currentOffset);
                   buildSegmentAndReplace();
                 } else {
-                  segmentLogger.info("Could not catch up to offset (current = {}). Downloading to replace", _currentOffset);
+                  segmentLogger
+                      .info("Could not catch up to offset (current = {}). Downloading to replace", _currentOffset);
                   downloadSegmentAndReplace(llcMetadata);
                 }
               }
@@ -1060,8 +1062,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   // If the transition is OFFLINE to ONLINE, the caller should have downloaded the segment and we don't reach here.
   public LLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
       InstanceZKMetadata instanceZKMetadata, RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir,
-      IndexLoadingConfig indexLoadingConfig, Schema schema, ServerMetrics serverMetrics)
-      throws Exception {
+      IndexLoadingConfig indexLoadingConfig, Schema schema, ServerMetrics serverMetrics) {
     _segBuildSemaphore = realtimeTableDataManager.getSegmentBuildSemaphore();
     _segmentZKMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
     _tableConfig = tableConfig;
@@ -1141,7 +1142,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Start new realtime segment
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setSegmentName(_segmentNameStr).setStreamName(_streamTopic)
-            .setSchema(schema).setCapacity(_segmentMaxRowCount)
+            .setSchema(_schema).setCapacity(_segmentMaxRowCount)
             .setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
             .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
@@ -1155,7 +1156,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _clientId = _streamPartitionId + "-" + NetUtil.getHostnameOrAddress();
 
     // Create record transformer
-    _recordTransformer = CompositeTransformer.getDefaultTransformer(schema);
+    _recordTransformer = CompositeTransformer.getDefaultTransformer(_schema);
     makeStreamConsumer("Starting");
     makeStreamMetadataProvider("Starting");
 
@@ -1193,8 +1194,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // that we get a value for _consumeEndTime that is in the very near future, or even in the past. In such
     // cases, we let some minimum consumption happen before we attempt to complete the segment (unless, of course
     // the max consumption time has been configured to be less than the minimum time we use in this class).
-    long minConsumeTimeMillis = Math.min(maxConsumeTimeMillis,
-        TimeUnit.MILLISECONDS.convert(MINIMUM_CONSUME_TIME_MINUTES, TimeUnit.MINUTES));
+    long minConsumeTimeMillis =
+        Math.min(maxConsumeTimeMillis, TimeUnit.MILLISECONDS.convert(MINIMUM_CONSUME_TIME_MINUTES, TimeUnit.MINUTES));
     if (_consumeEndTime - now < minConsumeTimeMillis) {
       _consumeEndTime = now + minConsumeTimeMillis;
     }

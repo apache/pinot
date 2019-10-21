@@ -68,6 +68,10 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
 
   private static final Set<String> DIMENSION_SUFFIX_BLACKLIST = new HashSet<>(Arrays.asList("_topk", "_approximate", "_tDigest"));
 
+  /**
+   * Use "ROW_COUNT" as the special token for the count(*) metric for a pinot table
+   */
+  private static final String ROW_COUNT = "ROW_COUNT";
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private final AlertConfigManager alertDAO;
   private final DatasetConfigManager datasetDAO;
@@ -154,7 +158,7 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
       List<MetricConfigDTO> metrics = metricDAO.findByDataset(datasetConfigDTO.getDataset());
       int metricCount = metrics.size();
       for (MetricConfigDTO metric : metrics) {
-        if (!metric.isDerived()) {
+        if (!metric.isDerived() && !metric.getName().equals(ROW_COUNT)) {
           metricDAO.delete(metric);
           metricCount--;
         }

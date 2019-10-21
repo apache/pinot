@@ -511,7 +511,7 @@ public class EntityUtils {
    * @return ParsedUrn
    */
   public static ParsedUrn parseUrnString(String urn, EntityType type, int filterOffset) {
-    if (!type.isType(urn)) {
+    if (urn == null || !type.isType(urn)) {
       throw new IllegalArgumentException(String.format("Expected type '%s' but got '%s'", type.getPrefix(), urn));
     }
     return parseUrnString(urn, filterOffset);

@@ -31,12 +31,18 @@ const HumanizedAnomaly = EmberObject.extend({// ex: record.humanizedChangeDispla
   baseline: computed('anomaly.baseline', function() {
     return humanizeFloat(get(this, 'anomaly.baseline'));
   }),
+  modifiedBy: computed.alias('anomaly.modifiedBy'),
+  rule: computed.alias('anomaly.rule'),
+  dimensionStr: computed.alias('anomaly.dimensionStr'),
   severity: computed('anomaly.severity', function() {
     return humanizeFloat(get(this, 'anomaly.severity'));
   }),
   source: computed('anomaly.source', function() {
     return humanizeFloat(get(this, 'anomaly.source'));
   }),
+  startDateStr: computed.alias('anomaly.startDateStr'),
+  start: computed.alias('anomaly.start'),
+  settings: computed.alias('anomaly.settings'),
   anomalyFeedback: computed('anomaly.feedback', function() {
     return get(this, 'anomaly.feedback') ? anomalyResponseObj.find(res => res.value === get(this, 'anomaly.feedback')).name : '';
   }),
@@ -99,7 +105,7 @@ export default Service.extend({
   getHumanizedEntity(anomaly, humanizedObject) {
     assert('you must pass anomaly record.', anomaly);
 
-    let cacheKey = get(anomaly, 'id');
+    let cacheKey = get(anomaly, 'id') + get(anomaly, 'start') + get(anomaly, 'end') + get(anomaly, 'current') + get(anomaly, 'baseline') + get(anomaly, 'settings');
     let humanizedEntity = this._humanizedAnomaliesCache[cacheKey];//retrieve the anomaly from cache if exists
     if (!humanizedEntity) {
       humanizedEntity = this._humanizedAnomaliesCache[cacheKey] = HumanizedAnomaly.create({ anomaly, humanizedObject });// add to our dictionary

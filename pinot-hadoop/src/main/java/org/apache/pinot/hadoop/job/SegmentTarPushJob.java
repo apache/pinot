@@ -55,7 +55,7 @@ public class SegmentTarPushJob extends BaseSegmentJob {
 
   public void run()
       throws Exception {
-    FileSystem fileSystem = FileSystem.get(_conf);
+    FileSystem fileSystem = FileSystem.get(_segmentPattern.toUri(), _conf);
     List<Path> segmentsToPush = getDataFilePaths(_segmentPattern);
     try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
       // TODO: Deal with invalid prefixes in the future

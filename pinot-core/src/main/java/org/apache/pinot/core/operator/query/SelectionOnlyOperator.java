@@ -25,16 +25,15 @@ import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
-import org.apache.pinot.core.operator.transform.TransformBlockDataFetcher;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock> {
@@ -43,8 +42,6 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
   private final IndexSegment _indexSegment;
   private final TransformOperator _transformOperator;
   private final List<TransformExpressionTree> _expressions;
-  private final TransformResultMetadata[] _expressionMetadata;
-  private final Dictionary[] _dictionaries;
   private final BlockValSet[] _blockValSets;
   private final DataSchema _dataSchema;
   private final int _numRowsToKeep;
@@ -58,18 +55,12 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
     _expressions = SelectionOperatorUtils.extractExpressions(selection.getSelectionColumns(), indexSegment, null);
 
     int numExpressions = _expressions.size();
-    _expressionMetadata = new TransformResultMetadata[numExpressions];
-    _dictionaries = new Dictionary[numExpressions];
     _blockValSets = new BlockValSet[numExpressions];
     String[] columnNames = new String[numExpressions];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
     for (int i = 0; i < numExpressions; i++) {
       TransformExpressionTree expression = _expressions.get(i);
       TransformResultMetadata expressionMetadata = _transformOperator.getResultMetadata(expression);
-      _expressionMetadata[i] = expressionMetadata;
-      if (expressionMetadata.hasDictionary()) {
-        _dictionaries[i] = _transformOperator.getDictionary(expression);
-      }
       columnNames[i] = expression.toString();
       columnDataTypes[i] =
           DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
@@ -90,13 +81,12 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
       for (int i = 0; i < numExpressions; i++) {
         _blockValSets[i] = transformBlock.getBlockValueSet(_expressions.get(i));
       }
-      TransformBlockDataFetcher dataFetcher =
-          new TransformBlockDataFetcher(_blockValSets, _dictionaries, _expressionMetadata);
+      RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(_blockValSets);
 
       int numDocsToAdd = Math.min(_numRowsToKeep - _rows.size(), transformBlock.getNumDocs());
       numDocsScanned += numDocsToAdd;
       for (int i = 0; i < numDocsToAdd; i++) {
-        _rows.add(dataFetcher.getRow(i));
+        _rows.add(blockValueFetcher.getRow(i));
       }
       if (_rows.size() == _numRowsToKeep) {
         break;

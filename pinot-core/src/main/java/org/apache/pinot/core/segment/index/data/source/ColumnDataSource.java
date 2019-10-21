@@ -30,7 +30,7 @@ import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import org.apache.pinot.core.operator.blocks.MultiValueBlock;
 import org.apache.pinot.core.operator.blocks.SingleValueBlock;
-import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionary;
+import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
@@ -66,7 +66,7 @@ public final class ColumnDataSource extends DataSource {
    * For REALTIME segment.
    */
   public ColumnDataSource(FieldSpec fieldSpec, int numDocs, int maxNumMultiValues, DataFileReader forwardIndex,
-      InvertedIndexReader invertedIndex, MutableDictionary dictionary, BloomFilterReader bloomFilter) {
+      InvertedIndexReader invertedIndex, BaseMutableDictionary dictionary, BloomFilterReader bloomFilter) {
     this(fieldSpec.getName(), fieldSpec.getDataType(), fieldSpec.isSingleValueField(), false, numDocs,
         maxNumMultiValues, forwardIndex, invertedIndex, dictionary, bloomFilter, Constants.UNKNOWN_CARDINALITY);
   }
@@ -151,13 +151,13 @@ public final class ColumnDataSource extends DataSource {
   }
 
   @Override
-  public InvertedIndexReader getInvertedIndex() {
-    return _invertedIndex;
+  public Dictionary getDictionary() {
+    return _dictionary;
   }
 
   @Override
-  public Dictionary getDictionary() {
-    return _dictionary;
+  public InvertedIndexReader getInvertedIndex() {
+    return _invertedIndex;
   }
 
   @Override

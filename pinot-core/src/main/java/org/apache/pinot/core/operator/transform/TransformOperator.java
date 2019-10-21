@@ -78,9 +78,8 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
   }
 
   /**
-   * Returns the dictionary associated with the given expression.
-   * <p>Should be called only if {@link #getResultMetadata(TransformExpressionTree)} indicates that the transform result
-   * has dictionary.
+   * Returns the dictionary associated with the given expression if the transform result is dictionary-encoded, or
+   * {@code null} if not.
    *
    * @return Dictionary
    */

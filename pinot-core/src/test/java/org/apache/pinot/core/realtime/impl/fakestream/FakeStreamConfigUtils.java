@@ -137,6 +137,16 @@ public class FakeStreamConfigUtils {
     return getDefaultLowLevelStreamConfigs(DEFAULT_NUM_PARTITIONS);
   }
 
+  public static StreamConfig replaceProperties(StreamConfig streamConfig, long desiredSegmentSize,
+      int initialAutoTuneRows, long timeThresholdMillis, int rowThreshold) {
+    Map<String, String> streamConfigsMap = streamConfig.getStreamConfigsMap();
+    streamConfigsMap.put(StreamConfigProperties.SEGMENT_FLUSH_DESIRED_SIZE, String.valueOf(desiredSegmentSize));
+    streamConfigsMap.put(StreamConfigProperties.SEGMENT_FLUSH_AUTOTUNE_INITIAL_ROWS, String.valueOf(initialAutoTuneRows));
+    streamConfigsMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, String.valueOf(timeThresholdMillis));
+    streamConfigsMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, String.valueOf(rowThreshold));
+    return new StreamConfig(streamConfig.getTableNameWithType(), streamConfigsMap);
+  }
+
   /**
    * Generate fake stream configs for high level stream
    */

@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -42,7 +41,7 @@ public class AdditionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(@Nonnull List<TransformFunction> arguments, @Nonnull Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     // Check that there are more than 1 arguments
     if (arguments.size() < 2) {
       throw new IllegalArgumentException("At least 2 arguments are required for ADD transform function");
@@ -66,7 +65,7 @@ public class AdditionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public double[] transformToDoubleValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     if (_sums == null) {
       _sums = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
@@ -74,39 +73,9 @@ public class AdditionTransformFunction extends BaseTransformFunction {
     int length = projectionBlock.getNumDocs();
     Arrays.fill(_sums, 0, length, _literalSum);
     for (TransformFunction transformFunction : _transformFunctions) {
-      switch (transformFunction.getResultMetadata().getDataType()) {
-        case INT:
-          int[] intValues = transformFunction.transformToIntValuesSV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            _sums[i] += intValues[i];
-          }
-          break;
-        case LONG:
-          long[] longValues = transformFunction.transformToLongValuesSV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            _sums[i] += longValues[i];
-          }
-          break;
-        case FLOAT:
-          float[] floatValues = transformFunction.transformToFloatValuesSV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            _sums[i] += floatValues[i];
-          }
-          break;
-        case DOUBLE:
-          double[] doubleValues = transformFunction.transformToDoubleValuesSV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            _sums[i] += doubleValues[i];
-          }
-          break;
-        case STRING:
-          String[] stringValues = transformFunction.transformToStringValuesSV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            _sums[i] += Double.parseDouble(stringValues[i]);
-          }
-          break;
-        default:
-          throw new UnsupportedOperationException();
+      double[] values = transformFunction.transformToDoubleValuesSV(projectionBlock);
+      for (int i = 0; i < length; i++) {
+        _sums[i] += values[i];
       }
     }
     return _sums;

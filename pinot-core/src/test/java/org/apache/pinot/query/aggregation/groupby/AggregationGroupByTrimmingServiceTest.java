@@ -33,6 +33,7 @@ import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
+import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -64,8 +65,7 @@ public class AggregationGroupByTrimmingServiceTest {
       List<String> group = new ArrayList<>(NUM_GROUP_KEYS);
       for (int i = 0; i < NUM_GROUP_KEYS; i++) {
         // Randomly generate group key without GROUP_KEY_DELIMITER
-        group.add(RandomStringUtils.random(RANDOM.nextInt(10))
-            .replace(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER, ""));
+        group.add(RandomStringUtils.random(RANDOM.nextInt(10)).replace(GroupKeyGenerator.DELIMITER, ""));
       }
       groupSet.add(buildGroupString(group));
     }
@@ -74,7 +74,7 @@ public class AggregationGroupByTrimmingServiceTest {
     // Explicitly set an empty group
     StringBuilder emptyGroupBuilder = new StringBuilder();
     for (int i = 1; i < NUM_GROUP_KEYS; i++) {
-      emptyGroupBuilder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
+      emptyGroupBuilder.append(GroupKeyGenerator.DELIMITER);
     }
     _groups.set(NUM_GROUPS - 1, emptyGroupBuilder.toString());
 
@@ -136,7 +136,7 @@ public class AggregationGroupByTrimmingServiceTest {
     StringBuilder groupStringBuilder = new StringBuilder();
     for (int i = 0; i < NUM_GROUP_KEYS; i++) {
       if (i != 0) {
-        groupStringBuilder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
+        groupStringBuilder.append(GroupKeyGenerator.DELIMITER);
       }
       groupStringBuilder.append(group.get(i));
     }

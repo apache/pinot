@@ -23,7 +23,6 @@ import org.apache.pinot.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import org.apache.pinot.thirdeye.anomaly.classification.ClassificationTaskRunner;
 import org.apache.pinot.thirdeye.anomaly.detection.DetectionTaskRunner;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorTaskRunner;
-import org.apache.pinot.thirdeye.anomaly.onboard.ReplayTaskRunner;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskType;
 import org.apache.pinot.thirdeye.completeness.checker.DataCompletenessTaskRunner;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskRunner;
@@ -66,8 +65,6 @@ public class TaskRunnerFactory {
       case CLASSIFICATION:
         taskRunner = new ClassificationTaskRunner();
         break;
-      case REPLAY:
-        taskRunner = new ReplayTaskRunner();
       default:
     }
     return taskRunner;

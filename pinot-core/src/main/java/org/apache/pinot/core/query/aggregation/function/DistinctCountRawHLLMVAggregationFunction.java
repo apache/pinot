@@ -18,44 +18,22 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.function.AggregationFunctionType;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 
 public class DistinctCountRawHLLMVAggregationFunction extends DistinctCountRawHLLAggregationFunction {
 
-  private final DistinctCountHLLMVAggregationFunction _distinctCountHLLMVAggregationFunction = new DistinctCountHLLMVAggregationFunction();
+  public DistinctCountRawHLLMVAggregationFunction() {
+    super(new DistinctCountHLLMVAggregationFunction());
+  }
 
-  @Nonnull
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.DISTINCTCOUNTRAWHLLMV;
   }
 
-  @Nonnull
   @Override
-  public String getColumnName(@Nonnull String column) {
+  public String getColumnName(String column) {
     return AggregationFunctionType.DISTINCTCOUNTRAWHLLMV.getName() + "_" + column;
-  }
-
-  @Override
-  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull BlockValSet... blockValSets) {
-    _distinctCountHLLMVAggregationFunction.aggregate(length, aggregationResultHolder, blockValSets);
-  }
-
-  @Override
-  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
-    _distinctCountHLLMVAggregationFunction.aggregateGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSets);
-  }
-
-  @Override
-  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
-    _distinctCountHLLMVAggregationFunction.aggregateGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSets);
   }
 }

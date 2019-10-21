@@ -39,7 +39,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -52,6 +51,9 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "valueIn";
 
   private TransformFunction _mainTransformFunction;
+  private TransformResultMetadata _resultMetadata;
+  private Dictionary _dictionary;
+
   private IntSet _dictIdSet;
   private int[][] _dictIds;
   private IntSet _intValueSet;
@@ -71,7 +73,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(@Nonnull List<TransformFunction> arguments, @Nonnull Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     // Check that there are more than 1 arguments
     int numArguments = arguments.size();
     if (numArguments < 2) {
@@ -85,6 +87,8 @@ public class ValueInTransformFunction extends BaseTransformFunction {
           "The first argument of VALUE_IN transform function must be a multi-valued column or a transform function");
     }
     _mainTransformFunction = firstArgument;
+    _resultMetadata = _mainTransformFunction.getResultMetadata();
+    _dictionary = _mainTransformFunction.getDictionary();
 
     // Collect all values for the VALUE_IN transform function
     _stringValueSet = new HashSet<>(numArguments - 1);
@@ -95,21 +99,21 @@ public class ValueInTransformFunction extends BaseTransformFunction {
 
   @Override
   public TransformResultMetadata getResultMetadata() {
-    return _mainTransformFunction.getResultMetadata();
+    return _resultMetadata;
   }
 
   @Override
   public Dictionary getDictionary() {
-    return _mainTransformFunction.getDictionary();
+    return _dictionary;
   }
 
   @Override
-  public int[][] transformToDictIdsMV(@Nonnull ProjectionBlock projectionBlock) {
+  public int[][] transformToDictIdsMV(ProjectionBlock projectionBlock) {
     if (_dictIdSet == null) {
       _dictIdSet = new IntOpenHashSet();
-      Dictionary dictionary = _mainTransformFunction.getDictionary();
+      assert _dictionary != null;
       for (String inValue : _stringValueSet) {
-        int dictId = dictionary.indexOf(inValue);
+        int dictId = _dictionary.indexOf(inValue);
         if (dictId >= 0) {
           _dictIdSet.add(dictId);
         }
@@ -125,8 +129,8 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[][] transformToIntValuesMV(@Nonnull ProjectionBlock projectionBlock) {
-    if (getResultMetadata().getDataType() != FieldSpec.DataType.INT) {
+  public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
+    if (_dictionary != null || _resultMetadata.getDataType() != FieldSpec.DataType.INT) {
       return super.transformToIntValuesMV(projectionBlock);
     }
 
@@ -146,8 +150,8 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public long[][] transformToLongValuesMV(@Nonnull ProjectionBlock projectionBlock) {
-    if (getResultMetadata().getDataType() != FieldSpec.DataType.LONG) {
+  public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
+    if (_dictionary != null || _resultMetadata.getDataType() != FieldSpec.DataType.LONG) {
       return super.transformToLongValuesMV(projectionBlock);
     }
 
@@ -167,8 +171,8 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public float[][] transformToFloatValuesMV(@Nonnull ProjectionBlock projectionBlock) {
-    if (getResultMetadata().getDataType() != FieldSpec.DataType.FLOAT) {
+  public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
+    if (_dictionary != null || _resultMetadata.getDataType() != FieldSpec.DataType.FLOAT) {
       return super.transformToFloatValuesMV(projectionBlock);
     }
 
@@ -188,8 +192,8 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public double[][] transformToDoubleValuesMV(@Nonnull ProjectionBlock projectionBlock) {
-    if (getResultMetadata().getDataType() != FieldSpec.DataType.DOUBLE) {
+  public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
+    if (_dictionary != null || _resultMetadata.getDataType() != FieldSpec.DataType.DOUBLE) {
       return super.transformToDoubleValuesMV(projectionBlock);
     }
 
@@ -209,8 +213,8 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public String[][] transformToStringValuesMV(@Nonnull ProjectionBlock projectionBlock) {
-    if (getResultMetadata().getDataType() != FieldSpec.DataType.STRING) {
+  public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
+    if (_dictionary != null || _resultMetadata.getDataType() != FieldSpec.DataType.STRING) {
       return super.transformToStringValuesMV(projectionBlock);
     }
 
@@ -291,7 +295,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
     if (stringList.size() == source.length) {
       return source;
     } else {
-      return stringList.toArray(new String[stringList.size()]);
+      return stringList.toArray(new String[0]);
     }
   }
 }

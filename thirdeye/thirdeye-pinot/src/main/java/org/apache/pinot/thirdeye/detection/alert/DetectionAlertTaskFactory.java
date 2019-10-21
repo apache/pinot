@@ -45,6 +45,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,6 +89,8 @@ public class DetectionAlertTaskFactory {
   public Set<DetectionAlertScheme> loadAlertSchemes(DetectionAlertConfigDTO alertConfig,
       ThirdEyeAnomalyConfiguration thirdeyeConfig, DetectionAlertFilterResult result) throws Exception {
     Preconditions.checkNotNull(alertConfig);
+    ADContentFormatterContext adContext = new ADContentFormatterContext();
+    adContext.setNotificationConfig(alertConfig);
     Map<String, Map<String, Object>> alertSchemes = alertConfig.getAlertSchemes();
     if (alertSchemes == null || alertSchemes.isEmpty()) {
       Map<String, Object> emailScheme = new HashMap<>();
@@ -100,9 +103,8 @@ public class DetectionAlertTaskFactory {
       Preconditions.checkNotNull(alertSchemes.get(alertSchemeType));
       Preconditions.checkNotNull(alertSchemes.get(alertSchemeType).get(PROP_CLASS_NAME));
       Constructor<?> constructor = Class.forName(alertSchemes.get(alertSchemeType).get(PROP_CLASS_NAME).toString().trim())
-          .getConstructor(DetectionAlertConfigDTO.class, ThirdEyeAnomalyConfiguration.class, DetectionAlertFilterResult.class);
-      detectionAlertSchemeSet.add((DetectionAlertScheme) constructor.newInstance(alertConfig,
-          thirdeyeConfig, result));
+          .getConstructor(ADContentFormatterContext.class, ThirdEyeAnomalyConfiguration.class, DetectionAlertFilterResult.class);
+      detectionAlertSchemeSet.add((DetectionAlertScheme) constructor.newInstance(adContext, thirdeyeConfig, result));
     }
     return detectionAlertSchemeSet;
   }

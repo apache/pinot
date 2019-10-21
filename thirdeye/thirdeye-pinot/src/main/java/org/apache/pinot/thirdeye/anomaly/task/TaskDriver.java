@@ -26,7 +26,6 @@ import java.util.concurrent.TimeoutException;
 import org.apache.pinot.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
 import org.apache.pinot.thirdeye.anomaly.utils.AnomalyUtils;
 import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
-import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 
 import java.util.ArrayList;
@@ -51,6 +50,8 @@ import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
+import org.slf4j.MDC;
+
 
 public class TaskDriver {
 
@@ -115,7 +116,8 @@ public class TaskDriver {
               ThirdeyeMetricsUtil.taskCounter.inc();
 
               try {
-                LOG.info("Executing task: {} {}", anomalyTaskSpec.getJobName(), anomalyTaskSpec.getTaskInfo());
+                MDC.put("job.name", anomalyTaskSpec.getJobName());
+                LOG.info("Executing task {} {}", anomalyTaskSpec.getId(), anomalyTaskSpec.getTaskInfo());
 
                 // execute the selected task
                 TaskType taskType = anomalyTaskSpec.getTaskType();
@@ -138,7 +140,7 @@ public class TaskDriver {
                       TaskStatus.RUNNING, TaskStatus.TIMEOUT, e.getMessage());
                   continue;
                 }
-                LOG.info("DONE Executing task: {}", anomalyTaskSpec.getId());
+                LOG.info("DONE Executing task {}", anomalyTaskSpec.getId());
                 // update status to COMPLETED
                 updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.COMPLETED, "");
                 ThirdeyeMetricsUtil.taskSuccessCounter.inc();
@@ -157,6 +159,7 @@ public class TaskDriver {
               } finally {
                 long elapsedTime = System.nanoTime() - tStart;
                 LOG.info("Task {} took {} nano seconds", anomalyTaskSpec.getId(), elapsedTime);
+                MDC.clear();
                 ThirdeyeMetricsUtil.taskDurationCounter.inc(elapsedTime);
               }
             }

@@ -45,7 +45,7 @@ import org.apache.pinot.common.utils.JsonUtils;
  * segment state to ONLINE in idealstate, and adds new CONSUMING segments as well.
  *
  * For details see the design document
- * https://github.com/linkedin/pinot/wiki/Low-level-kafka-consumers
+ * https://cwiki.apache.org/confluence/display/PINOT/Consuming+and+Indexing+rows+in+Realtime
  */
 public class SegmentCompletionProtocol {
 

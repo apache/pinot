@@ -263,7 +263,7 @@ public class NotInPredicateEvaluatorFactory {
       String[] values = notInPredicate.getValues();
       _nonMatchingValues = new HashSet<>(HashUtil.getMinHashSetSize(values.length));
       for (String value : values) {
-        _nonMatchingValues.add(new ByteArray(BytesUtils.toBytes(value)));
+        _nonMatchingValues.add(BytesUtils.toByteArray(value));
       }
     }
 
@@ -277,5 +277,4 @@ public class NotInPredicateEvaluatorFactory {
       return !_nonMatchingValues.contains(new ByteArray(value));
     }
   }
-
 }

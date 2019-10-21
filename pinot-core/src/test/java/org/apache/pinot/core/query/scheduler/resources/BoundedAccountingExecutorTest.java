@@ -24,13 +24,11 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
+import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.testng.Assert.assertEquals;
+import static org.mockito.Mockito.*;
+import static org.testng.Assert.*;
 
 
 public class BoundedAccountingExecutorTest {
@@ -83,17 +81,36 @@ public class BoundedAccountingExecutorTest {
     }).start();
 
     syncer.startupBarrier.await();
+    // At this point, 'limit' jobs should have executed the startupBarrier.await() call.
+    // The other jobs should be waiting on a semaphore for permits inside the BoundedAccountingExecutor.execute()
+    // so they have not executed running.incrementAndGet() yet.
     assertEquals(running.get(), limit);
     verify(accountant, times(limit)).incrementThreads();
     // reset will clear the counts on incrementThreads
     reset(accountant);
-    int pendingJobs = jobs - limit;
+    final int pendingJobs = jobs - limit;
+    // Before the pendingJobs get to startupBarrier, reset it to a different value
+    // since we cannot change the limit of the CyclicBarrier once created.
+    // The new limit will be pending jobs plus the await we will call in this thread.
     syncer.startupBarrier = new CyclicBarrier(pendingJobs + 1);
+
+    // Now let the running threads complete and call running.decrementAndGet. As
+    // they exit, the pending jobs will acquire permits and start to increment
+    // the running counter and wait on startupBarrier.await().
     syncer.validationBarrier.await();
     // verify additional jobs are run as soon as current job finishes
     syncer.validationBarrier = new CyclicBarrier(pendingJobs + 1);
+    // When we run the test in a small number of cores, it is possible that the running jobs
+    // have not yet gotten to execute running.decrementAndGet(), but the pending jobs have already
+    // done the increment. So, we need to wait until we check the running counter to equal the
+    // pending jobs.
+    TestUtils.waitForCondition(aVoid -> running.get() == pendingJobs,
+        10_000, "Invalid number of running jobs" + running.get());
+
+    // Now that there are no jobs running, we can let the new ones in.
+    // All the pending jobs will wait on the validationBarrier after we let them pass
+    // the startupbarrier below.
     syncer.startupBarrier.await();
-    assertEquals(running.get(), pendingJobs);
     verify(accountant, times(pendingJobs)).incrementThreads();
     syncer.validationBarrier.await();
   }

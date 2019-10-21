@@ -26,7 +26,6 @@ import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import javax.annotation.concurrent.ThreadSafe;
-import sun.misc.Cleaner;
 import sun.nio.ch.DirectBuffer;
 
 

@@ -32,7 +32,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import javax.annotation.Nullable;
 import org.apache.avro.generic.GenericData;
@@ -40,7 +39,7 @@ import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.TimeFieldSpec;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.common.utils.BytesUtils;
 
 
 public class RecordReaderUtils {
@@ -177,6 +176,8 @@ public class RecordReaderUtils {
         return Double.parseDouble(stringValue);
       case STRING:
         return stringValue;
+      case BYTES:
+        return BytesUtils.toBytes(stringValue);
       default:
         throw new IllegalStateException("Illegal data type: " + dataType);
     }
@@ -231,13 +232,6 @@ public class RecordReaderUtils {
       } else {
         return Arrays.copyOf(array, index);
       }
-    }
-  }
-
-  public static void copyRow(GenericRow source, GenericRow destination) {
-    destination.clear();
-    for (Map.Entry<String, Object> entry : source.getEntrySet()) {
-      destination.putField(entry.getKey(), entry.getValue());
     }
   }
 }

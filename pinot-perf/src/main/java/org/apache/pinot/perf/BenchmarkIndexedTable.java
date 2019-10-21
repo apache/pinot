@@ -21,10 +21,13 @@ package org.apache.pinot.perf;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -40,9 +43,9 @@ import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
+import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
-import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
@@ -71,25 +74,24 @@ public class BenchmarkIndexedTable {
 
   private ExecutorService _executorService;
 
-  @Setup(Level.Invocation)
-  public void setUpInvocation() {
 
+  @Setup
+  public void setup() {
     // create data
     int cardinalityD1 = 100;
-    _d1 = new ArrayList<>(cardinalityD1);
-    for (int i = 0; i < cardinalityD1; i++) {
-      _d1.add(RandomStringUtils.randomAlphabetic(3));
+    Set<String> d1 = new HashSet<>(cardinalityD1);
+    while (d1.size() < cardinalityD1) {
+      d1.add(RandomStringUtils.randomAlphabetic(3));
     }
+    _d1 = new ArrayList<>(cardinalityD1);
+    _d1.addAll(d1);
 
     int cardinalityD2 = 100;
     _d2 = new ArrayList<>(cardinalityD2);
     for (int i = 0; i < cardinalityD2; i++) {
       _d2.add(i);
     }
-  }
 
-  @Setup
-  public void setup() {
     _dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
             DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
@@ -136,27 +138,39 @@ public class BenchmarkIndexedTable {
     IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable();
     concurrentIndexedTable.init(_dataSchema, _aggregationInfos, _orderBy, CAPACITY);
 
-    List<Callable<Void>> innerSegmentCallables = new ArrayList<>(numSegments);
-
     // 10 parallel threads putting 10k records into the table
 
+    CountDownLatch operatorLatch = new CountDownLatch(numSegments);
+    Future[] futures = new Future[numSegments];
     for (int i = 0; i < numSegments; i++) {
-
-      Callable<Void> callable = () -> {
-        for (int r = 0; r < NUM_RECORDS; r++) {
-          concurrentIndexedTable.upsert(getNewRecord());
+      futures[i] = _executorService.submit(new TraceRunnable() {
+        @SuppressWarnings("unchecked")
+        @Override
+        public void runJob() {
+          for (int r = 0; r < NUM_RECORDS; r++) {
+            concurrentIndexedTable.upsert(getNewRecord());
+          }
+          operatorLatch.countDown();
         }
-        return null;
-      };
-      innerSegmentCallables.add(callable);
+      });
     }
 
-    List<Future<Void>> futures = _executorService.invokeAll(innerSegmentCallables);
-    for (Future<Void> future : futures) {
-      future.get(10, TimeUnit.SECONDS);
+    try {
+      boolean opCompleted = operatorLatch.await(30, TimeUnit.SECONDS);
+      if (!opCompleted) {
+        System.out.println("Timed out............");
+      }
+      concurrentIndexedTable.finish(false);
+    } catch (Exception e) {
+      throw e;
+    } finally {
+      // Cancel all ongoing jobs
+      for (Future future : futures) {
+        if (!future.isDone()) {
+          future.cancel(true);
+        }
+      }
     }
-
-    concurrentIndexedTable.finish();
   }
 
 
@@ -182,7 +196,7 @@ public class BenchmarkIndexedTable {
         for (int r = 0; r < NUM_RECORDS; r++) {
           simpleIndexedTable.upsert(getNewRecord());
         }
-        simpleIndexedTable.finish();
+        simpleIndexedTable.finish(false);
         return null;
       };
       innerSegmentCallables.add(callable);
@@ -202,7 +216,7 @@ public class BenchmarkIndexedTable {
         mergedTable.merge(indexedTable);
       }
     }
-    mergedTable.finish();
+    mergedTable.finish(false);
   }
 
   public static void main(String[] args) throws Exception {

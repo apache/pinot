@@ -18,24 +18,24 @@
  */
 package org.apache.pinot.core.realtime.impl.dictionary;
 
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.ints.IntSets;
 import java.io.IOException;
 import java.util.Arrays;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.primitive.ByteArray;
+import org.apache.pinot.core.common.predicate.RangePredicate;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
 
 
-/**
- * OffHeap mutable dictionary for Bytes data type.
- */
+@SuppressWarnings("Duplicates")
 public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
-
   private final MutableOffHeapByteArrayStore _byteStore;
 
-  private ByteArray _min = null;
-  private ByteArray _max = null;
+  private volatile byte[] _min = null;
+  private volatile byte[] _max = null;
 
   /**
    * Constructor the class.
@@ -53,14 +53,114 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   }
 
   @Override
-  public int indexOf(Object rawValue) {
-    byte[] bytes = BytesUtils.toBytes(rawValue);
-    return getDictId(new ByteArray(bytes), bytes);
+  public int index(Object value) {
+    byte[] bytesValue = (byte[]) value;
+    updateMinMax(bytesValue);
+    return indexValue(new ByteArray(bytesValue), bytesValue);
+  }
+
+  @Override
+  public int[] index(Object[] values) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public int compare(int dictId1, int dictId2) {
+    return ByteArray.compare(getBytesValue(dictId1), getBytesValue(dictId2));
+  }
+
+  @Override
+  public IntSet getDictIdsInRange(String lower, String upper, boolean includeLower, boolean includeUpper) {
+    int numValues = length();
+    if (numValues == 0) {
+      return IntSets.EMPTY_SET;
+    }
+    IntSet dictIds = new IntOpenHashSet();
+
+    int lowerCompareThreshold = includeLower ? 0 : 1;
+    int upperCompareThreshold = includeUpper ? 0 : -1;
+    if (lower.equals(RangePredicate.UNBOUNDED)) {
+      byte[] upperValue = BytesUtils.toBytes(upper);
+      for (int dictId = 0; dictId < numValues; dictId++) {
+        byte[] value = getBytesValue(dictId);
+        if (ByteArray.compare(value, upperValue) <= upperCompareThreshold) {
+          dictIds.add(dictId);
+        }
+      }
+    } else if (upper.equals(RangePredicate.UNBOUNDED)) {
+      byte[] lowerValue = BytesUtils.toBytes(lower);
+      for (int dictId = 0; dictId < numValues; dictId++) {
+        byte[] value = getBytesValue(dictId);
+        if (ByteArray.compare(value, lowerValue) >= lowerCompareThreshold) {
+          dictIds.add(dictId);
+        }
+      }
+    } else {
+      byte[] lowerValue = BytesUtils.toBytes(lower);
+      byte[] upperValue = BytesUtils.toBytes(upper);
+      for (int dictId = 0; dictId < numValues; dictId++) {
+        byte[] value = getBytesValue(dictId);
+        if (ByteArray.compare(value, lowerValue) >= lowerCompareThreshold
+            && ByteArray.compare(value, upperValue) <= upperCompareThreshold) {
+          dictIds.add(dictId);
+        }
+      }
+    }
+    return dictIds;
+  }
+
+  @Override
+  public ByteArray getMinVal() {
+    return new ByteArray(_min);
+  }
+
+  @Override
+  public ByteArray getMaxVal() {
+    return new ByteArray(_max);
+  }
+
+  @Override
+  public ByteArray[] getSortedValues() {
+    int numValues = length();
+    ByteArray[] sortedValues = new ByteArray[numValues];
+
+    for (int dictId = 0; dictId < numValues; dictId++) {
+      sortedValues[dictId] = new ByteArray(getBytesValue(dictId));
+    }
+
+    Arrays.sort(sortedValues);
+    return sortedValues;
+  }
+
+  @Override
+  public int indexOf(String stringValue) {
+    byte[] bytesValue = BytesUtils.toBytes(stringValue);
+    return getDictId(new ByteArray(bytesValue), bytesValue);
   }
 
   @Override
   public byte[] get(int dictId) {
     return getBytesValue(dictId);
+  }
+
+  @Override
+  public int getIntValue(int dictId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public long getLongValue(int dictId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public float getFloatValue(int dictId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public double getDoubleValue(int dictId) {
+    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -74,81 +174,13 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   }
 
   @Override
-  public void doClose()
-      throws IOException {
-    _byteStore.close();
-  }
-
-  @Override
-  protected void setRawValueAt(int dictId, Object rawValue, byte[] serializedValue) {
+  protected void setValue(int dictId, Object value, byte[] serializedValue) {
     _byteStore.add(serializedValue);
   }
 
   @Override
-  public void index(@Nonnull Object rawValue) {
-    byte[] bytes = BytesUtils.toBytes(rawValue);
-    ByteArray byteArray = new ByteArray(bytes);
-    indexValue(byteArray, bytes);
-    updateMinMax(byteArray);
-  }
-
-  @Override
-  public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare, boolean includeLower,
-      boolean includeUpper) {
-    return valueInRange(new ByteArray(BytesUtils.toBytes(lower)), new ByteArray(BytesUtils.toBytes(upper)),
-        includeLower, includeUpper, new ByteArray(getBytesValue(dictIdToCompare)));
-  }
-
-  @Nonnull
-  @Override
-  public Object getMinVal() {
-    return _min;
-  }
-
-  @Nonnull
-  @Override
-  public Object getMaxVal() {
-    return _max;
-  }
-
-  @Nonnull
-  @Override
-  public ByteArray[] getSortedValues() {
-    int numValues = length();
-    ByteArray[] sortedValues = new ByteArray[numValues];
-
-    for (int i = 0; i < numValues; i++) {
-      sortedValues[i] = getInternal(i);
-    }
-
-    Arrays.sort(sortedValues);
-    return sortedValues;
-  }
-
-  private ByteArray getInternal(int dictId) {
-    return new ByteArray(_byteStore.get(dictId));
-  }
-
   protected boolean equalsValueAt(int dictId, Object value, byte[] serializedValue) {
     return _byteStore.equalsValueAt(serializedValue, dictId);
-  }
-
-  private void updateMinMax(ByteArray value) {
-    if (_min == null) {
-      _min = value;
-      _max = value;
-    } else {
-      if (value.compareTo(_min) < 0) {
-        _min = value;
-      } else if (value.compareTo(_max) > 0) {
-        _max = value;
-      }
-    }
-  }
-
-  @Override
-  public long getTotalOffHeapMemUsed() {
-    return super.getTotalOffHeapMemUsed() + _byteStore.getTotalOffHeapMemUsed();
   }
 
   @Override
@@ -157,7 +189,27 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   }
 
   @Override
-  public int compare(int dictId1, int dictId2) {
-    return ByteArray.compare(getBytesValue(dictId1), getBytesValue(dictId2));
+  public long getTotalOffHeapMemUsed() {
+    return getOffHeapMemUsed() + _byteStore.getTotalOffHeapMemUsed();
+  }
+
+  @Override
+  public void doClose()
+      throws IOException {
+    _byteStore.close();
+  }
+
+  private void updateMinMax(byte[] value) {
+    if (_min == null) {
+      _min = value;
+      _max = value;
+    } else {
+      if (ByteArray.compare(value, _min) < 0) {
+        _min = value;
+      }
+      if (ByteArray.compare(value, _max) > 0) {
+        _max = value;
+      }
+    }
   }
 }

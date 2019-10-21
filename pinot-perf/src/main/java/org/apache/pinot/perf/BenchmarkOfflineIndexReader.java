@@ -212,7 +212,7 @@ public class BenchmarkOfflineIndexReader {
     int ret = 0;
     for (int i = 0; i < NUM_ROUNDS; i++) {
       int value = _intDictionary.getIntValue(RANDOM.nextInt(length));
-      ret += _intDictionary.indexOf(value);
+      ret += _intDictionary.indexOf(Integer.toString(value));
     }
     return ret;
   }
@@ -225,7 +225,7 @@ public class BenchmarkOfflineIndexReader {
     int ret = 0;
     for (int i = 0; i < NUM_ROUNDS; i++) {
       long value = _longDictionary.getLongValue(RANDOM.nextInt(length));
-      ret += _longDictionary.indexOf(value);
+      ret += _longDictionary.indexOf(Long.toString(value));
     }
     return ret;
   }
@@ -238,7 +238,7 @@ public class BenchmarkOfflineIndexReader {
     int ret = 0;
     for (int i = 0; i < NUM_ROUNDS; i++) {
       float value = _floatDictionary.getFloatValue(RANDOM.nextInt(length));
-      ret += _floatDictionary.indexOf(value);
+      ret += _floatDictionary.indexOf(Float.toString(value));
     }
     return ret;
   }
@@ -251,7 +251,7 @@ public class BenchmarkOfflineIndexReader {
     int ret = 0;
     for (int i = 0; i < NUM_ROUNDS; i++) {
       double value = _doubleDictionary.getDoubleValue(RANDOM.nextInt(length));
-      ret += _doubleDictionary.indexOf(value);
+      ret += _doubleDictionary.indexOf(Double.toString(value));
     }
     return ret;
   }
@@ -270,7 +270,7 @@ public class BenchmarkOfflineIndexReader {
       dictIds[i] = dictId;
     }
     String[] outValues = new String[NUM_ROUNDS];
-    _stringDictionary.readStringValues(dictIds, 0, NUM_ROUNDS, outValues, 0);
+    _stringDictionary.readStringValues(dictIds, NUM_ROUNDS, outValues);
     for (int i = 0; i < NUM_ROUNDS; i++) {
       ret += outValues[0].length();
     }

@@ -476,42 +476,4 @@ public class Pql2CompilerTest {
       Assert.assertEquals(orderBy.isIsAsc(), isAscs.get(i).booleanValue());
     }
   }
-
-  @Test
-  public void testBadQueries() {
-    Pql2Compiler.ENABLE_DISTINCT = true;
-    String pql = "SELECT sum(col1), min(col2), DISTINCT(col3, col4) FROM foo";
-    runBadQuery(pql, "Syntax error: Functions cannot be used with DISTINCT clause");
-
-    pql = "SELECT col1, col2, DISTINCT(col3) FROM foo";
-    runBadQuery(pql, "Syntax error: SELECT list columns should be part of DISTINCT clause");
-
-    pql = "SELECT DISTINCT(col1, col2), DISTINCT(col3) FROM foo";
-    runBadQuery(pql, "Syntax error: DISTINCT clause can be used only once in a query");
-
-    pql = "SELECT timeConvert(DaysSinceEpoch,'DAYS','SECONDS'), DISTINCT(DaysSinceEpoch) FROM foo";
-    runBadQuery(pql, "Syntax error: Functions cannot be used with DISTINCT clause");
-
-    pql = "SELECT DISTINCT(col1), col2, col3 FROM foo";
-    runBadQuery(pql, "Syntax error: SELECT list columns should be part of DISTINCT clause");
-
-    pql = "SELECT DISTINCT(col1, col2), sum(col3), min(col4) FROM foo";
-    runBadQuery(pql, "Syntax error: Functions cannot be used with DISTINCT clause");
-
-    pql = "SELECT DISTINCT(DaysSinceEpoch), timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM foo";
-    runBadQuery(pql, "Syntax error: Functions cannot be used with DISTINCT clause");
-
-    pql = "SELECT DISTINCT(*) FROM foo";
-    runBadQuery(pql,
-        "Syntax error: Pinot currently does not support DISTINCT with *. Please specify each column name as argument to DISTINCT function");
-  }
-
-  private void runBadQuery(final String pql, final String message) {
-    try {
-      COMPILER.compileToBrokerRequest(pql);
-      Assert.fail("Query should not have compiled successfully");
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof Pql2CompilationException && e.getMessage().contains(message));
-    }
-  }
 }

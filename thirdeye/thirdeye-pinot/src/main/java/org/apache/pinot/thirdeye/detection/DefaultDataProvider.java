@@ -236,7 +236,7 @@ public class DefaultDataProvider implements DataProvider {
           (configId >= 0) && (anomaly.getDetectionConfigId() == null || anomaly.getDetectionConfigId() != configId)
       );
 
-      LOG.info("Fetched {} anomalies between (startTime = {}, endTime = {}) with confid Id = {}", anomalies.size(), slice.getStart(), slice.getEnd(), configId);
+      LOG.info("Fetched {} anomalies between (startTime = {}, endTime = {}) with config Id = {}", anomalies.size(), slice.getStart(), slice.getEnd(), configId);
       output.putAll(slice, anomalies);
     }
     return output;

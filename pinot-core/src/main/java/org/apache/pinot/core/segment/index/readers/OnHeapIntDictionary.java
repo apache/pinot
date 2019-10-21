@@ -47,7 +47,7 @@ public class OnHeapIntDictionary extends OnHeapDictionary {
     super(dataBuffer, length, Integer.BYTES, (byte) 0);
 
     _valToDictId = new Int2IntOpenHashMap(length);
-    _valToDictId.defaultReturnValue(-1);
+    _valToDictId.defaultReturnValue(NULL_VALUE_INDEX);
     _dictIdToVal = new int[length];
 
     for (int dictId = 0; dictId < length; dictId++) {
@@ -58,29 +58,15 @@ public class OnHeapIntDictionary extends OnHeapDictionary {
   }
 
   @Override
-  public int indexOf(Object rawValue) {
-    int value = getValue(rawValue);
-    return _valToDictId.get(value);
-  }
-
-  private int getValue(Object rawValue) {
-    int value;
-    if (rawValue instanceof String) {
-      value = Integer.parseInt((String) rawValue);
-    } else if (rawValue instanceof Integer) {
-      value = (int) rawValue;
-    } else {
-      throw new IllegalArgumentException(
-          "Illegal data type for argument, actual: " + rawValue.getClass().getName() + " expected: " + Integer.class
-              .getName());
-    }
-    return value;
+  public int insertionIndexOf(String stringValue) {
+    int intValue = Integer.parseInt(stringValue);
+    int index = _valToDictId.get(intValue);
+    return (index != NULL_VALUE_INDEX) ? index : Arrays.binarySearch(_dictIdToVal, intValue);
   }
 
   @Override
-  public int insertionIndexOf(Object rawValue) {
-    int index = indexOf(rawValue);
-    return (index != -1) ? index : Arrays.binarySearch(_dictIdToVal, getValue(rawValue));
+  public int indexOf(String stringValue) {
+    return _valToDictId.get(Integer.parseInt(stringValue));
   }
 
   @Override
