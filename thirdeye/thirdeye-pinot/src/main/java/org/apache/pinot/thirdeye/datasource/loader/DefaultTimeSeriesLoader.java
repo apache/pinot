@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.datasource.loader;
 
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
@@ -27,10 +28,13 @@ import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.dataframe.util.TimeSeriesRequestContainer;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datasource.MetricFunction;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
 import org.apache.pinot.thirdeye.detection.cache.DefaultTimeSeriesCache;
 import org.apache.pinot.thirdeye.detection.cache.ThirdEyeCacheRequestContainer;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,6 +76,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
       response = this.cache.getQueryResult(rc.getRequest());
     }
 
+    System.out.println("show me the magic");
 
     return DataFrameUtils.evaluateResponse(response, rc);
   }
@@ -83,16 +88,6 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
     TimeSeriesRequestContainer rc = DataFrameUtils.makeTimeSeriesRequestAligned(slice, "ref", this.metricDAO, this.datasetDAO);
     ThirdEyeResponse response = this.cache.getQueryResult(rc.getRequest());
 
-    // fire and forget
-    ExecutorService executor = Executors.newCachedThreadPool();
-
-    // insert the time series in parallel
-
-
-    /*for (int i = 0; i < response.getNumRows(); i++) {
-      executor.execute(() -> timeSeriesCache.insertTimeSeriesIntoCache(response, i));
-    }*/
-    executor.execute(() -> timeSeriesCache.insertTimeSeriesIntoCache(response));
-    executor.shutdown();
+    timeSeriesCache.insertTimeSeriesIntoCache(response);
   }
 }

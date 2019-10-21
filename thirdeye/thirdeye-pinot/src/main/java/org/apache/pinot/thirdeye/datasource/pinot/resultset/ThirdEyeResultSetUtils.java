@@ -106,15 +106,15 @@ public class ThirdEyeResultSetUtils {
         for (int r = 0; r < numRows; r++) {
           boolean skipRowDueToError = false;
           String[] groupKeys;
+          String timestamp = null;
           if (hasGroupBy) {
 
             // TODO: CHANGE THIS TO KEEP TIMESTAMPS
-            groupKeys = new String[resultSet.getGroupKeyLength() + 1];
-            //groupKeys = new String[resultSet.getGroupKeyLength()];
+            //groupKeys = new String[resultSet.getGroupKeyLength() + 1];
+            groupKeys = new String[resultSet.getGroupKeyLength()];
 
             for (int grpKeyIdx = 0; grpKeyIdx < resultSet.getGroupKeyLength(); grpKeyIdx++) {
               String groupKeyVal = "";
-              long timestamp = 0;
               try {
                 groupKeyVal = resultSet.getGroupKeyColumnValue(r, grpKeyIdx);
               } catch (Exception e) {
@@ -137,14 +137,13 @@ public class ThirdEyeResultSetUtils {
                   skipRowDueToError = true;
                   break;
                 }
-                timestamp = millis;
                 timeBucket = TimeRangeUtils
                     .computeBucketIndex(request.getGroupByTimeGranularity(), startDateTime,
                         new DateTime(millis, dateTimeZone));
                 groupKeyVal = String.valueOf(timeBucket);
+                timestamp = String.valueOf(millis);
               }
               groupKeys[grpKeyIdx] = groupKeyVal;
-              groupKeys[groupKeys.length - 1] = String.valueOf(timestamp);
             }
             if (skipRowDueToError) {
               continue;
@@ -156,7 +155,12 @@ public class ThirdEyeResultSetUtils {
 
           String[] rowValues = dataMap.get(compositeGroupKey);
           if (rowValues == null) {
-            rowValues = new String[numCols];
+            // BRYAN: add one to include the timestamp, if applicable
+            if (timestamp != null) {
+              rowValues = new String[numCols + 1];
+            } else {
+              rowValues = new String[numCols];
+            }
             Arrays.fill(rowValues, "0");
             System.arraycopy(groupKeys, 0, rowValues, 0, groupKeys.length);
             dataMap.put(compositeGroupKey, rowValues);
@@ -170,15 +174,20 @@ public class ThirdEyeResultSetUtils {
           countMap.put(countKey, aggCount + 1);
 
           // aggregation of multiple values
-          rowValues[groupKeys.length - 1 + position + i] = String.valueOf(
+
+          // TODO: modified these
+          rowValues[groupKeys.length + position + i] = String.valueOf(
               reduce(
-                  Double.parseDouble(rowValues[groupKeys.length - 1 + position + i]),
+                  Double.parseDouble(rowValues[groupKeys.length + position + i]),
                   Double.parseDouble(resultSet.getString(r, 0)),
                   aggCount,
                   metricFunction.getFunctionName(),
                   sourceName
               ));
 
+          if (timestamp != null) {
+            rowValues[rowValues.length - 1] = timestamp;
+          }
         }
       }
       position ++;

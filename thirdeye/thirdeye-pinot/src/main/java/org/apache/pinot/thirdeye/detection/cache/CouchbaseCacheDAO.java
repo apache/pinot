@@ -1,5 +1,7 @@
 package org.apache.pinot.thirdeye.detection.cache;
 
+import com.couchbase.client.java.AsyncBucket;
+import com.couchbase.client.java.AsyncCluster;
 import com.couchbase.client.java.Bucket;
 import com.couchbase.client.java.Cluster;
 import com.couchbase.client.java.CouchbaseCluster;
@@ -27,11 +29,13 @@ import org.apache.pinot.thirdeye.datasource.MetricFunction;
 import org.apache.pinot.thirdeye.datasource.RelationalThirdEyeResponse;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.CacheUtils;
 import org.joda.time.DateTime;
 import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import rx.Observable;
 
 
 public class CouchbaseCacheDAO {
@@ -62,73 +66,74 @@ public class CouchbaseCacheDAO {
     Cluster cluster = CouchbaseCluster.create();
     cluster.authenticate(AUTH_USERNAME, AUTH_PASSWORD);
 
-    this.bucket = cluster.openBucket(BUCKET_NAME);
+    this.bucket = cluster.openBucket();
   }
 
   public boolean checkIfDetectionIdExistsInCache(String key) {
-    return bucket.exists(key);
+    return false;
+    //return bucket.exists.(key);
   }
 
   // rework this once we figure out how we're going to store data in couchbase
 
   //public MetricCacheResponse fetchExistingTimeSeries(long detectionId, MetricSlice slice) throws Exception {
   public ThirdEyeCacheResponse tryFetchExistingTimeSeries(ThirdEyeRequest request) {
-    //JsonDocument doc = bucket.get(request.getDetectionId());
-
-    // parametrize this later
-
-    // need to figure out how detections with multiple metrics will be stored
-
-    StringBuilder sb = new StringBuilder("SELECT `time`, `value` FROM `" + BUCKET_NAME + "` WHERE `metric_name` = `");
-    List<String> metricNames = request.getMetricNames();
-
-    for (int i = 0; i < metricNames.size() - 1; i++) {
-      sb.append(metricNames.get(i)).append("` OR `metric_name` = `");
-    }
-
-    // either this or use the metricId in the request instead
-    sb.append(metricNames.get(metricNames.size() - 1) + "`");
-    sb.append(" AND dataset = " + request.getDataSource());
-    sb.append(" AND time BETWEEN ");
-    sb.append("\"" + request.getStartTimeInclusive().toString() + "\"");
-    sb.append(" AND ");
-    sb.append("\"" + request.getEndTimeExclusive().toString() + "\"");
-    sb.append(" ORDER BY date asc;");
-
-    N1qlQueryResult result = bucket.query(N1qlQuery.simple(sb.toString()));
-
-    // if query failed or no results were returned
-    if (!result.finalSuccess() || result.allRows().isEmpty()) {
-      LOG.info("cache fetch missed or errored, retrieving data from source");
-      return null;
-    }
-
-    List<String[]> rowList = new ArrayList<>();
-
-    int i = 0;
-    DateTime startDate = request.getStartTimeInclusive();
-    Period period = request.getGroupByTimeGranularity().toPeriod();
-
-    // TODO: figure out a way to get around the relational ThirdEyeResponse data not having dates
-
-    //startDate.withPeriodAdded()
-    for (N1qlQueryRow row : result.allRows()) {
-      JsonObject dataPoint = row.value();
-      String[] pair = new String[2];
-
-      // since it's in sorted order, time bucket id will just be equal to the counter.
-      // however, we can consider changing the query to not return in sorted order
-      // and just store the time bucket value with it, which should also work.
-      String bucketNumber = String.valueOf(i);
-      String value = String.valueOf(dataPoint.get("value"));
-
-      // ignore "bubbles"/"nops"/nulls, since they represent missing data in the source
-      if (!value.equals("null")) {
-        pair[0] = bucketNumber;
-        pair[1] = value;
-        rowList.add(pair);
-      }
-    }
+//    //JsonDocument doc = bucket.get(request.getDetectionId());
+//
+//    // parametrize this later
+//
+//    // need to figure out how detections with multiple metrics will be stored
+//
+//    StringBuilder sb = new StringBuilder("SELECT `time`, `value` FROM `" + BUCKET_NAME + "` WHERE `metric_name` = `");
+//    List<String> metricNames = request.getMetricNames();
+//
+//    for (int i = 0; i < metricNames.size() - 1; i++) {
+//      sb.append(metricNames.get(i)).append("` OR `metric_name` = `");
+//    }
+//
+//    // either this or use the metricId in the request instead
+//    sb.append(metricNames.get(metricNames.size() - 1) + "`");
+//    sb.append(" AND dataset = " + request.getDataSource());
+//    sb.append(" AND time BETWEEN ");
+//    sb.append("\"" + request.getStartTimeInclusive().toString() + "\"");
+//    sb.append(" AND ");
+//    sb.append("\"" + request.getEndTimeExclusive().toString() + "\"");
+//    sb.append(" ORDER BY date asc;");
+//
+//    N1qlQueryResult result = bucket.query(N1qlQuery.simple(sb.toString()));
+//
+//    // if query failed or no results were returned
+//    if (!result.finalSuccess() || result.allRows().isEmpty()) {
+//      LOG.info("cache fetch missed or errored, retrieving data from source");
+//      return null;
+//    }
+//
+//    List<String[]> rowList = new ArrayList<>();
+//
+//    int i = 0;
+//    DateTime startDate = request.getStartTimeInclusive();
+//    Period period = request.getGroupByTimeGranularity().toPeriod();
+//
+//    // TODO: figure out a way to get around the relational ThirdEyeResponse data not having dates
+//
+//    //startDate.withPeriodAdded()
+//    for (N1qlQueryRow row : result.allRows()) {
+//      JsonObject dataPoint = row.value();
+//      String[] pair = new String[2];
+//
+//      // since it's in sorted order, time bucket id will just be equal to the counter.
+//      // however, we can consider changing the query to not return in sorted order
+//      // and just store the time bucket value with it, which should also work.
+//      String bucketNumber = String.valueOf(i);
+//      String value = String.valueOf(dataPoint.get("value"));
+//
+//      // ignore "bubbles"/"nops"/nulls, since they represent missing data in the source
+//      if (!value.equals("null")) {
+//        pair[0] = bucketNumber;
+//        pair[1] = value;
+//        rowList.add(pair);
+//      }
+//    }
 
     return null;
   }
@@ -169,7 +174,18 @@ public class CouchbaseCacheDAO {
 
   }
 
-  public void insertTimeSeriesDataPoint(ThirdEyeResponse response, int i) {
+  public void insertTimeSeriesDataPoint(TimeSeriesDataPoint point) {
 
+    JsonDocument doc = bucket.getAndTouch(point.getDocumentKey(), TIMEOUT);
+
+    if (doc == null) {
+      // if data point doesn't exist in cache, make a new document and insert it
+      JsonObject documentBody = CacheUtils.buildDocumentStructure(point);
+      doc = JsonDocument.create(point.getDocumentKey(), TIMEOUT, documentBody);
+    } else {
+      ((JsonObject)doc.content().get("dims")).put(point.getDimensionKey(), point.getDataValue());
+    }
+
+    bucket.async().upsert(doc);
   }
 }

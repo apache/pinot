@@ -12,9 +12,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.zip.CRC32;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.detection.cache.ResponseDataPojo;
 import org.apache.pinot.thirdeye.detection.cache.ThirdEyeCacheResponse;
+import org.apache.pinot.thirdeye.detection.cache.TimeSeriesDataPoint;
 
 
 public class CacheUtils {
@@ -114,5 +116,23 @@ public class CacheUtils {
       values.add(pair.getValue());
       groupByName.add(pair.getMetricName());
     }
+  }
+
+  public static String hashMetricUrn(String metricUrn) {
+    CRC32 c = new CRC32();
+    c.update(metricUrn.getBytes());
+    return String.valueOf(c.getValue());
+  }
+
+  public static JsonObject buildDocumentStructure(TimeSeriesDataPoint point) {
+    Map<String, String> dims = new HashMap<>();
+    dims.put(point.getDimensionKey(), point.getDataValue());
+
+    JsonObject body = JsonObject.create()
+        .put("time", Long.valueOf(point.getTimestamp()))
+        .put("metricId", Long.valueOf(point.getMetricId()))
+        .put("dims", dims);
+
+    return body;
   }
 }

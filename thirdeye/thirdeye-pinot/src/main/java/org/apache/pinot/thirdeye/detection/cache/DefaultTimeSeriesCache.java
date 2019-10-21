@@ -8,10 +8,13 @@ import org.apache.pinot.thirdeye.auto.onboard.AutoOnboardUtility;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datasource.MetricFunction;
 import org.apache.pinot.thirdeye.datasource.RelationalThirdEyeResponse;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
+import org.apache.pinot.thirdeye.util.CacheUtils;
 import org.joda.time.DateTime;
 import org.joda.time.Period;
 import org.slf4j.Logger;
@@ -86,10 +89,6 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
       }
     }
 
-    // TODO: Write logic to grab missing slices and merge rows later.
-    // TODO: for now, just fetch the whole series and work on that logic.
-    // fetch start to cacheStart - 1 => append to beginning
-    // fetch cacheEnd to end => append to end
     return response;
   }
 
@@ -100,18 +99,25 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
 
     switch (dataSourceType) {
       case "RelationalThirdEyeResponse":
-        cacheDAO.insertRelationalTimeSeries(response);
+        insertRelationalTimeSeries(response);
       case "CSVThirdEyeResponse":
         // do something
     }
   }
 
-  public void insertTimeSeriesPointIntoCache(ThirdEyeResponse response, int index) {
-    // also need the timestamp.
-    //cacheDAO.
-  }
+  private void insertRelationalTimeSeries(ThirdEyeResponse response) {
+    ExecutorService executor = Executors.newCachedThreadPool();
 
-  public boolean detectionIdExistsInCache(String key) {
-    return cacheDAO.checkIfDetectionIdExistsInCache(key);
+    RelationalThirdEyeResponse thirdEyeResponse = (RelationalThirdEyeResponse)response;
+
+    // need to revise this, since the loop condition looks weird, but the actual code fore
+    // relationalthirdeyeresponse makes no sense either
+    for (MetricFunction metric : response.getMetricFunctions()) {
+      String metricUrn = MetricEntity.fromMetric(response.getRequest().getFilterSet().asMap(), metric.getMetricId()).getUrn();
+      for (String[] dataPoint : thirdEyeResponse.getRows()) {
+        TimeSeriesDataPoint dp = TimeSeriesDataPoint.from(dataPoint, metricUrn);
+        executor.execute(() -> cacheDAO.insertTimeSeriesDataPoint(dp));
+      }
+    }
   }
 }
