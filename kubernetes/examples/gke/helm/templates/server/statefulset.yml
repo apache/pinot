@@ -33,7 +33,7 @@ spec:
       app: {{ include "pinot.name" . }}
       release: {{ .Release.Name }}
       component: {{ .Values.server.name }}
-  serviceName: server
+  serviceName: {{ template "pinot.server.headless" . }}
   replicas: {{ .Values.server.replicaCount }}
   updateStrategy:
     type: {{ .Values.server.updateStrategy.type }}
@@ -68,9 +68,12 @@ spec:
         args: [
           "StartServer",
           "-clusterName", "{{ .Values.cluster.name }}",
-          "-zkAddress", "{{ .Values.cluster.zookeeper }}",
+          "-zkAddress", {{ include "zookeeper.url" . | quote }},
           "-configFileName", "/var/pinot/server/config/pinot-server.conf"
         ]
+        env:
+          - name: JAVA_OPTS
+            value: {{ .Values.server.java_opts }}
         ports:
           - containerPort: {{ .Values.server.ports.netty }}
             protocol: TCP

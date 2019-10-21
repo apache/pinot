@@ -71,26 +71,44 @@ kubectl get all -n pinot-quickstart -o wide
 
 ## How to setup a Pinot cluster for demo
 
-The script requests:
- - Create persistent disk for deep storage and mount it.
-   - Zookeeper
-   - Pinot Controller
-   - Pinot Server
- - Create Pods for
-   - Zookeeper
-   - Pinot Controller
-   - Pinot Broker
-   - Pinot Server
-   - Pinot Example Loader
-
-
+### Update helm dependency
 ```
-helm install --namespace "pinot-quickstart" --name "pinot" kubernetes/examples/gke/helm/
+helm dependency update
 ```
 
-## How to query pinot data
+### Start Pinot with Helm
+```
+helm install --namespace "pinot-quickstart" --name "pinot" .
+```
+
+###  Pinot Realtime QuickStart
+
+#### Bring up a Kafka Cluster for realtime data ingestion
+```bash
+helm repo add incubator http://storage.googleapis.com/kubernetes-charts-incubator
+helm install --namespace "pinot-quickstart"  --name kafka incubator/kafka
+```
+
+#### Create Kafka topic
+```bash
+kubectl -n pinot-quickstart exec kafka-0 -- kafka-topics --zookeeper kafka-zookeeper:2181 --topic flights-realtime --create --partitions 1 --replication-factor 1
+```
+
+#### Load data into Kafka and create Pinot schema/table
+```bash
+kubectl apply -f pinot-example-loader.yml
+```
+
+### How to query pinot data
 
 Please use below script to do local port-forwarding and open Pinot query console on your web browser.
 ```
 ./query-pinot-data.sh
+```
+
+### How to clean up Pinot deployment
+```
+kubectl delete -f pinot-example-loader.yml
+helm del --purge kafka
+helm del --purge pinot
 ```

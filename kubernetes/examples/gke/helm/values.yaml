@@ -28,12 +28,11 @@ namespace: pinot-quickstart
 
 cluster:
   name: pinot-quickstart
-  zookeeper: zookeeper:2181/pinot
 
 controller:
   name: controller
 
-  replicaCount: 1
+  replicaCount: 2
 
   persistence:
     enabled: true
@@ -45,6 +44,12 @@ controller:
     dir: /var/pinot/controller/data
 
   port: 9000
+
+  vip:
+    host: pinot-controller
+    port: 9000
+
+  java_opts: "-Xms4G -Xmx4G -Dlog4j2.configurationFile=/opt/pinot/conf/pinot-controller-log4j2.xml -server -d64 -XX:+DisableExplicitGC -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintTenuringDistribution -XX:+PrintGCApplicationStoppedTime -Xloggc:gc-pinot-server.log -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:G1HeapRegionSize=8m -XX:InitiatingHeapOccupancyPercent=65 -XX:+UnlockExperimentalVMOptions -XX:G1MixedGCLiveThresholdPercent=85 -XX:G1HeapWastePercent=5"
 
   service:
     annotations: {}
@@ -72,9 +77,12 @@ controller:
 broker:
   name: broker
 
-  replicaCount: 1
+  replicaCount: 2
 
   port: 8099
+
+  java_opts: "-Xms4G -Xmx4G -Dlog4j2.configurationFile=/opt/pinot/conf/pinot-broker-log4j2.xml -server -d64 -XX:+DisableExplicitGC -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintTenuringDistribution -XX:+PrintGCApplicationStoppedTime -Xloggc:gc-pinot-server.log -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:G1HeapRegionSize=8m -XX:InitiatingHeapOccupancyPercent=85 -XX:G1ReservePercent=20 -XX:+UnlockExperimentalVMOptions -XX:G1MixedGCLiveThresholdPercent=85 -XX:G1HeapWastePercent=5"
+
   service:
     annotations: {}
     clusterIP: ""
@@ -101,7 +109,7 @@ broker:
 server:
   name: server
 
-  replicaCount: 1
+  replicaCount: 2
 
   ports:
     netty: 8098
@@ -115,6 +123,8 @@ server:
     accessMode: ReadWriteOnce
     size: 10G
     #storageClass: "ssd"
+
+  java_opts: "-Xms4G -Xmx4G -XX:MaxDirectMemorySize=10g -Dlog4j2.configurationFile=/opt/pinot/conf/pinot-server-log4j2.xml -server -d64 -XX:+DisableExplicitGC -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintTenuringDistribution -XX:+PrintGCApplicationStoppedTime -Xloggc:gc-pinot-server.log -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:G1HeapRegionSize=16m -XX:InitiatingHeapOccupancyPercent=25 -XX:G1ReservePercent=20 -XX:+UnlockExperimentalVMOptions -XX:G1MixedGCLiveThresholdPercent=85 -XX:G1HeapWastePercent=5"
 
   service:
     annotations: {}
@@ -143,15 +153,41 @@ server:
 # Zookeeper:
 # ------------------------------------------------------------------------------
 
-# zkHosts: pinot-zookeeper-headless:2181
-
 zookeeper:
+  ## If true, install the Zookeeper chart alongside Pinot
+  ## ref: https://github.com/kubernetes/charts/tree/master/incubator/zookeeper
   enabled: true
+
+  ## Configure Zookeeper resource requests and limits
+  ## ref: http://kubernetes.io/docs/user-guide/compute-resources/
+  resources: ~
+
   ## Environmental variables to set in Zookeeper
-  ##
   env:
     ## The JVM heap size to allocate to Zookeeper
-    ZK_HEAP_SIZE: "512M"
-  ## Configure Zookeeper persistence
+    ZK_HEAP_SIZE: "1G"
+
   persistence:
     enabled: true
+    ## The amount of PV storage allocated to each Zookeeper pod in the statefulset
+    # size: "2Gi"
+
+  ## Specify a Zookeeper imagePullPolicy
+  ## ref: http://kubernetes.io/docs/user-guide/images/#pre-pulling-images
+  image:
+    PullPolicy: "IfNotPresent"
+
+  ## If the Zookeeper Chart is disabled a URL and port are required to connect
+  url: ""
+  port: 2181
+
+  ## Pod scheduling preferences (by default keep pods within a release on separate nodes).
+  ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  ## By default we don't set affinity:
+  affinity: {}  # Criteria by which pod label-values influence scheduling for zookeeper pods.
+  # podAntiAffinity:
+  #   requiredDuringSchedulingIgnoredDuringExecution:
+  #     - topologyKey: "kubernetes.io/hostname"
+  #       labelSelector:
+  #         matchLabels:
+  #           release: zookeeper

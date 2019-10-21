@@ -17,8 +17,22 @@
 # under the License.
 #
 
-dependencies:
-  - name: zookeeper
-    version: 2.0.0
-    repository: https://kubernetes-charts-incubator.storage.googleapis.com/
-    condition: pinot.zookeeper.enabled,zookeeper.enabled
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "pinot.broker.headless" . }}
+  labels:
+    app: {{ include "pinot.name" . }}
+    chart: {{ include "pinot.chart" . }}
+    component: {{ .Values.broker.name }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  clusterIP: None
+  ports:
+    # [pod_name].[service_name].[namespace].svc.cluster.local
+    - port: {{ .Values.broker.service.port }}
+  selector:
+    app: {{ include "pinot.name" . }}
+    release: {{ .Release.Name }}
+    component: {{ .Values.broker.name }}

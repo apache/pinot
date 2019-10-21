@@ -18,7 +18,8 @@
 #
 
 dependencies:
-  - name: zookeeper
-    version: 2.0.0
-    repository: https://kubernetes-charts-incubator.storage.googleapis.com/
-    condition: pinot.zookeeper.enabled,zookeeper.enabled
+- name: zookeeper
+  repository: https://kubernetes-charts-incubator.storage.googleapis.com/
+  version: 2.0.0
+digest: sha256:49109ba68ee2345e11377f7e32ec0418f8738ab9c28a25e14db0797738cd97e3
+generated: "2019-10-21T13:54:19.613672-07:00"

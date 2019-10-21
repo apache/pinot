@@ -33,7 +33,7 @@ spec:
       app: {{ include "pinot.name" . }}
       release: {{ .Release.Name }}
       component: {{ .Values.controller.name }}
-  serviceName: controller
+  serviceName: {{ template "pinot.controller.headless" . }}
   replicas: {{ .Values.controller.replicaCount }}
   updateStrategy:
     type: {{ .Values.controller.updateStrategy.type }}
@@ -58,6 +58,9 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args: [ "StartController", "-configFileName", "/var/pinot/controller/config/pinot-controller.conf" ]
+        env:
+          - name: JAVA_OPTS
+            value: {{ .Values.controller.java_opts }}
         ports:
           - containerPort: {{ .Values.controller.port }}
             protocol: TCP
@@ -68,10 +71,6 @@ spec:
             mountPath: "{{ .Values.controller.data.dir }}"
         resources:
 {{ toYaml .Values.controller.resources | indent 12 }}
-      initContainers:
-      - name: create-zk-root-path
-        image: solsson/kafka:2.1.0@sha256:ac3f06d87d45c7be727863f31e79fbfdcb9c610b51ba9cf03c75a95d602f15e1
-        command: ["bin/zookeeper-shell.sh", "ZooKeeper", "-server", "{{ .Values.cluster.zookeeper }}", "create", "/", "\"\""]
       restartPolicy: Always
       volumes:
       - name: config

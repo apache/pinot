@@ -54,6 +54,34 @@ Create chart name and version as used by the chart label.
 
 
 {{/*
+Create a default fully qualified zookeeper name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+*/}}
+{{- define "pinot.zookeeper.fullname" -}}
+{{- if .Values.zookeeper.fullnameOverride -}}
+{{- .Values.zookeeper.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- $name := default "zookeeper" .Values.zookeeper.nameOverride -}}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Form the Zookeeper URL. If zookeeper is installed as part of this chart, use k8s service discovery,
+else use user-provided URL
+*/}}
+{{- define "zookeeper.url" }}
+{{- $port := .Values.zookeeper.port | toString }}
+{{- if .Values.zookeeper.enabled -}}
+{{- printf "%s:%s" (include "pinot.zookeeper.fullname" .) $port }}
+{{- else -}}
+{{- $zookeeperConnect := printf "%s:%s" .Values.zookeeper.url $port }}
+{{- $zookeeperConnectOverride := index .Values "configurationOverrides" "zookeeper.connect" }}
+{{- default $zookeeperConnect $zookeeperConnectOverride }}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Create a default fully qualified pinot controller name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 */}}
@@ -79,3 +107,23 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
 {{ template "pinot.fullname" . }}-{{ .Values.server.name }}
 {{- end -}}
 
+{{/*
+The name of the pinot controller headless service.
+*/}}
+{{- define "pinot.controller.headless" -}}
+{{- printf "%s-headless" (include "pinot.controller.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+The name of the pinot broker headless service.
+*/}}
+{{- define "pinot.broker.headless" -}}
+{{- printf "%s-headless" (include "pinot.broker.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+The name of the pinot server headless service.
+*/}}
+{{- define "pinot.server.headless" -}}
+{{- printf "%s-headless" (include "pinot.server.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
