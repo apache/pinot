@@ -282,7 +282,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     // Try deleting the tables and check that they have no routing table
     final String tableName = getTableName();
     dropOfflineTable(tableName);
+    LOGGER.info("Dropped offline table successfully");
     dropRealtimeTable(tableName);
+    LOGGER.info("Dropped realtime table successfully");
 
     // Routing table should not have any entries (length = 0) after deleting all tables
     TestUtils.waitForCondition(new Function<Void, Boolean>() {

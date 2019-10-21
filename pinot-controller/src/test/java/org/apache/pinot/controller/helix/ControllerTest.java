@@ -111,6 +111,8 @@ public abstract class ControllerTest {
 
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
+  private Logger LOGGER = LoggerFactory.getLogger(ControllerTest.class);
+
   protected String getHelixClusterName() {
     return getClass().getSimpleName();
   }
@@ -127,6 +129,7 @@ public abstract class ControllerTest {
     try {
       ZkStarter.stopLocalZkServer(_zookeeperInstance);
     } catch (Exception e) {
+      LOGGER.info("Could not stop local zk server");
       // Swallow exceptions
     }
   }

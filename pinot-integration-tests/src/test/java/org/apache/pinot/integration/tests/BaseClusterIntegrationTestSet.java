@@ -41,6 +41,8 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 
 
@@ -56,6 +58,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   private static final String DEFAULT_QUERY_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K";
   private static final int DEFAULT_NUM_QUERIES_TO_GENERATE = 100;
   private static final int DEFAULT_MAX_NUM_QUERIES_TO_SKIP_IN_QUERY_FILE = 200;
+
+  protected static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTest.class.getName());
 
   /**
    * Can be overridden to change default setting
@@ -225,6 +229,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     getPinotConnection().execute("select $docId, $segmentName, $hostName from mytable where $docId = 5 limit 50");
     getPinotConnection().execute("select $docId, $segmentName, $hostName from mytable where $docId > 19998 limit 50");
     getPinotConnection().execute("select max($docId) from mytable group by $segmentName");
+    LOGGER.info("Successfully completed virtual column query test");
   }
 
   /**
