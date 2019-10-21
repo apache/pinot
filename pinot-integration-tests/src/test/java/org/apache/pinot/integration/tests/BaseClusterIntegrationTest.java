@@ -46,6 +46,8 @@ import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
 import org.apache.pinot.util.TestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 
 
@@ -53,6 +55,7 @@ import org.testng.Assert;
  * Shared implementation details of the cluster integration tests.
  */
 public abstract class BaseClusterIntegrationTest extends ClusterTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTest.class);
 
   // Default settings
   private static final String DEFAULT_TABLE_NAME = "mytable";
@@ -364,17 +367,31 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @param timeoutMs Timeout in milliseconds
    * @throws Exception
    */
-  protected void waitForAllDocsLoaded(long timeoutMs)
-      throws Exception {
+  protected void waitForAllDocsLoaded(long timeoutMs) throws Exception {
     final long countStarResult = getCountStarResult();
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
       @Nullable
       @Override
       public Boolean apply(@Nullable Void aVoid) {
+        long currentResult;
         try {
-          return getCurrentCountStarResult() == countStarResult;
+          currentResult = getCurrentCountStarResult();
         } catch (Exception e) {
           return null;
+        }
+
+        // Add more information to logs
+        if (currentResult == countStarResult) {
+          return true;
+        } else if (currentResult < countStarResult) {
+          LOGGER.info("Docs are not fully loaded yet (current: {}, expected: {})", currentResult, countStarResult);
+          return false;
+        } else {
+          String errorMsg = String.format(
+              "Count star result is larger than the expected (current: %s, expected: %s). We must not hit this.",
+              currentResult, countStarResult);
+          LOGGER.error(errorMsg, currentResult, countStarResult);
+          throw new RuntimeException(errorMsg);
         }
       }
     }, timeoutMs, "Failed to load " + countStarResult + " documents");
