@@ -234,9 +234,9 @@
             {{/te-modal}}
 
             <div class="col-xs-12 te-graph-container">
-              {{#if isLoadingTimeSeries}}
+              {{#if isDataLoading}}
                 <div class="spinner-wrapper spinner-wrapper--card">
-                  {{ember-spinner}}
+                  {{ember-spinner lines=30 radius=20 length=0 width=10 opacity=0 trail=75 color='blue'}}
                 </div>
               {{/if}}
               {{timeseries-chart
@@ -260,7 +260,7 @@
             timeRangeOptions=baselineOptions
             selectAction=(action "onBaselineOptionClick")
           }}
-            {{#if anomaliesOld}}
+            {{#if anomaliesAny}}
               {{models-table
                 data=tableAnomalies
                 columns=columns
