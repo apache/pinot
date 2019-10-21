@@ -20,6 +20,7 @@ package org.apache.pinot.tools.admin.command;
 
 import java.util.Collections;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.tools.Command;
@@ -36,6 +37,9 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
 
   @Option(name = "-brokerPort", required = false, metaVar = "<int>", usage = "http port for broker.")
   private String _brokerPort = Integer.toString(CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
+
+  @Option(name = "-queryType", required = false, metaVar = "<string>", usage = "Query use sql or pql.")
+  private String _queryType = "pql";
 
   @Option(name = "-query", required = true, metaVar = "<string>", usage = "Query string to perform.")
   private String _query;
@@ -55,7 +59,7 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
 
   @Override
   public String toString() {
-    return ("PostQuery -brokerHost " + _brokerHost + " -brokerPort " + _brokerPort + " -query " + _query);
+    return ("PostQuery -brokerHost " + _brokerHost + " -brokerPort " + _brokerPort + " -queryType " + _queryType + " -query " + _query);
   }
 
   @Override
@@ -77,6 +81,10 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     _brokerPort = port;
     return this;
   }
+  public PostQueryCommand setQueryType(String queryType) {
+    _queryType = queryType;
+    return this;
+  }
 
   public PostQueryCommand setQuery(String query) {
     _query = query;
@@ -90,7 +98,13 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     }
     LOGGER.info("Executing command: " + toString());
 
-    String request = JsonUtils.objectToString(Collections.singletonMap("pql", _query));
+    String request = null;
+    if (_queryType.toLowerCase().equals(Request.SQL)) {
+      request = JsonUtils.objectToString(Collections.singletonMap(Request.SQL, _query));
+    } else {
+      request = JsonUtils.objectToString(Collections.singletonMap(Request.PQL, _query));
+    }
+
     return sendPostRequest("http://" + _brokerHost + ":" + _brokerPort + "/query", request);
   }
 
