@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.datalayer.bao;
 
 import java.util.List;
 
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import java.util.Set;
@@ -29,9 +30,13 @@ public interface TaskManager extends AbstractManager<TaskDTO>{
 
   List<TaskDTO> findByJobIdStatusNotIn(Long jobId, TaskStatus status);
 
+  List<TaskDTO> findByNameOrderByCreateTime(String name, int fetchSize, boolean asc);
+
   List<TaskDTO> findByStatusNotIn(TaskStatus status);
 
   List<TaskDTO> findByStatusWithinDays(TaskStatus status, int days);
+
+  List<TaskDTO> findByStatusesAndTypeWithinDays(List<TaskStatus> statuses, TaskConstants.TaskType type, int days);
 
   List<TaskDTO> findTimeoutTasksWithinDays(int days, long maxTaskTime);
 
@@ -39,8 +44,7 @@ public interface TaskManager extends AbstractManager<TaskDTO>{
 
   List<TaskDTO> findByStatusAndWorkerId(Long workerId, TaskStatus status);
 
-  boolean updateStatusAndWorkerId(Long workerId, Long id, Set<TaskStatus> allowedOldStatus,
-      TaskStatus newStatus, int expectedVersion);
+  boolean updateStatusAndWorkerId(Long workerId, Long id, Set<TaskStatus> allowedOldStatus, int expectedVersion);
 
   void updateStatusAndTaskEndTime(Long id, TaskStatus oldStatus, TaskStatus newStatus,
       Long taskEndTime, String message);

@@ -23,10 +23,8 @@ import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.anomaly.utils.AnomalyUtils;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -38,7 +36,6 @@ import org.quartz.JobDetail;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
-import org.quartz.SchedulerFactory;
 import org.quartz.Trigger;
 import org.quartz.TriggerBuilder;
 import org.quartz.impl.StdSchedulerFactory;
@@ -76,10 +73,13 @@ public class DetectionPipelineScheduler implements Runnable {
       for (DetectionConfigDTO config : configs) {
         JobKey key = new JobKey(getJobKey(config.getId()), TaskConstants.TaskType.DETECTION.toString());
         if (!config.isActive()) {
-          LOG.info("Detection config  " + key + " is inactive. Skipping.");
+          LOG.info("Detection config " + key + " is inactive. Skipping.");
           continue;
         }
-
+        if (config.isDataAvailabilitySchedule()) {
+          LOG.info("Detection config " + key + " is enabled for data availability scheduling. Skipping.");
+          continue;
+        }
         try {
           if (scheduler.checkExists(key)) {
             LOG.info("Detection config  " + key.getName() + " is already scheduled");
@@ -105,9 +105,15 @@ public class DetectionPipelineScheduler implements Runnable {
           if (detectionDTO == null) {
             LOG.info("Found a scheduled detection pipeline, but not found in the database {}", id);
             stopJob(jobKey);
+            continue;
 
           } else if (!detectionDTO.isActive()) {
             LOG.info("Found a scheduled pipeline, but has been deactivated");
+            stopJob(jobKey);
+            continue;
+          }
+          if (detectionDTO.isDataAvailabilitySchedule()) {
+            LOG.info("Found a scheduled pipeline enabled for data availability scheduling.");
             stopJob(jobKey);
           }
         } catch (Exception e) {

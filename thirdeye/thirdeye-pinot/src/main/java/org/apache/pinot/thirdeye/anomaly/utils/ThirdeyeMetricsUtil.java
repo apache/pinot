@@ -155,6 +155,12 @@ public class ThirdeyeMetricsUtil {
   public static final Counter processedTriggerEventCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "processedTriggerEventCounter");
 
+  public static final Counter eventScheduledTaskCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "eventScheduledTaskCounter");
+
+  public static final Counter eventScheduledTaskFallbackCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "eventScheduledTaskFallbackCounter");
+
   public static MetricsRegistry getMetricsRegistry() {
     return metricsRegistry;
   }

@@ -28,15 +28,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
-import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
-import org.apache.pinot.thirdeye.datasource.MetricExpression;
-import org.apache.pinot.thirdeye.datasource.MetricFunction;
 import org.apache.pinot.thirdeye.formatter.DetectionConfigFormatter;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
@@ -55,8 +50,10 @@ public class DatasetTriggerInfoRepo {
   private static int refreshFreqInMin = 30;
   private Map<String, Long> datasetRefreshTimeMap;
   private ScheduledThreadPoolExecutor executorService;
+  private DetectionConfigManager detectionConfigDAO;
 
   private DatasetTriggerInfoRepo() {
+    this.detectionConfigDAO = DAO_REGISTRY.getDetectionConfigManager();
     this.datasetRefreshTimeMap = new ConcurrentHashMap<>();
     this.updateFreshTimeMap(); // initial refresh
     this.executorService = new ScheduledThreadPoolExecutor(1, r -> {
@@ -103,8 +100,6 @@ public class DatasetTriggerInfoRepo {
 
   private void updateFreshTimeMap() {
     Set<Long> visitedMetrics = new HashSet<>(); // reduce the number of DB read
-    DetectionConfigManager detectionConfigDAO = DAO_REGISTRY.getDetectionConfigManager();
-    MetricConfigManager metricsConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     List<DetectionConfigDTO> detectionConfigs = detectionConfigDAO.findAllActive();
     LOG.info(String.format("Found %d active detection configs", detectionConfigs.size()));
     for (DetectionConfigDTO detectionConfig : detectionConfigs) {
@@ -116,17 +111,13 @@ public class DatasetTriggerInfoRepo {
           // the metric is already visited before, so skipping.
           continue;
         }
-        MetricConfigDTO metricConfig = metricsConfigDAO.findById(me.getId());
-        if (metricConfig == null) {
-          LOG.warn("Found null value for metric: " + me.getId());
-          continue;
-        }
-        if (metricConfig.isDerived()) {
-          MetricExpression metricExpression = ThirdEyeUtils.getMetricExpressionFromMetricConfig(metricConfig);
-          List<MetricFunction> functions = metricExpression.computeMetricFunctions();
-          functions.forEach(f -> add2CacheIfNeeded(f.getDataset()));
-        } else {
-          add2CacheIfNeeded(metricConfig.getDataset());
+        List<DatasetConfigDTO> datasetConfigs = ThirdEyeUtils.getDatasetConfigsFromMetricUrn(urn);
+        for (DatasetConfigDTO datasetConfig : datasetConfigs) {
+          String datasetName = datasetConfig.getName();
+          if (!datasetRefreshTimeMap.containsKey(datasetName)
+              && dataSourceWhitelist.contains(datasetConfig.getDataSource())) {
+            datasetRefreshTimeMap.put(datasetName, datasetConfig.getLastRefreshTime());
+          }
         }
         visitedMetrics.add(me.getId());
       }
@@ -134,14 +125,4 @@ public class DatasetTriggerInfoRepo {
     LOG.info("Finished updating the list of dataset with size: " + datasetRefreshTimeMap.size());
   }
 
-  private void add2CacheIfNeeded(String dataset) {
-    DatasetConfigManager datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
-    if (!datasetRefreshTimeMap.containsKey(dataset)) {
-      DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
-      if (!dataSourceWhitelist.contains(datasetConfig.getDataSource())) {
-        return;
-      }
-      datasetRefreshTimeMap.put(dataset, datasetConfig.getLastRefreshTime());
-    }
-  }
 }

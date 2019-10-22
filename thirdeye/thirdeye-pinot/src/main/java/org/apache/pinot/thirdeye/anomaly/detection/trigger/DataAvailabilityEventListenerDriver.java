@@ -30,7 +30,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.pinot.thirdeye.anomaly.detection.trigger.filter.DataAvailabilityEventFilter;
 import org.apache.pinot.thirdeye.anomaly.detection.trigger.utils.DatasetTriggerInfoRepo;
-import org.apache.pinot.thirdeye.anomaly.detection.trigger.utils.DataAvailabilityListenerConfiguration;
+import org.apache.pinot.thirdeye.anomaly.detection.trigger.utils.DataAvailabilitySchedulingConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,11 +41,11 @@ import org.slf4j.LoggerFactory;
 public class DataAvailabilityEventListenerDriver {
   private static final Logger LOG = LoggerFactory.getLogger(DataAvailabilityEventListenerDriver.class);
   private ExecutorService executorService;
-  private DataAvailabilityListenerConfiguration config;
+  private DataAvailabilitySchedulingConfiguration config;
   private Properties consumerProps;
   private List<DataAvailabilityEventListener> listeners;
 
-  public DataAvailabilityEventListenerDriver(DataAvailabilityListenerConfiguration config) throws IOException {
+  public DataAvailabilityEventListenerDriver(DataAvailabilitySchedulingConfiguration config) throws IOException {
     String rootDir = System.getProperty("dw.rootDir");
     this.config = config;
     this.executorService = Executors.newFixedThreadPool(this.config.getNumParallelConsumer(),

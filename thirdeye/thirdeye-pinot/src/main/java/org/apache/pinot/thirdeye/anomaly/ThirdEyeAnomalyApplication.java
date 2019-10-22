@@ -25,6 +25,7 @@ import org.apache.pinot.thirdeye.anomaly.classification.ClassificationJobSchedul
 import org.apache.pinot.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
 import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobScheduler;
 import org.apache.pinot.thirdeye.anomaly.detection.trigger.DataAvailabilityEventListenerDriver;
+import org.apache.pinot.thirdeye.anomaly.detection.trigger.DataAvailabilityTaskScheduler;
 import org.apache.pinot.thirdeye.anomaly.events.HolidayEventResource;
 import org.apache.pinot.thirdeye.anomaly.events.HolidayEventsLoader;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorJobScheduler;
@@ -75,6 +76,7 @@ public class ThirdEyeAnomalyApplication
   private DetectionPipelineScheduler detectionPipelineScheduler = null;
   private DetectionAlertScheduler detectionAlertScheduler = null;
   private DataAvailabilityEventListenerDriver dataAvailabilityEventListenerDriver = null;
+  private DataAvailabilityTaskScheduler dataAvailabilityTaskScheduler = null;
 
   public static void main(final String[] args) throws Exception {
     List<String> argList = new ArrayList<>(Arrays.asList(args));
@@ -185,9 +187,15 @@ public class ThirdEyeAnomalyApplication
           detectionAlertScheduler = new DetectionAlertScheduler();
           detectionAlertScheduler.start();
         }
-        if (config.isTriggerEventListener()) {
-          dataAvailabilityEventListenerDriver = new DataAvailabilityEventListenerDriver(config.getDataAvailabilityListenerConfiguration());
+        if (config.isDataAvailabilityEventListener()) {
+          dataAvailabilityEventListenerDriver = new DataAvailabilityEventListenerDriver(config.getDataAvailabilitySchedulingConfiguration());
           dataAvailabilityEventListenerDriver.start();
+        }
+        if (config.isDataAvailabilityTaskScheduler()) {
+          dataAvailabilityTaskScheduler = new DataAvailabilityTaskScheduler(
+              config.getDataAvailabilitySchedulingConfiguration().getSchedulerDelayInSec(),
+              config.getDataAvailabilitySchedulingConfiguration().getTaskTriggerFallBackTimeInSec());
+          dataAvailabilityTaskScheduler.start();
         }
       }
 

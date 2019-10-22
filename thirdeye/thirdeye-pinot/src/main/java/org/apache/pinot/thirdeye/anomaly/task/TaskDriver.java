@@ -123,7 +123,6 @@ public class TaskDriver {
                 TaskType taskType = anomalyTaskSpec.getTaskType();
                 TaskRunner taskRunner = TaskRunnerFactory.getTaskRunnerFromTaskType(taskType);
                 TaskInfo taskInfo = TaskInfoFactory.getTaskInfoFromTaskType(taskType, anomalyTaskSpec.getTaskInfo());
-                updateTaskStartTime(anomalyTaskSpec.getId());
                 Future<List<TaskResult>> future = taskExecutorService.submit(new Callable<List<TaskResult>>() {
                   @Override
                   public List<TaskResult> call() throws Exception {
@@ -211,9 +210,8 @@ public class TaskDriver {
 
           boolean success = false;
           try {
-            success = taskDAO
-                .updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(), allowedOldTaskStatus,
-                    TaskStatus.RUNNING, anomalyTaskSpec.getVersion());
+            success = taskDAO.updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(),
+                    allowedOldTaskStatus, anomalyTaskSpec.getVersion());
             LOG.info("Trying to acquire task id [{}], success status: [{}] with version [{}]",
                 anomalyTaskSpec.getId(), success, anomalyTaskSpec.getVersion());
           } catch (Exception e) {
@@ -247,17 +245,6 @@ public class TaskDriver {
       }
     }
     return null;
-  }
-
-  private void updateTaskStartTime(long taskId) {
-    LOG.info("Starting updateTaskStartTime for task id {}", taskId);
-    try {
-      long startTime = System.currentTimeMillis();
-      taskDAO.updateTaskStartTime(taskId, startTime);
-      LOG.info("Updated task start time {}", startTime);
-    } catch (Exception e) {
-      LOG.error("Exception in updating task start time", e);
-    }
   }
 
   private void updateStatusAndTaskEndTime(long taskId, TaskStatus oldStatus, TaskStatus newStatus, String message) {

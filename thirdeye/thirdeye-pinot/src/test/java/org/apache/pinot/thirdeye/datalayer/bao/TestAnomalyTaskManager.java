@@ -82,14 +82,13 @@ public class TestAnomalyTaskManager {
 
   @Test(dependsOnMethods = { "testFindAll" })
   public void testUpdateStatusAndWorkerId() {
-    TaskStatus newStatus = TaskStatus.RUNNING;
     Long workerId = 1L;
     TaskDTO taskDTO = taskDAO.findById(anomalyTaskId1);
     boolean status =
-        taskDAO.updateStatusAndWorkerId(workerId, anomalyTaskId1, allowedOldTaskStatus, newStatus, taskDTO.getVersion());
+        taskDAO.updateStatusAndWorkerId(workerId, anomalyTaskId1, allowedOldTaskStatus, taskDTO.getVersion());
     TaskDTO anomalyTask = taskDAO.findById(anomalyTaskId1);
     Assert.assertTrue(status);
-    Assert.assertEquals(anomalyTask.getStatus(), newStatus);
+    Assert.assertEquals(anomalyTask.getStatus(), TaskStatus.RUNNING);
     Assert.assertEquals(anomalyTask.getWorkerId(), workerId);
     Assert.assertEquals(anomalyTask.getVersion(), taskDTO.getVersion() + 1);
 

@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-
 /**
  * ConfigBean holds namespaced key-value configuration values.  Values are serialized into the
  * database using the default object mapper.  ConfigBean serves as a light-weight
@@ -44,6 +43,8 @@ public class DetectionConfigBean extends AbstractBean {
   Map<String, Object> componentSpecs;
   long lastTuningTimestamp;
   List<String> owners;
+  boolean isDataAvailabilitySchedule;
+  long taskTriggerFallBackTimeInSec;
 
   public List<String> getOwners() {
     return owners;
@@ -125,6 +126,22 @@ public class DetectionConfigBean extends AbstractBean {
     this.active = active;
   }
 
+  public boolean isDataAvailabilitySchedule() {
+    return isDataAvailabilitySchedule;
+  }
+
+  public void setDataAvailabilitySchedule(boolean dataAvailabilitySchedule) {
+    isDataAvailabilitySchedule = dataAvailabilitySchedule;
+  }
+
+  public long getTaskTriggerFallBackTimeInSec() {
+    return taskTriggerFallBackTimeInSec;
+  }
+
+  public void setTaskTriggerFallBackTimeInSec(long taskTriggerFallBackTimeInSec) {
+    this.taskTriggerFallBackTimeInSec = taskTriggerFallBackTimeInSec;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -136,7 +153,8 @@ public class DetectionConfigBean extends AbstractBean {
     DetectionConfigBean that = (DetectionConfigBean) o;
     return lastTimestamp == that.lastTimestamp && active == that.active && Objects.equals(cron, that.cron)
         && Objects.equals(name, that.name) && Objects.equals(properties, that.properties) && Objects.equals(yaml,
-        that.yaml);
+        that.yaml) && Objects.equals(isDataAvailabilitySchedule, that.isDataAvailabilitySchedule) && Objects
+        .equals(taskTriggerFallBackTimeInSec, that.taskTriggerFallBackTimeInSec);
   }
 
   @Override

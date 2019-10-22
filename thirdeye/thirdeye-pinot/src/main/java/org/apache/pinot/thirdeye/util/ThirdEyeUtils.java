@@ -59,6 +59,7 @@ import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -73,6 +74,7 @@ import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.cache.MetricDataset;
 import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSet;
 import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -370,9 +372,19 @@ public abstract class ThirdEyeUtils {
     return datasetConfig;
   }
 
-  public static String getDatasetFromMetricFunction(MetricFunction metricFunction) {
-    MetricConfigDTO metricConfig = getMetricConfigFromId(metricFunction.getMetricId());
-    return metricConfig.getDataset();
+  public static List<DatasetConfigDTO> getDatasetConfigsFromMetricUrn(String metricUrn) {
+    DatasetConfigManager datasetConfigManager = DAORegistry.getInstance().getDatasetConfigDAO();
+    MetricEntity me = MetricEntity.fromURN(metricUrn);
+    MetricConfigDTO metricConfig = DAORegistry.getInstance().getMetricConfigDAO().findById(me.getId());
+    if (metricConfig == null) return new ArrayList<>();
+    if (!metricConfig.isDerived()) {
+      return Collections.singletonList(datasetConfigManager.findByDataset(metricConfig.getDataset()));
+    } else {
+      MetricExpression metricExpression = ThirdEyeUtils.getMetricExpressionFromMetricConfig(metricConfig);
+      List<MetricFunction> functions = metricExpression.computeMetricFunctions();
+      return functions.stream().map(
+          f -> datasetConfigManager.findByDataset(f.getDataset())).collect(Collectors.toList());
+    }
   }
 
   public static MetricConfigDTO getMetricConfigFromId(Long metricId) {
@@ -661,5 +673,18 @@ public abstract class ThirdEyeUtils {
       components.add(component);
     }
     return String.join(",", components.stream().distinct().collect(Collectors.toList()));
+  }
+
+  /**
+   * Parse job name to get the detection id
+   * @param jobName
+   * @return
+   */
+  public static long getDetectionIdFromJobName(String jobName) {
+    String[] parts = jobName.split("_");
+    if (parts.length < 2) {
+      throw new IllegalArgumentException("Invalid job name: " + jobName);
+    }
+    return Long.parseLong(parts[1]);
   }
 }
