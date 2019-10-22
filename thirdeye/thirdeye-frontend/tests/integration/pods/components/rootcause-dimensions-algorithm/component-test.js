@@ -20,7 +20,8 @@ module('Integration | Component | rootcause-dimensions-algorithm', function(hook
         compareMode: 'WoW'
       },
       selectedUrns: {},
-      onSelection: () => {}
+      onSelection: () => {},
+      saveTableSettings: () => {}
     });
 
     await render(hbs`
@@ -32,6 +33,7 @@ module('Integration | Component | rootcause-dimensions-algorithm', function(hook
         selectedUrns=selectedUrns
         isLoading=true
         onSelection=(action onSelection)
+        sendTableSettings=(action saveTableSettings)
       }}
     `);
 

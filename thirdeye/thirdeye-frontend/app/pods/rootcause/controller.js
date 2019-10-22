@@ -735,8 +735,11 @@ export default Controller.extend({
    * @private
    */
   _makeSession() {
-    const { context, selectedUrns, sessionId, sessionName, sessionText, sessionOwner, sessionPermissions } =
-      getProperties(this, 'context', 'selectedUrns', 'sessionId', 'sessionName', 'sessionText', 'sessionOwner', 'sessionPermissions');
+    const { context, selectedUrns, sessionId, sessionName, sessionText, sessionOwner,
+      sessionPermissions, isUserCustomizingRequest, customTableSettings } =
+      getProperties(this, 'context', 'selectedUrns', 'sessionId', 'sessionName',
+      'sessionText', 'sessionOwner', 'sessionPermissions', 'isUserCustomizingRequest',
+      'customTableSettings');
 
     return {
       id: sessionId,
@@ -752,7 +755,9 @@ export default Controller.extend({
       analysisRangeEnd: context.analysisRange[1],
       contextUrns: context.urns,
       anomalyUrns: context.anomalyUrns,
-      selectedUrns
+      selectedUrns,
+      isUserCustomizingRequest,
+      customTableSettings
     };
   },
 
@@ -1247,6 +1252,16 @@ export default Controller.extend({
      */
     onCreateEventClick() {
       set(this, 'showCreateEventModal', true);
+    },
+
+    /**
+     * Save dimensions-algorithm table settings to post to session (called by child)
+     */
+    saveTableSettings(customTableSettings, isUserCustomizingRequest) {
+      this.setProperties({
+        customTableSettings,
+        isUserCustomizingRequest
+      });
     }
   }
 });
