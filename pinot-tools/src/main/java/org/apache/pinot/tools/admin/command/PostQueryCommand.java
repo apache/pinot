@@ -39,7 +39,7 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
   private String _brokerPort = Integer.toString(CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
 
   @Option(name = "-queryType", required = false, metaVar = "<string>", usage = "Query use sql or pql.")
-  private String _queryType = "pql";
+  private String _queryType = Request.PQL;
 
   @Option(name = "-query", required = true, metaVar = "<string>", usage = "Query string to perform.")
   private String _query;
@@ -81,6 +81,7 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     _brokerPort = port;
     return this;
   }
+
   public PostQueryCommand setQueryType(String queryType) {
     _queryType = queryType;
     return this;
