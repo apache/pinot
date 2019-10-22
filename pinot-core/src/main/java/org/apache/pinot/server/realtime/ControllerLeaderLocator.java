@@ -106,19 +106,15 @@ public class ControllerLeaderLocator {
    * Thus, simply exiting the method should be enough. Retry will be done in the next request.
    */
   private void refreshControllerLeaderMap() {
-    // Checks whether lead controller resource has been enabled or not.
-    boolean leadControllerResourceEnabled;
     try {
-      leadControllerResourceEnabled = LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager);
+      // Checks whether lead controller resource has been enabled or not.
+      if (LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager)) {
+        refreshControllerLeaderMapFromLeadControllerResource();
+      } else {
+        refreshControllerLeaderMapFromHelixClusterLeader();
+      }
     } catch (Exception e) {
       LOGGER.error("Exception when checking whether lead controller resource is enable or not.", e);
-      return;
-    }
-
-    if (leadControllerResourceEnabled) {
-      refreshControllerLeaderMapFromLeadControllerResource();
-    } else {
-      refreshControllerLeaderMapFromHelixClusterLeader();
     }
   }
 
