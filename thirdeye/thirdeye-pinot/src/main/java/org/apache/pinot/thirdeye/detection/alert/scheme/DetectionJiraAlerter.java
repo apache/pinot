@@ -19,16 +19,16 @@
 
 package org.apache.pinot.thirdeye.detection.alert.scheme;
 
-import com.atlassian.jira.rest.client.api.domain.input.IssueInput;
-import com.atlassian.jira.rest.client.internal.async.AsynchronousJiraRestClientFactory;
+import com.atlassian.jira.rest.client.api.domain.Issue;
 import com.google.common.base.Preconditions;
-import com.atlassian.jira.rest.client.api.JiraRestClient;
-import java.net.URI;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -37,6 +37,8 @@ import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotificatio
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.apache.pinot.thirdeye.detection.annotation.AlertScheme;
 import org.apache.pinot.thirdeye.notification.commons.JiraConfiguration;
+import org.apache.pinot.thirdeye.notification.commons.JiraEntity;
+import org.apache.pinot.thirdeye.notification.commons.ThirdEyeJiraClient;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
 import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.apache.pinot.thirdeye.notification.formatter.channels.JiraContentFormatter;
@@ -66,7 +68,7 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJiraAlerter.class);
 
   private ThirdEyeAnomalyConfiguration teConfig;
-  private JiraRestClient jiraRestClient;
+  private ThirdEyeJiraClient jiraClient;
   private JiraConfiguration jiraAdminConfig;
 
   public static final String PROP_JIRA_SCHEME = "jiraScheme";
@@ -76,19 +78,49 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
     super(adContext, result);
     this.teConfig = thirdeyeConfig;
 
-    init();
-  }
-
-  private void init() {
     this.jiraAdminConfig = JiraConfiguration.createFromProperties(this.teConfig.getAlerterConfiguration().get(JIRA_CONFIG_KEY));
-    this.jiraRestClient = new AsynchronousJiraRestClientFactory().createWithBasicHttpAuthentication(
-        URI.create(jiraAdminConfig.getJiraHost()),
-        jiraAdminConfig.getJiraUser(),
-        jiraAdminConfig.getJiraPassword());
+    this.jiraClient = new ThirdEyeJiraClient(this.jiraAdminConfig);
   }
 
-  private String createIssue(IssueInput issueInput) {
-    return jiraRestClient.getIssueClient().createIssue(issueInput).claim().getKey();
+  private void updateJiraAlert(Issue issue, JiraEntity jiraEntity) {
+    // Append labels
+    jiraEntity.getLabels().addAll(issue.getLabels());
+    jiraEntity.setLabels(jiraEntity.getLabels().stream().distinct().collect(Collectors.toList()));
+
+    jiraClient.reopenIssue(issue);
+    jiraClient.updateIssue(issue, jiraEntity);
+
+    try {
+      jiraClient.addComment(issue, jiraEntity.getDescription());
+    } catch (Exception e) {
+      // Jira has a upper limit on the number of characters. In such cases we will only share a link in the comment.
+      StringBuilder sb = new StringBuilder();
+      sb.append("*<Truncating details due to jira limit! Please use the below link to view all the anomalies.>*");
+      sb.append(System.getProperty("line.separator"));
+
+      String desc = jiraEntity.getDescription().replaceAll("listed below", "");
+
+      // Print only the first line with the redirection link to ThirdEye
+      sb.append(desc, 0, desc.indexOf("\n"));
+      jiraClient.addComment(issue, sb.toString());
+    }
+  }
+
+  private JiraEntity buildJiraEntity(DetectionAlertFilterNotification notification, Set<MergedAnomalyResultDTO> anomalies) {
+    Map<String, Object> notificationSchemeProps = notification.getNotificationSchemeProps();
+    if (notificationSchemeProps == null || notificationSchemeProps.get(PROP_JIRA_SCHEME) == null) {
+      throw new IllegalArgumentException("Invalid jira settings in subscription group " + this.adContext.getNotificationConfig().getId());
+    }
+
+    Properties jiraClientConfig = new Properties();
+    jiraClientConfig.putAll(ConfigUtils.getMap(notificationSchemeProps.get(PROP_JIRA_SCHEME)));
+
+    List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>(anomalies);
+    anomalyResultListOfGroup.sort(COMPARATOR_DESC);
+
+    BaseNotificationContent content = super.buildNotificationContent(jiraClientConfig);
+    return new JiraContentFormatter(this.jiraAdminConfig, jiraClientConfig, content,
+        this.teConfig, adContext).getJiraEntity(anomalyResultListOfGroup);
   }
 
   private void createJiraTickets(DetectionAlertFilterResult results) {
@@ -96,23 +128,31 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
     Preconditions.checkNotNull(results.getResult());
     for (Map.Entry<DetectionAlertFilterNotification, Set<MergedAnomalyResultDTO>> result : results.getResult().entrySet()) {
       try {
-        Map<String, Object> notificationSchemeProps = result.getKey().getNotificationSchemeProps();
-        if (notificationSchemeProps == null || notificationSchemeProps.get(PROP_JIRA_SCHEME) == null) {
-          throw new IllegalArgumentException("Invalid jira settings in subscription group " + this.adContext.getNotificationConfig().getId());
+        JiraEntity jiraEntity = buildJiraEntity(result.getKey(), result.getValue());
+        Iterable<Issue> issues = jiraClient.getIssue(jiraEntity.getJiraProject(), jiraEntity.getSummary(),
+            this.jiraAdminConfig.getJiraUser()).getIssues();
+
+        List<Issue> jiraIssues = new ArrayList<>();
+        if (issues != null) {
+          // Sort the issues by descending order of create time
+          jiraIssues = StreamSupport.stream(issues.spliterator(), false).sorted(new Comparator<Issue>() {
+            @Override
+            public int compare(Issue o1, Issue o2) {
+              return o2.getCreationDate().compareTo(o1.getCreationDate());
+            }
+          }).collect(Collectors.toList());
         }
 
-        Properties jiraClientConfig = new Properties();
-        jiraClientConfig.putAll(ConfigUtils.getMap(notificationSchemeProps.get(PROP_JIRA_SCHEME)));
-
-        List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>(result.getValue());
-        anomalyResultListOfGroup.sort(COMPARATOR_DESC);
-
-        BaseNotificationContent content = super.buildNotificationContent(jiraClientConfig);
-        IssueInput jiraIssueInput = new JiraContentFormatter(this.jiraAdminConfig, jiraClientConfig, content, this.teConfig, adContext)
-            .getJiraEntity(anomalyResultListOfGroup);
-
-        String issueKey = createIssue(jiraIssueInput);
-        LOG.info("Jira ticket created with issue key {} : anomalies reported = {}", issueKey, result.getValue().size());
+        String issueKey;
+        if (jiraIssues.isEmpty() || jiraIssues.get(0).getCreationDate().isBefore(System.currentTimeMillis() - jiraEntity.getMergeGap())) {
+          // No existing ticket found. Create a new jira ticket
+          issueKey = jiraClient.createIssue(jiraEntity);
+          LOG.info("Jira created {}, anomalies reported {}", issueKey, result.getValue().size());
+        } else {
+          // Reopen recent existing ticket and add a comment
+          updateJiraAlert(jiraIssues.get(0), jiraEntity);
+          LOG.info("Jira updated {}, anomalies reported = {}", jiraIssues.get(0).getKey(), result.getValue().size());
+        }
       } catch (IllegalArgumentException e) {
         LOG.warn("Skipping! Found illegal arguments while sending {} anomalies for alert {}."
             + " Exception message: ", result.getValue().size(), this.adContext.getNotificationConfig().getId(), e);

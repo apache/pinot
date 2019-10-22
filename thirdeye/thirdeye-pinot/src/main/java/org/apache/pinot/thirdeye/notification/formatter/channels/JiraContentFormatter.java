@@ -19,7 +19,6 @@
 
 package org.apache.pinot.thirdeye.notification.formatter.channels;
 
-import com.atlassian.jira.rest.client.api.domain.input.IssueInput;
 import com.atlassian.jira.rest.client.api.domain.input.IssueInputBuilder;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
@@ -36,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.mail.HtmlEmail;
@@ -43,6 +43,7 @@ import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.notification.commons.JiraConfiguration;
+import org.apache.pinot.thirdeye.notification.commons.JiraEntity;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
 import org.apache.pinot.thirdeye.notification.content.templates.MetricAnomaliesContent;
 import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
@@ -62,6 +63,7 @@ public class JiraContentFormatter extends AlertContentFormatter {
   static final String PROP_ISSUE_TYPE = "issuetype";
   static final String PROP_PROJECT = "project";
   static final String PROP_ASSIGNEE = "assignee";
+  static final String PROP_MERGE_GAP = "mergeGap";
   static final String PROP_LABELS = "labels";
   static final String PROP_SUMMARY = "summary";
   static final String PROP_DEFAULT_LABEL = "thirdeye";
@@ -90,7 +92,7 @@ public class JiraContentFormatter extends AlertContentFormatter {
     Preconditions.checkNotNull(jiraAdminConfig.getJiraHost());
   }
 
-  public IssueInput getJiraEntity(Collection<AnomalyResult> anomalies) {
+  public JiraEntity getJiraEntity(Collection<AnomalyResult> anomalies) {
     Map<String, Object> templateData = notificationContent.format(anomalies, adContext);
     templateData.put("dashboardHost", teConfig.getDashboardHost());
     return buildJiraEntity(alertContentToTemplateMap.get(notificationContent.getTemplate()), templateData);
@@ -99,24 +101,25 @@ public class JiraContentFormatter extends AlertContentFormatter {
   /**
    * Apply the parameter map to given email template, and format it as EmailEntity
    */
-  private IssueInput buildJiraEntity(String jiraTemplate, Map<String, Object> templateValues) {
+  private JiraEntity buildJiraEntity(String jiraTemplate, Map<String, Object> templateValues) {
     String issueSummary = BaseNotificationContent.makeSubject(super.getSubjectType(alertClientConfig), this.adContext.getNotificationConfig(), templateValues);
 
     // Fetch the jira project and issue type fields if overridden by user
     String jiraProject = MapUtils.getString(alertClientConfig, PROP_PROJECT, this.jiraAdminConfig.getJiraDefaultProjectKey());
     Long jiraIssueTypeId = MapUtils.getLong(alertClientConfig, PROP_ISSUE_TYPE, this.jiraAdminConfig.getJiraIssueTypeId());
 
-    IssueInputBuilder issueBuilder = new IssueInputBuilder(jiraProject, jiraIssueTypeId, issueSummary);
+    JiraEntity jiraEntity = new JiraEntity(jiraProject, jiraIssueTypeId, issueSummary);
 
     String assignee = MapUtils.getString(alertClientConfig, PROP_ASSIGNEE);
     if (StringUtils.isNotBlank(assignee)) {
-      LOG.info("Assigning the jira to " + alertClientConfig.get(PROP_ASSIGNEE));
-      issueBuilder.setAssigneeName(assignee);
+      jiraEntity.setAssignee(assignee);
     }
+
+    jiraEntity.setMergeGap(MapUtils.getLong(alertClientConfig, PROP_MERGE_GAP, TimeUnit.DAYS.toMillis(1)));
 
     List<String> labels = ConfigUtils.getList(alertClientConfig.get(PROP_LABELS));
     labels.add(PROP_DEFAULT_LABEL);
-    issueBuilder.setFieldValue("labels", labels);
+    jiraEntity.setLabels(labels);
 
     HtmlEmail email = new HtmlEmail();
     String cid = "";
@@ -129,6 +132,7 @@ public class JiraContentFormatter extends AlertContentFormatter {
     }
     templateValues.put("cid", cid);
 
+    // Render the values in templateValues map to the jira ftl template file
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     try (Writer out = new OutputStreamWriter(baos, CHARSET)) {
       Configuration freemarkerConfig = new Configuration(Configuration.VERSION_2_3_21);
@@ -140,11 +144,11 @@ public class JiraContentFormatter extends AlertContentFormatter {
 
       String alertEmailHtml = new String(baos.toByteArray(), CHARSET);
 
-      issueBuilder.setDescription(alertEmailHtml);
+      jiraEntity.setDescription(alertEmailHtml);
     } catch (Exception e) {
       Throwables.propagate(e);
     }
 
-    return issueBuilder.build();
+    return jiraEntity;
   }
 }
