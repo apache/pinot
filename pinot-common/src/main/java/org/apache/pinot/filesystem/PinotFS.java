@@ -22,7 +22,6 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Paths;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.annotations.InterfaceAudience;
 import org.apache.pinot.annotations.InterfaceStability;
@@ -101,7 +100,7 @@ public abstract class PinotFS implements Closeable {
       }
     } else {
       // ensures the parent path of dst exists.
-      URI parentUri = Paths.get(dstUri).getParent().toUri();
+      URI parentUri = dstUri.getPath().endsWith("/") ? dstUri.resolve("..") : dstUri.resolve(".");
       mkdir(parentUri);
     }
     return doMove(srcUri, dstUri);
