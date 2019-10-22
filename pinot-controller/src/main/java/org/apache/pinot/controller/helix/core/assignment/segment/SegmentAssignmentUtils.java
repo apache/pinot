@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -216,7 +217,7 @@ public class SegmentAssignmentUtils {
   /**
    * Returns the map from instance name to Helix partition state, which can be put into the segment assignment.
    */
-  public static Map<String, String> getInstanceStateMap(List<String> instances, String state) {
+  public static Map<String, String> getInstanceStateMap(Collection<String> instances, String state) {
     Map<String, String> instanceStateMap = new TreeMap<>();
     for (String instanceName : instances) {
       instanceStateMap.put(instanceName, state);

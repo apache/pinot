@@ -49,7 +49,6 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -186,37 +185,6 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTestSet
       }
     }
     Assert.fail("Failed to get from " + currentNrows + " to " + finalNrows);
-  }
-
-  @Test(dataProvider = "configProvider")
-  public void testSegmentValidator(String tableName, SegmentVersion version)
-      throws Exception {
-    completeTableConfiguration();
-    String serverInstanceId = "Server_localhost_" + CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
-
-    // Disable server instance.
-    _helixAdmin.enableInstance(getHelixClusterName(), serverInstanceId, false);
-
-    final String segment6 = "segmentToBeRefreshed_6";
-    final int nRows1 = 69;
-    File segmentTarDir = generateRandomSegment(segment6, nRows1);
-    try {
-      uploadSegmentsDirectly(segmentTarDir);
-      Assert.fail("Uploading segments should fail.");
-    } catch (Exception e) {
-      //
-    }
-
-    // Re-enable the server instance.
-    _helixAdmin.enableInstance(getHelixClusterName(), serverInstanceId, true);
-
-    try {
-      uploadSegmentsDirectly(segmentTarDir);
-    } catch (Exception e) {
-      Assert.fail("Uploading segments should succeed.");
-    }
-
-    FileUtils.forceDelete(segmentTarDir);
   }
 
   @AfterClass

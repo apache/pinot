@@ -53,12 +53,12 @@ public class InstanceTagPoolSelector {
     int tableNameHash = Math.abs(_tableNameWithType.hashCode());
     LOGGER.info("Starting instance tag/pool selection for table: {} with hash: {}", _tableNameWithType, tableNameHash);
 
-    // Filter out the enabled instances with the correct tag
+    // Filter out the instances with the correct tag
     String tag = _tagPoolConfig.getTag();
     Preconditions.checkState(tag != null, "Tag must be configured");
     List<InstanceConfig> candidateInstanceConfigs = new ArrayList<>();
     for (InstanceConfig instanceConfig : instanceConfigs) {
-      if (instanceConfig.getInstanceEnabled() && instanceConfig.getTags().contains(tag)) {
+      if (instanceConfig.getTags().contains(tag)) {
         candidateInstanceConfigs.add(instanceConfig);
       }
     }

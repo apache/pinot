@@ -95,7 +95,7 @@ public class SegmentCompletionManager {
     SegmentCompletionProtocol
         .setMaxSegmentCommitTimeMs(TimeUnit.MILLISECONDS.convert(segmentCommitTimeoutSeconds, TimeUnit.SECONDS));
     _fsmLocks = new Lock[NUM_FSM_LOCKS];
-    for (int i = 0; i < NUM_FSM_LOCKS; i ++) {
+    for (int i = 0; i < NUM_FSM_LOCKS; i++) {
       _fsmLocks[i] = new ReentrantLock();
     }
   }
@@ -129,17 +129,17 @@ public class SegmentCompletionManager {
         // TODO if we keep a list of last few committed segments, we don't need to go to zk for this.
         final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(segmentName.getTableName());
         LLCRealtimeSegmentZKMetadata segmentMetadata =
-            _segmentManager.getRealtimeSegmentZKMetadata(realtimeTableName, segmentName.getSegmentName(), null);
+            _segmentManager.getSegmentZKMetadata(realtimeTableName, segmentName.getSegmentName(), null);
         if (segmentMetadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.DONE)) {
           // Best to go through the state machine for this case as well, so that all code regarding state handling is in one place
           // Also good for synchronization, because it is possible that multiple threads take this path, and we don't want
           // multiple instances of the FSM to be created for the same commit sequence at the same time.
           final long endOffset = segmentMetadata.getEndOffset();
-          fsm = SegmentCompletionFSM.fsmInCommit(_segmentManager, this, segmentName, segmentMetadata.getNumReplicas(),
-              endOffset);
+          fsm = SegmentCompletionFSM
+              .fsmInCommit(_segmentManager, this, segmentName, segmentMetadata.getNumReplicas(), endOffset);
         } else if (msgType.equals(SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING)) {
-          fsm = SegmentCompletionFSM.fsmStoppedConsuming(_segmentManager, this, segmentName,
-              segmentMetadata.getNumReplicas());
+          fsm = SegmentCompletionFSM
+              .fsmStoppedConsuming(_segmentManager, this, segmentName, segmentMetadata.getNumReplicas());
         } else {
           // Segment is in the process of completing, and this is the first one to respond. Create fsm
           fsm = SegmentCompletionFSM.fsmInHolding(_segmentManager, this, segmentName, segmentMetadata.getNumReplicas());
@@ -356,6 +356,7 @@ public class SegmentCompletionManager {
     State _state = State.HOLDING;   // Typically start off in HOLDING state.
     final long _startTimeMs;
     private final LLCSegmentName _segmentName;
+    private final String _rawTableName;
     private final String _realtimeTableName;
     private final int _numReplicas;
     private final Set<String> _excludedServerStateMap;
@@ -399,7 +400,8 @@ public class SegmentCompletionManager {
     private SegmentCompletionFSM(PinotLLCRealtimeSegmentManager segmentManager,
         SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas) {
       _segmentName = segmentName;
-      _realtimeTableName = _segmentName.getTableName();
+      _rawTableName = _segmentName.getTableName();
+      _realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(_rawTableName);
       _numReplicas = numReplicas;
       _segmentManager = segmentManager;
       _commitStateMap = new HashMap<>(_numReplicas);
@@ -408,9 +410,8 @@ public class SegmentCompletionManager {
       _startTimeMs = _segmentCompletionManager.getCurrentTimeMs();
       _maxTimeToPickWinnerMs = _startTimeMs + MAX_TIME_TO_PICK_WINNER_MS;
       _maxTimeToNotifyWinnerMs = _startTimeMs + MAX_TIME_TO_NOTIFY_WINNER_MS;
-      long initialCommitTimeMs =
-          MAX_TIME_TO_NOTIFY_WINNER_MS + _segmentManager.getCommitTimeoutMS(_realtimeTableName);
-      Long savedCommitTime = _segmentCompletionManager._commitTimeMap.get(_realtimeTableName);
+      long initialCommitTimeMs = MAX_TIME_TO_NOTIFY_WINNER_MS + _segmentManager.getCommitTimeoutMS(_realtimeTableName);
+      Long savedCommitTime = _segmentCompletionManager._commitTimeMap.get(_rawTableName);
       if (savedCommitTime != null && savedCommitTime > initialCommitTimeMs) {
         initialCommitTimeMs = savedCommitTime;
       }
@@ -631,7 +632,8 @@ public class SegmentCompletionManager {
           LOGGER.error("Segment upload failed");
           return abortAndReturnFailed();
         }
-        SegmentCompletionProtocol.Response response = commitSegment(reqParams, isSplitCommit, committingSegmentDescriptor);
+        SegmentCompletionProtocol.Response response =
+            commitSegment(reqParams, isSplitCommit, committingSegmentDescriptor);
         if (!response.equals(SegmentCompletionProtocol.RESP_COMMIT_SUCCESS)) {
           return abortAndReturnFailed();
         } else {
@@ -687,14 +689,14 @@ public class SegmentCompletionManager {
     private SegmentCompletionProtocol.Response abortAndReturnHold(long now, String instanceId, long offset) {
       _state = State.ABORTED;
       _segmentCompletionManager._controllerMetrics
-          .addMeteredTableValue(_realtimeTableName, ControllerMeter.LLC_STATE_MACHINE_ABORTS, 1);
+          .addMeteredTableValue(_rawTableName, ControllerMeter.LLC_STATE_MACHINE_ABORTS, 1);
       return hold(instanceId, offset);
     }
 
     private SegmentCompletionProtocol.Response abortAndReturnFailed() {
       _state = State.ABORTED;
       _segmentCompletionManager._controllerMetrics
-          .addMeteredTableValue(_realtimeTableName, ControllerMeter.LLC_STATE_MACHINE_ABORTS, 1);
+          .addMeteredTableValue(_rawTableName, ControllerMeter.LLC_STATE_MACHINE_ABORTS, 1);
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
@@ -969,7 +971,13 @@ public class SegmentCompletionManager {
       LOGGER
           .info("Instance {} stopped consuming segment {} at offset {}, state {}, createNew: {}, reason:{}", instanceId,
               _segmentName, offset, _state, createNew, reason);
-      _segmentManager.segmentStoppedConsuming(_segmentName, instanceId);
+      try {
+        _segmentManager.segmentStoppedConsuming(_segmentName, instanceId);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while processing stopped CONSUMING segment: {} on instance: {}",
+            _segmentName.getSegmentName(), instanceId, e);
+        return SegmentCompletionProtocol.RESP_FAILED;
+      }
       return SegmentCompletionProtocol.RESP_PROCESSED;
     }
 
@@ -1012,9 +1020,7 @@ public class SegmentCompletionManager {
     }
 
     private SegmentCompletionProtocol.Response commitSegment(SegmentCompletionProtocol.Request.Params reqParams,
-                                                             boolean isSplitCommit,
-                                                             CommittingSegmentDescriptor committingSegmentDescriptor) {
-      boolean success;
+        boolean isSplitCommit, CommittingSegmentDescriptor committingSegmentDescriptor) {
       String instanceId = reqParams.getInstanceId();
       long offset = reqParams.getOffset();
       if (!_state.equals(State.COMMITTER_UPLOADING)) {
@@ -1028,17 +1034,26 @@ public class SegmentCompletionManager {
       // In case of splitCommit, the segment is uploaded to a unique file name indicated by segmentLocation,
       // so we need to move the segment file to its permanent location first before committing the metadata.
       if (isSplitCommit) {
-        if (!_segmentManager.commitSegmentFile(_segmentName.getTableName(), committingSegmentDescriptor)) {
+        try {
+          _segmentManager.commitSegmentFile(_realtimeTableName, committingSegmentDescriptor);
+        } catch (Exception e) {
+          LOGGER.error("Caught exception while committing segment file for segment: {}", _segmentName.getSegmentName(),
+              e);
           return SegmentCompletionProtocol.RESP_FAILED;
         }
       }
-      success = _segmentManager.commitSegmentMetadata(_segmentName.getTableName(), committingSegmentDescriptor);
-      if (success) {
-        _state = State.COMMITTED;
-        LOGGER.info("Committed segment {} at offset {} winner {}", _segmentName.getSegmentName(), offset, instanceId);
-        return SegmentCompletionProtocol.RESP_COMMIT_SUCCESS;
+      try {
+        _segmentManager.commitSegmentMetadata(_realtimeTableName, committingSegmentDescriptor);
+      } catch (Exception e) {
+        LOGGER
+            .error("Caught exception while committing segment metadata for segment: {}", _segmentName.getSegmentName(),
+                e);
+        return SegmentCompletionProtocol.RESP_FAILED;
       }
-      return SegmentCompletionProtocol.RESP_FAILED;
+
+      _state = State.COMMITTED;
+      LOGGER.info("Committed segment {} at offset {} winner {}", _segmentName.getSegmentName(), offset, instanceId);
+      return SegmentCompletionProtocol.RESP_COMMIT_SUCCESS;
     }
 
     private SegmentCompletionProtocol.Response processCommitWhileUploading(String instanceId, long offset, long now) {
