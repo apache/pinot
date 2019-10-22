@@ -24,7 +24,7 @@
 
 - kubectl (https://kubernetes.io/docs/tasks/tools/install-kubectl/)
 - Google Cloud SDK (https://cloud.google.com/sdk/install)
-- Helm (https://helm.sh/docs/using_helm/#installing-helm)
+- Skaffold (https://skaffold.dev/docs/getting-started/#installing-skaffold)
 - Enable Google Cloud Account and create a project, e.g. `pinot-demo`.
   - `pinot-demo` will be used as example value for `${GCLOUD_PROJECT}` variable in script example.
   - `pinot-demo@example.com` will be used as example value for `${GCLOUD_EMAIL}`.
@@ -71,44 +71,49 @@ kubectl get all -n pinot-quickstart -o wide
 
 ## How to setup a Pinot cluster for demo
 
-### Update helm dependency
+The script requests:
+ - Create persistent disk for deep storage and mount it.
+   - Zookeeper
+   - Kafka
+   - Pinot Controller
+   - Pinot Server
+ - Create Pods for
+   - Zookeeper
+   - Kafka
+   - Pinot Controller
+   - Pinot Broker
+   - Pinot Server
+   - Pinot Example Loader
+
+
 ```
-helm dependency update
+skaffold run -f skaffold.yaml
 ```
 
-### Start Pinot with Helm
-```
-helm install --namespace "pinot-quickstart" --name "pinot" .
-```
+## How to load sample data
 
-###  Pinot Realtime QuickStart
+Below command will
+- Upload sample table schema
+- Create sample table
+- Publish sample data to a Kafka topic, which the example table would consume from.
 
-#### Bring up a Kafka Cluster for realtime data ingestion
-```bash
-helm repo add incubator http://storage.googleapis.com/kubernetes-charts-incubator
-helm install --namespace "pinot-quickstart"  --name kafka incubator/kafka
+```
+kubectl apply -f pinot-realtime-quickstart.yml
 ```
 
-#### Create Kafka topic
-```bash
-kubectl -n pinot-quickstart exec kafka-0 -- kafka-topics --zookeeper kafka-zookeeper:2181 --topic flights-realtime --create --partitions 1 --replication-factor 1
-```
 
-#### Load data into Kafka and create Pinot schema/table
-```bash
-kubectl apply -f pinot-example-loader.yml
-```
-
-### How to query pinot data
+## How to query pinot data
 
 Please use below script to do local port-forwarding and open Pinot query console on your web browser.
 ```
 ./query-pinot-data.sh
 ```
 
-### How to clean up Pinot deployment
+## How to delete a cluster
+Below script will delete the pinot perf cluster and delete the pvc disks.
+
+Note that you need to replace the gcloud project name if you are using another one.
 ```
-kubectl delete -f pinot-example-loader.yml
-helm del --purge kafka
-helm del --purge pinot
+GCLOUD_PROJECT=[your gcloud project name]
+./cleanup.sh
 ```

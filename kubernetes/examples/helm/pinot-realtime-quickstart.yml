@@ -67,7 +67,7 @@ data:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: pinot-example-loader
+  name: pinot-realtime-quickstart
   namespace: pinot-quickstart
 spec:
   template:

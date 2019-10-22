@@ -27,23 +27,14 @@ fi
 
 GCLOUD_ZONE=us-west1-b
 GCLOUD_CLUSTER=pinot-quickstart
-GCLOUD_MACHINE_TYPE=n1-standard-2
-GCLOUD_NUM_NODES=1
+GCLOUD_MACHINE_TYPE=n1-standard-8
+GCLOUD_NUM_NODES=2
 gcloud container clusters create ${GCLOUD_CLUSTER} \
   --num-nodes=${GCLOUD_NUM_NODES} \
   --machine-type=${GCLOUD_MACHINE_TYPE} \
   --zone=${GCLOUD_ZONE} \
   --project=${GCLOUD_PROJECT}
 gcloud container clusters get-credentials ${GCLOUD_CLUSTER} --zone ${GCLOUD_ZONE} --project ${GCLOUD_PROJECT}
-
- 
-GCLOUD_MACHINE_TYPE=n1-standar-8
-gcloud container node-pools create pinot-server-pool \
-  --cluster=${GCLOUD_CLUSTER} \
-  --machine-type=${GCLOUD_MACHINE_TYPE} \
-  --num-nodes=${GCLOUD_NUM_NODES} \
-  --zone=${GCLOUD_ZONE} \
-  --project=${GCLOUD_PROJECT}
 
 kubectl create namespace pinot-quickstart
 

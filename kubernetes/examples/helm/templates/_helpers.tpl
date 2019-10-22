@@ -127,3 +127,17 @@ The name of the pinot server headless service.
 {{- define "pinot.server.headless" -}}
 {{- printf "%s-headless" (include "pinot.server.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
+
+{{/*
+The name of the pinot controller external service.
+*/}}
+{{- define "pinot.controller.external" -}}
+{{- printf "%s-external" (include "pinot.controller.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+The name of the pinot broker external service.
+*/}}
+{{- define "pinot.broker.external" -}}
+{{- printf "%s-external" (include "pinot.broker.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}

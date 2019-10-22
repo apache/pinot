@@ -61,6 +61,11 @@ controller:
     port: 9000
     nodePort: ""
 
+  external:
+    enabled: false
+    type: LoadBalancer
+    port: 9000
+
   resources: {}
 
   nodeSelector: {}
@@ -92,6 +97,11 @@ broker:
     type: ClusterIP
     port: 8099
     nodePort: ""
+
+  external:
+    enabled: false
+    type: LoadBalancer
+    port: 8099
 
   resources: {}
 
