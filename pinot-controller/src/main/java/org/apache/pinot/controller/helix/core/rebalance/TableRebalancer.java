@@ -98,8 +98,15 @@ public class TableRebalancer {
     }
 
     // Check that table exists and is enabled
-    IdealState currentIdealState =
-        _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().idealStates(tableNameWithType));
+    IdealState currentIdealState;
+    try {
+      currentIdealState =
+          _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().idealStates(tableNameWithType));
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while fetching IdealState for table: {}", tableNameWithType, e);
+      return new RebalanceResult(RebalanceResult.Status.FAILED, "Caught exception while fetching IdealState: " + e,
+          null, null);
+    }
     if (currentIdealState == null) {
       return new RebalanceResult(RebalanceResult.Status.FAILED, "Cannot find the table", null, null);
     }
@@ -110,11 +117,17 @@ public class TableRebalancer {
     // Check if any segment is in ERROR state in ExternalView before rebalancing the table. ERROR state segment cannot
     // be transferred to other state, thus will cause the rebalance to never converge.
     // NOTE: ExternalView might be null when table is just created
-    ExternalView externalView =
-        _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().externalView(tableNameWithType));
-    if (externalView != null && hasSegmentInErrorState(externalView.getRecord().getMapFields())) {
-      LOGGER.warn("Found segments in ERROR state for table: {}", tableNameWithType);
-      return new RebalanceResult(RebalanceResult.Status.FAILED, "Found segments in ERROR state", null, null);
+    try {
+      ExternalView externalView =
+          _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().externalView(tableNameWithType));
+      if (externalView != null && hasSegmentInErrorState(externalView.getRecord().getMapFields())) {
+        LOGGER.warn("Found segments in ERROR state for table: {}", tableNameWithType);
+        return new RebalanceResult(RebalanceResult.Status.FAILED, "Found segments in ERROR state", null, null);
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while fetching ExternalView for table: {}", tableNameWithType, e);
+      return new RebalanceResult(RebalanceResult.Status.FAILED, "Caught exception while fetching ExternalView: " + e,
+          null, null);
     }
 
     boolean dryRun =
@@ -126,24 +139,37 @@ public class TableRebalancer {
     }
 
     // Reassign instances if necessary
-    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
     boolean reassignInstances = rebalanceConfig
         .getBoolean(RebalanceConfigConstants.REASSIGN_INSTANCES, RebalanceConfigConstants.DEFAULT_REASSIGN_INSTANCES);
-    if (tableConfig.getTableType() == TableType.OFFLINE) {
-      instancePartitionsMap.put(InstancePartitionsType.OFFLINE,
-          getInstancePartitions(tableConfig, InstancePartitionsType.OFFLINE, reassignInstances, dryRun));
-    } else {
-      instancePartitionsMap.put(InstancePartitionsType.CONSUMING,
-          getInstancePartitions(tableConfig, InstancePartitionsType.CONSUMING, reassignInstances, dryRun));
-      instancePartitionsMap.put(InstancePartitionsType.COMPLETED,
-          getInstancePartitions(tableConfig, InstancePartitionsType.COMPLETED, reassignInstances, dryRun));
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
+    try {
+      if (tableConfig.getTableType() == TableType.OFFLINE) {
+        instancePartitionsMap.put(InstancePartitionsType.OFFLINE,
+            getInstancePartitions(tableConfig, InstancePartitionsType.OFFLINE, reassignInstances, dryRun));
+      } else {
+        instancePartitionsMap.put(InstancePartitionsType.CONSUMING,
+            getInstancePartitions(tableConfig, InstancePartitionsType.CONSUMING, reassignInstances, dryRun));
+        instancePartitionsMap.put(InstancePartitionsType.COMPLETED,
+            getInstancePartitions(tableConfig, InstancePartitionsType.COMPLETED, reassignInstances, dryRun));
+      }
+    } catch (Exception e) {
+      LOGGER
+          .warn("Caught exception while fetching/calculating instance partitions for table: {}", tableNameWithType, e);
+      return new RebalanceResult(RebalanceResult.Status.FAILED,
+          "Caught exception while fetching/calculating instance partitions: " + e, null, null);
     }
 
     LOGGER.info("Calculating the target assignment for table: {}", tableNameWithType);
     SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig);
     Map<String, Map<String, String>> currentAssignment = currentIdealState.getRecord().getMapFields();
-    Map<String, Map<String, String>> targetAssignment =
-        segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, rebalanceConfig);
+    Map<String, Map<String, String>> targetAssignment;
+    try {
+      targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, rebalanceConfig);
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while calculating target assignment for table: {}", tableNameWithType, e);
+      return new RebalanceResult(RebalanceResult.Status.FAILED,
+          "Caught exception while calculating target assignment: " + e, instancePartitionsMap, null);
+    }
 
     if (currentAssignment.equals(targetAssignment)) {
       LOGGER.info("Table: {} is already balanced", tableNameWithType);

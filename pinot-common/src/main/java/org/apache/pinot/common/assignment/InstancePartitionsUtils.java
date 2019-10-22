@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.assignment;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -112,10 +113,11 @@ public class InstancePartitionsUtils {
         throw new IllegalStateException();
     }
     List<String> instances = HelixHelper.getInstancesWithTag(helixManager, serverTag);
+    int numInstances = instances.size();
+    Preconditions.checkState(numInstances > 0, "No instance found with tag: %s", serverTag);
 
     // Sort the instances and rotate the list based on the table name
     instances.sort(null);
-    int numInstances = instances.size();
     String tableNameWithType = tableConfig.getTableName();
     Collections.rotate(instances, -(Math.abs(tableNameWithType.hashCode()) % numInstances));
     InstancePartitions instancePartitions =
