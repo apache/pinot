@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.server.starter;
 
-import com.linkedin.pinot.opal.distributed.keyCoordinator.server.KeyCoordinatorProvider;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.atomic.LongAccumulator;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -36,10 +38,6 @@ import org.apache.pinot.transport.netty.NettyServer;
 import org.apache.pinot.transport.netty.NettyTCPServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.HashSet;
-import java.util.Set;
-import java.util.concurrent.atomic.LongAccumulator;
 
 
 /**
@@ -123,9 +121,5 @@ public class ServerBuilder {
     int nettyPort = _serverConf.getNettyConfig().getPort();
     LOGGER.info("Building netty TCP server with port: {}", nettyPort);
     return new NettyTCPServer(nettyPort, requestHandlerFactory, null);
-  }
-
-  public KeyCoordinatorProvider buildKeyCoordinatorProvider() throws Exception {
-    return new KeyCoordinatorProvider(_serverConf.getOpalConfig());
   }
 }

@@ -20,15 +20,13 @@ package org.apache.pinot.common.data;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import javax.annotation.Nullable;
 import org.apache.avro.Schema.Type;
-import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.config.ConfigKey;
 import org.apache.pinot.common.config.ConfigNodeLifecycleAware;
 import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.JsonUtils;
-
-import javax.annotation.Nullable;
 
 
 /**
@@ -131,10 +129,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
 
   public boolean isSingleValueField() {
     return _isSingleValueField;
-  }
-
-  public boolean isVirtualColumnField() {
-    return _virtualColumnProvider != null;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
@@ -262,9 +256,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     jsonObject.put("dataType", _dataType.name());
     if (!_isSingleValueField) {
       jsonObject.put("singleValueField", false);
-    }
-    if (StringUtils.isNotEmpty(_virtualColumnProvider)) {
-      jsonObject.put("virtualColumnProvider", _virtualColumnProvider);
     }
     if (_maxLength != DEFAULT_MAX_LENGTH) {
       jsonObject.put("maxLength", _maxLength);

@@ -39,7 +39,6 @@ public class ServerConf {
   private static final String PINOT_SERVER_INSTANCE_DATA_MANAGER_CLASS = "pinot.server.instance.data.manager.class";
   private static final String PINOT_SERVER_QUERY_EXECUTOR_CLASS = "pinot.server.query.executor.class";
   private static final String PINOT_SERVER_TRANSFORM_FUNCTIONS = "pinot.server.transforms";
-  private static final String PINOT_SERVER_OPAL = "pinot.server.opal";
 
   private static final String PINOT_QUERY_SCHEDULER_PREFIX = "pinot.query.scheduler";
 
@@ -88,10 +87,6 @@ public class ServerConf {
 
   public Configuration getSchedulerConfig() {
     return _serverConf.subset(PINOT_QUERY_SCHEDULER_PREFIX);
-  }
-
-  public Configuration getOpalConfig() {
-    return _serverConf.subset(PINOT_SERVER_OPAL);
   }
 
   /**
