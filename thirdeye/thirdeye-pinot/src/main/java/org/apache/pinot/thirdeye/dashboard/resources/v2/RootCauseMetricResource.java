@@ -655,6 +655,7 @@ public class RootCauseMetricResource {
   }
 
   private MetricSlice makeSlice(String urn, long start, long end) {
+    // TODO
     return makeSlice(urn, start, end, MetricSlice.NATIVE_GRANULARITY);
   }
 
