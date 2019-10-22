@@ -87,6 +87,9 @@ public class IndexingConfig {
   @ConfigKey("aggregateMetrics")
   private boolean _aggregateMetrics;
 
+  @ConfigKey("nullHandlingEnabled")
+  private boolean _nullHandlingEnabled;
+
   /**
    * The list of columns for which the variable length dictionary needs to be enabled in offline
    * segments. This is only valid for string and bytes columns and has no impact for columns of
@@ -239,6 +242,12 @@ public class IndexingConfig {
     _varLengthDictionaryColumns = varLengthDictionaryColumns;
   }
 
+  public boolean isNullHandlingEnabled() { return _nullHandlingEnabled; }
+
+  public void setNullHandlingEnabled(boolean nullHandlingEnabled) {
+    _nullHandlingEnabled = nullHandlingEnabled;
+  }
+
   @Override
   public String toString() {
     final StringBuilder result = new StringBuilder();
@@ -296,7 +305,9 @@ public class IndexingConfig {
         .isEqual(_starTreeIndexSpec, that._starTreeIndexSpec) && EqualityUtils
         .isEqual(_segmentPartitionConfig, that._segmentPartitionConfig) && EqualityUtils
         .isEqual(_bloomFilterColumns, that._bloomFilterColumns) && EqualityUtils
-        .isEqual(_varLengthDictionaryColumns, that._varLengthDictionaryColumns);
+        .isEqual(_varLengthDictionaryColumns, that._varLengthDictionaryColumns) && EqualityUtils
+        .isEqual(_aggregateMetrics, that._aggregateMetrics) && EqualityUtils
+        .isEqual(_nullHandlingEnabled, that._nullHandlingEnabled);
   }
 
   @Override
@@ -316,6 +327,8 @@ public class IndexingConfig {
     result = EqualityUtils.hashCodeOf(result, _segmentPartitionConfig);
     result = EqualityUtils.hashCodeOf(result, _bloomFilterColumns);
     result = EqualityUtils.hashCodeOf(result, _varLengthDictionaryColumns);
+    result = EqualityUtils.hashCodeOf(result, _aggregateMetrics);
+    result = EqualityUtils.hashCodeOf(result, _nullHandlingEnabled);
     return result;
   }
 }

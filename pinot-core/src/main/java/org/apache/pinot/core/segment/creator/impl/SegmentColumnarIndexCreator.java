@@ -93,6 +93,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private int totalRawDocs;
   private int totalAggDocs;
   private int docIdCounter;
+  private boolean _nullHandlingEnabled;
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
@@ -195,8 +196,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                 indexCreationInfo.getLengthOfLongestEntry()));
       }
 
-      // Initialize Presence vector map
-      _presenceVectorCreatorMap.put(columnName, new PresenceVectorCreator(_indexDir, columnName));
+      _nullHandlingEnabled = config.isNullHandlingEnabled();
+
+      if (_nullHandlingEnabled) {
+        // Initialize Presence vector map
+        _presenceVectorCreatorMap.put(columnName, new PresenceVectorCreator(_indexDir, columnName));
+      }
     }
   }
 
@@ -263,7 +268,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @Override
   public void indexRow(GenericRow row) {
     // Determine if we need to process presence vector per row, per column
-    Set<String> nullColumnsSet = (Set<String>) row.getValue(CommonConstants.Segment.NULL_FIELDS);
+    Set<String> nullColumnsSet = null;
+    if (_nullHandlingEnabled) {
+      nullColumnsSet = (Set<String>) row.getValue(CommonConstants.Segment.NULL_FIELDS);
+    }
 
     for (String columnName : _forwardIndexCreatorMap.keySet()) {
       Object columnValueToIndex = row.getValue(columnName);
@@ -291,9 +299,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         }
       }
 
-      // If row has null value for given column name, add to presence vector
-      if (null != nullColumnsSet && nullColumnsSet.contains(columnName)) {
-        _presenceVectorCreatorMap.get(columnName).setNull(docIdCounter);
+      if (_nullHandlingEnabled) {
+        // If row has null value for given column name, add to presence vector
+        if (null != nullColumnsSet && nullColumnsSet.contains(columnName)) {
+          _presenceVectorCreatorMap.get(columnName).setNull(docIdCounter);
+        }
       }
     }
     docIdCounter++;

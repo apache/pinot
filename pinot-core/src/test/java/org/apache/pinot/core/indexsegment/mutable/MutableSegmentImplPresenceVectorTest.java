@@ -56,11 +56,11 @@ public class MutableSegmentImplPresenceVectorTest {
     URL schemaResourceUrl = this.getClass().getClassLoader().getResource(PINOT_SCHEMA_FILE_PATH);
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE);
     _schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
-    _recordTransformer = CompositeTransformer.getDefaultTransformer(_schema);
+    _recordTransformer = CompositeTransformer.getDefaultTransformer(_schema, true);
     File avroFile = new File(dataResourceUrl.getFile());
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            false);
+            false, true);
     GenericRow reuse = new GenericRow();
     try (RecordReader recordReader = new JSONRecordReader(avroFile, _schema)) {
       while (recordReader.hasNext()) {

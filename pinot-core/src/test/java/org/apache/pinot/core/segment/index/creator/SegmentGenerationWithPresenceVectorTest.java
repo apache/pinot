@@ -104,6 +104,7 @@ public class SegmentGenerationWithPresenceVectorTest {
 
     config.setOutDir(SEGMENT_DIR_NAME);
     config.setSegmentName(SEGMENT_NAME);
+    config.setNullHandlingEnabled(true);
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {

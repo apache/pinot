@@ -90,6 +90,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final PinotDataBufferMemoryManager _memoryManager;
   private final RealtimeSegmentStatsHistory _statsHistory;
   private final SegmentPartitionConfig _segmentPartitionConfig;
+  private final boolean _nullHandlingEnabled;
 
   private final Map<String, BaseMutableDictionary> _dictionaryMap = new HashMap<>();
   private final Map<String, DataFileReader> _indexReaderWriterMap = new HashMap<>();
@@ -147,6 +148,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _memoryManager = config.getMemoryManager();
     _statsHistory = config.getStatsHistory();
     _segmentPartitionConfig = config.getSegmentPartitionConfig();
+    _nullHandlingEnabled = config.isNullHandlingEnabled();
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
     List<FieldSpec> physicalFieldSpecs = new ArrayList<>(allFieldSpecs.size());
@@ -230,8 +232,10 @@ public class MutableSegmentImpl implements MutableSegment {
       if (invertedIndexColumns.contains(column)) {
         _invertedIndexMap.put(column, new RealtimeInvertedIndexReader());
       }
-      _presenceVectorMap.put(column, new RealtimePresenceVectorReaderWriter());
 
+      if (_nullHandlingEnabled) {
+        _presenceVectorMap.put(column, new RealtimePresenceVectorReaderWriter());
+      }
     }
 
     // Metric aggregation can be enabled only if config is specified, and all dimensions have dictionary,
@@ -269,7 +273,9 @@ public class MutableSegmentImpl implements MutableSegment {
       // Add forward and inverted indices for new document.
       addForwardIndex(row, docId, dictIdMap);
       addInvertedIndex(docId, dictIdMap);
-      addPresenceVector(row, docId);
+      if (_nullHandlingEnabled) {
+        addPresenceVector(row, docId);
+      }
 
       // Update number of document indexed at last to make the latest record queryable
       canTakeMore = _numDocsIndexed++ < _capacity;
@@ -497,10 +503,13 @@ public class MutableSegmentImpl implements MutableSegment {
    * @return Generic row with physical columns of the specified row.
    */
   public GenericRow getRecord(int docId, GenericRow reuse) {
-    // Try and reuse the null columns set
-    Set<String> nullColumnsSet = (Set<String>) reuse.getValue(CommonConstants.Segment.NULL_FIELDS);
-    if (nullColumnsSet != null) {
-      nullColumnsSet.clear();
+    Set<String> nullColumnsSet = null;
+    if (_nullHandlingEnabled) {
+      // Try and reuse the null columns set
+      nullColumnsSet = (Set<String>) reuse.getValue(CommonConstants.Segment.NULL_FIELDS);
+      if (nullColumnsSet != null) {
+        nullColumnsSet.clear();
+      }
     }
 
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
@@ -509,16 +518,21 @@ public class MutableSegmentImpl implements MutableSegment {
           .getValue(docId, fieldSpec, _indexReaderWriterMap.get(column), _dictionaryMap.get(column),
               _maxNumValuesMap.getOrDefault(column, 0)));
 
-      PresenceVectorReader reader = _presenceVectorMap.get(column);
-      if (reader != null && !reader.isPresent(docId)) {
-        if (nullColumnsSet == null) {
-          nullColumnsSet = new HashSet<>();
+      if (_nullHandlingEnabled) {
+        PresenceVectorReader reader = _presenceVectorMap.get(column);
+        if (reader != null && !reader.isPresent(docId)) {
+          if (nullColumnsSet == null) {
+            nullColumnsSet = new HashSet<>();
+          }
+          nullColumnsSet.add(column);
         }
-        nullColumnsSet.add(column);
       }
     }
 
-    reuse.putValue(CommonConstants.Segment.NULL_FIELDS, nullColumnsSet);
+    if (_nullHandlingEnabled) {
+      reuse.putValue(CommonConstants.Segment.NULL_FIELDS, nullColumnsSet);
+    }
+
     return reuse;
   }
 

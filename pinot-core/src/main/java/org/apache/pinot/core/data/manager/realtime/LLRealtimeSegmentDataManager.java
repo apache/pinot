@@ -259,6 +259,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private String _stopReason = null;
   private final Semaphore _segBuildSemaphore;
   private final boolean _isOffHeap;
+  private final boolean _nullHandlingEnabled;
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
@@ -687,7 +688,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), _schema,
               _tableNameWithType, _timeColumnName, _segmentZKMetadata.getSegmentName(), _sortedColumn,
-              _invertedIndexColumns, _noDictionaryColumns, _varLengthDictionaryColumns, _starTreeIndexSpec);
+              _invertedIndexColumns, _noDictionaryColumns, _varLengthDictionaryColumns, _starTreeIndexSpec,
+              _nullHandlingEnabled);
       segmentLogger.info("Trying to build segment");
       try {
         converter.build(_segmentVersion, _serverMetrics);
@@ -1139,6 +1141,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     _isOffHeap = indexLoadingConfig.isRealtimeOffheapAllocation();
 
+    _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
+
     // Start new realtime segment
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setSegmentName(_segmentNameStr).setStreamName(_streamTopic)
@@ -1149,14 +1153,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setInvertedIndexColumns(invertedIndexColumns).setRealtimeSegmentZKMetadata(segmentZKMetadata)
             .setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
-            .setAggregateMetrics(indexingConfig.isAggregateMetrics());
+            .setAggregateMetrics(indexingConfig.isAggregateMetrics())
+            .setNullHandlingEnabled(_nullHandlingEnabled);
 
     // Create message decoder
     _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, _schema);
     _clientId = _streamPartitionId + "-" + NetUtil.getHostnameOrAddress();
 
     // Create record transformer
-    _recordTransformer = CompositeTransformer.getDefaultTransformer(schema);
+    _recordTransformer = CompositeTransformer.getDefaultTransformer(schema,
+        tableConfig.getIndexingConfig().isNullHandlingEnabled());
     makeStreamConsumer("Starting");
     makeStreamMetadataProvider("Starting");
 

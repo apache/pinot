@@ -55,11 +55,12 @@ public class RealtimeSegmentConverter {
   private List<String> noDictionaryColumns;
   private StarTreeIndexSpec starTreeIndexSpec;
   private List<String> varLengthDictionaryColumns;
+  private final boolean _nullHandlingEnabled;
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
       String tableName, String timeColumnName, String segmentName, String sortedColumn,
       List<String> invertedIndexColumns, List<String> noDictionaryColumns,
-      List<String> varLengthDictionaryColumns, StarTreeIndexSpec starTreeIndexSpec) {
+      List<String> varLengthDictionaryColumns, StarTreeIndexSpec starTreeIndexSpec, boolean nullHandlingEnabled) {
     if (new File(outputPath).exists()) {
       throw new IllegalAccessError("path already exists:" + outputPath);
     }
@@ -77,12 +78,13 @@ public class RealtimeSegmentConverter {
     this.noDictionaryColumns = noDictionaryColumns;
     this.varLengthDictionaryColumns = varLengthDictionaryColumns;
     this.starTreeIndexSpec = starTreeIndexSpec;
+    this._nullHandlingEnabled = nullHandlingEnabled;
   }
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
       String tableName, String timeColumnName, String segmentName, String sortedColumn) {
     this(realtimeSegment, outputPath, schema, tableName, timeColumnName, segmentName, sortedColumn, new ArrayList<>(),
-        new ArrayList<>(), new ArrayList<>(), null/*StarTreeIndexSpec*/);
+        new ArrayList<>(), new ArrayList<>(), null/*StarTreeIndexSpec*/, false/*nullHandlingEnabled*/);
   }
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)
@@ -135,6 +137,7 @@ public class RealtimeSegmentConverter {
     genConfig.setSegmentName(segmentName);
     SegmentPartitionConfig segmentPartitionConfig = realtimeSegmentImpl.getSegmentPartitionConfig();
     genConfig.setSegmentPartitionConfig(segmentPartitionConfig);
+    genConfig.setNullHandlingEnabled(_nullHandlingEnabled);
     final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     RealtimeSegmentSegmentCreationDataSource dataSource =
         new RealtimeSegmentSegmentCreationDataSource(realtimeSegmentImpl, reader, dataSchema);

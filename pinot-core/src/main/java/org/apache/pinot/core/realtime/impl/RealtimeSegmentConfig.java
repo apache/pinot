@@ -40,6 +40,7 @@ public class RealtimeSegmentConfig {
   private final RealtimeSegmentStatsHistory _statsHistory;
   private final SegmentPartitionConfig _segmentPartitionConfig;
   private final boolean _aggregateMetrics;
+  private final boolean _nullHandlingEnabled;
 
   private RealtimeSegmentConfig(String segmentName, String streamName, Schema schema, int capacity,
       int avgNumMultiValues, Set<String> noDictionaryColumns, Set<String> varLengthDictionaryColumns,
@@ -47,6 +48,17 @@ public class RealtimeSegmentConfig {
       boolean offHeap, PinotDataBufferMemoryManager memoryManager,
       RealtimeSegmentStatsHistory statsHistory, SegmentPartitionConfig segmentPartitionConfig,
       boolean aggregateMetrics) {
+    this(segmentName, streamName, schema, capacity, avgNumMultiValues, noDictionaryColumns, varLengthDictionaryColumns,
+        invertedIndexColumns, realtimeSegmentZKMetadata, offHeap, memoryManager, statsHistory, segmentPartitionConfig,
+        aggregateMetrics, false);
+  }
+
+  private RealtimeSegmentConfig(String segmentName, String streamName, Schema schema, int capacity,
+      int avgNumMultiValues, Set<String> noDictionaryColumns, Set<String> varLengthDictionaryColumns,
+      Set<String> invertedIndexColumns, RealtimeSegmentZKMetadata realtimeSegmentZKMetadata,
+      boolean offHeap, PinotDataBufferMemoryManager memoryManager,
+      RealtimeSegmentStatsHistory statsHistory, SegmentPartitionConfig segmentPartitionConfig,
+      boolean aggregateMetrics, boolean nullHandlingEnabled) {
     _segmentName = segmentName;
     _streamName = streamName;
     _schema = schema;
@@ -61,6 +73,7 @@ public class RealtimeSegmentConfig {
     _statsHistory = statsHistory;
     _segmentPartitionConfig = segmentPartitionConfig;
     _aggregateMetrics = aggregateMetrics;
+    _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   public String getSegmentName() {
@@ -119,6 +132,8 @@ public class RealtimeSegmentConfig {
     return _aggregateMetrics;
   }
 
+  public boolean isNullHandlingEnabled() { return _nullHandlingEnabled; }
+
   public static class Builder {
     private String _segmentName;
     private String _streamName;
@@ -134,6 +149,7 @@ public class RealtimeSegmentConfig {
     private RealtimeSegmentStatsHistory _statsHistory;
     private SegmentPartitionConfig _segmentPartitionConfig;
     private boolean _aggregateMetrics = false;
+    private boolean _nullHandlingEnabled = false;
 
     public Builder() {
     }
@@ -208,11 +224,20 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public boolean isNullHandlingEnabled() {
+      return _nullHandlingEnabled;
+    }
+
+    public Builder setNullHandlingEnabled(boolean nullHandlingEnabled) {
+      _nullHandlingEnabled = nullHandlingEnabled;
+      return this;
+    }
+
     public RealtimeSegmentConfig build() {
       return new RealtimeSegmentConfig(_segmentName, _streamName, _schema, _capacity, _avgNumMultiValues,
           _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
           _realtimeSegmentZKMetadata, _offHeap, _memoryManager,
-          _statsHistory, _segmentPartitionConfig, _aggregateMetrics);
+          _statsHistory, _segmentPartitionConfig, _aggregateMetrics, _nullHandlingEnabled);
     }
   }
 }

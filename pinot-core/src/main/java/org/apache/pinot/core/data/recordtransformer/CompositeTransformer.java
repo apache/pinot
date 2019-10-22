@@ -47,10 +47,17 @@ public class CompositeTransformer implements RecordTransformer {
    *   </li>
    * </ul>
    */
-  public static CompositeTransformer getDefaultTransformer(Schema schema) {
+  public static CompositeTransformer getDefaultTransformer(Schema schema, boolean nullHandlingEnabled) {
     return new CompositeTransformer(Arrays
-        .asList(new NullValueTransformer(schema), new TimeTransformer(schema), new ExpressionTransformer(schema),
+        .asList(new NullValueTransformer(schema, nullHandlingEnabled), new TimeTransformer(schema), new ExpressionTransformer(schema),
             new DataTypeTransformer(schema), new SanitizationTransformer(schema)));
+  }
+
+  /**
+   * Wrapper around above function that returns a composite transformer with null handling disabled
+   */
+  public static CompositeTransformer getDefaultTransformer(Schema schema) {
+    return getDefaultTransformer(schema, false);
   }
 
   /**
