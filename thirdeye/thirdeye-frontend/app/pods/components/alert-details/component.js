@@ -41,7 +41,6 @@ export default Component.extend({
   anomaliesApiService: service('services/api/anomalies'),
   notifications: service('toast'),
   timeseries: null,
-  isLoading: false,
   analysisRange: [moment().subtract(2, 'day').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
   isPendingData: false,
   colorMapping: colorMapping,
@@ -174,9 +173,21 @@ export default Component.extend({
    */
   isPreviewLoading: computed(
     'isPreviewMode',
-    'isLoading',
+    '_getAnomalies.isIdle',
     function() {
-      return (get(this, 'isPreviewMode') && get(this, 'isLoading'));
+      return (get(this, 'isPreviewMode') && !get(this, '_getAnomalies.isIdle'));
+    }
+  ),
+
+  /**
+   * flag for graph data loading
+   * @type {Boolean}
+   */
+  isDataLoading: computed(
+    'isLoadingTimeSeries',
+    '_getAnomalies.isIdle',
+    function() {
+      return ((!get(this, '_getAnomalies.isIdle') || get(this, 'isLoadingTimeSeries')));
     }
   ),
 
@@ -260,7 +271,7 @@ export default Component.extend({
    * 1 - set to old (Alert Overview or Create Alert Preview w/o old)
    * 2 - set to new (Edit Alert Preview with old or Create Alert Preview w/o new)
    * 3 - shuffle then set to new (Create Alert Preview with 2 sets already)
-   * 4 - get originalYaml then get updated (Edit Alert Preview w/o any anomalies loaded yet)
+   * 4 - get alert anomalies only - no time series (Edit Alert Preview w/o any anomalies loaded yet)
    * 5 - error getting anomalies
    * @type {Number}
    */
@@ -315,9 +326,9 @@ export default Component.extend({
 
   disablePreviewButton: computed(
     'alertYaml',
-    'isLoading',
+    '_getAnomalies.isIdle',
     function() {
-      return (get(this, 'alertYaml') === null || get(this, 'isLoading') === true);
+      return (get(this, 'alertYaml') === null || !get(this, '_getAnomalies.isIdle'));
     }
   ),
 
@@ -717,6 +728,18 @@ export default Component.extend({
   ),
 
   /**
+   * flag for whether to show anomaly table
+   * @method anomaliesAny
+   * @return {Boolean}
+   */
+  anomaliesAny: computed(
+    'tableAnomalies.@each',
+    function() {
+      return (this.get('tableAnomalies').length > 0);
+    }
+  ),
+
+  /**
    * generates columns for anomaly table
    * @method columns
    * @return {Array}
@@ -737,13 +760,17 @@ export default Component.extend({
       const settingsColumn = ((isEditMode && stateOfAnomaliesAndTimeSeries === 2) ||
       stateOfAnomaliesAndTimeSeries === 3) ? [{
           title: 'Detection Settings',
-          propertyName: 'settings'
+          propertyName: 'settings',
+          sortDirection: 'asc',
+          sortPrecedence: 0 // lower number means higher precedence
         }] : [];
       const startColumn = [{
         template: 'custom/anomalies-table/start-duration',
         title: 'Start / Duration (PDT)',
         propertyName: 'startDateStr',
-        sortedBy: 'start'
+        sortedBy: 'start',
+        sortDirection: 'desc',
+        sortPrecedence: 1 // lower number means higher precedence
       }];
       const dimensionColumn = alertHasDimensions ? [{
         template: 'custom/anomalies-table/dimensions-only',
@@ -891,7 +918,8 @@ export default Component.extend({
     let metricUrnList;
     let firstDimension;
     try {
-      if(showRules){
+      // case 4 is anomaliesOld for Edit Alert Preview, so we only need the real anomalies without time series
+      if(showRules && stateOfAnomaliesAndTimeSeries !== 4){
         applicationAnomalies = ((granularity || '').includes('DAYS')) ? yield getBounds(alertId, startAnomalies, endAnomalies) : yield getYamlPreviewAnomalies(alertYaml, startAnomalies, endAnomalies, alertId);
         if (applicationAnomalies && applicationAnomalies.diagnostics && applicationAnomalies.diagnostics['0']) {
           metricUrnList = Object.keys(applicationAnomalies.diagnostics['0']);
@@ -909,8 +937,8 @@ export default Component.extend({
           }
           set(this, 'metricUrn', metricUrnList[0]);
         }
-        // case 1 is Alert Overview, case 4 is anomaliesOld for Edit Alert Preview (should be real anomalies with ids)
-        anomalies = ((stateOfAnomaliesAndTimeSeries === 1 && !this.get('isPreviewMode')) || stateOfAnomaliesAndTimeSeries === 4) ? yield getAnomaliesByAlertId(alertId, start, end) : applicationAnomalies.anomalies;
+        // Alert Overview (should be real anomalies with ids)
+        anomalies = ((stateOfAnomaliesAndTimeSeries === 1 && !this.get('isPreviewMode'))) ? yield getAnomaliesByAlertId(alertId, start, end) : applicationAnomalies.anomalies;
         uniqueTimeSeries = applicationAnomalies.predictions;
       } else {
         applicationAnomalies = yield getAnomaliesByAlertId(alertId, start, end);
@@ -941,7 +969,7 @@ export default Component.extend({
       anomalies,
       uniqueTimeSeries
     };
-  }).drop(),
+  }).keepLatest(),
 
   init() {
     this._super(...arguments);
@@ -1063,10 +1091,7 @@ export default Component.extend({
   },
 
   _fetchAnomalies() {
-    this.setProperties({
-      getAnomaliesError: false,
-      isLoading: true
-    });
+    set(this, 'getAnomaliesError', false);
 
     try {
       // in Edit Alert Preview, we want the original yaml used for comparisons
@@ -1081,12 +1106,12 @@ export default Component.extend({
           }
         })
         .catch(error => {
-          set(this, 'isLoading', false);
-          this.get('notifications').error(error, 'Error', toastOptions);
-          set(this, 'getAnomaliesError', true);
+          if (error.name !== 'TaskCancelation') {
+            this.get('notifications').error(error, 'Error', toastOptions);
+            set(this, 'getAnomaliesError', true);
+          }
         });
     } catch (error) {
-      set(this, 'isLoading', false);
       this.get('notifications').error(error, 'Error', toastOptions);
       set(this, 'getAnomaliesError', true);
     }
@@ -1105,16 +1130,14 @@ export default Component.extend({
         this.setProperties({
           anomaliesOld: results.anomalies,
           anomaliesOldSet: true,
-          uniqueTimeSeries: results.uniqueTimeSeries,
-          isLoading: false
+          uniqueTimeSeries: results.uniqueTimeSeries
         });
         break;
       case 2:
         this.setProperties({
           anomaliesNew: results.anomalies,
           anomaliesNewSet: true,
-          uniqueTimeSeries: results.uniqueTimeSeries,
-          isLoading: false
+          uniqueTimeSeries: results.uniqueTimeSeries
         });
         break;
       case 3:
@@ -1122,8 +1145,7 @@ export default Component.extend({
         this.setProperties({
           anomaliesNew: results.anomalies,
           anomaliesNewSet: true,
-          uniqueTimeSeries: results.uniqueTimeSeries,
-          isLoading: false
+          uniqueTimeSeries: results.uniqueTimeSeries
         });
         break;
       case 4:
@@ -1298,6 +1320,15 @@ export default Component.extend({
           });
         }
         this._fetchAnomalies();
+      }
+      // With a new date range, we should reset the state of time series and anomalies for comparison
+      if (get(this, 'isPreviewMode')) {
+        this.setProperties({
+          anomaliesOld: [],
+          anomaliesOldSet: false,
+          anomaliesNew: [],
+          anomaliesNewSet: false
+        });
       }
     },
 

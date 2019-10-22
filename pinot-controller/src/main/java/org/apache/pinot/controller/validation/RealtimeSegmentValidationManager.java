@@ -36,6 +36,7 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.core.realtime.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,10 +96,9 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
         updateRealtimeDocumentCount(tableConfig);
       }
 
-      Map<String, String> streamConfigMap = tableConfig.getIndexingConfig().getStreamConfigs();
-      StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
+      PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig);
       if (streamConfig.hasLowLevelConsumerType()) {
-        _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig);
+        _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig);
       }
     }
   }

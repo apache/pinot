@@ -21,7 +21,6 @@ package org.apache.pinot.core.io.writer.impl;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
@@ -86,25 +85,19 @@ public class MutableOffHeapByteArrayStore implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(MutableOffHeapByteArrayStore.class);
 
   private static class Buffer implements Closeable {
-
     private final PinotDataBuffer _pinotDataBuffer;
-    private final ByteBuffer _byteBuffer;
     private final int _startIndex;
-    private final long _size;
+    private final int _size;
 
     private int _numValues = 0;
     private int _availEndOffset;  // Exclusive
 
-    private Buffer(long size, int startIndex, PinotDataBufferMemoryManager memoryManager, String allocationContext) {
-      if (size >= Integer.MAX_VALUE) {
-        size = Integer.MAX_VALUE - 1;
-      }
+    private Buffer(int size, int startIndex, PinotDataBufferMemoryManager memoryManager, String allocationContext) {
       LOGGER.info("Allocating byte array store buffer of size {} for: {}", size, allocationContext);
       _pinotDataBuffer = memoryManager.allocate(size, allocationContext);
-      _byteBuffer = _pinotDataBuffer.toDirectByteBuffer(0, (int) size);
       _startIndex = startIndex;
-      _availEndOffset = _byteBuffer.capacity();
       _size = size;
+      _availEndOffset = size;
     }
 
     private int add(byte[] value) {
@@ -113,41 +106,41 @@ public class MutableOffHeapByteArrayStore implements Closeable {
         // full
         return -1;
       }
-      for (int i = 0, j = startOffset; i < value.length; i++, j++) {
-        _byteBuffer.put(j, value[i]);
-      }
-      _byteBuffer.putInt(_numValues * Integer.BYTES, startOffset);
+      _pinotDataBuffer.readFrom(startOffset, value);
+      _pinotDataBuffer.putInt(_numValues * Integer.BYTES, startOffset);
       _availEndOffset = startOffset;
       return _numValues++;
     }
 
     private boolean equalsValueAt(byte[] value, int index) {
-      int startOffset = _byteBuffer.getInt(index * Integer.BYTES);
-      int endOffset = _byteBuffer.capacity();
-      if (index > 0) {
-        endOffset = _byteBuffer.getInt((index - 1) * Integer.BYTES);
+      int startOffset = _pinotDataBuffer.getInt(index * Integer.BYTES);
+      int endOffset;
+      if (index != 0) {
+        endOffset = _pinotDataBuffer.getInt((index - 1) * Integer.BYTES);
+      } else {
+        endOffset = _size;
       }
       if ((endOffset - startOffset) != value.length) {
         return false;
       }
       for (int i = 0, j = startOffset; i < value.length; i++, j++) {
-        if (value[i] != _byteBuffer.get(j)) {
+        if (value[i] != _pinotDataBuffer.getByte(j)) {
           return false;
         }
       }
       return true;
     }
 
-    private byte[] get(final int index) {
-      int startOffset = _byteBuffer.getInt(index * Integer.BYTES);
-      int endOffset = _byteBuffer.capacity();
-      if (index > 0) {
-        endOffset = _byteBuffer.getInt((index - 1) * Integer.BYTES);
+    private byte[] get(int index) {
+      int startOffset = _pinotDataBuffer.getInt(index * Integer.BYTES);
+      int endOffset;
+      if (index != 0) {
+        endOffset = _pinotDataBuffer.getInt((index - 1) * Integer.BYTES);
+      } else {
+        endOffset = _size;
       }
       byte[] value = new byte[endOffset - startOffset];
-      for (int i = 0, j = startOffset; i < value.length; i++, j++) {
-        value[i] = _byteBuffer.get(j);
-      }
+      _pinotDataBuffer.copyTo(startOffset, value);
       return value;
     }
 
@@ -157,7 +150,7 @@ public class MutableOffHeapByteArrayStore implements Closeable {
       _pinotDataBuffer.close();
     }
 
-    private long getSize() {
+    private int getSize() {
       return _size;
     }
 
@@ -184,32 +177,23 @@ public class MutableOffHeapByteArrayStore implements Closeable {
     _memoryManager = memoryManager;
     _allocationContext = allocationContext;
     _startSize = numArrays * (avgArrayLen + 4); // For each array, we store the array and its startoffset (4 bytes)
-    expand(_startSize, 0L);
+    expand(_startSize);
   }
 
   /**
    * Expand the buffer list to add a new buffer, allocating a buffer that can definitely fit
    * the new value.
    *
-   * @param suggestedSize is the size of the new buffer to be allocated
-   * @param minSize is the new value that must fit into the new buffer.
+   * @param size Size of the expanded buffer
    * @return Expanded buffer
    */
-  @SuppressWarnings("Duplicates")
-  private Buffer expand(long suggestedSize, long minSize) {
-    Buffer buffer = new Buffer(Math.max(suggestedSize, minSize), _numElements, _memoryManager, _allocationContext);
-    List<Buffer> newList = new LinkedList<>();
-    for (Buffer b : _buffers) {
-      newList.add(b);
-    }
+  private Buffer expand(int size) {
+    Buffer buffer = new Buffer(size, _numElements, _memoryManager, _allocationContext);
+    List<Buffer> newList = new LinkedList<>(_buffers);
     newList.add(buffer);
     _buffers = newList;
     _currentBuffer = buffer;
     return buffer;
-  }
-
-  private Buffer expand(long sizeOfNewValue) {
-    return expand(_currentBuffer.getSize() * 2, sizeOfNewValue + Integer.BYTES);
   }
 
   // Returns a byte array, given an index
@@ -227,13 +211,22 @@ public class MutableOffHeapByteArrayStore implements Closeable {
 
   // Adds a byte array and returns the index. No verification is made as to whether the byte array already exists or not
   public int add(byte[] value) {
-    _totalStringSize += value.length;
+    int valueLength = value.length;
     Buffer buffer = _currentBuffer;
     int index = buffer.add(value);
     if (index < 0) {
-      buffer = expand(value.length);
+      // Need to expand the buffer
+      int currentBufferSize = buffer.getSize();
+      if ((currentBufferSize << 1) >= 0) {
+        // The expanded buffer size should be enough for the current value
+        buffer = expand(Math.max(currentBufferSize << 1, valueLength + Integer.BYTES));
+      } else {
+        // Int overflow
+        buffer = expand(Integer.MAX_VALUE);
+      }
       index = buffer.add(value);
     }
+    _totalStringSize += valueLength;
     _numElements++;
     return index + buffer.getStartIndex();
   }
