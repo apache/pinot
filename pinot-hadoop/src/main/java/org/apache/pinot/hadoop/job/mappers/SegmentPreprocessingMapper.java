@@ -94,7 +94,7 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
       if (!normalizedTimeColumnValue.equals(_sampleNormalizedTimeColumnValue)) {
         // TODO: Create a custom exception and gracefully catch this exception outside, changing what the path to input
         // into segment creation should be
-        LOGGER.error("This segment contains multiple time units. Sample is {}, current is {}", _sampleNormalizedTimeColumnValue, normalizedTimeColumnValue);
+        LOGGER.warn("This segment contains multiple time units. Sample is {}, current is {}", _sampleNormalizedTimeColumnValue, normalizedTimeColumnValue);
       }
     }
 
