@@ -24,7 +24,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
@@ -43,23 +42,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class DetectionPipelineJob implements Job {
-  private static final Logger LOG = LoggerFactory.getLogger(DetectionPipelineJob.class);
+public class DetectionDataAvailabilityJob implements Job {
+  private static final Logger LOG = LoggerFactory.getLogger(DetectionDataAvailabilityJob.class);
 
-  private TaskManager taskDAO = DAORegistry.getInstance().getTaskDAO();
+  private final TaskManager taskDAO = DAORegistry.getInstance().getTaskDAO();
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static final long DETECTION_TASK_TIMEOUT = TimeUnit.DAYS.toMillis(1);
+  private static final long DATA_AVAILABILITY_TASK_TIMEOUT = TimeUnit.MINUTES.toMillis(15);
 
   @Override
   public void execute(JobExecutionContext jobExecutionContext) {
     DetectionPipelineTaskInfo taskInfo = TaskUtils.buildTaskInfo(jobExecutionContext);
 
     // if a task is pending and not time out yet, don't schedule more
-    String jobName = String.format("%s_%d", TaskConstants.TaskType.DETECTION, taskInfo.configId);
-    if (TaskUtils.checkTaskAlreadyRun(jobName, taskInfo, DETECTION_TASK_TIMEOUT)) {
-      LOG.info("Skip scheduling detection task for {} with start time {}. Task is already in the queue.", jobName,
-          taskInfo.getStart());
+    String jobName = String.format("%s_%d", TaskConstants.TaskType.DATA_AVAILABILITY, taskInfo.configId);
+    if (TaskUtils.checkTaskAlreadyRun(jobName, taskInfo, DATA_AVAILABILITY_TASK_TIMEOUT)) {
+      LOG.info("Skip scheduling {} task for {} with start time {}. Task is already in the queue.",
+          TaskConstants.TaskType.DATA_AVAILABILITY, jobName, taskInfo.getStart());
       return;
     }
 
@@ -70,9 +69,9 @@ public class DetectionPipelineJob implements Job {
       LOG.error("Exception when converting DetectionPipelineTaskInfo {} to jsonString", taskInfo, e);
     }
 
-    TaskDTO taskDTO = TaskUtils.buildTask(taskInfo.configId, taskInfoJson, TaskConstants.TaskType.DETECTION);
+    TaskDTO taskDTO = TaskUtils.buildTask(taskInfo.configId, taskInfoJson, TaskConstants.TaskType.DATA_AVAILABILITY);
     long taskId = taskDAO.save(taskDTO);
-    LOG.info("Created {} task {} with taskId {}", TaskConstants.TaskType.DETECTION, taskDTO, taskId);
+    LOG.info("Created {} task {} with taskId {}", TaskConstants.TaskType.DATA_AVAILABILITY, taskDTO, taskId);
   }
 }
 

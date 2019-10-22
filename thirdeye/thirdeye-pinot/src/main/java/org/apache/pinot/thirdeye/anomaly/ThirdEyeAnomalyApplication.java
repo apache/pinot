@@ -41,8 +41,8 @@ import org.apache.pinot.thirdeye.dashboard.resources.EmailResource;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.pinot.resources.PinotDataSourceResource;
-import org.apache.pinot.thirdeye.detection.DetectionPipelineScheduler;
-import org.apache.pinot.thirdeye.detection.alert.DetectionAlertScheduler;
+import org.apache.pinot.thirdeye.scheduler.DetectionScheduler;
+import org.apache.pinot.thirdeye.scheduler.SubscriptionScheduler;
 import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
 import org.apache.pinot.thirdeye.tracking.RequestStatisticsLogger;
@@ -73,10 +73,10 @@ public class ThirdEyeAnomalyApplication
   private EmailResource emailResource = null;
   private HolidayEventsLoader holidayEventsLoader = null;
   private RequestStatisticsLogger requestStatisticsLogger = null;
-  private DetectionPipelineScheduler detectionPipelineScheduler = null;
-  private DetectionAlertScheduler detectionAlertScheduler = null;
   private DataAvailabilityEventListenerDriver dataAvailabilityEventListenerDriver = null;
   private DataAvailabilityTaskScheduler dataAvailabilityTaskScheduler = null;
+  private DetectionScheduler detectionScheduler = null;
+  private SubscriptionScheduler subscriptionScheduler = null;
 
   public static void main(final String[] args) throws Exception {
     List<String> argList = new ArrayList<>(Arrays.asList(args));
@@ -180,12 +180,12 @@ public class ThirdEyeAnomalyApplication
           environment.jersey().register(new PinotDataSourceResource());
         }
         if (config.isDetectionPipeline()) {
-          detectionPipelineScheduler = new DetectionPipelineScheduler(DAORegistry.getInstance().getDetectionConfigManager());
-          detectionPipelineScheduler.start();
+          detectionScheduler = new DetectionScheduler(DAORegistry.getInstance().getDetectionConfigManager());
+          detectionScheduler.start();
         }
         if (config.isDetectionAlert()) {
-          detectionAlertScheduler = new DetectionAlertScheduler();
-          detectionAlertScheduler.start();
+          subscriptionScheduler = new SubscriptionScheduler();
+          subscriptionScheduler.start();
         }
         if (config.isDataAvailabilityEventListener()) {
           dataAvailabilityEventListenerDriver = new DataAvailabilityEventListenerDriver(config.getDataAvailabilitySchedulingConfiguration());
@@ -229,8 +229,8 @@ public class ThirdEyeAnomalyApplication
         if (classificationJobScheduler != null) {
           classificationJobScheduler.shutdown();
         }
-        if (detectionPipelineScheduler != null) {
-          detectionPipelineScheduler.shutdown();
+        if (detectionScheduler != null) {
+          detectionScheduler.shutdown();
         }
         if (dataAvailabilityEventListenerDriver != null) {
           dataAvailabilityEventListenerDriver.shutdown();

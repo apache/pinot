@@ -19,6 +19,7 @@
 package org.apache.pinot.thirdeye.anomaly.detection.trigger;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -55,12 +56,14 @@ public class DataAvailabilityTaskSchedulerTest {
   private static String TEST_DATASET_PREFIX = "ds_trigger_scheduler_";
   private DAOTestBase testDAOProvider;
   private DataAvailabilityTaskScheduler dataAvailabilityTaskScheduler;
+  private DetectionConfigManager detectionConfigDAO;
   private long metricId1;
   private long metricId2;
 
   @BeforeMethod
   public void beforeMethod() {
     testDAOProvider = DAOTestBase.getInstance();
+    detectionConfigDAO = DAORegistry.getInstance().getDetectionConfigManager();
     MetricConfigManager metricConfigManager = DAORegistry.getInstance().getMetricConfigDAO();
     final String TEST_METRIC_PREFIX = "metric_trigger_scheduler_";
 
@@ -136,8 +139,7 @@ public class DataAvailabilityTaskSchedulerTest {
     createDataset(2, TEST_TIME - TimeUnit.HOURS.toMillis(1), TEST_TIME); // not updated dataset
     createDetectionTask(detection1, TEST_TIME - 60_000, TaskConstants.TaskStatus.COMPLETED);
     createDetectionTask(detection2, TEST_TIME - 60_000, TaskConstants.TaskStatus.COMPLETED);
-    DetectionConfigManager detectionConfigManager = DAORegistry.getInstance().getDetectionConfigManager();
-    List<DetectionConfigDTO> detectionConfigs = detectionConfigManager.findAll();
+    List<DetectionConfigDTO> detectionConfigs = detectionConfigDAO.findAll();
     Assert.assertEquals(detectionConfigs.size(), 2);
     dataAvailabilityTaskScheduler.run();
     TaskManager taskManager = DAORegistry.getInstance().getTaskDAO();
@@ -224,8 +226,34 @@ public class DataAvailabilityTaskSchedulerTest {
     List<TaskDTO> waitingTasks = tasks.stream().filter(t -> t.getStatus() == TaskConstants.TaskStatus.WAITING).collect(
         Collectors.toList());
     Assert.assertEquals(waitingTasks.size(), 1);
-    Assert.assertEquals(TaskConstants.TaskType.DETECTION.toString() + "_" + detection1,
-        waitingTasks.get(0).getJobName());
+    Assert.assertEquals(TaskConstants.TaskType.DETECTION.toString() + "_" + detection1, waitingTasks.get(0).getJobName());
+  }
+
+  @Test
+  public void testDetectionsWithDataAvailabilityRules() {
+    List<Long> metrics1 = Collections.singletonList(metricId1);
+    long oneDayAgo = TEST_TIME - TimeUnit.DAYS.toMillis(1);
+    DetectionConfigDTO detection = generateDetectionConfig(1, metrics1, oneDayAgo, 0);
+    Map<String, Object> props = new HashMap<>();
+    props.put("test_SLA", "7_DAYS");
+    detection.setDataAvailabilityProperties(props);
+    long detection1 = detectionConfigDAO.save(detection);
+    long halfHourAgo = TEST_TIME - TimeUnit.MINUTES.toMillis(30);
+    createDataset(1, TEST_TIME, halfHourAgo);
+    createDetectionTask(detection1, oneDayAgo - 60_000, TaskConstants.TaskStatus.COMPLETED);
+    TaskManager taskManager = DAORegistry.getInstance().getTaskDAO();
+    dataAvailabilityTaskScheduler.run();
+    List<TaskDTO> tasks = taskManager.findAll();
+    List<TaskDTO> waitingTasks = tasks.stream().filter(t -> t.getStatus() == TaskConstants.TaskStatus.WAITING).collect(
+        Collectors.toList());
+
+    // 2 tasks should be created (detection & availability)
+    Assert.assertEquals(waitingTasks.size(), 2);
+    List<String> jobNames = new ArrayList<>();
+    jobNames.add(waitingTasks.get(0).getJobName());
+    jobNames.add(waitingTasks.get(1).getJobName());
+    Assert.assertTrue(jobNames.contains(TaskConstants.TaskType.DETECTION.toString() + "_" + detection1));
+    Assert.assertTrue(jobNames.contains(TaskConstants.TaskType.DATA_AVAILABILITY.toString() + "_" + detection1));
   }
 
   private long createDataset(int intSuffix, long refreshTime, long refreshEventTime) {
@@ -238,8 +266,13 @@ public class DataAvailabilityTaskSchedulerTest {
   }
 
   private long createDetection(int intSuffix, List<Long> metrics, long lastTimestamp, int notRunThreshold) {
-    DetectionConfigManager detectionConfigManager = DAORegistry.getInstance().getDetectionConfigManager();
+    return detectionConfigDAO.save(generateDetectionConfig(intSuffix, metrics, lastTimestamp, notRunThreshold));
+  }
+
+  private DetectionConfigDTO generateDetectionConfig(int intSuffix, List<Long> metrics, long lastTimestamp,
+      int notRunThreshold) {
     final String TEST_DETECTION_PREFIX = "detection_trigger_listener_";
+
     DetectionConfigDTO detect = new DetectionConfigDTO();
     detect.setName(TEST_DETECTION_PREFIX + intSuffix);
     detect.setActive(true);
@@ -250,7 +283,8 @@ public class DataAvailabilityTaskSchedulerTest {
     detect.setLastTimestamp(lastTimestamp);
     detect.setDataAvailabilitySchedule(true);
     detect.setTaskTriggerFallBackTimeInSec(notRunThreshold);
-    return detectionConfigManager.save(detect);
+
+    return detect;
   }
 
   private long createDetectionTask(long detectionId, long createTime, TaskConstants.TaskStatus status) {

@@ -45,6 +45,10 @@ public class DetectionConfigBean extends AbstractBean {
   Map<String, Object> componentSpecs;
   long lastTuningTimestamp;
   List<String> owners;
+
+  // Stores properties related to data availability/SLA rules
+  Map<String, Object> dataAvailabilityProperties;
+
   boolean isDataAvailabilitySchedule;
   long taskTriggerFallBackTimeInSec;
   DetectionHealth health;
@@ -129,6 +133,14 @@ public class DetectionConfigBean extends AbstractBean {
     this.active = active;
   }
 
+  public Map<String, Object> getDataAvailabilityProperties() {
+    return dataAvailabilityProperties;
+  }
+
+  public void setDataAvailabilityProperties(Map<String, Object> dataAvailabilityProperties) {
+    this.dataAvailabilityProperties = dataAvailabilityProperties;
+  }
+
   public boolean isDataAvailabilitySchedule() {
     return isDataAvailabilitySchedule;
   }
@@ -164,7 +176,8 @@ public class DetectionConfigBean extends AbstractBean {
     DetectionConfigBean that = (DetectionConfigBean) o;
     return lastTimestamp == that.lastTimestamp && active == that.active && Objects.equals(cron, that.cron)
         && Objects.equals(name, that.name) && Objects.equals(properties, that.properties) && Objects.equals(yaml,
-        that.yaml) && Objects.equals(isDataAvailabilitySchedule, that.isDataAvailabilitySchedule) && Objects
+        that.yaml) && Objects.equals(dataAvailabilityProperties, that.dataAvailabilityProperties)
+        && Objects.equals(isDataAvailabilitySchedule, that.isDataAvailabilitySchedule) && Objects
         .equals(taskTriggerFallBackTimeInSec, that.taskTriggerFallBackTimeInSec);
   }
 

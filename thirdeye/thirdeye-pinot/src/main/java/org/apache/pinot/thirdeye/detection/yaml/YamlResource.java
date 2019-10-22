@@ -86,6 +86,7 @@ import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
+import org.apache.pinot.thirdeye.detection.TaskUtils;
 import org.apache.pinot.thirdeye.detection.cache.CouchbaseCacheDAO;
 import org.apache.pinot.thirdeye.detection.cache.DefaultTimeSeriesCache;
 import org.apache.pinot.thirdeye.detection.cache.TimeSeriesCache;
@@ -225,18 +226,11 @@ public class YamlResource {
     info.setTuningWindowEnd(tuningWindowEnd);
     info.setEnd(System.currentTimeMillis());
     info.setStart(info.getEnd() - ONBOARDING_REPLAY_LOOKBACK);
-
     String taskInfoJson = OBJECT_MAPPER.writeValueAsString(info);
-    String jobName = String.format("%s_%d", TaskConstants.TaskType.YAML_DETECTION_ONBOARD, configId);
 
-    TaskDTO taskDTO = new TaskDTO();
-    taskDTO.setTaskType(TaskConstants.TaskType.YAML_DETECTION_ONBOARD);
-    taskDTO.setJobName(jobName);
-    taskDTO.setStatus(TaskConstants.TaskStatus.WAITING);
-    taskDTO.setTaskInfo(taskInfoJson);
-
+    TaskDTO taskDTO = TaskUtils.buildTask(configId, taskInfoJson, TaskConstants.TaskType.YAML_DETECTION_ONBOARD);
     long taskId = this.taskDAO.save(taskDTO);
-    LOG.info("Created yaml detection onboarding task {} with taskId {}", taskDTO, taskId);
+    LOG.info("Created {} task {} with taskId {}", TaskConstants.TaskType.YAML_DETECTION_ONBOARD, taskDTO, taskId);
   }
 
   private Response processBadRequestResponse(String type, String operation, String payload, IllegalArgumentException e) {

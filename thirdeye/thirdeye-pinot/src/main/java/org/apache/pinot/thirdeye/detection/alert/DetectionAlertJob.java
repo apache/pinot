@@ -31,6 +31,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detection.TaskUtils;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
@@ -59,7 +60,7 @@ public class DetectionAlertJob implements Job {
   public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
     LOG.debug("Running " + jobExecutionContext.getJobDetail().getKey().getName());
     String jobKey = jobExecutionContext.getJobDetail().getKey().getName();
-    long detectionAlertConfigId = getIdFromJobKey(jobKey);
+    long detectionAlertConfigId = TaskUtils.getIdFromJobKey(jobKey);
     DetectionAlertConfigDTO configDTO = alertConfigDAO.findById(detectionAlertConfigId);
     if (configDTO == null) {
       LOG.error("Subscription config {} does not exist", detectionAlertConfigId);
@@ -94,14 +95,9 @@ public class DetectionAlertJob implements Job {
       LOG.error("Exception when converting AlertTaskInfo {} to jsonString", taskInfo, e);
     }
 
-    TaskDTO taskDTO = new TaskDTO();
-    taskDTO.setTaskType(TaskConstants.TaskType.DETECTION_ALERT);
-    taskDTO.setJobName(jobName);
-    taskDTO.setStatus(TaskConstants.TaskStatus.WAITING);
-    taskDTO.setTaskInfo(taskInfoJson);
-
+    TaskDTO taskDTO = TaskUtils.buildTask(detectionAlertConfigId, taskInfoJson, TaskConstants.TaskType.DETECTION_ALERT);
     long taskId = taskDAO.save(taskDTO);
-    LOG.info("Created subscription task {} with settings {}", taskId, taskDTO);
+    LOG.info("Created {} task {} with settings {}", TaskConstants.TaskType.DETECTION_ALERT, taskId, taskDTO);
   }
 
   /**
@@ -128,11 +124,5 @@ public class DetectionAlertJob implements Job {
       }
     }
     return false;
-  }
-
-  private Long getIdFromJobKey(String jobKey) {
-    String[] tokens = jobKey.split("_");
-    String id = tokens[tokens.length - 1];
-    return Long.valueOf(id);
   }
 }
