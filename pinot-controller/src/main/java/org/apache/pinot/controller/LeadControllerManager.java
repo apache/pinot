@@ -216,8 +216,6 @@ public class LeadControllerManager {
       leadControllerResourceEnabled = LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager);
     } catch (Exception e) {
       LOGGER.error("Exception when checking whether lead controller resource is enabled or not.", e);
-      _isLeadControllerResourceEnabled = false;
-      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_LEAD_CONTROLLER_RESOURCE_ENABLED, 0L);
       return;
     }
 
