@@ -252,6 +252,16 @@ public class DimensionWrapper extends DetectionPipeline {
       MetricEntity metric = nestedMetrics.get(i);
       List<Exception> exceptionsForNestedMetric = new ArrayList<>();
       LOG.info("running detection for metric urn {}. {}/{}", metric.getUrn(), i + 1, totalNestedMetrics);
+      if (Thread.interrupted()) {
+        /* This happens when Future.cancel() or ExecutorService.shutdown() is called. Since dimension wrapper run
+         under ExecutorService, it might take too long to compute all dimensions before it gets timeout and cancelled.
+         In that case, this method just returns all the computed dimensions and skips the rest of them.
+         */
+        LOG.error("Current thread is interrupted before running dimension {}/{} for detection {} metrics {}, "
+                + "so skip the rest of dimensions and return the intermediate",
+            i + 1 , totalNestedMetrics, this.config.getId(), metric.getUrn());
+        break;
+      }
       for (Map<String, Object> properties : this.nestedProperties) {
         DetectionPipelineResult intermediate;
         try {
