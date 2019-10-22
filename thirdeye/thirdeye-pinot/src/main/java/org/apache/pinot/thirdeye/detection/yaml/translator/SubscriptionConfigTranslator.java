@@ -84,6 +84,8 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
 
   private Map<String, Object> buildAlerterProperties(Map<String, Object> alertYamlConfigs, Collection<Long> detectionConfigIds) {
     Map<String, Object> properties = buildAlerterProperties(alertYamlConfigs);
+    // Default subscription type is "DEFAULT_ALERTER_PIPELINE"
+    properties.putIfAbsent(PROP_CLASS_NAME, "DEFAULT_ALERTER_PIPELINE");
     properties.put(PROP_DETECTION_CONFIG_IDS, detectionConfigIds);
     return properties;
   }

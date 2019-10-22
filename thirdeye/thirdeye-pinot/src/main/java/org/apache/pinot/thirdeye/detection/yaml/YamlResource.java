@@ -657,6 +657,7 @@ public class YamlResource {
         }
       }
     }
+
     updatedAlertConfig.setVectorClocks(updatedVectorClocks);
 
     // Validate before updating the config
