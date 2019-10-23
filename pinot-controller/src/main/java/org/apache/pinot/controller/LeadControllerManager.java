@@ -138,14 +138,19 @@ public class LeadControllerManager {
    * Checks from ZK if the current controller host is Helix cluster leader.
    */
   private boolean isHelixLeader() {
-    String helixLeaderInstanceId = LeadControllerUtils.getHelixClusterLeader(_helixManager);
-    if (helixLeaderInstanceId == null) {
-      LOGGER.warn("Helix leader ZNode is missing");
+    try {
+      String helixLeaderInstanceId = LeadControllerUtils.getHelixClusterLeader(_helixManager);
+      if (helixLeaderInstanceId == null) {
+        LOGGER.warn("Helix leader ZNode is missing");
+        return false;
+      }
+      // The instance name from Helix leader ZNode is without controller prefix.
+      // It is essential to convert to participant id for fair comparison.
+      return _instanceId.equals(Helix.PREFIX_OF_CONTROLLER_INSTANCE + helixLeaderInstanceId);
+    } catch (Exception e) {
+      LOGGER.error("Exception when getting Helix leader", e);
       return false;
     }
-    // The instance name from Helix leader ZNode is without controller prefix.
-    // It is essential to convert to participant id for fair comparison.
-    return _instanceId.equals(Helix.PREFIX_OF_CONTROLLER_INSTANCE + helixLeaderInstanceId);
   }
 
   /**
@@ -215,9 +220,11 @@ public class LeadControllerManager {
     try {
       leadControllerResourceEnabled = LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager);
     } catch (Exception e) {
+      // Do not change the state if any exception happened.
+      // Enabling the resource is always one-off. If administrator wants to enable it he will check the log.
+      // Plus, it's quite common to have resource config changes because every time there's a Helix task generated,
+      // the task will be written to resource config, which will trigger this notification as well.
       LOGGER.error("Exception when checking whether lead controller resource is enabled or not.", e);
-      _isLeadControllerResourceEnabled = false;
-      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_LEAD_CONTROLLER_RESOURCE_ENABLED, 0L);
       return;
     }
 

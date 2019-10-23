@@ -102,13 +102,19 @@ public class ControllerLeaderLocator {
    * Checks whether lead controller resource has been enabled or not.
    * If yes, updates lead controller pairs from the external view of lead controller resource.
    * Otherwise, updates lead controller pairs from Helix cluster leader.
+   * Note: Exception may happen due to Helix/ZK disconnect. If so, we should NOT regress the behavior back to false.
+   * Thus, simply exiting the method should be enough. Retry will be done in the next request.
    */
   private void refreshControllerLeaderMap() {
-    // Checks whether lead controller resource has been enabled or not.
-    if (LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager)) {
-      refreshControllerLeaderMapFromLeadControllerResource();
-    } else {
-      refreshControllerLeaderMapFromHelixClusterLeader();
+    try {
+      // Checks whether lead controller resource has been enabled or not.
+      if (LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager)) {
+        refreshControllerLeaderMapFromLeadControllerResource();
+      } else {
+        refreshControllerLeaderMapFromHelixClusterLeader();
+      }
+    } catch (Exception e) {
+      LOGGER.error("Exception when checking whether lead controller resource is enable or not.", e);
     }
   }
 
