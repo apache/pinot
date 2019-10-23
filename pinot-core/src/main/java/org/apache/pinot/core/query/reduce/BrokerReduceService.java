@@ -518,9 +518,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       Map<ServerInstance, DataTable> dataTableMap) {
 
     IndexedTable indexedTable = new ConcurrentIndexedTable();
-    int indexedTableCapacity = 1_000_000;
-    // FIXME: indexedTableCapacity should be derived from TOP. Hardcoding this value to a higher number until we can tune the resize
-    // int capacity = GroupByUtils.getTableCapacity((int) groupBy.getTopN());
+    int indexedTableCapacity = GroupByUtils.getTableCapacity((int) groupBy.getTopN());
     indexedTable.init(dataSchema, aggregationInfos, orderBy, indexedTableCapacity);
 
     for (DataTable dataTable : dataTableMap.values()) {

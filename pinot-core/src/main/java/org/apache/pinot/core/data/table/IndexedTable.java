@@ -19,7 +19,6 @@
 package org.apache.pinot.core.data.table;
 
 import java.util.List;
-import javax.annotation.Nonnull;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
@@ -38,13 +37,13 @@ public abstract class IndexedTable implements Table {
   DataSchema _dataSchema;
 
   int _capacity;
-  int _bufferedCapacity;
+  int _maxCapacity;
 
   boolean _isOrderBy;
   IndexedTableResizer _indexedTableResizer;
 
   @Override
-  public void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
+  public void init(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
       int capacity) {
     _dataSchema = dataSchema;
 
@@ -55,19 +54,20 @@ public abstract class IndexedTable implements Table {
           AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfos.get(i)).getAggregationFunction();
     }
 
-    _capacity = capacity;
-    // TODO: tune these numbers
-    if (capacity <= 100_000) { // Capacity is small, make a very large buffer. Make PQ of records to retain, during resize
-      _bufferedCapacity = 1_000_000;
-    } else { // Capacity is large, make buffer only slightly bigger. Make PQ of records to evict, during resize
-      _bufferedCapacity = (int) (capacity * 1.2);
-    }
-
     _isOrderBy = CollectionUtils.isNotEmpty(orderBy);
     if (_isOrderBy) {
-      _indexedTableResizer = new OrderedIndexedTableResizer(dataSchema, aggregationInfos, orderBy);
+      _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, orderBy);
+
+      // TODO: tune these numbers
+      // Based on the capacity and maxCapacity, the resizer will smartly choose to evict/retain recors from the PQ
+      if (capacity <= 100_000) { // Capacity is small, make a very large buffer. Make PQ of records to retain, during resize
+        _maxCapacity = 1_000_000;
+      } else { // Capacity is large, make buffer only slightly bigger. Make PQ of records to evict, during resize
+        _maxCapacity = (int) (capacity * 1.2);
+      }
     } else {
-      _indexedTableResizer = new RandomIndexedTableResizer();
+      _maxCapacity = capacity;
     }
+    _capacity = capacity;
   }
 }

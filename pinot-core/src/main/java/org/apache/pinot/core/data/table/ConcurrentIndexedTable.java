@@ -27,7 +27,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
@@ -55,10 +54,10 @@ public class ConcurrentIndexedTable extends IndexedTable {
    * @param dataSchema data schema of the record's keys and values
    * @param aggregationInfos aggregation infos for the aggregations in record's values
    * @param orderBy list of {@link SelectionSort} defining the order by
-   * @param capacity the max number of records to hold
+   * @param capacity the capacity of the table
    */
   @Override
-  public void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
+  public void init(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
       int capacity) {
     super.init(dataSchema, aggregationInfos, orderBy, capacity);
 
@@ -70,15 +69,17 @@ public class ConcurrentIndexedTable extends IndexedTable {
    * Thread safe implementation of upsert for inserting {@link Record} into {@link Table}
    */
   @Override
-  public boolean upsert(@Nonnull Record newRecord) {
+  public boolean upsert(Record newRecord) {
 
     Key key = newRecord.getKey();
     Preconditions.checkNotNull(key, "Cannot upsert record with null keys");
 
     if (_noMoreNewRecords.get()) { // allow only existing record updates
       _lookupMap.computeIfPresent(key, (k, v) -> {
+        Object[] existingValues = v.getValues();
+        Object[] newValues = newRecord.getValues();
         for (int i = 0; i < _numAggregations; i++) {
-          v.getValues()[i] = _aggregationFunctions[i].merge(v.getValues()[i], newRecord.getValues()[i]);
+          existingValues[i] = _aggregationFunctions[i].merge(existingValues[i], newValues[i]);
         }
         return v;
       });
@@ -90,8 +91,10 @@ public class ConcurrentIndexedTable extends IndexedTable {
           if (v == null) {
             return newRecord;
           } else {
+            Object[] existingValues = v.getValues();
+            Object[] newValues = newRecord.getValues();
             for (int i = 0; i < _numAggregations; i++) {
-              v.getValues()[i] = _aggregationFunctions[i].merge(v.getValues()[i], newRecord.getValues()[i]);
+              existingValues[i] = _aggregationFunctions[i].merge(existingValues[i], newValues[i]);
             }
             return v;
           }
@@ -100,13 +103,13 @@ public class ConcurrentIndexedTable extends IndexedTable {
         _readWriteLock.readLock().unlock();
       }
 
-      // resize if exceeds capacity
-      if (_lookupMap.size() >= _bufferedCapacity) {
+      // resize if exceeds max capacity
+      if (_lookupMap.size() >= _maxCapacity) {
         if (_isOrderBy) {
           // reached capacity, resize
           _readWriteLock.writeLock().lock();
           try {
-            if (_lookupMap.size() >= _bufferedCapacity) {
+            if (_lookupMap.size() >= _maxCapacity) {
               resize(_capacity);
             }
           } finally {
@@ -122,7 +125,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
   }
 
   @Override
-  public boolean merge(@Nonnull Table table) {
+  public boolean merge(Table table) {
     Iterator<Record> iterator = table.iterator();
     while (iterator.hasNext()) {
       upsert(iterator.next());
@@ -142,7 +145,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
   private void resize(int trimToSize) {
 
-    if (_lookupMap.size() > trimToSize) {
+    if (_isOrderBy && _lookupMap.size() > trimToSize) {
       long startTime = System.currentTimeMillis();
 
       _indexedTableResizer.resizeRecordsMap(_lookupMap, trimToSize);
@@ -157,16 +160,22 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
   @Override
   public void finish(boolean sort) {
-    resize(_capacity);
-    int numResizes = _numResizes.get();
-    long resizeTime = _resizeTime.get();
-    LOGGER.debug("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", numResizes, resizeTime,
-        numResizes == 0 ? 0 : resizeTime / numResizes);
 
-    _iterator = _lookupMap.values().iterator();
-    if (sort && _isOrderBy) {
-      List<Record> sortedRecords = _indexedTableResizer.sortRecordsMap(_lookupMap);
-      _iterator = sortedRecords.iterator();
+    if (_isOrderBy) {
+      resize(_capacity);
+      int numResizes = _numResizes.get();
+      long resizeTime = _resizeTime.get();
+      LOGGER.debug("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", numResizes, resizeTime,
+          numResizes == 0 ? 0 : resizeTime / numResizes);
+
+      if (sort) {
+        List<Record> sortedRecords = _indexedTableResizer.sortRecordsMap(_lookupMap);
+        _iterator = sortedRecords.iterator();
+      }
+    }
+
+    if (_iterator == null) {
+      _iterator = _lookupMap.values().iterator();
     }
   }
 

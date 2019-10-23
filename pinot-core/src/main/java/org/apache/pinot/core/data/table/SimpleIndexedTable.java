@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
@@ -51,10 +50,10 @@ public class SimpleIndexedTable extends IndexedTable {
    * @param dataSchema data schema of the record's keys and values
    * @param aggregationInfos aggregation infors for the aggregations in record'd values
    * @param orderBy list of {@link SelectionSort} defining the order by
-   * @param capacity the max number of records to hold
+   * @param capacity the capacity of the table
    */
   @Override
-  public void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
+  public void init(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
       int capacity) {
     super.init(dataSchema, aggregationInfos, orderBy, capacity);
 
@@ -65,14 +64,16 @@ public class SimpleIndexedTable extends IndexedTable {
    * Non thread safe implementation of upsert to insert {@link Record} into the {@link Table}
    */
   @Override
-  public boolean upsert(@Nonnull Record newRecord) {
+  public boolean upsert(Record newRecord) {
     Key key = newRecord.getKey();
     Preconditions.checkNotNull(key, "Cannot upsert record with null keys");
 
     if (_noMoreNewRecords) { // allow only existing record updates
       _lookupMap.computeIfPresent(key, (k, v) -> {
+        Object[] existingValues = v.getValues();
+        Object[] newValues = newRecord.getValues();
         for (int i = 0; i < _numAggregations; i++) {
-          v.getValues()[i] = _aggregationFunctions[i].merge(v.getValues()[i], newRecord.getValues()[i]);
+          existingValues[i] = _aggregationFunctions[i].merge(existingValues[i], newValues[i]);
         }
         return v;
       });
@@ -82,19 +83,21 @@ public class SimpleIndexedTable extends IndexedTable {
         if (v == null) {
           return newRecord;
         } else {
+          Object[] existingValues = v.getValues();
+          Object[] newValues = newRecord.getValues();
           for (int i = 0; i < _numAggregations; i++) {
-            v.getValues()[i] = _aggregationFunctions[i].merge(v.getValues()[i], newRecord.getValues()[i]);
+            existingValues[i] = _aggregationFunctions[i].merge(existingValues[i], newValues[i]);
           }
           return v;
         }
       });
 
-      if (_lookupMap.size() >= _bufferedCapacity) {
+      if (_lookupMap.size() >= _maxCapacity) {
         if (_isOrderBy) {
-            // reached capacity, resize
+            // reached max capacity, resize
             resize(_capacity);
         } else {
-          // reached capacity and no order by. No more new records will be accepted
+          // reached max capacity and no order by. No more new records will be accepted
           _noMoreNewRecords = true;
         }
       }
@@ -104,7 +107,7 @@ public class SimpleIndexedTable extends IndexedTable {
 
   private void resize(int trimToSize) {
 
-    if (_lookupMap.size() > trimToSize) {
+    if (_isOrderBy &&_lookupMap.size() > trimToSize) {
       long startTime = System.currentTimeMillis();
 
       _indexedTableResizer.resizeRecordsMap(_lookupMap, trimToSize);
@@ -118,7 +121,7 @@ public class SimpleIndexedTable extends IndexedTable {
   }
 
   @Override
-  public boolean merge(@Nonnull Table table) {
+  public boolean merge(Table table) {
     Iterator<Record> iterator = table.iterator();
     while (iterator.hasNext()) {
       upsert(iterator.next());
@@ -138,14 +141,19 @@ public class SimpleIndexedTable extends IndexedTable {
 
   @Override
   public void finish(boolean sort) {
-    resize(_capacity);
-    LOGGER.debug("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", _numResizes, _resizeTime,
-        _numResizes == 0 ? 0 : _resizeTime / _numResizes);
+    if (_isOrderBy) {
+      resize(_capacity);
+      LOGGER.debug("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", _numResizes, _resizeTime,
+          _numResizes == 0 ? 0 : _resizeTime / _numResizes);
 
-    _iterator = _lookupMap.values().iterator();
-    if (sort && _isOrderBy) {
-      List<Record> sortedRecords = _indexedTableResizer.sortRecordsMap(_lookupMap);
-      _iterator = sortedRecords.iterator();
+      if (sort) {
+        List<Record> sortedRecords = _indexedTableResizer.sortRecordsMap(_lookupMap);
+        _iterator = sortedRecords.iterator();
+      }
+    }
+
+    if (_iterator == null) {
+      _iterator = _lookupMap.values().iterator();
     }
   }
 

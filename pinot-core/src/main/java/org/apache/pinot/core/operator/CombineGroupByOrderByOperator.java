@@ -78,9 +78,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
     _timeOutMs = timeOutMs;
     _initLock = new ReentrantLock();
     _indexedTable = new ConcurrentIndexedTable();
-    _indexedTableCapacity = 1_000_000;
-    // FIXME: indexedTableCapacity should be derived from TOP. Hardcoding this value to a higher number until we can tune the resize
-    //_indexedTableCapacity = GroupByUtils.getTableCapacity((int) brokerRequest.getGroupBy().getTopN());
+    _indexedTableCapacity = GroupByUtils.getTableCapacity((int) brokerRequest.getGroupBy().getTopN());
   }
 
   /**

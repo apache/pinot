@@ -20,7 +20,6 @@ package org.apache.pinot.core.data.table;
 
 import java.util.Iterator;
 import java.util.List;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
@@ -36,20 +35,20 @@ public interface Table {
    * @param dataSchema the schema of the columns in the {@link Record}
    * @param aggregationInfos the aggregation info for the values if applicable
    * @param orderBy the order by information if applicable
-   * @param maxCapacity the max capacity the table should have
+   * @param capacity the capacity of the table
    */
   void init(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
-      int maxCapacity);
+      int capacity);
 
   /**
    * Update the table with the given record
    */
-  boolean upsert(@Nonnull Record record);
+  boolean upsert(Record record);
 
   /**
    * Merge all records from given table
    */
-  boolean merge(@Nonnull Table table);
+  boolean merge(Table table);
 
   /**
    * Returns the size of the table
