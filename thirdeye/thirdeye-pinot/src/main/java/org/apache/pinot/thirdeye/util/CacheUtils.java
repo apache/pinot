@@ -22,25 +22,6 @@ import org.apache.pinot.thirdeye.detection.cache.TimeSeriesDataPoint;
 
 public class CacheUtils {
 
-  public static Long getLongValue(Object o) {
-    return ((Number)o).longValue();
-  }
-
-  public static List<Long> convertObjectListToLongList(List<Object> list, int startIndex, int endIndex) {
-    return list.subList(startIndex, endIndex + 1)
-        .stream()
-        .map(CacheUtils::getLongValue)
-        .collect(Collectors.toList());
-  }
-
-  public static long findIndexInTimeSeries(List<Object> list, long target) {
-    return Collections.binarySearch(list, target, new Comparator<Object>() {
-      public int compare(Object u1, Object u2) {
-        return Long.compare(CacheUtils.getLongValue(u1), CacheUtils.getLongValue(u2));
-      }
-    });
-  }
-
   public static Map<Long, MetricSlice> findMaxRangeInterval(Collection<MetricSlice> slices) {
     if (slices == null || slices.isEmpty()) {
       return null;
@@ -64,37 +45,6 @@ public class CacheUtils {
     return result;
   }
 
-  public static Map<String, List<Map<String, String>>> mapJsonResponseToTimeSeries(String jsonString) {
-    Map<String, List<Map<String, String>>> val = null;
-
-    try {
-      val = new ObjectMapper().readValue(jsonString,
-          new TypeReference<Map<String, List<HashMap<String, String>>>>() {
-      });
-    } catch (Exception e) {
-      System.err.println("Error deserializing json: " + e);
-    }
-
-    return val;
-  }
-
-  public static ThirdEyeCacheResponse mapJsonToCacheResponse(JsonObject jsonObject) {
-    ThirdEyeCacheResponse val = null;
-
-    try {
-      String start = jsonObject.get("start").toString();
-      String end = jsonObject.get("end").toString();
-      List<String[]> metrics = new ObjectMapper().readValue(jsonObject.get("metrics").toString(), new TypeReference<List<String[]>>(){});
-      Map<String, String> timeSpec = new ObjectMapper().readValue(jsonObject.get("timeSpec").toString(), new TypeReference<Map<String, String>>(){});
-
-      val = new ThirdEyeCacheResponse(start, end, metrics, timeSpec);
-    } catch (Exception e) {
-      System.err.println("Error deserializing json: " + e);
-    }
-
-    return val;
-  }
-
   public static void setupMapFieldsForMetric(Map<String, Map<String, List<String>>> metricMap, long metricId) {
     String key = String.valueOf(metricId);
     Map<String, List<String>> map = new HashMap<String, List<String>>() {{
@@ -103,20 +53,6 @@ public class CacheUtils {
       put("groupByKey", new ArrayList<>());
     }};
     metricMap.put(key, map);
-  }
-
-  public static void addSortedPairDataToMap(Map<String, List<String>> map, List<ResponseDataPojo> pairs) {
-    // sort by time
-    Collections.sort(pairs, (ResponseDataPojo a, ResponseDataPojo b) -> Long.valueOf(a.getTime()).compareTo(Long.valueOf(b.getTime())));
-
-    List<String> times = map.get("times");
-    List<String> values = map.get("values");
-    List<String> groupByName = map.get("groupByKey");
-    for (ResponseDataPojo pair : pairs) {
-      times.add(pair.getTime());
-      values.add(pair.getValue());
-      groupByName.add(pair.getMetricName());
-    }
   }
 
   public static String hashMetricUrn(String metricUrn) {

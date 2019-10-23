@@ -80,6 +80,7 @@ public class RelationalThirdEyeResponse extends BaseThirdEyeResponse {
       rowMap.put(groupByKey, rowValues[i]);
     }
     rowMap.put(metricFunction.toString(), rowValues[metricFuncToIdMapping.get(metricFunction)]);
+    rowMap.put("timestamp", rowValues[rowValues.length - 1]);
     return rowMap;
   }
 

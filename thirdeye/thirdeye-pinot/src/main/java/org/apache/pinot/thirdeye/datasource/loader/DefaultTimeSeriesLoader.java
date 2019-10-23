@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.datasource.loader;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
@@ -81,7 +82,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
 
   public void prefetchTimeSeriesWindowRangeIntoCache(MetricSlice slice) throws Exception {
 
-    // TODO: add a check if TimeSeries already exists in cache.
+    // TODO: add a check if TimeSeries already exists in cache. can use SELECT COUNT?
 
     TimeSeriesRequestContainer rc = DataFrameUtils.makeTimeSeriesRequestAligned(slice, "ref", this.metricDAO, this.datasetDAO);
     ThirdEyeResponse response = this.cache.getQueryResult(rc.getRequest());

@@ -88,9 +88,6 @@ public class CouchbaseCacheDAO {
     if (!queryResult.finalSuccess()) {
       LOG.error("cache error occurred for window startTime = {} to endTime = {}", request.getStartTimeInclusive(), request.getEndTimeExclusive());
       return null;
-    } else if (queryResult.info().resultCount() == 0) {
-      LOG.error("cache miss occurred for window startTime = {} to endTime = {}", request.getStartTimeInclusive(), request.getEndTimeExclusive());
-      return null;
     }
 
     List<TimeSeriesDataPoint> timeSeriesRows = new ArrayList<>();
@@ -101,7 +98,7 @@ public class CouchbaseCacheDAO {
       timeSeriesRows.add(new TimeSeriesDataPoint(request.getMetricUrn(), timestamp, request.getMetricId(), dataValue));
     }
 
-    return new ThirdEyeCacheResponse(request.getRequest(), request.getStartTimeInclusive(), request.getEndTimeExclusive(), timeSeriesRows);
+    return new ThirdEyeCacheResponse(request, timeSeriesRows);
   }
 
   public void insertTimeSeriesDataPoint(TimeSeriesDataPoint point) {
@@ -111,12 +108,10 @@ public class CouchbaseCacheDAO {
     JsonDocument doc = bucket.get(point.getDocumentKey());
 
     if (doc == null) {
-      // if data point doesn't exist in cache, make a new document and insert it
       JsonObject documentBody = CacheUtils.buildDocumentStructure(point);
       doc = JsonDocument.create(point.getDocumentKey(), TIMEOUT, documentBody);
     } else {
       JsonObject dimensions = ((JsonObject)doc.content().get("dims"));
-      // if dimensionKey already exists in document, we don't need to re-insert it.
       if (dimensions.containsKey(point.getMetricUrnHash()))
         return;
       dimensions.put(point.getMetricUrnHash(), point.getDataValue());
