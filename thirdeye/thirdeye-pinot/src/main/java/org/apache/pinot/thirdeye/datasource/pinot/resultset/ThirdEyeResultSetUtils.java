@@ -174,8 +174,6 @@ public class ThirdEyeResultSetUtils {
           countMap.put(countKey, aggCount + 1);
 
           // aggregation of multiple values
-
-          // TODO: modified these
           rowValues[groupKeys.length + position + i] = String.valueOf(
               reduce(
                   Double.parseDouble(rowValues[groupKeys.length + position + i]),

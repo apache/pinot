@@ -8,6 +8,7 @@ import org.apache.pinot.thirdeye.auto.onboard.AutoOnboardUtility;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;
 import org.apache.pinot.thirdeye.datasource.RelationalThirdEyeResponse;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
@@ -15,6 +16,7 @@ import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.CacheUtils;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTime;
 import org.joda.time.Period;
 import org.slf4j.Logger;
@@ -37,59 +39,40 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
     this.cacheDAO = new CouchbaseCacheDAO();
   }
 
-  public ThirdEyeResponse fetchTimeSeries(ThirdEyeRequest request) throws Exception {
-    LOG.info("trying to fetch data from cache with id {}...", request);
+  public ThirdEyeResponse fetchTimeSeries(ThirdEyeRequest thirdEyeRequest) throws Exception {
+    LOG.info("trying to fetch data from cache...");
 
-    ThirdEyeResponse response;
-    ThirdEyeCacheResponse cacheResponse = cacheDAO.tryFetchExistingTimeSeries(request);
+    DatasetConfigDTO dto = datasetDAO.findByDataset(thirdEyeRequest.getDataSource());
+    TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(dto);
 
-    DateTime start = request.getStartTimeInclusive();
-    DateTime end = request.getEndTimeExclusive();
+    ThirdEyeCacheResponse cacheResponse = cacheDAO.tryFetchExistingTimeSeries(ThirdEyeCacheRequest.from(thirdEyeRequest));
 
-    if (cacheResponse == null || cacheResponse.isMissingSlice(start, end)) {
-      LOG.info("cache miss or bad cache response received");
-      response = this.cache.getQueryResult(request);
-      // fire and forget
-      ExecutorService executor = Executors.newCachedThreadPool();
-      executor.execute(() -> insertTimeSeriesIntoCache(response));
-      //this.insertTimeSeriesIntoCache(rc.getDetectionId(), response);
-    } else {
-      LOG.info("cache fetch success :)");
-
-      TimeSpec responseSpec = cacheResponse.getTimeSpec();
-      Period granularityPeriod = responseSpec.getDataGranularity().toPeriod();
-
-      DateTime cacheStart = new DateTime(Long.valueOf(cacheResponse.getStart()), start.getZone());
-      DateTime cacheEnd = new DateTime(Long.valueOf(cacheResponse.getEnd()), end.getZone());
-
-      try {
-        // keep adding from beginning
-        int startIndexOffset = 0;
-        while (!cacheStart.isEqual(start)) {
-          cacheStart = cacheStart.withPeriodAdded(granularityPeriod, 1);
-          startIndexOffset++;
-        }
-
-        // keep subtracting from end
-        int endIndexOffset = 0;
-        while (!cacheEnd.isEqual(end)) {
-          cacheEnd = cacheEnd.withPeriodAdded(granularityPeriod, -1);
-          endIndexOffset++;
-        }
-
-        List<String[]> rowList = cacheResponse.getMetrics();
-
-        List<String[]> rows = rowList.subList(startIndexOffset, rowList.size() - 1 - endIndexOffset);
-
-        response = new RelationalThirdEyeResponse(request, rows, responseSpec);
-      } catch (Exception e) {
-        LOG.info("requested slice between {} and {}", start, end);
-        LOG.info("cache contained slice between {} and {}", cacheStart, cacheEnd);
-        throw e;
-      }
+    if (cacheResponse == null|| cacheResponse.hasNoRows()) {
+      ThirdEyeResponse dataSourceResponse = cache.getQueryResult(thirdEyeRequest);
+      insertTimeSeriesIntoCache(dataSourceResponse);
+      return dataSourceResponse;
     }
 
-    return response;
+    long sliceStart = thirdEyeRequest.getStartTimeInclusive().getMillis();
+    long sliceEnd = thirdEyeRequest.getEndTimeExclusive().getMillis();
+
+    if (cacheResponse.isMissingSlice(sliceStart, sliceEnd)) {
+      fetchMissingSlices(cacheResponse);
+    }
+
+    return null;
+  }
+
+  private void fetchMissingSlices(ThirdEyeCacheResponse response) {
+    long sliceStart = response.getStartInclusive();
+    long sliceEnd = response.getEndExclusive();
+    if (response.isMissingStartAndEndSlice(sliceStart, sliceEnd)) {
+      // refetch whole series?
+    } else if (response.isMissingStartSlice(sliceStart)) {
+      // add to list
+    } else if (response.isMissingEndSlice(sliceEnd)) {
+
+    }
   }
 
 
@@ -101,7 +84,7 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
       case "RelationalThirdEyeResponse":
         insertRelationalTimeSeries(response);
       case "CSVThirdEyeResponse":
-        // do something
+        insertCSVTimeSeries(response);
     }
   }
 
@@ -110,14 +93,26 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
 
     RelationalThirdEyeResponse thirdEyeResponse = (RelationalThirdEyeResponse)response;
 
-    // need to revise this, since the loop condition looks weird, but the actual code fore
+    // need to revise this, since the loop condition looks weird, but the actual code for
     // relationalthirdeyeresponse makes no sense either
-    for (MetricFunction metric : response.getMetricFunctions()) {
-      String metricUrn = MetricEntity.fromMetric(response.getRequest().getFilterSet().asMap(), metric.getMetricId()).getUrn();
-      for (String[] dataPoint : thirdEyeResponse.getRows()) {
-        TimeSeriesDataPoint dp = TimeSeriesDataPoint.from(dataPoint, metricUrn);
-        executor.execute(() -> cacheDAO.insertTimeSeriesDataPoint(dp));
-      }
+
+//    for (MetricFunction metric : response.getMetricFunctions()) {
+//      String metricUrn = MetricEntity.fromMetric(response.getRequest().getFilterSet().asMap(), metric.getMetricId()).getUrn();
+//      for (String[] dataPoint : thirdEyeResponse.getRows()) {
+//        TimeSeriesDataPoint dp = TimeSeriesDataPoint.from(dataPoint, metricUrn);
+//        executor.execute(() -> cacheDAO.insertTimeSeriesDataPoint(dp));
+//      }
+//    }
+
+    String metricUrn = MetricEntity.fromMetric(response.getRequest().getFilterSet().asMap(), response.getMetricFunctions().get(0).getMetricId()).getUrn();
+    for (String[] dataPoint : thirdEyeResponse.getRows()) {
+      TimeSeriesDataPoint dp = TimeSeriesDataPoint.from(dataPoint, metricUrn);
+      executor.execute(() -> cacheDAO.insertTimeSeriesDataPoint(dp));
     }
+  }
+
+  // fill this out later
+  private void insertCSVTimeSeries(ThirdEyeResponse response) {
+    return;
   }
 }

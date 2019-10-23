@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 import java.util.zip.CRC32;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.detection.cache.ResponseDataPojo;
+import org.apache.pinot.thirdeye.detection.cache.ThirdEyeCacheRequest;
 import org.apache.pinot.thirdeye.detection.cache.ThirdEyeCacheResponse;
 import org.apache.pinot.thirdeye.detection.cache.TimeSeriesDataPoint;
 
@@ -126,11 +127,11 @@ public class CacheUtils {
 
   public static JsonObject buildDocumentStructure(TimeSeriesDataPoint point) {
     Map<String, String> dims = new HashMap<>();
-    dims.put(point.getDimensionKey(), point.getDataValue());
+    dims.put(point.getMetricUrnHash(), point.getDataValue());
 
     JsonObject body = JsonObject.create()
-        .put("time", Long.valueOf(point.getTimestamp()))
-        .put("metricId", Long.valueOf(point.getMetricId()))
+        .put("time", point.getTimestamp())
+        .put("metricId", point.getMetricId())
         .put("dims", dims);
 
     return body;

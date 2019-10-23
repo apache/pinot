@@ -48,11 +48,14 @@ public class CouchbaseCacheDAO {
   private static final String AUTH_PASSWORD = "thirdeye";
   private static final String BUCKET_NAME = "travel-sample";
 
-  private static final String METRICS_KEY = "metrics";
-  private static final String START_KEY = "start";
-  private static final String END_KEY = "end";
+  private static final String BASE_QUERY = "SELECT time, `dims`.$dimensionKey FROM `$bucket` WHERE metricId = $metricId AND time BETWEEN $start AND $end ORDER BY time ASC";
+  private static final String BUCKET = "bucket";
+  private static final String DIMENSION_KEY = "dimensionKey";
+  private static final String METRIC_ID = "metricId";
+  private static final String START = "start";
+  private static final String END = "end";
 
-  private static final String DATE_KEY = "Date";
+  private static final String TIME = "time";
 
   private static final int TIMEOUT = 36000;
 
@@ -65,140 +68,60 @@ public class CouchbaseCacheDAO {
   private void createDataStoreConnection() {
     Cluster cluster = CouchbaseCluster.create();
     cluster.authenticate(AUTH_USERNAME, AUTH_PASSWORD);
-
     this.bucket = cluster.openBucket(BUCKET_NAME);
   }
 
-  public boolean checkIfDetectionIdExistsInCache(String key) {
-    return false;
-    //return bucket.exists.(key);
-  }
+  public ThirdEyeCacheResponse tryFetchExistingTimeSeries(ThirdEyeCacheRequest request) {
 
-  // rework this once we figure out how we're going to store data in couchbase
+    String dimensionKey = request.getDimensionKey();
 
-  //public MetricCacheResponse fetchExistingTimeSeries(long detectionId, MetricSlice slice) throws Exception {
-  public ThirdEyeCacheResponse tryFetchExistingTimeSeries(ThirdEyeRequest request) {
-//    //JsonDocument doc = bucket.get(request.getDetectionId());
-//
-//    // parametrize this later
-//
-//    // need to figure out how detections with multiple metrics will be stored
-//
-//    StringBuilder sb = new StringBuilder("SELECT `time`, `value` FROM `" + BUCKET_NAME + "` WHERE `metric_name` = `");
-//    List<String> metricNames = request.getMetricNames();
-//
-//    for (int i = 0; i < metricNames.size() - 1; i++) {
-//      sb.append(metricNames.get(i)).append("` OR `metric_name` = `");
-//    }
-//
-//    // either this or use the metricId in the request instead
-//    sb.append(metricNames.get(metricNames.size() - 1) + "`");
-//    sb.append(" AND dataset = " + request.getDataSource());
-//    sb.append(" AND time BETWEEN ");
-//    sb.append("\"" + request.getStartTimeInclusive().toString() + "\"");
-//    sb.append(" AND ");
-//    sb.append("\"" + request.getEndTimeExclusive().toString() + "\"");
-//    sb.append(" ORDER BY date asc;");
-//
-//    N1qlQueryResult result = bucket.query(N1qlQuery.simple(sb.toString()));
-//
-//    // if query failed or no results were returned
-//    if (!result.finalSuccess() || result.allRows().isEmpty()) {
-//      LOG.info("cache fetch missed or errored, retrieving data from source");
-//      return null;
-//    }
-//
-//    List<String[]> rowList = new ArrayList<>();
-//
-//    int i = 0;
-//    DateTime startDate = request.getStartTimeInclusive();
-//    Period period = request.getGroupByTimeGranularity().toPeriod();
-//
-//    // TODO: figure out a way to get around the relational ThirdEyeResponse data not having dates
-//
-//    //startDate.withPeriodAdded()
-//    for (N1qlQueryRow row : result.allRows()) {
-//      JsonObject dataPoint = row.value();
-//      String[] pair = new String[2];
-//
-//      // since it's in sorted order, time bucket id will just be equal to the counter.
-//      // however, we can consider changing the query to not return in sorted order
-//      // and just store the time bucket value with it, which should also work.
-//      String bucketNumber = String.valueOf(i);
-//      String value = String.valueOf(dataPoint.get("value"));
-//
-//      // ignore "bubbles"/"nops"/nulls, since they represent missing data in the source
-//      if (!value.equals("null")) {
-//        pair[0] = bucketNumber;
-//        pair[1] = value;
-//        rowList.add(pair);
-//      }
-//    }
+    // NOTE: we subtract one from the end date because Couchabase's BETWEEN clause is inclusive on both sides
+    JsonObject parameters = JsonObject.create()
+        .put(BUCKET, BUCKET_NAME)
+        .put(DIMENSION_KEY, dimensionKey)
+        .put(METRIC_ID, request.getMetricId())
+        .put(START, request.getStartTimeInclusive())
+        .put(END, request.getEndTimeExclusive() - 1);
 
-    return null;
-  }
+    N1qlQueryResult queryResult = bucket.query(N1qlQuery.parameterized(BASE_QUERY, parameters));
 
-  public void insertRelationalTimeSeries(ThirdEyeResponse responseData) {
-
-    List<List<String>> jsonRows = new ArrayList<>();
-    List<String[]> rowList = new ArrayList<>();
-
-    // make a copy of the rows to avoid messing with the original
-    for (String[] row : ((RelationalThirdEyeResponse)responseData).getRows()) {
-      rowList.add(row);
+    if (!queryResult.finalSuccess()) {
+      LOG.error("cache error occurred for window startTime = {} to endTime = {}", request.getStartTimeInclusive(), request.getEndTimeExclusive());
+      return null;
+    } else if (queryResult.info().resultCount() == 0) {
+      LOG.error("cache miss occurred for window startTime = {} to endTime = {}", request.getStartTimeInclusive(), request.getEndTimeExclusive());
+      return null;
     }
 
-    Collections.sort(rowList, (a, b) -> Long.valueOf(a[0]).compareTo(Long.valueOf(b[0])));
+    List<TimeSeriesDataPoint> timeSeriesRows = new ArrayList<>();
 
-    // we use Arrays.asList because Couchbase doesn't support primitives.
-    for (String[] row : rowList) {
-      jsonRows.add(Arrays.asList(row));
+    for (N1qlQueryRow row : queryResult) {
+      long timestamp = row.value().getLong(TIME);
+      String dataValue = row.value().getString(dimensionKey);
+      timeSeriesRows.add(new TimeSeriesDataPoint(request.getMetricUrn(), timestamp, request.getMetricId(), dataValue));
     }
 
-    TimeSpec timeSpec = responseData.getDataTimeSpec();
-
-    Map<String, String> timeSpecMap = new HashMap<String, String>() {{
-      put("columnName", timeSpec.getColumnName());
-      put("dataGranularity", timeSpec.getDataGranularity().toString());
-      put("format", timeSpec.getFormat());
-    }};
-
-    JsonObject jsonObject = JsonObject.create()
-        .put(START_KEY, String.valueOf(responseData.getRequest().getStartTimeInclusive().getMillis()))
-        .put(END_KEY, String.valueOf(responseData.getRequest().getEndTimeExclusive().getMillis()))
-        .put(METRICS_KEY, jsonRows)
-        .put("timeSpec", timeSpecMap);
-
-    // this function needs to take in detection id as well and make that the key.
-    bucket.upsert(JsonDocument.create("0", TIMEOUT, jsonObject));
-
+    return new ThirdEyeCacheResponse(request.getRequest(), request.getStartTimeInclusive(), request.getEndTimeExclusive(), timeSeriesRows);
   }
 
   public void insertTimeSeriesDataPoint(TimeSeriesDataPoint point) {
 
-//    JsonDocument doc = bucket.getAndTouch(point.getDocumentKey(), TIMEOUT);
-    bucket.async().getAndTouch(point.getDocumentKey(), TIMEOUT)
-        .subscribe(doc -> {
-          if (doc == null) {
-            // if data point doesn't exist in cache, make a new document and insert it
-            JsonObject documentBody = CacheUtils.buildDocumentStructure(point);
-            doc = JsonDocument.create(point.getDocumentKey(), TIMEOUT, documentBody);
-          } else {
-            ((JsonObject)doc.content().get("dims")).put(point.getDimensionKey(), point.getDataValue());
-          }
+    // get or getAndTouch?
+    //JsonDocument doc = bucket.getAndTouch(point.getDocumentKey(), TIMEOUT);
+    JsonDocument doc = bucket.get(point.getDocumentKey());
 
-          bucket.async().upsert(doc);
-        }
-    );
+    if (doc == null) {
+      // if data point doesn't exist in cache, make a new document and insert it
+      JsonObject documentBody = CacheUtils.buildDocumentStructure(point);
+      doc = JsonDocument.create(point.getDocumentKey(), TIMEOUT, documentBody);
+    } else {
+      JsonObject dimensions = ((JsonObject)doc.content().get("dims"));
+      // if dimensionKey already exists in document, we don't need to re-insert it.
+      if (dimensions.containsKey(point.getMetricUrnHash()))
+        return;
+      dimensions.put(point.getMetricUrnHash(), point.getDataValue());
+    }
 
-//    if (doc == null) {
-//      // if data point doesn't exist in cache, make a new document and insert it
-//      JsonObject documentBody = CacheUtils.buildDocumentStructure(point);
-//      doc = JsonDocument.create(point.getDocumentKey(), TIMEOUT, documentBody);
-//    } else {
-//      ((JsonObject)doc.content().get("dims")).put(point.getDimensionKey(), point.getDataValue());
-//    }
-//
-//    bucket.async().upsert(doc);
+    bucket.upsert(doc);
   }
 }
