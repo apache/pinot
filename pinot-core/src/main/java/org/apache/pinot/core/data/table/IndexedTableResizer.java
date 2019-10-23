@@ -142,6 +142,7 @@ class IndexedTableResizer {
     if (numRecordsToEvict > 0) {
       int size;
       Comparator<IntermediateRecord> comparator;
+      // TODO: compare the performance of converting to IntermediateRecord vs keeping Record, in cases where we do not need to extract final results
       PriorityQueue<IntermediateRecord> priorityQueue;
 
       if (numRecordsToEvict < trimToSize) { // num records to evict is smaller than num records to retain
