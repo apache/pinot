@@ -394,20 +394,19 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   /**
-   * Check if the row has 'NULL_FIELDS' key and set the per
+   * Check if the row has any null fields and update the
    * column presence vectors accordingly
    * @param row specifies row being ingested
    * @param docId specified docId for this row
    */
   private void addPresenceVector(GenericRow row, int docId) {
-    if (row.getValue(CommonConstants.Segment.NULL_FIELDS) == null) {
+    if (!row.hasNullValues()) {
       return;
     }
 
-    Set<String> nullColumnsSet = (Set<String>) row.getValue(CommonConstants.Segment.NULL_FIELDS);
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String columnName = fieldSpec.getName();
-      if (nullColumnsSet.contains(columnName)) {
+      if (row.isNullValue(columnName)) {
         _presenceVectorMap.get(columnName).setNull(docId);
       }
     }
@@ -503,36 +502,21 @@ public class MutableSegmentImpl implements MutableSegment {
    * @return Generic row with physical columns of the specified row.
    */
   public GenericRow getRecord(int docId, GenericRow reuse) {
-    Set<String> nullColumnsSet = null;
-    if (_nullHandlingEnabled) {
-      // Try and reuse the null columns set
-      nullColumnsSet = (Set<String>) reuse.getValue(CommonConstants.Segment.NULL_FIELDS);
-      if (nullColumnsSet != null) {
-        nullColumnsSet.clear();
-      }
-    }
-
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       String column = fieldSpec.getName();
-      reuse.putField(column, IndexSegmentUtils
+      Object value = IndexSegmentUtils
           .getValue(docId, fieldSpec, _indexReaderWriterMap.get(column), _dictionaryMap.get(column),
-              _maxNumValuesMap.getOrDefault(column, 0)));
+              _maxNumValuesMap.getOrDefault(column, 0));
+      reuse.putValue(column, value);
 
       if (_nullHandlingEnabled) {
         PresenceVectorReader reader = _presenceVectorMap.get(column);
+        // If column has null value for this docId, set that accordingly in GenericRow
         if (reader != null && !reader.isPresent(docId)) {
-          if (nullColumnsSet == null) {
-            nullColumnsSet = new HashSet<>();
-          }
-          nullColumnsSet.add(column);
+          reuse.putDefaultNullValue(column, value);
         }
       }
     }
-
-    if (_nullHandlingEnabled) {
-      reuse.putValue(CommonConstants.Segment.NULL_FIELDS, nullColumnsSet);
-    }
-
     return reuse;
   }
 

@@ -267,12 +267,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   @Override
   public void indexRow(GenericRow row) {
-    // Determine if we need to process presence vector per row, per column
-    Set<String> nullColumnsSet = null;
-    if (_nullHandlingEnabled) {
-      nullColumnsSet = (Set<String>) row.getValue(CommonConstants.Segment.NULL_FIELDS);
-    }
-
     for (String columnName : _forwardIndexCreatorMap.keySet()) {
       Object columnValueToIndex = row.getValue(columnName);
       if (columnValueToIndex == null) {
@@ -301,7 +295,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
       if (_nullHandlingEnabled) {
         // If row has null value for given column name, add to presence vector
-        if (null != nullColumnsSet && nullColumnsSet.contains(columnName)) {
+        if (row.isNullValue(columnName)) {
           _presenceVectorCreatorMap.get(columnName).setNull(docIdCounter);
         }
       }

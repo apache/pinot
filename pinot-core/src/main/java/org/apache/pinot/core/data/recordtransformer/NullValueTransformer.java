@@ -19,27 +19,18 @@
 package org.apache.pinot.core.data.recordtransformer;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.FieldSpec.FieldType;
 import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.data.GenericRow;
 
 
 public class NullValueTransformer implements RecordTransformer {
   private final Map<String, Object> _defaultNullValues = new HashMap<>();
-  private final boolean _nullHandlingEnabled;
 
   public NullValueTransformer(Schema schema) {
-    this(schema, false);
-  }
-
-  public NullValueTransformer(Schema schema, boolean nullHandlingEnabled) {
-    _nullHandlingEnabled = nullHandlingEnabled;
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn() && fieldSpec.getFieldType() != FieldType.TIME) {
         String fieldName = fieldSpec.getName();
@@ -55,32 +46,13 @@ public class NullValueTransformer implements RecordTransformer {
 
   @Override
   public GenericRow transform(GenericRow record) {
-    Set<String> nullColumnsSet = null;
-    if (_nullHandlingEnabled) {
-      // Try and reuse the null columns set
-      nullColumnsSet = (Set<String>) record.getValue(CommonConstants.Segment.NULL_FIELDS);
-      if (nullColumnsSet != null) {
-        nullColumnsSet.clear();
-      }
-    }
-
     for (Map.Entry<String, Object> entry : _defaultNullValues.entrySet()) {
       String fieldName = entry.getKey();
       Object value = record.getValue(fieldName);
       if (value == null || (value instanceof Object[] && ((Object[]) value).length == 0) || (value instanceof List
           && ((List) value).isEmpty())) {
         record.putDefaultNullValue(fieldName, entry.getValue());
-        if (_nullHandlingEnabled) {
-          if (nullColumnsSet == null) {
-            nullColumnsSet = new HashSet<>();
-          }
-          nullColumnsSet.add(fieldName);
-        }
       }
-    }
-
-    if (_nullHandlingEnabled) {
-      record.putValue(CommonConstants.Segment.NULL_FIELDS, nullColumnsSet);
     }
     return record;
   }

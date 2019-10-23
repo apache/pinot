@@ -104,8 +104,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     super();
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     this.schema = schema;
-    _recordTransformer = CompositeTransformer.getDefaultTransformer(schema,
-        tableConfig.getIndexingConfig().isNullHandlingEnabled());
+    _recordTransformer = CompositeTransformer.getDefaultTransformer(schema);
     this.serverMetrics = serverMetrics;
     this.segmentName = realtimeSegmentZKMetadata.getSegmentName();
     this.tableNameWithType = tableConfig.getTableName();

@@ -47,6 +47,9 @@ public abstract class DataSource extends BaseOperator {
    */
   public abstract BloomFilterReader getBloomFilter();
 
+  /**
+   * Returns presence vector for the data source if exists, or {@code null} if not.
+   */
   public abstract PresenceVectorReader getPresenceVector();
 
 }

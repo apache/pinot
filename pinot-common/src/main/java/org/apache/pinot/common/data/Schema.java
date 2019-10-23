@@ -226,7 +226,6 @@ public final class Schema {
 
   public boolean removeField(String columnName) {
     FieldSpec existingFieldSpec = _fieldSpecMap.remove(columnName);
-
     if (existingFieldSpec != null) {
       FieldType fieldType = existingFieldSpec.getFieldType();
       switch (fieldType) {

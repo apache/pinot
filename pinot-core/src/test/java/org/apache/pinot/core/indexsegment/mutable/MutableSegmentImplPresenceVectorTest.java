@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.indexsegment.mutable;
 
-import java.util.Set;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.JSONRecordReader;
@@ -26,7 +25,6 @@ import org.apache.pinot.core.data.readers.RecordReader;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
 import org.apache.pinot.core.segment.index.readers.PresenceVectorReader;
-import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -34,12 +32,9 @@ import org.testng.annotations.Test;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-
-import static org.apache.pinot.common.utils.CommonConstants.Segment.NULL_FIELDS;
 
 
 public class MutableSegmentImplPresenceVectorTest {
@@ -56,7 +51,7 @@ public class MutableSegmentImplPresenceVectorTest {
     URL schemaResourceUrl = this.getClass().getClassLoader().getResource(PINOT_SCHEMA_FILE_PATH);
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE);
     _schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
-    _recordTransformer = CompositeTransformer.getDefaultTransformer(_schema, true);
+    _recordTransformer = CompositeTransformer.getDefaultTransformer(_schema);
     File avroFile = new File(dataResourceUrl.getFile());
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
@@ -67,6 +62,7 @@ public class MutableSegmentImplPresenceVectorTest {
         recordReader.next(reuse);
         GenericRow transformedRow = _recordTransformer.transform(reuse);
         _mutableSegmentImpl.index(transformedRow, null);
+        reuse.clear();
       }
     }
     _finalNullColumns = Arrays.asList("signup_email", "cityid");
@@ -89,17 +85,10 @@ public class MutableSegmentImplPresenceVectorTest {
   public void testGetRecord() {
     GenericRow reuse = new GenericRow();
     _mutableSegmentImpl.getRecord(0, reuse);
-    List<String> nullColumns = new ArrayList<>();
-    Set<String> nullColumnsSet = (Set<String>) reuse.getValue(NULL_FIELDS);
-    for (String colName : _schema.getColumnNames()) {
-      if (nullColumnsSet.contains(colName)) {
-        nullColumns.add(colName);
-      }
-    }
-    Assert.assertEquals(nullColumns, _finalNullColumns);
+    Assert.assertEquals(reuse.getNullValueFields(), _finalNullColumns);
 
+    reuse.clear();
     _mutableSegmentImpl.getRecord(1, reuse);
-    nullColumnsSet = (Set<String>) reuse.getValue(NULL_FIELDS);
-    Assert.assertTrue(nullColumnsSet.isEmpty());
+    Assert.assertTrue(reuse.getNullValueFields().isEmpty());
   }
 }

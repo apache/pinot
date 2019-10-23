@@ -1161,8 +1161,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _clientId = _streamPartitionId + "-" + NetUtil.getHostnameOrAddress();
 
     // Create record transformer
-    _recordTransformer = CompositeTransformer.getDefaultTransformer(schema,
-        tableConfig.getIndexingConfig().isNullHandlingEnabled());
+    _recordTransformer = CompositeTransformer.getDefaultTransformer(schema);
     makeStreamConsumer("Starting");
     makeStreamMetadataProvider("Starting");
 
