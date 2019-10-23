@@ -24,12 +24,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
-import java.util.Set;
-import org.apache.commons.collections.comparators.ComparableComparator;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
@@ -135,6 +132,8 @@ class IndexedTableResizer {
 
   /**
    * Trim recordsMap to trimToSize, based on order by information
+   * Resize only if number of records is greater than trimToSize
+   * The resizer smartly chooses to create PQ of records to evict or records to retain, based on the number of records and the number of records to evict
    */
   void resizeRecordsMap(Map<Key, Record> recordsMap, int trimToSize) {
 
@@ -143,39 +142,21 @@ class IndexedTableResizer {
     if (numRecordsToEvict > 0) {
       int size;
       Comparator<IntermediateRecord> comparator;
+      PriorityQueue<IntermediateRecord> priorityQueue;
 
       if (numRecordsToEvict < trimToSize) { // num records to evict is smaller than num records to retain
         size = numRecordsToEvict;
         // make PQ of records to evict
         comparator = _intermediateRecordComparator;
+        priorityQueue = convertToIntermediateRecordsPQ(recordsMap, size, comparator);
+        for (IntermediateRecord evictRecord : priorityQueue) {
+          recordsMap.remove(evictRecord._key);
+        }
       } else { // num records to retain is smaller than num records to evict
         size = trimToSize;
         // make PQ of records to retain
         comparator = _intermediateRecordComparator.reversed();
-      }
-
-      PriorityQueue<IntermediateRecord> priorityQueue =
-          new PriorityQueue<>(size, comparator);
-
-      for (Record record : recordsMap.values()) {
-
-        IntermediateRecord intermediateRecord = getIntermediateRecord(record);
-        if (priorityQueue.size() < size) {
-          priorityQueue.offer(intermediateRecord);
-        } else {
-          IntermediateRecord peek = priorityQueue.peek();
-          if (priorityQueue.comparator().compare(peek, intermediateRecord) < 0) {
-            priorityQueue.poll();
-            priorityQueue.offer(intermediateRecord);
-          }
-        }
-      }
-
-      if (numRecordsToEvict < trimToSize) { // PQ contains records to evict
-        for (IntermediateRecord evictRecord : priorityQueue) {
-          recordsMap.remove(evictRecord._key);
-        }
-      } else { // PQ contains records to retain
+        priorityQueue = convertToIntermediateRecordsPQ(recordsMap, size, comparator);
         ObjectOpenHashSet<Key> keysToRetain = new ObjectOpenHashSet<>(priorityQueue.size());
         for (IntermediateRecord retainRecord : priorityQueue) {
           keysToRetain.add(retainRecord._key);
@@ -185,26 +166,55 @@ class IndexedTableResizer {
     }
   }
 
-  /**
-   * Sort the records in the recordsMap according to order by
-   */
-  List<Record> sortRecordsMap(Map<Key, Record> recordsMap) {
-    int numRecords = recordsMap.size();
-    if (numRecords == 0) {
-      return Collections.emptyList();
-    }
-    List<Record> sortedRecords = new ArrayList<>(numRecords);
-    List<IntermediateRecord> intermediateRecords = new ArrayList<>(numRecords);
+  private PriorityQueue<IntermediateRecord> convertToIntermediateRecordsPQ(Map<Key, Record> recordsMap, int size,
+      Comparator<IntermediateRecord> comparator) {
+    PriorityQueue<IntermediateRecord> priorityQueue = new PriorityQueue<>(size, comparator);
+
     for (Record record : recordsMap.values()) {
-      intermediateRecords.add(getIntermediateRecord(record));
+
+      IntermediateRecord intermediateRecord = getIntermediateRecord(record);
+      if (priorityQueue.size() < size) {
+        priorityQueue.offer(intermediateRecord);
+      } else {
+        IntermediateRecord peek = priorityQueue.peek();
+        if (priorityQueue.comparator().compare(peek, intermediateRecord) < 0) {
+          priorityQueue.poll();
+          priorityQueue.offer(intermediateRecord);
+        }
+      }
     }
-    intermediateRecords.sort(_intermediateRecordComparator);
-    for (IntermediateRecord intermediateRecord : intermediateRecords) {
-      sortedRecords.add(recordsMap.get(intermediateRecord._key));
-    }
-    return sortedRecords;
+    return priorityQueue;
   }
 
+  /**
+   * Resizes the recordsMap and returns a sorted list of records.
+   * This method is to be called from IndexedTable::finish, if both resize and sort is needed
+   */
+  List<Record> resizeAndSortRecordsMap(Map<Key, Record> recordsMap, int trimToSize) {
+
+    int numRecordsToRetain = Math.min(recordsMap.size(), trimToSize);
+    if (numRecordsToRetain == 0) {
+      return Collections.emptyList();
+    }
+
+    // create PQ of records to retain, so that it can further be used to return sorted list of retained records
+    Comparator<IntermediateRecord> comparator = _intermediateRecordComparator.reversed();
+    PriorityQueue<IntermediateRecord> priorityQueue =
+        convertToIntermediateRecordsPQ(recordsMap, numRecordsToRetain, comparator);
+
+    // created sorted list of retained records
+    List<Record> sortedList = new ArrayList<>(numRecordsToRetain);
+    ObjectOpenHashSet<Key> keysToRetain = new ObjectOpenHashSet<>(numRecordsToRetain);
+    while (!priorityQueue.isEmpty()) {
+      IntermediateRecord intermediateRecord = priorityQueue.poll();
+      keysToRetain.add(intermediateRecord._key);
+      Record record = recordsMap.get(intermediateRecord._key);
+      sortedList.add(record);
+    }
+    recordsMap.keySet().retainAll(keysToRetain);
+    Collections.reverse(sortedList);
+    return sortedList;
+  }
 
   /**
    * Helper class to store a subset of Record fields

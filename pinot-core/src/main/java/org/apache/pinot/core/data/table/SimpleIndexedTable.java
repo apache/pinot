@@ -48,7 +48,7 @@ public class SimpleIndexedTable extends IndexedTable {
   /**
    * Initializes the data structures and comparators needed for this Table
    * @param dataSchema data schema of the record's keys and values
-   * @param aggregationInfos aggregation infors for the aggregations in record'd values
+   * @param aggregationInfos aggregation infos for the aggregations in record'd values
    * @param orderBy list of {@link SelectionSort} defining the order by
    * @param capacity the capacity of the table
    */
@@ -94,8 +94,8 @@ public class SimpleIndexedTable extends IndexedTable {
 
       if (_lookupMap.size() >= _maxCapacity) {
         if (_isOrderBy) {
-            // reached max capacity, resize
-            resize(_capacity);
+          // reached max capacity, resize
+          resize(_capacity);
         } else {
           // reached max capacity and no order by. No more new records will be accepted
           _noMoreNewRecords = true;
@@ -107,17 +107,30 @@ public class SimpleIndexedTable extends IndexedTable {
 
   private void resize(int trimToSize) {
 
-    if (_isOrderBy &&_lookupMap.size() > trimToSize) {
-      long startTime = System.currentTimeMillis();
+    long startTime = System.currentTimeMillis();
 
-      _indexedTableResizer.resizeRecordsMap(_lookupMap, trimToSize);
+    _indexedTableResizer.resizeRecordsMap(_lookupMap, trimToSize);
 
-      long endTime = System.currentTimeMillis();
-      long timeElapsed = endTime - startTime;
+    long endTime = System.currentTimeMillis();
+    long timeElapsed = endTime - startTime;
 
-      _numResizes++;
-      _resizeTime += timeElapsed;
-    }
+    _numResizes++;
+    _resizeTime += timeElapsed;
+  }
+
+  private List<Record> resizeAndSort(int trimToSize) {
+
+    long startTime = System.currentTimeMillis();
+
+    List<Record> sortedRecords = _indexedTableResizer.resizeAndSortRecordsMap(_lookupMap, trimToSize);
+
+    long endTime = System.currentTimeMillis();
+    long timeElapsed = endTime - startTime;
+
+    _numResizes++;
+    _resizeTime += timeElapsed;
+
+    return sortedRecords;
   }
 
   @Override
@@ -141,15 +154,18 @@ public class SimpleIndexedTable extends IndexedTable {
 
   @Override
   public void finish(boolean sort) {
+
     if (_isOrderBy) {
-      resize(_capacity);
-      LOGGER.debug("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", _numResizes, _resizeTime,
-          _numResizes == 0 ? 0 : _resizeTime / _numResizes);
 
       if (sort) {
-        List<Record> sortedRecords = _indexedTableResizer.sortRecordsMap(_lookupMap);
+        List<Record> sortedRecords = resizeAndSort(_capacity);
         _iterator = sortedRecords.iterator();
+      } else {
+        resize(_capacity);
       }
+      LOGGER
+          .debug("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", _numResizes, _resizeTime,
+              _numResizes == 0 ? 0 : _resizeTime / _numResizes);
     }
 
     if (_iterator == null) {

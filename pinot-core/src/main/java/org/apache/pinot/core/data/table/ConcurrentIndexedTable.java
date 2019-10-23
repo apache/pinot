@@ -145,33 +145,47 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
   private void resize(int trimToSize) {
 
-    if (_isOrderBy && _lookupMap.size() > trimToSize) {
-      long startTime = System.currentTimeMillis();
+    long startTime = System.currentTimeMillis();
 
-      _indexedTableResizer.resizeRecordsMap(_lookupMap, trimToSize);
+    _indexedTableResizer.resizeRecordsMap(_lookupMap, trimToSize);
 
-      long endTime = System.currentTimeMillis();
-      long timeElapsed = endTime - startTime;
+    long endTime = System.currentTimeMillis();
+    long timeElapsed = endTime - startTime;
 
-      _numResizes.incrementAndGet();
-      _resizeTime.addAndGet(timeElapsed);
-    }
+    _numResizes.incrementAndGet();
+    _resizeTime.addAndGet(timeElapsed);
+  }
+
+  private List<Record> resizeAndSort(int trimToSize) {
+
+    long startTime = System.currentTimeMillis();
+
+    List<Record> sortedRecords = _indexedTableResizer.resizeAndSortRecordsMap(_lookupMap, trimToSize);
+
+    long endTime = System.currentTimeMillis();
+    long timeElapsed = endTime - startTime;
+
+    _numResizes.incrementAndGet();
+    _resizeTime.addAndGet(timeElapsed);
+
+    return sortedRecords;
   }
 
   @Override
   public void finish(boolean sort) {
 
     if (_isOrderBy) {
-      resize(_capacity);
+
+      if (sort) {
+        List<Record> sortedRecords = resizeAndSort(_capacity);
+        _iterator = sortedRecords.iterator();
+      } else {
+        resize(_capacity);
+      }
       int numResizes = _numResizes.get();
       long resizeTime = _resizeTime.get();
       LOGGER.debug("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", numResizes, resizeTime,
           numResizes == 0 ? 0 : resizeTime / numResizes);
-
-      if (sort) {
-        List<Record> sortedRecords = _indexedTableResizer.sortRecordsMap(_lookupMap);
-        _iterator = sortedRecords.iterator();
-      }
     }
 
     if (_iterator == null) {

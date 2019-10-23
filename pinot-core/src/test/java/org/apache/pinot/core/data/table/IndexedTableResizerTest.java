@@ -45,7 +45,7 @@ public class IndexedTableResizerTest {
   private SelectionSort sel1;
   private SelectionSort sel2;
   private SelectionSort sel3;
-  private IndexedTableResizer orderedResizer;
+  private IndexedTableResizer _indexedTableResizer;
 
   private List<Record> records;
   private int trimToSize = 3;
@@ -108,10 +108,10 @@ public class IndexedTableResizerTest {
   }
 
   /**
-   * {@link IndexedTableResizer} trims the records map based on SelectionSort
+   * {@link IndexedTableResizer} resizes the records map based on SelectionSort
    */
   @Test
-  public void testOrderedResize() {
+  public void testResizeRecordsMap() {
 
     // Test resize algorithm with numRecordsToEvict < trimToSize.
     // TotalRecords=5; trimToSize=3; numRecordsToEvict=2
@@ -120,9 +120,9 @@ public class IndexedTableResizerTest {
     sel1.setColumn("d1");
     sel1.setIsAsc(true);
     selectionSort = Lists.newArrayList(sel1);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     records.forEach(k -> recordsMap.put(k.getKey(), k));
-    orderedResizer.resizeRecordsMap(recordsMap, trimToSize);
+    _indexedTableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
     Assert.assertTrue(recordsMap.containsKey(records.get(0).getKey())); // a, b, c
     Assert.assertTrue(recordsMap.containsKey(records.get(1).getKey()));
@@ -131,9 +131,9 @@ public class IndexedTableResizerTest {
     sel1.setColumn("d1");
     sel1.setIsAsc(false);
     selectionSort = Lists.newArrayList(sel1);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     records.forEach(k -> recordsMap.put(k.getKey(), k));
-    orderedResizer.resizeRecordsMap(recordsMap, trimToSize);
+    _indexedTableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
     Assert.assertTrue(recordsMap.containsKey(records.get(2).getKey())); // c, c, c
     Assert.assertTrue(recordsMap.containsKey(records.get(3).getKey()));
@@ -145,9 +145,9 @@ public class IndexedTableResizerTest {
     sel2.setColumn("d3");
     sel2.setIsAsc(false);
     selectionSort = Lists.newArrayList(sel1, sel2);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     records.forEach(k -> recordsMap.put(k.getKey(), k));
-    orderedResizer.resizeRecordsMap(recordsMap, trimToSize);
+    _indexedTableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
     Assert.assertTrue(recordsMap.containsKey(records.get(0).getKey())); // 10, 10, 300
     Assert.assertTrue(recordsMap.containsKey(records.get(1).getKey()));
@@ -157,9 +157,9 @@ public class IndexedTableResizerTest {
     sel1.setColumn("d2");
     sel1.setIsAsc(true);
     selectionSort = Lists.newArrayList(sel1);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     records.forEach(k -> recordsMap.put(k.getKey(), k));
-    orderedResizer.resizeRecordsMap(recordsMap, trimToSize);
+    _indexedTableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
     Assert.assertTrue(recordsMap.containsKey(records.get(0).getKey())); // 10, 10, 50
     Assert.assertTrue(recordsMap.containsKey(records.get(1).getKey()));
@@ -173,9 +173,9 @@ public class IndexedTableResizerTest {
     sel3.setColumn("max(m2)");
     sel3.setIsAsc(false);
     selectionSort = Lists.newArrayList(sel1, sel2, sel3);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     records.forEach(k -> recordsMap.put(k.getKey(), k));
-    orderedResizer.resizeRecordsMap(recordsMap, trimToSize);
+    _indexedTableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
     Assert.assertTrue(recordsMap.containsKey(records.get(0).getKey())); // a, b, (c (30, 300))
     Assert.assertTrue(recordsMap.containsKey(records.get(1).getKey()));
@@ -185,9 +185,9 @@ public class IndexedTableResizerTest {
     sel1.setColumn("avg(m4)");
     sel1.setIsAsc(true);
     selectionSort = Lists.newArrayList(sel1);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     records.forEach(k -> recordsMap.put(k.getKey(), k));
-    orderedResizer.resizeRecordsMap(recordsMap, trimToSize);
+    _indexedTableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
     Assert.assertTrue(recordsMap.containsKey(records.get(4).getKey())); // 2, 3, 3.33,
     Assert.assertTrue(recordsMap.containsKey(records.get(3).getKey()));
@@ -199,9 +199,9 @@ public class IndexedTableResizerTest {
     sel2.setColumn("d1");
     sel2.setIsAsc(true);
     selectionSort = Lists.newArrayList(sel1, sel2);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     records.forEach(k -> recordsMap.put(k.getKey(), k));
-    orderedResizer.resizeRecordsMap(recordsMap, trimToSize);
+    _indexedTableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
     Assert.assertTrue(recordsMap.containsKey(records.get(4).getKey())); // 6, 5, 4 (b)
     Assert.assertTrue(recordsMap.containsKey(records.get(3).getKey()));
@@ -216,9 +216,9 @@ public class IndexedTableResizerTest {
     sel1.setColumn("d1");
     sel1.setIsAsc(true);
     selectionSort = Lists.newArrayList(sel1);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     records.forEach(k -> recordsMap.put(k.getKey(), k));
-    orderedResizer.resizeRecordsMap(recordsMap, trimToSize);
+    _indexedTableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
     Assert.assertTrue(recordsMap.containsKey(records.get(0).getKey())); // a, b
     Assert.assertTrue(recordsMap.containsKey(records.get(1).getKey()));
@@ -227,9 +227,9 @@ public class IndexedTableResizerTest {
     sel1.setColumn("avg(m4)");
     sel1.setIsAsc(true);
     selectionSort = Lists.newArrayList(sel1);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     records.forEach(k -> recordsMap.put(k.getKey(), k));
-    orderedResizer.resizeRecordsMap(recordsMap, trimToSize);
+    _indexedTableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
     Assert.assertTrue(recordsMap.containsKey(records.get(4).getKey())); // 2, 3, 3.33,
     Assert.assertTrue(recordsMap.containsKey(records.get(3).getKey()));
@@ -240,9 +240,9 @@ public class IndexedTableResizerTest {
     sel2.setColumn("d1");
     sel2.setIsAsc(true);
     selectionSort = Lists.newArrayList(sel1, sel2);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     records.forEach(k -> recordsMap.put(k.getKey(), k));
-    orderedResizer.resizeRecordsMap(recordsMap, trimToSize);
+    _indexedTableResizer.resizeRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(recordsMap.size(), trimToSize);
     Assert.assertTrue(recordsMap.containsKey(records.get(4).getKey())); // 6, 5, 4 (b)
     Assert.assertTrue(recordsMap.containsKey(records.get(3).getKey()));
@@ -255,7 +255,7 @@ public class IndexedTableResizerTest {
    * Tests the sort function for ordered resizer
    */
   @Test
-  public void testOrderedResizerSort() {
+  public void testSortRecordsMap() {
     List<Record> sortedRecords;
     int[] order;
 
@@ -263,10 +263,10 @@ public class IndexedTableResizerTest {
     sel1.setColumn("d1");
     sel1.setIsAsc(true);
     selectionSort = Lists.newArrayList(sel1);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     records.forEach(k -> recordsMap.put(k.getKey(), k));
-    sortedRecords = orderedResizer.sortRecordsMap(recordsMap);
-    Assert.assertEquals(sortedRecords.size(), recordsMap.size());
+    sortedRecords = _indexedTableResizer.resizeAndSortRecordsMap(recordsMap, trimToSize);
+    Assert.assertEquals(sortedRecords.size(), trimToSize);
     order = new int[]{0, 1};
     for (int i = 0; i < order.length; i++) {
       Assert.assertEquals(sortedRecords.get(i), records.get(order[i]));
@@ -278,11 +278,11 @@ public class IndexedTableResizerTest {
     sel2.setColumn("d3");
     sel2.setIsAsc(false);
     selectionSort = Lists.newArrayList(sel1, sel2);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     records.forEach(k -> recordsMap.put(k.getKey(), k));
-    sortedRecords = orderedResizer.sortRecordsMap(recordsMap);
-    Assert.assertEquals(sortedRecords.size(), recordsMap.size());
-    order = new int[]{0, 1, 4, 3, 2};
+    sortedRecords = _indexedTableResizer.resizeAndSortRecordsMap(recordsMap, trimToSize);
+    Assert.assertEquals(sortedRecords.size(), trimToSize);
+    order = new int[]{0, 1, 4};
     for (int i = 0; i < order.length; i++) {
       Assert.assertEquals(sortedRecords.get(i), records.get(order[i]));
     }
@@ -295,11 +295,11 @@ public class IndexedTableResizerTest {
     sel3.setColumn("max(m2)");
     sel3.setIsAsc(false);
     selectionSort = Lists.newArrayList(sel1, sel2, sel3);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     records.forEach(k -> recordsMap.put(k.getKey(), k));
-    sortedRecords = orderedResizer.sortRecordsMap(recordsMap);
-    Assert.assertEquals(sortedRecords.size(), recordsMap.size());
-    order = new int[]{0, 1, 2, 3, 4};
+    sortedRecords = _indexedTableResizer.resizeAndSortRecordsMap(recordsMap, trimToSize);
+    Assert.assertEquals(sortedRecords.size(), trimToSize);
+    order = new int[]{0, 1, 2};
     for (int i = 0; i < order.length; i++) {
       Assert.assertEquals(sortedRecords.get(i), records.get(order[i]));
     }
@@ -310,9 +310,9 @@ public class IndexedTableResizerTest {
     sel2.setColumn("d1");
     sel2.setIsAsc(true);
     selectionSort = Lists.newArrayList(sel1, sel2);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     records.forEach(k -> recordsMap.put(k.getKey(), k));
-    sortedRecords = orderedResizer.sortRecordsMap(recordsMap);
+    sortedRecords = _indexedTableResizer.resizeAndSortRecordsMap(recordsMap, 10); // high trim to size
     Assert.assertEquals(sortedRecords.size(), recordsMap.size());
     order = new int[]{4, 3, 1, 0, 2};
     for (int i = 0; i < order.length; i++) {
@@ -325,9 +325,9 @@ public class IndexedTableResizerTest {
     sel2.setColumn("avg(m4)");
     sel2.setIsAsc(false);
     selectionSort = Lists.newArrayList(sel1, sel2);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     records.forEach(k -> recordsMap.put(k.getKey(), k));
-    sortedRecords = orderedResizer.sortRecordsMap(recordsMap);
+    sortedRecords = _indexedTableResizer.resizeAndSortRecordsMap(recordsMap, recordsMap.size()); // equal trim to size
     Assert.assertEquals(sortedRecords.size(), recordsMap.size());
     order = new int[]{4, 3, 2, 1, 0};
     for (int i = 0; i < order.length; i++) {
@@ -344,9 +344,9 @@ public class IndexedTableResizerTest {
     // d2
     sel1.setColumn("d2");
     selectionSort = Lists.newArrayList(sel1);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     for (Record record : records) {
-      IndexedTableResizer.IntermediateRecord intermediateRecord = orderedResizer.getIntermediateRecord(record);
+      IndexedTableResizer.IntermediateRecord intermediateRecord = _indexedTableResizer.getIntermediateRecord(record);
       Assert.assertEquals(intermediateRecord._key, record.getKey());
       Assert.assertEquals(intermediateRecord._values.length, 1);
       Assert.assertEquals(intermediateRecord._values[0], record.getKey().getColumns()[1]);
@@ -355,9 +355,9 @@ public class IndexedTableResizerTest {
     // sum(m1)
     sel1.setColumn("sum(m1)");
     selectionSort = Lists.newArrayList(sel1);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     for (Record record : records) {
-      IndexedTableResizer.IntermediateRecord intermediateRecord = orderedResizer.getIntermediateRecord(record);
+      IndexedTableResizer.IntermediateRecord intermediateRecord = _indexedTableResizer.getIntermediateRecord(record);
       Assert.assertEquals(intermediateRecord._key, record.getKey());
       Assert.assertEquals(intermediateRecord._values.length, 1);
       Assert.assertEquals(intermediateRecord._values[0], record.getValues()[0]);
@@ -367,9 +367,9 @@ public class IndexedTableResizerTest {
     sel1.setColumn("d1");
     sel2.setColumn("max(m2)");
     selectionSort = Lists.newArrayList(sel1, sel2);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     for (Record record : records) {
-      IndexedTableResizer.IntermediateRecord intermediateRecord = orderedResizer.getIntermediateRecord(record);
+      IndexedTableResizer.IntermediateRecord intermediateRecord = _indexedTableResizer.getIntermediateRecord(record);
       Assert.assertEquals(intermediateRecord._key, record.getKey());
       Assert.assertEquals(intermediateRecord._values.length, 2);
       Assert.assertEquals(intermediateRecord._values[0], record.getKey().getColumns()[0]);
@@ -381,9 +381,9 @@ public class IndexedTableResizerTest {
     sel2.setColumn("sum(m1)");
     sel3.setColumn("d3");
     selectionSort = Lists.newArrayList(sel1, sel2, sel3);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     for (Record record : records) {
-      IndexedTableResizer.IntermediateRecord intermediateRecord = orderedResizer.getIntermediateRecord(record);
+      IndexedTableResizer.IntermediateRecord intermediateRecord = _indexedTableResizer.getIntermediateRecord(record);
       Assert.assertEquals(intermediateRecord._key, record.getKey());
       Assert.assertEquals(intermediateRecord._values.length, 3);
       Assert.assertEquals(intermediateRecord._values[0], record.getKey().getColumns()[1]);
@@ -394,11 +394,11 @@ public class IndexedTableResizerTest {
     // non-comparable intermediate result
     sel1.setColumn("distinctcount(m3)");
     selectionSort = Lists.newArrayList(sel1);
-    orderedResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
+    _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, selectionSort);
     AggregationFunction distinctCountFunction =
         AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfos.get(2)).getAggregationFunction();
     for (Record record : records) {
-      IndexedTableResizer.IntermediateRecord intermediateRecord = orderedResizer.getIntermediateRecord(record);
+      IndexedTableResizer.IntermediateRecord intermediateRecord = _indexedTableResizer.getIntermediateRecord(record);
       Assert.assertEquals(intermediateRecord._key, record.getKey());
       Assert.assertEquals(intermediateRecord._values.length, 1);
       Assert.assertEquals(intermediateRecord._values[0], distinctCountFunction.extractFinalResult(record.getValues()[2]));
