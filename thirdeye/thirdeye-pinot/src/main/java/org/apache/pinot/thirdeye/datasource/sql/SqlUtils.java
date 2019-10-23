@@ -581,6 +581,14 @@ public class SqlUtils {
     }
   }
 
+  private static String timeFormatToVerticaFormat(String timeFormat) {
+    if (timeFormat.contains("mm")) {
+      return timeFormat.replaceAll("(?i):mm", ":mi");
+    } else {
+      return timeFormat;
+    }
+  }
+
   /**
    * Return a SQL clause that cast any timeColumn as unix timestamp
    *
@@ -597,7 +605,7 @@ public class SqlUtils {
     } else if (sourceName.equals(H2)){
       return "TO_UNIXTIME(PARSEDATETIME(CAST(" + timeColumn + " AS VARCHAR), '" + timeFormat + "'))";
     } else if (sourceName.equals(VERTICA)) {
-      return "EXTRACT(EPOCH FROM to_timestamp(to_char(" + timeColumn + "), '" + timeFormat + "'))";
+      return "EXTRACT(EPOCH FROM to_timestamp(to_char(" + timeColumn + "), '" + timeFormatToVerticaFormat(timeFormat) + "'))";
     }
     return "";
   }
