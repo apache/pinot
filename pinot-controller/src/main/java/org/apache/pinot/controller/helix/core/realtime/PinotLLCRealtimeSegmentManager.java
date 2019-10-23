@@ -604,11 +604,12 @@ public class PinotLLCRealtimeSegmentManager {
       HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
         assert idealState != null;
         Map<String, String> stateMap = idealState.getInstanceStateMap(segmentName);
-        if (stateMap != null) {
-          String state = stateMap.get(instanceName);
-          if (state != null && state.equals(RealtimeSegmentOnlineOfflineStateModel.CONSUMING)) {
-            stateMap.put(instanceName, RealtimeSegmentOnlineOfflineStateModel.OFFLINE);
-          }
+        String state = stateMap.get(instanceName);
+        if (RealtimeSegmentOnlineOfflineStateModel.CONSUMING.equals(state)) {
+          stateMap.put(instanceName, RealtimeSegmentOnlineOfflineStateModel.OFFLINE);
+        } else {
+          LOGGER.info("Segment {} in state {} when trying to register consumption stop from {}",
+              segmentName, state, instanceName);
         }
         return idealState;
       }, RetryPolicies.exponentialBackoffRetryPolicy(10, 500L, 1.2f), true);
