@@ -20,6 +20,7 @@ package org.apache.pinot.common.metadata.segment;
 
 import java.util.Map;
 import org.apache.helix.ZNRecord;
+import org.apache.pinot.common.utils.StringUtil;
 
 import static org.apache.pinot.common.utils.EqualityUtils.hashCodeOf;
 import static org.apache.pinot.common.utils.EqualityUtils.isEqual;
@@ -36,8 +37,8 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
   private long _startOffset;
   private long _endOffset;
   private int _numReplicas;
-
-  private String _downloadUrl = null;
+  // A comma separated list of urls to download the segment.
+  private String _downloadUrls = null;
 
   public LLCRealtimeSegmentZKMetadata() {
     super();
@@ -48,7 +49,7 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
     _startOffset = Long.valueOf(znRecord.getSimpleField(START_OFFSET));
     _numReplicas = Integer.valueOf(znRecord.getSimpleField(NUM_REPLICAS));
     _endOffset = Long.valueOf(znRecord.getSimpleField(END_OFFSET));
-    _downloadUrl = znRecord.getSimpleField(DOWNLOAD_URL);
+    _downloadUrls = znRecord.getSimpleField(DOWNLOAD_URL);
   }
 
   public long getStartOffset() {
@@ -76,11 +77,15 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
   }
 
   public String getDownloadUrl() {
-    return _downloadUrl;
+    return _downloadUrls;
   }
 
-  public void setDownloadUrl(String downloadUrl) {
-    _downloadUrl = downloadUrl;
+  public void appendDownloadUrl(String downloadUrl) {
+    if (_downloadUrls == null) {
+      _downloadUrls = downloadUrl;
+      return;
+    }
+    _downloadUrls = StringUtil.join(",", _downloadUrls, downloadUrl);
   }
 
   @Override
@@ -89,7 +94,7 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
     znRecord.setLongField(START_OFFSET, _startOffset);
     znRecord.setLongField(END_OFFSET, _endOffset);
     znRecord.setIntField(NUM_REPLICAS, _numReplicas);
-    znRecord.setSimpleField(DOWNLOAD_URL, _downloadUrl);
+    znRecord.setSimpleField(DOWNLOAD_URL, _downloadUrls);
     return znRecord;
   }
 
@@ -104,7 +109,7 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
     result.append(newline);
     result.append("  " + START_OFFSET + " : " + _startOffset + ",");
     result.append(newline);
-    result.append("  " + DOWNLOAD_URL + " : " + _downloadUrl + ",");
+    result.append("  " + DOWNLOAD_URL + " : " + _downloadUrls + ",");
     result.append(newline);
     result.append("  " + END_OFFSET + " : " + _endOffset);
     result.append(newline);
@@ -124,7 +129,7 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
 
     LLCRealtimeSegmentZKMetadata metadata = (LLCRealtimeSegmentZKMetadata) segmentMetadata;
     return super.equals(metadata) && isEqual(_startOffset, metadata._startOffset) && isEqual(_endOffset,
-        metadata._endOffset) && isEqual(_downloadUrl, metadata._downloadUrl) && isEqual(_numReplicas,
+        metadata._endOffset) && isEqual(_downloadUrls, metadata._downloadUrls) && isEqual(_numReplicas,
         metadata._numReplicas);
   }
 
@@ -134,7 +139,7 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
     result = hashCodeOf(result, _startOffset);
     result = hashCodeOf(result, _endOffset);
     result = hashCodeOf(result, _numReplicas);
-    result = hashCodeOf(result, _downloadUrl);
+    result = hashCodeOf(result, _downloadUrls);
     return result;
   }
 
@@ -144,7 +149,7 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
     configMap.put(START_OFFSET, Long.toString(_startOffset));
     configMap.put(END_OFFSET, Long.toString(_endOffset));
     configMap.put(NUM_REPLICAS, Integer.toString(_numReplicas));
-    configMap.put(DOWNLOAD_URL, _downloadUrl);
+    configMap.put(DOWNLOAD_URL, _downloadUrls);
 
     return configMap;
   }

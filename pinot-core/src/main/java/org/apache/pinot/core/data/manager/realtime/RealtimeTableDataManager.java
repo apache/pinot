@@ -251,7 +251,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   public void downloadAndReplaceSegment(String segmentName, LLCRealtimeSegmentZKMetadata llcSegmentMetadata,
       IndexLoadingConfig indexLoadingConfig) {
-    final String uri = llcSegmentMetadata.getDownloadUrl();
+    final String uriLst = llcSegmentMetadata.getDownloadUrl();
+    String uri = getDownloadUriFromList(uriLst);
     File tempSegmentFolder = new File(_indexDir, "tmp-" + segmentName + "." + System.currentTimeMillis());
     File tempFile = new File(_indexDir, segmentName + ".tar.gz");
     final File segmentFolder = new File(_indexDir, segmentName);
@@ -270,6 +271,14 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       FileUtils.deleteQuietly(tempFile);
       FileUtils.deleteQuietly(tempSegmentFolder);
     }
+  }
+
+  private String getDownloadUriFromList(String uriLst) {
+    String[] urls = uriLst.split(",");
+    if (urls != null && urls.length > 0) {
+      return urls[0];
+    }
+    return null;
   }
 
   /**

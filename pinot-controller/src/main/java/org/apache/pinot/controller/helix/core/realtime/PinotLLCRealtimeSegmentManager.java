@@ -480,7 +480,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     committingSegmentZKMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset());
     committingSegmentZKMetadata.setStatus(Status.DONE);
-    committingSegmentZKMetadata.setDownloadUrl(URIUtils
+    committingSegmentZKMetadata.appendDownloadUrl(URIUtils
         .constructDownloadUrl(_controllerConf.generateVipUrl(), TableNameBuilder.extractRawTableName(realtimeTableName),
             segmentName));
     committingSegmentZKMetadata.setCrc(Long.valueOf(segmentMetadata.getCrc()));
