@@ -1,22 +1,11 @@
 package org.apache.pinot.thirdeye.util;
 
-import com.couchbase.client.java.document.json.JsonArray;
 import com.couchbase.client.java.document.json.JsonObject;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.zip.CRC32;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
-import org.apache.pinot.thirdeye.detection.cache.ResponseDataPojo;
-import org.apache.pinot.thirdeye.detection.cache.ThirdEyeCacheRequest;
-import org.apache.pinot.thirdeye.detection.cache.ThirdEyeCacheResponse;
 import org.apache.pinot.thirdeye.detection.cache.TimeSeriesDataPoint;
 
 
@@ -43,16 +32,6 @@ public class CacheUtils {
     }
 
     return result;
-  }
-
-  public static void setupMapFieldsForMetric(Map<String, Map<String, List<String>>> metricMap, long metricId) {
-    String key = String.valueOf(metricId);
-    Map<String, List<String>> map = new HashMap<String, List<String>>() {{
-      put("times", new ArrayList<>());
-      put("values", new ArrayList<>());
-      put("groupByKey", new ArrayList<>());
-    }};
-    metricMap.put(key, map);
   }
 
   public static String hashMetricUrn(String metricUrn) {
