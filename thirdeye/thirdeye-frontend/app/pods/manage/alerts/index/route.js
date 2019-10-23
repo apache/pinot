@@ -3,7 +3,8 @@ import Route from '@ember/routing/route';
 import fetch from 'fetch';
 import { get, getWithDefault } from '@ember/object';
 import { inject as service } from '@ember/service';
-import { checkStatus, formatYamlFilter } from 'thirdeye-frontend/utils/utils';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import { formatYamlFilter} from 'thirdeye-frontend/utils/yaml-tools';
 import { powerSort } from 'thirdeye-frontend/utils/manage-alert-utils';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 

@@ -16,12 +16,17 @@
 import Component from '@ember/component';
 import { computed, set, get, getProperties } from '@ember/object';
 import { later } from '@ember/runloop';
-import { checkStatus, humanizeFloat, postProps, stripNonFiniteValues } from 'thirdeye-frontend/utils/utils';
+import { checkStatus,
+  humanizeFloat,
+  postProps,
+  replaceNonFiniteWithCurrent,
+  stripNonFiniteValues } from 'thirdeye-frontend/utils/utils';
 import { toastOptions } from 'thirdeye-frontend/utils/constants';
 import { colorMapping, makeTime, toMetricLabel, extractTail } from 'thirdeye-frontend/utils/rca-utils';
 import { getYamlPreviewAnomalies,
   getAnomaliesByAlertId,
   getBounds  } from 'thirdeye-frontend/utils/anomaly';
+import { getValueFromYaml } from 'thirdeye-frontend/utils/yaml-tools';
 import { inject as service } from '@ember/service';
 import { task } from 'ember-concurrency';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
@@ -84,6 +89,8 @@ export default Component.extend({
   granularity: null,
   alertYaml: null,
   dimensionExploration: null,
+  // cachedMetric holds the last metric of anomalies fetched, so that state can be reset for comparison if metric changes
+  cachedMetric: null,
   getAnomaliesError:false, // stops the component from fetching more anomalies until user changes state
   detectionHealth: null, // result of call to detection/health/{id}, passed in by parent
   timeWindowSize: null, // passed in by parent, which retrieves from endpoint.  Do not set
@@ -268,9 +275,9 @@ export default Component.extend({
 
   /**
    * Return state of anomalies and time series for updating state correctly
-   * 1 - set to old (Alert Overview or Create Alert Preview w/o old)
+   * 1 - set to old (Alert Overview or Create Alert Preview)
    * 2 - set to new (Edit Alert Preview with old or Create Alert Preview w/o new)
-   * 3 - shuffle then set to new (Create Alert Preview with 2 sets already)
+   * 3 - shuffle then set to new (Create Alert Preview with 2 sets already) (not used for now)
    * 4 - get alert anomalies only - no time series (Edit Alert Preview w/o any anomalies loaded yet)
    * 5 - error getting anomalies
    * @type {Number}
@@ -520,7 +527,8 @@ export default Component.extend({
       if (baseline && !_.isEmpty(baseline.upper_bound)) {
         series['Upper and lower bound'] = {
           timestamps: baseline.timestamp,
-          values: stripNonFiniteValues(baseline.upper_bound),
+          values: replaceNonFiniteWithCurrent(baseline.upper_bound,
+            showRules ? timeseries.current : timeseries.value),
           type: 'line',
           color: 'screenshot-bounds'
         };
@@ -529,7 +537,8 @@ export default Component.extend({
       if (baseline && !_.isEmpty(baseline.lower_bound)) {
         series['lowerBound'] = {
           timestamps: baseline.timestamp,
-          values: stripNonFiniteValues(baseline.lower_bound),
+          values: replaceNonFiniteWithCurrent(baseline.lower_bound,
+            showRules ? timeseries.current : timeseries.value),
           type: 'line',
           color: 'screenshot-bounds'
         };
@@ -824,10 +833,10 @@ export default Component.extend({
       let falsePositives = 0;
       let falseNegatives = 0;
       let numberOfAnomalies = 0;
-      anomaliesOld.forEach(function (attr) {
+      anomaliesOld.forEach(function (anomaly) {
         numberOfAnomalies++;
-        if(attr.anomaly && attr.anomaly.statusClassification) {
-          const classification = attr.anomaly.statusClassification;
+        if(anomaly && anomaly.statusClassification) {
+          const classification = anomaly.statusClassification;
           if (classification !== 'NONE') {
             respondedAnomaliesCount++;
             if (classification === 'TRUE_POSITIVE') {
@@ -960,8 +969,9 @@ export default Component.extend({
         }
         anomalies = applicationAnomalies;
       }
+      set(this, 'cachedMetric', getValueFromYaml('metric', alertYaml, 'string'));
     } catch (error) {
-      notifications.error(`_getAnomalies failed: ${error}`, 'Error', toastOptions);
+      notifications.error(`_getAnomalies failed: ${error.body.message}`, 'Error', toastOptions);
       this.set('getAnomaliesError', true);
     }
 
@@ -998,36 +1008,63 @@ export default Component.extend({
     }
   },
 
-  _formattedModifiedBy(feedback) {
-    let result;
-    if (feedback && typeof feedback === 'object') {
-      if (feedback.updatedBy && feedback.updatedBy !== 'no-auth-user') {
-        result = feedback.updatedBy.split('@')[0];
-      } else {
-        result = '--';
+  /**
+   * Helper to reset state if the user is previewing a different metric
+   * returns true if the metrics are different
+   * @method checkMetricIfCreateAlertPreview
+   * @return {boolean}
+   */
+  _checkMetricIfCreateAlertPreview() {
+    let isMetricNew = false;
+    const {
+      stateOfAnomaliesAndTimeSeries,
+      cachedMetric,
+      alertYaml
+    } = this.getProperties('stateOfAnomaliesAndTimeSeries', 'cachedMetric', 'alertYaml');
+    if (stateOfAnomaliesAndTimeSeries === 2 || stateOfAnomaliesAndTimeSeries === 3) {
+      if (!this.get('isEditMode')) {
+        // is Create Alert preview
+        isMetricNew = !(cachedMetric === getValueFromYaml('metric', alertYaml, 'string'));
       }
     }
-    return result;
+    return isMetricNew;
   },
 
-  _formattedRule(properties) {
-    let result;
-    if (properties && typeof properties === 'object') {
-      if (properties.detectorComponentName) {
-        result = properties.detectorComponentName.split(':')[0];
-      } else {
-        result = '--';
-      }
+  _fetchAnomalies() {
+    set(this, 'getAnomaliesError', false);
+
+    // If the user is running the detection with a new metric, we should reset the state of time series and anomalies for comparison
+    if (this._checkMetricIfCreateAlertPreview()) {
+      this.setProperties({
+        anomaliesOld: [],
+        anomaliesOldSet: false,
+        anomaliesNew: [],
+        anomaliesNewSet: false
+      });
     }
-    return result;
-  },
 
-  _formatAnomaly(anomaly) {
-    return `${moment(anomaly.startTime).format(TABLE_DATE_FORMAT)}`;
-  },
-
-  _filterAnomalies(rows) {
-    return rows.filter(row => (row.startTime && row.endTime && !row.child));
+    try {
+      // in Edit Alert Preview, we want the original yaml used for comparisons
+      const content = (get(this, 'isEditMode') && !(get(this, 'anomaliesOldSet'))) ? get(this, 'originalYaml') : get(this, 'alertYaml');
+      return this.get('_getAnomalies').perform(content)
+        .then(results => this._setAnomaliesAndTimeSeries(results))
+        .then(() => {
+          if (get(this, 'metricUrn')) {
+            this._fetchTimeseries();
+          } else {
+            throw new Error('Unable to get MetricUrn from response');
+          }
+        })
+        .catch(error => {
+          if (error.name !== 'TaskCancelation') {
+            this.get('notifications').error(error, 'Error', toastOptions);
+            set(this, 'getAnomaliesError', true);
+          }
+        });
+    } catch (error) {
+      this.get('notifications').error(error, 'Error', toastOptions);
+      set(this, 'getAnomaliesError', true);
+    }
   },
 
   _fetchTimeseries() {
@@ -1090,31 +1127,36 @@ export default Component.extend({
     set(this, 'errorBaseline', null);
   },
 
-  _fetchAnomalies() {
-    set(this, 'getAnomaliesError', false);
+  _filterAnomalies(rows) {
+    return rows.filter(row => (row.startTime && row.endTime && !row.child));
+  },
 
-    try {
-      // in Edit Alert Preview, we want the original yaml used for comparisons
-      const content = (get(this, 'isEditMode') && !(get(this, 'anomaliesOldSet'))) ? get(this, 'originalYaml') : get(this, 'alertYaml');
-      return this.get('_getAnomalies').perform(content)
-        .then(results => this._setAnomaliesAndTimeSeries(results))
-        .then(() => {
-          if (get(this, 'metricUrn')) {
-            this._fetchTimeseries();
-          } else {
-            throw new Error('Unable to get MetricUrn from response');
-          }
-        })
-        .catch(error => {
-          if (error.name !== 'TaskCancelation') {
-            this.get('notifications').error(error, 'Error', toastOptions);
-            set(this, 'getAnomaliesError', true);
-          }
-        });
-    } catch (error) {
-      this.get('notifications').error(error, 'Error', toastOptions);
-      set(this, 'getAnomaliesError', true);
+  _formatAnomaly(anomaly) {
+    return `${moment(anomaly.startTime).format(TABLE_DATE_FORMAT)}`;
+  },
+
+  _formattedModifiedBy(feedback) {
+    let result;
+    if (feedback && typeof feedback === 'object') {
+      if (feedback.updatedBy && feedback.updatedBy !== 'no-auth-user') {
+        result = feedback.updatedBy.split('@')[0];
+      } else {
+        result = '--';
+      }
     }
+    return result;
+  },
+
+  _formattedRule(properties) {
+    let result;
+    if (properties && typeof properties === 'object') {
+      if (properties.detectorComponentName) {
+        result = properties.detectorComponentName.split(':')[0];
+      } else {
+        result = '--';
+      }
+    }
+    return result;
   },
 
   /**
