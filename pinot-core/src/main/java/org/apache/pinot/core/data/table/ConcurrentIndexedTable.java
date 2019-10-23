@@ -107,7 +107,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
           _readWriteLock.writeLock().lock();
           try {
             if (_lookupMap.size() >= _bufferedCapacity) {
-              resize(_maxCapacity);
+              resize(_capacity);
             }
           } finally {
             _readWriteLock.writeLock().unlock();
@@ -157,7 +157,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
   @Override
   public void finish(boolean sort) {
-    resize(_maxCapacity);
+    resize(_capacity);
     int numResizes = _numResizes.get();
     long resizeTime = _resizeTime.get();
     LOGGER.debug("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", numResizes, resizeTime,

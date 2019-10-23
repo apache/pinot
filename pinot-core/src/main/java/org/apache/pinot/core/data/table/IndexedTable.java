@@ -37,7 +37,7 @@ public abstract class IndexedTable implements Table {
   int _numAggregations;
   DataSchema _dataSchema;
 
-  int _maxCapacity;
+  int _capacity;
   int _bufferedCapacity;
 
   boolean _isOrderBy;
@@ -55,25 +55,13 @@ public abstract class IndexedTable implements Table {
           AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfos.get(i)).getAggregationFunction();
     }
 
-    /* Factor used to add buffer to maxCapacity of the table **/
-    double bufferFactor;
-    /* Factor used to decide eviction threshold **/
-    /** The true capacity of the table is {@link IndexedTable::_bufferedCapacity},
-     * which is bufferFactor times the {@link IndexedTable::_maxCapacity}
-     *
-     * If records beyond {@link IndexedTable::_bufferedCapacity} are received,
-     * the table resize and evict bottom records, resizing it to {@link IndexedTable::_maxCapacity}
-     * The assumption here is that {@link IndexedTable::_maxCapacity} already has a buffer added by the caller (typically, we do max(top * 5, 5000))
-     */
-    if (capacity > 50000) {
-      // if max capacity is large, buffer capacity is kept smaller, so that we do not accumulate too many records for sorting/resizing
-      bufferFactor = 1.2;
-    } else {
-      // if max capacity is small, buffer capacity is kept larger, so that we avoid frequent resizing
-      bufferFactor = 2.0;
+    _capacity = capacity;
+    // TODO: tune these numbers
+    if (capacity <= 100_000) { // Capacity is small, make a very large buffer. Make PQ of records to retain, during resize
+      _bufferedCapacity = 1_000_000;
+    } else { // Capacity is large, make buffer only slightly bigger. Make PQ of records to evict, during resize
+      _bufferedCapacity = (int) (capacity * 1.2);
     }
-    _maxCapacity = capacity;
-    _bufferedCapacity = (int) (capacity * bufferFactor);
 
     _isOrderBy = CollectionUtils.isNotEmpty(orderBy);
     if (_isOrderBy) {

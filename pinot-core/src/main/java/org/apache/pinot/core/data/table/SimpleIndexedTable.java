@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.concurrent.NotThreadSafe;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
@@ -93,7 +92,7 @@ public class SimpleIndexedTable extends IndexedTable {
       if (_lookupMap.size() >= _bufferedCapacity) {
         if (_isOrderBy) {
             // reached capacity, resize
-            resize(_maxCapacity);
+            resize(_capacity);
         } else {
           // reached capacity and no order by. No more new records will be accepted
           _noMoreNewRecords = true;
@@ -139,7 +138,7 @@ public class SimpleIndexedTable extends IndexedTable {
 
   @Override
   public void finish(boolean sort) {
-    resize(_maxCapacity);
+    resize(_capacity);
     LOGGER.debug("Num resizes : {}, Total time spent in resizing : {}, Avg resize time : {}", _numResizes, _resizeTime,
         _numResizes == 0 ? 0 : _resizeTime / _numResizes);
 

@@ -23,9 +23,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.Set;
 import org.apache.commons.collections.comparators.ComparableComparator;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
@@ -137,27 +139,49 @@ class OrderedIndexedTableResizer extends IndexedTableResizer {
   @Override
   void resizeRecordsMap(Map<Key, Record> recordsMap, int trimToSize) {
 
-    // make min heap of elements to evict
-    int heapSize = recordsMap.size() - trimToSize;
-    if (heapSize > 0) {
-      PriorityQueue<IntermediateRecord> minHeap = new PriorityQueue<>(heapSize, _intermediateRecordComparator);
+    int numRecordsToEvict = recordsMap.size() - trimToSize;
+
+    if (numRecordsToEvict > 0) {
+      int size;
+      Comparator<IntermediateRecord> comparator;
+
+      if (numRecordsToEvict < trimToSize) { // num records to evict is smaller than num records to retain
+        size = numRecordsToEvict;
+        // make PQ of records to evict
+        comparator = _intermediateRecordComparator;
+      } else { // num records to retain is smaller than num records to evict
+        size = trimToSize;
+        // make PQ of records to retain
+        comparator = _intermediateRecordComparator.reversed();
+      }
+
+      PriorityQueue<IntermediateRecord> priorityQueue =
+          new PriorityQueue<>(size, comparator);
 
       for (Record record : recordsMap.values()) {
 
         IntermediateRecord intermediateRecord = getIntermediateRecord(record);
-        if (minHeap.size() < heapSize) {
-          minHeap.offer(intermediateRecord);
+        if (priorityQueue.size() < size) {
+          priorityQueue.offer(intermediateRecord);
         } else {
-          IntermediateRecord peek = minHeap.peek();
-          if (minHeap.comparator().compare(peek, intermediateRecord) < 0) {
-            minHeap.poll();
-            minHeap.offer(intermediateRecord);
+          IntermediateRecord peek = priorityQueue.peek();
+          if (priorityQueue.comparator().compare(peek, intermediateRecord) < 0) {
+            priorityQueue.poll();
+            priorityQueue.offer(intermediateRecord);
           }
         }
       }
 
-      for (IntermediateRecord evictRecord : minHeap) {
-        recordsMap.remove(evictRecord.getKey());
+      if (numRecordsToEvict < trimToSize) { // PQ contains records to evict
+        for (IntermediateRecord evictRecord : priorityQueue) {
+          recordsMap.remove(evictRecord.getKey());
+        }
+      } else { // PQ contains records to retain
+        Set<Key> keysToRetain = new HashSet<>(priorityQueue.size());
+        for (IntermediateRecord retainRecord : priorityQueue) {
+          keysToRetain.add(retainRecord.getKey());
+        }
+        recordsMap.keySet().retainAll(keysToRetain);
       }
     }
   }
