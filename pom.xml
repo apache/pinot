@@ -1265,6 +1265,8 @@
             <exclude>**/*.conf</exclude>
             <exclude>**/appAssemblerScriptTemplate</exclude>
 
+            <exclude>**/zone-index.properties</exclude>
+
             <!-- Resource directories under test -->
             <exclude>**/src/test/resources/**</exclude>
 
