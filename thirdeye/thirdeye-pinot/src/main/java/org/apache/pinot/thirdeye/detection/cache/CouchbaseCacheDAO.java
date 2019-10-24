@@ -21,12 +21,10 @@ public class CouchbaseCacheDAO {
   private static final Logger LOG = LoggerFactory.getLogger(AutoOnboardUtility.class);
 
   // these will all be moved to config files
-  //private static final String HOSTNAME = "localhost";
   private static final String AUTH_USERNAME = "thirdeye";
   private static final String AUTH_PASSWORD = "thirdeye";
   private static final String BUCKET_NAME = "travel-sample";
 
-  private static final String BASE_QUERY = "SELECT time, `dims`.$dimensionKey FROM `$bucket` WHERE metricId = $metricId AND time BETWEEN $start AND $end ORDER BY time ASC";
   private static final String BUCKET = "bucket";
   private static final String DIMENSION_KEY = "dimensionKey";
   private static final String METRIC_ID = "metricId";
@@ -53,15 +51,17 @@ public class CouchbaseCacheDAO {
 
     String dimensionKey = request.getDimensionKey();
 
-    // NOTE: we subtract one from the end date because Couchabase's BETWEEN clause is inclusive on both sides
+    // NOTE: we subtract one from the end date because Couchbase's BETWEEN clause is inclusive on both sides
     JsonObject parameters = JsonObject.create()
         .put(BUCKET, BUCKET_NAME)
-        .put(DIMENSION_KEY, dimensionKey)
         .put(METRIC_ID, request.getMetricId())
+        .put(DIMENSION_KEY, request.getDimensionKey())
         .put(START, request.getStartTimeInclusive())
         .put(END, request.getEndTimeExclusive() - 1);
 
-    N1qlQueryResult queryResult = bucket.query(N1qlQuery.parameterized(BASE_QUERY, parameters));
+    String query = CacheUtils.buildQuery(parameters);
+
+    N1qlQueryResult queryResult = bucket.query(N1qlQuery.simple(query));
 
     if (!queryResult.finalSuccess()) {
       LOG.error("cache error occurred for window startTime = {} to endTime = {}", request.getStartTimeInclusive(), request.getEndTimeExclusive());
@@ -81,18 +81,17 @@ public class CouchbaseCacheDAO {
 
   public void insertTimeSeriesDataPoint(TimeSeriesDataPoint point) {
 
-    // get or getAndTouch?
-    //JsonDocument doc = bucket.getAndTouch(point.getDocumentKey(), TIMEOUT);
-    JsonDocument doc = bucket.get(point.getDocumentKey());
+    JsonDocument doc = bucket.getAndTouch(point.getDocumentKey(), TIMEOUT);
+    //JsonDocument doc = bucket.get(point.getDocumentKey());
 
     if (doc == null) {
       JsonObject documentBody = CacheUtils.buildDocumentStructure(point);
       doc = JsonDocument.create(point.getDocumentKey(), TIMEOUT, documentBody);
     } else {
-      JsonObject dimensions = ((JsonObject)doc.content().get("dims"));
+      JsonObject dimensions = doc.content().getObject("dims");
       if (dimensions.containsKey(point.getMetricUrnHash()))
         return;
-      dimensions.put(point.getMetricUrnHash(), point.getDataValue());
+      dimensions.put(point.getMetricUrnHash(), point.getDataValue() == null ? "0" : point.getDataValue());
     }
 
     bucket.upsert(doc);

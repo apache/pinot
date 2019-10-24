@@ -108,9 +108,6 @@ public class ThirdEyeResultSetUtils {
           String[] groupKeys;
           String timestamp = null;
           if (hasGroupBy) {
-
-            // TODO: CHANGE THIS TO KEEP TIMESTAMPS
-            //groupKeys = new String[resultSet.getGroupKeyLength() + 1];
             groupKeys = new String[resultSet.getGroupKeyLength()];
 
             for (int grpKeyIdx = 0; grpKeyIdx < resultSet.getGroupKeyLength(); grpKeyIdx++) {
@@ -155,7 +152,7 @@ public class ThirdEyeResultSetUtils {
 
           String[] rowValues = dataMap.get(compositeGroupKey);
           if (rowValues == null) {
-            // BRYAN: add one to include the timestamp, if applicable
+            // add one to include the timestamp, if applicable
             if (timestamp != null) {
               rowValues = new String[numCols + 1];
             } else {

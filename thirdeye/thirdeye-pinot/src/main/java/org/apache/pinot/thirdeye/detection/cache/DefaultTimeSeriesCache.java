@@ -58,17 +58,27 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
     }
 
     List<String[]> rows = new ArrayList<>();
-    TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetDAO.findByDataset(thirdEyeRequest.getDataSource()));
+    String dataset = thirdEyeRequest.getMetricFunctions().get(0).getDataset();
+    TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetDAO.findByDataset(dataset));
     int timeBucketId = 0;
 
     for (TimeSeriesDataPoint dataPoint : cacheResponse.getRows()) {
       String[] row = new String[2];
       row[0] = String.valueOf(timeBucketId++);
       row[1] = dataPoint.getDataValue();
+      rows.add(row);
     }
 
     // ???
-    return new RelationalThirdEyeResponse(thirdEyeRequest, rows, timeSpec);
+    // make a new function that checks the type to return as and makes the corresponding ThirdEyeResponse
+    try {
+      ThirdEyeResponse r = new RelationalThirdEyeResponse(thirdEyeRequest, rows, timeSpec);
+      return r;
+    } catch(Exception e) {
+      System.out.println(":(");
+      return null;
+    }
+    //return new RelationalThirdEyeResponse(thirdEyeRequest, rows, timeSpec);
   }
 
 
@@ -92,7 +102,7 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
     }
 
     if (cacheResponse.isMissingEndSlice(requestSliceEnd)) {
-      // we add one  time granularity to start because the start is inclusive.
+      // we add one time granularity to start because the start is inclusive.
       slice = MetricSlice.from(metricId, cacheResponse.getLastTimestamp() + request.getGroupByTimeGranularity().toMillis(), requestSliceEnd, request.getFilterSet(), request.getGroupByTimeGranularity());
       result = fetchSliceFromSource(slice);
       insertTimeSeriesIntoCache(result);
@@ -126,8 +136,7 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
       String metricUrn = MetricEntity.fromMetric(response.getRequest().getFilterSet().asMap(), metric.getMetricId()).getUrn();
       for (int i = 0; i < response.getNumRowsFor(metric); i++) {
         Map<String, String> row = response.getRow(metric, i);
-
-        TimeSeriesDataPoint dp = new TimeSeriesDataPoint(metricUrn, Long.valueOf(row.get("timestamp")), metric.getMetricId(), row.get(metric.getMetricName()));
+        TimeSeriesDataPoint dp = new TimeSeriesDataPoint(metricUrn, Long.parseLong(row.get("timestamp")), metric.getMetricId(), row.get(metric.toString()));
         executor.execute(() -> this.cacheDAO.insertTimeSeriesDataPoint(dp));
       }
     }

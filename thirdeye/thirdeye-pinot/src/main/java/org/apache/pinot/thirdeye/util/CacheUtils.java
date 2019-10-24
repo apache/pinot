@@ -42,7 +42,7 @@ public class CacheUtils {
 
   public static JsonObject buildDocumentStructure(TimeSeriesDataPoint point) {
     Map<String, String> dims = new HashMap<>();
-    dims.put(point.getMetricUrnHash(), point.getDataValue());
+    dims.put(point.getMetricUrnHash(), point.getDataValue() == null ? "0" : point.getDataValue());
 
     JsonObject body = JsonObject.create()
         .put("time", point.getTimestamp())
@@ -50,5 +50,20 @@ public class CacheUtils {
         .put("dims", dims);
 
     return body;
+  }
+
+  public static String buildQuery(JsonObject parameters) {
+    StringBuilder sb = new StringBuilder("SELECT time, `dims`.`").append(parameters.getString("dimensionKey"))
+        .append("` FROM `")
+        .append(parameters.getString("bucket"))
+        .append("` WHERE metricId = ")
+        .append(parameters.getLong("metricId"))
+        .append(" AND time BETWEEN ")
+        .append(parameters.getLong("start"))
+        .append(" AND ")
+        .append(parameters.getLong("end"))
+        .append(" ORDER BY time ASC");
+
+    return sb.toString();
   }
 }

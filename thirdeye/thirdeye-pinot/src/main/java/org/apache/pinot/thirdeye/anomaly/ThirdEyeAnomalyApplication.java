@@ -155,7 +155,7 @@ public class ThirdEyeAnomalyApplication
         }
         if (config.isAutoload()) {
           autoOnboardService = new AutoOnboardService(config);
-          autoOnboardService.start();
+          //autoOnboardService.start();
         }
         if (config.isHolidayEventsLoader()) {
           holidayEventsLoader =
