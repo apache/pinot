@@ -70,13 +70,13 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.upload.SegmentValidator;
-import org.apache.pinot.controller.api.upload.SegmentValidatorResponse;
 import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
@@ -197,28 +197,34 @@ public class PinotSegmentUploadRestletResource {
       throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST);
     }
 
-    final URI segmentFileURI =
-        ControllerConf.getUriFromPath(StringUtil.join("/", provider.getBaseDataDirURI().toString(),
-            tableName, URLEncoder.encode(segmentName, URL_ENCODING_SCHEME)));
+    final URI segmentFileURI = URIUtils.getUri(provider.getBaseDataDirURI().toString(), tableName, segmentName);
     PinotFS pinotFS = PinotFSFactory.create(provider.getBaseDataDirURI().getScheme());
 
     if (!pinotFS.exists(segmentFileURI)) {
       throw new ControllerApplicationException(LOGGER,
           "Segment " + segmentName + " or table " + tableName + " not found in " + segmentFileURI.toString(), Response.Status.NOT_FOUND);
     }
-    File tmpSegmentFile = new File(StringUtil.join("/", _controllerConf.getLocalTempDir(), tableName,
-        StringUtil.join("_", segmentName, String.valueOf(System.nanoTime()))));
-    pinotFS.copyToLocalFile(segmentFileURI, tmpSegmentFile);
-    // Streaming in the tmp file and delete it afterward.
-    Response.ResponseBuilder builder = Response.ok().entity((StreamingOutput) output -> {
-      try {
-        Files.copy(tmpSegmentFile.toPath(), output);
-      } finally {
-        FileUtils.deleteQuietly(tmpSegmentFile);
-      }
-    });
-    builder.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + tmpSegmentFile.getName());
-    builder.header(HttpHeaders.CONTENT_LENGTH, tmpSegmentFile.length());
+    Response.ResponseBuilder builder = Response.ok();
+    File segmentFile;
+    // If the segment file is local, just use it as the return object; otherwise copy it from remote to local.
+    if (segmentFileURI.getScheme().equals(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
+      segmentFile = new File(provider.getBaseDataDir(), StringUtil.join("/", tableName, segmentName));
+      builder.entity(segmentFile);
+    } else {
+      segmentFile = new File(StringUtil.join("/", _controllerConf.getLocalTempDir(), tableName,
+          StringUtil.join("_", segmentName, String.valueOf(System.nanoTime()))));
+      pinotFS.copyToLocalFile(segmentFileURI, segmentFile);
+      // Streaming in the tmp file and delete it afterward.
+      builder.entity((StreamingOutput) output -> {
+        try {
+          Files.copy(segmentFile.toPath(), output);
+        } finally {
+          FileUtils.deleteQuietly(segmentFile);
+        }
+      });
+    }
+    builder.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + segmentFile.getName());
+    builder.header(HttpHeaders.CONTENT_LENGTH, segmentFile.length());
     return builder.build();
   }
 
