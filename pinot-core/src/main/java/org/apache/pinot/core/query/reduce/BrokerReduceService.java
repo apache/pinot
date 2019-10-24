@@ -53,6 +53,7 @@ import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.common.utils.DataSchema;
@@ -541,6 +542,9 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
             break;
           case STRING:
             function = dataTable::getString;
+            break;
+          case BYTES:
+            function = (row, col) -> BytesUtils.toByteArray(dataTable.getString(row, col));
             break;
           default:
             function = dataTable::getObject;
