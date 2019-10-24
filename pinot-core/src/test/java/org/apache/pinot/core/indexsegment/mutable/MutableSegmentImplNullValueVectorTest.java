@@ -24,7 +24,7 @@ import org.apache.pinot.core.data.readers.JSONRecordReader;
 import org.apache.pinot.core.data.readers.RecordReader;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
-import org.apache.pinot.core.segment.index.readers.PresenceVectorReader;
+import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -37,9 +37,9 @@ import java.util.Collections;
 import java.util.List;
 
 
-public class MutableSegmentImplPresenceVectorTest {
-  private static final String PINOT_SCHEMA_FILE_PATH = "data/test_presence_vector_pinot_schema.json";
-  private static final String DATA_FILE = "data/test_presence_vector_data.json";
+public class MutableSegmentImplNullValueVectorTest {
+  private static final String PINOT_SCHEMA_FILE_PATH = "data/test_null_value_vector_pinot_schema.json";
+  private static final String DATA_FILE = "data/test_null_value_vector_data.json";
   private static CompositeTransformer _recordTransformer;
   private static Schema _schema;
   private static MutableSegmentImpl _mutableSegmentImpl;
@@ -69,16 +69,16 @@ public class MutableSegmentImplPresenceVectorTest {
   }
 
   @Test
-  public void testPresenceVector()
+  public void testNullValueVector()
       throws Exception {
     ColumnDataSource cityIdDataSource = _mutableSegmentImpl.getDataSource("cityid");
     ColumnDataSource descriptionDataSource = _mutableSegmentImpl.getDataSource("description");
-    PresenceVectorReader cityIdPresenceVector = cityIdDataSource.getPresenceVector();
-    PresenceVectorReader descPresenceVector = descriptionDataSource.getPresenceVector();
-    Assert.assertFalse(cityIdPresenceVector.isPresent(0));
-    Assert.assertTrue(cityIdPresenceVector.isPresent(1));
-    Assert.assertTrue(descPresenceVector.isPresent(0));
-    Assert.assertTrue(descPresenceVector.isPresent(1));
+    NullValueVectorReader cityIdNullValueVector = cityIdDataSource.getNullValueVector();
+    NullValueVectorReader descNullValueVector = descriptionDataSource.getNullValueVector();
+    Assert.assertFalse(cityIdNullValueVector.isNull(1));
+    Assert.assertTrue(cityIdNullValueVector.isNull(0));
+    Assert.assertFalse(descNullValueVector.isNull(0));
+    Assert.assertFalse(descNullValueVector.isNull(1));
   }
 
   @Test

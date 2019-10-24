@@ -19,7 +19,7 @@
 package org.apache.pinot.core.segment.index.readers;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.segment.creator.impl.presence.PresenceVectorCreator;
+import org.apache.pinot.core.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -29,8 +29,8 @@ import org.testng.annotations.Test;
 import java.io.File;
 import java.io.IOException;
 
-public class PresenceVectorReaderImplTest {
-    private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "PresenceVectorCreatorTest");
+public class NullValueVectorReaderImplTest {
+    private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "NullValueVectorReaderImplTest");
     private static final String COLUMN_NAME = "test";
 
     @BeforeClass
@@ -39,27 +39,27 @@ public class PresenceVectorReaderImplTest {
             FileUtils.deleteQuietly(TEMP_DIR);
         }
         TEMP_DIR.mkdir();
-        try (PresenceVectorCreator creator = new PresenceVectorCreator(TEMP_DIR, COLUMN_NAME)) {
+        try (NullValueVectorCreator creator = new NullValueVectorCreator(TEMP_DIR, COLUMN_NAME)) {
             for (int i = 0; i < 100; i++) {
                 creator.setNull(i);
             }
         } catch (IOException e) {
-            Assert.fail("Unable to create PresenceVectorCreator", e);
+            Assert.fail("Unable to create NullValueVectorCreator", e);
         }
     }
 
     @Test
-    public void testPresenceVectorReader() {
+    public void testNullValueVectorReader() {
         Assert.assertEquals(TEMP_DIR.list().length, 1);
-        File presenceFile = new File(TEMP_DIR, TEMP_DIR.list()[0]);
+        File nullValueFile = new File(TEMP_DIR, TEMP_DIR.list()[0]);
         try {
-            PinotDataBuffer buffer = PinotDataBuffer.loadBigEndianFile(presenceFile);
-            PresenceVectorReader reader = new PresenceVectorReaderImpl(buffer);
+            PinotDataBuffer buffer = PinotDataBuffer.loadBigEndianFile(nullValueFile);
+            NullValueVectorReader reader = new NullValueVectorReaderImpl(buffer);
             for (int i = 0; i < 100; i++) {
-                Assert.assertFalse(reader.isPresent(i));
+                Assert.assertTrue(reader.isNull(i));
             }
         } catch (IOException e) {
-            Assert.fail("Unable to create PresenceVectorReader from given file", e);
+            Assert.fail("Unable to create NullValueVectorReader from given file", e);
         }
     }
 

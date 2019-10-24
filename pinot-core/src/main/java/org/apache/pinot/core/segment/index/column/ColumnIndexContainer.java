@@ -22,7 +22,7 @@ import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
-import org.apache.pinot.core.segment.index.readers.PresenceVectorReaderImpl;
+import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
 
 
 /**
@@ -53,7 +53,7 @@ public interface ColumnIndexContainer {
 
   /**
    *
-   * @return Get the presence vector for the column, or {@code null} if it does not exist.
+   * @return Get the null value vector for the column, or {@code null} if it does not exist.
    */
-  PresenceVectorReaderImpl getPresenceVector();
+  NullValueVectorReaderImpl getNullValueVector();
 }

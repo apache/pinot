@@ -16,27 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.impl.presence;
+package org.apache.pinot.core.segment.index.readers;
 
-import org.apache.pinot.core.segment.index.readers.PresenceVectorReader;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import java.io.IOException;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * Defines a real-time presence vector to be used in realtime ingestion.
- */
-public class RealtimePresenceVectorReaderWriter implements PresenceVectorReader {
-  private final MutableRoaringBitmap _nullBitmap;
+public class NullValueVectorReaderImpl implements NullValueVectorReader {
 
-  public RealtimePresenceVectorReaderWriter() {
-    _nullBitmap = new MutableRoaringBitmap();
+  ImmutableRoaringBitmap _nullBitmap;
+
+  public NullValueVectorReaderImpl(PinotDataBuffer nullValueVectorBuffer) throws IOException {
+    _nullBitmap = new ImmutableRoaringBitmap(nullValueVectorBuffer.toDirectByteBuffer(0,
+        (int) nullValueVectorBuffer.size()));
   }
 
-  public void setNull(int docId) {
-    _nullBitmap.add(docId);
+  public boolean isNull(int docId) {
+    return _nullBitmap.contains(docId);
   }
 
-  public boolean isPresent(int docId) {
-    return !_nullBitmap.contains(docId);
-  }
 }

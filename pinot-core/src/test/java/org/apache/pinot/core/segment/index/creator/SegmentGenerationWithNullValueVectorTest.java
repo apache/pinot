@@ -39,7 +39,7 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.core.segment.index.readers.PresenceVectorReader;
+import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -51,11 +51,11 @@ import static org.apache.pinot.core.segment.index.creator.RawIndexCreatorTest.ge
 /**
  * Class for testing segment generation with byte[] data type.
  */
-public class SegmentGenerationWithPresenceVectorTest {
+public class SegmentGenerationWithNullValueVectorTest {
   private static final int NUM_ROWS = 10001;
 
   private static final String SEGMENT_DIR_NAME =
-      System.getProperty("java.io.tmpdir") + File.separator + "presenceVectorTest";
+      System.getProperty("java.io.tmpdir") + File.separator + "nullValueVectorTest";
   private static final String SEGMENT_NAME = "testSegment";
 
   private Random _random;
@@ -150,18 +150,18 @@ public class SegmentGenerationWithPresenceVectorTest {
   @Test
   public void test()
       throws Exception {
-    Map<String, PresenceVectorReader> presenceVectorReaderMap = new HashMap<>();
+    Map<String, NullValueVectorReader> nullValueVectorReaderMap = new HashMap<>();
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
 
-      PresenceVectorReader presenceVector = _segment.getDataSource(fieldSpec.getName()).getPresenceVector();
+      NullValueVectorReader nullValueVector = _segment.getDataSource(fieldSpec.getName()).getNullValueVector();
       System.out.println("field = " + fieldSpec.getName());
-      Assert.assertNotNull(presenceVector);
-      presenceVectorReaderMap.put(fieldSpec.getName(), presenceVector);
+      Assert.assertNotNull(nullValueVector);
+      nullValueVectorReaderMap.put(fieldSpec.getName(), nullValueVector);
     }
     for (int i = 0; i < NUM_ROWS; i++) {
       for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
         String colName = fieldSpec.getName();
-        Assert.assertEquals(_actualNullVectorMap.get(colName)[i], !presenceVectorReaderMap.get(colName).isPresent(i));
+        Assert.assertEquals(_actualNullVectorMap.get(colName)[i], nullValueVectorReaderMap.get(colName).isNull(i));
       }
     }
   }

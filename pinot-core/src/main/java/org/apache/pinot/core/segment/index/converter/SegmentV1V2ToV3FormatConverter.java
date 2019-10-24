@@ -143,8 +143,8 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
             copyDictionary(v2DataReader, v3DataWriter, column);
           }
           copyForwardIndex(v2DataReader, v3DataWriter, column);
-          if (v2DataReader.hasIndexFor(column, ColumnIndexType.PRESENCE_VECTOR)) {
-            copyPresenceVector(v2DataReader, v3DataWriter, column);
+          if (v2DataReader.hasIndexFor(column, ColumnIndexType.NULLVALUE_VECTOR)) {
+            copyNullValueVector(v2DataReader, v3DataWriter, column);
           }
         }
 
@@ -192,9 +192,9 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     readCopyBuffers(reader, writer, column, ColumnIndexType.FORWARD_INDEX);
   }
 
-  private void copyPresenceVector(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column)
+  private void copyNullValueVector(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column)
       throws IOException {
-    readCopyBuffers(reader, writer, column, ColumnIndexType.PRESENCE_VECTOR);
+    readCopyBuffers(reader, writer, column, ColumnIndexType.NULLVALUE_VECTOR);
   }
 
   private void copyExistingInvertedIndex(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column)

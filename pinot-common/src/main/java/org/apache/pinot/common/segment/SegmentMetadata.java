@@ -103,7 +103,7 @@ public interface SegmentMetadata {
 
   String getBloomFilterFileName(String column);
 
-  String getPresenceVectorFileName(String column);
+  String getNullValueVectorFileName(String column);
 
   String getCreatorName();
 

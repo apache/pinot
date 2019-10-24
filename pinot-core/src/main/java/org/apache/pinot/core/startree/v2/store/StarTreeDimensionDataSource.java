@@ -27,7 +27,7 @@ import org.apache.pinot.core.operator.blocks.SingleValueBlock;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
-import org.apache.pinot.core.segment.index.readers.PresenceVectorReader;
+import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
@@ -115,7 +115,7 @@ public class StarTreeDimensionDataSource extends DataSource {
   }
 
   @Override
-  public PresenceVectorReader getPresenceVector() {
+  public NullValueVectorReader getNullValueVector() {
     return null;
   }
 

@@ -98,16 +98,16 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer getPresenceVectorBufferFor(String column)
+  public PinotDataBuffer getNullValueVectorBufferFor(String column)
       throws IOException {
-    IndexKey key = new IndexKey(column, ColumnIndexType.PRESENCE_VECTOR);
+    IndexKey key = new IndexKey(column, ColumnIndexType.NULLVALUE_VECTOR);
     return getReadBufferFor(key);
   }
 
   @Override
-  public PinotDataBuffer newPresenceVectorBuffer(String column, long sizeBytes)
+  public PinotDataBuffer newNullValueVectorBuffer(String column, long sizeBytes)
       throws IOException {
-    IndexKey key = new IndexKey(column, ColumnIndexType.PRESENCE_VECTOR);
+    IndexKey key = new IndexKey(column, ColumnIndexType.NULLVALUE_VECTOR);
     return getWriteBufferFor(key, sizeBytes);
   }
 
@@ -176,8 +176,8 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
       case BLOOM_FILTER:
         filename = metadata.getBloomFilterFileName(column);
         break;
-      case PRESENCE_VECTOR:
-        filename = metadata.getPresenceVectorFileName(column);
+      case NULLVALUE_VECTOR:
+        filename = metadata.getNullValueVectorFileName(column);
         break;
       default:
         throw new UnsupportedOperationException("Unknown index type: " + indexType.toString());

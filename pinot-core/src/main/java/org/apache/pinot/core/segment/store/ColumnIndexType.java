@@ -23,7 +23,7 @@ public enum ColumnIndexType {
   FORWARD_INDEX("forward_index"),
   INVERTED_INDEX("inverted_index"),
   BLOOM_FILTER("bloom_filter"),
-  PRESENCE_VECTOR("presence_vector");
+  NULLVALUE_VECTOR("nullvalue_vector");
 
   private final String indexName;
 

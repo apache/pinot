@@ -242,8 +242,8 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
       case BLOOM_FILTER:
         buffer = columnIndexDirectory.getBloomFilterBufferFor(column);
         break;
-      case PRESENCE_VECTOR:
-        buffer = columnIndexDirectory.getPresenceVectorBufferFor(column);
+      case NULLVALUE_VECTOR:
+        buffer = columnIndexDirectory.getNullValueVectorBufferFor(column);
         break;
       default:
         throw new RuntimeException("Unknown index type: " + type.name());
@@ -426,8 +426,8 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
           return columnIndexDirectory.newInvertedIndexBuffer(key.name, sizeBytes);
         case BLOOM_FILTER:
           return columnIndexDirectory.newBloomFilterBuffer(key.name, sizeBytes);
-        case PRESENCE_VECTOR:
-          return columnIndexDirectory.newPresenceVectorBuffer(key.name, sizeBytes);
+        case NULLVALUE_VECTOR:
+          return columnIndexDirectory.newNullValueVectorBuffer(key.name, sizeBytes);
         default:
           throw new RuntimeException("Unknown index type: " + indexType.name() + " for directory: " + segmentDirectory);
       }

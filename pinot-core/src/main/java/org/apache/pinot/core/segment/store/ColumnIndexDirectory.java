@@ -109,12 +109,12 @@ abstract class ColumnIndexDirectory implements Closeable {
 
 
   /**
-   * Get presence vector buffer for a column
+   * Get null value vector buffer for a column
    * @param column column name
    * @return in-memory ByteBuffer like buffer for data
    * @throws IOException
    */
-  public abstract PinotDataBuffer getPresenceVectorBufferFor(String column)
+  public abstract PinotDataBuffer getNullValueVectorBufferFor(String column)
       throws IOException;
 
   /**
@@ -164,7 +164,7 @@ abstract class ColumnIndexDirectory implements Closeable {
    * @return in-memory ByteBuffer like buffer for data
    * @throws IOException
    */
-  public abstract PinotDataBuffer newPresenceVectorBuffer(String column, long sizeBytes)
+  public abstract PinotDataBuffer newNullValueVectorBuffer(String column, long sizeBytes)
       throws IOException;
 
   /**

@@ -114,9 +114,9 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer getPresenceVectorBufferFor(String column)
+  public PinotDataBuffer getNullValueVectorBufferFor(String column)
       throws IOException {
-    return checkAndGetIndexBuffer(column, ColumnIndexType.PRESENCE_VECTOR);
+    return checkAndGetIndexBuffer(column, ColumnIndexType.NULLVALUE_VECTOR);
   }
 
   @Override
@@ -150,9 +150,9 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer newPresenceVectorBuffer(String column, long sizeBytes)
+  public PinotDataBuffer newNullValueVectorBuffer(String column, long sizeBytes)
       throws IOException {
-    return allocNewBufferInternal(column, ColumnIndexType.PRESENCE_VECTOR, sizeBytes, "presence_vector.create");
+    return allocNewBufferInternal(column, ColumnIndexType.NULLVALUE_VECTOR, sizeBytes, "nullvalue_vector.create");
   }
 
   private PinotDataBuffer checkAndGetIndexBuffer(String column, ColumnIndexType type) {

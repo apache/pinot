@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.creator.impl.presence;
+package org.apache.pinot.core.segment.creator.impl.nullvalue;
 
 import org.apache.commons.io.FileUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -28,10 +28,10 @@ import org.testng.annotations.Test;
 import java.io.File;
 import java.io.IOException;
 
-public class PresenceVectorCreatorTest {
-    private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "PresenceVectorCreatorTest");
+public class NullValueVectorCreatorTest {
+    private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "NullValueVectorCreatorTest");
     private static final String COLUMN_NAME = "test";
-    private static final String PRESENCE_FILE = "test.bitmap.presence";
+    private static final String NULL_VALUE_FILE = "test.bitmap.nullvalue";
 
     @BeforeClass
     public void setUp()
@@ -43,8 +43,8 @@ public class PresenceVectorCreatorTest {
     }
 
     @Test
-    public void testPresenceVectorCreation() {
-        try (PresenceVectorCreator creator = new PresenceVectorCreator(TEMP_DIR, COLUMN_NAME)) {
+    public void testNullValueVectorCreation() {
+        try (NullValueVectorCreator creator = new NullValueVectorCreator(TEMP_DIR, COLUMN_NAME)) {
             for (int i = 0; i < 100; i++) {
                 creator.setNull(i);
             }
@@ -53,11 +53,11 @@ public class PresenceVectorCreatorTest {
                 Assert.assertTrue(nullBitmap.contains(i));
             }
         } catch (IOException e) {
-            Assert.fail("Unable to create a valid PresenceVectorCreator object", e);
+            Assert.fail("Unable to create a valid NullValueVectorCreator object", e);
         }
 
         Assert.assertEquals(TEMP_DIR.list().length, 1);
-        Assert.assertEquals(PRESENCE_FILE, TEMP_DIR.list()[0]);
+        Assert.assertEquals(NULL_VALUE_FILE, TEMP_DIR.list()[0]);
     }
 
     @AfterClass

@@ -39,7 +39,7 @@ public class V1Constants {
     public static final String UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION = ".mv.fwd";
     public static final String BITMAP_INVERTED_INDEX_FILE_EXTENSION = ".bitmap.inv";
     public static final String BLOOM_FILTER_FILE_EXTENSION = ".bloom";
-    public static final String PRESENCE_VECTOR_FILE_EXTENSION = ".bitmap.presence";
+    public static final String NULLVALUE_VECTOR_FILE_EXTENSION = ".bitmap.nullvalue";
   }
 
   public static class MetadataKeys {

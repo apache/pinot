@@ -532,8 +532,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
-  public String getPresenceVectorFileName(String column) {
-    return column + V1Constants.Indexes.PRESENCE_VECTOR_FILE_EXTENSION;
+  public String getNullValueVectorFileName(String column) {
+    return column + V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION;
   }
 
   @Nullable

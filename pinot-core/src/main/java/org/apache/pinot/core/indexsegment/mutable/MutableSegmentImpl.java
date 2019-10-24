@@ -37,7 +37,6 @@ import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.metadata.RowMetadata;
 import org.apache.pinot.common.segment.SegmentMetadata;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.indexsegment.IndexSegmentUtils;
@@ -51,12 +50,12 @@ import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
 import org.apache.pinot.core.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
 import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionaryFactory;
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeInvertedIndexReader;
-import org.apache.pinot.core.realtime.impl.presence.RealtimePresenceVectorReaderWriter;
+import org.apache.pinot.core.realtime.impl.nullvalue.RealtimeNullValueVectorReaderWriter;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
-import org.apache.pinot.core.segment.index.readers.PresenceVectorReader;
+import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
@@ -65,7 +64,6 @@ import org.apache.pinot.core.util.FixedIntArray;
 import org.apache.pinot.core.util.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.core.util.IdMap;
 import org.roaringbitmap.IntIterator;
-import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,7 +95,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Map<String, Integer> _maxNumValuesMap = new HashMap<>();
   private final Map<String, RealtimeInvertedIndexReader> _invertedIndexMap = new HashMap<>();
   private final Map<String, BloomFilterReader> _bloomFilterMap = new HashMap<>();
-  private final Map<String, RealtimePresenceVectorReaderWriter> _presenceVectorMap = new HashMap<>();
+  private final Map<String, RealtimeNullValueVectorReaderWriter> _nullValueVectorMap = new HashMap<>();
   private final IdMap<FixedIntArray> _recordIdMap;
   private boolean _aggregateMetrics;
 
@@ -234,7 +232,7 @@ public class MutableSegmentImpl implements MutableSegment {
       }
 
       if (_nullHandlingEnabled) {
-        _presenceVectorMap.put(column, new RealtimePresenceVectorReaderWriter());
+        _nullValueVectorMap.put(column, new RealtimeNullValueVectorReaderWriter());
       }
     }
 
@@ -274,7 +272,7 @@ public class MutableSegmentImpl implements MutableSegment {
       addForwardIndex(row, docId, dictIdMap);
       addInvertedIndex(docId, dictIdMap);
       if (_nullHandlingEnabled) {
-        addPresenceVector(row, docId);
+        addNullValueVector(row, docId);
       }
 
       // Update number of document indexed at last to make the latest record queryable
@@ -395,17 +393,17 @@ public class MutableSegmentImpl implements MutableSegment {
 
   /**
    * Check if the row has any null fields and update the
-   * column presence vectors accordingly
+   * column null value vectors accordingly
    * @param row specifies row being ingested
    * @param docId specified docId for this row
    */
-  private void addPresenceVector(GenericRow row, int docId) {
+  private void addNullValueVector(GenericRow row, int docId) {
     if (!row.hasNullValues()) {
       return;
     }
 
     for (String columnName : row.getNullValueFields()) {
-      _presenceVectorMap.get(columnName).setNull(docId);
+      _nullValueVectorMap.get(columnName).setNull(docId);
     }
   }
 
@@ -483,7 +481,7 @@ public class MutableSegmentImpl implements MutableSegment {
     } else {
       return new ColumnDataSource(fieldSpec, _numDocsIndexed, _maxNumValuesMap.get(columnName),
           _indexReaderWriterMap.get(columnName), _invertedIndexMap.get(columnName), _dictionaryMap.get(columnName),
-          _bloomFilterMap.get(columnName), _presenceVectorMap.get(columnName));
+          _bloomFilterMap.get(columnName), _nullValueVectorMap.get(columnName));
     }
   }
 
@@ -507,9 +505,9 @@ public class MutableSegmentImpl implements MutableSegment {
       reuse.putValue(column, value);
 
       if (_nullHandlingEnabled) {
-        PresenceVectorReader reader = _presenceVectorMap.get(column);
+        NullValueVectorReader reader = _nullValueVectorMap.get(column);
         // If column has null value for this docId, set that accordingly in GenericRow
-        if (reader != null && !reader.isPresent(docId)) {
+        if (reader != null && reader.isNull(docId)) {
           reuse.putDefaultNullValue(column, value);
         }
       }

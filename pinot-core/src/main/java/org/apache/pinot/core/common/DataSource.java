@@ -22,7 +22,7 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
-import org.apache.pinot.core.segment.index.readers.PresenceVectorReader;
+import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 
 
 public abstract class DataSource extends BaseOperator {
@@ -48,8 +48,8 @@ public abstract class DataSource extends BaseOperator {
   public abstract BloomFilterReader getBloomFilter();
 
   /**
-   * Returns presence vector for the data source if exists, or {@code null} if not.
+   * Returns null value vector for the data source if exists, or {@code null} if not.
    */
-  public abstract PresenceVectorReader getPresenceVector();
+  public abstract NullValueVectorReader getNullValueVector();
 
 }

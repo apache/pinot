@@ -16,28 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.impl.presence;
+package org.apache.pinot.core.realtime.impl.nullvalue;
 
-import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
+import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-public class RealtimePresenceVectorReaderWriterTest {
-  private static RealtimePresenceVectorReaderWriter readerWriter = null;
+/**
+ * Defines a real-time null value vector to be used in realtime ingestion.
+ */
+public class RealtimeNullValueVectorReaderWriter implements NullValueVectorReader {
+  private final MutableRoaringBitmap _nullBitmap;
 
-  @BeforeClass
-  public void setup() {
-    readerWriter = new RealtimePresenceVectorReaderWriter();
+  public RealtimeNullValueVectorReaderWriter() {
+    _nullBitmap = new MutableRoaringBitmap();
   }
 
-  @Test
-  public void testRealtimePresenceVectorReaderWriter() {
-    for (int i = 0; i < 100; i++) {
-      readerWriter.setNull(i);
-    }
-    for (int i = 0; i < 100; i++) {
-      Assert.assertFalse(readerWriter.isPresent(i));
-    }
+  public void setNull(int docId) {
+    _nullBitmap.add(docId);
+  }
+
+  public boolean isNull(int docId) {
+    return _nullBitmap.contains(docId);
   }
 }

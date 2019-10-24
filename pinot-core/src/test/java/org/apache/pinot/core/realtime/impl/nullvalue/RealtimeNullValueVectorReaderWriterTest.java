@@ -16,27 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.index.readers;
+package org.apache.pinot.core.realtime.impl.nullvalue;
 
-import com.google.common.base.Joiner;
-
-import java.io.IOException;
-import java.util.Random;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import org.roaringbitmap.RoaringBitmap;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
-public class PresenceVectorReaderImpl implements PresenceVectorReader {
+public class RealtimeNullValueVectorReaderWriterTest {
+  private static RealtimeNullValueVectorReaderWriter readerWriter = null;
 
-  ImmutableRoaringBitmap _nullBitmap;
-
-  public PresenceVectorReaderImpl(PinotDataBuffer presenceVectorBuffer) throws IOException {
-    _nullBitmap = new ImmutableRoaringBitmap(presenceVectorBuffer.toDirectByteBuffer(0, (int) presenceVectorBuffer.size()));
+  @BeforeClass
+  public void setup() {
+    readerWriter = new RealtimeNullValueVectorReaderWriter();
   }
 
-  public boolean isPresent(int docId) {
-    return !_nullBitmap.contains(docId);
+  @Test
+  public void testRealtimeNullValueVectorReaderWriter() {
+    for (int i = 0; i < 100; i++) {
+      readerWriter.setNull(i);
+    }
+    for (int i = 0; i < 100; i++) {
+      Assert.assertTrue(readerWriter.isNull(i));
+    }
   }
-
 }

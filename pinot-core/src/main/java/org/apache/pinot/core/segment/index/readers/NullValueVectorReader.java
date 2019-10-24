@@ -19,18 +19,18 @@
 package org.apache.pinot.core.segment.index.readers;
 
 /**
- * Reader interface to read from an underlying Presence vector. This is
+ * Reader interface to read from an underlying Null value vector. This is
  * primarily used to check if a particular column value corresponding to
  * a document ID is null or not.
  */
-public interface PresenceVectorReader {
+public interface NullValueVectorReader {
 
 
   /**
-   * Check if the given docId is present in the corresponding column
+   * Check if the given docId has a null value in the corresponding column
    *
-   * @param docId specifies ID to check for presence
-   * @return true if docId is present (non null). False otherwise
+   * @param docId specifies ID to check for nullability
+   * @return true if docId is absent (null). False otherwise
    */
-  boolean isPresent(int docId);
+  boolean isNull(int docId);
 }

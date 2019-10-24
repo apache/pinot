@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.creator.impl.presence;
+package org.apache.pinot.core.segment.creator.impl.nullvalue;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -33,20 +33,20 @@ import java.io.IOException;
  * Used to persist the null bitmap on disk. This is used by SegmentCreator
  * while indexing rows.
  */
-public class PresenceVectorCreator implements Closeable {
+public class NullValueVectorCreator implements Closeable {
 
   private MutableRoaringBitmap _nullBitmap;
-  private File _presenceVectorFile;
+  private File _nullValueVectorFile;
 
-  public PresenceVectorCreator(File indexDir, String columnName) {
-    _presenceVectorFile = new File(indexDir, columnName + V1Constants.Indexes.PRESENCE_VECTOR_FILE_EXTENSION);
+  public NullValueVectorCreator(File indexDir, String columnName) {
+    _nullValueVectorFile = new File(indexDir, columnName + V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
     _nullBitmap = new MutableRoaringBitmap();
   }
 
   @Override
   public void close()
       throws IOException {
-    try (DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(_presenceVectorFile))) {
+    try (DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(_nullValueVectorFile))) {
       _nullBitmap.serialize(outputStream);
     }
   }
