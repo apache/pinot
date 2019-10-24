@@ -157,7 +157,7 @@ public class BenchmarkCombineGroupBy {
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public void concurrentIndexedTableForCombineGroupBy() throws InterruptedException, ExecutionException, TimeoutException {
 
-    int capacity = 200_000;//GroupByUtils.getTableCapacity(TOP_N);
+    int capacity = GroupByUtils.getTableCapacity(TOP_N);
 
     // make 1 concurrent table
     IndexedTable concurrentIndexedTable =
@@ -184,7 +184,7 @@ public class BenchmarkCombineGroupBy {
       future.get(30, TimeUnit.SECONDS);
     }
 
-    concurrentIndexedTable.finish(false);
+    concurrentIndexedTable.finish(true);
   }
 
 

@@ -255,7 +255,7 @@ public class IndexedTableResizerTest {
    * Tests the sort function for ordered resizer
    */
   @Test
-  public void testSortRecordsMap() {
+  public void testResizeAndSortRecordsMap() {
     List<Record> sortedRecords;
     int[] order;
 
@@ -268,6 +268,15 @@ public class IndexedTableResizerTest {
     sortedRecords = _indexedTableResizer.resizeAndSortRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(sortedRecords.size(), trimToSize);
     order = new int[]{0, 1};
+    for (int i = 0; i < order.length; i++) {
+      Assert.assertEquals(sortedRecords.get(i), records.get(order[i]));
+    }
+
+    // d1 asc - trim to 1
+    records.forEach(k -> recordsMap.put(k.getKey(), k));
+    sortedRecords = _indexedTableResizer.resizeAndSortRecordsMap(recordsMap, 1);
+    Assert.assertEquals(sortedRecords.size(), 1);
+    order = new int[]{0};
     for (int i = 0; i < order.length; i++) {
       Assert.assertEquals(sortedRecords.get(i), records.get(order[i]));
     }
@@ -287,6 +296,15 @@ public class IndexedTableResizerTest {
       Assert.assertEquals(sortedRecords.get(i), records.get(order[i]));
     }
 
+    // d1 asc, d3 desc (tie breaking with 2nd comparator) - trim 1
+    records.forEach(k -> recordsMap.put(k.getKey(), k));
+    sortedRecords = _indexedTableResizer.resizeAndSortRecordsMap(recordsMap, 1);
+    Assert.assertEquals(sortedRecords.size(), 1);
+    order = new int[]{0};
+    for (int i = 0; i < order.length; i++) {
+      Assert.assertEquals(sortedRecords.get(i), records.get(order[i]));
+    }
+
     // d1 asc, sum(m1) desc, max(m2) desc
     sel1.setColumn("d1");
     sel1.setIsAsc(true);
@@ -300,6 +318,15 @@ public class IndexedTableResizerTest {
     sortedRecords = _indexedTableResizer.resizeAndSortRecordsMap(recordsMap, trimToSize);
     Assert.assertEquals(sortedRecords.size(), trimToSize);
     order = new int[]{0, 1, 2};
+    for (int i = 0; i < order.length; i++) {
+      Assert.assertEquals(sortedRecords.get(i), records.get(order[i]));
+    }
+
+    // trim 1
+    records.forEach(k -> recordsMap.put(k.getKey(), k));
+    sortedRecords = _indexedTableResizer.resizeAndSortRecordsMap(recordsMap, 1);
+    Assert.assertEquals(sortedRecords.size(), 1);
+    order = new int[]{0};
     for (int i = 0; i < order.length; i++) {
       Assert.assertEquals(sortedRecords.get(i), records.get(order[i]));
     }
