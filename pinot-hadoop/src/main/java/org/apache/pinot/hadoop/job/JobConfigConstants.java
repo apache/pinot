@@ -59,4 +59,5 @@ public class JobConfigConstants {
   // This setting should be used if you will generate less # of segments after
   // push. In preprocessing, this is likely because we resize segments.
   public static final String DELETE_EXTRA_SEGMENTS = "delete.extra.segments";
+  public static final String BOOTSTRAP_JOB = "job.bootstrap";
 }

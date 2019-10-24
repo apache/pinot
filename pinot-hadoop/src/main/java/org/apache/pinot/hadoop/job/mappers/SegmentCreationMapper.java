@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -31,6 +32,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
@@ -66,6 +68,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   protected String _rawTableName;
   protected Schema _schema;
   protected SegmentNameGenerator _segmentNameGenerator;
+  protected boolean _bootstrapJob = false;
 
   // Optional
   protected TableConfig _tableConfig;
@@ -87,6 +90,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     _jobConf = context.getConfiguration();
     logConfigurations();
 
+    _bootstrapJob = _jobConf.getBoolean(JobConfigConstants.BOOTSTRAP_JOB, false);
     _rawTableName = _jobConf.get(JobConfigConstants.SEGMENT_TABLE_NAME);
     _schema = Schema.fromString(_jobConf.get(JobConfigConstants.SCHEMA));
 
@@ -251,12 +255,38 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
         DataSize.fromBytes(uncompressedSegmentSize), DataSize.fromBytes(compressedSegmentSize));
 
     Path hdfsSegmentTarFile = new Path(_hdfsSegmentTarDir, segmentTarFileName);
+    if (_bootstrapJob) {
+      Path bootstrapOutputPath =
+          getBootstrapOutputPath(new Path(_jobConf.get(JobConfigConstants.PATH_TO_INPUT)).toUri(),
+              hdfsInputFile.toUri(), _hdfsSegmentTarDir);
+      if (bootstrapOutputPath != null) {
+        hdfsSegmentTarFile = new Path(bootstrapOutputPath, segmentTarFileName);
+      }
+    }
     _logger.info("Copying segment tar file from: {} to: {}", localSegmentTarFile, hdfsSegmentTarFile);
     FileSystem.get(hdfsSegmentTarFile.toUri(), _jobConf).copyFromLocalFile(true, true, new Path(localSegmentTarFile.getAbsolutePath()), hdfsSegmentTarFile);
 
     context.write(new LongWritable(sequenceId), new Text(segmentTarFileName));
     _logger.info("Finish generating segment: {} with HDFS input file: {}, sequence id: {}", segmentName, hdfsInputFile,
         sequenceId);
+  }
+
+  /**
+   * Generate an output directory path for bootstrap mode.
+   * This method will compute the relative path based on `inputFile` and `baseInputDir`,
+   * then apply only the directory part of relative path to `outputDir`.
+   * E.g.
+   *    baseInputDir = "/path/to/input"
+   *    inputFile = "/path/to/input/a/b/c/d.avro"
+   *    outputDir = "/path/to/output"
+   *    getBootstrapOutputPath(baseInputDir, inputFile, outputDir) = /path/to/output/a/b/c
+   */
+  protected static Path getBootstrapOutputPath(URI baseInputDir, URI inputFile, Path outputDir) {
+    URI relativePath = baseInputDir.relativize(inputFile);
+    if (relativePath.getPath().length() > 0) {
+      return new Path(outputDir, relativePath.getPath()).getParent();
+    }
+    return null;
   }
 
   protected FileFormat getFileFormat(String fileName) {
