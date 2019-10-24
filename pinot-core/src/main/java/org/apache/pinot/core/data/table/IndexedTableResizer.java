@@ -39,7 +39,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
  */
 class IndexedTableResizer {
 
-  private List<OrderByInfo> _orderByInfos;
+  private ComparableExtractor[] _comparableExtractors;
   private Comparator<IntermediateRecord> _intermediateRecordComparator;
   private int _numOrderBy;
 
@@ -49,8 +49,11 @@ class IndexedTableResizer {
     int numKeyColumns = dataSchema.size() - numAggregations;
 
     Map<String, Integer> keyIndexMap = new HashMap<>();
+    Map<String, DataSchema.ColumnDataType> keyColumnDataTypeMap = new HashMap<>();
     for (int i = 0; i < numKeyColumns; i++) {
-      keyIndexMap.put(dataSchema.getColumnName(i), i);
+      String columnName = dataSchema.getColumnName(i);
+      keyIndexMap.put(columnName, i);
+      keyColumnDataTypeMap.put(columnName, dataSchema.getColumnDataType(i));
     }
 
     Map<String, Integer> aggregationColumnToIndex = new HashMap<>();
@@ -63,7 +66,7 @@ class IndexedTableResizer {
     }
 
     _numOrderBy = orderBy.size();
-    _orderByInfos = new ArrayList<>(_numOrderBy);
+    _comparableExtractors = new ComparableExtractor[_numOrderBy];
     Comparator[] comparators = new Comparator[_numOrderBy];
 
     for (int i = 0; i < _numOrderBy; i++) {
@@ -72,10 +75,19 @@ class IndexedTableResizer {
 
       if (keyIndexMap.containsKey(column)) {
         int index = keyIndexMap.get(column);
-        _orderByInfos.add(createOrderByInfoForKeyColumn(index));
+        DataSchema.ColumnDataType columnDataType = keyColumnDataTypeMap.get(column);
+        _comparableExtractors[i] = new KeyColumnExtractor(index, columnDataType);
       } else if (aggregationColumnToIndex.containsKey(column)) {
         int index = aggregationColumnToIndex.get(column);
-        _orderByInfos.add(createOrderByInfoForAggregationColumn(index, aggregationColumnToInfo.get(column)));
+        AggregationInfo aggregationInfo = aggregationColumnToInfo.get(column);
+        AggregationFunction aggregationFunction =
+            AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction();
+
+        if (aggregationFunction.isIntermediateResultComparable()) {
+          _comparableExtractors[i] = new ComparableAggregationColumnExtractor(index, aggregationFunction);
+        } else {
+          _comparableExtractors[i] = new NonComparableAggregationColumnExtractor(index, aggregationFunction);
+        }
       } else {
         throw new IllegalStateException("Could not find column " + column + " in data schema");
       }
@@ -107,25 +119,8 @@ class IndexedTableResizer {
   @VisibleForTesting
   IntermediateRecord getIntermediateRecord(Record record) {
     Comparable[] intermediateRecordValues = new Comparable[_numOrderBy];
-
-    Object[] keyColumns = record.getKey().getColumns();
-    Object[] aggregationColumns = record.getValues();
     for (int i = 0; i < _numOrderBy; i++) {
-      OrderByInfo orderByInfo = _orderByInfos.get(i);
-      Comparable comparable;
-      if (orderByInfo.getOrderByType().equals(OrderByType.KEY_COLUMN)) {
-        Object keyColumn = keyColumns[orderByInfo.getIndex()];
-        comparable = (Comparable) keyColumn; // FIXME: is this the right way to get Comparable? will it work for BYTES?
-      } else {
-        Object aggregationColumn = aggregationColumns[orderByInfo.getIndex()];
-        AggregationFunction aggregationFunction = orderByInfo.getAggregationFunction();
-        if (!aggregationFunction.isIntermediateResultComparable()) {
-          comparable = aggregationFunction.extractFinalResult(aggregationColumn);
-        } else {
-          comparable = (Comparable) aggregationColumn;
-        }
-      }
-      intermediateRecordValues[i] = comparable;
+      intermediateRecordValues[i] = _comparableExtractors[i].extract(record);
     }
     return new IntermediateRecord(record.getKey(), intermediateRecordValues);
   }
@@ -238,49 +233,64 @@ class IndexedTableResizer {
     }
   }
 
-  /**
-   * Enum to differentiate between different types of order by
-   * Order by can be on the key column (group by values or distinct), or on the aggregation column
-   */
-  private enum OrderByType {
-    KEY_COLUMN, // order by on a key column (e.g. group by or distinct)
-    AGGREGATION_COLUMN // order by on aggregation (e.g. aggregations in aggregation only or group by)
+  private static abstract class ComparableExtractor {
+    abstract Comparable extract(Record record);
   }
 
   /**
-   * Defines the information needed for one SelectionSort of an order by clause
+   * Extractor for key column
    */
-  private static class OrderByInfo {
-    final OrderByType _orderByType;
-    final int _index; // if orderByType = KEY_COLUMN, index in the Record::key, else index in the Record::value
-    final AggregationFunction _aggregationFunction; // required if orderByType = AGGREGATION_COLUMN
+  private static class KeyColumnExtractor extends ComparableExtractor {
+    final int _index;
+    final DataSchema.ColumnDataType _columnDataType;
 
-    OrderByInfo(OrderByType orderByType, int index, AggregationFunction aggregationFunction) {
-      _orderByType = orderByType;
+    KeyColumnExtractor(int index, DataSchema.ColumnDataType columnDataType) {
+      _index = index;
+      _columnDataType = columnDataType;
+    }
+
+    @Override
+    Comparable extract(Record record) {
+      Object column = record.getKey().getColumns()[_index];
+      return (Comparable) column; // FIXME: is this the right way to get Comparable for key column? will it work for BYTES?
+    }
+  }
+
+  /**
+   * Extractor for aggregation column with comparable intermediate result
+   */
+  private static class ComparableAggregationColumnExtractor extends ComparableExtractor {
+    final int _index;
+    final AggregationFunction _aggregationFunction;
+
+    ComparableAggregationColumnExtractor(int index, AggregationFunction aggregationFunction) {
       _index = index;
       _aggregationFunction = aggregationFunction;
     }
 
-    OrderByType getOrderByType() {
-      return _orderByType;
-    }
-
-    int getIndex() {
-      return _index;
-    }
-
-    AggregationFunction getAggregationFunction() {
-      return _aggregationFunction;
+    @Override
+    Comparable extract(Record record) {
+      Object aggregationColumn = record.getValues()[_index];
+      return (Comparable) aggregationColumn;
     }
   }
 
-  private OrderByInfo createOrderByInfoForKeyColumn(int index) {
-    return new OrderByInfo(OrderByType.KEY_COLUMN, index, null);
-  }
+  /**
+   * Extractor for aggregation column with non-comparable intermediate result
+   */
+  private static class NonComparableAggregationColumnExtractor extends ComparableExtractor {
+    final int _index;
+    final AggregationFunction _aggregationFunction;
 
-  private OrderByInfo createOrderByInfoForAggregationColumn(int index, AggregationInfo aggregationInfo) {
-    AggregationFunction aggregationFunction =
-        AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction();
-    return new OrderByInfo(OrderByType.AGGREGATION_COLUMN, index, aggregationFunction);
+    NonComparableAggregationColumnExtractor(int index, AggregationFunction aggregationFunction) {
+      _index = index;
+      _aggregationFunction = aggregationFunction;
+    }
+
+    @Override
+    Comparable extract(Record record) {
+      Object aggregationColumn = record.getValues()[_index];
+      return _aggregationFunction.extractFinalResult(aggregationColumn);
+    }
   }
 }
