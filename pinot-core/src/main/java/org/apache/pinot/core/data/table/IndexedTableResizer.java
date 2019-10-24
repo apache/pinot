@@ -31,7 +31,6 @@ import java.util.function.Function;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 
@@ -51,11 +50,9 @@ class IndexedTableResizer {
     int numKeyColumns = dataSchema.size() - numAggregations;
 
     Map<String, Integer> keyIndexMap = new HashMap<>();
-    Map<String, DataSchema.ColumnDataType> keyColumnDataTypeMap = new HashMap<>();
     for (int i = 0; i < numKeyColumns; i++) {
       String columnName = dataSchema.getColumnName(i);
       keyIndexMap.put(columnName, i);
-      keyColumnDataTypeMap.put(columnName, dataSchema.getColumnDataType(i));
     }
 
     Map<String, Integer> aggregationColumnToIndex = new HashMap<>();
@@ -77,8 +74,7 @@ class IndexedTableResizer {
 
       if (keyIndexMap.containsKey(column)) {
         int index = keyIndexMap.get(column);
-        DataSchema.ColumnDataType columnDataType = keyColumnDataTypeMap.get(column);
-        _orderByValueExtractors[i] = new KeyColumnExtractor(index, columnDataType);
+        _orderByValueExtractors[i] = new KeyColumnExtractor(index);
       } else if (aggregationColumnToIndex.containsKey(column)) {
         int index = aggregationColumnToIndex.get(column);
         AggregationInfo aggregationInfo = aggregationColumnToInfo.get(column);
@@ -242,23 +238,15 @@ class IndexedTableResizer {
    */
   private static class KeyColumnExtractor extends OrderByValueExtractor {
     final int _index;
-    final DataSchema.ColumnDataType _columnDataType;
-    final Function<Object, Comparable> _convertorFunction;
 
-    KeyColumnExtractor(int index, DataSchema.ColumnDataType columnDataType) {
+    KeyColumnExtractor(int index) {
       _index = index;
-      _columnDataType = columnDataType;
-      if (_columnDataType.equals(DataSchema.ColumnDataType.BYTES)) {
-        _convertorFunction = o -> new ByteArray((byte[]) o);
-      } else {
-        _convertorFunction = o -> (Comparable) o;
-      }
     }
 
     @Override
     Comparable extract(Record record) {
       Object keyColumn = record.getKey().getColumns()[_index];
-      return _convertorFunction.apply(keyColumn);
+      return (Comparable) keyColumn;
     }
   }
 

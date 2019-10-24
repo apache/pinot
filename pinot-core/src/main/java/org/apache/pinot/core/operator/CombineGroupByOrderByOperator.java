@@ -237,7 +237,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
         function = Double::valueOf;
         break;
       case BYTES:
-        function = BytesUtils::toBytes;
+        function = BytesUtils::toByteArray;
         break;
       case STRING:
       default:
