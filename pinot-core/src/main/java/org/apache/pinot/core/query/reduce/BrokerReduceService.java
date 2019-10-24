@@ -518,7 +518,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy, DataSchema dataSchema,
       Map<ServerInstance, DataTable> dataTableMap) {
 
-    int indexedTableCapacity = GroupByUtils.getTableCapacity((int) groupBy.getTopN());
+    int indexedTableCapacity = GroupByUtils.getTableCapacity(groupBy, orderBy);
     IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, aggregationInfos, orderBy, indexedTableCapacity);
 
     for (DataTable dataTable : dataTableMap.values()) {

@@ -39,6 +39,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.request.AggregationInfo;
+import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
@@ -79,6 +80,7 @@ public class BenchmarkCombineGroupBy {
 
   private DataSchema _dataSchema;
   private List<AggregationInfo> _aggregationInfos;
+  private GroupBy _groupBy;
   private AggregationFunction[] _aggregationFunctions;
   private List<SelectionSort> _orderBy;
   private int _numAggregationFunctions;
@@ -126,6 +128,10 @@ public class BenchmarkCombineGroupBy {
       _aggregationFunctions[i] = AggregationFunctionFactory.getAggregationFunction(_aggregationInfos.get(i), null);
     }
 
+    _groupBy = new GroupBy();
+    _groupBy.setTopN(TOP_N);
+    _groupBy.setExpressions(Lists.newArrayList("d1", "d2"));
+
     SelectionSort orderBy = new SelectionSort();
     orderBy.setColumn("sum(m1)");
     orderBy.setIsAsc(true);
@@ -157,7 +163,7 @@ public class BenchmarkCombineGroupBy {
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public void concurrentIndexedTableForCombineGroupBy() throws InterruptedException, ExecutionException, TimeoutException {
 
-    int capacity = GroupByUtils.getTableCapacity(TOP_N);
+    int capacity = GroupByUtils.getTableCapacity(_groupBy, _orderBy);
 
     // make 1 concurrent table
     IndexedTable concurrentIndexedTable =
@@ -184,7 +190,7 @@ public class BenchmarkCombineGroupBy {
       future.get(30, TimeUnit.SECONDS);
     }
 
-    concurrentIndexedTable.finish(true);
+    concurrentIndexedTable.finish(false);
   }
 
 

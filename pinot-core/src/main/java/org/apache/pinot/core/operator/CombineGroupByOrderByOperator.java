@@ -77,7 +77,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
     _executorService = executorService;
     _timeOutMs = timeOutMs;
     _initLock = new ReentrantLock();
-    _indexedTableCapacity = GroupByUtils.getTableCapacity((int) brokerRequest.getGroupBy().getTopN());
+    _indexedTableCapacity = GroupByUtils.getTableCapacity(brokerRequest.getGroupBy(), brokerRequest.getOrderBy());
   }
 
   /**
