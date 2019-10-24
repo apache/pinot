@@ -25,7 +25,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 public class NullValueVectorReaderImpl implements NullValueVectorReader {
 
-  ImmutableRoaringBitmap _nullBitmap;
+  private final ImmutableRoaringBitmap _nullBitmap;
 
   public NullValueVectorReaderImpl(PinotDataBuffer nullValueVectorBuffer) throws IOException {
     _nullBitmap = new ImmutableRoaringBitmap(nullValueVectorBuffer.toDirectByteBuffer(0,

@@ -29,43 +29,40 @@ import org.testng.annotations.Test;
 import java.io.File;
 import java.io.IOException;
 
+
 public class NullValueVectorReaderImplTest {
-    private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "NullValueVectorReaderImplTest");
-    private static final String COLUMN_NAME = "test";
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "NullValueVectorReaderImplTest");
+  private static final String COLUMN_NAME = "test";
 
-    @BeforeClass
-    public void setup() {
-        if (TEMP_DIR.exists()) {
-            FileUtils.deleteQuietly(TEMP_DIR);
-        }
-        TEMP_DIR.mkdir();
-        try (NullValueVectorCreator creator = new NullValueVectorCreator(TEMP_DIR, COLUMN_NAME)) {
-            for (int i = 0; i < 100; i++) {
-                creator.setNull(i);
-            }
-        } catch (IOException e) {
-            Assert.fail("Unable to create NullValueVectorCreator", e);
-        }
+  @BeforeClass
+  public void setup()
+      throws IOException {
+    if (TEMP_DIR.exists()) {
+      FileUtils.deleteQuietly(TEMP_DIR);
     }
+    TEMP_DIR.mkdir();
+    NullValueVectorCreator creator = new NullValueVectorCreator(TEMP_DIR, COLUMN_NAME);
+    for (int i = 0; i < 100; i++) {
+      creator.setNull(i);
+    }
+    creator.seal();
+  }
 
-    @Test
-    public void testNullValueVectorReader() {
-        Assert.assertEquals(TEMP_DIR.list().length, 1);
-        File nullValueFile = new File(TEMP_DIR, TEMP_DIR.list()[0]);
-        try {
-            PinotDataBuffer buffer = PinotDataBuffer.loadBigEndianFile(nullValueFile);
-            NullValueVectorReader reader = new NullValueVectorReaderImpl(buffer);
-            for (int i = 0; i < 100; i++) {
-                Assert.assertTrue(reader.isNull(i));
-            }
-        } catch (IOException e) {
-            Assert.fail("Unable to create NullValueVectorReader from given file", e);
-        }
+  @Test
+  public void testNullValueVectorReader()
+      throws IOException {
+    Assert.assertEquals(TEMP_DIR.list().length, 1);
+    File nullValueFile = new File(TEMP_DIR, TEMP_DIR.list()[0]);
+    PinotDataBuffer buffer = PinotDataBuffer.loadBigEndianFile(nullValueFile);
+    NullValueVectorReader reader = new NullValueVectorReaderImpl(buffer);
+    for (int i = 0; i < 100; i++) {
+      Assert.assertTrue(reader.isNull(i));
     }
+  }
 
-    @AfterClass
-    public void tearDown()
-            throws Exception {
-        FileUtils.deleteDirectory(TEMP_DIR);
-    }
+  @AfterClass
+  public void tearDown()
+      throws Exception {
+    FileUtils.deleteDirectory(TEMP_DIR);
+  }
 }

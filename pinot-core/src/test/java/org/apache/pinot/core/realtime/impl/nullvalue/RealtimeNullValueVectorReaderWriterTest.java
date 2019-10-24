@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.realtime.impl.nullvalue;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -25,6 +28,8 @@ import org.testng.annotations.Test;
 
 public class RealtimeNullValueVectorReaderWriterTest {
   private static RealtimeNullValueVectorReaderWriter readerWriter = null;
+  private static final Random random = new Random(System.currentTimeMillis());
+  private static final int MAX_DOC_ID = 10000;
 
   @BeforeClass
   public void setup() {
@@ -33,11 +38,14 @@ public class RealtimeNullValueVectorReaderWriterTest {
 
   @Test
   public void testRealtimeNullValueVectorReaderWriter() {
+    List<Integer> randomdocIds = new ArrayList<>();
     for (int i = 0; i < 100; i++) {
-      readerWriter.setNull(i);
+      int randomDocId = random.nextInt(MAX_DOC_ID);
+      readerWriter.setNull(randomDocId);
+      randomdocIds.add(randomDocId);
     }
     for (int i = 0; i < 100; i++) {
-      Assert.assertTrue(readerWriter.isNull(i));
+      Assert.assertTrue(readerWriter.isNull(randomdocIds.get(i)));
     }
   }
 }

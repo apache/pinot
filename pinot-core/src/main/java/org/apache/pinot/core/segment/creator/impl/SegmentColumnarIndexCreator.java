@@ -312,6 +312,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     for (InvertedIndexCreator invertedIndexCreator : _invertedIndexCreatorMap.values()) {
       invertedIndexCreator.seal();
     }
+    for (NullValueVectorCreator nullValueVectorCreator : _nullValueVectorCreatorMap.values()) {
+      nullValueVectorCreator.seal();
+    }
     writeMetadata();
   }
 

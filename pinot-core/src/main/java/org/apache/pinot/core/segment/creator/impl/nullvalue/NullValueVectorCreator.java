@@ -43,12 +43,15 @@ public class NullValueVectorCreator implements Closeable {
     _nullBitmap = new MutableRoaringBitmap();
   }
 
-  @Override
-  public void close()
+  public void seal()
       throws IOException {
     try (DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(_nullValueVectorFile))) {
       _nullBitmap.serialize(outputStream);
     }
+  }
+
+  @Override
+  public void close() {
   }
 
   @VisibleForTesting

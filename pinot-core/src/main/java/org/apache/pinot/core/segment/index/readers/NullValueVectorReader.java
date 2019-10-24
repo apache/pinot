@@ -25,7 +25,6 @@ package org.apache.pinot.core.segment.index.readers;
  */
 public interface NullValueVectorReader {
 
-
   /**
    * Check if the given docId has a null value in the corresponding column
    *

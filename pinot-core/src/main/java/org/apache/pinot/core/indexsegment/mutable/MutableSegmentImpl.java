@@ -272,7 +272,7 @@ public class MutableSegmentImpl implements MutableSegment {
       addForwardIndex(row, docId, dictIdMap);
       addInvertedIndex(docId, dictIdMap);
       if (_nullHandlingEnabled) {
-        addNullValueVector(row, docId);
+        handleNullValues(row, docId);
       }
 
       // Update number of document indexed at last to make the latest record queryable
@@ -397,7 +397,7 @@ public class MutableSegmentImpl implements MutableSegment {
    * @param row specifies row being ingested
    * @param docId specified docId for this row
    */
-  private void addNullValueVector(GenericRow row, int docId) {
+  private void handleNullValues(GenericRow row, int docId) {
     if (!row.hasNullValues()) {
       return;
     }
@@ -507,7 +507,7 @@ public class MutableSegmentImpl implements MutableSegment {
       if (_nullHandlingEnabled) {
         NullValueVectorReader reader = _nullValueVectorMap.get(column);
         // If column has null value for this docId, set that accordingly in GenericRow
-        if (reader != null && reader.isNull(docId)) {
+        if (reader.isNull(docId)) {
           reuse.putDefaultNullValue(column, value);
         }
       }
