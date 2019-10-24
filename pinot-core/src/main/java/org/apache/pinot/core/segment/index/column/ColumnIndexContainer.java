@@ -47,13 +47,13 @@ public interface ColumnIndexContainer {
 
   /**
    *
-   * @return Get the bloom filter for the column if it exists else  {@code null}
+   * @return Get the bloom filter for the column, or {@code null} if it does not exist.
    */
   BloomFilterReader getBloomFilter();
 
   /**
    *
-   * @return Get the presence vector for the column if it exists else  {@code null}
+   * @return Get the presence vector for the column, or {@code null} if it does not exist.
    */
   PresenceVectorReaderImpl getPresenceVector();
 }

@@ -242,7 +242,9 @@ public class IndexingConfig {
     _varLengthDictionaryColumns = varLengthDictionaryColumns;
   }
 
-  public boolean isNullHandlingEnabled() { return _nullHandlingEnabled; }
+  public boolean isNullHandlingEnabled() {
+    return _nullHandlingEnabled;
+  }
 
   public void setNullHandlingEnabled(boolean nullHandlingEnabled) {
     _nullHandlingEnabled = nullHandlingEnabled;

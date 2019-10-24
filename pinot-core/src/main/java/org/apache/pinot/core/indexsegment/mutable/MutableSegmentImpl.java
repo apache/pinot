@@ -404,11 +404,8 @@ public class MutableSegmentImpl implements MutableSegment {
       return;
     }
 
-    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
-      String columnName = fieldSpec.getName();
-      if (row.isNullValue(columnName)) {
-        _presenceVectorMap.get(columnName).setNull(docId);
-      }
+    for (String columnName : row.getNullValueFields()) {
+      _presenceVectorMap.get(columnName).setNull(docId);
     }
   }
 

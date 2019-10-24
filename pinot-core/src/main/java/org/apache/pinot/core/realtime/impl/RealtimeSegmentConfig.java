@@ -47,17 +47,6 @@ public class RealtimeSegmentConfig {
       Set<String> invertedIndexColumns, RealtimeSegmentZKMetadata realtimeSegmentZKMetadata,
       boolean offHeap, PinotDataBufferMemoryManager memoryManager,
       RealtimeSegmentStatsHistory statsHistory, SegmentPartitionConfig segmentPartitionConfig,
-      boolean aggregateMetrics) {
-    this(segmentName, streamName, schema, capacity, avgNumMultiValues, noDictionaryColumns, varLengthDictionaryColumns,
-        invertedIndexColumns, realtimeSegmentZKMetadata, offHeap, memoryManager, statsHistory, segmentPartitionConfig,
-        aggregateMetrics, false);
-  }
-
-  private RealtimeSegmentConfig(String segmentName, String streamName, Schema schema, int capacity,
-      int avgNumMultiValues, Set<String> noDictionaryColumns, Set<String> varLengthDictionaryColumns,
-      Set<String> invertedIndexColumns, RealtimeSegmentZKMetadata realtimeSegmentZKMetadata,
-      boolean offHeap, PinotDataBufferMemoryManager memoryManager,
-      RealtimeSegmentStatsHistory statsHistory, SegmentPartitionConfig segmentPartitionConfig,
       boolean aggregateMetrics, boolean nullHandlingEnabled) {
     _segmentName = segmentName;
     _streamName = streamName;
@@ -132,7 +121,9 @@ public class RealtimeSegmentConfig {
     return _aggregateMetrics;
   }
 
-  public boolean isNullHandlingEnabled() { return _nullHandlingEnabled; }
+  public boolean isNullHandlingEnabled() {
+    return _nullHandlingEnabled;
+  }
 
   public static class Builder {
     private String _segmentName;
@@ -222,10 +213,6 @@ public class RealtimeSegmentConfig {
     public Builder setAggregateMetrics(boolean aggregateMetrics) {
       _aggregateMetrics = aggregateMetrics;
       return this;
-    }
-
-    public boolean isNullHandlingEnabled() {
-      return _nullHandlingEnabled;
     }
 
     public Builder setNullHandlingEnabled(boolean nullHandlingEnabled) {
