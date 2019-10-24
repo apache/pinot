@@ -47,6 +47,7 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
   private boolean _isAppend = false;
   private NormalizedDateSegmentNameGenerator _normalizedDateSegmentNameGenerator;
   private String _sampleNormalizedTimeColumnValue;
+  private boolean _firstInstanceOfMismatchedTime = true;
 
   @Override
   public void setup(final Context context) {
@@ -91,10 +92,11 @@ public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, N
       String timeColumnValue = record.datum().get(_timeColumn).toString();
       String normalizedTimeColumnValue = _normalizedDateSegmentNameGenerator.getNormalizedDate(timeColumnValue);
 
-      if (!normalizedTimeColumnValue.equals(_sampleNormalizedTimeColumnValue)) {
+      if (!normalizedTimeColumnValue.equals(_sampleNormalizedTimeColumnValue) && _firstInstanceOfMismatchedTime) {
+        _firstInstanceOfMismatchedTime = false;
         // TODO: Create a custom exception and gracefully catch this exception outside, changing what the path to input
         // into segment creation should be
-        LOGGER.error("This segment contains multiple time units. Sample is {}, current is {}", _sampleNormalizedTimeColumnValue, normalizedTimeColumnValue);
+        LOGGER.warn("This segment contains multiple time units. Sample is {}, current is {}", _sampleNormalizedTimeColumnValue, normalizedTimeColumnValue);
       }
     }
 
