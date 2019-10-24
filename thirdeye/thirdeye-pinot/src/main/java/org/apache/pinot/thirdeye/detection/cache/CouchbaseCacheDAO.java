@@ -10,7 +10,6 @@ import com.couchbase.client.java.query.N1qlQueryResult;
 import com.couchbase.client.java.query.N1qlQueryRow;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.thirdeye.auto.onboard.AutoOnboardUtility;
 import org.apache.pinot.thirdeye.util.CacheUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +17,7 @@ import org.slf4j.LoggerFactory;
 
 public class CouchbaseCacheDAO {
 
-  private static final Logger LOG = LoggerFactory.getLogger(AutoOnboardUtility.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CouchbaseCacheDAO.class);
 
   // these will all be moved to config files
   private static final String AUTH_USERNAME = "thirdeye";
@@ -33,7 +32,8 @@ public class CouchbaseCacheDAO {
 
   private static final String TIME = "time";
 
-  private static final int TIMEOUT = 36000;
+  // 1 hour
+  private static final int TIMEOUT = 3600;
 
   private Bucket bucket;
 

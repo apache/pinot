@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.apache.pinot.thirdeye.auto.onboard.AutoOnboardUtility;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
@@ -25,7 +24,7 @@ import org.slf4j.LoggerFactory;
 
 public class DefaultTimeSeriesCache implements TimeSeriesCache {
 
-  private static final Logger LOG = LoggerFactory.getLogger(AutoOnboardUtility.class);
+  private static final Logger LOG = LoggerFactory.getLogger(DefaultTimeSeriesCache.class);
 
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
@@ -69,16 +68,8 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
       rows.add(row);
     }
 
-    // ???
     // make a new function that checks the type to return as and makes the corresponding ThirdEyeResponse
-    try {
-      ThirdEyeResponse r = new RelationalThirdEyeResponse(thirdEyeRequest, rows, timeSpec);
-      return r;
-    } catch(Exception e) {
-      System.out.println(":(");
-      return null;
-    }
-    //return new RelationalThirdEyeResponse(thirdEyeRequest, rows, timeSpec);
+    return new RelationalThirdEyeResponse(thirdEyeRequest, rows, timeSpec);
   }
 
 
@@ -130,6 +121,7 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
 
   private void insertRelationalTimeSeries(ThirdEyeResponse response) {
 
+    // use CachedThreadPool? or fixedThreadPool?
     ExecutorService executor = Executors.newCachedThreadPool();
 
     for (MetricFunction metric : response.getMetricFunctions()) {
