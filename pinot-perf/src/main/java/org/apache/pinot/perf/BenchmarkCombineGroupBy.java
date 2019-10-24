@@ -160,8 +160,8 @@ public class BenchmarkCombineGroupBy {
     int capacity = 200_000;//GroupByUtils.getTableCapacity(TOP_N);
 
     // make 1 concurrent table
-    IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable();
-    concurrentIndexedTable.init(_dataSchema, _aggregationInfos, _orderBy, capacity);
+    IndexedTable concurrentIndexedTable =
+        new ConcurrentIndexedTable(_dataSchema, _aggregationInfos, _orderBy, capacity);
 
     List<Callable<Void>> innerSegmentCallables = new ArrayList<>(NUM_SEGMENTS);
 

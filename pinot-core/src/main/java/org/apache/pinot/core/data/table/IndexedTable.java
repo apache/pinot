@@ -42,8 +42,10 @@ public abstract class IndexedTable implements Table {
   boolean _isOrderBy;
   IndexedTableResizer _indexedTableResizer;
 
-  @Override
-  public void init(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
+  /**
+   * Initializes the variables and comparators needed for the table
+   */
+  public IndexedTable(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
       int capacity) {
     _dataSchema = dataSchema;
 

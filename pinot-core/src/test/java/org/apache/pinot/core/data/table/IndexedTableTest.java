@@ -49,7 +49,6 @@ public class IndexedTableTest {
 
   @Test
   public void testConcurrentIndexedTable() throws InterruptedException, TimeoutException, ExecutionException {
-    Table indexedTable = new ConcurrentIndexedTable();
 
     DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"},
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE,
@@ -72,7 +71,7 @@ public class IndexedTableTest {
     sel.setIsAsc(true);
     List<SelectionSort> orderBy = Lists.newArrayList(sel);
 
-    indexedTable.init(dataSchema, aggregationInfos, orderBy, 5);
+    IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, aggregationInfos, orderBy, 5);
 
     // 3 threads upsert together
     // a inserted 6 times (60), b inserted 5 times (50), d inserted 2 times (20)
@@ -151,12 +150,9 @@ public class IndexedTableTest {
     List<AggregationInfo> aggregationInfos = Lists.newArrayList(agg1, agg2);
 
     // Test SimpleIndexedTable
-    IndexedTable simpleIndexedTable = new SimpleIndexedTable();
-    // max capacity 5, buffered capacity 10
-    simpleIndexedTable.init(dataSchema, aggregationInfos, orderBy, 5);
+    IndexedTable simpleIndexedTable = new SimpleIndexedTable(dataSchema, aggregationInfos, orderBy, 5);
     // merge table
-    IndexedTable mergeTable = new SimpleIndexedTable();
-    mergeTable.init(dataSchema, aggregationInfos, orderBy, 10);
+    IndexedTable mergeTable = new SimpleIndexedTable(dataSchema, aggregationInfos, orderBy, 10);
     testNonConcurrent(simpleIndexedTable, mergeTable);
 
     // finish
@@ -164,11 +160,8 @@ public class IndexedTableTest {
     checkSurvivors(simpleIndexedTable, survivors);
 
     // Test ConcurrentIndexedTable
-    IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable();
-    // max capacity 5, buffered capacity 10
-    concurrentIndexedTable.init(dataSchema, aggregationInfos, orderBy, 5);
-    mergeTable = new SimpleIndexedTable();
-    mergeTable.init(dataSchema, aggregationInfos, orderBy, 10);
+    IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable(dataSchema, aggregationInfos, orderBy, 5);
+    mergeTable = new SimpleIndexedTable(dataSchema, aggregationInfos, orderBy, 10);
     testNonConcurrent(concurrentIndexedTable, mergeTable);
 
     // finish
@@ -328,12 +321,10 @@ public class IndexedTableTest {
     agg2.setAggregationType("max");
     List<AggregationInfo> aggregationInfos = Lists.newArrayList(agg1, agg2);
 
-    IndexedTable indexedTable = new SimpleIndexedTable();
-    indexedTable.init(dataSchema, aggregationInfos, null, 5);
+    IndexedTable indexedTable = new SimpleIndexedTable(dataSchema, aggregationInfos, null, 5);
     testNoMoreNewRecordsInTable(indexedTable);
 
-    indexedTable = new ConcurrentIndexedTable();
-    indexedTable.init(dataSchema, aggregationInfos, null, 5);
+    indexedTable = new ConcurrentIndexedTable(dataSchema, aggregationInfos, null, 5);
     testNoMoreNewRecordsInTable(indexedTable);
   }
 

@@ -77,7 +77,6 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
     _executorService = executorService;
     _timeOutMs = timeOutMs;
     _initLock = new ReentrantLock();
-    _indexedTable = new ConcurrentIndexedTable();
     _indexedTableCapacity = GroupByUtils.getTableCapacity((int) brokerRequest.getGroupBy().getTopN());
   }
 
@@ -121,8 +120,8 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
             try {
               if (_dataSchema == null) {
                 _dataSchema = intermediateResultsBlock.getDataSchema();
-                _indexedTable.init(_dataSchema, _brokerRequest.getAggregationsInfo(), _brokerRequest.getOrderBy(),
-                    _indexedTableCapacity);
+                _indexedTable = new ConcurrentIndexedTable(_dataSchema, _brokerRequest.getAggregationsInfo(),
+                    _brokerRequest.getOrderBy(), _indexedTableCapacity);
               }
             } finally {
               _initLock.unlock();

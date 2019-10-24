@@ -46,16 +46,15 @@ public class SimpleIndexedTable extends IndexedTable {
   private long _resizeTime = 0;
 
   /**
-   * Initializes the data structures and comparators needed for this Table
+   * Initializes the data structures needed for this Table
    * @param dataSchema data schema of the record's keys and values
    * @param aggregationInfos aggregation infos for the aggregations in record'd values
    * @param orderBy list of {@link SelectionSort} defining the order by
    * @param capacity the capacity of the table
    */
-  @Override
-  public void init(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
+  public SimpleIndexedTable(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
       int capacity) {
-    super.init(dataSchema, aggregationInfos, orderBy, capacity);
+    super(dataSchema, aggregationInfos, orderBy, capacity);
 
     _lookupMap = new HashMap<>();
   }

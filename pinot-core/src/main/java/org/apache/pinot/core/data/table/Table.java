@@ -19,9 +19,6 @@
 package org.apache.pinot.core.data.table;
 
 import java.util.Iterator;
-import java.util.List;
-import org.apache.pinot.common.request.AggregationInfo;
-import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
 
 
@@ -29,16 +26,6 @@ import org.apache.pinot.common.utils.DataSchema;
  * Table to host {@link Record}s which will be passed between operators
  */
 public interface Table {
-
-  /**
-   * Initializes the Table for use
-   * @param dataSchema the schema of the columns in the {@link Record}
-   * @param aggregationInfos the aggregation info for the values if applicable
-   * @param orderBy the order by information if applicable
-   * @param capacity the capacity of the table
-   */
-  void init(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
-      int capacity);
 
   /**
    * Update the table with the given record

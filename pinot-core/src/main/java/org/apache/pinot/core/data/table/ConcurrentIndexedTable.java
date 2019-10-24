@@ -50,16 +50,15 @@ public class ConcurrentIndexedTable extends IndexedTable {
   private final AtomicLong _resizeTime = new AtomicLong();
 
   /**
-   * Initializes the data structures and comparators needed for this Table
+   * Initializes the data structures needed for this Table
    * @param dataSchema data schema of the record's keys and values
    * @param aggregationInfos aggregation infos for the aggregations in record's values
    * @param orderBy list of {@link SelectionSort} defining the order by
    * @param capacity the capacity of the table
    */
-  @Override
-  public void init(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
+  public ConcurrentIndexedTable(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
       int capacity) {
-    super.init(dataSchema, aggregationInfos, orderBy, capacity);
+    super(dataSchema, aggregationInfos, orderBy, capacity);
 
     _lookupMap = new ConcurrentHashMap<>();
     _readWriteLock = new ReentrantReadWriteLock();
