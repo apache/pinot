@@ -589,7 +589,7 @@ public class PinotLLCRealtimeSegmentManager {
 
   /**
    * An instance is reporting that it has stopped consuming a topic due to some error.
-   * Mark the state of the segment to be OFFLINE in idealstate.
+   * If the segment is in CONSUMING state, mark the state of the segment to be OFFLINE in idealstate.
    * When all replicas of this segment are marked offline, the {@link org.apache.pinot.controller.validation.RealtimeSegmentValidationManager},
    * in its next run, will auto-create a new segment with the appropriate offset.
    */
@@ -603,9 +603,16 @@ public class PinotLLCRealtimeSegmentManager {
     try {
       HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
         assert idealState != null;
-        idealState.getInstanceStateMap(segmentName).put(instanceName, RealtimeSegmentOnlineOfflineStateModel.OFFLINE);
+        Map<String, String> stateMap = idealState.getInstanceStateMap(segmentName);
+        String state = stateMap.get(instanceName);
+        if (RealtimeSegmentOnlineOfflineStateModel.CONSUMING.equals(state)) {
+          stateMap.put(instanceName, RealtimeSegmentOnlineOfflineStateModel.OFFLINE);
+        } else {
+          LOGGER.info("Segment {} in state {} when trying to register consumption stop from {}",
+              segmentName, state, instanceName);
+        }
         return idealState;
-      }, RetryPolicies.exponentialBackoffRetryPolicy(10, 500L, 1.2f));
+      }, RetryPolicies.exponentialBackoffRetryPolicy(10, 500L, 1.2f), true);
     } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_ZOOKEEPER_UPDATE_FAILURES, 1L);
       throw e;
