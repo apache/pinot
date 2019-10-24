@@ -27,9 +27,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.function.Function;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 
@@ -82,12 +84,7 @@ class IndexedTableResizer {
         AggregationInfo aggregationInfo = aggregationColumnToInfo.get(column);
         AggregationFunction aggregationFunction =
             AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction();
-
-        if (aggregationFunction.isIntermediateResultComparable()) {
-          _orderByValueExtractors[i] = new ComparableAggregationColumnExtractor(index, aggregationFunction);
-        } else {
-          _orderByValueExtractors[i] = new NonComparableAggregationColumnExtractor(index, aggregationFunction);
-        }
+        _orderByValueExtractors[i] = new AggregationColumnExtractor(index, aggregationFunction);
       } else {
         throw new IllegalStateException("Could not find column " + column + " in data schema");
       }
@@ -233,6 +230,9 @@ class IndexedTableResizer {
     }
   }
 
+  /**
+   * Extractor for order by value columns from Record
+   */
   private static abstract class OrderByValueExtractor {
     abstract Comparable extract(Record record);
   }
@@ -243,54 +243,47 @@ class IndexedTableResizer {
   private static class KeyColumnExtractor extends OrderByValueExtractor {
     final int _index;
     final DataSchema.ColumnDataType _columnDataType;
+    final Function<Object, Comparable> _convertorFunction;
 
     KeyColumnExtractor(int index, DataSchema.ColumnDataType columnDataType) {
       _index = index;
       _columnDataType = columnDataType;
+      if (_columnDataType.equals(DataSchema.ColumnDataType.BYTES)) {
+        _convertorFunction = o -> new ByteArray((byte[]) o);
+      } else {
+        _convertorFunction = o -> (Comparable) o;
+      }
     }
 
     @Override
     Comparable extract(Record record) {
-      Object column = record.getKey().getColumns()[_index];
-      return (Comparable) column; // FIXME: is this the right way to get Comparable for key column? will it work for BYTES?
+      Object keyColumn = record.getKey().getColumns()[_index];
+      return _convertorFunction.apply(keyColumn);
     }
   }
 
   /**
-   * Extractor for aggregation column with comparable intermediate result
+   * Extractor for aggregation column
    */
-  private static class ComparableAggregationColumnExtractor extends OrderByValueExtractor {
+  private static class AggregationColumnExtractor extends OrderByValueExtractor {
     final int _index;
     final AggregationFunction _aggregationFunction;
+    final Function<Object, Comparable> _convertorFunction;
 
-    ComparableAggregationColumnExtractor(int index, AggregationFunction aggregationFunction) {
+    AggregationColumnExtractor(int index, AggregationFunction aggregationFunction) {
       _index = index;
       _aggregationFunction = aggregationFunction;
+      if (aggregationFunction.isIntermediateResultComparable()) {
+        _convertorFunction = o -> (Comparable) o;
+      } else {
+        _convertorFunction = o -> aggregationFunction.extractFinalResult(o);
+      }
     }
 
     @Override
     Comparable extract(Record record) {
       Object aggregationColumn = record.getValues()[_index];
-      return (Comparable) aggregationColumn;
-    }
-  }
-
-  /**
-   * Extractor for aggregation column with non-comparable intermediate result
-   */
-  private static class NonComparableAggregationColumnExtractor extends OrderByValueExtractor {
-    final int _index;
-    final AggregationFunction _aggregationFunction;
-
-    NonComparableAggregationColumnExtractor(int index, AggregationFunction aggregationFunction) {
-      _index = index;
-      _aggregationFunction = aggregationFunction;
-    }
-
-    @Override
-    Comparable extract(Record record) {
-      Object aggregationColumn = record.getValues()[_index];
-      return _aggregationFunction.extractFinalResult(aggregationColumn);
+      return _convertorFunction.apply(aggregationColumn);
     }
   }
 }
