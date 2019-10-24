@@ -39,7 +39,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
  */
 class IndexedTableResizer {
 
-  private ComparableExtractor[] _comparableExtractors;
+  private OrderByValueExtractor[] _orderByValueExtractors;
   private Comparator<IntermediateRecord> _intermediateRecordComparator;
   private int _numOrderBy;
 
@@ -66,7 +66,7 @@ class IndexedTableResizer {
     }
 
     _numOrderBy = orderBy.size();
-    _comparableExtractors = new ComparableExtractor[_numOrderBy];
+    _orderByValueExtractors = new OrderByValueExtractor[_numOrderBy];
     Comparator[] comparators = new Comparator[_numOrderBy];
 
     for (int i = 0; i < _numOrderBy; i++) {
@@ -76,7 +76,7 @@ class IndexedTableResizer {
       if (keyIndexMap.containsKey(column)) {
         int index = keyIndexMap.get(column);
         DataSchema.ColumnDataType columnDataType = keyColumnDataTypeMap.get(column);
-        _comparableExtractors[i] = new KeyColumnExtractor(index, columnDataType);
+        _orderByValueExtractors[i] = new KeyColumnExtractor(index, columnDataType);
       } else if (aggregationColumnToIndex.containsKey(column)) {
         int index = aggregationColumnToIndex.get(column);
         AggregationInfo aggregationInfo = aggregationColumnToInfo.get(column);
@@ -84,9 +84,9 @@ class IndexedTableResizer {
             AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction();
 
         if (aggregationFunction.isIntermediateResultComparable()) {
-          _comparableExtractors[i] = new ComparableAggregationColumnExtractor(index, aggregationFunction);
+          _orderByValueExtractors[i] = new ComparableAggregationColumnExtractor(index, aggregationFunction);
         } else {
-          _comparableExtractors[i] = new NonComparableAggregationColumnExtractor(index, aggregationFunction);
+          _orderByValueExtractors[i] = new NonComparableAggregationColumnExtractor(index, aggregationFunction);
         }
       } else {
         throw new IllegalStateException("Could not find column " + column + " in data schema");
@@ -120,7 +120,7 @@ class IndexedTableResizer {
   IntermediateRecord getIntermediateRecord(Record record) {
     Comparable[] intermediateRecordValues = new Comparable[_numOrderBy];
     for (int i = 0; i < _numOrderBy; i++) {
-      intermediateRecordValues[i] = _comparableExtractors[i].extract(record);
+      intermediateRecordValues[i] = _orderByValueExtractors[i].extract(record);
     }
     return new IntermediateRecord(record.getKey(), intermediateRecordValues);
   }
@@ -233,14 +233,14 @@ class IndexedTableResizer {
     }
   }
 
-  private static abstract class ComparableExtractor {
+  private static abstract class OrderByValueExtractor {
     abstract Comparable extract(Record record);
   }
 
   /**
    * Extractor for key column
    */
-  private static class KeyColumnExtractor extends ComparableExtractor {
+  private static class KeyColumnExtractor extends OrderByValueExtractor {
     final int _index;
     final DataSchema.ColumnDataType _columnDataType;
 
@@ -259,7 +259,7 @@ class IndexedTableResizer {
   /**
    * Extractor for aggregation column with comparable intermediate result
    */
-  private static class ComparableAggregationColumnExtractor extends ComparableExtractor {
+  private static class ComparableAggregationColumnExtractor extends OrderByValueExtractor {
     final int _index;
     final AggregationFunction _aggregationFunction;
 
@@ -278,7 +278,7 @@ class IndexedTableResizer {
   /**
    * Extractor for aggregation column with non-comparable intermediate result
    */
-  private static class NonComparableAggregationColumnExtractor extends ComparableExtractor {
+  private static class NonComparableAggregationColumnExtractor extends OrderByValueExtractor {
     final int _index;
     final AggregationFunction _aggregationFunction;
 
