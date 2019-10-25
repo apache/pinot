@@ -86,7 +86,7 @@ public class KafkaConnectionHandler {
 
   /**
    * A Kafka protocol error that indicates a situation that is not likely to clear up by retrying the request (for
-   * example, no such topic or offset out of range).
+   * example, no such topic).
    */
   private class KafkaPermanentConsumerException extends RuntimeException {
     public KafkaPermanentConsumerException(Errors error) {
