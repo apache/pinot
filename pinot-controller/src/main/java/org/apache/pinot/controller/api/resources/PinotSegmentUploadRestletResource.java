@@ -189,13 +189,7 @@ public class PinotSegmentUploadRestletResource {
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
-    try {
-      segmentName = URLDecoder.decode(segmentName, URL_ENCODING_SCHEME);
-    } catch (UnsupportedEncodingException e) {
-      String errStr = "Could not decode segment name '" + segmentName + "'";
-      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST);
-    }
-
+    segmentName = URIUtils.decode(segmentName);
     final URI segmentFileURI = URIUtils.getUri(provider.getBaseDataDirURI().toString(), tableName, segmentName);
     PinotFS pinotFS = PinotFSFactory.create(provider.getBaseDataDirURI().getScheme());
 
