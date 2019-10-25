@@ -37,7 +37,9 @@ public abstract class IndexedTable implements Table {
   int _numAggregations;
   private DataSchema _dataSchema;
 
+  // the capacity we need to trim to
   int _capacity;
+  // the capacity with added buffer, in order to collect more records than capacity for better precision
   int _maxCapacity;
 
   boolean _isOrderBy;
