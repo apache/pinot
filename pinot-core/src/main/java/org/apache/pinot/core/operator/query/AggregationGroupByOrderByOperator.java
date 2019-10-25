@@ -86,6 +86,9 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       index++;
     }
 
+    // TODO: We need to support putting order by columns in the data schema.
+    //  It is possible that the order by column is not one of the group by or aggregation columns
+
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
   }
 

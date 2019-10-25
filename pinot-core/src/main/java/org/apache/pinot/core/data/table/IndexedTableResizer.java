@@ -47,23 +47,21 @@ class IndexedTableResizer {
 
   IndexedTableResizer(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy) {
 
-    int numAggregations = aggregationInfos.size();
-    int numKeyColumns = dataSchema.size() - numAggregations;
-
-    Map<String, Integer> keyIndexMap = new HashMap<>();
     // NOTE: the assumption here is that the key columns will appear before the aggregation columns in the data schema
     // This is handled in the only in the AggregationGroupByOrderByOperator for now
-    for (int i = 0; i < numKeyColumns; i++) {
-      String columnName = dataSchema.getColumnName(i);
-      keyIndexMap.put(columnName, i);
+
+    int numColumns = dataSchema.size();
+    int numAggregations = aggregationInfos.size();
+    int numKeyColumns = numColumns - numAggregations;
+
+    Map<String, Integer> columnIndexMap = new HashMap<>();
+    for (int i = 0; i < numColumns; i++) {
+      columnIndexMap.put(dataSchema.getColumnName(i), i);
     }
 
-    Map<String, Integer> aggregationColumnToIndex = new HashMap<>();
     Map<String, AggregationInfo> aggregationColumnToInfo = new HashMap<>();
-    for (int i = 0; i < numAggregations; i++) {
-      AggregationInfo aggregationInfo = aggregationInfos.get(i);
+    for (AggregationInfo aggregationInfo : aggregationInfos) {
       String aggregationColumn = AggregationFunctionUtils.getAggregationColumnName(aggregationInfo);
-      aggregationColumnToIndex.put(aggregationColumn, i);
       aggregationColumnToInfo.put(aggregationColumn, aggregationInfo);
     }
 
@@ -75,15 +73,16 @@ class IndexedTableResizer {
       SelectionSort selectionSort = orderBy.get(i);
       String column = selectionSort.getColumn();
 
-      if (keyIndexMap.containsKey(column)) {
-        int index = keyIndexMap.get(column);
-        _orderByValueExtractors[i] = new KeyColumnExtractor(index);
-      } else if (aggregationColumnToIndex.containsKey(column)) {
-        int index = aggregationColumnToIndex.get(column);
-        AggregationInfo aggregationInfo = aggregationColumnToInfo.get(column);
-        AggregationFunction aggregationFunction =
-            AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction();
-        _orderByValueExtractors[i] = new AggregationColumnExtractor(index, aggregationFunction);
+      if (columnIndexMap.containsKey(column)) {
+        int index = columnIndexMap.get(column);
+        if (index < numKeyColumns) {
+          _orderByValueExtractors[i] = new KeyColumnExtractor(index);
+        } else {
+          AggregationInfo aggregationInfo = aggregationColumnToInfo.get(column);
+          AggregationFunction aggregationFunction =
+              AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction();
+          _orderByValueExtractors[i] = new AggregationColumnExtractor(index - numKeyColumns, aggregationFunction);
+        }
       } else {
         throw new IllegalStateException("Could not find column " + column + " in data schema");
       }
