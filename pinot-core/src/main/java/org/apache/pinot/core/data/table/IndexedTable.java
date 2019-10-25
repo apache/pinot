@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.table;
 
+import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.request.AggregationInfo;
@@ -34,7 +35,7 @@ public abstract class IndexedTable implements Table {
 
   AggregationFunction[] _aggregationFunctions;
   int _numAggregations;
-  DataSchema _dataSchema;
+  private DataSchema _dataSchema;
 
   int _capacity;
   int _maxCapacity;
@@ -71,5 +72,19 @@ public abstract class IndexedTable implements Table {
       _maxCapacity = capacity;
     }
     _capacity = capacity;
+  }
+
+  @Override
+  public boolean merge(Table table) {
+    Iterator<Record> iterator = table.iterator();
+    while (iterator.hasNext()) {
+      upsert(iterator.next());
+    }
+    return true;
+  }
+
+  @Override
+  public DataSchema getDataSchema() {
+    return _dataSchema;
   }
 }

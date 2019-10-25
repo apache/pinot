@@ -38,10 +38,18 @@ public final class GroupByUtils {
   /**
    * Returns the higher of topN * 5 or 5k. This is to ensure better precision in results
    */
+  public static int getTableCapacity(int topN) {
+    return Math.max(topN * 5, NUM_RESULTS_LOWER_LIMIT);
+  }
+
+  /**
+   * For group by + order by queries: returns the higher of (topN * 5) or (5k), to ensure better precision in results
+   * For group by with no order by queries: returns the topN
+   */
   public static int getTableCapacity(GroupBy groupBy, List<SelectionSort> orderBy) {
     int topN = (int) groupBy.getTopN();
     if (orderBy != null && !orderBy.isEmpty()) {
-      return Math.max(topN * 5, NUM_RESULTS_LOWER_LIMIT);
+      return getTableCapacity(topN);
     } else {
       return topN;
     }

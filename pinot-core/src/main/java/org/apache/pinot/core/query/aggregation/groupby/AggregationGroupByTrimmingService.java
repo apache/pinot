@@ -36,6 +36,7 @@ import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.function.MinAggregationFunction;
+import org.apache.pinot.core.util.GroupByUtils;
 
 
 /**
@@ -55,7 +56,7 @@ public class AggregationGroupByTrimmingService {
     _groupByTopN = groupByTopN;
 
     // To keep the precision, _trimSize is the larger of (_groupByTopN * 5) or 5000
-    _trimSize = Math.max(_groupByTopN * 5, 5000);
+    _trimSize = GroupByUtils.getTableCapacity(_groupByTopN);
 
     // To trigger the trimming, number of groups should be larger than _trimThreshold which is (_trimSize * 4)
     _trimThreshold = _trimSize * 4;

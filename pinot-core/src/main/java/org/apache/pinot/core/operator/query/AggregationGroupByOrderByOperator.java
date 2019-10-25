@@ -63,6 +63,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     _numTotalRawDocs = numTotalRawDocs;
     _useStarTree = useStarTree;
 
+    // NOTE: The indexedTable expects that the the data schema will have group by columns before aggregation columns
     int numColumns = groupBy.getExpressionsSize() + _functionContexts.length;
     String[] columnNames = new String[numColumns];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];

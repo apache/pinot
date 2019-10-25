@@ -124,15 +124,6 @@ public class ConcurrentIndexedTable extends IndexedTable {
   }
 
   @Override
-  public boolean merge(Table table) {
-    Iterator<Record> iterator = table.iterator();
-    while (iterator.hasNext()) {
-      upsert(iterator.next());
-    }
-    return true;
-  }
-
-  @Override
   public int size() {
     return _lookupMap.size();
   }
@@ -190,10 +181,5 @@ public class ConcurrentIndexedTable extends IndexedTable {
     if (_iterator == null) {
       _iterator = _lookupMap.values().iterator();
     }
-  }
-
-  @Override
-  public DataSchema getDataSchema() {
-    return _dataSchema;
   }
 }

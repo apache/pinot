@@ -544,6 +544,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
             function = dataTable::getString;
             break;
           case BYTES:
+            // FIXME: support BYTES in DataTable instead of converting to string
             function = (row, col) -> BytesUtils.toByteArray(dataTable.getString(row, col));
             break;
           default:

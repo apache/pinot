@@ -51,6 +51,8 @@ class IndexedTableResizer {
     int numKeyColumns = dataSchema.size() - numAggregations;
 
     Map<String, Integer> keyIndexMap = new HashMap<>();
+    // NOTE: the assumption here is that the key columns will appear before the aggregation columns in the data schema
+    // This is handled in the only in the AggregationGroupByOrderByOperator for now
     for (int i = 0; i < numKeyColumns; i++) {
       String columnName = dataSchema.getColumnName(i);
       keyIndexMap.put(columnName, i);
@@ -129,24 +131,21 @@ class IndexedTableResizer {
     int numRecordsToEvict = recordsMap.size() - trimToSize;
 
     if (numRecordsToEvict > 0) {
-      int size;
-      Comparator<IntermediateRecord> comparator;
       // TODO: compare the performance of converting to IntermediateRecord vs keeping Record, in cases where we do not need to extract final results
-      PriorityQueue<IntermediateRecord> priorityQueue;
 
       if (numRecordsToEvict < trimToSize) { // num records to evict is smaller than num records to retain
-        size = numRecordsToEvict;
         // make PQ of records to evict
-        comparator = _intermediateRecordComparator;
-        priorityQueue = convertToIntermediateRecordsPQ(recordsMap, size, comparator);
+        Comparator<IntermediateRecord> comparator = _intermediateRecordComparator;
+        PriorityQueue<IntermediateRecord> priorityQueue =
+            convertToIntermediateRecordsPQ(recordsMap, numRecordsToEvict, comparator);
         for (IntermediateRecord evictRecord : priorityQueue) {
           recordsMap.remove(evictRecord._key);
         }
       } else { // num records to retain is smaller than num records to evict
-        size = trimToSize;
         // make PQ of records to retain
-        comparator = _intermediateRecordComparator.reversed();
-        priorityQueue = convertToIntermediateRecordsPQ(recordsMap, size, comparator);
+        Comparator<IntermediateRecord> comparator = _intermediateRecordComparator.reversed();
+        PriorityQueue<IntermediateRecord> priorityQueue =
+            convertToIntermediateRecordsPQ(recordsMap, trimToSize, comparator);
         ObjectOpenHashSet<Key> keysToRetain = new ObjectOpenHashSet<>(priorityQueue.size());
         for (IntermediateRecord retainRecord : priorityQueue) {
           keysToRetain.add(retainRecord._key);
@@ -167,7 +166,7 @@ class IndexedTableResizer {
         priorityQueue.offer(intermediateRecord);
       } else {
         IntermediateRecord peek = priorityQueue.peek();
-        if (priorityQueue.comparator().compare(peek, intermediateRecord) < 0) {
+        if (comparator.compare(peek, intermediateRecord) < 0) {
           priorityQueue.poll();
           priorityQueue.offer(intermediateRecord);
         }
@@ -285,12 +284,10 @@ class IndexedTableResizer {
    */
   private static class AggregationColumnExtractor extends OrderByValueExtractor {
     final int _index;
-    final AggregationFunction _aggregationFunction;
     final Function<Object, Comparable> _convertorFunction;
 
     AggregationColumnExtractor(int index, AggregationFunction aggregationFunction) {
       _index = index;
-      _aggregationFunction = aggregationFunction;
       if (aggregationFunction.isIntermediateResultComparable()) {
         _convertorFunction = o -> (Comparable) o;
       } else {

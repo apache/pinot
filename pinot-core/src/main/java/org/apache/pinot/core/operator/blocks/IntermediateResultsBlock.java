@@ -300,6 +300,7 @@ public class IntermediateResultsBlock implements Block {
         dataTableBuilder.setColumn(columnIndex, (String) value);
         break;
       case BYTES:
+        // FIXME: support BYTES in DataTable instead of converting to string
         dataTableBuilder.setColumn(columnIndex, value.toString()); // ByteArray::toString
         break;
       default:
