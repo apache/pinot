@@ -23,7 +23,6 @@ import com.google.common.collect.Iterables;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -61,6 +60,8 @@ import org.apache.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndex
 import org.apache.pinot.core.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.startree.hll.HllConfig;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Interval;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
@@ -359,33 +360,44 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     String timeColumn = config.getTimeColumnName();
     ColumnIndexCreationInfo timeColumnIndexCreationInfo = indexCreationInfoMap.get(timeColumn);
     if (timeColumnIndexCreationInfo != null) {
+      long startTime;
+      long endTime;
+      TimeUnit timeUnit;
+
       // Use start/end time in config if defined
       if (config.getStartTime() != null) {
-        checkTime(config, config.getStartTime(), config.getEndTime(), segmentName);
-        properties.setProperty(SEGMENT_START_TIME, config.getStartTime());
-        properties.setProperty(SEGMENT_END_TIME, Preconditions.checkNotNull(config.getEndTime()));
-        properties.setProperty(TIME_UNIT, Preconditions.checkNotNull(config.getSegmentTimeUnit()));
+        startTime = Long.parseLong(config.getStartTime());
+        endTime = Long.parseLong(config.getEndTime());
+        timeUnit = Preconditions.checkNotNull(config.getSegmentTimeUnit());
       } else {
-        Object minTime = Preconditions.checkNotNull(timeColumnIndexCreationInfo.getMin());
-        Object maxTime = Preconditions.checkNotNull(timeColumnIndexCreationInfo.getMax());
+        String startTimeStr = timeColumnIndexCreationInfo.getMin().toString();
+        String endTimeStr = timeColumnIndexCreationInfo.getMax().toString();
 
         if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
           // For TimeColumnType.SIMPLE_DATE_FORMAT, convert time value into millis since epoch
           DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(config.getSimpleDateFormat());
-          final long minTimeMillis = dateTimeFormatter.parseMillis(minTime.toString());
-          final long maxTimeMillis = dateTimeFormatter.parseMillis(maxTime.toString());
-          checkTime(config, minTimeMillis, maxTimeMillis, segmentName);
-          properties.setProperty(SEGMENT_START_TIME, minTimeMillis);
-          properties.setProperty(SEGMENT_END_TIME, maxTimeMillis);
-          properties.setProperty(TIME_UNIT, TimeUnit.MILLISECONDS);
+          startTime = dateTimeFormatter.parseMillis(startTimeStr);
+          endTime = dateTimeFormatter.parseMillis(endTimeStr);
+          timeUnit = TimeUnit.MILLISECONDS;
         } else {
           // by default, time column type is TimeColumnType.EPOCH
-          checkTime(config, minTime, maxTime, segmentName);
-          properties.setProperty(SEGMENT_START_TIME, minTime);
-          properties.setProperty(SEGMENT_END_TIME, maxTime);
-          properties.setProperty(TIME_UNIT, Preconditions.checkNotNull(config.getSegmentTimeUnit()));
+          startTime = Long.parseLong(startTimeStr);
+          endTime = Long.parseLong(endTimeStr);
+          timeUnit = Preconditions.checkNotNull(config.getSegmentTimeUnit());
         }
       }
+
+      if (!config.isSkipTimeValueCheck()) {
+        Interval timeInterval = new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime), DateTimeZone.UTC);
+        Preconditions.checkState(TimeUtils.isValidTimeInterval(timeInterval),
+            "Invalid segment start/end time: %s (in millis: %s/%s) for time column: %s, must be between: %s",
+            timeInterval, timeInterval.getStartMillis(), timeInterval.getEndMillis(), timeColumn,
+            TimeUtils.VALID_TIME_INTERVAL);
+      }
+
+      properties.setProperty(SEGMENT_START_TIME, startTime);
+      properties.setProperty(SEGMENT_END_TIME, endTime);
+      properties.setProperty(TIME_UNIT, timeUnit);
     }
 
     for (Map.Entry<String, String> entry : config.getCustomProperties().entrySet()) {
@@ -418,123 +430,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     properties.save();
-  }
-
-  /**
-   * Check for the validity of segment start and end time
-   * @param startTime segment start time
-   * @param endTime segment end time
-   * @param segmentName segment name
-   */
-  private void checkTime(final SegmentGeneratorConfig config, final Object startTime, final Object endTime,
-      final String segmentName) {
-    if (!config.isCheckTimeColumnValidityDuringGeneration()) {
-      return;
-    }
-
-    if (startTime == null || endTime == null) {
-      throw new RuntimeException("Expecting non-null start/end time for segment: " + segmentName);
-    }
-
-    if (!(startTime.getClass().equals(endTime.getClass()))) {
-      final StringBuilder err = new StringBuilder();
-      err.append("Start and end time of segment should be of same type.").append(" segment name: ").append(segmentName)
-          .append(" start time: ").append(startTime).append(" end time: ").append(endTime).append(" start time class: ")
-          .append(startTime.getClass()).append(" end time class: ").append(endTime.getClass());
-      throw new RuntimeException(err.toString());
-    }
-
-    long start;
-    long end;
-
-    final String cl = startTime.getClass().getSimpleName();
-
-    switch (cl) {
-      case "Long":
-        start = (long) startTime;
-        end = (long) endTime;
-        break;
-      case "String":
-        start = Long.parseLong((String) startTime);
-        end = Long.parseLong((String) endTime);
-        break;
-      case "Integer":
-        start = ((Integer) startTime).longValue();
-        end = ((Integer) endTime).longValue();
-        break;
-      default:
-        final StringBuilder err = new StringBuilder();
-        err.append("Unable to interpret type of time column value. Failed to validate start and end time of segment")
-            .append(" uninterpreted type: ").append(startTime.getClass()).append(" start time: ").append(startTime)
-            .append(" end time: ").append(endTime).append(" time column name: ").append(config.getTimeColumnName())
-            .append(" segment name: ").append(segmentName).append(" segment time column unit: ")
-            .append(config.getSegmentTimeUnit().toString()).append(" segment time column type: ")
-            .append(config.getTimeColumnType().toString()).append(" time field spec data type: ")
-            .append(config.getSchema().getTimeFieldSpec().getDataType().toString());
-        LOGGER.error(err.toString());
-        throw new RuntimeException(err.toString());
-    }
-
-    // note that handling of SimpleDateFormat (TimeColumnType.SIMPLE)
-    // is done by the caller of this function that converts the simple format
-    // into millis since epoch before calling this function for validation.
-    // For TimeColumnType.EPOCH, the time field spec could still have unit
-    // as any of the following and we need to convert to millis for doing the
-    // min-max comparison against TimeUtils.getValidMinTimeMillis() and
-    // TimeUtils.getValidMaxTimeMillis()
-    if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.EPOCH) {
-      switch (config.getSegmentTimeUnit()) {
-        case DAYS:
-          start = TimeUnit.DAYS.toMillis(start);
-          end = TimeUnit.DAYS.toMillis(end);
-          break;
-        case HOURS:
-          start = TimeUnit.HOURS.toMillis(start);
-          end = TimeUnit.HOURS.toMillis(end);
-          break;
-        case MINUTES:
-          start = TimeUnit.MINUTES.toMillis(start);
-          end = TimeUnit.MINUTES.toMillis(end);
-          break;
-        case SECONDS:
-          start = TimeUnit.SECONDS.toMillis(start);
-          end = TimeUnit.SECONDS.toMillis(end);
-          break;
-        case MICROSECONDS:
-          start = TimeUnit.MICROSECONDS.toMillis(start);
-          end = TimeUnit.MICROSECONDS.toMillis(end);
-          break;
-        case NANOSECONDS:
-          start = TimeUnit.NANOSECONDS.toMillis(start);
-          end = TimeUnit.NANOSECONDS.toMillis(end);
-          break;
-        default:
-          if (config.getSegmentTimeUnit() != TimeUnit.MILLISECONDS) {
-            // we should never be here
-            final StringBuilder err = new StringBuilder();
-            err.append("Unexpected time unit: ").append(config.getSegmentTimeUnit().toString())
-                .append(" for time column: ").append(config.getTimeColumnName()).append(" for segment: ")
-                .append(segmentName);
-            LOGGER.error(err.toString());
-            throw new RuntimeException(err.toString());
-          }
-      }
-    }
-
-    if (!TimeUtils.checkSegmentTimeValidity(start, end)) {
-      final Date minDate = new Date(TimeUtils.getValidMinTimeMillis());
-      final Date maxDate = new Date(TimeUtils.getValidMaxTimeMillis());
-      final StringBuilder err = new StringBuilder();
-      err.append("Invalid start/end time.").append(" segment name: ").append(segmentName).append(" time column name: ")
-          .append(config.getTimeColumnName()).append(" given start time: ").append(start).append("ms")
-          .append(" given end time: ").append(end).append("ms").append(" start and end time must be between ")
-          .append(minDate).append(" and ").append(maxDate).append(" segment time column unit: ")
-          .append(config.getSegmentTimeUnit().toString()).append(" segment time column type: ")
-          .append(config.getTimeColumnType().toString()).append(" time field spec data type: ")
-          .append(config.getSchema().getTimeFieldSpec().getDataType().toString());
-      LOGGER.error(err.toString());
-      throw new RuntimeException(err.toString());
-    }
   }
 
   public static void addColumnMetadataInfo(PropertiesConfiguration properties, String column,

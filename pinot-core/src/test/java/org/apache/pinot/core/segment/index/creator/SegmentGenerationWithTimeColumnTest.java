@@ -68,7 +68,7 @@ public class SegmentGenerationWithTimeColumnTest {
 
   @BeforeClass
   public void printSeed() {
-    System.out.println("Seed is: "+ seed);
+    System.out.println("Seed is: " + seed);
   }
 
   @BeforeMethod
@@ -98,15 +98,11 @@ public class SegmentGenerationWithTimeColumnTest {
     Assert.assertEquals(metadata.getEndTime(), maxTime);
   }
 
-  @Test
-  public void testSegmentGenerationWithInvalidTime() {
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testSegmentGenerationWithInvalidTime()
+      throws Exception {
     Schema schema = createSchema(false);
-    try {
-      buildSegment(schema, false, true);
-      Assert.fail("Expecting exception from buildSegment for invalid start/end time of segment");
-    } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().contains("Invalid start/end time. segment name: testSegment time column name: date"));
-    }
+    buildSegment(schema, false, true);
   }
 
   private Schema createSchema(boolean isSimpleDate) {
@@ -120,8 +116,7 @@ public class SegmentGenerationWithTimeColumnTest {
     return schema;
   }
 
-  private File buildSegment(final Schema schema, final boolean isSimpleDate,
-      final boolean isInvalidDate)
+  private File buildSegment(final Schema schema, final boolean isSimpleDate, final boolean isInvalidDate)
       throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
     config.setRawIndexCreationColumns(schema.getDimensionNames());
@@ -177,8 +172,8 @@ public class SegmentGenerationWithTimeColumnTest {
   }
 
   private Object getRandomValueForTimeColumn(boolean isSimpleDate, boolean isInvalidDate) {
-    long randomMs = validMinTime + (long)(_random.nextDouble() * (startTime - validMinTime));
-    Preconditions.checkArgument(TimeUtils.timeValueInValidRange(randomMs), "Value " + randomMs +" out of range");
+    long randomMs = validMinTime + (long) (_random.nextDouble() * (startTime - validMinTime));
+    Preconditions.checkArgument(TimeUtils.timeValueInValidRange(randomMs), "Value " + randomMs + " out of range");
     long dateColVal = randomMs;
     Object result;
     if (isInvalidDate) {

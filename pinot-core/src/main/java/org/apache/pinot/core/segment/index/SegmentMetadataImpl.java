@@ -57,6 +57,7 @@ import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.core.startree.v2.StarTreeV2Constants;
 import org.apache.pinot.core.startree.v2.StarTreeV2Metadata;
 import org.apache.pinot.startree.hll.HllConstants;
+import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
@@ -190,7 +191,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         String endTimeString = segmentMetadataPropertiesConfiguration.getString(SEGMENT_END_TIME);
         _segmentStartTime = Long.parseLong(startTimeString);
         _segmentEndTime = Long.parseLong(endTimeString);
-        _timeInterval = new Interval(_timeUnit.toMillis(_segmentStartTime), _timeUnit.toMillis(_segmentEndTime));
+        _timeInterval =
+            new Interval(_timeUnit.toMillis(_segmentStartTime), _timeUnit.toMillis(_segmentEndTime), DateTimeZone.UTC);
       } catch (Exception e) {
         LOGGER.warn("Caught exception while setting time interval and granularity", e);
         _timeInterval = null;
