@@ -69,9 +69,7 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
 
     for (TimeSeriesDataPoint dataPoint : cacheResponse.getRows()) {
       int timeBucketIndex = TimeRangeUtils.computeBucketIndex(
-          thirdEyeRequest.getGroupByTimeGranularity(),
-          sliceStart,
-          new DateTime(dataPoint.getTimestamp(), timeZone));
+          thirdEyeRequest.getGroupByTimeGranularity(), sliceStart, new DateTime(dataPoint.getTimestamp(), timeZone));
 
       String[] row = new String[2];
       row[0] = String.valueOf(timeBucketIndex);
