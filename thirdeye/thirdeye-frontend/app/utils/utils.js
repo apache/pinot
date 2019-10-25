@@ -2,6 +2,7 @@ import d3 from 'd3';
 import { isNone } from '@ember/utils';
 import moment from 'moment';
 import { splitFilterFragment, toFilterMap, makeTime } from 'thirdeye-frontend/utils/rca-utils';
+import _ from 'lodash';
 
 /**
  * The Promise returned from fetch() won't reject on HTTP error status even if the response is an HTTP 404 or 500.
@@ -164,24 +165,32 @@ export function getProps() {
 }
 
 /**
- * Preps post object for Yaml payload
- * @param {string} text to post
- * @returns {Object}
- */
-export function postYamlProps(postData) {
-  return {
-    method: 'post',
-    body: postData,
-    headers: { 'content-type': 'text/plain' }
-  };
-}
-
-/**
  * Format conversion helper
  * @param {String} dateStr - date to convert
  */
 export function toIso(dateStr) {
   return moment(Number(dateStr)).toISOString();
+}
+
+/**
+ * Replace all Infinity and NaN with value from second time series
+ * @param {Array} series1 - time series to modify
+ * @param {Array} series2 - time series to get replacement values from
+ */
+export function replaceNonFiniteWithCurrent(series1, series2) {
+  if (_.isEmpty(series2)) {
+    return stripNonFiniteValues(series1);
+  }
+  for (let i = 0; i < series1.length; i++) {
+    if (!isFinite(series1[i]) || !series1[i]) {
+      let newValue = null;
+      if (i < series2.length) {
+        newValue = isFinite(series2[i]) ? series2[i] : null;
+      }
+      series1[i] = newValue;
+    }
+  }
+  return series1;
 }
 
 /**
@@ -194,40 +203,6 @@ export function stripNonFiniteValues(timeSeries) {
   });
 }
 
-/**
- * The yaml filters formatter. Convert filters in the yaml file in to a legacy filters string
- * For example, filters = {
- *   "country": ["us", "cn"],
- *   "browser": ["chrome"]
- * }
- * will be convert into "country=us;country=cn;browser=chrome"
- *
- * @method _formatYamlFilter
- * @param {Map} filters multimap of filters
- * @return {String} - formatted filters string
- */
-export function formatYamlFilter(filters) {
-  if (filters){
-    const filterStrings = [];
-    Object.keys(filters).forEach(
-      function(filterKey) {
-        const filter = filters[filterKey];
-        if (filter && Array.isArray(filter)) {
-          filter.forEach(
-            function (filterValue) {
-              filterStrings.push(filterKey + '=' + filterValue);
-            }
-          );
-        } else {
-          filterStrings.push(filterKey + '=' + filter);
-        }
-      }
-    );
-    return filterStrings.join(';');
-  }
-  return '';
-}
-
 export default {
   checkStatus,
   humanizeFloat,
@@ -237,8 +212,7 @@ export default {
   parseProps,
   postProps,
   toIso,
+  replaceNonFiniteWithCurrent,
   stripNonFiniteValues,
-  postYamlProps,
-  formatYamlFilter,
   getProps
 };

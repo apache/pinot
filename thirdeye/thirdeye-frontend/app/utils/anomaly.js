@@ -4,9 +4,9 @@ import _ from 'lodash';
 import {
   checkStatus,
   postProps,
-  postYamlProps,
   getProps
 } from 'thirdeye-frontend/utils/utils';
+import { postYamlProps } from 'thirdeye-frontend/utils/yaml-tools';
 import fetch from 'fetch';
 import {
   anomalyApiUrls,
