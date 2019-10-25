@@ -18,11 +18,8 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
-import java.util.Arrays;
-import java.util.Iterator;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
-import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -36,8 +33,7 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
   public BitmapDocIdSet(ImmutableRoaringBitmap[] bitmaps, int startDocId, int endDocId, boolean exclusive) {
     int numBitmaps = bitmaps.length;
     if (numBitmaps > 1) {
-      Iterator iterator = Arrays.asList(bitmaps).iterator();
-      MutableRoaringBitmap orBitmap = MutableRoaringBitmap.or(iterator, startDocId, endDocId + 1);
+      MutableRoaringBitmap orBitmap = MutableRoaringBitmap.or(bitmaps);
       if (exclusive) {
         orBitmap.flip(startDocId, endDocId + 1);
       }
