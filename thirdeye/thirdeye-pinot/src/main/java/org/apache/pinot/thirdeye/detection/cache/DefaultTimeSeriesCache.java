@@ -11,13 +11,17 @@ import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.dataframe.util.TimeSeriesRequestContainer;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;
 import org.apache.pinot.thirdeye.datasource.RelationalThirdEyeResponse;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
+import org.apache.pinot.thirdeye.datasource.TimeRangeUtils;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,12 +62,16 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
 
     List<String[]> rows = new ArrayList<>();
     String dataset = thirdEyeRequest.getMetricFunctions().get(0).getDataset();
-    TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetDAO.findByDataset(dataset));
-    int timeBucketId = 0;
+    DatasetConfigDTO datasetDTO = datasetDAO.findByDataset(dataset);
+    TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetDTO);
 
     for (TimeSeriesDataPoint dataPoint : cacheResponse.getRows()) {
       String[] row = new String[2];
-      row[0] = String.valueOf(timeBucketId++);
+      row[0] = String.valueOf(
+          TimeRangeUtils.computeBucketIndex(
+              thirdEyeRequest.getGroupByTimeGranularity(),
+              thirdEyeRequest.getStartTimeInclusive(), new DateTime(dataPoint.getTimestamp(),
+              DateTimeZone.forID(datasetDTO.getTimezone()))));
       row[1] = dataPoint.getDataValue();
       rows.add(row);
     }

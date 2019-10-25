@@ -1,10 +1,10 @@
 package org.apache.pinot.thirdeye.detection.cache;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.thirdeye.common.time.TimeGranularity;
+import java.util.TreeMap;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
@@ -43,7 +43,29 @@ public class ThirdEyeCacheResponse {
 
   public void mergeSliceIntoRows(ThirdEyeResponse slice, MergeSliceType type) {
 
-    List<TimeSeriesDataPoint> sliceRows = new ArrayList<>(Arrays.asList(new TimeSeriesDataPoint[slice.getNumRows()]));
+//    List<TimeSeriesDataPoint> sliceRows = new ArrayList<>(Arrays.asList(new TimeSeriesDataPoint[slice.getNumRows()]));
+//
+//    for (MetricFunction metric : slice.getMetricFunctions()) {
+//      String metricUrn = MetricEntity.fromMetric(slice.getRequest().getFilterSet().asMap(), metric.getMetricId()).getUrn();
+//      for (int i = 0; i < slice.getNumRowsFor(metric); i++) {
+//        Map<String, String> row = slice.getRow(metric, i);
+//
+//        // this assumption maybe wrong. need to look more into this.
+//        String timeColumnKey = slice.getGroupKeyColumns().get(0);
+//
+//        int timeBucketId = Integer.parseInt(row.get(timeColumnKey));
+//
+//        // test fix for indexOutOfBoundsException
+//        if (timeBucketId == sliceRows.size()) {
+//          sliceRows.add(new TimeSeriesDataPoint(metricUrn, Long.valueOf(row.get("timestamp")), metric.getMetricId(), row.get(metric.toString())));
+//        } else {
+//          sliceRows.set(timeBucketId,
+//              new TimeSeriesDataPoint(metricUrn, Long.valueOf(row.get("timestamp")), metric.getMetricId(), row.get(metric.toString())));
+//        }
+//      }
+//    }
+
+    List<TimeSeriesDataPointBucketIdPair> sliceRows = new ArrayList<>();
 
     for (MetricFunction metric : slice.getMetricFunctions()) {
       String metricUrn = MetricEntity.fromMetric(slice.getRequest().getFilterSet().asMap(), metric.getMetricId()).getUrn();
@@ -54,16 +76,27 @@ public class ThirdEyeCacheResponse {
         String timeColumnKey = slice.getGroupKeyColumns().get(0);
 
         int timeBucketId = Integer.parseInt(row.get(timeColumnKey));
-        sliceRows.set(timeBucketId,
-            new TimeSeriesDataPoint(metricUrn, Long.valueOf(row.get("timestamp")), metric.getMetricId(), row.get(metric.toString())));
+
+        TimeSeriesDataPoint dataPoint = new TimeSeriesDataPoint(metricUrn, Long.valueOf(row.get("timestamp")), metric.getMetricId(), row.get(metric.toString()));
+        sliceRows.add(new TimeSeriesDataPointBucketIdPair(dataPoint, timeBucketId));
       }
     }
 
+    Collections.sort(sliceRows,
+        (TimeSeriesDataPointBucketIdPair a, TimeSeriesDataPointBucketIdPair b) -> a.getTimeBucketId() - b.getTimeBucketId());
+
+    List<TimeSeriesDataPoint> sortedRows = new ArrayList<>();
+    for (TimeSeriesDataPointBucketIdPair pair : sliceRows) {
+      sortedRows.add(pair.getDataPoint());
+    }
+
+    //TreeMap<Integer, TimeSeriesDataPoint>
+
     if (type == MergeSliceType.PREPEND) {
-      sliceRows.addAll(rows);
-      this.rows = sliceRows;
+      sortedRows.addAll(rows);
+      this.rows = sortedRows;
     } else if (type == MergeSliceType.APPEND) {
-      rows.addAll(sliceRows);
+      rows.addAll(sortedRows);
     }
   }
 }
