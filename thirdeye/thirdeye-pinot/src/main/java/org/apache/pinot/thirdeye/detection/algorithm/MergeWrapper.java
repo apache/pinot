@@ -31,7 +31,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.anomaly.AnomalyType;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
@@ -45,6 +44,7 @@ import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.PredictionResult;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -204,9 +204,7 @@ public class MergeWrapper extends DetectionPipeline {
         parent.setEndTime(Math.max(parent.getEndTime(), anomaly.getEndTime()));
 
         // merge the anomaly's properties into parent
-        Map<String, String> properties = parent.getProperties();
-        properties.putAll(anomaly.getProperties());
-        parent.setProperties(properties);
+        ThirdEyeUtils.mergeAnomalyProperties(parent.getProperties(), anomaly.getProperties());
         if (isExistingAnomaly(parent)) {
           modifiedExistingAnomalies.add(parent);
         } else {

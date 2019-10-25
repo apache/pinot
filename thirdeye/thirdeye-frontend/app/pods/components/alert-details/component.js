@@ -1014,7 +1014,11 @@ export default Component.extend({
     let result;
     if (properties && typeof properties === 'object') {
       if (properties.detectorComponentName) {
-        result = properties.detectorComponentName.split(':')[0];
+        // The format is rule1_name:rule1_type,rule2_name:rule2_type ...
+        // For example: wow_10_percent_change:PERCENTAGE_RULE,algorithm:ALGORITHM
+        let rules = [];
+        properties.detectorComponentName.split(',').forEach(x => { rules.push(x.split(':')[0])});
+        result = rules.sort().join();
       } else {
         result = '--';
       }
