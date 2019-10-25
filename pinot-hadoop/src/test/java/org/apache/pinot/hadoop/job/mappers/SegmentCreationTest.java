@@ -21,6 +21,7 @@ package org.apache.pinot.hadoop.job.mappers;
 import java.net.URI;
 import org.apache.hadoop.fs.Path;
 import org.testng.Assert;
+import org.testng.Assert.ThrowingRunnable;
 import org.testng.annotations.Test;
 
 
@@ -33,6 +34,15 @@ public class SegmentCreationTest {
     Path outputPath = new Path("/path/to/output");
     Path bootstrapOutputPath = SegmentCreationMapper.getBootstrapOutputPath(baseDir, inputFile, outputPath);
     Assert.assertEquals(bootstrapOutputPath.toString(), "/path/to/output/a/b/c/d");
+  }
+
+
+  @Test
+  public void testBootstrapOutputPath1() {
+    URI baseDir = new Path("/path/to/input/*/*.avro").toUri();
+    URI inputFile = new Path("/path/to/input/a/b.avro").toUri();
+    Path outputPath = new Path("/path/to/output");
+    Assert.assertThrows(() -> SegmentCreationMapper.getBootstrapOutputPath(baseDir, inputFile, outputPath));
   }
 
   @Test

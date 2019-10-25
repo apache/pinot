@@ -32,7 +32,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
@@ -90,7 +89,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     _jobConf = context.getConfiguration();
     logConfigurations();
 
-    _bootstrapJob = _jobConf.getBoolean(JobConfigConstants.BOOTSTRAP_JOB, false);
+    _bootstrapJob = _jobConf.getBoolean(JobConfigConstants.USE_RELATIVE_PATH, false);
     _rawTableName = _jobConf.get(JobConfigConstants.SEGMENT_TABLE_NAME);
     _schema = Schema.fromString(_jobConf.get(JobConfigConstants.SCHEMA));
 
@@ -283,10 +282,10 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
    */
   protected static Path getBootstrapOutputPath(URI baseInputDir, URI inputFile, Path outputDir) {
     URI relativePath = baseInputDir.relativize(inputFile);
-    if (relativePath.getPath().length() > 0) {
+    if (relativePath.getPath().length() > 0 && !relativePath.equals(inputFile)) {
       return new Path(outputDir, relativePath.getPath()).getParent();
     }
-    return null;
+    throw new RuntimeException("Unable to extract out the relative path based on base input path: " + baseInputDir);
   }
 
   protected FileFormat getFileFormat(String fileName) {
