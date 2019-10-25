@@ -82,7 +82,6 @@ public class CouchbaseCacheDAO {
   public void insertTimeSeriesDataPoint(TimeSeriesDataPoint point) {
 
     JsonDocument doc = bucket.getAndTouch(point.getDocumentKey(), TIMEOUT);
-    //JsonDocument doc = bucket.get(point.getDocumentKey());
 
     if (doc == null) {
       JsonObject documentBody = CacheUtils.buildDocumentStructure(point);

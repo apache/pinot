@@ -159,7 +159,8 @@ public class DefaultDataProvider implements DataProvider {
         }
       }
       //LOG.info("Fetching {} slices of timeseries, {} cache hit, {} cache miss", slices.size(), output.size(), futures.size());
-      final long deadline = System.currentTimeMillis() + TIMEOUT;
+      // TODO: CHANGE THIS TIMEOUT BACK, JUST USING IT FOR DEBUG PURPOSES
+      final long deadline = System.currentTimeMillis() + TIMEOUT * 100;
       for (MetricSlice slice : slices) {
         if (!output.containsKey(slice)) {
           output.put(slice, futures.get(slice).get(makeTimeout(deadline), TimeUnit.MILLISECONDS));
