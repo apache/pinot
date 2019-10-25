@@ -53,26 +53,30 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
       return dataSourceResponse;
     }
 
-    long sliceStart = thirdEyeRequest.getStartTimeInclusive().getMillis();
-    long sliceEnd = thirdEyeRequest.getEndTimeExclusive().getMillis();
+    DateTime sliceStart = thirdEyeRequest.getStartTimeInclusive();
+    DateTime sliceEnd = thirdEyeRequest.getEndTimeExclusive();
 
-    if (cacheResponse.isMissingSlice(sliceStart, sliceEnd)) {
+    if (cacheResponse.isMissingSlice(sliceStart.getMillis(), sliceEnd.getMillis())) {
       fetchMissingSlices(cacheResponse);
     }
 
     List<String[]> rows = new ArrayList<>();
     String dataset = thirdEyeRequest.getMetricFunctions().get(0).getDataset();
+
     DatasetConfigDTO datasetDTO = datasetDAO.findByDataset(dataset);
     TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetDTO);
+    DateTimeZone timeZone = DateTimeZone.forID(datasetDTO.getTimezone());
 
     for (TimeSeriesDataPoint dataPoint : cacheResponse.getRows()) {
+      int timeBucketIndex = TimeRangeUtils.computeBucketIndex(
+          thirdEyeRequest.getGroupByTimeGranularity(),
+          sliceStart,
+          new DateTime(dataPoint.getTimestamp(), timeZone));
+
       String[] row = new String[2];
-      row[0] = String.valueOf(
-          TimeRangeUtils.computeBucketIndex(
-              thirdEyeRequest.getGroupByTimeGranularity(),
-              thirdEyeRequest.getStartTimeInclusive(), new DateTime(dataPoint.getTimestamp(),
-              DateTimeZone.forID(datasetDTO.getTimezone()))));
+      row[0] = String.valueOf(timeBucketIndex);
       row[1] = dataPoint.getDataValue();
+
       rows.add(row);
     }
 

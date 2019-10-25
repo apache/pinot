@@ -43,60 +43,23 @@ public class ThirdEyeCacheResponse {
 
   public void mergeSliceIntoRows(ThirdEyeResponse slice, MergeSliceType type) {
 
-//    List<TimeSeriesDataPoint> sliceRows = new ArrayList<>(Arrays.asList(new TimeSeriesDataPoint[slice.getNumRows()]));
-//
-//    for (MetricFunction metric : slice.getMetricFunctions()) {
-//      String metricUrn = MetricEntity.fromMetric(slice.getRequest().getFilterSet().asMap(), metric.getMetricId()).getUrn();
-//      for (int i = 0; i < slice.getNumRowsFor(metric); i++) {
-//        Map<String, String> row = slice.getRow(metric, i);
-//
-//        // this assumption maybe wrong. need to look more into this.
-//        String timeColumnKey = slice.getGroupKeyColumns().get(0);
-//
-//        int timeBucketId = Integer.parseInt(row.get(timeColumnKey));
-//
-//        // test fix for indexOutOfBoundsException
-//        if (timeBucketId == sliceRows.size()) {
-//          sliceRows.add(new TimeSeriesDataPoint(metricUrn, Long.valueOf(row.get("timestamp")), metric.getMetricId(), row.get(metric.toString())));
-//        } else {
-//          sliceRows.set(timeBucketId,
-//              new TimeSeriesDataPoint(metricUrn, Long.valueOf(row.get("timestamp")), metric.getMetricId(), row.get(metric.toString())));
-//        }
-//      }
-//    }
-
-    List<TimeSeriesDataPointBucketIdPair> sliceRows = new ArrayList<>();
+    List<TimeSeriesDataPoint> sliceRows = new ArrayList<>();
 
     for (MetricFunction metric : slice.getMetricFunctions()) {
       String metricUrn = MetricEntity.fromMetric(slice.getRequest().getFilterSet().asMap(), metric.getMetricId()).getUrn();
       for (int i = 0; i < slice.getNumRowsFor(metric); i++) {
         Map<String, String> row = slice.getRow(metric, i);
-
         // this assumption maybe wrong. need to look more into this.
         String timeColumnKey = slice.getGroupKeyColumns().get(0);
-
-        int timeBucketId = Integer.parseInt(row.get(timeColumnKey));
-
-        TimeSeriesDataPoint dataPoint = new TimeSeriesDataPoint(metricUrn, Long.valueOf(row.get("timestamp")), metric.getMetricId(), row.get(metric.toString()));
-        sliceRows.add(new TimeSeriesDataPointBucketIdPair(dataPoint, timeBucketId));
+        sliceRows.add(new TimeSeriesDataPoint(metricUrn, Long.valueOf(row.get("timestamp")), metric.getMetricId(), row.get(metric.toString())));
       }
     }
 
-    Collections.sort(sliceRows,
-        (TimeSeriesDataPointBucketIdPair a, TimeSeriesDataPointBucketIdPair b) -> a.getTimeBucketId() - b.getTimeBucketId());
-
-    List<TimeSeriesDataPoint> sortedRows = new ArrayList<>();
-    for (TimeSeriesDataPointBucketIdPair pair : sliceRows) {
-      sortedRows.add(pair.getDataPoint());
-    }
-
-    //TreeMap<Integer, TimeSeriesDataPoint>
-
     if (type == MergeSliceType.PREPEND) {
-      sortedRows.addAll(rows);
-      this.rows = sortedRows;
+      sliceRows.addAll(rows);
+      this.rows = sliceRows;
     } else if (type == MergeSliceType.APPEND) {
-      rows.addAll(sortedRows);
+      rows.addAll(sliceRows);
     }
   }
 }
