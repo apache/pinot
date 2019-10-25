@@ -32,7 +32,6 @@ import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
@@ -207,7 +206,7 @@ public class PinotSegmentUploadRestletResource {
     Response.ResponseBuilder builder = Response.ok();
     File segmentFile;
     // If the segment file is local, just use it as the return object; otherwise copy it from remote to local.
-    if (segmentFileURI.getScheme().equals(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
+    if (CommonConstants.Segment.LOCAL_SEGMENT_SCHEME.equals(segmentFileURI.getScheme())) {
       segmentFile = new File(provider.getBaseDataDir(), StringUtil.join("/", tableName, segmentName));
       builder.entity(segmentFile);
     } else {
