@@ -145,7 +145,7 @@ public class DefaultDataProvider implements DataProvider {
       // if not in cache, fetch from data source
       Map<MetricSlice, Future<DataFrame>> futures = new HashMap<>();
 
-      boolean runBryanPoC = true;
+      boolean runBryanPoC = false;
       if (runBryanPoC) {
         Map<Long, MetricSlice> ranges = CacheUtils.findMaxRangeInterval(slices);
         for (MetricSlice slice : ranges.values()) {

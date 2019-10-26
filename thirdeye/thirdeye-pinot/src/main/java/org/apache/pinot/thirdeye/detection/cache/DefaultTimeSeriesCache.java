@@ -61,8 +61,8 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
     }
 
     List<String[]> rows = new ArrayList<>();
-    String dataset = thirdEyeRequest.getMetricFunctions().get(0).getDataset();
 
+    String dataset = thirdEyeRequest.getMetricFunctions().get(0).getDataset();
     DatasetConfigDTO datasetDTO = datasetDAO.findByDataset(dataset);
     TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetDTO);
     DateTimeZone timeZone = DateTimeZone.forID(datasetDTO.getTimezone());
@@ -70,10 +70,11 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
     for (TimeSeriesDataPoint dataPoint : cacheResponse.getRows()) {
       int timeBucketIndex = TimeRangeUtils.computeBucketIndex(
           thirdEyeRequest.getGroupByTimeGranularity(), sliceStart, new DateTime(dataPoint.getTimestamp(), timeZone));
+      String dataValue = dataPoint.getDataValue();
 
       String[] row = new String[2];
       row[0] = String.valueOf(timeBucketIndex);
-      row[1] = dataPoint.getDataValue();
+      row[1] = (dataValue == null || dataValue.equals("null")) ? "0" : dataValue;
 
       rows.add(row);
     }
