@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.data.table;
 
-import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
-import javax.annotation.Nonnull;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.DataSchema;
@@ -33,43 +33,60 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
  */
 public abstract class IndexedTable implements Table {
 
-  List<AggregationFunction> _aggregationFunctions;
+  AggregationFunction[] _aggregationFunctions;
   int _numAggregations;
-  DataSchema _dataSchema;
+  private DataSchema _dataSchema;
 
+  // the capacity we need to trim to
+  int _capacity;
+  // the capacity with added buffer, in order to collect more records than capacity for better precision
   int _maxCapacity;
-  int _bufferedCapacity;
 
-  @Override
-  public void init(@Nonnull DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
+  boolean _isOrderBy;
+  IndexedTableResizer _indexedTableResizer;
+
+  /**
+   * Initializes the variables and comparators needed for the table
+   */
+  public IndexedTable(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy,
       int capacity) {
     _dataSchema = dataSchema;
 
     _numAggregations = aggregationInfos.size();
-    _aggregationFunctions = new ArrayList<>(_numAggregations);
-    for (AggregationInfo aggregationInfo : aggregationInfos) {
-      _aggregationFunctions.add(
-          AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction());
+    _aggregationFunctions = new AggregationFunction[_numAggregations];
+    for (int i = 0; i < _numAggregations; i++) {
+      _aggregationFunctions[i] =
+          AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfos.get(i)).getAggregationFunction();
     }
 
-    /* Factor used to add buffer to maxCapacity of the table **/
-    double bufferFactor;
-    /* Factor used to decide eviction threshold **/
-    /** The true capacity of the table is {@link IndexedTable::_bufferedCapacity},
-     * which is bufferFactor times the {@link IndexedTable::_maxCapacity}
-     *
-     * If records beyond {@link IndexedTable::_bufferedCapacity} are received,
-     * the table resize and evict bottom records, resizing it to {@link IndexedTable::_maxCapacity}
-     * The assumption here is that {@link IndexedTable::_maxCapacity} already has a buffer added by the caller (typically, we do max(top * 5, 5000))
-     */
-    if (capacity > 50000) {
-      // if max capacity is large, buffer capacity is kept smaller, so that we do not accumulate too many records for sorting/resizing
-      bufferFactor = 1.2;
+    _isOrderBy = CollectionUtils.isNotEmpty(orderBy);
+    if (_isOrderBy) {
+      _indexedTableResizer = new IndexedTableResizer(dataSchema, aggregationInfos, orderBy);
+
+      // TODO: tune these numbers
+      // Based on the capacity and maxCapacity, the resizer will smartly choose to evict/retain recors from the PQ
+      if (capacity <= 100_000) { // Capacity is small, make a very large buffer. Make PQ of records to retain, during resize
+        _maxCapacity = 1_000_000;
+      } else { // Capacity is large, make buffer only slightly bigger. Make PQ of records to evict, during resize
+        _maxCapacity = (int) (capacity * 1.2);
+      }
     } else {
-      // if max capacity is small, buffer capacity is kept larger, so that we avoid frequent resizing
-      bufferFactor = 2.0;
+      _maxCapacity = capacity;
     }
-    _maxCapacity = capacity;
-    _bufferedCapacity = (int) (capacity * bufferFactor);
+    _capacity = capacity;
+  }
+
+  @Override
+  public boolean merge(Table table) {
+    Iterator<Record> iterator = table.iterator();
+    while (iterator.hasNext()) {
+      upsert(iterator.next());
+    }
+    return true;
+  }
+
+  @Override
+  public DataSchema getDataSchema() {
+    return _dataSchema;
   }
 }

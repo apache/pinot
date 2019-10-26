@@ -279,7 +279,8 @@ public class IntermediateResultsBlock implements Block {
     return attachMetadataToDataTable(dataTable);
   }
 
-  private void setDataTableColumn(ColumnDataType columnDataType, DataTableBuilder dataTableBuilder, int columnIndex, Object value)
+  private void setDataTableColumn(ColumnDataType columnDataType, DataTableBuilder dataTableBuilder, int columnIndex,
+      Object value)
       throws IOException {
     switch (columnDataType) {
 
@@ -297,6 +298,10 @@ public class IntermediateResultsBlock implements Block {
         break;
       case STRING:
         dataTableBuilder.setColumn(columnIndex, (String) value);
+        break;
+      case BYTES:
+        // FIXME: support BYTES in DataTable instead of converting to string
+        dataTableBuilder.setColumn(columnIndex, value.toString()); // ByteArray::toString
         break;
       default:
         dataTableBuilder.setColumn(columnIndex, value);

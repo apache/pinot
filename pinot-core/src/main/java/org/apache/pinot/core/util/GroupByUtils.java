@@ -18,24 +18,41 @@
  */
 package org.apache.pinot.core.util;
 
+import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.GroupBy;
+import org.apache.pinot.common.request.SelectionSort;
 
 import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.*;
 
 
 public final class GroupByUtils {
 
-  public static final int NUM_RESULTS_LOWER_LIMIT = 5000;
+  private static final int NUM_RESULTS_LOWER_LIMIT = 5000;
 
   private GroupByUtils() {
 
   }
 
   /**
-   * Returns the higher of topN * 5 or 5k. This is to ensure we better precision in results
+   * Returns the higher of topN * 5 or 5k. This is to ensure better precision in results
    */
   public static int getTableCapacity(int topN) {
     return Math.max(topN * 5, NUM_RESULTS_LOWER_LIMIT);
+  }
+
+  /**
+   * For group by + order by queries: returns the higher of (topN * 5) or (5k), to ensure better precision in results
+   * For group by with no order by queries: returns the topN
+   */
+  public static int getTableCapacity(GroupBy groupBy, List<SelectionSort> orderBy) {
+    int topN = (int) groupBy.getTopN();
+    if (orderBy != null && !orderBy.isEmpty()) {
+      return getTableCapacity(topN);
+    } else {
+      return topN;
+    }
   }
 
   public static boolean isGroupByMode(String groupByMode, Map<String, String> queryOptions) {

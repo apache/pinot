@@ -63,6 +63,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     _numTotalRawDocs = numTotalRawDocs;
     _useStarTree = useStarTree;
 
+    // NOTE: The indexedTable expects that the the data schema will have group by columns before aggregation columns
     int numColumns = groupBy.getExpressionsSize() + _functionContexts.length;
     String[] columnNames = new String[numColumns];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
@@ -84,6 +85,9 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       columnDataTypes[index] = functionContext.getAggregationFunction().getIntermediateResultColumnType();
       index++;
     }
+
+    // TODO: We need to support putting order by columns in the data schema.
+    //  It is possible that the order by column is not one of the group by or aggregation columns
 
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
   }
