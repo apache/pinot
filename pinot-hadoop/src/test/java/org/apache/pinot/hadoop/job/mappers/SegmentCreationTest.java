@@ -21,7 +21,6 @@ package org.apache.pinot.hadoop.job.mappers;
 import java.net.URI;
 import org.apache.hadoop.fs.Path;
 import org.testng.Assert;
-import org.testng.Assert.ThrowingRunnable;
 import org.testng.annotations.Test;
 
 
@@ -32,17 +31,16 @@ public class SegmentCreationTest {
     URI baseDir = new Path("/path/to/input").toUri();
     URI inputFile = new Path("/path/to/input/a/b/c/d/e").toUri();
     Path outputPath = new Path("/path/to/output");
-    Path bootstrapOutputPath = SegmentCreationMapper.getBootstrapOutputPath(baseDir, inputFile, outputPath);
-    Assert.assertEquals(bootstrapOutputPath.toString(), "/path/to/output/a/b/c/d");
+    Path relativeOutputPath = SegmentCreationMapper.getRelativeOutputPath(baseDir, inputFile, outputPath);
+    Assert.assertEquals(relativeOutputPath.toString(), "/path/to/output/a/b/c/d");
   }
-
 
   @Test
   public void testBootstrapOutputPath1() {
     URI baseDir = new Path("/path/to/input/*/*.avro").toUri();
     URI inputFile = new Path("/path/to/input/a/b.avro").toUri();
     Path outputPath = new Path("/path/to/output");
-    Assert.assertThrows(() -> SegmentCreationMapper.getBootstrapOutputPath(baseDir, inputFile, outputPath));
+    Assert.assertThrows(() -> SegmentCreationMapper.getRelativeOutputPath(baseDir, inputFile, outputPath));
   }
 
   @Test
@@ -50,33 +48,28 @@ public class SegmentCreationTest {
     URI baseDir = new Path("s3a://sample-s3-bucket/tmp/pinot/input").toUri();
     URI inputFile = new Path("s3a://sample-s3-bucket/tmp/pinot/input/airlineStats_data.avro").toUri();
     Path outputPath = new Path("s3a://sample-s3-bucket/tmp/pinot/output");
-    Path bootstrapOutputPath = SegmentCreationMapper.getBootstrapOutputPath(baseDir, inputFile, outputPath);
-    Assert.assertEquals(bootstrapOutputPath.toString(),
-        "s3a://sample-s3-bucket/tmp/pinot/output");
+    Path relativeOutputPath = SegmentCreationMapper.getRelativeOutputPath(baseDir, inputFile, outputPath);
+    Assert.assertEquals(relativeOutputPath.toString(), "s3a://sample-s3-bucket/tmp/pinot/output");
 
     baseDir = new Path("s3a://sample-s3-bucket/tmp/pinot/input").toUri();
     inputFile = new Path("s3a://sample-s3-bucket/tmp/pinot/input/yyyy=2019/mm=10/dd=18/airlineStats_data.avro").toUri();
     outputPath = new Path("s3a://sample-s3-bucket/tmp/pinot/output");
-    bootstrapOutputPath = SegmentCreationMapper.getBootstrapOutputPath(baseDir, inputFile, outputPath);
-    Assert.assertEquals(bootstrapOutputPath.toString(),
-        "s3a://sample-s3-bucket/tmp/pinot/output/yyyy=2019/mm=10/dd=18");
+    relativeOutputPath = SegmentCreationMapper.getRelativeOutputPath(baseDir, inputFile, outputPath);
+    Assert.assertEquals(relativeOutputPath.toString(), "s3a://sample-s3-bucket/tmp/pinot/output/yyyy=2019/mm=10/dd=18");
   }
-
 
   @Test
   public void testBootstrapOutputPathHdfs() {
     URI baseDir = new Path("hdfs://raw-data/tmp/pinot/input").toUri();
     URI inputFile = new Path("hdfs://raw-data/tmp/pinot/input/airlineStats_data.avro").toUri();
     Path outputPath = new Path("hdfs://raw-data/tmp/pinot/output");
-    Path bootstrapOutputPath = SegmentCreationMapper.getBootstrapOutputPath(baseDir, inputFile, outputPath);
-    Assert.assertEquals(bootstrapOutputPath.toString(),
-        "hdfs://raw-data/tmp/pinot/output");
+    Path relativeOutputPath = SegmentCreationMapper.getRelativeOutputPath(baseDir, inputFile, outputPath);
+    Assert.assertEquals(relativeOutputPath.toString(), "hdfs://raw-data/tmp/pinot/output");
 
     baseDir = new Path("hdfs://raw-data/tmp/pinot/input").toUri();
     inputFile = new Path("hdfs://raw-data/tmp/pinot/input/yyyy=2019/mm=10/dd=18/airlineStats_data.avro").toUri();
     outputPath = new Path("hdfs://raw-data/tmp/pinot/output");
-    bootstrapOutputPath = SegmentCreationMapper.getBootstrapOutputPath(baseDir, inputFile, outputPath);
-    Assert.assertEquals(bootstrapOutputPath.toString(),
-        "hdfs://raw-data/tmp/pinot/output/yyyy=2019/mm=10/dd=18");
+    relativeOutputPath = SegmentCreationMapper.getRelativeOutputPath(baseDir, inputFile, outputPath);
+    Assert.assertEquals(relativeOutputPath.toString(), "hdfs://raw-data/tmp/pinot/output/yyyy=2019/mm=10/dd=18");
   }
 }
