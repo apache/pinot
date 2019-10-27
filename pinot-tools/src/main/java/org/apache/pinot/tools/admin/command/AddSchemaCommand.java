@@ -65,7 +65,7 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
   @Override
   public String toString() {
     String retString =
-        ("AddSchema -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort + " -schemaFilePath "
+        ("AddSchema -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort + " -schemaFile "
             + _schemaFile);
 
     return ((_exec) ? (retString + " -exec") : retString);
