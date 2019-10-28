@@ -71,13 +71,4 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
 
     return DataFrameUtils.evaluateResponse(response, rc);
   }
-
-  public void prefetchTimeSeriesWindowRangeIntoCache(MetricSlice slice) throws Exception {
-
-    // TODO: add a check if TimeSeries already exists in cache. can use SELECT COUNT?
-    TimeSeriesRequestContainer rc = DataFrameUtils.makeTimeSeriesRequestAligned(slice, "ref", this.metricDAO, this.datasetDAO);
-    ThirdEyeResponse response = this.cache.getQueryResult(rc.getRequest());
-
-    timeSeriesCache.insertTimeSeriesIntoCache(response);
-  }
 }

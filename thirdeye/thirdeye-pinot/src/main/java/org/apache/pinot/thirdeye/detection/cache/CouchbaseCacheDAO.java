@@ -87,7 +87,8 @@ public class CouchbaseCacheDAO {
       JsonObject documentBody = CacheUtils.buildDocumentStructure(point);
       doc = JsonDocument.create(point.getDocumentKey(), TIMEOUT, documentBody);
     } else {
-      JsonObject dimensions = doc.content().getObject("dims");
+      // will this have memory issues later? if we need to pull all the dimension values into memory.
+      JsonObject dimensions = doc.content();
       if (dimensions.containsKey(point.getMetricUrnHash()))
         return;
       dimensions.put(point.getMetricUrnHash(), point.getDataValue() == null ? "0" : point.getDataValue());

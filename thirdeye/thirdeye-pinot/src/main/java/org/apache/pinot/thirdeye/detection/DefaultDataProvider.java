@@ -60,7 +60,6 @@ import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EvaluationSlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
-import org.apache.pinot.thirdeye.util.CacheUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,7 +81,6 @@ public class DefaultDataProvider implements DataProvider {
   private final TimeSeriesLoader timeseriesLoader;
   private final AggregationLoader aggregationLoader;
   private final DetectionPipelineLoader loader;
-  private static LoadingCache<MetricSlice, DataFrame> DETECTION_TIME_SERIES_CACHE;
 
   public DefaultDataProvider(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, EventManager eventDAO,
       MergedAnomalyResultManager anomalyDAO, EvaluationManager evaluationDAO, TimeSeriesLoader timeseriesLoader,
@@ -95,30 +93,6 @@ public class DefaultDataProvider implements DataProvider {
     this.timeseriesLoader = timeseriesLoader;
     this.aggregationLoader = aggregationLoader;
     this.loader = loader;
-
-    if (DETECTION_TIME_SERIES_CACHE == null) {
-      // don't use more than one third of memory for detection time series
-      long cacheSize = Runtime.getRuntime().freeMemory() / 3;
-      LOG.info("initializing detection timeseries cache with {} bytes", cacheSize);
-      DETECTION_TIME_SERIES_CACHE = CacheBuilder.newBuilder()
-          .maximumWeight(cacheSize)
-          // Estimate that most detection tasks will complete within 15 minutes
-          .expireAfterWrite(15, TimeUnit.MINUTES)
-          .weigher((Weigher<MetricSlice, DataFrame>) (slice, dataFrame) -> dataFrame.size() * (Long.BYTES + Double.BYTES))
-          .build(new CacheLoader<MetricSlice, DataFrame>() {
-            // load single slice
-            @Override
-            public DataFrame load(MetricSlice slice) {
-              return loadTimeseries(Collections.singleton(slice)).get(slice);
-            }
-
-            // buck loading time series slice in parallel
-            @Override
-            public Map<MetricSlice, DataFrame> loadAll(Iterable<? extends MetricSlice> slices) {
-              return loadTimeseries(Lists.newArrayList(slices));
-            }
-          });
-    }
   }
 
   private Map<MetricSlice, DataFrame> loadTimeseries(Collection<MetricSlice> slices) {
@@ -126,36 +100,8 @@ public class DefaultDataProvider implements DataProvider {
       long ts = System.currentTimeMillis();
       Map<MetricSlice, DataFrame> output = new HashMap<>();
 
-      // if the time series slice is already in cache, return directly
-//      for (MetricSlice slice : slices){
-//        LOG.info(slice.toString());
-//        for (Map.Entry<MetricSlice, DataFrame> entry : DETECTION_TIME_SERIES_CACHE.asMap().entrySet()) {
-//          // current slice potentially contained in cache
-//          if (entry.getKey().containSlice(slice)){
-//            DataFrame df = entry.getValue().filter(entry.getValue().getLongs(COL_TIME).between(slice.getStart(), slice.getEnd())).dropNull(COL_TIME);
-//            // double check if it is cache hit
-//            if (df.getLongs(COL_TIME).size() > 0) {
-//              output.put(slice, df);
-//              break;
-//            }
-//          }
-//        }
-//      }
-
       // if not in cache, fetch from data source
       Map<MetricSlice, Future<DataFrame>> futures = new HashMap<>();
-
-      // TODO: research if this is even necessary?
-      // if so, we can just check if the documents for the first and last timestamps exist
-      // and if they do, we don't need to fetch anything else.
-
-//      boolean runBryanPoC = false;
-//      if (runBryanPoC) {
-//        Map<Long, MetricSlice> ranges = CacheUtils.findMaxRangeInterval(slices);
-//        for (MetricSlice slice : ranges.values()) {
-//          timeseriesLoader.prefetchTimeSeriesWindowRangeIntoCache(slice);
-//        }
-//      }
 
       for (final MetricSlice slice : slices) {
         if (!output.containsKey(slice)){
@@ -163,8 +109,7 @@ public class DefaultDataProvider implements DataProvider {
         }
       }
       //LOG.info("Fetching {} slices of timeseries, {} cache hit, {} cache miss", slices.size(), output.size(), futures.size());
-      // TODO: CHANGE THIS TIMEOUT BACK, JUST USING IT FOR DEBUG PURPOSES
-      final long deadline = System.currentTimeMillis() + TIMEOUT * 100;
+      final long deadline = System.currentTimeMillis() + TIMEOUT;
       for (MetricSlice slice : slices) {
         if (!output.containsKey(slice)) {
           output.put(slice, futures.get(slice).get(makeTimeout(deadline), TimeUnit.MILLISECONDS));
@@ -185,11 +130,10 @@ public class DefaultDataProvider implements DataProvider {
       for (MetricSlice slice: slices) {
         alignedMetricSlicesToOriginalSlice.put(alignSlice(slice), slice);
       }
-      Map<MetricSlice, DataFrame> cacheResult = DETECTION_TIME_SERIES_CACHE.getAll(alignedMetricSlicesToOriginalSlice.keySet());
+      Map<MetricSlice, DataFrame> cacheResult = loadTimeseries(alignedMetricSlicesToOriginalSlice.keySet());
       Map<MetricSlice, DataFrame> timeseriesResult = new HashMap<>();
       for (Map.Entry<MetricSlice, DataFrame> entry : cacheResult.entrySet()) {
-        // make a copy of the result so that cache won't be contaminated by client code
-        timeseriesResult.put(alignedMetricSlicesToOriginalSlice.get(entry.getKey()), entry.getValue().copy());
+        timeseriesResult.put(alignedMetricSlicesToOriginalSlice.get(entry.getKey()), entry.getValue());
       }
       return timeseriesResult;
     } catch (Exception e) {
@@ -384,10 +328,4 @@ public class DefaultDataProvider implements DataProvider {
     return dataset;
   }
 
-  public static void cleanCache() {
-    if (DETECTION_TIME_SERIES_CACHE != null) {
-      DETECTION_TIME_SERIES_CACHE.cleanUp();
-      DETECTION_TIME_SERIES_CACHE = null;
-    }
-  }
 }

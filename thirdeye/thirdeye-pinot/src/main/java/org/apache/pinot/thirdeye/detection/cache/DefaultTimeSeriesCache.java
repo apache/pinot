@@ -43,7 +43,7 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
   }
 
   public ThirdEyeResponse fetchTimeSeries(ThirdEyeRequest thirdEyeRequest) throws Exception {
-    LOG.info("trying to fetch data from cache...");
+    //LOG.info("trying to fetch data from cache...");
 
     ThirdEyeCacheResponse cacheResponse = cacheDAO.tryFetchExistingTimeSeries(ThirdEyeCacheRequest.from(thirdEyeRequest));
 
