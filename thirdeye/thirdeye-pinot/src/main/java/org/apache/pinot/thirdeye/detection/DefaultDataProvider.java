@@ -127,31 +127,35 @@ public class DefaultDataProvider implements DataProvider {
       Map<MetricSlice, DataFrame> output = new HashMap<>();
 
       // if the time series slice is already in cache, return directly
-      for (MetricSlice slice : slices){
-        LOG.info(slice.toString());
-        for (Map.Entry<MetricSlice, DataFrame> entry : DETECTION_TIME_SERIES_CACHE.asMap().entrySet()) {
-          // current slice potentially contained in cache
-          if (entry.getKey().containSlice(slice)){
-            DataFrame df = entry.getValue().filter(entry.getValue().getLongs(COL_TIME).between(slice.getStart(), slice.getEnd())).dropNull(COL_TIME);
-            // double check if it is cache hit
-            if (df.getLongs(COL_TIME).size() > 0) {
-              output.put(slice, df);
-              break;
-            }
-          }
-        }
-      }
+//      for (MetricSlice slice : slices){
+//        LOG.info(slice.toString());
+//        for (Map.Entry<MetricSlice, DataFrame> entry : DETECTION_TIME_SERIES_CACHE.asMap().entrySet()) {
+//          // current slice potentially contained in cache
+//          if (entry.getKey().containSlice(slice)){
+//            DataFrame df = entry.getValue().filter(entry.getValue().getLongs(COL_TIME).between(slice.getStart(), slice.getEnd())).dropNull(COL_TIME);
+//            // double check if it is cache hit
+//            if (df.getLongs(COL_TIME).size() > 0) {
+//              output.put(slice, df);
+//              break;
+//            }
+//          }
+//        }
+//      }
 
       // if not in cache, fetch from data source
       Map<MetricSlice, Future<DataFrame>> futures = new HashMap<>();
 
-      boolean runBryanPoC = false;
-      if (runBryanPoC) {
-        Map<Long, MetricSlice> ranges = CacheUtils.findMaxRangeInterval(slices);
-        for (MetricSlice slice : ranges.values()) {
-          timeseriesLoader.prefetchTimeSeriesWindowRangeIntoCache(slice);
-        }
-      }
+      // TODO: research if this is even necessary?
+      // if so, we can just check if the documents for the first and last timestamps exist
+      // and if they do, we don't need to fetch anything else.
+
+//      boolean runBryanPoC = false;
+//      if (runBryanPoC) {
+//        Map<Long, MetricSlice> ranges = CacheUtils.findMaxRangeInterval(slices);
+//        for (MetricSlice slice : ranges.values()) {
+//          timeseriesLoader.prefetchTimeSeriesWindowRangeIntoCache(slice);
+//        }
+//      }
 
       for (final MetricSlice slice : slices) {
         if (!output.containsKey(slice)){
