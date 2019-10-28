@@ -59,6 +59,7 @@ import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForward
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.startree.hll.HllConfig;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
@@ -82,6 +83,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
   private Map<String, ForwardIndexCreator> _forwardIndexCreatorMap = new HashMap<>();
   private Map<String, InvertedIndexCreator> _invertedIndexCreatorMap = new HashMap<>();
+  private Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new HashMap<>();
   private String segmentName;
   private Schema schema;
   private File _indexDir;
@@ -89,6 +91,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private int totalRawDocs;
   private int totalAggDocs;
   private int docIdCounter;
+  private boolean _nullHandlingEnabled;
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
@@ -190,6 +193,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
             getRawIndexCreatorForColumn(_indexDir, compressionType, columnName, fieldSpec.getDataType(), totalDocs,
                 indexCreationInfo.getLengthOfLongestEntry()));
       }
+
+      _nullHandlingEnabled = config.isNullHandlingEnabled();
+
+      if (_nullHandlingEnabled) {
+        // Initialize Null value vector map
+        _nullValueVectorCreatorMap.put(columnName, new NullValueVectorCreator(_indexDir, columnName));
+      }
     }
   }
 
@@ -280,6 +290,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           _invertedIndexCreatorMap.get(columnName).add(dictIds, dictIds.length);
         }
       }
+
+      if (_nullHandlingEnabled) {
+        // If row has null value for given column name, add to null value vector
+        if (row.isNullValue(columnName)) {
+          _nullValueVectorCreatorMap.get(columnName).setNull(docIdCounter);
+        }
+      }
     }
     docIdCounter++;
   }
@@ -294,6 +311,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       throws ConfigurationException, IOException {
     for (InvertedIndexCreator invertedIndexCreator : _invertedIndexCreatorMap.values()) {
       invertedIndexCreator.seal();
+    }
+    for (NullValueVectorCreator nullValueVectorCreator : _nullValueVectorCreatorMap.values()) {
+      nullValueVectorCreator.seal();
     }
     writeMetadata();
   }
@@ -662,6 +682,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   public void close()
       throws IOException {
     FileUtils.close(Iterables
-        .concat(_dictionaryCreatorMap.values(), _forwardIndexCreatorMap.values(), _invertedIndexCreatorMap.values()));
+        .concat(_dictionaryCreatorMap.values(), _forwardIndexCreatorMap.values(), _invertedIndexCreatorMap.values(), _nullValueVectorCreatorMap
+            .values()));
   }
 }

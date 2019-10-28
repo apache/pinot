@@ -44,6 +44,7 @@ import org.apache.pinot.core.segment.index.readers.OnHeapFloatDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapIntDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapLongDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapStringDictionary;
+import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
 import org.apache.pinot.core.segment.index.readers.StringDictionary;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
@@ -59,6 +60,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   private final InvertedIndexReader _invertedIndex;
   private final BaseImmutableDictionary _dictionary;
   private final BloomFilterReader _bloomFilterReader;
+  private final NullValueVectorReaderImpl _nullValueVectorReader;
 
   public PhysicalColumnIndexContainer(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
       IndexLoadingConfig indexLoadingConfig)
@@ -72,6 +74,14 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       loadOnHeapDictionary = indexLoadingConfig.getOnHeapDictionaryColumns().contains(columnName);
       loadBloomFilter = indexLoadingConfig.getBloomFilterColumns().contains(columnName);
     }
+
+    if(segmentReader.hasIndexFor(columnName, ColumnIndexType.NULLVALUE_VECTOR)) {
+      PinotDataBuffer nullValueVectorBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.NULLVALUE_VECTOR);
+      _nullValueVectorReader = new NullValueVectorReaderImpl(nullValueVectorBuffer);
+    } else {
+      _nullValueVectorReader = null;
+    }
+
     PinotDataBuffer fwdIndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
 
     if (metadata.hasDictionary()) {
@@ -138,6 +148,11 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   @Override
   public BloomFilterReader getBloomFilter() {
     return _bloomFilterReader;
+  }
+
+  @Override
+  public NullValueVectorReaderImpl getNullValueVector() {
+    return _nullValueVectorReader;
   }
 
   private static BaseImmutableDictionary loadDictionary(PinotDataBuffer dictionaryBuffer, ColumnMetadata metadata,

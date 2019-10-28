@@ -57,6 +57,9 @@ public class ColumnIndexDirectoryTestHelper {
       case BLOOM_FILTER:
         buf = columnDirectory.newBloomFilterBuffer(columnName, size);
         break;
+      case NULLVALUE_VECTOR:
+        buf = columnDirectory.newNullValueVectorBuffer(columnName, size);
+        break;
     }
     return buf;
   }
@@ -79,6 +82,9 @@ public class ColumnIndexDirectoryTestHelper {
         break;
       case BLOOM_FILTER:
         buf = columnDirectory.getBloomFilterBufferFor(columnName);
+        break;
+      case NULLVALUE_VECTOR:
+        buf = columnDirectory.getNullValueVectorBufferFor(columnName);
         break;
     }
     return buf;
@@ -141,6 +147,13 @@ public class ColumnIndexDirectoryTestHelper {
       public String answer(InvocationOnMock invocationOnMock)
           throws Throwable {
         return invocationOnMock.getArguments()[0] + ".bloom";
+      }
+    });
+    when(meta.getNullValueVectorFileName(anyString())).thenAnswer(new Answer<String>() {
+      @Override
+      public String answer(InvocationOnMock invocationOnMock)
+              throws Throwable {
+        return invocationOnMock.getArguments()[0] + ".nullvalue";
       }
     });
     return meta;

@@ -91,6 +91,13 @@ public class GenericRow {
   }
 
   /**
+   * Returns whether this row has null values for any of the columns
+   */
+  public boolean hasNullValues() {
+    return !_nullValueFields.isEmpty();
+  }
+
+  /**
    * Sets the value for the given field.
    */
   public void putValue(String fieldName, @Nullable Object value) {

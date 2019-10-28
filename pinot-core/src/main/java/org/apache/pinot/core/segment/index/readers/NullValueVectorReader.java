@@ -16,31 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.store;
+package org.apache.pinot.core.segment.index.readers;
 
-public enum ColumnIndexType {
-  DICTIONARY("dictionary"),
-  FORWARD_INDEX("forward_index"),
-  INVERTED_INDEX("inverted_index"),
-  BLOOM_FILTER("bloom_filter"),
-  NULLVALUE_VECTOR("nullvalue_vector");
+/**
+ * Reader interface to read from an underlying Null value vector. This is
+ * primarily used to check if a particular column value corresponding to
+ * a document ID is null or not.
+ */
+public interface NullValueVectorReader {
 
-  private final String indexName;
-
-  ColumnIndexType(String name) {
-    indexName = name;
-  }
-
-  public String getIndexName() {
-    return indexName;
-  }
-
-  public static ColumnIndexType getValue(String val) {
-    for (ColumnIndexType type : values()) {
-      if (type.getIndexName().equalsIgnoreCase(val)) {
-        return type;
-      }
-    }
-    throw new IllegalArgumentException("Unknown value: " + val);
-  }
+  /**
+   * Check if the given docId has a null value in the corresponding column
+   *
+   * @param docId specifies ID to check for nullability
+   * @return true if docId is absent (null). False otherwise
+   */
+  boolean isNull(int docId);
 }

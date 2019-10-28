@@ -16,31 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.store;
+package org.apache.pinot.core.realtime.impl.nullvalue;
 
-public enum ColumnIndexType {
-  DICTIONARY("dictionary"),
-  FORWARD_INDEX("forward_index"),
-  INVERTED_INDEX("inverted_index"),
-  BLOOM_FILTER("bloom_filter"),
-  NULLVALUE_VECTOR("nullvalue_vector");
+import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
-  private final String indexName;
 
-  ColumnIndexType(String name) {
-    indexName = name;
+/**
+ * Defines a real-time null value vector to be used in realtime ingestion.
+ */
+public class RealtimeNullValueVectorReaderWriter implements NullValueVectorReader {
+  private final MutableRoaringBitmap _nullBitmap;
+
+  public RealtimeNullValueVectorReaderWriter() {
+    _nullBitmap = new MutableRoaringBitmap();
   }
 
-  public String getIndexName() {
-    return indexName;
+  public void setNull(int docId) {
+    _nullBitmap.add(docId);
   }
 
-  public static ColumnIndexType getValue(String val) {
-    for (ColumnIndexType type : values()) {
-      if (type.getIndexName().equalsIgnoreCase(val)) {
-        return type;
-      }
-    }
-    throw new IllegalArgumentException("Unknown value: " + val);
+  public boolean isNull(int docId) {
+    return _nullBitmap.contains(docId);
   }
 }

@@ -16,31 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.store;
+package org.apache.pinot.core.segment.index.readers;
 
-public enum ColumnIndexType {
-  DICTIONARY("dictionary"),
-  FORWARD_INDEX("forward_index"),
-  INVERTED_INDEX("inverted_index"),
-  BLOOM_FILTER("bloom_filter"),
-  NULLVALUE_VECTOR("nullvalue_vector");
+import java.io.IOException;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
-  private final String indexName;
 
-  ColumnIndexType(String name) {
-    indexName = name;
+public class NullValueVectorReaderImpl implements NullValueVectorReader {
+
+  private final ImmutableRoaringBitmap _nullBitmap;
+
+  public NullValueVectorReaderImpl(PinotDataBuffer nullValueVectorBuffer) throws IOException {
+    _nullBitmap = new ImmutableRoaringBitmap(nullValueVectorBuffer.toDirectByteBuffer(0,
+        (int) nullValueVectorBuffer.size()));
   }
 
-  public String getIndexName() {
-    return indexName;
+  public boolean isNull(int docId) {
+    return _nullBitmap.contains(docId);
   }
 
-  public static ColumnIndexType getValue(String val) {
-    for (ColumnIndexType type : values()) {
-      if (type.getIndexName().equalsIgnoreCase(val)) {
-        return type;
-      }
-    }
-    throw new IllegalArgumentException("Unknown value: " + val);
-  }
 }

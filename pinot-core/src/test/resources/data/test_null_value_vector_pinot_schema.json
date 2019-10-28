@@ -1,0 +1,26 @@
+{
+  "schemaName": "test_pinot_table",
+  "dimensionFieldSpecs": [
+    {
+      "name": "cityid",
+      "dataType": "INT",
+      "defaultNullValue": 0
+    },
+    {
+      "name": "description",
+      "dataType": "STRING"
+    },
+    {
+      "name": "signup_email",
+      "dataType": "STRING",
+      "defaultNullValue": ""
+    }
+  ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "name": "secondsSinceEpoch",
+      "dataType": "LONG",
+      "timeType": "SECONDS"
+    }
+  }
+}

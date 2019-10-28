@@ -41,6 +41,13 @@ public class MutableSegmentImplTestUtils {
   public static MutableSegmentImpl createMutableSegmentImpl(@Nonnull Schema schema,
       @Nonnull Set<String> noDictionaryColumns, @Nonnull Set<String> varLengthDictionaryColumns,
       @Nonnull Set<String> invertedIndexColumns, boolean aggregateMetrics) {
+    return createMutableSegmentImpl(schema, noDictionaryColumns, varLengthDictionaryColumns, invertedIndexColumns,
+        aggregateMetrics, false);
+  }
+
+  public static MutableSegmentImpl createMutableSegmentImpl(@Nonnull Schema schema,
+      @Nonnull Set<String> noDictionaryColumns, @Nonnull Set<String> varLengthDictionaryColumns,
+      @Nonnull Set<String> invertedIndexColumns, boolean aggregateMetrics, boolean nullHandlingEnabled) {
     RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
     when(statsHistory.getEstimatedCardinality(anyString())).thenReturn(200);
     when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
@@ -51,7 +58,8 @@ public class MutableSegmentImplTestUtils {
             .setVarLengthDictionaryColumns(varLengthDictionaryColumns)
             .setInvertedIndexColumns(invertedIndexColumns).setRealtimeSegmentZKMetadata(new RealtimeSegmentZKMetadata())
             .setMemoryManager(new DirectMemoryManager(SEGMENT_NAME)).setStatsHistory(statsHistory)
-            .setAggregateMetrics(aggregateMetrics).build();
+            .setAggregateMetrics(aggregateMetrics)
+            .setNullHandlingEnabled(nullHandlingEnabled).build();
     return new MutableSegmentImpl(realtimeSegmentConfig);
   }
 }

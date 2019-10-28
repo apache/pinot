@@ -113,6 +113,7 @@ public class SegmentGeneratorConfig {
   // Use on-heap or off-heap memory to generate index (currently only affect inverted index and star-tree v2)
   private boolean _onHeap = false;
   private boolean _checkTimeColumnValidityDuringGeneration = true;
+  private boolean _nullHandlingEnabled = false;
 
   public SegmentGeneratorConfig() {
   }
@@ -162,6 +163,7 @@ public class SegmentGeneratorConfig {
     _onHeap = config._onHeap;
     _recordReaderPath = config._recordReaderPath;
     _checkTimeColumnValidityDuringGeneration = config._checkTimeColumnValidityDuringGeneration;
+    _nullHandlingEnabled = config._nullHandlingEnabled;
   }
 
   /**
@@ -218,6 +220,8 @@ public class SegmentGeneratorConfig {
 
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     _hllConfig = validationConfig.getHllConfig();
+
+    _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
   }
 
   public SegmentGeneratorConfig(Schema schema) {
@@ -679,5 +683,13 @@ public class SegmentGeneratorConfig {
 
     Collections.sort(fields);
     return StringUtils.join(fields, ",");
+  }
+
+  public boolean isNullHandlingEnabled() {
+    return _nullHandlingEnabled;
+  }
+
+  public void setNullHandlingEnabled(boolean nullHandlingEnabled) {
+    _nullHandlingEnabled = nullHandlingEnabled;
   }
 }

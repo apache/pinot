@@ -188,7 +188,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             getMemoryManager(realtimeTableDataManager.getConsumerDir(), segmentName,
                 indexLoadingConfig.isRealtimeOffheapAllocation(),
                 indexLoadingConfig.isDirectRealtimeOffheapAllocation(), serverMetrics))
-            .setStatsHistory(realtimeTableDataManager.getStatsHistory()).build();
+            .setStatsHistory(realtimeTableDataManager.getStatsHistory())
+            .setNullHandlingEnabled(indexingConfig.isNullHandlingEnabled()).build();
     realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfig);
 
     notifier = realtimeTableDataManager;
@@ -272,7 +273,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               new RealtimeSegmentConverter(realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
                   tableNameWithType, timeColumnName, realtimeSegmentZKMetadata.getSegmentName(), sortedColumn,
                   HLRealtimeSegmentDataManager.this.invertedIndexColumns, noDictionaryColumns,
-                  varLengthDictionaryColumns, null/*StarTreeIndexSpec*/); // Star tree not supported for HLC.
+                  varLengthDictionaryColumns, null/*StarTreeIndexSpec*/, indexingConfig.isNullHandlingEnabled()); // Star tree not supported for HLC.
 
           segmentLogger.info("Trying to build segment");
           final long buildStartTime = System.nanoTime();

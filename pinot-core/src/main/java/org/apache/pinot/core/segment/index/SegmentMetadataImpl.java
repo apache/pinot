@@ -531,6 +531,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return column + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION;
   }
 
+  @Override
+  public String getNullValueVectorFileName(String column) {
+    return column + V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION;
+  }
+
   @Nullable
   @Override
   public String getCreatorName() {
