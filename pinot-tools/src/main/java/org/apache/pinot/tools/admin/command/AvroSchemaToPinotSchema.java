@@ -91,7 +91,8 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
 
     File outputDir = new File(_outputDir);
     if (!outputDir.isDirectory()) {
-      LOGGER.error("ERROR: Output directory: %s does not exist or is not a directory", _outputDir);
+      LOGGER.error("ERROR: Output directory: {} does not exist or is not a directory", _outputDir);
+      return false;
     }
     File outputFile = new File(outputDir, _pinotSchemaName + ".json");
     LOGGER.info("Store Pinot schema to file: {}", outputFile.getAbsolutePath());
