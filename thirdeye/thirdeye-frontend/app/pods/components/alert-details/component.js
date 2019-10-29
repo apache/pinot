@@ -68,9 +68,9 @@ export default Component.extend({
   anomaliesOld: [],
   // flag for knowing the state of old anomalies, needed since there may be no anomalies
   anomaliesOldSet: false,
-  anomaliesNew: [],
+  anomaliesCurrent: [],
   // flag for knowing the state of old anomalies, needed since there may be no anomalies
-  anomaliesNewSet: false,
+  anomaliesCurrentSet: false,
   selectedBaseline: null,
   pageSize: 10,
   currentPage: 1,
@@ -88,6 +88,18 @@ export default Component.extend({
   isLoadingTimeSeries: false,
   granularity: null,
   alertYaml: null,
+  //** overrides for ember-models-table defaults
+  customMessages: {
+    searchLabel: 'Search',
+    searchPlaceholder: 'search by any column'
+  },
+  customClasses: {
+    globalFilterWrapper: 'te-table-global-filter',
+    outerTableWrapper: 'te-anomaly-table-wrapper',
+    columnsDropdownWrapper: 'te-column-dropdown',
+    table: 'table table-striped table-bordered table-condensed te-anomaly-table-body'
+  },
+  //**
   dimensionExploration: null,
   // cachedMetric holds the last metric of anomalies fetched, so that state can be reset for comparison if metric changes
   cachedMetric: null,
@@ -150,6 +162,18 @@ export default Component.extend({
       const end = Math.min(moment().valueOf(), analysisRange[1]);
       range.push(end);
       return range;
+    }
+  ),
+
+  /**
+   * Flag for the stats box to show one or two values
+   * @type {Boolean}
+   */
+  areTwoSetsOfAnomalies: computed(
+    'anomaliesOldSet',
+    'anomaliesCurrentSet',
+    function() {
+      return (this.get('anomaliesOldSet') && this.get('anomaliesCurrentSet'));
     }
   ),
 
@@ -247,33 +271,6 @@ export default Component.extend({
   ),
 
   /**
-   * Table pagination: number of pages to display
-   * @type {Number}
-   */
-  paginationSize: computed(
-    'pagesNum',
-    'pageSize',
-    function() {
-      const { pagesNum, pageSize } = this.getProperties('pagesNum', 'pageSize');
-      return Math.min(pagesNum, pageSize/2);
-    }
-  ),
-
-  /**
-   * Table pagination: total Number of pages to display
-   * @type {Number}
-   */
-  pagesNum: computed(
-    'tableAnomalies',
-    'pageSize',
-    function() {
-      const { tableAnomalies, pageSize } = this.getProperties('tableAnomalies', 'pageSize');
-      const anomalyCount = tableAnomalies.length || 0;
-      return Math.ceil(anomalyCount/pageSize);
-    }
-  ),
-
-  /**
    * Return state of anomalies and time series for updating state correctly
    * 1 - set to old (Alert Overview or Create Alert Preview)
    * 2 - set to new (Edit Alert Preview with old or Create Alert Preview w/o new)
@@ -285,20 +282,20 @@ export default Component.extend({
   stateOfAnomaliesAndTimeSeries: computed(
     'isPreviewMode',
     'anomaliesOldSet',
-    'anomaliesNewSet',
+    'anomaliesCurrentSet',
     'isEditMode',
     'getAnomaliesError',
     function() {
       let state = 1;
       if (this.get('isPreviewMode')) {
         // Not Alert Preview
-        if ((this.get('anomaliesOldSet'))) {
+        if ((this.get('anomaliesCurrentSet')) || this.get('anomaliesOldSet')) {
           // At least one set of anomalies already loaded
-          if (this.get('isEditMode') || !(this.get('anomaliesNewSet'))) {
-            // replace new if Edit Alert Preview or it's Create Alert Preview with only one set
+          if (this.get('isEditMode')) {
+            // replace current if Edit Alert Preview
             state = 2;
           } else {
-            // Create Alert Preview with 2 sets of anomalies - shuffle
+            // Create Alert Preview  - shuffle
             state = 3;
           }
         } else if (this.get('isEditMode')) {
@@ -415,20 +412,20 @@ export default Component.extend({
    * Old anomalies to show in graph based on current dimension/rule combination
    * @type {Array}
    */
-  filteredAnomaliesNew: computed(
-    'anomaliesNew',
+  filteredAnomaliesCurrent: computed(
+    'anomaliesCurrent',
     'metricUrn',
     'selectedRule',
     'selectedDimension',
     'showRules',
     function() {
-      let filteredAnomaliesNew = [];
+      let filteredAnomaliesCurrent = [];
       const {
-        metricUrn, anomaliesNew, selectedRule, showRules
-      } = getProperties(this, 'metricUrn', 'anomaliesNew', 'selectedRule', 'showRules');
-      if (!_.isEmpty(anomaliesNew)) {
+        metricUrn, anomaliesCurrent, selectedRule, showRules
+      } = getProperties(this, 'metricUrn', 'anomaliesCurrent', 'selectedRule', 'showRules');
+      if (!_.isEmpty(anomaliesCurrent)) {
 
-        filteredAnomaliesNew = anomaliesNew.filter(anomaly => {
+        filteredAnomaliesCurrent = anomaliesCurrent.filter(anomaly => {
           if (anomaly.metricUrn === metricUrn) {
             if(showRules && anomaly.properties && typeof anomaly.properties === 'object' && selectedRule && typeof selectedRule === 'object') {
               return (anomaly.properties.detectorComponentName.includes(selectedRule.detectorName));
@@ -440,7 +437,7 @@ export default Component.extend({
           return false;
         });
       }
-      return filteredAnomaliesNew;
+      return filteredAnomaliesCurrent;
     }
   ),
 
@@ -462,16 +459,16 @@ export default Component.extend({
 
   numFilteredAnomalies: computed(
     'filteredAnomaliesOld.@each',
-    'filteredAnomaliesNew.@each',
+    'filteredAnomaliesCurrent.@each',
     function() {
-      const filteredAnomalies = [...this.get('filteredAnomaliesOld'), ...this.get('filteredAnomaliesNew')];
+      const filteredAnomalies = [...this.get('filteredAnomaliesOld'), ...this.get('filteredAnomaliesCurrent')];
       return filteredAnomalies.length;
     }
   ),
 
   series: computed(
     'filteredAnomaliesOld.@each',
-    'filteredAnomaliesNew.@each',
+    'filteredAnomaliesCurrent.@each',
     'timeseries',
     'baseline',
     'analysisRange',
@@ -479,21 +476,26 @@ export default Component.extend({
     'metricUrn',
     function () {
       const {
-        filteredAnomaliesOld, filteredAnomaliesNew, timeseries, baseline, showRules, isPreviewMode
-      } = getProperties(this, 'filteredAnomaliesOld', 'filteredAnomaliesNew',
+        filteredAnomaliesOld, filteredAnomaliesCurrent, timeseries, baseline, showRules, isPreviewMode
+      } = getProperties(this, 'filteredAnomaliesOld', 'filteredAnomaliesCurrent',
         'timeseries', 'baseline', 'showRules', 'isPreviewMode');
 
       const series = {};
       // Should be displayed in Create Mode of Preview with one set of anomalies
-      let anomaliesOldLabel = 'Current Settings Anomalies';
+      let anomaliesCurrentLabel = 'Current Settings Anomalies';
+      let anomaliesOldLabel = 'Current Anomalies';
       // Should be displayed in Create Mode of Preview, if there are two sets of anomalies
       if (isPreviewMode && (this.get('stateOfAnomaliesAndTimeSeries') === 3)) {
         anomaliesOldLabel = 'Old Settings Anomalies';
-      // Should be displayed in Alert Overview or in Edit Mode of Preview ('real' anomalies saved in db)
-      } else if (!isPreviewMode || this.get('isEditMode')) {
+        anomaliesCurrentLabel = 'New Settings Anomalies';
+      // Should be displayed in Edit Mode of Preview ('real' anomalies saved in db)
+      } else if (this.get('isEditMode')) {
         anomaliesOldLabel = 'Current Anomalies';
+        anomaliesCurrentLabel = 'New Settings Anomalies';
+      } else if (!isPreviewMode) {
+        // Should be displayed in Alert Overview
+        anomaliesCurrentLabel = 'Current Anomalies';
       }
-      const anomaliesNewLabel = 'New Settings Anomalies';
       // The current time series has a different naming convention in Preview
       if (showRules) {
         if (timeseries && !_.isEmpty(timeseries.current)) {
@@ -516,7 +518,7 @@ export default Component.extend({
       }
 
       if (baseline && !_.isEmpty(baseline.value)) {
-        series['Baseline'] = {
+        series['Selected Baseline'] = {
           timestamps: baseline.timestamp,
           values: stripNonFiniteValues(baseline.value),
           type: 'line',
@@ -543,7 +545,63 @@ export default Component.extend({
           color: 'screenshot-bounds'
         };
       }
-      // build set of anomalous values (older of 2 sets of anomalies)
+      // build set of anomalous values (newer of 2 sets of anomalies)
+      if (!_.isEmpty(filteredAnomaliesCurrent) && timeseries && !_.isEmpty(series.Current)) {
+        const valuesCurrent = [];
+        // needed because anomalies with startTime before time window are possible
+        let currentAnomaly = filteredAnomaliesCurrent.find(anomaly => {
+          return anomaly.startTime <= series.Current.timestamps[0];
+        });
+        let inAnomalyRange = currentAnomaly ? true : false;
+        let anomalyEdgeValues = [];
+        let anomalyEdgeTimestamps = [];
+        for (let i = 0; i < series.Current.timestamps.length; ++i) {
+          if (!inAnomalyRange) {
+            currentAnomaly = filteredAnomaliesCurrent.find(anomaly => {
+              return anomaly.startTime === series.Current.timestamps[i];
+            });
+            if (currentAnomaly) {
+              inAnomalyRange = true;
+              valuesCurrent.push(series.Current.values[i]);
+              anomalyEdgeValues.push(series.Current.values[i]);
+              anomalyEdgeTimestamps.push(series.Current.timestamps[i]);
+            } else {
+              valuesCurrent.push(null);
+            }
+          } else if (currentAnomaly.endTime === series.Current.timestamps[i]) {
+            inAnomalyRange = false;
+            // we don't want to include the endTime in anomaly range
+            currentAnomaly = filteredAnomaliesCurrent.find(anomaly => {
+              return anomaly.startTime === series.Current.timestamps[i];
+            });
+            if (currentAnomaly) {
+              inAnomalyRange = true;
+              valuesCurrent.push(series.Current.values[i]);
+              anomalyEdgeValues.push(series.Current.values[i]);
+              anomalyEdgeTimestamps.push(series.Current.timestamps[i]);
+            } else {
+              anomalyEdgeValues.push(series.Current.values[i-1]);
+              anomalyEdgeTimestamps.push(series.Current.timestamps[i-1]);
+              valuesCurrent.push(null);
+            }
+          } else {
+            valuesCurrent.push(series.Current.values[i]);
+          }
+        }
+        series[anomaliesCurrentLabel] = {
+          timestamps: series.Current.timestamps,
+          values: valuesCurrent,
+          type: 'line',
+          color: 'red'
+        };
+        series['new-anomaly-edges'] = {
+          timestamps: anomalyEdgeTimestamps,
+          values: anomalyEdgeValues,
+          type: 'scatter',
+          color: 'red'
+        };
+      }
+      // build set of new anomalies
       if (!_.isEmpty(filteredAnomaliesOld) && timeseries && !_.isEmpty(series.Current)) {
         const valuesOld = [];
         // needed because anomalies with startTime before time window are possible
@@ -560,8 +618,8 @@ export default Component.extend({
             });
             if (currentAnomaly) {
               inAnomalyRange = true;
-              valuesOld.push(series.Current.values[i]);
-              anomalyEdgeValues.push(series.Current.values[i]);
+              valuesOld.push(1.0);
+              anomalyEdgeValues.push(1.0);
               anomalyEdgeTimestamps.push(series.Current.timestamps[i]);
             } else {
               valuesOld.push(null);
@@ -574,82 +632,26 @@ export default Component.extend({
             });
             if (currentAnomaly) {
               inAnomalyRange = true;
-              valuesOld.push(series.Current.values[i]);
-              anomalyEdgeValues.push(series.Current.values[i]);
+              valuesOld.push(1.0);
+              anomalyEdgeValues.push(1.0);
               anomalyEdgeTimestamps.push(series.Current.timestamps[i]);
             } else {
-              anomalyEdgeValues.push(series.Current.values[i-1]);
+              anomalyEdgeValues.push(1.0);
               anomalyEdgeTimestamps.push(series.Current.timestamps[i-1]);
               valuesOld.push(null);
             }
           } else {
-            valuesOld.push(series.Current.values[i]);
+            valuesOld.push(1.0);
           }
         }
         series[anomaliesOldLabel] = {
           timestamps: series.Current.timestamps,
           values: valuesOld,
           type: 'line',
-          color: 'red'
-        };
-        series['old-anomaly-edges'] = {
-          timestamps: anomalyEdgeTimestamps,
-          values: anomalyEdgeValues,
-          type: 'scatter',
-          color: 'red'
-        };
-      }
-      // build set of new anomalies
-      if (!_.isEmpty(filteredAnomaliesNew) && timeseries && !_.isEmpty(series.Current)) {
-        const valuesNew = [];
-        // needed because anomalies with startTime before time window are possible
-        let currentAnomaly = filteredAnomaliesNew.find(anomaly => {
-          return anomaly.startTime <= series.Current.timestamps[0];
-        });
-        let inAnomalyRange = currentAnomaly ? true : false;
-        let anomalyEdgeValues = [];
-        let anomalyEdgeTimestamps = [];
-        for (let i = 0; i < series.Current.timestamps.length; ++i) {
-          if (!inAnomalyRange) {
-            currentAnomaly = filteredAnomaliesNew.find(anomaly => {
-              return anomaly.startTime === series.Current.timestamps[i];
-            });
-            if (currentAnomaly) {
-              inAnomalyRange = true;
-              valuesNew.push(1.0);
-              anomalyEdgeValues.push(1.0);
-              anomalyEdgeTimestamps.push(series.Current.timestamps[i]);
-            } else {
-              valuesNew.push(null);
-            }
-          } else if (currentAnomaly.endTime === series.Current.timestamps[i]) {
-            inAnomalyRange = false;
-            // we don't want to include the endTime in anomaly range
-            currentAnomaly = filteredAnomaliesOld.find(anomaly => {
-              return anomaly.startTime === series.Current.timestamps[i];
-            });
-            if (currentAnomaly) {
-              inAnomalyRange = true;
-              valuesNew.push(1.0);
-              anomalyEdgeValues.push(1.0);
-              anomalyEdgeTimestamps.push(series.Current.timestamps[i]);
-            } else {
-              anomalyEdgeValues.push(1.0);
-              anomalyEdgeTimestamps.push(series.Current.timestamps[i-1]);
-              valuesNew.push(null);
-            }
-          } else {
-            valuesNew.push(1.0);
-          }
-        }
-        series[anomaliesNewLabel] = {
-          timestamps: series.Current.timestamps,
-          values: valuesNew,
-          type: 'line',
           color: 'grey',
           axis: 'y2'
         };
-        series['new-anomaly-edges'] = {
+        series['old-anomaly-edges'] = {
           timestamps: anomalyEdgeTimestamps,
           values: anomalyEdgeValues,
           type: 'scatter',
@@ -669,14 +671,14 @@ export default Component.extend({
    */
   tableAnomalies: computed(
     'anomaliesOld',
-    'anomaliesNew',
+    'anomaliesCurrent',
     function() {
       const {
         anomaliesOld,
-        anomaliesNew,
+        anomaliesCurrent,
         analysisRange,
         stateOfAnomaliesAndTimeSeries
-      } = this.getProperties('anomaliesOld', 'anomaliesNew', 'analysisRange', 'stateOfAnomaliesAndTimeSeries');
+      } = this.getProperties('anomaliesOld', 'anomaliesCurrent', 'analysisRange', 'stateOfAnomaliesAndTimeSeries');
       let tableData = [];
       const humanizedObject = {
         queryDuration: (get(this, 'duration') || DEFAULT_ACTIVE_DURATION),
@@ -693,6 +695,8 @@ export default Component.extend({
           const dimensionsString = [...dimensionKeys, ...dimensionValues].join();
           set(a, 'dimensionStr', dimensionsString);
           set(a, 'settings', ((stateOfAnomaliesAndTimeSeries === 2) && this.get('isEditMode')) ? 'Current' : 'Old');
+          // settingsNum is for sorting anomalies by 'new' vs 'old' regardless of label given
+          set(a, 'settingsNum', 1);
           set(a, 'id', (!a.id) ? fakeId : a.id);
           set(a, 'startDateStr', this._formatAnomaly(a));
           set(a, 'current', a.avgCurrentVal);
@@ -710,12 +714,13 @@ export default Component.extend({
           ++fakeId;
         });
       }
-      if (anomaliesNew) {
-        anomaliesNew.forEach(a => {
+      if (anomaliesCurrent) {
+        anomaliesCurrent.forEach(a => {
           // 'settings' field only matters if column for settings shown
           set(a, 'settings', 'New');
-          // always give the new ones fake id's
-          set(a, 'id', fakeId);
+          // settingsNum is for sorting anomalies by 'new' vs 'old' regardless of label given
+          set(a, 'settingsNum', 0);
+          set(a, 'id', (!a.id) ? fakeId : a.id);
           set(a, 'startDateStr', this._formatAnomaly(a));
           set(a, 'current', a.avgCurrentVal);
           set(a, 'baseline', a.avgBaselineVal);
@@ -771,6 +776,7 @@ export default Component.extend({
           title: 'Detection Settings',
           propertyName: 'settings',
           sortDirection: 'asc',
+          sortedBy: 'settingsNum',
           sortPrecedence: 0 // lower number means higher precedence
         }] : [];
       const startColumn = [{
@@ -817,23 +823,26 @@ export default Component.extend({
    */
   stats: computed(
     'anomaliesOld',
-    'anomaliesNew',
+    'anomaliesCurrent',
     'stateOfAnomaliesAndTimeSeries',
     function() {
       const {
+        anomaliesCurrent,
         anomaliesOld,
         isPreviewMode,
         isEditMode
-      } = this.getProperties('anomaliesOld', 'isPreviewMode', 'isEditMode');
-      if (!anomaliesOld) {
-        return [];
-      }
+      } = this.getProperties('anomaliesCurrent', 'anomaliesOld', 'isPreviewMode', 'isEditMode');
       let respondedAnomaliesCount = 0;
       let truePositives = 0;
       let falsePositives = 0;
       let falseNegatives = 0;
       let numberOfAnomalies = 0;
-      anomaliesOld.forEach(function (anomaly) {
+      let anomaliesToCalculate = anomaliesCurrent;
+      // Only in the case of Edit Alert Preview will stats be based on anomaliesOld
+      if (this.get('isEditMode')) {
+        anomaliesToCalculate = anomaliesOld;
+      }
+      anomaliesToCalculate.forEach(function (anomaly) {
         numberOfAnomalies++;
         if(anomaly && anomaly.statusClassification) {
           const classification = anomaly.statusClassification;
@@ -860,15 +869,21 @@ export default Component.extend({
         const responseRateDescription = '% of anomalies that are reviewed';
         const precisionDescription = '% of all anomalies detected by the system that are true';
         const recallDescription = '% of all anomalies detected by the system';
+        // old and new fields added for all blocks to allow for having comparison in all boxes
         statsArray = [
-          ['Anomalies', totalAlertsDescription, totalAnomaliesCount, 'digit'],
-          ['Response Rate', responseRateDescription, floatToPercent(responseRate), 'percent'],
-          ['Precision', precisionDescription, floatToPercent(precision), 'percent'],
-          ['Recall', recallDescription, floatToPercent(recall), 'percent']
+          ['Anomalies', totalAlertsDescription, totalAnomaliesCount, 'digit',
+            anomaliesOld.length, anomaliesCurrent.length],
+          ['Response Rate', responseRateDescription, floatToPercent(responseRate), 'percent',
+            floatToPercent(responseRate), floatToPercent(responseRate)],
+          ['Precision', precisionDescription, floatToPercent(precision), 'percent',
+            floatToPercent(precision), floatToPercent(precision)],
+          ['Recall', recallDescription, floatToPercent(recall), 'percent',
+            floatToPercent(recall), floatToPercent(recall)]
         ];
       } else {
         statsArray = [
-          ['Anomalies', totalAlertsDescription, totalAnomaliesCount, 'digit']
+          ['Anomalies', totalAlertsDescription, totalAnomaliesCount, 'digit',
+            anomaliesOld.length, anomaliesCurrent.length]
         ];
       }
       return statsArray;
@@ -971,7 +986,8 @@ export default Component.extend({
       }
       set(this, 'cachedMetric', getValueFromYaml('metric', alertYaml, 'string'));
     } catch (error) {
-      notifications.error(`_getAnomalies failed: ${error.body.message}`, 'Error', toastOptions);
+      const message = (error.body && typeof error.body === 'object') ? error.body.message : error.message;
+      notifications.error(`_getAnomalies failed: ${message}`, 'Error', toastOptions);
       this.set('getAnomaliesError', true);
     }
 
@@ -1052,7 +1068,7 @@ export default Component.extend({
           if (get(this, 'metricUrn')) {
             this._fetchTimeseries();
           } else {
-            throw new Error('Unable to get MetricUrn from response');
+            throw new Error('There was no anomaly data returned for the detection');
           }
         })
         .catch(error => {
@@ -1170,23 +1186,24 @@ export default Component.extend({
     switch (state) {
       case 1:
         this.setProperties({
-          anomaliesOld: results.anomalies,
-          anomaliesOldSet: true,
+          anomaliesCurrent: results.anomalies,
+          anomaliesCurrentSet: true,
           uniqueTimeSeries: results.uniqueTimeSeries
         });
         break;
       case 2:
         this.setProperties({
-          anomaliesNew: results.anomalies,
-          anomaliesNewSet: true,
+          anomaliesCurrent: results.anomalies,
+          anomaliesCurrentSet: true,
           uniqueTimeSeries: results.uniqueTimeSeries
         });
         break;
       case 3:
-        set(this, 'anomaliesOld', this.get('anomaliesNew'));
+        set(this, 'anomaliesOld', this.get('anomaliesCurrent'));
+        set(this, 'anomaliesOldSet', true);
         this.setProperties({
-          anomaliesNew: results.anomalies,
-          anomaliesNewSet: true,
+          anomaliesCurrent: results.anomalies,
+          anomaliesCurrentSet: true,
           uniqueTimeSeries: results.uniqueTimeSeries
         });
         break;
@@ -1194,8 +1211,8 @@ export default Component.extend({
         this.setProperties({
           anomaliesOld: results.anomalies,
           anomaliesOldSet: true,
-          anomaliesNew: [],
-          anomaliesNewSet: false
+          anomaliesCurrent: [],
+          anomaliesCurrentSet: false
         });
         this._fetchAnomalies();
         break;
@@ -1357,8 +1374,8 @@ export default Component.extend({
           this.setProperties({
             anomaliesOld: [],
             anomaliesOldSet: false,
-            anomaliesNew: [],
-            anomaliesNewSet: false
+            anomaliesCurrent: [],
+            anomaliesCurrentSet: false
           });
         }
         this._fetchAnomalies();
@@ -1368,8 +1385,8 @@ export default Component.extend({
         this.setProperties({
           anomaliesOld: [],
           anomaliesOldSet: false,
-          anomaliesNew: [],
-          anomaliesNewSet: false
+          anomaliesCurrent: [],
+          anomaliesCurrentSet: false
         });
       }
     },

@@ -1,7 +1,7 @@
 // Overriding default c3
 
 .timeseries-chart {
-  .c3-target-Baseline {
+  .c3-target-Selected-Baseline {
     stroke-dasharray: 2,2;
   }
   .c3-target-Predicted {
@@ -52,7 +52,7 @@
      opacity: 0.5
   }
 
-  .c3-legend-item-Baseline > .c3-legend-item-tile {
+  .c3-legend-item-Selected-Baseline > .c3-legend-item-tile {
     stroke-dasharray: 2,2;
     stroke-width: 3
   }

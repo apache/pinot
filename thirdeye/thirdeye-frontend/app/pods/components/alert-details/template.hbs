@@ -73,7 +73,11 @@
                 </label>
               </h4>
               {{!-- Alert anomaly stats cards --}}
-              {{stats-cards stats=stats}}
+              {{stats-cards
+                stats=stats
+                areTwoSetsOfAnomalies=areTwoSetsOfAnomalies
+                isEditMode=isEditMode
+              }}
             </div>
 
             <!-- Detection Health -->
@@ -115,7 +119,11 @@
                 </label>
               </h4>
               {{!-- Alert anomaly stats cards --}}
-              {{stats-cards stats=stats}}
+              {{stats-cards
+                stats=stats
+                areTwoSetsOfAnomalies=areTwoSetsOfAnomalies
+                isEditMode=isEditMode
+              }}
             </div>
 
           {{/if}}
@@ -265,6 +273,8 @@
                 data=tableAnomalies
                 columns=columns
                 columnsDropdownTemplate="dropdown"
+                customMessages=customMessages
+                customClasses=customClasses
               }}
             {{/if}}
         </div>
