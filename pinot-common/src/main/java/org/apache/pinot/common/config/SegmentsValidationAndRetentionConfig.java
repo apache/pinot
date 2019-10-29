@@ -83,6 +83,8 @@ public class SegmentsValidationAndRetentionConfig {
     this.segmentAssignmentStrategy = segmentAssignmentStrategy;
   }
 
+  // TODO: Use TimeFieldSpec in Schema
+  @Deprecated
   public String getTimeColumnName() {
     return timeColumnName;
   }
@@ -91,6 +93,8 @@ public class SegmentsValidationAndRetentionConfig {
     this.timeColumnName = timeColumnName;
   }
 
+  // TODO: Use TimeFieldSpec in Schema
+  @Deprecated
   public TimeUnit getTimeType() {
     return _timeType;
   }
@@ -233,15 +237,16 @@ public class SegmentsValidationAndRetentionConfig {
 
     SegmentsValidationAndRetentionConfig that = (SegmentsValidationAndRetentionConfig) o;
 
-    return EqualityUtils.isEqual(retentionTimeUnit, that.retentionTimeUnit) && EqualityUtils.isEqual(retentionTimeValue,
-        that.retentionTimeValue) && EqualityUtils.isEqual(segmentPushFrequency, that.segmentPushFrequency)
-        && EqualityUtils.isEqual(segmentPushType, that.segmentPushType) && EqualityUtils.isEqual(replication,
-        that.replication) && EqualityUtils.isEqual(schemaName, that.schemaName) && EqualityUtils.isEqual(timeColumnName,
-        that.timeColumnName) && EqualityUtils.isEqual(_timeType, that._timeType) && EqualityUtils.isEqual(
-        segmentAssignmentStrategy, that.segmentAssignmentStrategy) && EqualityUtils.isEqual(replicaGroupStrategyConfig,
-        that.replicaGroupStrategyConfig) && EqualityUtils.isEqual(_completionConfig, that._completionConfig)
-        && EqualityUtils.isEqual(hllConfig, that.hllConfig) && EqualityUtils.isEqual(replicasPerPartition,
-        that.replicasPerPartition);
+    return EqualityUtils.isEqual(retentionTimeUnit, that.retentionTimeUnit) && EqualityUtils
+        .isEqual(retentionTimeValue, that.retentionTimeValue) && EqualityUtils
+        .isEqual(segmentPushFrequency, that.segmentPushFrequency) && EqualityUtils
+        .isEqual(segmentPushType, that.segmentPushType) && EqualityUtils.isEqual(replication, that.replication)
+        && EqualityUtils.isEqual(schemaName, that.schemaName) && EqualityUtils
+        .isEqual(timeColumnName, that.timeColumnName) && EqualityUtils.isEqual(_timeType, that._timeType)
+        && EqualityUtils.isEqual(segmentAssignmentStrategy, that.segmentAssignmentStrategy) && EqualityUtils
+        .isEqual(replicaGroupStrategyConfig, that.replicaGroupStrategyConfig) && EqualityUtils
+        .isEqual(_completionConfig, that._completionConfig) && EqualityUtils.isEqual(hllConfig, that.hllConfig)
+        && EqualityUtils.isEqual(replicasPerPartition, that.replicasPerPartition);
   }
 
   @Override

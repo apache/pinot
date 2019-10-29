@@ -32,6 +32,7 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.controller.util.SegmentIntervalUtils;
 import org.apache.pinot.tools.Command;
 import org.joda.time.Interval;
@@ -140,7 +141,7 @@ public class OfflineSegmentIntervalCheckerCommand extends AbstractBaseAdminComma
     if (SegmentIntervalUtils.eligibleForSegmentIntervalCheck(tableConfig.getValidationConfig())) {
       for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadataList) {
         Interval timeInterval = offlineSegmentZKMetadata.getTimeInterval();
-        if (!SegmentIntervalUtils.isValidInterval(timeInterval)) {
+        if (timeInterval == null || !TimeUtils.isValidTimeInterval(timeInterval)) {
           segmentsWithInvalidIntervals.add(offlineSegmentZKMetadata.getSegmentName());
         }
       }

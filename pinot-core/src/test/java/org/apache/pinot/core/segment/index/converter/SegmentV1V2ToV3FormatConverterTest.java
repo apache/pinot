@@ -63,13 +63,12 @@ public class SegmentV1V2ToV3FormatConverterTest {
         .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), _indexDir, "daysSinceEpoch", TimeUnit.HOURS,
             "testTable");
     config.setSegmentNamePostfix("1");
-    config.setTimeColumnName("daysSinceEpoch");
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
     // range. For this test, we first need to fix the input avro data
     // to have the time column values in allowed range. Until then, the check
     // is explicitly disabled
-    config.setCheckTimeColumnValidityDuringGeneration(false);
+    config.setSkipTimeValueCheck(true);
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();

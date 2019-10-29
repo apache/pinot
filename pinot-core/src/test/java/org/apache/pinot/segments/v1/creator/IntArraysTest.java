@@ -46,8 +46,7 @@ import org.testng.annotations.Test;
 
 public class IntArraysTest {
   private static final String AVRO_DATA = "data/test_data-mv.avro";
-  private static File INDEX_DIR =
-      new File(FileUtils.getTempDirectory() + File.separator + IntArraysTest.class.getName());
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "IntArraysTest");
 
   @AfterClass
   public static void cleanup() {
@@ -63,19 +62,17 @@ public class IntArraysTest {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
-//    System.out.println(INDEX_DIR.getAbsolutePath());
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
 
     final SegmentGeneratorConfig config = SegmentTestUtils
         .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "weeksSinceEpochSunday",
             TimeUnit.DAYS, "test");
-    config.setTimeColumnName("weeksSinceEpochSunday");
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
     // range. For this test, we first need to fix the input avro data
     // to have the time column values in allowed range. Until then, the check
     // is explicitly disabled
-    config.setCheckTimeColumnValidityDuringGeneration(false);
+    config.setSkipTimeValueCheck(true);
     driver.init(config);
     driver.build();
 

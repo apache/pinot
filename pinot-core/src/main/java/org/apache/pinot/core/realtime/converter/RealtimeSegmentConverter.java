@@ -102,7 +102,7 @@ public class RealtimeSegmentConverter {
     // range. We don't want the realtime consumption to stop (if an exception
     // is thrown) and thus the time validity check is explicitly disabled for
     // realtime segment generation
-    genConfig.setCheckTimeColumnValidityDuringGeneration(false);
+    genConfig.setSkipTimeValueCheck(true);
     if (invertedIndexColumns != null && !invertedIndexColumns.isEmpty()) {
       for (String column : invertedIndexColumns) {
         genConfig.createInvertedIndexForColumn(column);

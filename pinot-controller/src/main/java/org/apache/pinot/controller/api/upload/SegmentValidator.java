@@ -19,9 +19,7 @@
 package org.apache.pinot.controller.api.upload;
 
 import java.io.File;
-import java.util.Date;
 import java.util.concurrent.Executor;
-import javax.annotation.Nonnull;
 import javax.ws.rs.core.Response;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.common.config.TableConfig;
@@ -88,11 +86,14 @@ public class SegmentValidator {
               + quotaResponse.reason, Response.Status.FORBIDDEN);
     }
 
-    // Check time range
-    if (!isSegmentTimeValid(segmentMetadata)) {
-      throw new ControllerApplicationException(LOGGER,
-          "Invalid segment start/end time for segment: " + segmentName + " of table: " + offlineTableName,
-          Response.Status.NOT_ACCEPTABLE);
+    // Check time interval
+    // TODO: Pass in schema and check the existence of time interval when time field exists
+    Interval timeInterval = segmentMetadata.getTimeInterval();
+    if (timeInterval != null && !TimeUtils.isValidTimeInterval(timeInterval)) {
+      throw new ControllerApplicationException(LOGGER, String.format(
+          "Invalid segment start/end time: %s (in millis: %d/%d) for segment: %s of table: %s, must be between: %s",
+          timeInterval, timeInterval.getStartMillis(), timeInterval.getEndMillis(), segmentName, offlineTableName,
+          TimeUtils.VALID_TIME_INTERVAL), Response.Status.NOT_ACCEPTABLE);
     }
   }
 
@@ -103,8 +104,8 @@ public class SegmentValidator {
    * @param metadata segment metadata. This should not be null.
    * @param offlineTableConfig offline table configuration. This should not be null.
    */
-  private StorageQuotaChecker.QuotaCheckerResponse checkStorageQuota(@Nonnull File segmentFile,
-      @Nonnull SegmentMetadata metadata, @Nonnull TableConfig offlineTableConfig)
+  private StorageQuotaChecker.QuotaCheckerResponse checkStorageQuota(File segmentFile, SegmentMetadata metadata,
+      TableConfig offlineTableConfig)
       throws InvalidConfigException {
     if (!_controllerConf.getEnableStorageQuotaCheck()) {
       return StorageQuotaChecker.success("Quota check is disabled");
@@ -115,35 +116,5 @@ public class SegmentValidator {
         new StorageQuotaChecker(offlineTableConfig, tableSizeReader, _controllerMetrics, _isLeaderForTable);
     return quotaChecker.isSegmentStorageWithinQuota(segmentFile, metadata.getName(),
         _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
-  }
-
-  /**
-   * Returns true if:
-   * - Segment does not have a start/end time, OR
-   * - The start/end time are in a valid range (Jan 01 1971 - Jan 01, 2071)
-   * @param metadata Segment metadata
-   * @return
-   */
-  private boolean isSegmentTimeValid(SegmentMetadata metadata) {
-    Interval interval = metadata.getTimeInterval();
-    if (interval == null) {
-      return true;
-    }
-
-    long startMillis = interval.getStartMillis();
-    long endMillis = interval.getEndMillis();
-
-    if (!TimeUtils.checkSegmentTimeValidity(startMillis, endMillis)) {
-      Date minDate = new Date(TimeUtils.getValidMinTimeMillis());
-      Date maxDate = new Date(TimeUtils.getValidMaxTimeMillis());
-
-      LOGGER.error(
-          "Invalid start time '{}ms' or end time '{}ms' for segment {}, must be between '{}' and '{}' (timecolumn {}, timeunit {})",
-          interval.getStartMillis(), interval.getEndMillis(), metadata.getName(), minDate, maxDate,
-          metadata.getTimeColumn(), metadata.getTimeUnit().toString());
-      return false;
-    }
-
-    return true;
   }
 }
