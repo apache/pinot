@@ -24,32 +24,32 @@ image:
   tag: 0.1.13-SNAPSHOT
   pullPolicy: IfNotPresent
 
-namespace: pinot-quickstart
-
 cluster:
   name: pinot-quickstart
 
 controller:
   name: controller
-
+  port: 9000
   replicaCount: 2
 
   persistence:
     enabled: true
     accessMode: ReadWriteOnce
-    size: 10G
-    #storageClass: "ssd"
+    size: 1G
+    mountPath: /var/pinot/controller/data
+    storageClass: ""
 
   data:
     dir: /var/pinot/controller/data
 
-  port: 9000
 
   vip:
     host: pinot-controller
     port: 9000
 
-  java_opts: "-Xms4G -Xmx4G -Dlog4j2.configurationFile=/opt/pinot/conf/pinot-controller-log4j2.xml -server -d64 -XX:+DisableExplicitGC -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintTenuringDistribution -XX:+PrintGCApplicationStoppedTime -Xloggc:gc-pinot-server.log -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:G1HeapRegionSize=8m -XX:InitiatingHeapOccupancyPercent=65 -XX:+UnlockExperimentalVMOptions -XX:G1MixedGCLiveThresholdPercent=85 -XX:G1HeapWastePercent=5"
+  jvmOpts: "-Xms4G -Xmx4G"
+
+  log4j2ConfFile: /opt/pinot/conf/pinot-controller-log4j2.xml
 
   service:
     annotations: {}
@@ -82,11 +82,16 @@ controller:
 broker:
   name: broker
 
-  replicaCount: 2
-
   port: 8099
 
-  java_opts: "-Xms4G -Xmx4G -Dlog4j2.configurationFile=/opt/pinot/conf/pinot-broker-log4j2.xml -server -d64 -XX:+DisableExplicitGC -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintTenuringDistribution -XX:+PrintGCApplicationStoppedTime -Xloggc:gc-pinot-server.log -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:G1HeapRegionSize=8m -XX:InitiatingHeapOccupancyPercent=85 -XX:G1ReservePercent=20 -XX:+UnlockExperimentalVMOptions -XX:G1MixedGCLiveThresholdPercent=85 -XX:G1HeapWastePercent=5"
+  replicaCount: 2
+
+  jvmOpts: "-Xms4G -Xmx4G"
+
+  log4j2ConfFile: /opt/pinot/conf/pinot-broker-log4j2.xml
+
+  routingTable:
+    builderClass: random
 
   service:
     annotations: {}
@@ -107,9 +112,9 @@ broker:
 
   nodeSelector: {}
 
-  tolerations: []
-
   affinity: {}
+
+  tolerations: []
 
   podAnnotations: {}
 
@@ -119,22 +124,26 @@ broker:
 server:
   name: server
 
-  replicaCount: 2
-
   ports:
     netty: 8098
     admin: 8097
 
+  replicaCount: 2
+
   dataDir: /var/pinot/server/data/index
-  segmentTarDir: /var/pinot/server/data/index
+  segmentTarDir: /var/pinot/server/data/segment
 
   persistence:
     enabled: true
     accessMode: ReadWriteOnce
-    size: 10G
+    size: 4G
+    mountPath: /var/pinot/server/data
+    storageClass: ""
     #storageClass: "ssd"
 
-  java_opts: "-Xms4G -Xmx4G -XX:MaxDirectMemorySize=10g -Dlog4j2.configurationFile=/opt/pinot/conf/pinot-server-log4j2.xml -server -d64 -XX:+DisableExplicitGC -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintTenuringDistribution -XX:+PrintGCApplicationStoppedTime -Xloggc:gc-pinot-server.log -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:G1HeapRegionSize=16m -XX:InitiatingHeapOccupancyPercent=25 -XX:G1ReservePercent=20 -XX:+UnlockExperimentalVMOptions -XX:G1MixedGCLiveThresholdPercent=85 -XX:G1HeapWastePercent=5"
+  jvmOpts: "-Xms4G -Xmx4G -XX:MaxDirectMemorySize=10g"
+
+  log4j2ConfFile: /opt/pinot/conf/pinot-server-log4j2.xml
 
   service:
     annotations: {}
@@ -150,9 +159,9 @@ server:
 
   nodeSelector: {}
 
-  tolerations: []
-
   affinity: {}
+
+  tolerations: []
 
   podAnnotations: {}
 

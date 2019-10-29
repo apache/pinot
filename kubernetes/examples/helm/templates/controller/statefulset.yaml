@@ -60,7 +60,7 @@ spec:
         args: [ "StartController", "-configFileName", "/var/pinot/controller/config/pinot-controller.conf" ]
         env:
           - name: JAVA_OPTS
-            value: {{ .Values.controller.java_opts }}
+            value: "{{ .Values.controller.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.controller.log4j2ConfFile }}"
         ports:
           - containerPort: {{ .Values.controller.port }}
             protocol: TCP
@@ -68,7 +68,7 @@ spec:
           - name: config
             mountPath: /var/pinot/controller/config
           - name: data
-            mountPath: "{{ .Values.controller.data.dir }}"
+            mountPath: "{{ .Values.controller.persistence.mountPath }}"
         resources:
 {{ toYaml .Values.controller.resources | indent 12 }}
       restartPolicy: Always

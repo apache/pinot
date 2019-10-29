@@ -24,5 +24,5 @@ metadata:
 data:
   pinot-broker.conf: |-
     pinot.broker.client.queryPort={{ .Values.broker.port }}
-    pinot.broker.routing.table.builder.class=random
+    pinot.broker.routing.table.builder.class={{ .Values.broker.routingTable.builderClass }}
     pinot.set.instance.id.to.hostname=true

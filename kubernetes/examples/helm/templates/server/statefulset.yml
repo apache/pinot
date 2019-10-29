@@ -45,22 +45,14 @@ spec:
         release: {{ .Release.Name }}
         component: {{ .Values.server.name }}
       annotations:
-{{- with .Values.server.podAnnotations }}
-{{ toYaml . | indent 8 }}
-{{- end }}
+{{ toYaml .Values.controller.podAnnotations | indent 8 }}
     spec:
       nodeSelector:
-{{- with .Values.server.nodeSelector }}
-{{ toYaml . | indent 8 }}
-{{- end }}
+{{ toYaml .Values.controller.nodeSelector | indent 8 }}
       affinity:
-{{- with .Values.server.affinity }}
-{{ toYaml . | indent 8 }}
-{{- end }}
+{{ toYaml .Values.controller.affinity | indent 8 }}
       tolerations:
-{{- with .Values.server.tolerations }}
-{{ toYaml . | indent 8 }}
-{{- end }}
+{{ toYaml .Values.controller.tolerations | indent 8 }}
       containers:
       - name: server
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -73,15 +65,17 @@ spec:
         ]
         env:
           - name: JAVA_OPTS
-            value: {{ .Values.server.java_opts }}
+            value: "{{ .Values.server.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.server.log4j2ConfFile }}"
         ports:
           - containerPort: {{ .Values.server.ports.netty }}
+            protocol: TCP
+          - containerPort: {{ .Values.server.ports.admin }}
             protocol: TCP
         volumeMounts:
           - name: config
             mountPath: /var/pinot/server/config
           - name: data
-            mountPath: /var/pinot/server/data
+            mountPath: "{{ .Values.server.persistence.mountPath }}"
       restartPolicy: Always
       volumes:
         - name: config

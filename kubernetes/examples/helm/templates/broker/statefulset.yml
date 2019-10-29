@@ -44,11 +44,15 @@ spec:
         app: {{ include "pinot.name" . }}
         release: {{ .Release.Name }}
         component: {{ .Values.broker.name }}
-        {{- with .Values.broker.podAnnotations }}
       annotations:
-        {{ toYaml . | indent 8 }}
-        {{- end }}
+{{ toYaml .Values.broker.podAnnotations | indent 8 }}
     spec:
+      nodeSelector:
+{{ toYaml .Values.broker.nodeSelector | indent 8 }}
+      affinity:
+{{ toYaml .Values.broker.affinity | indent 8 }}
+      tolerations:
+{{ toYaml .Values.broker.tolerations | indent 8 }}
       containers:
       - name: broker
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -61,7 +65,7 @@ spec:
         ]
         env:
           - name: JAVA_OPTS
-            value: {{ .Values.broker.java_opts }}
+            value: "{{ .Values.broker.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.broker.log4j2ConfFile }}"
         ports:
           - containerPort: {{ .Values.broker.port }}
             protocol: TCP
@@ -80,18 +84,6 @@ spec:
             port: {{ .Values.broker.port }}
         resources:
           {{ toYaml .Values.broker.resources | indent 12 }}
-      {{- with .Values.broker.nodeSelector }}
-      nodeSelector:
-        {{ toYaml . | indent 8 }}
-      {{- end }}
-      {{- with .Values.broker.affinity }}
-      affinity:
-        {{ toYaml . | indent 8 }}
-      {{- end }}
-      {{- with .Values.broker.tolerations }}
-      tolerations:
-        {{ toYaml . | indent 8 }}
-      {{- end }}
       restartPolicy: Always
       volumes:
         - name: config
