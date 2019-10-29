@@ -19,6 +19,7 @@
 
 package org.apache.pinot.queries;
 
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -43,9 +44,14 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
+import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
+import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -141,6 +147,55 @@ public class TransformQueriesTest extends BaseQueriesTest {
     } finally {
       destroySegments();
     }
+  }
+
+  @Test
+  public void testTransformWithDateTruncInnerSegment()
+      throws Exception {
+    Object[] columns = new Object[]{"Pinot", 1000, 2000, 500000, 1000000};
+    long start = new DateTime(1973, 1, 8, 14, 6, 4, 3, DateTimeZone.UTC).getMillis();
+
+    List<GenericRow> rows = new ArrayList<>();
+    for (int i = 0; i < 7; i++) {
+      GenericRow row = new GenericRow();
+      row.putField(D1, columns[0]);
+      row.putField(M1, columns[1]);
+      row.putField(M2, columns[2]);
+      row.putField(M3, columns[3]);
+      row.putField(M4, columns[4]);
+      row.putField(TIME, ThreadLocalRandom.current().nextLong(start, start + 5000));
+      rows.add(row);
+    }
+
+    try (final RecordReader recordReader = new GenericRowRecordReader(rows, _schema)) {
+      createSegment(_schema, recordReader, SEGMENT_NAME_1, TABLE_NAME);
+      final ImmutableSegment segment = loadSegment(SEGMENT_NAME_1);
+      _indexSegments.add(segment);
+
+      String query =
+          "SELECT COUNT(*) FROM foo GROUP BY DATETRUNC('week', ADD(SUB(DIV(T, 1000), INT_COL2), INT_COL2), 'SECONDS', 'Europe/Berlin')";
+      verifyDateTruncationResult(query, rows.size(), "95295600");
+
+      query =
+          "SELECT COUNT(*) FROM foo GROUP BY DATETRUNC('week', DIV(MULT(DIV(ADD(SUB(T, 5), 5), 1000), INT_COL2), INT_COL2), 'SECONDS', 'Europe/Berlin', 'MILLISECONDS')";
+      verifyDateTruncationResult(query, rows.size(), "95295600000");
+
+      query = "SELECT COUNT(*) FROM foo GROUP BY DATETRUNC('quarter', T, 'MILLISECONDS')";
+      verifyDateTruncationResult(query, rows.size(), "94694400000");
+    } finally {
+      destroySegments();
+    }
+  }
+
+  private void verifyDateTruncationResult(String query, long countResult, String stringKey) {
+    AggregationGroupByOperator aggregtionGroupByOperator = getOperatorForQuery(query);
+    IntermediateResultsBlock resultsBlock = aggregtionGroupByOperator.nextBlock();
+    final AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    List<GroupKeyGenerator.GroupKey> groupKeys = ImmutableList.copyOf(aggregationGroupByResult.getGroupKeyIterator());
+    Assert.assertEquals(groupKeys.size(), 1);
+    Assert.assertEquals(groupKeys.get(0)._stringKey, stringKey);
+    Object resultForKey = aggregationGroupByResult.getResultForKey(groupKeys.get(0), 0);
+    Assert.assertEquals(resultForKey, countResult);
   }
 
   @Test
