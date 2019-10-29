@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -109,7 +110,7 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
   private JiraEntity buildJiraEntity(DetectionAlertFilterNotification notification, Set<MergedAnomalyResultDTO> anomalies) {
     Map<String, Object> notificationSchemeProps = notification.getNotificationSchemeProps();
     if (notificationSchemeProps == null || notificationSchemeProps.get(PROP_JIRA_SCHEME) == null) {
-      throw new IllegalArgumentException("Invalid jira settings in subscription group " + this.adContext.getNotificationConfig().getId());
+      throw new IllegalArgumentException("Jira not configured in subscription group " + this.adContext.getNotificationConfig().getId());
     }
 
     Properties jiraClientConfig = new Properties();
@@ -132,26 +133,23 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
         Iterable<Issue> issues = jiraClient.getIssue(jiraEntity.getJiraProject(), jiraEntity.getSummary(),
             this.jiraAdminConfig.getJiraUser()).getIssues();
 
-        List<Issue> jiraIssues = new ArrayList<>();
+        Optional<Issue> latestJiraIssue = Optional.empty();
         if (issues != null) {
-          // Sort the issues by descending order of create time
-          jiraIssues = StreamSupport.stream(issues.spliterator(), false).sorted(new Comparator<Issue>() {
-            @Override
-            public int compare(Issue o1, Issue o2) {
-              return o2.getCreationDate().compareTo(o1.getCreationDate());
-            }
-          }).collect(Collectors.toList());
+          latestJiraIssue = StreamSupport.stream(issues.spliterator(), false).max(
+              (o1, o2) -> o2.getCreationDate().compareTo(o1.getCreationDate()));
         }
 
         String issueKey;
-        if (jiraIssues.isEmpty() || jiraIssues.get(0).getCreationDate().isBefore(System.currentTimeMillis() - jiraEntity.getMergeGap())) {
+        long lookBackTimestamp = System.currentTimeMillis() - jiraEntity.getMergeGap();
+        if (!latestJiraIssue.isPresent() ||
+            latestJiraIssue.get().getCreationDate().isBefore(lookBackTimestamp)) {
           // No existing ticket found. Create a new jira ticket
           issueKey = jiraClient.createIssue(jiraEntity);
           LOG.info("Jira created {}, anomalies reported {}", issueKey, result.getValue().size());
         } else {
           // Reopen recent existing ticket and add a comment
-          updateJiraAlert(jiraIssues.get(0), jiraEntity);
-          LOG.info("Jira updated {}, anomalies reported = {}", jiraIssues.get(0).getKey(), result.getValue().size());
+          updateJiraAlert(latestJiraIssue.get(), jiraEntity);
+          LOG.info("Jira updated {}, anomalies reported = {}", latestJiraIssue.get().getKey(), result.getValue().size());
         }
       } catch (IllegalArgumentException e) {
         LOG.warn("Skipping! Found illegal arguments while sending {} anomalies for alert {}."

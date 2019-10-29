@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.notification.commons;
 
 import java.util.List;
+import java.util.Objects;
 
 
 /**
@@ -106,5 +107,10 @@ public class JiraEntity {
     sb.append(", labels='").append(labels).append('\'');
     sb.append('}');
     return sb.toString();
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(jiraProject, jiraIssueTypeId, assignee, summary, labels, mergeGap);
   }
 }
