@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import java.io.BufferedReader;
@@ -919,7 +920,7 @@ public class PinotDataAndQueryAnonymizer {
         String queryFile,
         String tableName,
         Set<String> filterColumns,
-        Set<String> timeColumns) {
+        Set<String> timeColumns) throws Exception {
       _outputDir = outputDir;
       _queryDir = queryDir;
       _queryFileName = queryFile;
@@ -929,13 +930,13 @@ public class PinotDataAndQueryAnonymizer {
       _globalDictionaryColumns = filterColumns;
       _timeColumns = timeColumns;
       for (String column : timeColumns) {
-        filterColumns.remove(column);
+        _globalDictionaryColumns.remove(column);
       }
+      loadGlobalDictionariesAndColumnMapping();
     }
 
     public void generateQueries() throws Exception {
       _generateQueryWatch.start();
-      loadGlobalDictionariesAndColumnMapping();
       File queryFile = new File(_queryDir + "/" + _queryFileName);
       InputStream inputStream = new FileInputStream(queryFile);
       BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
@@ -952,7 +953,8 @@ public class PinotDataAndQueryAnonymizer {
       out.flush();
     }
 
-    public void generateQuery(String origQuery, PrintWriter out) {
+    @VisibleForTesting
+    public String generateQuery(String origQuery, PrintWriter out) {
       AstNode root = Pql2Compiler.buildAst(origQuery);
       StringBuilder genQuery = new StringBuilder();
       genQuery.append("SELECT ");
@@ -997,7 +999,14 @@ public class PinotDataAndQueryAnonymizer {
       } else if (selectAstNode.isHasTopClause()) {
         genQuery.append("TOP ").append(selectAstNode.getTopN());
       }
-      out.println(genQuery.toString());
+
+      String result = genQuery.toString().trim();
+
+      if (out != null) {
+        out.println(result);
+      }
+
+      return result;
     }
 
     private String rewriteGroupBy(GroupByAstNode groupByAstNode) {

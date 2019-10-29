@@ -35,16 +35,16 @@ import org.slf4j.LoggerFactory;
 public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AnonymizeDataCommand.class);
 
-  @Option(name = "-inputSegmentsDir", metaVar = "<String>", usage = "Directory containing Pinot table segments")
+  @Option(name = "-inputSegmentsDir", metaVar = "<String>", usage = "Absolute path of directory containing Pinot table segments")
   private String _inputSegmentsDir;
 
-  @Option(name = "-outputDir", metaVar = "<String>", usage = "Directory where generated Avro files and global dictionaries will be written into")
+  @Option(name = "-outputDir", metaVar = "<String>", usage = "Absolute path of directory where generated Avro files and global dictionaries will be written into")
   private String _outputDir;
 
   @Option(name = "-avroFileNamePrefix", metaVar = "<String>", usage = "Generated Avro file name prefix")
   private String _avroFileNamePrefix;
 
-  @Option(name = "-generateData", metaVar = "<boolean>", usage = "Should the tool generate data(true by default)")
+  @Option(name = "-generateData", metaVar = "<boolean>", usage = "Should the tool generate data(false by default)")
   private boolean _generateData = false;
 
   @Option(name = "-generateQueries", metaVar = "<boolean>", usage = "Should the tool generate queries(false by default)")
@@ -53,7 +53,7 @@ public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Co
   @Option(name = "-tableName", metaVar = "<String>", usage = "Table name to use for generating queries")
   private String _tableName;
 
-  @Option(name = "-queryDir", metaVar = "<String>", usage = "Directory containing the source query file and where the generated query file will be written into")
+  @Option(name = "-queryDir", metaVar = "<String>", usage = "Absolute path of directory containing the source query file and where the generated query file will be written into")
   private String _queryDir;
 
   @Option(name = "-queryFileName", metaVar = "<String>", usage = "Query file name in queryDir")
