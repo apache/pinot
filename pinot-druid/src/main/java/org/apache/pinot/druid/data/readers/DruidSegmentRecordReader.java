@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.druid.jackson.DefaultObjectMapper;
 import org.apache.druid.java.util.common.granularity.Granularities;
@@ -60,53 +61,23 @@ import org.slf4j.LoggerFactory;
  * Note that Druid uses LONG and not INT, so construct the Pinot schema accordingly.
  */
 public class DruidSegmentRecordReader implements RecordReader {
-  // TODO: Figure out why logger stuff isn't showing up in console
   private static final Logger LOGGER = LoggerFactory.getLogger(DruidSegmentRecordReader.class);
 
   private Schema _pinotSchema;
-  private Cursor _cursor;
   private ArrayList<String> _columnNames;
+  private Cursor _cursor;
   private List<BaseObjectColumnValueSelector> _selectors;
   private QueryableIndex _index;
-  private QueryableIndexStorageAdapter _adapter;
 
-  private void validateColumns()
-      throws IllegalArgumentException {
-    for (int i = 0; i < _columnNames.size(); i++) {
-      final String columnName = _columnNames.get(i);
-      ColumnCapabilities capabilities = _adapter.getColumnCapabilities(columnName);
-      if (capabilities == null) {
-        LOGGER.warn("Column {} is not in record", columnName);
-      } else {
-        if (capabilities.getType() == ValueType.COMPLEX) {
-          throw new IllegalArgumentException("Column " + columnName
-              + ": DruidSegmentRecordReader does not support complex metric columns.");
-        }
-        FieldSpec fieldSpec = _pinotSchema.getFieldSpecFor(_columnNames.get(i));
-        if (fieldSpec.isSingleValueField() && capabilities.hasMultipleValues()) {
-          throw new IllegalArgumentException("Column " + columnName
-              + " in Pinot schema is single-valued, but column {} in " + "record is multi-valued.");
-        }
-        if (!fieldSpec.isSingleValueField() && !capabilities.hasMultipleValues()) {
-          throw new IllegalArgumentException("Column " + columnName
-              + " in Pinot schema is multi-valued, but column {} in" + "record is single-valued");
-        }
-        String typeFromSchema = _pinotSchema.getFieldSpecFor(columnName).getDataType().toString();
-        String typeFromRecord = capabilities.getType().toString();
-        if (typeFromRecord != typeFromSchema) {
-          throw new IllegalArgumentException("Type for column " + columnName +
-              " in schema does not match type for column " + columnName + " in record.");
-        }
-      }
-    }
+  public DruidSegmentRecordReader(@Nonnull File indexDir, @Nullable Schema schema)
+      throws IOException {
+    init(indexDir, schema);
   }
 
-  private void init(String indexPath, Schema schema)
+  private void init(File indexDir, Schema schema)
       throws IOException {
     // Only the columns whose names are in the Pinot schema will get processed
     _pinotSchema = schema;
-    _columnNames = new ArrayList<>();
-    _columnNames.addAll(_pinotSchema.getColumnNames());
 
     ColumnConfig config = new DruidProcessingConfig() {
       @Override
@@ -132,13 +103,13 @@ public class DruidSegmentRecordReader implements RecordReader {
 
     ObjectMapper mapper = new DefaultObjectMapper();
     final IndexIO indexIO = new IndexIO(mapper, config);
-    _index = indexIO.loadIndex(new File(indexPath));
-    _adapter = new QueryableIndexStorageAdapter(_index);
+    _index = indexIO.loadIndex(indexDir);
+    QueryableIndexStorageAdapter adapter = new QueryableIndexStorageAdapter(_index);
 
     // A Sequence "represents an iterable sequence of elements. Unlike normal Iterators however, it doesn't expose
     // a way for you to extract values from it, instead you provide it with a worker (an Accumulator) and that defines
     // what happens with the data."
-    final Sequence<Cursor> cursors = _adapter.makeCursors(
+    final Sequence<Cursor> cursors = adapter.makeCursors(
         Filters.toFilter(null),
         _index.getDataInterval().withChronology(ISOChronology.getInstanceUTC()),
         VirtualColumns.EMPTY,
@@ -158,10 +129,12 @@ public class DruidSegmentRecordReader implements RecordReader {
     sequence.accumulate(null, (accumulated, in) -> null);
 
     // There should only be one single Cursor for every segment, so there should only be one Cursor in the cursorList
-    Preconditions.checkArgument(cursorList.size() == 1, "msg");
+    Preconditions.checkArgument(cursorList.size() == 1, "There should only be one Cursor in the Sequence.");
     _cursor = cursorList.get(0);
 
-    validateColumns();
+    _columnNames = new ArrayList<>();
+    _columnNames.addAll(_pinotSchema.getColumnNames());
+    validateColumns(adapter);
 
     ColumnSelectorFactory columnSelectorFactory = _cursor.getColumnSelectorFactory();
     _selectors = _columnNames
@@ -171,9 +144,8 @@ public class DruidSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig)
-      throws IOException {
-    init(segmentGeneratorConfig.getInputFilePath(), segmentGeneratorConfig.getSchema());
+  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+
   }
 
   @Override
@@ -215,5 +187,56 @@ public class DruidSegmentRecordReader implements RecordReader {
   @Override
   public void close() {
     _index.close();
+  }
+
+  private boolean compareTypes(FieldSpec.DataType pinotColumnType, ValueType druidColumnType) {
+    switch (pinotColumnType) {
+      case INT:
+        return false;
+      case LONG:
+        return druidColumnType == ValueType.LONG;
+      case FLOAT:
+        return druidColumnType == ValueType.FLOAT;
+      case DOUBLE:
+        return druidColumnType == ValueType.DOUBLE;
+      case STRING:
+        return druidColumnType == ValueType.STRING;
+      case BOOLEAN:
+      case BYTES:
+      default:
+        throw new UnsupportedOperationException("Unsupported Druid type: " + pinotColumnType.name());
+    }
+  }
+
+  private void validateColumns(QueryableIndexStorageAdapter adapter) {
+    for (int i = 0; i < _columnNames.size(); i++) {
+      final String columnName = _columnNames.get(i);
+      ColumnCapabilities capabilities = adapter.getColumnCapabilities(columnName);
+      if (capabilities == null) {
+        LOGGER.warn("Column {} is not in record", columnName);
+      } else {
+        if (capabilities.getType() == ValueType.COMPLEX) {
+          throw new IllegalArgumentException("Column " + columnName
+              + ": DruidSegmentRecordReader does not support complex metric columns.");
+        }
+        FieldSpec fieldSpec = _pinotSchema.getFieldSpecFor(_columnNames.get(i));
+        if (!fieldSpec.isSingleValueField() && fieldSpec.getDataType() != FieldSpec.DataType.STRING) {
+          throw new IllegalArgumentException("Column " + columnName
+              + ": DruidSegmentRecordReader does not support non-STRING multi-value dimensions.");
+        }
+        if (fieldSpec.isSingleValueField() && capabilities.hasMultipleValues()) {
+          throw new IllegalArgumentException("Column " + columnName
+              + " in Pinot schema is single-valued, but column {} in " + "record is multi-valued.");
+        }
+        if (!fieldSpec.isSingleValueField() && !capabilities.hasMultipleValues()) {
+          throw new IllegalArgumentException("Column " + columnName
+              + " in Pinot schema is multi-valued, but column {} in" + "record is single-valued");
+        }
+        if (!compareTypes(_pinotSchema.getFieldSpecFor(columnName).getDataType(), capabilities.getType())) {
+          throw new IllegalArgumentException("Type for column " + columnName +
+              " in schema does not match type for column " + columnName + " in record.");
+        }
+      }
+    }
   }
 }
