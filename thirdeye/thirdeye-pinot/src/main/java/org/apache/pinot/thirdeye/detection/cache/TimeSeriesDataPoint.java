@@ -23,6 +23,22 @@ public class TimeSeriesDataPoint {
   public long getMetricId() { return metricId; }
   public String getDataValue() { return dataValue; }
 
+  public void setMetricUrn(String metricUrn) {
+    this.metricUrn = metricUrn;
+  }
+
+  public void setTimestamp(long timestamp) {
+    this.timestamp = timestamp;
+  }
+
+  public void setMetricId(long metricId) {
+    this.metricId = metricId;
+  }
+
+  public void setDataValue(String dataValue) {
+    this.dataValue = dataValue;
+  }
+
   public String getDocumentKey() {
     return metricId + "_" + timestamp;
   }

@@ -19,11 +19,6 @@ public class CouchbaseCacheDAO {
 
   private static final Logger LOG = LoggerFactory.getLogger(CouchbaseCacheDAO.class);
 
-  // these will all be moved to config files
-  private static final String AUTH_USERNAME = "thirdeye";
-  private static final String AUTH_PASSWORD = "thirdeye";
-  private static final String BUCKET_NAME = "travel-sample";
-
   private static final String BUCKET = "bucket";
   private static final String DIMENSION_KEY = "dimensionKey";
   private static final String METRIC_ID = "metricId";
@@ -43,8 +38,8 @@ public class CouchbaseCacheDAO {
 
   private void createDataStoreConnection() {
     Cluster cluster = CouchbaseCluster.create();
-    cluster.authenticate(AUTH_USERNAME, AUTH_PASSWORD);
-    this.bucket = cluster.openBucket(BUCKET_NAME);
+    cluster.authenticate(CacheConfig.getAuthUsername(), CacheConfig.getAuthPassword());
+    this.bucket = cluster.openBucket(CacheConfig.getBucketName());
   }
 
   public ThirdEyeCacheResponse tryFetchExistingTimeSeries(ThirdEyeCacheRequest request) {
@@ -53,7 +48,7 @@ public class CouchbaseCacheDAO {
 
     // NOTE: we subtract one from the end date because Couchbase's BETWEEN clause is inclusive on both sides
     JsonObject parameters = JsonObject.create()
-        .put(BUCKET, BUCKET_NAME)
+        .put(BUCKET, CacheConfig.getBucketName())
         .put(METRIC_ID, request.getMetricId())
         .put(DIMENSION_KEY, request.getDimensionKey())
         .put(START, request.getStartTimeInclusive())

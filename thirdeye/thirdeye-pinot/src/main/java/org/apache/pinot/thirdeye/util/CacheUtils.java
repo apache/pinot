@@ -1,11 +1,7 @@
 package org.apache.pinot.thirdeye.util;
 
 import com.couchbase.client.java.document.json.JsonObject;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.zip.CRC32;
-import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.detection.cache.TimeSeriesDataPoint;
 
 
@@ -18,14 +14,11 @@ public class CacheUtils {
   }
 
   public static JsonObject buildDocumentStructure(TimeSeriesDataPoint point) {
-    Map<String, String> dims = new HashMap<>();
-    dims.put(point.getMetricUrnHash(), point.getDataValue() == null ? "0" : point.getDataValue());
-
     JsonObject body = JsonObject.create()
         .put("time", point.getTimestamp())
         .put("metricId", point.getMetricId())
-        .put("dims", dims);
-
+        .put(point.getMetricUrnHash(),
+            (point.getDataValue() == null || point.getDataValue().equals("null")) ? "0" : point.getDataValue());
     return body;
   }
 

@@ -60,29 +60,8 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
       fetchMissingSlices(cacheResponse);
     }
 
-    List<String[]> rows = new ArrayList<>();
-
-    String dataset = thirdEyeRequest.getMetricFunctions().get(0).getDataset();
-    DatasetConfigDTO datasetDTO = datasetDAO.findByDataset(dataset);
-    TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetDTO);
-    DateTimeZone timeZone = DateTimeZone.forID(datasetDTO.getTimezone());
-
-    for (TimeSeriesDataPoint dataPoint : cacheResponse.getRows()) {
-      int timeBucketIndex = TimeRangeUtils.computeBucketIndex(
-          thirdEyeRequest.getGroupByTimeGranularity(), sliceStart, new DateTime(dataPoint.getTimestamp(), timeZone));
-      String dataValue = dataPoint.getDataValue();
-
-      String[] row = new String[2];
-      row[0] = String.valueOf(timeBucketIndex);
-      row[1] = (dataValue == null || dataValue.equals("null")) ? "0" : dataValue;
-
-      rows.add(row);
-    }
-
-    // make a new function that checks the type to return as and makes the corresponding ThirdEyeResponse
-    return new RelationalThirdEyeResponse(thirdEyeRequest, rows, timeSpec);
+    return buildResponseFromCacheResponse(cacheResponse);
   }
-
 
   // NOTE: we will pretend the case where there are missing documents
   //       within the returned time-series doesn't exist.
@@ -117,6 +96,30 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
     return this.cache.getQueryResult(rc.getRequest());
   }
 
+  private ThirdEyeResponse buildResponseFromCacheResponse(ThirdEyeCacheResponse cacheResponse) {
+
+    List<String[]> rows = new ArrayList<>();
+    ThirdEyeRequest request = cacheResponse.getCacheRequest().getRequest();
+
+    String dataset = request.getMetricFunctions().get(0).getDataset();
+    DatasetConfigDTO datasetDTO = datasetDAO.findByDataset(dataset);
+    TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetDTO);
+    DateTimeZone timeZone = DateTimeZone.forID(datasetDTO.getTimezone());
+
+    for (TimeSeriesDataPoint dataPoint : cacheResponse.getRows()) {
+      int timeBucketIndex = TimeRangeUtils.computeBucketIndex(
+          request.getGroupByTimeGranularity(), request.getStartTimeInclusive(), new DateTime(dataPoint.getTimestamp(), timeZone));
+      String dataValue = dataPoint.getDataValue();
+
+      String[] row = new String[2];
+      row[0] = String.valueOf(timeBucketIndex);
+      row[1] = (dataValue == null || dataValue.equals("null")) ? "0" : dataValue;
+
+      rows.add(row);
+    }
+
+    return new RelationalThirdEyeResponse(request, rows, timeSpec);
+  }
 
   public void insertTimeSeriesIntoCache(ThirdEyeResponse response) {
 
