@@ -891,7 +891,6 @@ public class PinotLLCRealtimeSegmentManager {
             if (partitionStartOffset > startOffset) {
               LOGGER.error("Data lost from offset: {} to: {} for partition: {} of table: {}", startOffset,
                   partitionStartOffset, partitionId, realtimeTableName);
-              _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_KAFKA_DATA_LOSS, 1L);
               _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_STREAM_DATA_LOSS, 1L);
               startOffset = partitionStartOffset;
             }
@@ -938,7 +937,6 @@ public class PinotLLCRealtimeSegmentManager {
             LOGGER
                 .error("Failed to find previous CONSUMING segment for partition: {} of table: {}, potential data loss",
                     partitionId, realtimeTableName);
-            _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_KAFKA_DATA_LOSS, 1L);
             _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_STREAM_DATA_LOSS, 1L);
           }
           updateInstanceStatesForNewConsumingSegment(instanceStatesMap, previousConsumingSegment, latestSegmentName,

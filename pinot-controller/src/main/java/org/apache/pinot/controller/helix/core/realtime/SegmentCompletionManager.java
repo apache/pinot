@@ -165,7 +165,6 @@ public class SegmentCompletionManager {
     final String segmentNameStr = reqParams.getSegmentName();
     final String tableName = segmentNameStr.split(SEPARATOR)[0];
     if (!isLeader(tableName) || !_helixManager.isConnected()) {
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String instanceId = reqParams.getInstanceId();
@@ -204,7 +203,6 @@ public class SegmentCompletionManager {
     final String segmentNameStr = reqParams.getSegmentName();
     final String tableName = segmentNameStr.split(SEPARATOR)[0];
     if (!isLeader(tableName) || !_helixManager.isConnected()) {
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String instanceId = reqParams.getInstanceId();
@@ -229,7 +227,6 @@ public class SegmentCompletionManager {
     final String segmentNameStr = reqParams.getSegmentName();
     final String tableName = segmentNameStr.split(SEPARATOR)[0];
     if (!isLeader(tableName) || !_helixManager.isConnected()) {
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String instanceId = reqParams.getInstanceId();
@@ -261,7 +258,6 @@ public class SegmentCompletionManager {
     final String segmentNameStr = reqParams.getSegmentName();
     final String tableName = segmentNameStr.split(SEPARATOR)[0];
     if (!isLeader(tableName) || !_helixManager.isConnected()) {
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String instanceId = reqParams.getInstanceId();
@@ -298,7 +294,6 @@ public class SegmentCompletionManager {
     final String segmentNameStr = reqParams.getSegmentName();
     final String tableName = segmentNameStr.split(SEPARATOR)[0];
     if (!isLeader(tableName) || !_helixManager.isConnected()) {
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
