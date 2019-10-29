@@ -39,8 +39,8 @@ public class CouchbaseCacheDAO {
   private void createDataStoreConnection() {
     if (CacheConfig.useCentralizedCache()) {
       Cluster cluster = CouchbaseCluster.create();
-      cluster.authenticate(CacheConfig.getAuthUsername(), CacheConfig.getAuthPassword());
-      this.bucket = cluster.openBucket(CacheConfig.getBucketName());
+      cluster.authenticate(CacheConfig.getCouchbaseAuthUsername(), CacheConfig.getCouchbaseAuthPassword());
+      this.bucket = cluster.openBucket(CacheConfig.getCouchbaseBucketName());
     }
   }
 
@@ -50,7 +50,7 @@ public class CouchbaseCacheDAO {
 
     // NOTE: we subtract one from the end date because Couchbase's BETWEEN clause is inclusive on both sides
     JsonObject parameters = JsonObject.create()
-        .put(BUCKET, CacheConfig.getBucketName())
+        .put(BUCKET, CacheConfig.getCouchbaseBucketName())
         .put(METRIC_ID, request.getMetricId())
         .put(DIMENSION_KEY, request.getDimensionKey())
         .put(START, request.getStartTimeInclusive())
