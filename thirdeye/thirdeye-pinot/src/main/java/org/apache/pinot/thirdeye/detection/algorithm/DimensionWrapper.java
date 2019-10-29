@@ -46,6 +46,7 @@ import org.apache.pinot.thirdeye.detection.DetectionPipelineException;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.PredictionResult;
+import org.apache.pinot.thirdeye.detection.cache.CacheConfig;
 import org.apache.pinot.thirdeye.detection.spi.exception.DetectorDataInsufficientException;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.joda.time.DateTime;
@@ -243,9 +244,14 @@ public class DimensionWrapper extends DetectionPipeline {
           this.config.getId(), nestedMetrics.size(), MAX_DIMENSION_COMBINATIONS));
     }
 
-    if (this.cachingPeriodLookback >= 0) {
-      this.provider.fetchTimeseries(nestedMetrics.stream().map(metricEntity -> MetricSlice.from(metricEntity.getId(), startTime - cachingPeriodLookback, endTime,
-          metricEntity.getFilters())).collect(Collectors.toList()));
+    // don't use in-memory cache for dimension exploration, it will cause thrashing
+    if (CacheConfig.useCentralizedCache()) {
+      if (this.cachingPeriodLookback >= 0) {
+        this.provider.fetchTimeseries(nestedMetrics.stream()
+            .map(metricEntity -> MetricSlice.from(metricEntity.getId(), startTime - cachingPeriodLookback, endTime,
+                metricEntity.getFilters()))
+            .collect(Collectors.toList()));
+      }
     }
 
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();

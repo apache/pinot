@@ -38,15 +38,14 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
 
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
-  private final QueryCache cache;
+  private final QueryCache queryCache;
   private final DefaultTimeSeriesCache timeSeriesCache;
 
-  public DefaultTimeSeriesLoader(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, QueryCache cache) {
+  public DefaultTimeSeriesLoader(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, QueryCache queryCache) {
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
-    this.cache = cache;
-
-    this.timeSeriesCache = new DefaultTimeSeriesCache(metricDAO, datasetDAO, cache);
+    this.queryCache = queryCache;
+    this.timeSeriesCache = new DefaultTimeSeriesCache(metricDAO, datasetDAO, queryCache);
   }
 
   /**
@@ -66,7 +65,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
     if (CacheConfig.useCentralizedCache()) {
       response = timeSeriesCache.fetchTimeSeries(rc.getRequest());
     } else {
-      response = this.cache.getQueryResult(rc.getRequest());
+      response = this.queryCache.getQueryResult(rc.getRequest());
     }
 
     return DataFrameUtils.evaluateResponse(response, rc);

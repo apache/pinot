@@ -37,9 +37,11 @@ public class CouchbaseCacheDAO {
   }
 
   private void createDataStoreConnection() {
-    Cluster cluster = CouchbaseCluster.create();
-    cluster.authenticate(CacheConfig.getAuthUsername(), CacheConfig.getAuthPassword());
-    this.bucket = cluster.openBucket(CacheConfig.getBucketName());
+    if (CacheConfig.useCentralizedCache()) {
+      Cluster cluster = CouchbaseCluster.create();
+      cluster.authenticate(CacheConfig.getAuthUsername(), CacheConfig.getAuthPassword());
+      this.bucket = cluster.openBucket(CacheConfig.getBucketName());
+    }
   }
 
   public ThirdEyeCacheResponse tryFetchExistingTimeSeries(ThirdEyeCacheRequest request) {

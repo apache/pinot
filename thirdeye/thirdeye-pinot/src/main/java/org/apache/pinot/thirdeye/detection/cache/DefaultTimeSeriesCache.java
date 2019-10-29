@@ -32,14 +32,13 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
 
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
-  private final QueryCache cache;
-  private CouchbaseCacheDAO cacheDAO = null;
+  private final QueryCache queryCache;
+  private CouchbaseCacheDAO cacheDAO = new CouchbaseCacheDAO();
 
-  public DefaultTimeSeriesCache(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, QueryCache cache) {
+  public DefaultTimeSeriesCache(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, QueryCache queryCache) {
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
-    this.cache = cache;
-    this.cacheDAO = new CouchbaseCacheDAO();
+    this.queryCache = queryCache;
   }
 
   public ThirdEyeResponse fetchTimeSeries(ThirdEyeRequest thirdEyeRequest) throws Exception {
@@ -48,7 +47,7 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
     ThirdEyeCacheResponse cacheResponse = cacheDAO.tryFetchExistingTimeSeries(ThirdEyeCacheRequest.from(thirdEyeRequest));
 
     if (cacheResponse == null || cacheResponse.hasNoRows()) {
-      ThirdEyeResponse dataSourceResponse = cache.getQueryResult(thirdEyeRequest);
+      ThirdEyeResponse dataSourceResponse = queryCache.getQueryResult(thirdEyeRequest);
       insertTimeSeriesIntoCache(dataSourceResponse);
       return dataSourceResponse;
     }
@@ -93,7 +92,7 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
 
   private ThirdEyeResponse fetchSliceFromSource(MetricSlice slice) throws Exception {
     TimeSeriesRequestContainer rc = DataFrameUtils.makeTimeSeriesRequestAligned(slice, "ref", this.metricDAO, this.datasetDAO);
-    return this.cache.getQueryResult(rc.getRequest());
+    return this.queryCache.getQueryResult(rc.getRequest());
   }
 
   private ThirdEyeResponse buildResponseFromCacheResponse(ThirdEyeCacheResponse cacheResponse) {
