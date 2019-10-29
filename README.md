@@ -62,7 +62,7 @@ $ cd incubator-pinot
 # Build Pinot
 $ mvn clean install -DskipTests -Pbin-dist
 
-# Run a Quick Demo
+# Run the Quick Demo
 $ cd pinot-distribution/target/apache-pinot-incubating-<version>-SNAPSHOT-bin
 $ bin/quick-start-offline.sh
 ```
