@@ -56,6 +56,7 @@
     <module>pinot-orc</module>
     <module>pinot-parquet</module>
     <module>pinot-connectors</module>
+    <module>pinot-druid</module>
   </modules>
 
   <licenses>
@@ -661,6 +662,14 @@
         <artifactId>hadoop-aws</artifactId>
         <version>${hadoop.version}</version>
       </dependency>
+
+      <!-- Druid -->
+      <dependency>
+        <groupId>org.apache.druid</groupId>
+        <artifactId>druid-processing</artifactId>
+        <version>0.16.0-incubating</version>
+      </dependency>
+
       <dependency>
         <groupId>org.apache.orc</groupId>
         <artifactId>orc-core</artifactId>
