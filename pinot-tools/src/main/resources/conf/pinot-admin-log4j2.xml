@@ -45,8 +45,8 @@
     <AsyncLogger name="org.apache.pinot.controller.ControllerStarter" level="info" additivity="false">
       <AppenderRef ref="console"/>
     </AsyncLogger>
-    <AsyncLogger name="org.apache.pinot.tools.admin" level="info" additivity="false">
+    <Logger name="org.apache.pinot.tools.admin" level="info" additivity="false">
       <AppenderRef ref="console"/>
-    </AsyncLogger>
+    </Logger>
   </Loggers>
 </Configuration>
