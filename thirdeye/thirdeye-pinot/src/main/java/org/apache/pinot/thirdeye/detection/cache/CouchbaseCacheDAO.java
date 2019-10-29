@@ -19,17 +19,6 @@ public class CouchbaseCacheDAO {
 
   private static final Logger LOG = LoggerFactory.getLogger(CouchbaseCacheDAO.class);
 
-  private static final String BUCKET = "bucket";
-  private static final String DIMENSION_KEY = "dimensionKey";
-  private static final String METRIC_ID = "metricId";
-  private static final String START = "start";
-  private static final String END = "end";
-
-  private static final String TIME = "time";
-
-  // 1 hour
-  private static final int TIMEOUT = 3600;
-
   private Bucket bucket;
 
   public CouchbaseCacheDAO() {
@@ -39,8 +28,8 @@ public class CouchbaseCacheDAO {
   private void createDataStoreConnection() {
     if (CacheConfig.useCentralizedCache()) {
       Cluster cluster = CouchbaseCluster.create();
-      cluster.authenticate(CacheConfig.getCouchbaseAuthUsername(), CacheConfig.getCouchbaseAuthPassword());
-      this.bucket = cluster.openBucket(CacheConfig.getCouchbaseBucketName());
+      cluster.authenticate(CacheConfig.COUCHBASE_AUTH_USERNAME, CacheConfig.COUCHBASE_AUTH_PASSWORD);
+      this.bucket = cluster.openBucket(CacheConfig.COUCHBASE_BUCKET_NAME);
     }
   }
 
@@ -48,13 +37,13 @@ public class CouchbaseCacheDAO {
 
     String dimensionKey = request.getDimensionKey();
 
-    // NOTE: we subtract one from the end date because Couchbase's BETWEEN clause is inclusive on both sides
+    // NOTE: we subtract 1 granularity from the end date because Couchbase's BETWEEN clause is inclusive on both sides
     JsonObject parameters = JsonObject.create()
-        .put(BUCKET, CacheConfig.getCouchbaseBucketName())
-        .put(METRIC_ID, request.getMetricId())
-        .put(DIMENSION_KEY, request.getDimensionKey())
-        .put(START, request.getStartTimeInclusive())
-        .put(END, request.getEndTimeExclusive() - 1);
+        .put(CacheConstants.BUCKET, CacheConfig.COUCHBASE_BUCKET_NAME)
+        .put(CacheConstants.METRIC_ID, request.getMetricId())
+        .put(CacheConstants.DIMENSION_KEY, request.getDimensionKey())
+        .put(CacheConstants.START, request.getStartTimeInclusive())
+        .put(CacheConstants.END, request.getEndTimeExclusive() - request.getRequest().getGroupByTimeGranularity().toMillis());
 
     String query = CacheUtils.buildQuery(parameters);
 
@@ -67,8 +56,11 @@ public class CouchbaseCacheDAO {
 
     List<TimeSeriesDataPoint> timeSeriesRows = new ArrayList<>();
 
+    // move this out of DAO and put it in the TimeSeriesCache instead?
+    // otherwise hard to test.
+
     for (N1qlQueryRow row : queryResult) {
-      long timestamp = row.value().getLong(TIME);
+      long timestamp = row.value().getLong(CacheConstants.TIME);
       String dataValue = row.value().getString(dimensionKey);
       timeSeriesRows.add(new TimeSeriesDataPoint(request.getMetricUrn(), timestamp, request.getMetricId(), dataValue));
     }
@@ -78,17 +70,18 @@ public class CouchbaseCacheDAO {
 
   public void insertTimeSeriesDataPoint(TimeSeriesDataPoint point) {
 
-    JsonDocument doc = bucket.getAndTouch(point.getDocumentKey(), TIMEOUT);
+    // will this have memory issues later? if we need to pull all the dimension values into memory.
+    JsonDocument doc = bucket.getAndTouch(point.getDocumentKey(), CacheConfig.TTL);
 
     if (doc == null) {
       JsonObject documentBody = CacheUtils.buildDocumentStructure(point);
-      doc = JsonDocument.create(point.getDocumentKey(), TIMEOUT, documentBody);
+      doc = JsonDocument.create(point.getDocumentKey(), CacheConfig.TTL, documentBody);
     } else {
-      // will this have memory issues later? if we need to pull all the dimension values into memory.
       JsonObject dimensions = doc.content();
       if (dimensions.containsKey(point.getMetricUrnHash()))
         return;
-      dimensions.put(point.getMetricUrnHash(), point.getDataValue() == null ? "0" : point.getDataValue());
+      dimensions.put(point.getMetricUrnHash(),
+          (point.getDataValue() == null || point.getDataValue().equals("null")) ? "0" : point.getDataValue());
     }
 
     bucket.upsert(doc);

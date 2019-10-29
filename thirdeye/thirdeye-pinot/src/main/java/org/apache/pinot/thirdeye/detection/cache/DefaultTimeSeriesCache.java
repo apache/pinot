@@ -30,6 +30,8 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
 
   private static final Logger LOG = LoggerFactory.getLogger(DefaultTimeSeriesCache.class);
 
+  private static final String TIMESTAMP = "timestamp";
+
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
   private final QueryCache queryCache;
@@ -141,7 +143,7 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
       String metricUrn = MetricEntity.fromMetric(response.getRequest().getFilterSet().asMap(), metric.getMetricId()).getUrn();
       for (int i = 0; i < response.getNumRowsFor(metric); i++) {
         Map<String, String> row = response.getRow(metric, i);
-        TimeSeriesDataPoint dp = new TimeSeriesDataPoint(metricUrn, Long.parseLong(row.get("timestamp")), metric.getMetricId(), row.get(metric.toString()));
+        TimeSeriesDataPoint dp = new TimeSeriesDataPoint(metricUrn, Long.parseLong(row.get(CacheConstants.TIMESTAMP)), metric.getMetricId(), row.get(metric.toString()));
         executor.execute(() -> this.cacheDAO.insertTimeSeriesDataPoint(dp));
       }
     }
