@@ -39,72 +39,64 @@ public class KafkaJSONMessageDecoderTest {
   @Test
   public void testJsonDecoderWithoutOutgoingTimeSpec()
       throws Exception {
-    Schema schema = Schema.fromFile(new File(
+    testJsonDecoderWithSchema(Schema.fromFile(new File(
         getClass().getClassLoader().getResource("data/test_sample_data_schema_without_outgoing_time_spec.json")
-            .getFile()));
-    BufferedReader reader = new BufferedReader(
-        new FileReader(getClass().getClassLoader().getResource("data/test_sample_data.json").getFile()));
-    testJsonDecoder(schema, reader);
+            .getFile())));
   }
 
   @Test
   public void testJsonDecoderWithOutgoingTimeSpec()
       throws Exception {
-    Schema schema = Schema.fromFile(new File(
-        getClass().getClassLoader().getResource("data/test_sample_data_schema_with_outgoing_time_spec.json")
-            .getFile()));
-    BufferedReader reader = new BufferedReader(
-        new FileReader(getClass().getClassLoader().getResource("data/test_sample_data.json").getFile()));
-    testJsonDecoder(schema, reader);
+    testJsonDecoderWithSchema(Schema.fromFile(new File(
+        getClass().getClassLoader().getResource("data/test_sample_data_schema_no_time_field.json").getFile())));
   }
 
   @Test
   public void testJsonDecoderNoTimeSpec()
       throws Exception {
-    Schema schema = Schema.fromFile(
-        new File(getClass().getClassLoader().getResource("data/test_sample_data_schema_no_time_field.json").getFile()));
-    BufferedReader reader = new BufferedReader(
-        new FileReader(getClass().getClassLoader().getResource("data/test_sample_data.json").getFile()));
-    testJsonDecoder(schema, reader);
+    testJsonDecoderWithSchema(Schema.fromFile(new File(
+        getClass().getClassLoader().getResource("data/test_sample_data_schema_no_time_field.json").getFile())));
   }
 
-  private void testJsonDecoder(Schema schema, BufferedReader reader)
+  private void testJsonDecoderWithSchema(Schema schema)
       throws Exception {
-    KafkaJSONMessageDecoder decoder = new KafkaJSONMessageDecoder();
-    decoder.init(new HashMap<>(), schema, "testTopic");
-    GenericRow r = new GenericRow();
-    String line = reader.readLine();
-    while (line != null) {
-      JsonNode jsonNode = objectMapper.reader().readTree(line);
-      decoder.decode(line.getBytes(), r);
-      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-        FieldSpec incomingFieldSpec = fieldSpec.getFieldType() == FieldSpec.FieldType.TIME ? new TimeFieldSpec(
-            schema.getTimeFieldSpec().getIncomingGranularitySpec()) : fieldSpec;
-        String fieldSpecName = incomingFieldSpec.getName();
-        Object actualValue = r.getValue(fieldSpecName);
-        JsonNode expectedValue = jsonNode.get(fieldSpecName);
-        switch (incomingFieldSpec.getDataType()) {
-          case STRING:
-            Assert.assertEquals(actualValue, expectedValue.asText());
-            break;
-          case INT:
-            Assert.assertEquals(actualValue, expectedValue.asInt());
-            break;
-          case LONG:
-            Assert.assertEquals(actualValue, expectedValue.asLong());
-            break;
-          case FLOAT:
-            Assert.assertEquals(actualValue, (float) expectedValue.asDouble());
-            break;
-          case DOUBLE:
-            Assert.assertEquals(actualValue, expectedValue.asDouble());
-            break;
-          default:
-            Assert.assertTrue(false, "Shouldn't arrive here.");
+    try (BufferedReader reader = new BufferedReader(
+        new FileReader(getClass().getClassLoader().getResource("data/test_sample_data.json").getFile()))) {
+      KafkaJSONMessageDecoder decoder = new KafkaJSONMessageDecoder();
+      decoder.init(new HashMap<>(), schema, "testTopic");
+      GenericRow r = new GenericRow();
+      String line = reader.readLine();
+      while (line != null) {
+        JsonNode jsonNode = objectMapper.reader().readTree(line);
+        decoder.decode(line.getBytes(), r);
+        for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+          FieldSpec incomingFieldSpec = fieldSpec.getFieldType() == FieldSpec.FieldType.TIME ? new TimeFieldSpec(
+              schema.getTimeFieldSpec().getIncomingGranularitySpec()) : fieldSpec;
+          String fieldSpecName = incomingFieldSpec.getName();
+          Object actualValue = r.getValue(fieldSpecName);
+          JsonNode expectedValue = jsonNode.get(fieldSpecName);
+          switch (incomingFieldSpec.getDataType()) {
+            case STRING:
+              Assert.assertEquals(actualValue, expectedValue.asText());
+              break;
+            case INT:
+              Assert.assertEquals(actualValue, expectedValue.asInt());
+              break;
+            case LONG:
+              Assert.assertEquals(actualValue, expectedValue.asLong());
+              break;
+            case FLOAT:
+              Assert.assertEquals(actualValue, (float) expectedValue.asDouble());
+              break;
+            case DOUBLE:
+              Assert.assertEquals(actualValue, expectedValue.asDouble());
+              break;
+            default:
+              Assert.assertTrue(false, "Shouldn't arrive here.");
+          }
         }
+        line = reader.readLine();
       }
-      line = reader.readLine();
     }
-    reader.close();
   }
 }
