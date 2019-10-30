@@ -24,8 +24,8 @@ export const colorMapping = {
   'light-pink': '#FFB9E2',
   'light-grey': '#CFCFCF',
   'confidence-bounds-blue' : '#dcf8f3',
-  'screenshot-current' : '#622570',
-  'screenshot-predicted' : '#EA168E',
+  'screenshot-current' : '#1B1B1E',
+  'screenshot-predicted' : '#FF9505',
   'screenshot-anomaly' : '#EEF2F5',
   'screenshot-bounds' : '#1CAFED'
 };

@@ -56,14 +56,18 @@ export default Route.extend(AuthenticatedRouteMixin, {
             dataset: detection_json.datasetNames,
             filters: formatYamlFilter(detectionInfo.filters),
             dimensionExploration: formatYamlFilter(detectionInfo.dimensionExploration),
-            lastDetectionTime: lastDetection.toDateString() + ", " +  lastDetection.toLocaleTimeString() + " (" + moment().tz(moment.tz.guess()).format('z') + ")"
+            lastDetectionTime: lastDetection.toDateString() + ", " +  lastDetection.toLocaleTimeString() + " (" + moment().tz(moment.tz.guess()).format('z') + ")",
+            rawYaml: detection_json.yaml
           });
 
           this.setProperties({
             alertId: alertId,
             detectionInfo,
             rawDetectionYaml: detection_json.yaml,
-            timeWindowSize: detection_json.alertDetailsDefaultWindowSize
+            metricUrn: detection_json.metricUrns[0],
+            metricUrnList: detection_json.metricUrns,
+            timeWindowSize: detection_json.alertDetailsDefaultWindowSize,
+            granularity: detection_json.monitoringGranularity.toString()
           });
         }
       }
@@ -130,7 +134,10 @@ export default Route.extend(AuthenticatedRouteMixin, {
       subscriptionGroups: get(this, 'subscriptionGroups'),
       subscribedGroups,
       subscriptionGroupNames, // all subscription groups as Ember data
-      timeWindowSize: get(this, 'timeWindowSize')
+      metricUrn: get(this, 'metricUrn'),
+      metricUrnList: get(this, 'metricUrnList') ? get(this, 'metricUrnList') : [],
+      timeWindowSize: get(this, 'timeWindowSize'),
+      granularity: get(this, 'granularity')
     });
   },
 

@@ -1,28 +1,36 @@
 <div class="{{classes.columnsDropdownWrapper}}">
-  <div class="{{classes.columnsDropdownButtonWrapper}}">
-    {{#bs-dropdown as |dd|}}
+  <div class="te-button__no-border">
+    {{#bs-dropdown closeOnMenuClick=false as |dd|}}
       {{#dd.button}}
-        {{messages.columns-title}}<span class="caret"></span>
+        <span class="glyphicon glyphicon-pencil"></span>{{messages.columns-title}}
       {{/dd.button}}
-      {{#dd.menu as |ddm|}}
+      {{#dd.menu class="te-dropdown" as |ddm|}}
         {{#ddm.item}}
-          <a {{action "showAllColumns" column bubbles=false}} href="#">{{messages.columns-showAll}}</a>
+          <a class="te-dropdown__top-options" {{action "showAllColumns" column bubbles=false}} href="#"><span class="{{icons.column-visible}}" style="visibility: hidden"></span> {{messages.columns-showAll}}</a>
         {{/ddm.item}}
         {{#ddm.item}}
-          <a {{action "hideAllColumns" column bubbles=false}} href="#">{{messages.columns-hideAll}}</a>
+          <a class="te-dropdown__top-options" {{action "hideAllColumns" column bubbles=false}} href="#"><span class="{{icons.column-visible}}" style="visibility: hidden"></span> {{messages.columns-hideAll}}</a>
         {{/ddm.item}}
         {{#ddm.item}}
-          <a {{action "restoreDefaultVisibility" column bubbles=false}} href="#">{{messages.columns-restoreDefaults}}</a>
+          <a class="te-dropdown__top-options" {{action "restoreDefaultVisibility" column bubbles=false}} href="#"><span class="{{icons.column-visible}}" style="visibility: hidden"></span> {{messages.columns-restoreDefaults}}</a>
         {{/ddm.item}}
         {{#each processedColumns as |column|}}
           {{#if column.mayBeHidden}}
             {{#ddm.item}}
-              <a {{action "toggleHidden" column bubbles=false}} href="#">
-                  <span class="{{if column.isVisible icons.column-visible icons.column-hidden}}"></span> {{column.title}}
-              </a>
+              <div>
+                <a class="te-checkbox-left" {{action "toggleHidden" column bubbles=false}} href="#">
+                  <span class="{{if column.isVisible icons.column-visible icons.column-hidden}}"></span>
+                </a>
+                {{column.title}}
+              </div>
             {{/ddm.item}}
           {{/if}}
         {{/each}}
+        {{#ddm.item}}
+          <fieldset class="te-dropdown__close">
+            <a class="te-link-secondary" {{action dd.closeDropdown}} href="#"><span class="{{icons.column-visible}}" style="visibility: hidden"></span> Done</a>
+          </fieldset>
+        {{/ddm.item}}
       {{/dd.menu}}
     {{/bs-dropdown}}
   </div>
