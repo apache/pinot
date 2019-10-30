@@ -27,7 +27,6 @@ import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
-import org.apache.pinot.thirdeye.detection.cache.CacheConfig;
 import org.apache.pinot.thirdeye.detection.cache.DefaultTimeSeriesCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
