@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.Map;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.data.TimeFieldSpec;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
@@ -33,21 +34,30 @@ import org.slf4j.LoggerFactory;
 public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaJSONMessageDecoder.class);
 
-  private Schema schema;
+  private Schema _schema;
+  private FieldSpec _incomingTimeFieldSpec;
 
   @Override
   public void init(Map<String, String> props, Schema indexingSchema, String topicName)
       throws Exception {
-    this.schema = indexingSchema;
+    _schema = indexingSchema;
+
+    // For time field, we use the incoming time field spec
+    TimeFieldSpec timeFieldSpec = _schema.getTimeFieldSpec();
+    if (timeFieldSpec != null) {
+      _incomingTimeFieldSpec = new TimeFieldSpec(timeFieldSpec.getIncomingGranularitySpec());
+    }
   }
 
   @Override
   public GenericRow decode(byte[] payload, GenericRow destination) {
     try {
       JsonNode message = JsonUtils.bytesToJsonNode(payload);
-      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-        String column = fieldSpec.getName();
-        destination.putField(column, JsonUtils.extractValue(message.get(column), fieldSpec));
+      for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
+        FieldSpec incomingFieldSpec =
+            fieldSpec.getFieldType() == FieldSpec.FieldType.TIME ? _incomingTimeFieldSpec : fieldSpec;
+        String column = incomingFieldSpec.getName();
+        destination.putValue(column, JsonUtils.extractValue(message.get(column), incomingFieldSpec));
       }
       return destination;
     } catch (Exception e) {

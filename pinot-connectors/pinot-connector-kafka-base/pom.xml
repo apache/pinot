@@ -35,4 +35,13 @@
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
   </properties>
+
+  <dependencies>
+    <!-- test -->
+    <dependency>
+      <groupId>org.testng</groupId>
+      <artifactId>testng</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
 </project>
