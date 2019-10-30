@@ -1053,7 +1053,9 @@ export default Component.extend({
         // The format is rule1_name:rule1_type,rule2_name:rule2_type ...
         // For example: wow_10_percent_change:PERCENTAGE_RULE,algorithm:ALGORITHM
         let rules = [];
-        properties.detectorComponentName.split(',').forEach(x => { rules.push(x.split(':')[0])});
+        properties.detectorComponentName.split(',').forEach(x => {
+          rules.push(x.split(':')[0]);
+        });
         result = rules.sort().join();
       } else {
         result = '--';
@@ -1064,7 +1066,7 @@ export default Component.extend({
 
   _fetchAnomalies() {
     set(this, 'getAnomaliesError', false);
-    
+
     // If the user is running the detection with a new metric, we should reset the state of time series and anomalies for comparison
     if (this._checkMetricIfCreateAlertPreview()) {
       this.setProperties({
@@ -1172,18 +1174,6 @@ export default Component.extend({
     if (feedback && typeof feedback === 'object') {
       if (feedback.updatedBy && feedback.updatedBy !== 'no-auth-user') {
         result = feedback.updatedBy.split('@')[0];
-      } else {
-        result = '--';
-      }
-    }
-    return result;
-  },
-
-  _formattedRule(properties) {
-    let result;
-    if (properties && typeof properties === 'object') {
-      if (properties.detectorComponentName) {
-        result = properties.detectorComponentName.split(':')[0];
       } else {
         result = '--';
       }
