@@ -19,7 +19,6 @@
 package org.apache.pinot.core.realtime.impl.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Map;
 import org.apache.pinot.common.data.FieldSpec;
@@ -58,7 +57,7 @@ public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
         FieldSpec incomingFieldSpec =
             fieldSpec.getFieldType() == FieldSpec.FieldType.TIME ? _incomingTimeFieldSpec : fieldSpec;
         String column = incomingFieldSpec.getName();
-        destination.putValue(column, JsonUtils.extractValue(message.get(column), fieldSpec));
+        destination.putValue(column, JsonUtils.extractValue(message.get(column), incomingFieldSpec));
       }
       return destination;
     } catch (Exception e) {

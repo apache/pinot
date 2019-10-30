@@ -18,21 +18,23 @@
  */
 package org.apache.pinot.core.realtime.impl.kafka;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.HashMap;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.data.TimeFieldSpec;
 import org.apache.pinot.core.data.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 public class KafkaJSONMessageDecoderTest {
+
+  private static ObjectMapper objectMapper = new ObjectMapper();
 
   @Test
   public void testJsonDecoderWithoutOutgoingTimeSpec()
@@ -73,28 +75,29 @@ public class KafkaJSONMessageDecoderTest {
     GenericRow r = new GenericRow();
     String line = reader.readLine();
     while (line != null) {
-      JsonObject jsonObject = JsonParser.parseString(line).getAsJsonObject();
+      JsonNode jsonNode = objectMapper.reader().readTree(line);
       decoder.decode(line.getBytes(), r);
       for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-        String fieldSpecName = (fieldSpec.getFieldType() == FieldSpec.FieldType.TIME) ? schema.getTimeFieldSpec()
-            .getIncomingTimeColumnName() : fieldSpec.getName();
+        FieldSpec incomingFieldSpec = fieldSpec.getFieldType() == FieldSpec.FieldType.TIME ? new TimeFieldSpec(
+            schema.getTimeFieldSpec().getIncomingGranularitySpec()) : fieldSpec;
+        String fieldSpecName = incomingFieldSpec.getName();
         Object actualValue = r.getValue(fieldSpecName);
-        JsonElement expectedValue = jsonObject.get(fieldSpecName);
-        switch (fieldSpec.getDataType()) {
+        JsonNode expectedValue = jsonNode.get(fieldSpecName);
+        switch (incomingFieldSpec.getDataType()) {
           case STRING:
-            Assert.assertEquals(actualValue, expectedValue.getAsString());
+            Assert.assertEquals(actualValue, expectedValue.asText());
             break;
           case INT:
-            Assert.assertEquals(actualValue, expectedValue.getAsInt());
+            Assert.assertEquals(actualValue, expectedValue.asInt());
             break;
           case LONG:
-            Assert.assertEquals(actualValue, expectedValue.getAsLong());
+            Assert.assertEquals(actualValue, expectedValue.asLong());
             break;
           case FLOAT:
-            Assert.assertEquals(actualValue, expectedValue.getAsFloat());
+            Assert.assertEquals(actualValue, (float) expectedValue.asDouble());
             break;
           case DOUBLE:
-            Assert.assertEquals(actualValue, expectedValue.getAsDouble());
+            Assert.assertEquals(actualValue, expectedValue.asDouble());
             break;
           default:
             Assert.assertTrue(false, "Shouldn't arrive here.");
