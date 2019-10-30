@@ -36,9 +36,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.validation.constraints.NotNull;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -538,6 +540,40 @@ public class DetectionResource {
     this.anomalyDAO.save(anomaly);
 
     return Response.ok(anomaly.getId()).build();
+  }
+
+  /**
+   * Toggle active/inactive for given detection
+   *
+   * @param detectionId detection config id (must exist)
+   * @param active value to set for active field in detection config
+   */
+  @PUT
+  @Path("/activation/{id}")
+  @ApiOperation("Make detection active or inactive, given id")
+  public Response toggleActivation(
+      @ApiParam("Detection configuration id for the alert") @NotNull @PathParam("id") long detectionId,
+      @ApiParam("Active status you want to set for the alert") @NotNull @QueryParam("active") boolean active) throws Exception {
+    Map<String, String> responseMessage = new HashMap<>();
+    try {
+      DetectionConfigDTO config = this.configDAO.findById(detectionId);
+      if (config == null) {
+        throw new IllegalArgumentException(String.format("Cannot find config %d", detectionId));
+      }
+
+      // update state
+      config.setActive(active);
+      this.configDAO.update(config);
+      responseMessage.put("message", "Alert activation toggled to " + active + " for detection id " + detectionId);
+    }
+    catch (Exception e) {
+      LOG.error("Error toggling activation on detection id " + detectionId, e);
+      responseMessage.put("message", "Failed to toggle activation: " + e.getMessage());
+      return Response.serverError().entity(responseMessage).build();
+    }
+
+    LOG.info("Alert activation toggled to {} for detection id {}", active , detectionId);
+    return Response.ok(responseMessage).build();
   }
 
   @GET
