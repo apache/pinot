@@ -54,29 +54,6 @@ public class ValidationMetrics {
   }
 
   /**
-   * A simple gauge that returns the difference between the current system time in millis and the value stored in the
-   * _gaugeValues hash map.
-   */
-  private class CurrentTimeMillisDeltaGauge extends Gauge<Long> {
-    private final String key;
-
-    public CurrentTimeMillisDeltaGauge(String key) {
-      this.key = key;
-    }
-
-    @Override
-    public Long value() {
-      Long gaugeValue = _gaugeValues.get(key);
-
-      if (gaugeValue != null && gaugeValue != Long.MIN_VALUE) {
-        return System.currentTimeMillis() - gaugeValue;
-      } else {
-        return Long.MIN_VALUE;
-      }
-    }
-  }
-
-  /**
    * A simple gauge that returns the difference in hours between the current system time and the value stored in the
    * _gaugeValues hash map.
    */
@@ -112,13 +89,6 @@ public class ValidationMetrics {
     }
   }
 
-  private class CurrentTimeMillisDeltaGaugeFactory implements GaugeFactory<Long> {
-    @Override
-    public Gauge<Long> buildGauge(final String key) {
-      return new CurrentTimeMillisDeltaGauge(key);
-    }
-  }
-
   private class CurrentTimeMillisDeltaGaugeHoursFactory implements GaugeFactory<Double> {
     @Override
     public Gauge<Double> buildGauge(final String key) {
@@ -127,8 +97,6 @@ public class ValidationMetrics {
   }
 
   private final StoredValueGaugeFactory _storedValueGaugeFactory = new StoredValueGaugeFactory();
-  private final CurrentTimeMillisDeltaGaugeFactory _currentTimeMillisDeltaGaugeFactory =
-      new CurrentTimeMillisDeltaGaugeFactory();
   private final CurrentTimeMillisDeltaGaugeHoursFactory _currentTimeMillisDeltaGaugeHoursFactory =
       new CurrentTimeMillisDeltaGaugeHoursFactory();
 
@@ -160,9 +128,6 @@ public class ValidationMetrics {
    *                               if there is no such time.
    */
   public void updateOfflineSegmentDelayGauge(final String resource, final long lastOfflineSegmentTime) {
-    final String fullGaugeName = makeGaugeName(resource, "offlineSegmentDelayMillis");
-    makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _currentTimeMillisDeltaGaugeFactory,
-        lastOfflineSegmentTime);
     final String fullGaugeNameHours = makeGaugeName(resource, "offlineSegmentDelayHours");
     makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory,
         lastOfflineSegmentTime);
@@ -176,8 +141,6 @@ public class ValidationMetrics {
    *                           such time.
    */
   public void updateLastPushTimeGauge(final String resource, final long lastPushTimeMillis) {
-    final String fullGaugeName = makeGaugeName(resource, "lastPushTimeDelayMillis");
-    makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _currentTimeMillisDeltaGaugeFactory, lastPushTimeMillis);
     final String fullGaugeNameHours = makeGaugeName(resource, "lastPushTimeDelayHours");
     makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory,
         lastPushTimeMillis);

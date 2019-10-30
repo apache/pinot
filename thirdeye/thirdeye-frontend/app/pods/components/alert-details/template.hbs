@@ -73,7 +73,11 @@
                 </label>
               </h4>
               {{!-- Alert anomaly stats cards --}}
-              {{stats-cards stats=stats}}
+              {{stats-cards
+                stats=stats
+                areTwoSetsOfAnomalies=areTwoSetsOfAnomalies
+                isEditMode=isEditMode
+              }}
             </div>
 
             <!-- Detection Health -->
@@ -115,7 +119,11 @@
                 </label>
               </h4>
               {{!-- Alert anomaly stats cards --}}
-              {{stats-cards stats=stats}}
+              {{stats-cards
+                stats=stats
+                areTwoSetsOfAnomalies=areTwoSetsOfAnomalies
+                isEditMode=isEditMode
+              }}
             </div>
 
           {{/if}}
@@ -265,11 +273,13 @@
                 data=tableAnomalies
                 columns=columns
                 columnsDropdownTemplate="dropdown"
+                customMessages=customMessages
+                customClasses=customClasses
               }}
             {{/if}}
         </div>
         {{else}}
-        <div class="yaml-editor-msg">Alert configuration has changed.</div>
+        <div class="detection-yaml-msg">Alert configuration has changed.</div>
           {{range-pill-selectors
             title="Show me"
             uiDateFormat=pill.uiDateFormat

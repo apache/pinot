@@ -43,6 +43,7 @@ const HumanizedAnomaly = EmberObject.extend({// ex: record.humanizedChangeDispla
   startDateStr: computed.alias('anomaly.startDateStr'),
   start: computed.alias('anomaly.start'),
   settings: computed.alias('anomaly.settings'),
+  settingsNum: computed.alias('anomaly.settingsNum'),
   anomalyFeedback: computed('anomaly.feedback', function() {
     return get(this, 'anomaly.feedback') ? anomalyResponseObj.find(res => res.value === get(this, 'anomaly.feedback')).name : '';
   }),

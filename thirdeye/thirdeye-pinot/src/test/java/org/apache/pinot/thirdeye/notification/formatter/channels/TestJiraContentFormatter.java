@@ -1,7 +1,24 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 package org.apache.pinot.thirdeye.notification.formatter.channels;
 
-import com.atlassian.jira.rest.client.api.domain.input.ComplexIssueInputFieldValue;
-import com.atlassian.jira.rest.client.api.domain.input.IssueInput;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -25,6 +42,7 @@ import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.alert.scheme.DetectionAlertScheme;
 import org.apache.pinot.thirdeye.notification.commons.JiraConfiguration;
+import org.apache.pinot.thirdeye.notification.commons.JiraEntity;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
 import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.testng.Assert;
@@ -134,18 +152,18 @@ public class TestJiraContentFormatter {
     JiraContentFormatter jiraContent = new JiraContentFormatter(
         JiraConfiguration.createFromProperties(jiraConfiguration), jiraClientConfig, content, teConfig, adContext);
 
-    IssueInput issueInput = jiraContent.getJiraEntity(new HashSet<>(this.anomalyDAO.findAll()));
+    JiraEntity jiraEntity = jiraContent.getJiraEntity(new HashSet<>(this.anomalyDAO.findAll()));
 
     // Assert Jira fields
-    Assert.assertEquals(issueInput.getField(PROP_LABELS).getValue(), Arrays.asList("test-label-1", "test-label-2", "thirdeye"));
-    Assert.assertEquals(((ComplexIssueInputFieldValue) issueInput.getField(PROP_ISSUE_TYPE).getValue()).getValuesMap().get("id"), "16");
-    Assert.assertEquals(((ComplexIssueInputFieldValue) issueInput.getField(PROP_ASSIGNEE).getValue()).getValuesMap().get("name"), "test");
-    Assert.assertEquals(((ComplexIssueInputFieldValue) issueInput.getField(PROP_PROJECT).getValue()).getValuesMap().get("key"), "thirdeye");
+    Assert.assertEquals(jiraEntity.getLabels(), Arrays.asList("test-label-1", "test-label-2", "thirdeye"));
+    Assert.assertEquals(jiraEntity.getJiraIssueTypeId().longValue(), 16L);
+    Assert.assertEquals(jiraEntity.getAssignee(), "test");
+    Assert.assertEquals(jiraEntity.getJiraProject(), "thirdeye");
 
     // Assert summary and description
-    Assert.assertEquals(issueInput.getField(PROP_SUMMARY).getValue(), "Thirdeye Alert : alert_name - test_metric");
+    Assert.assertEquals(jiraEntity.getSummary(), "Thirdeye Alert : alert_name - test_metric");
     Assert.assertEquals(
-        issueInput.getField("description").getValue().toString().replaceAll(" ", ""),
+        jiraEntity.getDescription().replaceAll(" ", ""),
         IOUtils.toString(Thread.currentThread().getContextClassLoader()
             .getResourceAsStream("test-jira-anomalies-template.ftl")).replaceAll(" ", ""));
   }

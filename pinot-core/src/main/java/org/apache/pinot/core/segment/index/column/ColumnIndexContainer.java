@@ -22,6 +22,7 @@ import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.index.readers.NullValueVectorReaderImpl;
 
 
 /**
@@ -44,5 +45,15 @@ public interface ColumnIndexContainer {
    */
   Dictionary getDictionary();
 
+  /**
+   *
+   * @return Get the bloom filter for the column, or {@code null} if it does not exist.
+   */
   BloomFilterReader getBloomFilter();
+
+  /**
+   *
+   * @return Get the null value vector for the column, or {@code null} if it does not exist.
+   */
+  NullValueVectorReaderImpl getNullValueVector();
 }

@@ -53,6 +53,7 @@ import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.common.utils.DataSchema;
@@ -517,11 +518,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy, DataSchema dataSchema,
       Map<ServerInstance, DataTable> dataTableMap) {
 
-    IndexedTable indexedTable = new ConcurrentIndexedTable();
-    int indexedTableCapacity = 1_000_000;
-    // FIXME: indexedTableCapacity should be derived from TOP. Hardcoding this value to a higher number until we can tune the resize
-    // int capacity = GroupByUtils.getTableCapacity((int) groupBy.getTopN());
-    indexedTable.init(dataSchema, aggregationInfos, orderBy, indexedTableCapacity);
+    int indexedTableCapacity = GroupByUtils.getTableCapacity(groupBy, orderBy);
+    IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, aggregationInfos, orderBy, indexedTableCapacity);
 
     for (DataTable dataTable : dataTableMap.values()) {
       BiFunction[] functions = new BiFunction[dataSchema.size()];
@@ -544,6 +542,10 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
             break;
           case STRING:
             function = dataTable::getString;
+            break;
+          case BYTES:
+            // FIXME: support BYTES in DataTable instead of converting to string
+            function = (row, col) -> BytesUtils.toByteArray(dataTable.getString(row, col));
             break;
           default:
             function = dataTable::getObject;

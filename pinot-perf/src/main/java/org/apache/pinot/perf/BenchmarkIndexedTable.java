@@ -135,8 +135,8 @@ public class BenchmarkIndexedTable {
     int numSegments = 10;
 
     // make 1 concurrent table
-    IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable();
-    concurrentIndexedTable.init(_dataSchema, _aggregationInfos, _orderBy, CAPACITY);
+    IndexedTable concurrentIndexedTable =
+        new ConcurrentIndexedTable(_dataSchema, _aggregationInfos, _orderBy, CAPACITY);
 
     // 10 parallel threads putting 10k records into the table
 
@@ -187,8 +187,7 @@ public class BenchmarkIndexedTable {
     for (int i = 0; i < numSegments; i++) {
 
       // make 10 indexed tables
-      IndexedTable simpleIndexedTable = new SimpleIndexedTable();
-      simpleIndexedTable.init(_dataSchema, _aggregationInfos, _orderBy, CAPACITY);
+      IndexedTable simpleIndexedTable = new SimpleIndexedTable(_dataSchema, _aggregationInfos, _orderBy, CAPACITY);
       simpleIndexedTables.add(simpleIndexedTable);
 
       // put 10k records in each indexed table, in parallel

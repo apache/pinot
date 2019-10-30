@@ -99,7 +99,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     // range. For this test, we first need to fix the input avro data
     // to have the time column values in allowed range. Until then, the check
     // is explicitly disabled
-    segmentGeneratorConfig.setCheckTimeColumnValidityDuringGeneration(false);
+    segmentGeneratorConfig.setSkipTimeValueCheck(true);
     segmentGeneratorConfig
         .setInvertedIndexCreationColumns(Arrays.asList("column6", "column7", "column11", "column17", "column18"));
 
@@ -132,7 +132,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     // range. For this test, we first need to fix the input avro data
     // to have the time column values in allowed range. Until then, the check
     // is explicitly disabled
-    segmentGeneratorConfig.setCheckTimeColumnValidityDuringGeneration(false);
+    segmentGeneratorConfig.setSkipTimeValueCheck(true);
 
     // Build the index segment.
     driver = new SegmentIndexCreationDriverImpl();
@@ -214,8 +214,9 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
       boolean expectedIsFitForDictionary) {
     BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
 
-    boolean isFitForMetadataBasedPlan = PLAN_MAKER.isFitForMetadataBasedPlan(brokerRequest, indexSegment);
-    boolean isFitForDictionaryBasedPlan = PLAN_MAKER.isFitForDictionaryBasedPlan(brokerRequest, indexSegment);
+    boolean isFitForMetadataBasedPlan = InstancePlanMakerImplV2.isFitForMetadataBasedPlan(brokerRequest, indexSegment);
+    boolean isFitForDictionaryBasedPlan =
+        InstancePlanMakerImplV2.isFitForDictionaryBasedPlan(brokerRequest, indexSegment);
     Assert.assertEquals(isFitForMetadataBasedPlan, expectedIsFitForMetadata);
     Assert.assertEquals(isFitForDictionaryBasedPlan, expectedIsFitForDictionary);
   }

@@ -105,7 +105,7 @@ public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
     // range. For this test, we first need to fix the input avro data
     // to have the time column values in allowed range. Until then, the check
     // is explicitly disabled
-    segmentGeneratorConfig.setCheckTimeColumnValidityDuringGeneration(false);
+    segmentGeneratorConfig.setSkipTimeValueCheck(true);
 
     // Build the index segment.
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();

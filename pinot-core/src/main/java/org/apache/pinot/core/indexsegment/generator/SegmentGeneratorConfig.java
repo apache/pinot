@@ -112,7 +112,8 @@ public class SegmentGeneratorConfig {
   private String _simpleDateFormat = null;
   // Use on-heap or off-heap memory to generate index (currently only affect inverted index and star-tree v2)
   private boolean _onHeap = false;
-  private boolean _checkTimeColumnValidityDuringGeneration = true;
+  private boolean _skipTimeValueCheck = false;
+  private boolean _nullHandlingEnabled = false;
 
   public SegmentGeneratorConfig() {
   }
@@ -161,7 +162,8 @@ public class SegmentGeneratorConfig {
     _simpleDateFormat = config._simpleDateFormat;
     _onHeap = config._onHeap;
     _recordReaderPath = config._recordReaderPath;
-    _checkTimeColumnValidityDuringGeneration = config._checkTimeColumnValidityDuringGeneration;
+    _skipTimeValueCheck = config._skipTimeValueCheck;
+    _nullHandlingEnabled = config._nullHandlingEnabled;
   }
 
   /**
@@ -218,6 +220,8 @@ public class SegmentGeneratorConfig {
 
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     _hllConfig = validationConfig.getHllConfig();
+
+    _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
   }
 
   public SegmentGeneratorConfig(Schema schema) {
@@ -595,12 +599,12 @@ public class SegmentGeneratorConfig {
     _onHeap = onHeap;
   }
 
-  public boolean isCheckTimeColumnValidityDuringGeneration() {
-    return _checkTimeColumnValidityDuringGeneration;
+  public boolean isSkipTimeValueCheck() {
+    return _skipTimeValueCheck;
   }
 
-  public void setCheckTimeColumnValidityDuringGeneration(boolean checkTimeColumnValidityDuringGeneration) {
-    _checkTimeColumnValidityDuringGeneration = checkTimeColumnValidityDuringGeneration;
+  public void setSkipTimeValueCheck(boolean skipTimeValueCheck) {
+    _skipTimeValueCheck = skipTimeValueCheck;
   }
 
   public Map<String, ChunkCompressorFactory.CompressionType> getRawIndexCompressionType() {
@@ -679,5 +683,13 @@ public class SegmentGeneratorConfig {
 
     Collections.sort(fields);
     return StringUtils.join(fields, ",");
+  }
+
+  public boolean isNullHandlingEnabled() {
+    return _nullHandlingEnabled;
+  }
+
+  public void setNullHandlingEnabled(boolean nullHandlingEnabled) {
+    _nullHandlingEnabled = nullHandlingEnabled;
   }
 }

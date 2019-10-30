@@ -50,10 +50,12 @@ import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
 import org.apache.pinot.core.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
 import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionaryFactory;
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeInvertedIndexReader;
+import org.apache.pinot.core.realtime.impl.nullvalue.RealtimeNullValueVectorReaderWriter;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
+import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
@@ -86,12 +88,14 @@ public class MutableSegmentImpl implements MutableSegment {
   private final PinotDataBufferMemoryManager _memoryManager;
   private final RealtimeSegmentStatsHistory _statsHistory;
   private final SegmentPartitionConfig _segmentPartitionConfig;
+  private final boolean _nullHandlingEnabled;
 
   private final Map<String, BaseMutableDictionary> _dictionaryMap = new HashMap<>();
   private final Map<String, DataFileReader> _indexReaderWriterMap = new HashMap<>();
   private final Map<String, Integer> _maxNumValuesMap = new HashMap<>();
   private final Map<String, RealtimeInvertedIndexReader> _invertedIndexMap = new HashMap<>();
   private final Map<String, BloomFilterReader> _bloomFilterMap = new HashMap<>();
+  private final Map<String, RealtimeNullValueVectorReaderWriter> _nullValueVectorMap = new HashMap<>();
   private final IdMap<FixedIntArray> _recordIdMap;
   private boolean _aggregateMetrics;
 
@@ -142,6 +146,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _memoryManager = config.getMemoryManager();
     _statsHistory = config.getStatsHistory();
     _segmentPartitionConfig = config.getSegmentPartitionConfig();
+    _nullHandlingEnabled = config.isNullHandlingEnabled();
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
     List<FieldSpec> physicalFieldSpecs = new ArrayList<>(allFieldSpecs.size());
@@ -225,6 +230,10 @@ public class MutableSegmentImpl implements MutableSegment {
       if (invertedIndexColumns.contains(column)) {
         _invertedIndexMap.put(column, new RealtimeInvertedIndexReader());
       }
+
+      if (_nullHandlingEnabled) {
+        _nullValueVectorMap.put(column, new RealtimeNullValueVectorReaderWriter());
+      }
     }
 
     // Metric aggregation can be enabled only if config is specified, and all dimensions have dictionary,
@@ -262,6 +271,9 @@ public class MutableSegmentImpl implements MutableSegment {
       // Add forward and inverted indices for new document.
       addForwardIndex(row, docId, dictIdMap);
       addInvertedIndex(docId, dictIdMap);
+      if (_nullHandlingEnabled) {
+        handleNullValues(row, docId);
+      }
 
       // Update number of document indexed at last to make the latest record queryable
       canTakeMore = _numDocsIndexed++ < _capacity;
@@ -379,6 +391,22 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
+  /**
+   * Check if the row has any null fields and update the
+   * column null value vectors accordingly
+   * @param row specifies row being ingested
+   * @param docId specified docId for this row
+   */
+  private void handleNullValues(GenericRow row, int docId) {
+    if (!row.hasNullValues()) {
+      return;
+    }
+
+    for (String columnName : row.getNullValueFields()) {
+      _nullValueVectorMap.get(columnName).setNull(docId);
+    }
+  }
+
   private boolean aggregateMetrics(GenericRow row, int docId) {
     for (MetricFieldSpec metricFieldSpec : _physicalMetricFieldSpecs) {
       String column = metricFieldSpec.getName();
@@ -453,7 +481,7 @@ public class MutableSegmentImpl implements MutableSegment {
     } else {
       return new ColumnDataSource(fieldSpec, _numDocsIndexed, _maxNumValuesMap.get(columnName),
           _indexReaderWriterMap.get(columnName), _invertedIndexMap.get(columnName), _dictionaryMap.get(columnName),
-          _bloomFilterMap.get(columnName));
+          _bloomFilterMap.get(columnName), _nullValueVectorMap.get(columnName));
     }
   }
 
@@ -471,9 +499,18 @@ public class MutableSegmentImpl implements MutableSegment {
   public GenericRow getRecord(int docId, GenericRow reuse) {
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       String column = fieldSpec.getName();
-      reuse.putField(column, IndexSegmentUtils
+      Object value = IndexSegmentUtils
           .getValue(docId, fieldSpec, _indexReaderWriterMap.get(column), _dictionaryMap.get(column),
-              _maxNumValuesMap.getOrDefault(column, 0)));
+              _maxNumValuesMap.getOrDefault(column, 0));
+      reuse.putValue(column, value);
+
+      if (_nullHandlingEnabled) {
+        NullValueVectorReader reader = _nullValueVectorMap.get(column);
+        // If column has null value for this docId, set that accordingly in GenericRow
+        if (reader.isNull(docId)) {
+          reuse.putDefaultNullValue(column, value);
+        }
+      }
     }
     return reuse;
   }

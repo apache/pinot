@@ -77,10 +77,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
     _executorService = executorService;
     _timeOutMs = timeOutMs;
     _initLock = new ReentrantLock();
-    _indexedTable = new ConcurrentIndexedTable();
-    _indexedTableCapacity = 1_000_000;
-    // FIXME: indexedTableCapacity should be derived from TOP. Hardcoding this value to a higher number until we can tune the resize
-    //_indexedTableCapacity = GroupByUtils.getTableCapacity((int) brokerRequest.getGroupBy().getTopN());
+    _indexedTableCapacity = GroupByUtils.getTableCapacity(brokerRequest.getGroupBy(), brokerRequest.getOrderBy());
   }
 
   /**
@@ -123,8 +120,8 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
             try {
               if (_dataSchema == null) {
                 _dataSchema = intermediateResultsBlock.getDataSchema();
-                _indexedTable.init(_dataSchema, _brokerRequest.getAggregationsInfo(), _brokerRequest.getOrderBy(),
-                    _indexedTableCapacity);
+                _indexedTable = new ConcurrentIndexedTable(_dataSchema, _brokerRequest.getAggregationsInfo(),
+                    _brokerRequest.getOrderBy(), _indexedTableCapacity);
               }
             } finally {
               _initLock.unlock();
@@ -240,7 +237,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
         function = Double::valueOf;
         break;
       case BYTES:
-        function = BytesUtils::toBytes;
+        function = BytesUtils::toByteArray;
         break;
       case STRING:
       default:

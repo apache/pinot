@@ -29,6 +29,7 @@ import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -88,7 +89,7 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
       int numSegmentsWithInvalidIntervals = 0;
       for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadataList) {
         Interval timeInterval = offlineSegmentZKMetadata.getTimeInterval();
-        if (SegmentIntervalUtils.isValidInterval(timeInterval)) {
+        if (timeInterval != null && TimeUtils.isValidTimeInterval(timeInterval)) {
           segmentIntervals.add(timeInterval);
         } else {
           numSegmentsWithInvalidIntervals++;

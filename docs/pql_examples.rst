@@ -246,6 +246,23 @@ Supported transform functions
    format ``1:SECONDS:EPOCH`` with a granularity of ``15:MINUTES`` (*i.e.* nearest 15-minute value lower than the value
    of ``date`` column.
 
+``DATETRUNC``
+   (Presto) SQL compatible date truncation, equivalent to the Presto function `date_trunc
+<https://mode.com/blog/date-trunc-sql-timestamp-function-count-on>`_. Takes atleast 3 and upto 5 arguments, converts the value into a specified output granularity seconds since UTC epoch that is bucketed on a unit in a specified timezone.
+
+   *e.g.* ``DATETRUNC('week', time_in_seconds, 'SECONDS')`` This expression
+   converts the column ``time_in_seconds``, which is a long containing seconds
+   since UTC epoch truncated at ``WEEK`` (where a Week starts at Monday UTC
+   midnight). The output is a long seconds since UTC epoch.
+
+   *e.g.* ``DATETRUNC('quarter', DIV(time_milliseconds/1000), 'SECONDS',
+   'America/Los_Angeles', 'HOURS')`` This expression converts the expression
+   ``time_in_milliseconds/1000`` (which is thus in seconds) into hours that are
+   truncated at ``QUARTER`` at the Los Angeles time zone (where a Quarter
+   begins on 1/1, 4/1, 7/1, 10/1 in Los Angelese timezone). The output is
+   expressed as hours since UTC epoch (note that the output is not Los Angeles
+   timezone)
+
 ``VALUEIN``
    Takes at least 2 arguments, where the first argument is a multi-valued column, and the following arguments are constant values.
    The transform function will filter the value from the multi-valued column with the given constant values.

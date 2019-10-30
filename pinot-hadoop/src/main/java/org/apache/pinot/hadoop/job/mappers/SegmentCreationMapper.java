@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -66,6 +67,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   protected String _rawTableName;
   protected Schema _schema;
   protected SegmentNameGenerator _segmentNameGenerator;
+  protected boolean _useRelativePath = false;
 
   // Optional
   protected TableConfig _tableConfig;
@@ -81,12 +83,30 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   protected File _localSegmentDir;
   protected File _localSegmentTarDir;
 
+  /**
+   * Generate a relative output directory path when `useRelativePath` flag is on.
+   * This method will compute the relative path based on `inputFile` and `baseInputDir`,
+   * then apply only the directory part of relative path to `outputDir`.
+   * E.g.
+   *    baseInputDir = "/path/to/input"
+   *    inputFile = "/path/to/input/a/b/c/d.avro"
+   *    outputDir = "/path/to/output"
+   *    getRelativeOutputPath(baseInputDir, inputFile, outputDir) = /path/to/output/a/b/c
+   */
+  protected static Path getRelativeOutputPath(URI baseInputDir, URI inputFile, Path outputDir) {
+    URI relativePath = baseInputDir.relativize(inputFile);
+    Preconditions.checkState(relativePath.getPath().length() > 0 && !relativePath.equals(inputFile),
+        "Unable to extract out the relative path based on base input path: " + baseInputDir);
+    return new Path(outputDir, relativePath.getPath()).getParent();
+  }
+
   @Override
   public void setup(Context context)
       throws IOException, InterruptedException {
     _jobConf = context.getConfiguration();
     logConfigurations();
 
+    _useRelativePath = _jobConf.getBoolean(JobConfigConstants.USE_RELATIVE_PATH, false);
     _rawTableName = _jobConf.get(JobConfigConstants.SEGMENT_TABLE_NAME);
     _schema = Schema.fromString(_jobConf.get(JobConfigConstants.SCHEMA));
 
@@ -195,7 +215,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     String inputFileName = hdfsInputFile.getName();
     File localInputFile = new File(_localInputDir, inputFileName);
     _logger.info("Copying input file from: {} to: {}", hdfsInputFile, localInputFile);
-    FileSystem.get(hdfsInputFile.toUri(), _jobConf).copyToLocalFile(hdfsInputFile, new Path(localInputFile.getAbsolutePath()));
+    FileSystem.get(hdfsInputFile.toUri(), _jobConf)
+        .copyToLocalFile(hdfsInputFile, new Path(localInputFile.getAbsolutePath()));
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, _schema);
     segmentGeneratorConfig.setTableName(_rawTableName);
@@ -251,8 +272,15 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
         DataSize.fromBytes(uncompressedSegmentSize), DataSize.fromBytes(compressedSegmentSize));
 
     Path hdfsSegmentTarFile = new Path(_hdfsSegmentTarDir, segmentTarFileName);
+    if (_useRelativePath) {
+      Path relativeOutputPath =
+          getRelativeOutputPath(new Path(_jobConf.get(JobConfigConstants.PATH_TO_INPUT)).toUri(), hdfsInputFile.toUri(),
+              _hdfsSegmentTarDir);
+      hdfsSegmentTarFile = new Path(relativeOutputPath, segmentTarFileName);
+    }
     _logger.info("Copying segment tar file from: {} to: {}", localSegmentTarFile, hdfsSegmentTarFile);
-    FileSystem.get(hdfsSegmentTarFile.toUri(), _jobConf).copyFromLocalFile(true, true, new Path(localSegmentTarFile.getAbsolutePath()), hdfsSegmentTarFile);
+    FileSystem.get(hdfsSegmentTarFile.toUri(), _jobConf)
+        .copyFromLocalFile(true, true, new Path(localSegmentTarFile.getAbsolutePath()), hdfsSegmentTarFile);
 
     context.write(new LongWritable(sequenceId), new Text(segmentTarFileName));
     _logger.info("Finish generating segment: {} with HDFS input file: {}, sequence id: {}", segmentName, hdfsInputFile,

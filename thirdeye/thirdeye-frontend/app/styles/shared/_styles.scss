@@ -45,6 +45,48 @@ body {
   }
 }
 
+.te-link-secondary {
+  color: #369ece !important;
+  font-weight: 600 !important;
+  font-size: 16px !important;
+}
+
+.te-table-global-filter {
+  display: inline-block;
+  padding-bottom: 5px;
+  padding-right:5px;
+}
+
+.te-column-dropdown {
+  display: inline-block;
+}
+
+.te-anomaly-table-wrapper {
+  text-align: right;
+  padding-top: 5px;
+}
+
+.te-anomaly-table-body {
+  text-align: left !important;
+}
+
+.te-dropdown {
+  padding-right: 5px;
+  padding-left: 5px;
+  text-align: left;
+  font-size: 15px !important;
+  min-width: 180px !important;
+
+  &__top-options {
+    padding: 0 0 0 0 !important;
+  }
+
+  &__close {
+    text-align: left;
+    border-top: 1px solid app-shade(black, 0.15);
+  }
+}
+
 .te-icon {
   &__inline-link {
     color: $te-link-blue;
@@ -427,6 +469,10 @@ body {
     display: flex;
     margin-top: 15px;
     clear: both;
+  }
+
+  &__val-group__margin-left {
+    margin-left: 30px;
   }
 
   &__card {

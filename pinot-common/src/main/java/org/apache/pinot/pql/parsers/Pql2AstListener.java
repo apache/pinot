@@ -310,13 +310,13 @@ public class Pql2AstListener extends PQL2BaseListener {
     String literalWithoutQuotes = text.substring(1, textLength - 1);
     if (text.charAt(0) == '\'') {
       if (literalWithoutQuotes.contains("''")) {
-        literalWithoutQuotes = literalWithoutQuotes.replaceAll("''", "'");
+        literalWithoutQuotes = literalWithoutQuotes.replace("''", "'");
       }
 
       pushNode(new StringLiteralAstNode(literalWithoutQuotes));
     } else if (text.charAt(0) == '"') {
       if (literalWithoutQuotes.contains("\"\"")) {
-        literalWithoutQuotes = literalWithoutQuotes.replaceAll("\"\"", "\"");
+        literalWithoutQuotes = literalWithoutQuotes.replace("\"\"", "\"");
       }
 
       pushNode(new StringLiteralAstNode(literalWithoutQuotes));

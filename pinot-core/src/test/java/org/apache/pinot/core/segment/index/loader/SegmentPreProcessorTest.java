@@ -126,7 +126,7 @@ public class SegmentPreProcessorTest {
     // range. For this test, we first need to fix the input avro data
     // to have the time column values in allowed range. Until then, the check
     // is explicitly disabled
-    segmentGeneratorConfig.setCheckTimeColumnValidityDuringGeneration(false);
+    segmentGeneratorConfig.setSkipTimeValueCheck(true);
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(segmentGeneratorConfig);
     driver.build();
@@ -277,15 +277,16 @@ public class SegmentPreProcessorTest {
       processor.process();
     }
 
-
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
     ColumnMetadata hllMetricMetadata = segmentMetadata.getColumnMetadataFor(NEW_HLL_BYTE_METRIC_COLUMN_NAME);
     Assert.assertEquals(hllMetricMetadata.getDataType(), FieldSpec.DataType.BYTES);
-    Assert.assertEquals(hllMetricMetadata.getDefaultNullValueString(), "00000008000000ac00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+    Assert.assertEquals(hllMetricMetadata.getDefaultNullValueString(),
+        "00000008000000ac00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
 
     ColumnMetadata tDigestMetricMetadata = segmentMetadata.getColumnMetadataFor(NEW_TDIGEST_BYTE_METRIC_COLUMN_NAME);
     Assert.assertEquals(tDigestMetricMetadata.getDataType(), FieldSpec.DataType.BYTES);
-    Assert.assertEquals(tDigestMetricMetadata.getDefaultNullValueString(), "0000000141ba085ee15d2f3241ba085ee15d2f324059000000000000000000013ff000000000000041ba085ee15d2f32");
+    Assert.assertEquals(tDigestMetricMetadata.getDefaultNullValueString(),
+        "0000000141ba085ee15d2f3241ba085ee15d2f324059000000000000000000013ff000000000000041ba085ee15d2f32");
   }
 
   private void checkUpdateDefaultColumns()

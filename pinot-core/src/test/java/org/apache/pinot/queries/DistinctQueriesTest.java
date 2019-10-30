@@ -242,7 +242,6 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     segmentGeneratorConfig.setTableName(tableName);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
     segmentGeneratorConfig.setSegmentName(segmentName);
-    segmentGeneratorConfig.setCheckTimeColumnValidityDuringGeneration(false);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig, recordReader);

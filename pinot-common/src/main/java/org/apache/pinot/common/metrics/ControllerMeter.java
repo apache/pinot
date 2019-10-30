@@ -37,14 +37,10 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   CONTROLLER_TABLE_TENANT_CREATE_ERROR("TableTenantCreateError", true),
   CONTROLLER_TABLE_TENANT_DELETE_ERROR("TableTenantDeleteError", true),
   CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR("errors", true),
-  CONTROLLER_NOT_LEADER("notLeader", true),
   CONTROLLER_LEADERSHIP_CHANGE_WITHOUT_CALLBACK("leadershipChangeWithoutCallback", true),
   LLC_STATE_MACHINE_ABORTS("aborts", false),
   LLC_ZOOKEEPER_FETCH_FAILURES("failures", false),
   LLC_ZOOKEEPER_UPDATE_FAILURES("failures", false),
-  LLC_KAFKA_DATA_LOSS("dataLoss", false),
-  // Introducing a new stream agnostic metric to replace LLC_KAFKA_DATA_LOSS.
-  // We can phase out LLC_KAFKA_DATA_LOSS once we have collected sufficient metrics for the new one
   LLC_STREAM_DATA_LOSS("dataLoss", false),
   CONTROLLER_PERIODIC_TASK_RUN("periodicTaskRun", false),
   CONTROLLER_PERIODIC_TASK_ERROR("periodicTaskError", false),

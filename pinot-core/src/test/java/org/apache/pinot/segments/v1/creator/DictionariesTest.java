@@ -94,7 +94,7 @@ public class DictionariesTest {
     // range. For this test, we first need to fix the input avro data
     // to have the time column values in allowed range. Until then, the check
     // is explicitly disabled
-    config.setCheckTimeColumnValidityDuringGeneration(false);
+    config.setSkipTimeValueCheck(true);
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
