@@ -1,0 +1,95 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: examples
+  namespace: pinot-quickstart
+data:
+  airlineStats_realtime_table_config.json: |-
+    {
+      "tableName": "airlineStats",
+      "tableType": "REALTIME",
+      "segmentsConfig": {
+        "timeColumnName": "DaysSinceEpoch",
+        "timeType": "DAYS",
+        "retentionTimeUnit": "DAYS",
+        "retentionTimeValue": "5",
+        "segmentPushType": "APPEND",
+        "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+        "schemaName": "airlineStats",
+        "replication": "1",
+        "replicasPerPartition": "1"
+      },
+      "tenants": {
+        "broker": "airline_broker",
+        "server": "airline"
+      },
+      "tableIndexConfig": {
+        "loadMode": "MMAP",
+        "streamConfigs": {
+          "streamType": "kafka",
+          "stream.kafka.consumer.type": "simple",
+          "stream.kafka.topic.name": "flights-realtime",
+          "stream.kafka.decoder.class.name": "org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder",
+          "stream.kafka.consumer.factory.class.name": "org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory",
+          "stream.kafka.hlc.zk.connect.string": "kafka-zookeeper:2181",
+          "stream.kafka.zk.broker.url": "kafka-zookeeper:2181",
+          "stream.kafka.broker.list": "kafka:9092",
+          "realtime.segment.flush.threshold.time": "3600000",
+          "realtime.segment.flush.threshold.size": "50000",
+          "stream.kafka.consumer.prop.auto.offset.reset": "smallest"
+        }
+      },
+      "metadata": {
+        "customConfigs": {}
+      }
+    }
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pinot-realtime-quickstart
+  namespace: pinot-quickstart
+spec:
+  template:
+    spec:
+      containers:
+        - name: loading-data-to-kafka
+          image: winedepot/pinot:0.1.13-SNAPSHOT
+          args: [ "StreamAvroIntoKafka", "-avroFile", "sample_data/airlineStats_data.avro", "-kafkaTopic", "flights-realtime", "-kafkaBrokerList", "kafka:9092", "-zkAddress", "kafka-zookeeper:2181" ]
+        - name: pinot-add-example-schema
+          image: winedepot/pinot:0.1.13-SNAPSHOT
+          args: [ "AddSchema", "-schemaFile", "sample_data/airlineStats_schema.json", "-controllerHost", "pinot-controller", "-controllerPort", "9000", "-exec" ]
+        - name: pinot-add-example-realtime-table
+          image: winedepot/pinot:0.1.13-SNAPSHOT
+          args: [ "AddTable", "-filePath", "/var/pinot/examples/airlineStats_realtime_table_config.json", "-controllerHost", "pinot-controller", "-controllerPort", "9000", "-exec" ]
+          volumeMounts:
+            - name: examples
+              mountPath: /var/pinot/examples
+      restartPolicy: OnFailure
+      volumes:
+        - name: examples
+          configMap:
+            name: examples
+  backoffLimit: 3
+
+

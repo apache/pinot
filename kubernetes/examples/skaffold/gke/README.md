@@ -98,7 +98,7 @@ Below command will
 - Publish sample data to a Kafka topic, which the example table would consume from.
 
 ```
-kubectl apply -f pinot-example-loader.yml
+kubectl apply -f pinot-realtime-quickstart.yml
 ```
 
 
