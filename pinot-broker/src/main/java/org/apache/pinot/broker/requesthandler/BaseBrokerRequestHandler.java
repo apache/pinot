@@ -24,10 +24,13 @@ import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.RateLimiter;
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -53,12 +56,14 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.request.FilterQueryMap;
+import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Broker;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -478,7 +483,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // verify the following for DISTINCT queries:
     // (1) User query does not have DISTINCT() along with any other aggregation function
-    // (2) User query does not have DISTINCT() along with ORDER BY
+    // (2) For DISTINCT(column set) with ORDER BY, the order by columns should be some/all columns in column set
     // (3) User query does not have DISTINCT() along with GROUP BY
     if (brokerRequest.isSetAggregationsInfo()) {
       List<AggregationInfo> aggregationInfos = brokerRequest.getAggregationsInfo();
@@ -493,8 +498,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             throw new UnsupportedOperationException("DISTINCT with GROUP BY is currently not supported");
           }
           if (brokerRequest.isSetOrderBy()) {
-            // TODO: Add support for ORDER BY with DISTINCT
-            throw new UnsupportedOperationException("DISTINCT with ORDER BY is currently not supported");
+            String column = aggregationInfo.getAggregationParams().get(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO);
+            String[] columns = column.split(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR);
+            Set<String> set = new HashSet<>(Arrays.asList(columns));
+            List<SelectionSort> orderByColumns = brokerRequest.getOrderBy();
+            for (SelectionSort selectionSort : orderByColumns) {
+              if (!set.contains(selectionSort.getColumn())) {
+                throw new UnsupportedOperationException("ORDER By should be only on some/all of the columns passed as arguments to DISTINCT");
+              }
+            }
           }
         }
       }

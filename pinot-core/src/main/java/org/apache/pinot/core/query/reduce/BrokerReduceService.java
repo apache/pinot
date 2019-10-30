@@ -59,7 +59,6 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
-import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.DistinctTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -263,7 +262,7 @@ public class BrokerReduceService {
         AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(brokerRequest);
         if (!brokerRequest.isSetGroupBy()) {
           // Aggregation only query.
-          setAggregationResults(brokerResponseNative, aggregationFunctions, dataTableMap.values(), cachedDataSchema,
+          setAggregationResults(brokerRequest, brokerResponseNative, aggregationFunctions, dataTableMap.values(), cachedDataSchema,
               queryOptions.isPreserveType());
         } else {
           // Aggregation group-by query.
@@ -375,69 +374,43 @@ public class BrokerReduceService {
    * @param dataSchema data schema.
    */
   @SuppressWarnings("unchecked")
-  private void setAggregationResults(BrokerResponseNative brokerResponseNative,
+  private void setAggregationResults(BrokerRequest brokerRequest, BrokerResponseNative brokerResponseNative,
       AggregationFunction[] aggregationFunctions, Collection<DataTable> dataTables, DataSchema dataSchema,
       boolean preserveType) {
-    int numAggregationFunctions = aggregationFunctions.length;
-
-    // Merge results from all data tables.
-    Object[] intermediateResults = new Object[numAggregationFunctions];
-    for (DataTable dataTable : dataTables) {
-      for (int i = 0; i < numAggregationFunctions; i++) {
-        Object intermediateResultToMerge;
-        ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
-        switch (columnDataType) {
-          case LONG:
-            intermediateResultToMerge = dataTable.getLong(0, i);
-            break;
-          case DOUBLE:
-            intermediateResultToMerge = dataTable.getDouble(0, i);
-            break;
-          case OBJECT:
-            intermediateResultToMerge = dataTable.getObject(0, i);
-            break;
-          default:
-            throw new IllegalStateException("Illegal column data type in aggregation results: " + columnDataType);
-        }
-        Object mergedIntermediateResult = intermediateResults[i];
-        if (mergedIntermediateResult == null) {
-          intermediateResults[i] = intermediateResultToMerge;
-        } else {
-          intermediateResults[i] = aggregationFunctions[i].merge(mergedIntermediateResult, intermediateResultToMerge);
-        }
-      }
-    }
-
-    // The DISTINCT query is just another SELECTION style query from the user's point of view
-    // and will return one or records in the result table for the column selected.
-    // Internally the execution is happening as an aggregation function (but that is an implementation
-    // detail) and so for that reason, response from broker should be a selection query result
-    // up until now, we have treated DISTINCT similar to another aggregation function even in terms
-    // of the result from function since it has been implemented as an aggregation function.
-    // However, the broker response will be a selection query response as that makes sense from SQL
-    // perspective
     if (isDistinct(aggregationFunctions)) {
-      Object merged = intermediateResults[0];
-      Preconditions.checkState(merged instanceof DistinctTable, "Error: Expecting merged result of type DistinctTable");
-      DistinctTable distinctTable = (DistinctTable) merged;
-      String[] columnNames = distinctTable.getColumnNames();
-      List<Serializable[]> resultSet = new ArrayList<>(distinctTable.size());
-      Iterator<Key> iterator = distinctTable.getIterator();
-
-      while (iterator.hasNext()) {
-        Key key = iterator.next();
-        Object[] columns = key.getColumns();
-        Preconditions.checkState(columns.length == columnNames.length,
-            "Error: unexpected number of columns in RecordHolder for DISTINCT");
-        Serializable[] distinctRow = new Serializable[columns.length];
-        for (int col = 0; col < columns.length; col++) {
-          final Serializable columnValue = AggregationFunctionUtils.getSerializableValue(columns[col]);
-          distinctRow[col] = columnValue;
-        }
-        resultSet.add(distinctRow);
-      }
-      brokerResponseNative.setSelectionResults((new SelectionResults(Arrays.asList(columnNames), resultSet)));
+      // Special handling for DISTINCT aggregation function
+      setDistinctQueryResults(brokerRequest, brokerResponseNative, dataTables, dataSchema, aggregationFunctions[0]);
     } else {
+      // handle all other aggregation functions
+      int numAggregationFunctions = aggregationFunctions.length;
+      // Merge results from all data tables.
+      Object[] intermediateResults = new Object[numAggregationFunctions];
+      for (DataTable dataTable : dataTables) {
+        for (int i = 0; i < numAggregationFunctions; i++) {
+          Object intermediateResultToMerge;
+          ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
+          switch (columnDataType) {
+            case LONG:
+              intermediateResultToMerge = dataTable.getLong(0, i);
+              break;
+            case DOUBLE:
+              intermediateResultToMerge = dataTable.getDouble(0, i);
+              break;
+            case OBJECT:
+              intermediateResultToMerge = dataTable.getObject(0, i);
+              break;
+            default:
+              throw new IllegalStateException("Illegal column data type in aggregation results: " + columnDataType);
+          }
+          Object mergedIntermediateResult = intermediateResults[i];
+          if (mergedIntermediateResult == null) {
+            intermediateResults[i] = intermediateResultToMerge;
+          } else {
+            intermediateResults[i] = aggregationFunctions[i].merge(mergedIntermediateResult, intermediateResultToMerge);
+          }
+        }
+      }
+
       // Extract final results and set them into the broker response.
       List<AggregationResult> reducedAggregationResults = new ArrayList<>(numAggregationFunctions);
       for (int i = 0; i < numAggregationFunctions; i++) {
@@ -452,6 +425,63 @@ public class BrokerReduceService {
       }
       brokerResponseNative.setAggregationResults(reducedAggregationResults);
     }
+  }
+
+  private void setDistinctQueryResults(BrokerRequest brokerRequest, BrokerResponseNative brokerResponseNative,
+      Collection<DataTable> dataTables, DataSchema dataSchema, AggregationFunction aggregationFunction) {
+    // DISTINCT is implemented as an aggregation function in the execution engine. Just like
+    // other aggregation functions, DISTINCT returns its result as a single object
+    // (of type DistinctTable) serialized by the server into the DataTable and deserialized
+    // by the broker from the DataTable. So there should be exactly 1 row and 1 column and that
+    // column value should be the serialized DistinctTable -- so essentially it is a DataTable
+    // inside a DataTable
+    Preconditions.checkState(dataSchema.size() == 1,
+        "DataTable from server for DISTINCT should have exactly one row");
+    Preconditions.checkState(dataSchema.getColumnDataType(0) == ColumnDataType.OBJECT,
+        "DistinctAggregationFunction should return result of type OBJECT");
+    Object mergedIntermediateResult = null;
+    // go over all the data tables from servers
+    for (DataTable dataTable : dataTables) {
+      Preconditions.checkState(dataTable.getNumberOfRows() == 1);
+      // deserialize the DistinctTable
+      Object intermediateResultToMerge = dataTable.getObject(0, 0);
+      Preconditions.checkState(intermediateResultToMerge instanceof DistinctTable);
+      DistinctTable distinctTable = (DistinctTable)intermediateResultToMerge;
+      // since DistinctTable uses the Table interface and during deserialization, we didn't
+      // have all the necessary information w.r.t ORDER BY, limit etc, we set it now
+      // before merging so that resize/trimming/sorting happens correctly
+      distinctTable.addLimitAndOrderByInfo(brokerRequest);
+      if (mergedIntermediateResult == null) {
+        mergedIntermediateResult = intermediateResultToMerge;
+      } else {
+        aggregationFunction.merge(mergedIntermediateResult, intermediateResultToMerge);
+      }
+    }
+
+    DistinctTable distinctTable =  (DistinctTable)mergedIntermediateResult;
+    // finish the merging, sort (if ORDER BY), get iterator
+    distinctTable.finish(true);
+
+    List<Serializable[]> resultSet = new ArrayList<>(distinctTable.size());
+    String[] columnNames = distinctTable.getDataSchema().getColumnNames();
+    Iterator<Record> iterator = distinctTable.iterator();
+    while (iterator.hasNext()) {
+      Record record = iterator.next();
+      Object[] columns = record.getValues();
+      Serializable[] distinctRow = new Serializable[columns.length];
+      for (int col = 0; col < columns.length; col++) {
+        final Serializable columnValue = AggregationFunctionUtils.getSerializableValue(columns[col]);
+        distinctRow[col] = columnValue;
+      }
+      resultSet.add(distinctRow);
+    }
+
+    // Up until now, we have treated DISTINCT similar to another aggregation function even in terms
+    // of the result from function and merging results.
+    // However, the DISTINCT query is just another SELECTION style query from the user's point
+    // of view and will return one or records in the result table for the column(s) selected and so
+    // for that reason, response from broker should be a selection query result.
+    brokerResponseNative.setSelectionResults((new SelectionResults(Arrays.asList(columnNames), resultSet)));
   }
 
   /**

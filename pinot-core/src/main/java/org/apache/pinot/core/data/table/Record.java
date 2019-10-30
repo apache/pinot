@@ -42,4 +42,15 @@ public class Record {
   public String toString() {
     return Arrays.deepToString(_values);
   }
+
+  @Override
+  public boolean equals(Object o) {
+    Record that = (Record) o;
+    return Arrays.deepEquals(_values, that._values);
+  }
+
+  @Override
+  public int hashCode() {
+    return Arrays.deepHashCode(_values);
+  }
 }

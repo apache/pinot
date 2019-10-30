@@ -113,7 +113,7 @@ public class AggregationFunctionFactory {
             return new DistinctCountRawHLLMVAggregationFunction();
           case DISTINCT:
             return new DistinctAggregationFunction(AggregationFunctionUtils.getColumn(aggregationInfo),
-                brokerRequest != null ? brokerRequest.getLimit() : SelectAstNode.DEFAULT_RECORD_LIMIT);
+                brokerRequest != null ? brokerRequest.getLimit() : SelectAstNode.DEFAULT_RECORD_LIMIT, brokerRequest.getOrderBy());
           default:
             throw new IllegalArgumentException();
         }
