@@ -198,13 +198,22 @@ public class DimensionsDetectionAlertFilterTest {
     DetectionAlertFilterNotification recDefault = AlertFilterUtils.makeEmailNotifications();
     Assert.assertEquals(result.getResult().get(recDefault), makeSet(0, 3, 4));
 
+    Map<String, String> dimFilters = new HashMap<>();
+    dimFilters.put("key", "value");
+
     // Send anomalies who dimensions are configured to appropriate recipients
     DetectionAlertFilterNotification recValue = AlertFilterUtils.makeEmailNotifications(PROP_TO_FOR_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
+    recValue.setDimensionFilters(dimFilters);
     Assert.assertEquals(result.getResult().get(recValue), makeSet(1, 5));
+
+    dimFilters.remove("key");
+    dimFilters.put("key1", "anotherValue1");
+    dimFilters.put("key2", "anotherValue2");
 
     // Send alert when configured dimensions is a subset of anomaly dimensions
     // Anomaly 2 occurs on 3 dimensions (key 1, 2 & 3), dimensionRecipients is configured on (key 1 & 2) - send alert
     DetectionAlertFilterNotification recAnotherValue = AlertFilterUtils.makeEmailNotifications(PROP_TO_FOR_ANOTHER_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
+    recAnotherValue.setDimensionFilters(dimFilters);
     Assert.assertEquals(result.getResult().get(recAnotherValue), makeSet(2));
   }
 
@@ -218,7 +227,10 @@ public class DimensionsDetectionAlertFilterTest {
 
     this.detectedAnomalies.add(child);
 
+    Map<String, String> dimFilters = new HashMap<>();
+    dimFilters.put("key", "value");
     DetectionAlertFilterNotification recValue = AlertFilterUtils.makeEmailNotifications(PROP_TO_FOR_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
+    recValue.setDimensionFilters(dimFilters);
 
     DetectionAlertFilterResult result = this.alertFilter.run();
 
@@ -253,6 +265,9 @@ public class DimensionsDetectionAlertFilterTest {
     DetectionAlertFilterResult result = this.alertFilter.run();
     Assert.assertEquals(result.getResult().size(), 2);
 
+    Map<String, String> dimFilters = new HashMap<>();
+    dimFilters.put("key", "value");
+
     DetectionAlertFilterNotification recDefault = AlertFilterUtils.makeEmailNotifications(PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
     Assert.assertTrue(result.getResult().containsKey(recDefault));
     Assert.assertEquals(result.getResult().get(recDefault).size(), 2);
@@ -260,6 +275,7 @@ public class DimensionsDetectionAlertFilterTest {
     Assert.assertTrue(result.getResult().get(recDefault).contains(anomalyWithNull));
 
     DetectionAlertFilterNotification recValue = AlertFilterUtils.makeEmailNotifications(PROP_TO_FOR_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
+    recValue.setDimensionFilters(dimFilters);
     Assert.assertTrue(result.getResult().containsKey(recValue));
     Assert.assertEquals(result.getResult().get(recValue).size(), 1);
   }

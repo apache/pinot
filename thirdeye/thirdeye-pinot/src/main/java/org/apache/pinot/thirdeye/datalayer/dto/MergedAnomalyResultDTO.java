@@ -19,6 +19,8 @@
 
 package org.apache.pinot.thirdeye.datalayer.dto;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 
@@ -27,6 +29,7 @@ import org.apache.pinot.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -58,6 +61,15 @@ public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements A
     setAvgBaselineVal(anomalyResult.getAvgBaselineVal());
     setFeedback(anomalyResult.getFeedback());
     setProperties(anomalyResult.getProperties());
+  }
+
+  public Multimap<String, String> getDimensionMap() {
+    Multimap<String, String> dimMap = ArrayListMultimap.create();
+    if (this.getMetricUrn() != null) {
+      dimMap = MetricEntity.fromURN(this.getMetricUrn()).getFilters();
+    }
+
+    return dimMap;
   }
 
   @Override

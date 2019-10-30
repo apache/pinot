@@ -40,6 +40,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -147,7 +148,7 @@ public class EntityGroupKeyContent extends BaseNotificationContent {
     AnomalyReportEntity anomalyReport = new AnomalyReportEntity(String.valueOf(anomaly.getId()),
         getAnomalyURL(anomaly, thirdEyeAnomalyConfig.getDashboardHost()),
         anomaly.getAvgBaselineVal(),
-        anomaly.getAvgCurrentVal(), 0d, getDimensionsList(anomaly.getDimensions()),
+        anomaly.getAvgCurrentVal(), 0d, getDimensionsList(anomaly.getDimensionMap()),
         getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()), getFeedbackValue(anomaly.getFeedback()),
         detectionConfig.getName(), detectionConfig.getDescription(), anomaly.getMetric(),
         getDateString(anomaly.getStartTime(), dateTimeZone), getDateString(anomaly.getEndTime(), dateTimeZone),

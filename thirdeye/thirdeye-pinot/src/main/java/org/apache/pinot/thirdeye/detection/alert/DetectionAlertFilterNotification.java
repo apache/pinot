@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection.alert;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -27,19 +28,33 @@ import java.util.Objects;
  * Container class for notification properties
  */
 public class DetectionAlertFilterNotification {
+
   Map<String, Object> notificationSchemeProps;
+  Map<String, String> dimensionFilters;
 
   public DetectionAlertFilterNotification(Map<String, Object> notificationSchemeProps) {
+    this(notificationSchemeProps, new HashMap<>());
+  }
+
+  public DetectionAlertFilterNotification(Map<String, Object> notificationSchemeProps, Map<String, String> dimensionFilters) {
     this.notificationSchemeProps = notificationSchemeProps;
+    this.dimensionFilters = dimensionFilters;
   }
 
   public Map<String, Object> getNotificationSchemeProps() {
     return notificationSchemeProps;
   }
 
-  public DetectionAlertFilterNotification setNotificationSchemeProps(Map<String, Object> notificationSchemeProps) {
+  public void setNotificationSchemeProps(Map<String, Object> notificationSchemeProps) {
     this.notificationSchemeProps = notificationSchemeProps;
-    return this;
+  }
+
+  public Map<String, String> getDimensionFilters() {
+    return dimensionFilters;
+  }
+
+  public void setDimensionFilters(Map<String, String> dimensions) {
+    this.dimensionFilters = dimensions;
   }
 
   @Override
@@ -51,12 +66,13 @@ public class DetectionAlertFilterNotification {
       return false;
     }
     DetectionAlertFilterNotification that = (DetectionAlertFilterNotification) o;
-    return Objects.equals(notificationSchemeProps, that.notificationSchemeProps);
+    return Objects.equals(notificationSchemeProps, that.notificationSchemeProps) &&
+        Objects.equals(dimensionFilters, that.dimensionFilters);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(notificationSchemeProps);
+    return Objects.hash(notificationSchemeProps, dimensionFilters);
   }
 
 }

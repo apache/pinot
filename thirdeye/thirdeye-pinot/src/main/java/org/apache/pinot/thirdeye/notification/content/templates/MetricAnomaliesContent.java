@@ -42,6 +42,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -129,7 +130,7 @@ public class MetricAnomaliesContent extends BaseNotificationContent {
           anomaly.getAvgBaselineVal(),
           anomaly.getAvgCurrentVal(),
           0d,
-          getDimensionsList(anomaly.getDimensions()),
+          getDimensionsList(anomaly.getDimensionMap()),
           getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()), // duration
           feedbackVal,
           functionName,

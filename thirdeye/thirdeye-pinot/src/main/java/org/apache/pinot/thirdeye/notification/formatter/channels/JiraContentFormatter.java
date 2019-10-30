@@ -64,8 +64,9 @@ public class JiraContentFormatter extends AlertContentFormatter {
   static final String PROP_ASSIGNEE = "assignee";
   static final String PROP_MERGE_GAP = "mergeGap";
   static final String PROP_LABELS = "labels";
-  static final String PROP_SUMMARY = "summary";
   static final String PROP_DEFAULT_LABEL = "thirdeye";
+
+  public static final int MAX_JIRA_SUMMARY_LENGTH = 255;
 
   private static final Map<String, String> alertContentToTemplateMap;
   static {
@@ -91,17 +92,28 @@ public class JiraContentFormatter extends AlertContentFormatter {
     Preconditions.checkNotNull(jiraAdminConfig.getJiraHost());
   }
 
-  public JiraEntity getJiraEntity(Collection<AnomalyResult> anomalies) {
+  public JiraEntity getJiraEntity(Map<String, String> dimensionFilters, Collection<AnomalyResult> anomalies) {
     Map<String, Object> templateData = notificationContent.format(anomalies, this.subsConfig);
     templateData.put("dashboardHost", teConfig.getDashboardHost());
-    return buildJiraEntity(alertContentToTemplateMap.get(notificationContent.getTemplate()), templateData);
+    return buildJiraEntity(alertContentToTemplateMap.get(notificationContent.getTemplate()), templateData, dimensionFilters);
   }
 
   /**
    * Apply the parameter map to given email template, and format it as EmailEntity
    */
-  private JiraEntity buildJiraEntity(String jiraTemplate, Map<String, Object> templateValues) {
+  private JiraEntity buildJiraEntity(String jiraTemplate, Map<String, Object> templateValues,
+      Map<String, String> dimensionFilters) {
     String issueSummary = BaseNotificationContent.makeSubject(super.getSubjectType(alertClientConfig), this.subsConfig, templateValues);
+
+    // Append dimensional info to summary
+    StringBuilder dimensions = new StringBuilder();
+    for (Map.Entry<String, String> dimFilter : dimensionFilters.entrySet()) {
+      dimensions.append(", ").append(dimFilter.getKey()).append("=").append(dimFilter.getValue());
+    }
+    issueSummary = issueSummary + dimensions.toString();
+
+    // Truncate summary due to jira character limit
+    issueSummary = StringUtils.abbreviate(issueSummary, MAX_JIRA_SUMMARY_LENGTH);
 
     // Fetch the jira project and issue type fields if overridden by user
     String jiraProject = MapUtils.getString(alertClientConfig, PROP_PROJECT, this.jiraAdminConfig.getJiraDefaultProjectKey());
@@ -118,6 +130,8 @@ public class JiraContentFormatter extends AlertContentFormatter {
 
     List<String> labels = ConfigUtils.getList(alertClientConfig.get(PROP_LABELS));
     labels.add(PROP_DEFAULT_LABEL);
+    labels.add("subsId=" + this.subsConfig.getId().toString());
+    dimensionFilters.forEach((k,v) -> labels.add(k + "=" + v));
     jiraEntity.setLabels(labels);
 
     HtmlEmail email = new HtmlEmail();
