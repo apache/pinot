@@ -31,6 +31,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.algorithm.MergeWrapper;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 
 
 /**
@@ -94,6 +95,9 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
           parent.getChildren().add(copyAnomalyInfo(parent, new MergedAnomalyResultDTO()));
         }
         parent.setEndTime(Math.max(parent.getEndTime(), anomaly.getEndTime()));
+
+        // merge the anomaly's properties into parent
+        ThirdEyeUtils.mergeAnomalyProperties(parent.getProperties(), anomaly.getProperties());
 
         if (anomaly.getChildren().isEmpty()) {
           parent.getChildren().add(anomaly);
