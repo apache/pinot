@@ -75,9 +75,6 @@ public class CouchbaseCacheDAO {
 
     List<TimeSeriesDataPoint> timeSeriesRows = new ArrayList<>();
 
-    // move this out of DAO and put it in the TimeSeriesCache instead?
-    // otherwise hard to test.
-
     for (N1qlQueryRow row : queryResult) {
       long timestamp = row.value().getLong(CacheConstants.TIME);
       String dataValue = row.value().getString(dimensionKey);
@@ -89,7 +86,6 @@ public class CouchbaseCacheDAO {
 
   public void insertTimeSeriesDataPoint(TimeSeriesDataPoint point) {
 
-    // will this have memory issues later? if we need to pull all the dimension values into memory.
     JsonDocument doc = bucket.getAndTouch(point.getDocumentKey(), CacheConfig.TTL);
 
     if (doc == null) {

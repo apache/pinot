@@ -87,8 +87,8 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
     long requestSliceStart = request.getStartTimeInclusive().getMillis();
     long requestSliceEnd = request.getEndTimeExclusive().getMillis();
 
-    ThirdEyeResponse result = null;
-    MetricSlice slice = null;
+    ThirdEyeResponse result;
+    MetricSlice slice;
 
     if (cacheResponse.isMissingStartSlice(requestSliceStart)) {
       slice = MetricSlice.from(metricId, requestSliceStart, cacheResponse.getFirstTimestamp(), request.getFilterSet(), request.getGroupByTimeGranularity());
