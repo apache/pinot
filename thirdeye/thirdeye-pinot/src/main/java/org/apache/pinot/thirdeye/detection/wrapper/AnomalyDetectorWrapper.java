@@ -193,7 +193,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
         successWindows++;
       }
       catch (DetectorDataInsufficientException e) {
-        LOG.warn("[DetectionConfigID{}] Insufficient data ro run detection for window {} to {}.", this.config.getId(), window.getStart(), window.getEnd());
+        LOG.warn("[DetectionConfigID{}] Insufficient data to run detection for window {} to {}.", this.config.getId(), window.getStart(), window.getEnd());
         lastException = e;
       }
       catch (Exception e) {

@@ -106,6 +106,7 @@ public class ThirdEyeResultSetUtils {
         for (int r = 0; r < numRows; r++) {
           boolean skipRowDueToError = false;
           String[] groupKeys;
+          String timestamp = null;
           if (hasGroupBy) {
             groupKeys = new String[resultSet.getGroupKeyLength()];
             for (int grpKeyIdx = 0; grpKeyIdx < resultSet.getGroupKeyLength(); grpKeyIdx++) {
@@ -136,6 +137,7 @@ public class ThirdEyeResultSetUtils {
                     .computeBucketIndex(request.getGroupByTimeGranularity(), startDateTime,
                         new DateTime(millis, dateTimeZone));
                 groupKeyVal = String.valueOf(timeBucket);
+                timestamp = String.valueOf(millis);
               }
               groupKeys[grpKeyIdx] = groupKeyVal;
             }
@@ -149,7 +151,12 @@ public class ThirdEyeResultSetUtils {
 
           String[] rowValues = dataMap.get(compositeGroupKey);
           if (rowValues == null) {
-            rowValues = new String[numCols];
+            // add one to include the timestamp, if applicable
+            if (timestamp != null) {
+              rowValues = new String[numCols + 1];
+            } else {
+              rowValues = new String[numCols];
+            }
             Arrays.fill(rowValues, "0");
             System.arraycopy(groupKeys, 0, rowValues, 0, groupKeys.length);
             dataMap.put(compositeGroupKey, rowValues);
@@ -172,6 +179,9 @@ public class ThirdEyeResultSetUtils {
                   sourceName
               ));
 
+          if (timestamp != null) {
+            rowValues[rowValues.length - 1] = timestamp;
+          }
         }
       }
       position ++;

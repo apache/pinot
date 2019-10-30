@@ -46,6 +46,7 @@ import org.apache.pinot.thirdeye.detection.DetectionPipelineException;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.PredictionResult;
+import org.apache.pinot.thirdeye.detection.cache.CacheConfig;
 import org.apache.pinot.thirdeye.detection.spi.exception.DetectorDataInsufficientException;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.joda.time.DateTime;
@@ -74,6 +75,7 @@ public class DimensionWrapper extends DetectionPipeline {
   private static final String PROP_NESTED_METRIC_URNS = "nestedMetricUrns";
 
   private static final String PROP_CLASS_NAME = "className";
+  private static final String PROP_CACHE_PERIOD_LOOKBACK = "cachingPeriodLookback";
 
   // Max number of dimension combinations we can handle.
   private static final int MAX_DIMENSION_COMBINATIONS = 20000;
@@ -97,6 +99,7 @@ public class DimensionWrapper extends DetectionPipeline {
   private final DateTimeZone timezone;
   private DateTime start;
   private DateTime end;
+  private final long cachingPeriodLookback;
 
   protected final String nestedMetricUrnKey;
   protected final List<String> dimensions;
@@ -140,6 +143,9 @@ public class DimensionWrapper extends DetectionPipeline {
     if (minStart.isBefore(this.start)) {
       this.start = minStart;
     }
+    this.cachingPeriodLookback = config.getProperties().containsKey(PROP_CACHE_PERIOD_LOOKBACK) ?
+        MapUtils.getLong(config.getProperties(), PROP_CACHE_PERIOD_LOOKBACK) : TimeUnit.DAYS.toMillis(90);
+
     this.evaluationMetricUrns = new HashSet<>();
   }
 
@@ -236,6 +242,16 @@ public class DimensionWrapper extends DetectionPipeline {
       throw new DetectionPipelineException(String.format(
           "Dimension combination for {} is {} which exceeds limit of {}",
           this.config.getId(), nestedMetrics.size(), MAX_DIMENSION_COMBINATIONS));
+    }
+
+    // don't use in-memory cache for dimension exploration, it will cause thrashing
+    if (CacheConfig.useCentralizedCache()) {
+      if (this.cachingPeriodLookback >= 0) {
+        this.provider.fetchTimeseries(nestedMetrics.stream()
+            .map(metricEntity -> MetricSlice.from(metricEntity.getId(), startTime - cachingPeriodLookback, endTime,
+                metricEntity.getFilters()))
+            .collect(Collectors.toList()));
+      }
     }
 
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
