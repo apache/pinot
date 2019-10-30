@@ -109,7 +109,6 @@ public class ThirdEyeResultSetUtils {
           String timestamp = null;
           if (hasGroupBy) {
             groupKeys = new String[resultSet.getGroupKeyLength()];
-
             for (int grpKeyIdx = 0; grpKeyIdx < resultSet.getGroupKeyLength(); grpKeyIdx++) {
               String groupKeyVal = "";
               try {

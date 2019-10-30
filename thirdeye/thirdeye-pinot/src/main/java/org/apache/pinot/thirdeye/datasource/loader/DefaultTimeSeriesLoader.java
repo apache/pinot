@@ -60,13 +60,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
     LOG.info("Loading time series for '{}'", slice);
 
     TimeSeriesRequestContainer rc = DataFrameUtils.makeTimeSeriesRequestAligned(slice, "ref", this.metricDAO, this.datasetDAO);
-    ThirdEyeResponse response;
-
-    if (CacheConfig.useCentralizedCache()) {
-      response = timeSeriesCache.fetchTimeSeries(rc.getRequest());
-    } else {
-      response = this.queryCache.getQueryResult(rc.getRequest());
-    }
+    ThirdEyeResponse response = this.timeSeriesCache.fetchTimeSeries(rc.getRequest());
 
     return DataFrameUtils.evaluateResponse(response, rc);
   }

@@ -59,7 +59,7 @@ public class RelationalThirdEyeResponse extends BaseThirdEyeResponse {
       }
       List<Double> metrics = new ArrayList<>();
       for (int i = 0; i < metricFunctions.size(); i++) {
-         metrics.add(Double.parseDouble(row[groupKeyColumns.size() + i]));
+        metrics.add(Double.parseDouble(row[groupKeyColumns.size() + i]));
       }
       ThirdEyeResponseRow responseRow = new ThirdEyeResponseRow(timeBucketId, dimensions, metrics);
       responseRows.add(responseRow);
@@ -98,8 +98,6 @@ public class RelationalThirdEyeResponse extends BaseThirdEyeResponse {
   public int getNumRows() {
     return rows.size();
   }
-
-  public List<String[]> getRows() { return rows; }
 
   @Override
   public ThirdEyeResponseRow getRow(int rowId) {

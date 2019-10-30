@@ -242,6 +242,7 @@
     <dependency>
       <groupId>com.couchbase.client</groupId>
       <artifactId>java-client</artifactId>
+      <version>2.7.9</version>
     </dependency>
 
     <!-- demo dependencies -->
@@ -334,12 +335,6 @@
       <groupId>com.atlassian.jira</groupId>
       <artifactId>jira-rest-java-client-api</artifactId>
       <version>2.0.0-m30</version>
-    </dependency>
-
-    <dependency>
-      <groupId>nz.ac.waikato.cms.weka</groupId>
-      <artifactId>weka-dev</artifactId>
-      <version>3.7.10</version>
     </dependency>
   </dependencies>
 

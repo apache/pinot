@@ -46,13 +46,11 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
   public ThirdEyeResponse fetchTimeSeries(ThirdEyeRequest thirdEyeRequest) throws Exception {
     //LOG.info("trying to fetch data from cache...");
 
-    ThirdEyeCacheResponse cacheResponse = cacheDAO.tryFetchExistingTimeSeries(ThirdEyeCacheRequest.from(thirdEyeRequest));
-
-    if (cacheResponse == null || cacheResponse.hasNoRows()) {
-      ThirdEyeResponse dataSourceResponse = queryCache.getQueryResult(thirdEyeRequest);
-      insertTimeSeriesIntoCache(dataSourceResponse);
-      return dataSourceResponse;
+    if (!CacheConfig.useCentralizedCache()) {
+      return this.queryCache.getQueryResult(thirdEyeRequest);
     }
+
+    ThirdEyeCacheResponse cacheResponse = cacheDAO.tryFetchExistingTimeSeries(ThirdEyeCacheRequest.from(thirdEyeRequest));
 
     DateTime sliceStart = thirdEyeRequest.getStartTimeInclusive();
     DateTime sliceEnd = thirdEyeRequest.getEndTimeExclusive();
@@ -64,8 +62,7 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
     return buildResponseFromCacheResponse(cacheResponse);
   }
 
-  // NOTE: we will pretend the case where there are missing documents
-  //       within the returned time-series doesn't exist.
+
   private void fetchMissingSlices(ThirdEyeCacheResponse cacheResponse) throws Exception {
 
     ThirdEyeRequest request = cacheResponse.getCacheRequest().getRequest();
@@ -124,18 +121,6 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
 
   public void insertTimeSeriesIntoCache(ThirdEyeResponse response) {
 
-    String dataSourceType = response.getClass().getSimpleName();
-
-    switch (dataSourceType) {
-      case "RelationalThirdEyeResponse":
-        insertRelationalTimeSeries(response);
-      case "CSVThirdEyeResponse":
-        insertCSVTimeSeries(response);
-    }
-  }
-
-  private void insertRelationalTimeSeries(ThirdEyeResponse response) {
-
     // use CachedThreadPool? or fixedThreadPool?
     ExecutorService executor = Executors.newCachedThreadPool();
 
@@ -147,10 +132,5 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
         executor.execute(() -> this.cacheDAO.insertTimeSeriesDataPoint(dp));
       }
     }
-  }
-
-  // fill this out later
-  private void insertCSVTimeSeries(ThirdEyeResponse response) {
-    return;
   }
 }

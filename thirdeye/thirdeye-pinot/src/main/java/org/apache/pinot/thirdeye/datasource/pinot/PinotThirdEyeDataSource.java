@@ -27,7 +27,6 @@ import com.google.common.cache.RemovalNotification;
 import com.google.common.cache.Weigher;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
-import java.util.Collections;
 import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -200,7 +199,6 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
 
       List<String[]> resultRows = ThirdEyeResultSetUtils.parseResultSets(request, metricFunctionToResultSetList,
           PINOT);
-
       return new RelationalThirdEyeResponse(request, resultRows, timeSpec);
 
     } catch (Exception e) {

@@ -33,7 +33,7 @@ public class CouchbaseCacheDAO {
     }
   }
 
-  public ThirdEyeCacheResponse tryFetchExistingTimeSeries(ThirdEyeCacheRequest request) {
+  public ThirdEyeCacheResponse tryFetchExistingTimeSeries(ThirdEyeCacheRequest request) throws Exception {
 
     String dimensionKey = request.getDimensionKey();
 
@@ -51,7 +51,7 @@ public class CouchbaseCacheDAO {
 
     if (!queryResult.finalSuccess()) {
       LOG.error("cache error occurred for window startTime = {} to endTime = {}", request.getStartTimeInclusive(), request.getEndTimeExclusive());
-      return null;
+      throw new Exception("query to Couchbase failed");
     }
 
     List<TimeSeriesDataPoint> timeSeriesRows = new ArrayList<>();
@@ -78,8 +78,10 @@ public class CouchbaseCacheDAO {
       doc = JsonDocument.create(point.getDocumentKey(), CacheConfig.TTL, documentBody);
     } else {
       JsonObject dimensions = doc.content();
-      if (dimensions.containsKey(point.getMetricUrnHash()))
+      if (dimensions.containsKey(point.getMetricUrnHash())) {
         return;
+      }
+
       dimensions.put(point.getMetricUrnHash(),
           (point.getDataValue() == null || point.getDataValue().equals("null")) ? "0" : point.getDataValue());
     }

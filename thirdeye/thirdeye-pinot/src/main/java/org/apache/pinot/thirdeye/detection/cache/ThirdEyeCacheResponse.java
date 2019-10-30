@@ -29,12 +29,18 @@ public class ThirdEyeCacheResponse {
   }
 
   public boolean isMissingStartSlice(long sliceStart) {
+    if (this.hasNoRows()) {
+      return true;
+    }
     long timeGranularity = request.getRequest().getGroupByTimeGranularity().toMillis();
     return sliceStart <= getFirstTimestamp() - timeGranularity;
   }
 
   // note: sliceEnd is exclusive so we don't need equality check.
   public boolean isMissingEndSlice(long sliceEnd) {
+    if (this.hasNoRows()) {
+      return true;
+    }
     long timeGranularity = request.getRequest().getGroupByTimeGranularity().toMillis();
     return sliceEnd > getLastTimestamp() + timeGranularity;
   }
@@ -49,7 +55,7 @@ public class ThirdEyeCacheResponse {
         Map<String, String> row = slice.getRow(metric, i);
         // this assumption maybe wrong. need to look more into this.
         String timeColumnKey = slice.getGroupKeyColumns().get(0);
-        sliceRows.add(new TimeSeriesDataPoint(metricUrn, Long.valueOf(row.get("timestamp")), metric.getMetricId(), row.get(metric.toString())));
+        sliceRows.add(new TimeSeriesDataPoint(metricUrn, Long.valueOf(row.get(CacheConstants.TIMESTAMP)), metric.getMetricId(), row.get(metric.toString())));
       }
     }
 
