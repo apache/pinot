@@ -72,8 +72,6 @@ public class ThirdEyeCacheResponse {
       String metricUrn = MetricEntity.fromMetric(slice.getRequest().getFilterSet().asMap(), metric.getMetricId()).getUrn();
       for (int i = 0; i < slice.getNumRowsFor(metric); i++) {
         Map<String, String> row = slice.getRow(metric, i);
-        // this assumption maybe wrong. need to look more into this.
-        String timeColumnKey = slice.getGroupKeyColumns().get(0);
         sliceRows.add(new TimeSeriesDataPoint(metricUrn, Long.valueOf(row.get(CacheConstants.TIMESTAMP)), metric.getMetricId(), row.get(metric.toString())));
       }
     }
