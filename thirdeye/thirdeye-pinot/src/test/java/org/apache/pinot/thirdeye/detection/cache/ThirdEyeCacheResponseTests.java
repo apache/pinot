@@ -4,8 +4,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;
+import org.apache.pinot.thirdeye.datasource.RelationalThirdEyeResponse;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
 import org.apache.pinot.thirdeye.datasource.cache.MetricDataset;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
@@ -30,10 +32,11 @@ public class ThirdEyeCacheResponseTests {
       .setMetricFunctions(Collections.singletonList(metricFunction))
       .setStartTimeInclusive(1000)
       .setEndTimeExclusive(20000)
-      .setGroupBy("dimension")
       .setGroupByTimeGranularity(TimeGranularity.fromString("1_SECONDS"))
       .setLimit(12345)
       .build("ref");
+
+  TimeSpec timeSpec = new TimeSpec(METRIC.getMetricName(), TimeGranularity.fromString("1_SECONDS"), TimeSpec.SINCE_EPOCH_FORMAT);
 
   String metricUrn = MetricEntity.fromMetric(request.getFilterSet().asMap(), metricFunction.getMetricId()).getUrn();
   ThirdEyeCacheRequest cacheRequest = new ThirdEyeCacheRequest(request,1L, metricUrn,1000L, 20000L);
@@ -238,4 +241,71 @@ public class ThirdEyeCacheResponseTests {
 
     Assert.assertFalse(cacheResponse.isMissingEndSlice(request.getEndTimeExclusive().getMillis()));
   }
+
+  @Test
+  public void testMergeSliceIntoRowsPrepend() {
+
+    List<String[]> newRows = new ArrayList<>();
+
+    for (int i = 0; i < 10; i++) {
+      String[] rawTimeSeriesDataPoint = new String[3];
+      rawTimeSeriesDataPoint[0] = String.valueOf(i);
+      rawTimeSeriesDataPoint[1] = String.valueOf(i);
+      rawTimeSeriesDataPoint[2] = String.valueOf(i * 1000);
+      newRows.add(rawTimeSeriesDataPoint);
+    }
+
+    for (int i = 10; i < 20; i++) {
+      TimeSeriesDataPoint dataPoint = new TimeSeriesDataPoint(metricUrn, i * 1000, metricFunction.getMetricId(), String.valueOf(i));
+      rows.add(dataPoint);
+    }
+
+    cacheResponse.mergeSliceIntoRows(new RelationalThirdEyeResponse(request, newRows, timeSpec), MergeSliceType.PREPEND);
+
+    Assert.assertEquals(cacheResponse.getNumRows(), 20);
+
+    List<TimeSeriesDataPoint> resultRows = cacheResponse.getRows();
+
+    for (int i = 0; i < 20; i++) {
+      TimeSeriesDataPoint dp = resultRows.get(i);
+      Assert.assertEquals(dp.getMetricId(), metricFunction.getMetricId().longValue());
+      Assert.assertEquals(dp.getMetricUrn(), metricUrn);
+      Assert.assertEquals(dp.getTimestamp(), i * 1000);
+      Assert.assertEquals(dp.getDataValue(), String.valueOf(i));
+    }
+  }
+
+  @Test
+  public void testMergeSliceIntoRowsAppend() {
+    for (int i = 0; i < 10; i++) {
+      TimeSeriesDataPoint dataPoint = new TimeSeriesDataPoint(metricUrn, i * 1000, metricFunction.getMetricId(), String.valueOf(i));
+      rows.add(dataPoint);
+    }
+
+    List<String[]> newRows = new ArrayList<>();
+
+    for (int i = 10; i < 20; i++) {
+      String[] rawTimeSeriesDataPoint = new String[3];
+      rawTimeSeriesDataPoint[0] = String.valueOf(i);
+      rawTimeSeriesDataPoint[1] = String.valueOf(i);
+      rawTimeSeriesDataPoint[2] = String.valueOf(i * 1000);
+      newRows.add(rawTimeSeriesDataPoint);
+    }
+
+    cacheResponse.mergeSliceIntoRows(new RelationalThirdEyeResponse(request, newRows, timeSpec), MergeSliceType.APPEND);
+
+    Assert.assertEquals(cacheResponse.getNumRows(), 20);
+
+    List<TimeSeriesDataPoint> rows = cacheResponse.getRows();
+
+    for (int i = 0; i < 20; i++) {
+      TimeSeriesDataPoint dp = rows.get(i);
+      Assert.assertEquals(dp.getMetricId(), metricFunction.getMetricId().longValue());
+      Assert.assertEquals(dp.getMetricUrn(), metricUrn);
+      Assert.assertEquals(dp.getTimestamp(), i * 1000);
+      Assert.assertEquals(dp.getDataValue(), String.valueOf(i));
+    }
+  }
+
+  
 }
