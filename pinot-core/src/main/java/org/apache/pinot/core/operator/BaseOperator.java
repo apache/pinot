@@ -33,6 +33,9 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
 
   @Override
   public final T nextBlock() {
+    if (Thread.interrupted()) {
+      throw new RuntimeException("Thread has been interrupted");
+    }
     if (TraceContext.traceEnabled()) {
       long start = System.currentTimeMillis();
       T nextBlock = getNextBlock();

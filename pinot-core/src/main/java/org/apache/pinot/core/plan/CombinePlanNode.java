@@ -19,10 +19,12 @@
 package org.apache.pinot.core.plan;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
@@ -98,21 +100,40 @@ public class CombinePlanNode implements PlanNode {
       int opsPerThread = Math.max(numPlanNodes / threads + ((numPlanNodes % threads == 0) ? 0 : 1),
           // ceil without using double arithmetic
           MIN_TASKS_PER_THREAD);
+
+      // Use a Phaser to ensure all the Futures are done (not scheduled, finished or interrupted) before the main thread
+      // returns. We need to ensure no execution left before the main thread returning because the main thread holds the
+      // reference to the segments, and if the segments are deleted/refreshed, the segments can be released after the
+      // main thread returns, which would lead to undefined behavior (even JVM crash) when executing queries against
+      // them.
+      Phaser phaser = new Phaser(1);
+
       // Submit all jobs
       Future[] futures = new Future[threads];
       for (int i = 0; i < threads; i++) {
         final int index = i;
         futures[i] = _executorService.submit(new TraceCallable<List<Operator>>() {
           @Override
-          public List<Operator> callJob()
-              throws Exception {
-            List<Operator> operators = new ArrayList<>();
-            int start = index * opsPerThread;
-            int limit = Math.min(opsPerThread, numPlanNodes - start);
-            for (int count = start; count < start + limit; count++) {
-              operators.add(_planNodes.get(count).run());
+          public List<Operator> callJob() {
+            try {
+              // Register the thread to the phaser.
+              // If the phaser is terminated (returning negative value) when trying to register the thread, that means
+              // the query execution has timed out, and the main thread has deregistered itself and returned the result.
+              // Directly return as no execution result will be taken.
+              if (phaser.register() < 0) {
+                return Collections.emptyList();
+              }
+
+              List<Operator> operators = new ArrayList<>();
+              int start = index * opsPerThread;
+              int end = Math.min(start + opsPerThread, numPlanNodes);
+              for (int j = start; j < end; j++) {
+                operators.add(_planNodes.get(j).run());
+              }
+              return operators;
+            } finally {
+              phaser.arriveAndDeregister();
             }
-            return operators;
           }
         });
       }
@@ -139,6 +160,8 @@ public class CombinePlanNode implements PlanNode {
             future.cancel(true);
           }
         }
+        // Deregister the main thread and wait for all threads done
+        phaser.awaitAdvance(phaser.arriveAndDeregister());
       }
     }
 

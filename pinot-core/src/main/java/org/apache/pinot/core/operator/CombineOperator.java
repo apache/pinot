@@ -25,6 +25,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.exception.QueryException;
@@ -82,20 +83,40 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
 
     final List<List<Operator>> operatorGroups = new ArrayList<>(numGroups);
     for (int i = 0; i < numGroups; i++) {
-      operatorGroups.add(new ArrayList<Operator>());
+      operatorGroups.add(new ArrayList<>());
     }
     for (int i = 0; i < numOperators; i++) {
       operatorGroups.get(i % numGroups).add(_operators.get(i));
     }
 
-    final BlockingQueue<Block> blockingQueue = new ArrayBlockingQueue<>(numGroups);
-    // Submit operators.
-    for (final List<Operator> operatorGroup : operatorGroups) {
-      _executorService.submit(new TraceRunnable() {
+    // We use a BlockingQueue to store the results for each operator group, and track if all operator groups are
+    // finished by the query timeout, and cancel the unfinished futures (try to interrupt the execution if it already
+    // started).
+    // Besides the BlockingQueue, we also use a Phaser to ensure all the Futures are done (not scheduled, finished or
+    // interrupted) before the main thread returns. We need to ensure no execution left before the main thread returning
+    // because the main thread holds the reference to the segments, and if the segments are deleted/refreshed, the
+    // segments can be released after the main thread returns, which would lead to undefined behavior (even JVM crash)
+    // when executing queries against them.
+    BlockingQueue<Block> blockingQueue = new ArrayBlockingQueue<>(numGroups);
+    Phaser phaser = new Phaser(1);
+
+    // Submit operator group execution jobs
+    Future[] futures = new Future[numGroups];
+    for (int i = 0; i < numGroups; i++) {
+      List<Operator> operatorGroup = operatorGroups.get(i);
+      futures[i] = _executorService.submit(new TraceRunnable() {
         @Override
         public void runJob() {
-          IntermediateResultsBlock mergedBlock = null;
           try {
+            // Register the thread to the phaser.
+            // If the phaser is terminated (returning negative value) when trying to register the thread, that means the
+            // query execution has timed out, and the main thread has deregistered itself and returned the result.
+            // Directly return as no execution result will be taken.
+            if (phaser.register() < 0) {
+              return;
+            }
+
+            IntermediateResultsBlock mergedBlock = null;
             for (Operator operator : operatorGroup) {
               IntermediateResultsBlock blockToMerge = (IntermediateResultsBlock) operator.nextBlock();
               if (mergedBlock == null) {
@@ -110,18 +131,20 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
                 }
               }
             }
+            assert mergedBlock != null;
+            blockingQueue.offer(mergedBlock);
           } catch (Exception e) {
             LOGGER.error("Caught exception while executing query.", e);
-            mergedBlock = new IntermediateResultsBlock(e);
+            blockingQueue.offer(new IntermediateResultsBlock(e));
+          } finally {
+            phaser.arriveAndDeregister();
           }
-          assert mergedBlock != null;
-          blockingQueue.offer(mergedBlock);
         }
       });
     }
     LOGGER.debug("Submitting operators to be run in parallel and it took:" + (System.currentTimeMillis() - startTime));
 
-    // Submit merger job:
+    // Submit operator groups merge job
     Future<IntermediateResultsBlock> mergedBlockFuture =
         _executorService.submit(new TraceCallable<IntermediateResultsBlock>() {
           @Override
@@ -175,6 +198,15 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
       mergedBlockFuture.cancel(true);
       mergedBlock =
           new IntermediateResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR, e));
+    } finally {
+      // Cancel all ongoing jobs
+      for (Future future : futures) {
+        if (!future.isDone()) {
+          future.cancel(true);
+        }
+      }
+      // Deregister the main thread and wait for all threads done
+      phaser.awaitAdvance(phaser.arriveAndDeregister());
     }
 
     // Update execution statistics.
