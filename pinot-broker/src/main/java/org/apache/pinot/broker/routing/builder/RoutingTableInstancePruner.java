@@ -68,6 +68,12 @@ public class RoutingTableInstancePruner {
       return true;
     }
 
+    if (Boolean
+        .parseBoolean(instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.QUERIES_DISABLED))) {
+      LOGGER.info("Instance '{}' has disabled queries", instanceName);
+      return true;
+    }
+
     return false;
   }
 }

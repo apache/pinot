@@ -218,33 +218,51 @@ public class LowLevelConsumerRoutingTableBuilderTest {
   public void testShutdownInProgressServer() {
     final int SEGMENT_COUNT = 10;
     final int ONLINE_SEGMENT_COUNT = 8;
+    final String rawTableName = "table";
+    final String realtimeTableName = TableNameBuilder.forType(CommonConstants.Helix.TableType.REALTIME).
+        tableNameWithType(rawTableName);
+    final String serverInstanceName = "Server_localhost_1234";
 
     TableConfig tableConfig =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName("tableName").build();
+        new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(rawTableName).build();
     LowLevelConsumerRoutingTableBuilder routingTableBuilder = new LowLevelConsumerRoutingTableBuilder();
     routingTableBuilder.init(new BaseConfiguration(), tableConfig, null, null);
 
     List<SegmentName> segmentNames = new ArrayList<>();
     for (int i = 0; i < SEGMENT_COUNT; ++i) {
-      segmentNames.add(new LLCSegmentName("table", 0, i, System.currentTimeMillis()));
+      segmentNames.add(new LLCSegmentName(rawTableName, 0, i, System.currentTimeMillis()));
     }
 
     List<InstanceConfig> instanceConfigs = new ArrayList<>();
-    InstanceConfig instanceConfig = new InstanceConfig("Server_localhost_1234");
+    final InstanceConfig instanceConfig = new InstanceConfig(serverInstanceName);
     instanceConfigs.add(instanceConfig);
     instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, "true");
 
     // Generate an external view for a single server with some consuming segments
-    ExternalView externalView = new ExternalView("table_REALTIME");
+    ExternalView externalView = new ExternalView(realtimeTableName);
     for (int i = 0; i < ONLINE_SEGMENT_COUNT; i++) {
-      externalView.setState(segmentNames.get(i).getSegmentName(), "Server_localhost_1234", "ONLINE");
+      externalView.setState(segmentNames.get(i).getSegmentName(), serverInstanceName, "ONLINE");
     }
     for (int i = ONLINE_SEGMENT_COUNT; i < SEGMENT_COUNT; ++i) {
-      externalView.setState(segmentNames.get(i).getSegmentName(), "Server_localhost_1234", "CONSUMING");
+      externalView.setState(segmentNames.get(i).getSegmentName(), serverInstanceName, "CONSUMING");
     }
 
-    routingTableBuilder.computeOnExternalViewChange("table", externalView, instanceConfigs);
+    routingTableBuilder.computeOnExternalViewChange(rawTableName, externalView, instanceConfigs);
     List<Map<String, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
+    for (Map<String, List<String>> routingTable : routingTables) {
+      Assert.assertTrue(routingTable.isEmpty());
+    }
+
+    instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, "false");
+    routingTableBuilder.computeOnExternalViewChange(rawTableName, externalView, instanceConfigs);
+    routingTables = routingTableBuilder.getRoutingTables();
+    for (Map<String, List<String>> routingTable : routingTables) {
+      Assert.assertFalse(routingTable.isEmpty());
+    }
+
+    instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.QUERIES_DISABLED, "true");
+    routingTableBuilder.computeOnExternalViewChange(rawTableName, externalView, instanceConfigs);
+    routingTables = routingTableBuilder.getRoutingTables();
     for (Map<String, List<String>> routingTable : routingTables) {
       Assert.assertTrue(routingTable.isEmpty());
     }

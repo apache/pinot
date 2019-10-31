@@ -222,9 +222,14 @@ public class HelixExternalViewBasedRouting implements ClusterChangeHandler, Rout
           previousInstanceConfig.getRecord().getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS);
       String isShuttingDown =
           currentInstanceConfig.getRecord().getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS);
+      String wasQueriesDisabled =
+          previousInstanceConfig.getRecord().getSimpleField(CommonConstants.Helix.QUERIES_DISABLED);
+      String isQueriesDisabled =
+          currentInstanceConfig.getRecord().getSimpleField(CommonConstants.Helix.QUERIES_DISABLED);
 
       boolean instancesChanged =
-          !EqualityUtils.isEqual(wasEnabled, isEnabled) || !EqualityUtils.isEqual(wasShuttingDown, isShuttingDown);
+          !EqualityUtils.isEqual(wasEnabled, isEnabled) || !EqualityUtils.isEqual(wasShuttingDown, isShuttingDown) ||
+          !EqualityUtils.isEqual(wasQueriesDisabled, isQueriesDisabled);
 
       if (instancesChanged) {
         LOGGER.info(
