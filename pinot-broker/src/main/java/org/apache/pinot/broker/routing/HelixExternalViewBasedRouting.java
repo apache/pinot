@@ -222,14 +222,21 @@ public class HelixExternalViewBasedRouting implements ClusterChangeHandler, Rout
           previousInstanceConfig.getRecord().getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS);
       String isShuttingDown =
           currentInstanceConfig.getRecord().getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS);
+      String wasQueriesDisabled =
+          previousInstanceConfig.getRecord().getSimpleField(CommonConstants.Helix.QUERIES_DISABLED);
+      String isQueriesDisabled =
+          currentInstanceConfig.getRecord().getSimpleField(CommonConstants.Helix.QUERIES_DISABLED);
 
       boolean instancesChanged =
-          !EqualityUtils.isEqual(wasEnabled, isEnabled) || !EqualityUtils.isEqual(wasShuttingDown, isShuttingDown);
+          !EqualityUtils.isEqual(wasEnabled, isEnabled) || !EqualityUtils.isEqual(wasShuttingDown, isShuttingDown) ||
+          !EqualityUtils.isEqual(wasQueriesDisabled, isQueriesDisabled);
 
       if (instancesChanged) {
         LOGGER.info(
-            "Routing table for table {} requires rebuild due to at least one instance changing state (instance {} enabled: {} -> {}; shutting down {} -> {})",
-            tableName, instanceName, wasEnabled, isEnabled, wasShuttingDown, isShuttingDown);
+            "Routing table for table {} requires rebuild due to at least one instance changing state " +
+                "(instance {} enabled: {} -> {}; shutting down {} -> {}; queries disabled {} -> {})",
+            tableName, instanceName, wasEnabled, isEnabled, wasShuttingDown, isShuttingDown,
+            wasQueriesDisabled, isQueriesDisabled);
         return true;
       } else {
         // Update the instance config in our last known instance config, since it hasn't changed

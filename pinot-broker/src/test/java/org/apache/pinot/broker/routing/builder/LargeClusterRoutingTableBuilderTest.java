@@ -87,13 +87,19 @@ public class LargeClusterRoutingTableBuilderTest {
     shuttingDownInstance.getRecord()
         .setSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true));
 
+    final InstanceConfig queriesDisabledInstance = instanceConfigs.get(2);
+    final String queriesDisabledInstanceName = queriesDisabledInstance.getInstanceName();
+    queriesDisabledInstance.getRecord()
+        .setSimpleField(CommonConstants.Helix.QUERIES_DISABLED, Boolean.toString(true));
+
     validateAssertionForOneRoutingTable(new RoutingTableValidator() {
       @Override
       public boolean isRoutingTableValid(Map<String, List<String>> routingTable, ExternalView externalView,
           List<InstanceConfig> instanceConfigs) {
         for (String serverName : routingTable.keySet()) {
           // These servers should not appear in the routing table
-          if (serverName.equals(disabledHelixInstanceName) || serverName.equals(shuttingDownInstanceName)) {
+          if (serverName.equals(disabledHelixInstanceName) || serverName.equals(shuttingDownInstanceName) ||
+              serverName.equals(queriesDisabledInstanceName)) {
             return false;
           }
         }
