@@ -233,8 +233,10 @@ public class HelixExternalViewBasedRouting implements ClusterChangeHandler, Rout
 
       if (instancesChanged) {
         LOGGER.info(
-            "Routing table for table {} requires rebuild due to at least one instance changing state (instance {} enabled: {} -> {}; shutting down {} -> {})",
-            tableName, instanceName, wasEnabled, isEnabled, wasShuttingDown, isShuttingDown);
+            "Routing table for table {} requires rebuild due to at least one instance changing state " +
+                "(instance {} enabled: {} -> {}; shutting down {} -> {}; queries disabled {} -> {})",
+            tableName, instanceName, wasEnabled, isEnabled, wasShuttingDown, isShuttingDown,
+            wasQueriesDisabled, isQueriesDisabled);
         return true;
       } else {
         // Update the instance config in our last known instance config, since it hasn't changed
