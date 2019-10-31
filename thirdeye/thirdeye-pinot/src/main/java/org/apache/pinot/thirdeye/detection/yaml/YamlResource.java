@@ -88,6 +88,9 @@ import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
+import org.apache.pinot.thirdeye.detection.cache.CouchbaseCacheDAO;
+import org.apache.pinot.thirdeye.detection.cache.DefaultTimeSeriesCache;
+import org.apache.pinot.thirdeye.detection.cache.TimeSeriesCache;
 import org.apache.pinot.thirdeye.detection.onboard.YamlOnboardingTaskInfo;
 import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
@@ -160,8 +163,11 @@ public class YamlResource {
     this.executor = Executors.newFixedThreadPool(previewConfig.getParallelism());
     this.previewTimeout = previewConfig.getTimeout();
 
+    TimeSeriesCache timeSeriesCache =
+        new DefaultTimeSeriesCache(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(), new CouchbaseCacheDAO());
+
     TimeSeriesLoader timeseriesLoader =
-        new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache());
+        new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(), timeSeriesCache);
 
     AggregationLoader aggregationLoader =
         new DefaultAggregationLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(),

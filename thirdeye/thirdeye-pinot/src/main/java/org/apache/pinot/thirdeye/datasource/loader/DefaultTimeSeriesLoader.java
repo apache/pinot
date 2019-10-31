@@ -27,7 +27,8 @@ import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
-import org.apache.pinot.thirdeye.detection.cache.DefaultTimeSeriesCache;
+import org.apache.pinot.thirdeye.detection.cache.CacheConfig;
+import org.apache.pinot.thirdeye.detection.cache.TimeSeriesCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,13 +39,13 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
   private final QueryCache queryCache;
-  private final DefaultTimeSeriesCache timeSeriesCache;
+  private final TimeSeriesCache timeSeriesCache;
 
-  public DefaultTimeSeriesLoader(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, QueryCache queryCache) {
+  public DefaultTimeSeriesLoader(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, QueryCache queryCache, TimeSeriesCache cache) {
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
     this.queryCache = queryCache;
-    this.timeSeriesCache = new DefaultTimeSeriesCache(metricDAO, datasetDAO, queryCache);
+    this.timeSeriesCache = cache;
   }
 
   /**
@@ -59,7 +60,12 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
     LOG.info("Loading time series for '{}'", slice);
 
     TimeSeriesRequestContainer rc = DataFrameUtils.makeTimeSeriesRequestAligned(slice, "ref", this.metricDAO, this.datasetDAO);
-    ThirdEyeResponse response = this.timeSeriesCache.fetchTimeSeries(rc.getRequest());
+    ThirdEyeResponse response;
+    if (CacheConfig.useCentralizedCache()) {
+      response = this.timeSeriesCache.fetchTimeSeries(rc.getRequest());
+    } else {
+      response = this.queryCache.getQueryResult(rc.getRequest());
+    }
 
     return DataFrameUtils.evaluateResponse(response, rc);
   }

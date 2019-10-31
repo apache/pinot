@@ -1,6 +1,7 @@
-package org.apache.pinot.thirdeye.detection.cache;
+package org.apache.pinot.thirdeye.util;
 
 import com.couchbase.client.java.document.json.JsonObject;
+import org.apache.pinot.thirdeye.detection.cache.TimeSeriesDataPoint;
 import org.apache.pinot.thirdeye.util.CacheUtils;
 import org.mockito.Mockito;
 import org.testng.Assert;

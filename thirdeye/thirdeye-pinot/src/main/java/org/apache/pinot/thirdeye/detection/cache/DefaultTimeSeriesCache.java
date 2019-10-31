@@ -52,12 +52,13 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
   private final QueryCache queryCache;
-  private CouchbaseCacheDAO cacheDAO = new CouchbaseCacheDAO();
+  private CouchbaseCacheDAO cacheDAO;
 
-  public DefaultTimeSeriesCache(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, QueryCache queryCache) {
+  public DefaultTimeSeriesCache(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, QueryCache queryCache, CouchbaseCacheDAO cacheDAO) {
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
     this.queryCache = queryCache;
+    this.cacheDAO = cacheDAO;
   }
 
   public ThirdEyeResponse fetchTimeSeries(ThirdEyeRequest thirdEyeRequest) throws Exception {
@@ -89,6 +90,12 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
 
     ThirdEyeResponse result;
     MetricSlice slice;
+
+    if (cacheResponse.hasNoRows()) {
+      ThirdEyeResponse response = this.queryCache.getQueryResult(cacheResponse.getCacheRequest().getRequest());
+      insertTimeSeriesIntoCache(response);
+      cacheResponse.mergeSliceIntoRows(response, MergeSliceType.APPEND);
+    }
 
     if (cacheResponse.isMissingStartSlice(requestSliceStart)) {
       slice = MetricSlice.from(metricId, requestSliceStart, cacheResponse.getFirstTimestamp(), request.getFilterSet(), request.getGroupByTimeGranularity());

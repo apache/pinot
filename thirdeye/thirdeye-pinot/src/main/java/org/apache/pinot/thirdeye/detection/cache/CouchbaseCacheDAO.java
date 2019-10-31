@@ -29,6 +29,7 @@ import com.couchbase.client.java.query.N1qlQueryResult;
 import com.couchbase.client.java.query.N1qlQueryRow;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import org.apache.pinot.thirdeye.util.CacheUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,8 +69,11 @@ public class CouchbaseCacheDAO {
 
     N1qlQueryResult queryResult = bucket.query(N1qlQuery.simple(query));
 
+    ThirdeyeMetricsUtil.couchbaseCallCounter.inc();
+
     if (!queryResult.finalSuccess()) {
       LOG.error("cache error occurred for window startTime = {} to endTime = {}", request.getStartTimeInclusive(), request.getEndTimeExclusive());
+      ThirdeyeMetricsUtil.couchbaseExceptionCounter.inc();
       throw new Exception("query to Couchbase failed");
     }
 
@@ -87,6 +91,7 @@ public class CouchbaseCacheDAO {
   public void insertTimeSeriesDataPoint(TimeSeriesDataPoint point) {
 
     JsonDocument doc = bucket.getAndTouch(point.getDocumentKey(), CacheConfig.TTL);
+    ThirdeyeMetricsUtil.couchbaseCallCounter.inc();
 
     if (doc == null) {
       JsonObject documentBody = CacheUtils.buildDocumentStructure(point);
@@ -102,5 +107,6 @@ public class CouchbaseCacheDAO {
     }
 
     bucket.upsert(doc);
+    ThirdeyeMetricsUtil.couchbaseWriteCounter.inc();
   }
 }

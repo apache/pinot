@@ -185,7 +185,7 @@ public class AnomaliesResource {
     QueryCache queryCache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
     LoadingCache<String, Long> maxTimeCache = ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache();
 
-    this.timeSeriesLoader = new DefaultTimeSeriesLoader(this.metricConfigDAO, this.datasetConfigDAO, queryCache);
+    this.timeSeriesLoader = new DefaultTimeSeriesLoader(this.metricConfigDAO, this.datasetConfigDAO, queryCache, ThirdEyeCacheRegistry.getInstance().getTimeSeriesCache());
     this.aggregationLoader = new DefaultAggregationLoader(this.metricConfigDAO, this.datasetConfigDAO, queryCache, maxTimeCache);
     this.loader = new DetectionPipelineLoader();
 

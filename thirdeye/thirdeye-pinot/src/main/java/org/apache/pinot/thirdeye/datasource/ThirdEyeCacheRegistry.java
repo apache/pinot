@@ -36,6 +36,9 @@ import java.net.URL;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.thirdeye.detection.cache.CouchbaseCacheDAO;
+import org.apache.pinot.thirdeye.detection.cache.DefaultTimeSeriesCache;
+import org.apache.pinot.thirdeye.detection.cache.TimeSeriesCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,6 +51,7 @@ public class ThirdEyeCacheRegistry {
 
   // TODO: Rename QueryCache to a name like DataSourceCache.
   private QueryCache queryCache;
+  private TimeSeriesCache timeSeriesCache = null;
 
   // Meta-data caches
   private LoadingCache<String, DatasetConfigDTO> datasetConfigCache;
@@ -68,6 +72,7 @@ public class ThirdEyeCacheRegistry {
   public static void initializeCaches(ThirdEyeConfiguration thirdeyeConfig) throws Exception {
     initDataSources(thirdeyeConfig);
     initMetaDataCaches();
+    initCentralizedCache();
   }
 
   /**
@@ -87,6 +92,22 @@ public class ThirdEyeCacheRegistry {
       ThirdEyeCacheRegistry.getInstance().registerQueryCache(queryCache);
     } catch (Exception e) {
      LOGGER.info("Caught exception while initializing caches", e);
+    }
+  }
+
+  public static void initCentralizedCache() {
+    try {
+      // I couldn't figure out how to register the CouchbaseCacheDAO in the DAO registry, so just going to
+      // hardcode it in for now...
+
+      if (INSTANCE.getTimeSeriesCache() == null) {
+        TimeSeriesCache timeSeriesCache = new DefaultTimeSeriesCache(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
+            ThirdEyeCacheRegistry.getInstance().getQueryCache(), new CouchbaseCacheDAO());
+
+        ThirdEyeCacheRegistry.getInstance().registerTimeSeriesCache(timeSeriesCache);
+      }
+    } catch (Exception e) {
+      LOGGER.info("Caught exception while initializing caches", e);
     }
   }
 
@@ -161,6 +182,10 @@ public class ThirdEyeCacheRegistry {
   public void registerQueryCache(QueryCache queryCache) {
     this.queryCache = queryCache;
   }
+
+  public TimeSeriesCache getTimeSeriesCache() { return timeSeriesCache; }
+
+  public void registerTimeSeriesCache(TimeSeriesCache timeSeriesCache) { this.timeSeriesCache = timeSeriesCache; }
 
   public LoadingCache<String, DatasetConfigDTO> getDatasetConfigCache() {
     return datasetConfigCache;

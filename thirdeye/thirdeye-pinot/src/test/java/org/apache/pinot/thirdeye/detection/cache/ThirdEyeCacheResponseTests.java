@@ -22,13 +22,13 @@ public class ThirdEyeCacheResponseTests {
   private static final String COLLECTION = "collection";
   private static final MetricDataset METRIC = new MetricDataset("metric", COLLECTION);
 
-  ThirdEyeCacheResponse cacheResponse;
-  List<TimeSeriesDataPoint> rows = new ArrayList<>();
+  private ThirdEyeCacheResponse cacheResponse;
+  private List<TimeSeriesDataPoint> rows = new ArrayList<>();
 
-  MetricFunction
+  private static final MetricFunction
       metricFunction = new MetricFunction(MetricAggFunction.AVG, METRIC.getMetricName(), 1L, COLLECTION, null, null);
 
-  ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
+  private static final ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
       .setMetricFunctions(Collections.singletonList(metricFunction))
       .setStartTimeInclusive(1000)
       .setEndTimeExclusive(20000)
@@ -36,10 +36,10 @@ public class ThirdEyeCacheResponseTests {
       .setLimit(12345)
       .build("ref");
 
-  TimeSpec timeSpec = new TimeSpec(METRIC.getMetricName(), TimeGranularity.fromString("1_SECONDS"), TimeSpec.SINCE_EPOCH_FORMAT);
+  private static final TimeSpec timeSpec = new TimeSpec(METRIC.getMetricName(), TimeGranularity.fromString("1_SECONDS"), TimeSpec.SINCE_EPOCH_FORMAT);
 
-  String metricUrn = MetricEntity.fromMetric(request.getFilterSet().asMap(), metricFunction.getMetricId()).getUrn();
-  ThirdEyeCacheRequest cacheRequest = new ThirdEyeCacheRequest(request,1L, metricUrn,1000L, 20000L);
+  private static final String metricUrn = MetricEntity.fromMetric(request.getFilterSet().asMap(), metricFunction.getMetricId()).getUrn();
+  private static final ThirdEyeCacheRequest cacheRequest = new ThirdEyeCacheRequest(request,1L, metricUrn,1000L, 20000L);
 
   @BeforeMethod
   public void beforeMethod() {
