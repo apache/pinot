@@ -2,9 +2,9 @@ package org.apache.pinot.thirdeye.notification.formatter.channels;
 
 import java.util.Properties;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
-import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 
 
 /**
@@ -14,15 +14,15 @@ public abstract class AlertContentFormatter {
   protected static final String PROP_SUBJECT_STYLE = "subject";
 
   protected Properties alertClientConfig;
-  protected ADContentFormatterContext adContext;
+  protected DetectionAlertConfigDTO subsConfig;
   protected ThirdEyeAnomalyConfiguration teConfig;
   protected BaseNotificationContent notificationContent;
 
-  public AlertContentFormatter(Properties alertClientConfig, BaseNotificationContent content, ThirdEyeAnomalyConfiguration teConfig, ADContentFormatterContext adContext) {
+  public AlertContentFormatter(Properties alertClientConfig, BaseNotificationContent content, ThirdEyeAnomalyConfiguration teConfig, DetectionAlertConfigDTO subsConfig) {
     this.alertClientConfig = alertClientConfig;
     this.teConfig = teConfig;
     this.notificationContent = content;
-    this.adContext = adContext;
+    this.subsConfig = subsConfig;
 
     notificationContent.init(alertClientConfig, teConfig);
   }
@@ -36,7 +36,7 @@ public abstract class AlertContentFormatter {
       subjectType = AlertConfigBean.SubjectType.valueOf(alertSchemeClientConfigs.get(PROP_SUBJECT_STYLE).toString());
     } else {
       // To support the legacy email subject configuration
-      subjectType = this.adContext.getNotificationConfig().getSubjectType();
+      subjectType = this.subsConfig.getSubjectType();
     }
 
     return subjectType;

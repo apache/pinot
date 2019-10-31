@@ -30,15 +30,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import kafka.common.Config;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.mail.DefaultAuthenticator;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
-import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.alert.AlertUtils;
@@ -48,7 +47,6 @@ import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.apache.pinot.thirdeye.detection.annotation.AlertScheme;
 import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
-import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.apache.pinot.thirdeye.notification.formatter.channels.EmailContentFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,9 +78,9 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   private ThirdEyeAnomalyConfiguration teConfig;
   private SmtpConfiguration smtpConfig;
 
-  public DetectionEmailAlerter(ADContentFormatterContext adContext, ThirdEyeAnomalyConfiguration thirdeyeConfig,
+  public DetectionEmailAlerter(DetectionAlertConfigDTO subsConfig, ThirdEyeAnomalyConfiguration thirdeyeConfig,
       DetectionAlertFilterResult result) throws Exception {
-    super(adContext, result);
+    super(subsConfig, result);
     this.teConfig = thirdeyeConfig;
     this.smtpConfig = SmtpConfiguration.createFromProperties(this.teConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY));
   }
@@ -146,15 +144,15 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     validateAlert(recipients, anomalies);
 
     BaseNotificationContent content = buildNotificationContent(emailClientConfigs);
-    EmailEntity emailEntity = new EmailContentFormatter(emailClientConfigs, content, this.teConfig, adContext)
+    EmailEntity emailEntity = new EmailContentFormatter(emailClientConfigs, content, this.teConfig, this.subsConfig)
         .getEmailEntity(anomalies);
-    if (Strings.isNullOrEmpty(this.adContext.getNotificationConfig().getFrom())) {
+    if (Strings.isNullOrEmpty(this.subsConfig.getFrom())) {
       throw new IllegalArgumentException("Invalid sender's email");
     }
 
     HtmlEmail email = emailEntity.getContent();
     email.setSubject(emailEntity.getSubject());
-    email.setFrom(this.adContext.getNotificationConfig().getFrom());
+    email.setFrom(this.subsConfig.getFrom());
     email.setTo(AlertUtils.toAddress(recipients.getTo()));
     if (!CollectionUtils.isEmpty(recipients.getCc())) {
       email.setCc(AlertUtils.toAddress(recipients.getCc()));
@@ -187,13 +185,13 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   }
 
   private void generateAndSendEmails(DetectionAlertFilterResult results) throws Exception {
-    LOG.info("Preparing an email alert for subscription group id {}", this.adContext.getNotificationConfig().getId());
+    LOG.info("Preparing an email alert for subscription group id {}", this.subsConfig.getId());
     Preconditions.checkNotNull(results.getResult());
     for (Map.Entry<DetectionAlertFilterNotification, Set<MergedAnomalyResultDTO>> result : results.getResult().entrySet()) {
       try {
         Map<String, Object> notificationSchemeProps = result.getKey().getNotificationSchemeProps();
         if (notificationSchemeProps == null || notificationSchemeProps.get(PROP_EMAIL_SCHEME) == null) {
-          throw new IllegalArgumentException("Invalid email settings in subscription group " + this.adContext.getNotificationConfig().getId());
+          throw new IllegalArgumentException("Invalid email settings in subscription group " + this.subsConfig.getId());
         }
 
         Properties emailClientConfigs = new Properties();
@@ -205,7 +203,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
         if (emailClientConfigs.get(PROP_RECIPIENTS) != null) {
           Map<String, Object> emailRecipients = ConfigUtils.getMap(emailClientConfigs.get(PROP_RECIPIENTS));
           if (emailRecipients.get(PROP_TO) == null || ConfigUtils.getList(emailRecipients.get(PROP_TO)).isEmpty()) {
-            LOG.warn("Skipping! No email recipients found for alert {}.", this.adContext.getNotificationConfig().getId());
+            LOG.warn("Skipping! No email recipients found for alert {}.", this.subsConfig.getId());
             return;
           }
 
@@ -217,7 +215,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
         }
       } catch (IllegalArgumentException e) {
         LOG.warn("Skipping! Found illegal arguments while sending {} anomalies for alert {}."
-            + " Exception message: ", result.getValue().size(), this.adContext.getNotificationConfig().getId(), e);
+            + " Exception message: ", result.getValue().size(), this.subsConfig.getId(), e);
       }
     }
   }
@@ -226,7 +224,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   public void run() throws Exception {
     Preconditions.checkNotNull(result);
     if (result.getAllAnomalies().size() == 0) {
-      LOG.info("Zero anomalies found, skipping email alert for {}", this.adContext.getNotificationConfig().getId());
+      LOG.info("Zero anomalies found, skipping email alert for {}", this.subsConfig.getId());
       return;
     }
 

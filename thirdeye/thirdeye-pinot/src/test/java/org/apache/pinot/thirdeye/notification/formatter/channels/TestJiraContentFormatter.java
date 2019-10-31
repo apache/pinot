@@ -44,7 +44,6 @@ import org.apache.pinot.thirdeye.detection.alert.scheme.DetectionAlertScheme;
 import org.apache.pinot.thirdeye.notification.commons.JiraConfiguration;
 import org.apache.pinot.thirdeye.notification.commons.JiraEntity;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
-import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -69,7 +68,6 @@ public class TestJiraContentFormatter {
   private MetricConfigManager metricDAO;
   private DatasetConfigManager dataSetDAO;
   private DetectionAlertConfigDTO alertConfigDTO;
-  private ADContentFormatterContext adContext;
   private Long alertConfigId;
   private Long detectionConfigId;
 
@@ -111,9 +109,6 @@ public class TestJiraContentFormatter {
 
     this.alertConfigId = this.alertConfigDAO.save(this.alertConfigDTO);
 
-    this.adContext = new ADContentFormatterContext();
-    adContext.setNotificationConfig(this.alertConfigDTO);
-
     MergedAnomalyResultDTO anomalyResultDTO = new MergedAnomalyResultDTO();
     anomalyResultDTO.setStartTime(1000L);
     anomalyResultDTO.setEndTime(2000L);
@@ -150,7 +145,7 @@ public class TestJiraContentFormatter {
 
     BaseNotificationContent content = DetectionAlertScheme.buildNotificationContent(jiraClientConfig);
     JiraContentFormatter jiraContent = new JiraContentFormatter(
-        JiraConfiguration.createFromProperties(jiraConfiguration), jiraClientConfig, content, teConfig, adContext);
+        JiraConfiguration.createFromProperties(jiraConfiguration), jiraClientConfig, content, teConfig, this.alertConfigDTO);
 
     JiraEntity jiraEntity = jiraContent.getJiraEntity(new HashSet<>(this.anomalyDAO.findAll()));
 

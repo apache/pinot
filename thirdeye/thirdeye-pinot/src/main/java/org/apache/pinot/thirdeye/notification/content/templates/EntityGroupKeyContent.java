@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.alert.util.AlertScreenshotHelper;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
@@ -92,8 +92,8 @@ public class EntityGroupKeyContent extends BaseNotificationContent {
   }
 
   @Override
-  public Map<String, Object> format(Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
-    Map<String, Object> templateData = super.getTemplateData(context.getNotificationConfig(), anomalies);
+  public Map<String, Object> format(Collection<AnomalyResult> anomalies, DetectionAlertConfigDTO subsConfig) {
+    Map<String, Object> templateData = super.getTemplateData(subsConfig, anomalies);
 
     DetectionConfigDTO config = null;
     Preconditions.checkArgument(anomalies != null && !anomalies.isEmpty(), "Report has empty anomalies");

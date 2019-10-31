@@ -22,7 +22,6 @@ package org.apache.pinot.thirdeye.detection.alert.scheme;
 import com.atlassian.jira.rest.client.api.domain.Issue;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,6 +31,7 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
@@ -41,7 +41,6 @@ import org.apache.pinot.thirdeye.notification.commons.JiraConfiguration;
 import org.apache.pinot.thirdeye.notification.commons.JiraEntity;
 import org.apache.pinot.thirdeye.notification.commons.ThirdEyeJiraClient;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
-import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.apache.pinot.thirdeye.notification.formatter.channels.JiraContentFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,9 +73,9 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
 
   public static final String PROP_JIRA_SCHEME = "jiraScheme";
 
-  public DetectionJiraAlerter(ADContentFormatterContext adContext, ThirdEyeAnomalyConfiguration thirdeyeConfig,
+  public DetectionJiraAlerter(DetectionAlertConfigDTO subsConfig, ThirdEyeAnomalyConfiguration thirdeyeConfig,
       DetectionAlertFilterResult result) throws Exception {
-    super(adContext, result);
+    super(subsConfig, result);
     this.teConfig = thirdeyeConfig;
 
     this.jiraAdminConfig = JiraConfiguration.createFromProperties(this.teConfig.getAlerterConfiguration().get(JIRA_CONFIG_KEY));
@@ -110,7 +109,7 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
   private JiraEntity buildJiraEntity(DetectionAlertFilterNotification notification, Set<MergedAnomalyResultDTO> anomalies) {
     Map<String, Object> notificationSchemeProps = notification.getNotificationSchemeProps();
     if (notificationSchemeProps == null || notificationSchemeProps.get(PROP_JIRA_SCHEME) == null) {
-      throw new IllegalArgumentException("Jira not configured in subscription group " + this.adContext.getNotificationConfig().getId());
+      throw new IllegalArgumentException("Jira not configured in subscription group " + this.subsConfig.getId());
     }
 
     Properties jiraClientConfig = new Properties();
@@ -121,11 +120,11 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
 
     BaseNotificationContent content = super.buildNotificationContent(jiraClientConfig);
     return new JiraContentFormatter(this.jiraAdminConfig, jiraClientConfig, content,
-        this.teConfig, adContext).getJiraEntity(anomalyResultListOfGroup);
+        this.teConfig, subsConfig).getJiraEntity(anomalyResultListOfGroup);
   }
 
   private void createJiraTickets(DetectionAlertFilterResult results) {
-    LOG.info("Preparing a jira alert for subscription group id {}", this.adContext.getNotificationConfig().getId());
+    LOG.info("Preparing a jira alert for subscription group id {}", this.subsConfig.getId());
     Preconditions.checkNotNull(results.getResult());
     for (Map.Entry<DetectionAlertFilterNotification, Set<MergedAnomalyResultDTO>> result : results.getResult().entrySet()) {
       try {
@@ -153,7 +152,7 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
         }
       } catch (IllegalArgumentException e) {
         LOG.warn("Skipping! Found illegal arguments while sending {} anomalies for alert {}."
-            + " Exception message: ", result.getValue().size(), this.adContext.getNotificationConfig().getId(), e);
+            + " Exception message: ", result.getValue().size(), this.subsConfig.getId(), e);
       }
     }
   }
@@ -162,7 +161,7 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
   public void run() throws Exception {
     Preconditions.checkNotNull(result);
     if (result.getAllAnomalies().size() == 0) {
-      LOG.info("Zero anomalies found, skipping creation of jira alert for {}", this.adContext.getNotificationConfig().getId());
+      LOG.info("Zero anomalies found, skipping creation of jira alert for {}", this.subsConfig.getId());
       return;
     }
 

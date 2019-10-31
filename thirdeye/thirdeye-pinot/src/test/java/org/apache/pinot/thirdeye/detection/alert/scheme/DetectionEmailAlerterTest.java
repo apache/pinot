@@ -35,7 +35,6 @@ import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
-import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -60,7 +59,6 @@ public class DetectionEmailAlerterTest {
   private DetectionConfigManager detectionDAO;
   private DetectionAlertConfigDTO alertConfigDTO;
   private Long detectionConfigId;
-  private ADContentFormatterContext adContext;
   private ThirdEyeAnomalyConfiguration thirdEyeConfig;
 
   @BeforeMethod
@@ -112,9 +110,6 @@ public class DetectionEmailAlerterTest {
     anomalyResultDTO2.setMetric(METRIC_VALUE);
     this.anomalyDAO.save(anomalyResultDTO2);
 
-    this.adContext = new ADContentFormatterContext();
-    adContext.setNotificationConfig(alertConfigDTO);
-
     this.thirdEyeConfig = new ThirdEyeAnomalyConfiguration();
     thirdEyeConfig.setDashboardHost(DASHBOARD_HOST_VALUE);
     Map<String, Object> smtpProperties = new HashMap<>();
@@ -132,7 +127,7 @@ public class DetectionEmailAlerterTest {
 
   @Test(expectedExceptions = NullPointerException.class)
   public void testFailAlertWithNullResult() throws Exception {
-    DetectionEmailAlerter alertTaskInfo = new DetectionEmailAlerter(this.adContext, this.thirdEyeConfig, null);
+    DetectionEmailAlerter alertTaskInfo = new DetectionEmailAlerter(this.alertConfigDTO, this.thirdEyeConfig, null);
     alertTaskInfo.run();
   }
 
@@ -147,7 +142,7 @@ public class DetectionEmailAlerterTest {
     final HtmlEmail htmlEmail = mock(HtmlEmail.class);
     when(htmlEmail.send()).thenReturn("sent");
 
-    DetectionEmailAlerter emailAlerter = new DetectionEmailAlerter(this.adContext, this.thirdEyeConfig, notificationResults) {
+    DetectionEmailAlerter emailAlerter = new DetectionEmailAlerter(this.alertConfigDTO, this.thirdEyeConfig, notificationResults) {
       @Override
       protected HtmlEmail getHtmlContent(EmailEntity emailEntity) {
         return htmlEmail;

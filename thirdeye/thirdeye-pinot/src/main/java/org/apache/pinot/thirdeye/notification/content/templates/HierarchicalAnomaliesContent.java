@@ -23,13 +23,12 @@ import com.google.common.base.Joiner;
 import java.util.Arrays;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.pql.parsers.utils.Pair;
-import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.common.metric.MetricTimeSeries;
-import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
@@ -86,8 +85,8 @@ public class HierarchicalAnomaliesContent extends BaseNotificationContent {
   }
 
   @Override
-  public Map<String, Object> format(Collection<AnomalyResult> anomalies, ADContentFormatterContext context) {
-    Map<String, Object> templateData = super.getTemplateData(context.getNotificationConfig(), anomalies);
+  public Map<String, Object> format(Collection<AnomalyResult> anomalies, DetectionAlertConfigDTO subsConfig) {
+    Map<String, Object> templateData = super.getTemplateData(subsConfig, anomalies);
     enrichMetricInfo(templateData, anomalies);
     List<AnomalyReportEntity> rootAnomalyDetails = new ArrayList<>();
     SortedMap<String, List<AnomalyReportEntity>> leafAnomalyDetails = new TreeMap<>();

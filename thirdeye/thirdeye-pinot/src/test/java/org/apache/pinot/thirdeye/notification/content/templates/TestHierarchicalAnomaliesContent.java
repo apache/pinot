@@ -19,24 +19,20 @@ package org.apache.pinot.thirdeye.notification.content.templates;
 import java.util.Properties;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
-import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.apache.pinot.thirdeye.notification.formatter.channels.EmailContentFormatter;
 import org.apache.pinot.thirdeye.notification.ContentFormatterUtils;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConfiguration;
 import org.apache.pinot.thirdeye.anomaly.task.TaskDriverConfiguration;
-import org.apache.pinot.thirdeye.anomaly.utils.EmailUtils;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datalayer.DaoTestUtils;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
-import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -47,7 +43,6 @@ import org.joda.time.DateTimeZone;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 
 import static org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration.*;
 
@@ -152,10 +147,9 @@ public class TestHierarchicalAnomaliesContent {
 
     DetectionAlertConfigDTO notificationConfigDTO = DaoTestUtils.getTestNotificationConfig("Test Config");
 
-    ADContentFormatterContext context = new ADContentFormatterContext();
-    context.setNotificationConfig(notificationConfigDTO);
     EmailContentFormatter
-        contentFormatter = new EmailContentFormatter(new Properties(), new HierarchicalAnomaliesContent(), thirdeyeAnomalyConfig, context);
+        contentFormatter = new EmailContentFormatter(new Properties(), new HierarchicalAnomaliesContent(),
+        thirdeyeAnomalyConfig, notificationConfigDTO);
     EmailEntity emailEntity = contentFormatter.getEmailEntity(anomalies);
 
     String htmlPath = ClassLoader.getSystemResource("test-hierarchical-metric-anomalies-template.html").getPath();

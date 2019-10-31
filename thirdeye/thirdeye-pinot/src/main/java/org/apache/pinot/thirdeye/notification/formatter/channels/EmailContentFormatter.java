@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
@@ -40,7 +41,6 @@ import org.apache.commons.mail.HtmlEmail;
 import org.apache.pinot.thirdeye.notification.content.templates.EntityGroupKeyContent;
 import org.apache.pinot.thirdeye.notification.content.templates.HierarchicalAnomaliesContent;
 import org.apache.pinot.thirdeye.notification.content.templates.MetricAnomaliesContent;
-import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,12 +63,12 @@ public class EmailContentFormatter extends AlertContentFormatter {
     alertContentToTemplateMap = Collections.unmodifiableMap(aMap);
   }
 
-  public EmailContentFormatter(Properties emailClientConfig, BaseNotificationContent content, ThirdEyeAnomalyConfiguration teConfig, ADContentFormatterContext adContext) {
-    super(emailClientConfig, content, teConfig, adContext);
+  public EmailContentFormatter(Properties emailClientConfig, BaseNotificationContent content, ThirdEyeAnomalyConfiguration teConfig, DetectionAlertConfigDTO subsConfig) {
+    super(emailClientConfig, content, teConfig, subsConfig);
   }
 
   public EmailEntity getEmailEntity(Collection<AnomalyResult> anomalies) {
-    Map<String, Object> templateData = notificationContent.format(anomalies, adContext);
+    Map<String, Object> templateData = notificationContent.format(anomalies, subsConfig);
     templateData.put("dashboardHost", teConfig.getDashboardHost());
     return buildEmailEntity(alertContentToTemplateMap.get(notificationContent.getTemplate()), templateData);
   }
@@ -101,7 +101,7 @@ public class EmailContentFormatter extends AlertContentFormatter {
 
       String alertEmailHtml = new String(baos.toByteArray(), CHARSET);
 
-      String subject = BaseNotificationContent.makeSubject(super.getSubjectType(alertClientConfig), adContext.getNotificationConfig(), templateValues);
+      String subject = BaseNotificationContent.makeSubject(super.getSubjectType(alertClientConfig), this.subsConfig, templateValues);
       emailEntity.setSubject(subject);
       email.setHtmlMsg(alertEmailHtml);
       emailEntity.setContent(email);

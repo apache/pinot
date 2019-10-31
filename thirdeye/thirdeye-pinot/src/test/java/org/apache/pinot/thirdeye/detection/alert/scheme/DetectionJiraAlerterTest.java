@@ -16,15 +16,12 @@
 
 package org.apache.pinot.thirdeye.detection.alert.scheme;
 
-import com.atlassian.jira.rest.client.api.domain.Issue;
 import com.atlassian.jira.rest.client.api.domain.SearchResult;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.mail.HtmlEmail;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
@@ -37,10 +34,8 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
-import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
 import org.apache.pinot.thirdeye.notification.commons.JiraEntity;
 import org.apache.pinot.thirdeye.notification.commons.ThirdEyeJiraClient;
-import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -65,7 +60,6 @@ public class DetectionJiraAlerterTest {
   private DetectionConfigManager detectionDAO;
   private DetectionAlertConfigDTO alertConfigDTO;
   private Long detectionConfigId;
-  private ADContentFormatterContext adContext;
   private ThirdEyeAnomalyConfiguration thirdEyeConfig;
 
   @BeforeMethod
@@ -117,9 +111,6 @@ public class DetectionJiraAlerterTest {
     anomalyResultDTO2.setMetric(METRIC_VALUE);
     this.anomalyDAO.save(anomalyResultDTO2);
 
-    this.adContext = new ADContentFormatterContext();
-    adContext.setNotificationConfig(alertConfigDTO);
-
     this.thirdEyeConfig = new ThirdEyeAnomalyConfiguration();
     thirdEyeConfig.setDashboardHost(DASHBOARD_HOST_VALUE);
     Map<String, Object> jiraProperties = new HashMap<>();
@@ -139,7 +130,7 @@ public class DetectionJiraAlerterTest {
 
   @Test(expectedExceptions = NullPointerException.class)
   public void testFailAlertWithNullResult() throws Exception {
-    DetectionEmailAlerter alertTaskInfo = new DetectionEmailAlerter(this.adContext, this.thirdEyeConfig, null);
+    DetectionEmailAlerter alertTaskInfo = new DetectionEmailAlerter(this.alertConfigDTO, this.thirdEyeConfig, null);
     alertTaskInfo.run();
   }
 
@@ -155,7 +146,7 @@ public class DetectionJiraAlerterTest {
     when(jiraClient.getIssue(anyString(), anyString(), anyString())).thenReturn(new SearchResult(0, 0, 0, null));
     when(jiraClient.createIssue(any(JiraEntity.class))).thenReturn("created");
 
-    DetectionJiraAlerter jiraAlerter = new DetectionJiraAlerter(this.adContext, this.thirdEyeConfig, notificationResults);
+    DetectionJiraAlerter jiraAlerter = new DetectionJiraAlerter(this.alertConfigDTO, this.thirdEyeConfig, notificationResults);
 
     // Executes successfully without errors
     jiraAlerter.run();
