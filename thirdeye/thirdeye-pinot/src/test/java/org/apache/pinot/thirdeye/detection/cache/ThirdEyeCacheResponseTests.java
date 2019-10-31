@@ -52,10 +52,14 @@ public class ThirdEyeCacheResponseTests {
   }
 
   @Test
-  public void testHasNoRows() {
-    Assert.assertTrue(cacheResponse.hasNoRows());
+  public void testHasNoRowsWithRows() {
     rows.add(new TimeSeriesDataPoint(metricUrn, 2000, metricFunction.getMetricId(), "123"));
     Assert.assertFalse(cacheResponse.hasNoRows());
+  }
+
+  @Test
+  public void testHasNoRowsWithoutRows() {
+    Assert.assertTrue(cacheResponse.hasNoRows());
   }
 
   /**
@@ -242,6 +246,10 @@ public class ThirdEyeCacheResponseTests {
     Assert.assertFalse(cacheResponse.isMissingEndSlice(request.getEndTimeExclusive().getMillis()));
   }
 
+  /**
+   * ThirdEyeCacheResponse.mergeSliceIntoRows() tests
+   */
+
   @Test
   public void testMergeSliceIntoRowsPrepend() {
 
@@ -306,6 +314,4 @@ public class ThirdEyeCacheResponseTests {
       Assert.assertEquals(dp.getDataValue(), String.valueOf(i));
     }
   }
-
-  
 }
