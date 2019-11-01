@@ -60,4 +60,11 @@ public class DatasetConfigManagerImpl extends AbstractManagerImpl<DatasetConfigD
     Predicate predicate = Predicate.AND(activePredicate, completenessPredicate);
     return findByPredicate(predicate);
   }
+
+  @Override
+  public void updateLastRefreshTime(String dataset, long refreshTime) {
+    DatasetConfigDTO datasetConfigDTO = findByDataset(dataset);
+    datasetConfigDTO.setLastRefreshTime(refreshTime);
+    update(datasetConfigDTO);
+  }
 }

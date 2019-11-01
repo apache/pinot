@@ -24,10 +24,12 @@ public class DatasetConfigIndex extends AbstractIndexEntity {
   String displayName;
   boolean active;
   boolean requiresCompletenessCheck;
+  long lastRefreshTime;
 
   public String getDataset() {
     return dataset;
   }
+
   public void setDataset(String dataset) {
     this.dataset = dataset;
   }
@@ -43,14 +45,24 @@ public class DatasetConfigIndex extends AbstractIndexEntity {
   public boolean isActive() {
     return active;
   }
+
   public void setActive(boolean active) {
     this.active = active;
   }
+
   public boolean isRequiresCompletenessCheck() {
     return requiresCompletenessCheck;
   }
+
   public void setRequiresCompletenessCheck(boolean requiresCompletenessCheck) {
     this.requiresCompletenessCheck = requiresCompletenessCheck;
   }
 
+  public long getLastRefreshTime() {
+    return lastRefreshTime;
+  }
+
+  public void setLastRefreshTime(long lastRefreshTime) {
+    this.lastRefreshTime = lastRefreshTime;
+  }
 }

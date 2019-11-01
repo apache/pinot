@@ -149,6 +149,12 @@ public class ThirdeyeMetricsUtil {
   public static final Counter detectionRetuneCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "detectionRetuneCounter");
 
+  public static final Counter triggerEventCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "triggerEventCounter");
+
+  public static final Counter processedTriggerEventCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "processedTriggerEventCounter");
+
   public static MetricsRegistry getMetricsRegistry() {
     return metricsRegistry;
   }

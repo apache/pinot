@@ -137,6 +137,24 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
   }
 
   /**
+   * Extract the list of metric urns in the detection config properties
+   * @param properties the detection config properties
+   * @return the list of metric urns
+   */
+  public static List<String> extractMetricUrnsFromProperties(Map<String, Object> properties) {
+    List<String> metricUrns = new ArrayList<>();
+    if (properties.containsKey(PROP_NESTED_METRIC_URNS_KEY)) {
+      metricUrns.addAll(ConfigUtils.getList(properties.get(PROP_NESTED_METRIC_URNS_KEY)));
+    }
+    List<Map<String, Object>> nestedProperties = ConfigUtils.getList(properties.get(PROP_NESTED_PROPERTIES_KEY));
+    // extract the metric urns recursively from the nested properties
+    for (Map<String, Object> nestedProperty : nestedProperties) {
+      metricUrns.addAll(extractMetricUrnsFromProperties(nestedProperty));
+    }
+    return metricUrns;
+  }
+
+  /**
    * Get the display names for the datasets. Show the display name if it is available in the dataset. Otherwize, use the dataset name.
    * @param metricUrnToDatasets the map of detection config keyed buy metric urn
    * @return the list of dataset names to show in UI
@@ -167,24 +185,6 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
   private MetricConfigDTO getMetricConfigForMetricUrn(String metricUrn) {
     MetricEntity me = MetricEntity.fromURN(metricUrn);
     return this.metricDAO.findById(me.getId());
-  }
-
-  /**
-   * Extract the list of metric urns in the detection config properties
-   * @param properties the detection config properties
-   * @return the list of metric urns
-   */
-  private List<String> extractMetricUrnsFromProperties(Map<String, Object> properties) {
-    List<String> metricUrns = new ArrayList<>();
-    if (properties.containsKey(PROP_NESTED_METRIC_URNS_KEY)) {
-      metricUrns.addAll(ConfigUtils.getList(properties.get(PROP_NESTED_METRIC_URNS_KEY)));
-    }
-    List<Map<String, Object>> nestedProperties = ConfigUtils.getList(properties.get(PROP_NESTED_PROPERTIES_KEY));
-    // extract the metric urns recursively from the nested properties
-    for (Map<String, Object> nestedProperty : nestedProperties) {
-      metricUrns.addAll(extractMetricUrnsFromProperties(nestedProperty));
-    }
-    return metricUrns;
   }
 
   private List<TimeGranularity> getGranularitiesForConfig(DetectionConfigDTO config, Map<String, DatasetConfigDTO> metricUrnToDatasets) {

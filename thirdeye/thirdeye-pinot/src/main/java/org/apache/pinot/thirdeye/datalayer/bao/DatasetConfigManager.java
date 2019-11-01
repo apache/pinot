@@ -26,7 +26,11 @@ import java.util.List;
 public interface DatasetConfigManager extends AbstractManager<DatasetConfigDTO> {
 
   DatasetConfigDTO findByDataset(String dataset);
+
   List<DatasetConfigDTO> findActive();
+
   List<DatasetConfigDTO> findActiveRequiresCompletenessCheck();
+
+  void updateLastRefreshTime(String dataset, long lastRefreshTime);
 
 }

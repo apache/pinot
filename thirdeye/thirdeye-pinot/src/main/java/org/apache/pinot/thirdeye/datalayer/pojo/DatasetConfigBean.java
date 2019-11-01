@@ -95,6 +95,8 @@ public class DatasetConfigBean extends AbstractBean {
   private String dataCompletenessAlgorithm = DEFAULT_COMPLETENESS_ALGORITHM;
   // expected percentage completeness for dataset to be marked complete
   private double expectedCompleteness = Wo4WAvgDataCompletenessAlgorithm.DEFAULT_EXPECTED_COMPLETENESS;
+  // latest timestamp of the dataset updated by external events
+  private long lastRefreshTime;
 
   private Map<String, String> properties = new HashMap<>();
 
@@ -293,6 +295,14 @@ public class DatasetConfigBean extends AbstractBean {
 
   public void setDisplayName(String displayName) {
     this.displayName = displayName;
+  }
+
+  public long getLastRefreshTime() {
+    return lastRefreshTime;
+  }
+
+  public void setLastRefreshTime(long lastRefreshTime) {
+    this.lastRefreshTime = lastRefreshTime;
   }
 
   @Override

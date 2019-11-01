@@ -17,12 +17,19 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.datalayer.bao;
+package org.apache.pinot.thirdeye.anomaly.detection.trigger.filter;
 
-import java.util.List;
-import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.anomaly.detection.trigger.DataAvailabilityEvent;
+import org.apache.pinot.thirdeye.anomaly.detection.trigger.utils.DatasetTriggerInfoRepo;
 
+/**
+ * This class is to filter out out-of-order events.
+ */
+public class OnTimeFilter implements DataAvailabilityEventFilter {
 
-public interface DetectionConfigManager extends AbstractManager<DetectionConfigDTO> {
-  List<DetectionConfigDTO> findAllActive();
+  @Override
+  public boolean isPassed(DataAvailabilityEvent e) {
+    DatasetTriggerInfoRepo triggerInfoRepo = DatasetTriggerInfoRepo.getInstance();
+    return (e.getHighWatermark() > triggerInfoRepo.getLastUpdateTimestamp(e.getDatasetName()));
+  }
 }
