@@ -32,7 +32,6 @@ import org.slf4j.Logger;
 public class DefaultSegmentCommitter implements SegmentCommitter{
   private SegmentCompletionProtocol.Request.Params _params;
   private ServerSegmentCompletionProtocolHandler _protocolHandler;
-  private IndexLoadingConfig _indexLoadingConfig;
 
   private Logger _segmentLogger;
 
@@ -40,7 +39,6 @@ public class DefaultSegmentCommitter implements SegmentCommitter{
       IndexLoadingConfig indexLoadingConfig, SegmentCompletionProtocol.Request.Params params, SegmentCompletionProtocol.Response prevResponse) {
     _segmentLogger = segmentLogger;
     _protocolHandler = protocolHandler;
-    _indexLoadingConfig = indexLoadingConfig;
     _params = params;
     return this;
   }

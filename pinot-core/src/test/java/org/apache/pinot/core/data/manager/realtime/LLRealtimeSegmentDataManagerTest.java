@@ -710,7 +710,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected SegmentCompletionProtocol.Response commit(SegmentCompletionProtocol.Response prevResponse, boolean isSplitCommit) {
+    protected SegmentCompletionProtocol.Response commit(SegmentCompletionProtocol.Response prevResponse) {
       SegmentCompletionProtocol.Response response = _responses.remove();
       return response;
     }

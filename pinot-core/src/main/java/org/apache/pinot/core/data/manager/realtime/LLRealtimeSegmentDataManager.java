@@ -772,8 +772,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
     SegmentCompletionProtocol.Response returnedResponse;
 
-    boolean isSplitCommit = response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit();
-    returnedResponse = commit(response, isSplitCommit);
+    returnedResponse = commit(response);
 
     if (!returnedResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
       return false;
@@ -784,7 +783,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return true;
   }
 
-  protected SegmentCompletionProtocol.Response commit(SegmentCompletionProtocol.Response response, boolean isSplitCommit) {
+  protected SegmentCompletionProtocol.Response commit(SegmentCompletionProtocol.Response response) {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
 
     params.withSegmentName(_segmentNameStr).withOffset(_currentOffset).withNumRows(_numRowsConsumed)
@@ -797,19 +796,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     Configuration config = new PropertiesConfiguration();
 
-    if (isSplitCommit) {
-      try {
-        config.setProperty(CommonConstants.Segment.Realtime.COMMITTER_CLASS, SplitSegmentCommitter.class.getName());
-      } catch (Exception e) {
-        throw new RuntimeException("Could not create configuration");
-      }
+    if (response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit()) {
+      config.setProperty(CommonConstants.Segment.Realtime.COMMITTER_CLASS, SplitSegmentCommitter.class.getName());
     } else {
-      try {
-        config.setProperty(CommonConstants.Segment.Realtime.COMMITTER_CLASS, DefaultSegmentCommitter.class.getName());
-      } catch (Exception e) {
-        throw new RuntimeException("Could not create configuration");
-      }
+      config.setProperty(CommonConstants.Segment.Realtime.COMMITTER_CLASS, DefaultSegmentCommitter.class.getName());
     }
+
     SegmentCommitterFactory.init(config);
     SegmentCommitter segmentCommitter = SegmentCommitterFactory.create(segmentLogger, _protocolHandler, _indexLoadingConfig, params, response);
     return segmentCommitter.commit(_currentOffset, _numRowsConsumed, _segmentBuildDescriptor);

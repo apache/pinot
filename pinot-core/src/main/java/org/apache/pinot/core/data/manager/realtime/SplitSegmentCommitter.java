@@ -33,7 +33,6 @@ public class SplitSegmentCommitter implements SegmentCommitter {
   private SegmentCompletionProtocol.Request.Params _params;
   private ServerSegmentCompletionProtocolHandler _protocolHandler;
   private SegmentCompletionProtocol.Response _prevResponse;
-  private boolean _isEnableSplitCommitWithMetadata;
   private IndexLoadingConfig _indexLoadingConfig;
 
   private Logger _segmentLogger;
@@ -46,6 +45,10 @@ public class SplitSegmentCommitter implements SegmentCommitter {
     _params = params;
     _prevResponse = prevResponse;
     return this;
+  }
+
+  public SplitSegmentCommitter() {
+
   }
 
   @Override
@@ -73,7 +76,7 @@ public class SplitSegmentCommitter implements SegmentCommitter {
         .withNumRows(numRowsConsumed);
 
     SegmentCompletionProtocol.Response commitEndResponse;
-    if (_isEnableSplitCommitWithMetadata) {
+    if (_indexLoadingConfig.isEnableSplitCommitEndWithMetadata()) {
       commitEndResponse =
           _protocolHandler.segmentCommitEndWithMetadata(params, segmentBuildDescriptor.getMetadataFiles());
     } else {
