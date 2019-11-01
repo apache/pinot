@@ -18,39 +18,32 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
-import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * Factory for the SegmentCommitter interface
  */
 public class SegmentCommitterFactory {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCommitterFactory.class);
-  private static SegmentCommitter _segmentCommitter;
+  private static Logger LOGGER;
+  private static IndexLoadingConfig _indexLoadingConfig;
+  private static ServerSegmentCompletionProtocolHandler _protocolHandler;
 
   // Prevent factory from being instantiated.
-  private SegmentCommitterFactory() {
-
+  public SegmentCommitterFactory(Logger segmentLogger, IndexLoadingConfig indexLoadingConfig, ServerSegmentCompletionProtocolHandler protocolHandler) {
+    LOGGER = segmentLogger;
+    _indexLoadingConfig = indexLoadingConfig;
+    _protocolHandler = protocolHandler;
   }
 
-  public static void init(Configuration config) {
-    String committerClass = (String) config.getProperty(CommonConstants.Segment.Realtime.COMMITTER_CLASS);
-    try {
-      LOGGER.info("Creating segment committer class {}", committerClass);
-      _segmentCommitter = (SegmentCommitter) Class.forName(committerClass).newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException("Could not create segment committer " + committerClass);
-    }
+  public SegmentCommitter createSplitSegmentCommitter(SegmentCompletionProtocol.Request.Params params, SegmentCompletionProtocol.Response prevResponse) {
+    return new SplitSegmentCommitter(LOGGER, _protocolHandler, _indexLoadingConfig, params, prevResponse);
   }
 
-  public static SegmentCommitter create(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
-      IndexLoadingConfig indexLoadingConfig, SegmentCompletionProtocol.Request.Params params, SegmentCompletionProtocol.Response prevResponse) {
-    return _segmentCommitter.init(segmentLogger, protocolHandler, indexLoadingConfig, params, prevResponse);
+  public SegmentCommitter createDefaultSegmentCommitter(SegmentCompletionProtocol.Request.Params params, SegmentCompletionProtocol.Response prevResponse) {
+    return new DefaultSegmentCommitter(LOGGER, _protocolHandler, _indexLoadingConfig, params, prevResponse);
   }
 }

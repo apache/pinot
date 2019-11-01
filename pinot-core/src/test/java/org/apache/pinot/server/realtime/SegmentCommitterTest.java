@@ -16,21 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.manager.realtime;
+package org.apache.pinot.server.realtime;
 
-import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-
-
-/**
- * For committing realtime segments.
- */
-public interface SegmentCommitter {
-  /**
-   * Commits a realtime segment
-   * @param currentOffset current offset
-   * @param numRows num rows committing
-   * @param segmentBuildDescriptor object that describes segment to be committed
-   * @return
-   */
-  SegmentCompletionProtocol.Response commit(long currentOffset, int numRows, LLRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor);
+public class SegmentCommitterTest {
+  
 }

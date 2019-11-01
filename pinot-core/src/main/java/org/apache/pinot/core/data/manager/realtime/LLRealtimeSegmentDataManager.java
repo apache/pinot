@@ -51,7 +51,6 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.NetUtil;
@@ -263,6 +262,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final Semaphore _segBuildSemaphore;
   private final boolean _isOffHeap;
   private final boolean _nullHandlingEnabled;
+  private SegmentCommitterFactory _segmentCommitterFactory;
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
@@ -795,15 +795,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
 
     Configuration config = new PropertiesConfiguration();
+    SegmentCommitter segmentCommitter;
 
     if (response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit()) {
-      config.setProperty(CommonConstants.Segment.Realtime.COMMITTER_CLASS, SplitSegmentCommitter.class.getName());
+      segmentCommitter = _segmentCommitterFactory.createSplitSegmentCommitter(params, response);
     } else {
-      config.setProperty(CommonConstants.Segment.Realtime.COMMITTER_CLASS, DefaultSegmentCommitter.class.getName());
+      segmentCommitter = _segmentCommitterFactory.createDefaultSegmentCommitter(params, response);
     }
 
-    SegmentCommitterFactory.init(config);
-    SegmentCommitter segmentCommitter = SegmentCommitterFactory.create(segmentLogger, _protocolHandler, _indexLoadingConfig, params, response);
     return segmentCommitter.commit(_currentOffset, _numRowsConsumed, _segmentBuildDescriptor);
   }
 
@@ -1158,6 +1157,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     segmentLogger
         .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", _segmentName,
             _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC).toString());
+    _segmentCommitterFactory = new SegmentCommitterFactory(segmentLogger, _indexLoadingConfig, _protocolHandler);
     start();
   }
 

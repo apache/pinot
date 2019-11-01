@@ -37,18 +37,13 @@ public class SplitSegmentCommitter implements SegmentCommitter {
 
   private Logger _segmentLogger;
 
-  public SplitSegmentCommitter init(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
+  public SplitSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
       IndexLoadingConfig indexLoadingConfig, SegmentCompletionProtocol.Request.Params params, SegmentCompletionProtocol.Response prevResponse) {
     _segmentLogger = segmentLogger;
     _protocolHandler = protocolHandler;
     _indexLoadingConfig = indexLoadingConfig;
     _params = params;
     _prevResponse = prevResponse;
-    return this;
-  }
-
-  public SplitSegmentCommitter() {
-
   }
 
   @Override

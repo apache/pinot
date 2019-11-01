@@ -35,16 +35,11 @@ public class DefaultSegmentCommitter implements SegmentCommitter{
 
   private Logger _segmentLogger;
 
-  public DefaultSegmentCommitter init(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
+  public DefaultSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
       IndexLoadingConfig indexLoadingConfig, SegmentCompletionProtocol.Request.Params params, SegmentCompletionProtocol.Response prevResponse) {
     _segmentLogger = segmentLogger;
     _protocolHandler = protocolHandler;
     _params = params;
-    return this;
-  }
-
-  public DefaultSegmentCommitter() {
-
   }
 
   @Override
