@@ -138,7 +138,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   private static int MINIMUM_CONSUME_TIME_MINUTES = 10;
 
-  protected class SegmentBuildDescriptor {
+  public class SegmentBuildDescriptor {
     final String _segmentTarFilePath;
     final Map<String, File> _metadataFileMap;
     final long _offset;
@@ -147,7 +147,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     final String _segmentDirPath;
     final long _segmentSizeBytes;
 
-    SegmentBuildDescriptor(String segmentTarFilePath, Map<String, File> metadataFileMap, long offset,
+    public SegmentBuildDescriptor(String segmentTarFilePath, Map<String, File> metadataFileMap, long offset,
         String segmentDirPath, long buildTimeMillis, long waitTimeMillis, long segmentSizeBytes) {
       _segmentTarFilePath = segmentTarFilePath;
       _metadataFileMap = metadataFileMap;
