@@ -17,6 +17,8 @@
 .. under the License.
 ..
 
+:orphan:
+
 ##########
 User Guide
 ##########
