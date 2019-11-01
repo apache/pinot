@@ -19,7 +19,6 @@
 
 package org.apache.pinot.thirdeye.notification.formatter.channels;
 
-import com.atlassian.jira.rest.client.api.domain.input.IssueInputBuilder;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import freemarker.template.Configuration;
@@ -41,12 +40,12 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.mail.HtmlEmail;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.notification.commons.JiraConfiguration;
 import org.apache.pinot.thirdeye.notification.commons.JiraEntity;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
 import org.apache.pinot.thirdeye.notification.content.templates.MetricAnomaliesContent;
-import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,8 +75,8 @@ public class JiraContentFormatter extends AlertContentFormatter {
   }
 
   public JiraContentFormatter(JiraConfiguration jiraAdminConfig, Properties jiraClientConfig,
-      BaseNotificationContent content, ThirdEyeAnomalyConfiguration teConfig, ADContentFormatterContext adContext) {
-    super(jiraClientConfig, content, teConfig, adContext);
+      BaseNotificationContent content, ThirdEyeAnomalyConfiguration teConfig, DetectionAlertConfigDTO subsConfig) {
+    super(jiraClientConfig, content, teConfig, subsConfig);
 
     this.jiraAdminConfig = jiraAdminConfig;
     validateJiraConfigs(jiraAdminConfig);
@@ -93,7 +92,7 @@ public class JiraContentFormatter extends AlertContentFormatter {
   }
 
   public JiraEntity getJiraEntity(Collection<AnomalyResult> anomalies) {
-    Map<String, Object> templateData = notificationContent.format(anomalies, adContext);
+    Map<String, Object> templateData = notificationContent.format(anomalies, this.subsConfig);
     templateData.put("dashboardHost", teConfig.getDashboardHost());
     return buildJiraEntity(alertContentToTemplateMap.get(notificationContent.getTemplate()), templateData);
   }
@@ -102,7 +101,7 @@ public class JiraContentFormatter extends AlertContentFormatter {
    * Apply the parameter map to given email template, and format it as EmailEntity
    */
   private JiraEntity buildJiraEntity(String jiraTemplate, Map<String, Object> templateValues) {
-    String issueSummary = BaseNotificationContent.makeSubject(super.getSubjectType(alertClientConfig), this.adContext.getNotificationConfig(), templateValues);
+    String issueSummary = BaseNotificationContent.makeSubject(super.getSubjectType(alertClientConfig), this.subsConfig, templateValues);
 
     // Fetch the jira project and issue type fields if overridden by user
     String jiraProject = MapUtils.getString(alertClientConfig, PROP_PROJECT, this.jiraAdminConfig.getJiraDefaultProjectKey());

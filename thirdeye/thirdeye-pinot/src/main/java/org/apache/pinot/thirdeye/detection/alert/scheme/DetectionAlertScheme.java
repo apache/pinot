@@ -27,7 +27,6 @@ import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
 import org.apache.pinot.thirdeye.notification.content.templates.EntityGroupKeyContent;
 import org.apache.pinot.thirdeye.notification.content.templates.MetricAnomaliesContent;
-import org.apache.pinot.thirdeye.notification.formatter.ADContentFormatterContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,7 +34,7 @@ import org.slf4j.LoggerFactory;
 public abstract class DetectionAlertScheme {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionAlertScheme.class);
 
-  protected final ADContentFormatterContext adContext;
+  protected final DetectionAlertConfigDTO subsConfig;
   protected final DetectionAlertFilterResult result;
 
   public static final String PROP_TEMPLATE = "template";
@@ -48,8 +47,8 @@ public abstract class DetectionAlertScheme {
     ENTITY_GROUPBY_REPORT
   }
 
-  public DetectionAlertScheme(ADContentFormatterContext adContext, DetectionAlertFilterResult result) {
-    this.adContext = adContext;
+  public DetectionAlertScheme(DetectionAlertConfigDTO subsConfig, DetectionAlertFilterResult result) {
+    this.subsConfig = subsConfig;
     this.result = result;
   }
 
