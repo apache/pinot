@@ -45,13 +45,14 @@ import org.slf4j.LoggerFactory;
 public class CombinePlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(CombinePlanNode.class);
 
-  /**
-   * MAX_PLAN_THREADS should be >= 1.
-   * Runtime.getRuntime().availableProcessors() may return value < 2 in container based environment, e.g. Kubernetes.
-   */
-  private static final int MAX_PLAN_THREADS =
-      Math.max(1, Math.min(10, (int) (Runtime.getRuntime().availableProcessors() * .5)));
-  private static final int MIN_TASKS_PER_THREAD = 10;
+  // Use at most 10 or half of the processors threads for each query.
+  // If there are less than 2 processors, use 1 thread.
+  // Runtime.getRuntime().availableProcessors() may return value < 2 in container based environment, e.g. Kubernetes.
+  private static final int MAX_NUM_THREADS_PER_QUERY =
+      Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2));
+  // Try to schedule 10 plans for each thread, or evenly distribute plans to all MAX_NUM_THREADS_PER_QUERY threads
+  private static final int TARGET_NUM_PLANS_PER_THREAD = 10;
+
   private static final int TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN = 10_000;
 
   private final List<PlanNode> _planNodes;
@@ -83,7 +84,7 @@ public class CombinePlanNode implements PlanNode {
     int numPlanNodes = _planNodes.size();
     List<Operator> operators = new ArrayList<>(numPlanNodes);
 
-    if (numPlanNodes <= MIN_TASKS_PER_THREAD) {
+    if (numPlanNodes <= TARGET_NUM_PLANS_PER_THREAD) {
       // Small number of plan nodes, run them sequentially
       for (PlanNode planNode : _planNodes) {
         operators.add(planNode.run());
@@ -92,14 +93,11 @@ public class CombinePlanNode implements PlanNode {
       // Large number of plan nodes, run them in parallel
 
       // Calculate the time out timestamp
-      long endTime = System.currentTimeMillis() + TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN;
+      long endTimeMs = System.currentTimeMillis() + TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN;
 
-      int threads = Math.min(numPlanNodes / MIN_TASKS_PER_THREAD + ((numPlanNodes % MIN_TASKS_PER_THREAD == 0) ? 0 : 1),
-          // ceil without using double arithmetic
-          MAX_PLAN_THREADS);
-      int opsPerThread = Math.max(numPlanNodes / threads + ((numPlanNodes % threads == 0) ? 0 : 1),
-          // ceil without using double arithmetic
-          MIN_TASKS_PER_THREAD);
+      int numThreads = Math.min((numPlanNodes + TARGET_NUM_PLANS_PER_THREAD - 1) / TARGET_NUM_PLANS_PER_THREAD,
+          MAX_NUM_THREADS_PER_QUERY);
+      int numPlansPerThread = (numPlanNodes + numThreads - 1) / numThreads;
 
       // Use a Phaser to ensure all the Futures are done (not scheduled, finished or interrupted) before the main thread
       // returns. We need to ensure no execution left before the main thread returning because the main thread holds the
@@ -109,9 +107,9 @@ public class CombinePlanNode implements PlanNode {
       Phaser phaser = new Phaser(1);
 
       // Submit all jobs
-      Future[] futures = new Future[threads];
-      for (int i = 0; i < threads; i++) {
-        final int index = i;
+      Future[] futures = new Future[numThreads];
+      for (int i = 0; i < numThreads; i++) {
+        int index = i;
         futures[i] = _executorService.submit(new TraceCallable<List<Operator>>() {
           @Override
           public List<Operator> callJob() {
@@ -125,10 +123,10 @@ public class CombinePlanNode implements PlanNode {
               }
 
               List<Operator> operators = new ArrayList<>();
-              int start = index * opsPerThread;
-              int end = Math.min(start + opsPerThread, numPlanNodes);
-              for (int j = start; j < end; j++) {
-                operators.add(_planNodes.get(j).run());
+              int start = index * numPlansPerThread;
+              int end = Math.min(start + numPlansPerThread, numPlanNodes);
+              for (int i = start; i < end; i++) {
+                operators.add(_planNodes.get(i).run());
               }
               return operators;
             } finally {
@@ -141,7 +139,8 @@ public class CombinePlanNode implements PlanNode {
       // Get all results
       try {
         for (Future future : futures) {
-          List<Operator> ops = (List<Operator>) future.get(endTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+          List<Operator> ops =
+              (List<Operator>) future.get(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
           operators.addAll(ops);
         }
       } catch (Exception e) {
