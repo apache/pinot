@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -30,7 +29,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.reduce.CombineService;
@@ -47,22 +45,16 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(CombineOperator.class);
   private static final String OPERATOR_NAME = "CombineOperator";
 
+  // Use at most 10 or half of the processors threads for each query.
+  // If there are less than 2 processors, use 1 thread.
+  // Runtime.getRuntime().availableProcessors() may return value < 2 in container based environment, e.g. Kubernetes.
+  private static final int MAX_NUM_THREADS_PER_QUERY =
+      Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2));
+
   private final List<Operator> _operators;
   private final BrokerRequest _brokerRequest;
   private final ExecutorService _executorService;
   private final long _timeOutMs;
-  //Make this configurable
-  //These two control the parallelism on a per query basis, depending on the number of segments to process
-  private static final int MIN_THREADS_PER_QUERY;
-  private static final int MAX_THREADS_PER_QUERY;
-  private static final int MIN_SEGMENTS_PER_THREAD = 10;
-
-  static {
-    int numCores = Runtime.getRuntime().availableProcessors();
-    MIN_THREADS_PER_QUERY = Math.max(1, (int) (numCores * .5));
-    //Dont have more than 10 threads per query
-    MAX_THREADS_PER_QUERY = Math.min(10, (int) (numCores * .5));
-  }
 
   public CombineOperator(List<Operator> operators, ExecutorService executorService, long timeOutMs,
       BrokerRequest brokerRequest) {
@@ -74,20 +66,12 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    final long startTime = System.currentTimeMillis();
-    final long queryEndTime = System.currentTimeMillis() + _timeOutMs;
-    final int numOperators = _operators.size();
-    // Ensure that the number of groups is not more than the number of segments
-    final int numGroups = Math.min(numOperators, Math.max(MIN_THREADS_PER_QUERY,
-        Math.min(MAX_THREADS_PER_QUERY, (numOperators + MIN_SEGMENTS_PER_THREAD - 1) / MIN_SEGMENTS_PER_THREAD)));
-
-    final List<List<Operator>> operatorGroups = new ArrayList<>(numGroups);
-    for (int i = 0; i < numGroups; i++) {
-      operatorGroups.add(new ArrayList<>());
-    }
-    for (int i = 0; i < numOperators; i++) {
-      operatorGroups.get(i % numGroups).add(_operators.get(i));
-    }
+    long startTimeMs = System.currentTimeMillis();
+    long endTimeMs = startTimeMs + _timeOutMs;
+    int numOperators = _operators.size();
+    // Try to use all MAX_NUM_THREADS_PER_QUERY threads for the query, but ensure each thread has at least one operator
+    int numThreads = Math.min(numOperators, MAX_NUM_THREADS_PER_QUERY);
+    int numOperatorsPerThread = (numOperators + numThreads - 1) / numThreads;
 
     // We use a BlockingQueue to store the results for each operator group, and track if all operator groups are
     // finished by the query timeout, and cancel the unfinished futures (try to interrupt the execution if it already
@@ -97,13 +81,13 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
     // because the main thread holds the reference to the segments, and if the segments are deleted/refreshed, the
     // segments can be released after the main thread returns, which would lead to undefined behavior (even JVM crash)
     // when executing queries against them.
-    BlockingQueue<Block> blockingQueue = new ArrayBlockingQueue<>(numGroups);
+    BlockingQueue<IntermediateResultsBlock> blockingQueue = new ArrayBlockingQueue<>(numThreads);
     Phaser phaser = new Phaser(1);
 
     // Submit operator group execution jobs
-    Future[] futures = new Future[numGroups];
-    for (int i = 0; i < numGroups; i++) {
-      List<Operator> operatorGroup = operatorGroups.get(i);
+    Future[] futures = new Future[numThreads];
+    for (int i = 0; i < numThreads; i++) {
+      int index = i;
       futures[i] = _executorService.submit(new TraceRunnable() {
         @Override
         public void runJob() {
@@ -116,22 +100,19 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
               return;
             }
 
-            IntermediateResultsBlock mergedBlock = null;
-            for (Operator operator : operatorGroup) {
-              IntermediateResultsBlock blockToMerge = (IntermediateResultsBlock) operator.nextBlock();
-              if (mergedBlock == null) {
-                mergedBlock = blockToMerge;
-              } else {
-                try {
-                  CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
-                } catch (Exception e) {
-                  LOGGER.error("Caught exception while merging two blocks (step 1).", e);
-                  mergedBlock
-                      .addToProcessingExceptions(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
-                }
+            int start = index * numOperatorsPerThread;
+            int end = Math.min(start + numOperatorsPerThread, numOperators);
+            IntermediateResultsBlock mergedBlock = (IntermediateResultsBlock) _operators.get(start).nextBlock();
+            for (int i = start + 1; i < end; i++) {
+              IntermediateResultsBlock blockToMerge = (IntermediateResultsBlock) _operators.get(i).nextBlock();
+              try {
+                CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
+              } catch (Exception e) {
+                LOGGER.error("Caught exception while merging two blocks (step 1).", e);
+                mergedBlock
+                    .addToProcessingExceptions(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
               }
             }
-            assert mergedBlock != null;
             blockingQueue.offer(mergedBlock);
           } catch (Exception e) {
             LOGGER.error("Caught exception while executing query.", e);
@@ -142,7 +123,6 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
         }
       });
     }
-    LOGGER.debug("Submitting operators to be run in parallel and it took:" + (System.currentTimeMillis() - startTime));
 
     // Submit operator groups merge job
     Future<IntermediateResultsBlock> mergedBlockFuture =
@@ -150,34 +130,26 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
           @Override
           public IntermediateResultsBlock callJob()
               throws Exception {
-            int mergedBlocksNumber = 0;
-            IntermediateResultsBlock mergedBlock = null;
-            while (mergedBlocksNumber < numGroups) {
-              if (mergedBlock == null) {
-                mergedBlock = (IntermediateResultsBlock) blockingQueue
-                    .poll(queryEndTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-                if (mergedBlock != null) {
-                  mergedBlocksNumber++;
-                }
-                LOGGER.debug("Got response from operator 0 after: {}", (System.currentTimeMillis() - startTime));
-              } else {
-                IntermediateResultsBlock blockToMerge = (IntermediateResultsBlock) blockingQueue
-                    .poll(queryEndTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-                if (blockToMerge != null) {
-                  try {
-                    LOGGER.debug("Got response from operator {} after: {}", mergedBlocksNumber,
-                        (System.currentTimeMillis() - startTime));
-                    CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
-                    LOGGER.debug("Merged response from operator {} after: {}", mergedBlocksNumber,
-                        (System.currentTimeMillis() - startTime));
-                  } catch (Exception e) {
-                    LOGGER.error("Caught exception while merging two blocks (step 2).", e);
-                    mergedBlock
-                        .addToProcessingExceptions(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
-                  }
-                  mergedBlocksNumber++;
-                }
+            IntermediateResultsBlock mergedBlock =
+                blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+            if (mergedBlock == null) {
+              throw new TimeoutException("Timed out while polling result from first thread");
+            }
+            int numMergedBlocks = 1;
+            while (numMergedBlocks < numThreads) {
+              IntermediateResultsBlock blockToMerge =
+                  blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+              if (blockToMerge == null) {
+                throw new TimeoutException("Timed out while polling result from thread: " + numMergedBlocks);
               }
+              try {
+                CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
+              } catch (Exception e) {
+                LOGGER.error("Caught exception while merging two blocks (step 2).", e);
+                mergedBlock
+                    .addToProcessingExceptions(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
+              }
+              numMergedBlocks++;
             }
             return mergedBlock;
           }
@@ -186,7 +158,7 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
     // Get merge results.
     IntermediateResultsBlock mergedBlock;
     try {
-      mergedBlock = mergedBlockFuture.get(queryEndTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+      mergedBlock = mergedBlockFuture.get(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
       LOGGER.error("Caught InterruptedException.", e);
       mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.FUTURE_CALL_ERROR, e));
