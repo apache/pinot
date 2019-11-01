@@ -833,7 +833,7 @@ body {
     line-height: 20px;
     border-radius: 3px;
     padding: 4px 8px;
-    margin: 0 20px;
+    margin-right: 20px;
     display: inline-block;
     color: white;
     width: auto;
@@ -927,4 +927,8 @@ body {
       margin-left: 0;
     }
   }
+}
+
+.activation-toggle {
+  display: inline-block;
 }

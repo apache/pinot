@@ -4,6 +4,7 @@
       alertData=model.alertData
       subscribedGroups=model.subscribedGroups
       isLoadError=isLoadError
+      toggleActivation=(action "toggleActivation")
     }}
     <div class="te-search-results__cta">
       {{#link-to "manage.explore" model.alertId}}
@@ -52,8 +53,8 @@
                   dataIsCurrent=alertDataIsCurrent
                   detectionHealth=model.detectionHealth
                   timeWindowSize=model.timeWindowSize
-                  metricUrn=model.metricUrn
-                  metricUrnList=model.metricUrnList
+                  metricUrnRoute=model.metricUrn
+                  metricUrnListRoute=model.metricUrnList
                 }}
                   {{yield}}
                 {{/alert-details}}

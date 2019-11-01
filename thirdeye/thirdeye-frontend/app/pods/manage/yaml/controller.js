@@ -7,6 +7,7 @@ import Controller from '@ember/controller';
 import {computed, set, get, getProperties} from '@ember/object';
 import {toastOptions} from 'thirdeye-frontend/utils/constants';
 import {inject as service} from '@ember/service';
+import { putAlertActiveStatus } from 'thirdeye-frontend/utils/anomaly';
 
 const CREATE_GROUP_TEXT = 'Create a new subscription group';
 
@@ -81,6 +82,23 @@ export default Controller.extend({
   actions: {
     changeAccordion() {
       set(this, 'toggleCollapsed', !get(this, 'toggleCollapsed'));
+    },
+
+    /**
+     * toggle the active status of alert being displayed
+     * @method toggleActivation
+     * @return {undefined}
+     */
+    toggleActivation() {
+      const detectionConfigId = this.get('model.alertId');
+      putAlertActiveStatus(detectionConfigId, !this.get('model.alertData.isActive'))
+        .then(() => this.send('refreshModel'))
+        .catch(error => {
+          this.get('notifications')
+            .error(`Failed to set active flag of detection config ${detectionConfigId}: ${(typeof error === 'object' ? error.message : error)}`,
+              'Error',
+              toastOptions);
+        });
     },
 
     /**

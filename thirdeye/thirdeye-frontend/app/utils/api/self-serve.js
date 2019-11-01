@@ -135,6 +135,13 @@ const editAlert = '/thirdeye/entity?entityType=ANOMALY_FUNCTION';
  */
 const createNewDataset = '/onboard/create';
 
+/**
+ * PUT | Set active status of alert
+ * @param {Number} detectionId
+ * @param {Boolean} active
+ */
+const setAlertActivationUrl = (detectionId, active) => `/detection/activation/${detectionId}?active=${active}`;
+
 
 /**
  * General self-serve endpoints
@@ -147,7 +154,8 @@ export const selfServeApiCommon = {
   alertFunctionByName,
   configGroupByAlertId,
   alertFunctionByAppName,
-  metricAutoComplete
+  metricAutoComplete,
+  setAlertActivationUrl
 };
 
 /**
