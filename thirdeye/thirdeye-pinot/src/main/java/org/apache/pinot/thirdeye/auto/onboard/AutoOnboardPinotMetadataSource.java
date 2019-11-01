@@ -35,7 +35,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -108,10 +107,9 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
       Map<String, Map<String, String>> allCustomConfigs = new HashMap<>();
       loadDatasets(allDatasets, allSchemas, allCustomConfigs);
       LOG.info("Checking all datasets");
-      removeDeletedDataset(allDatasets);
+      deactivateDatasets(allDatasets);
       for (String dataset : allDatasets) {
         LOG.info("Checking dataset {}", dataset);
-
         Schema schema = allSchemas.get(dataset);
         Map<String, String> customConfigs = allCustomConfigs.get(dataset);
         DatasetConfigDTO datasetConfig = datasetDAO.findByDataset(dataset);
@@ -122,8 +120,8 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
     }
   }
 
-  void removeDeletedDataset(List<String> allDatasets) {
-    LOG.info("Removing deleted Pinot datasets");
+  void deactivateDatasets(List<String> allDatasets) {
+    LOG.info("deactivating deleted Pinot datasets");
     List<DatasetConfigDTO> allExistingDataset = this.datasetDAO.findAll();
     Set<String> datasets = new HashSet<>(allDatasets);
 
@@ -135,31 +133,22 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
     });
 
     for (DatasetConfigDTO datasetConfigDTO : filtered) {
-      if (shouldRemoveDataset(datasetConfigDTO, datasets)) {
-        LOG.info("Deleting pinot dataset '{}'", datasetConfigDTO.getDataset());
-        datasetDAO.deleteByPredicate(Predicate.EQ("dataset", datasetConfigDTO.getDataset()));
-        deleteAutoCreatedAlertGroup(datasetConfigDTO);
+      if (shouldDeactivateDataset(datasetConfigDTO, datasets)) {
+        LOG.info("Deactivating pinot dataset '{}'", datasetConfigDTO.getDataset());
+        datasetConfigDTO.setActive(false);
+        datasetDAO.save(datasetConfigDTO);
       }
     }
   }
 
-  private void deleteAutoCreatedAlertGroup(DatasetConfigDTO datasetConfigDTO) {
-    String alertGroupName = AutoOnboardUtility.getAutoAlertGroupName(datasetConfigDTO.getDataset());
-    AlertConfigDTO alertGroupDTO = alertDAO.findWhereNameEquals(alertGroupName);
-    if (alertGroupDTO != null) {
-      alertDAO.deleteById(alertGroupDTO.getId());
-      LOG.info("Deleting auto created alert group {} associated with pinot dataset '{}'", alertGroupDTO.getName(),
-          datasetConfigDTO.getDataset());
-    }
-  }
-
-  private boolean shouldRemoveDataset(DatasetConfigDTO datasetConfigDTO, Set<String> datasets) {
+  private boolean shouldDeactivateDataset(DatasetConfigDTO datasetConfigDTO, Set<String> datasets) {
     if (!datasets.contains(datasetConfigDTO.getDataset())) {
       List<MetricConfigDTO> metrics = metricDAO.findByDataset(datasetConfigDTO.getDataset());
       int metricCount = metrics.size();
       for (MetricConfigDTO metric : metrics) {
         if (!metric.isDerived() && !metric.getName().equals(ROW_COUNT)) {
-          metricDAO.delete(metric);
+          metric.setActive(false);
+          metricDAO.save(metric);
           metricCount--;
         }
       }
@@ -221,6 +210,7 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
     checkMetricChanges(dataset, datasetConfig, schema);
     checkTimeFieldChanges(datasetConfig, schema);
     appendNewCustomConfigs(datasetConfig, customConfigs);
+    datasetConfig.setActive(true);
   }
 
   private void checkDimensionChanges(String dataset, DatasetConfigDTO datasetConfig, Schema schema) {
@@ -315,16 +305,24 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
       if (!datasetMetricNames.contains(metricSpec.getName())) {
         MetricConfigDTO metricConfigDTO = ConfigGenerator.generateMetricConfig(metricSpec, dataset);
         LOG.info("Creating metric {} in {}", metricSpec.getName(), dataset);
-        DAO_REGISTRY.getMetricConfigDAO().save(metricConfigDTO);
+        this.metricDAO.save(metricConfigDTO);
       }
     }
 
-    // remove deleted metrics from ThirdEye
+    // audit existing metrics in ThirdEye
     for (MetricConfigDTO metricConfig : datasetMetricConfigs) {
-      if (!metricConfig.isDerived()) {
-        if (!schemaMetricNames.contains(getColumnName(metricConfig))) {
-          LOG.info("Deleting metric {} in {}", metricConfig.getName(), dataset);
-          DAO_REGISTRY.getMetricConfigDAO().delete(metricConfig);
+      if (!schemaMetricNames.contains(getColumnName(metricConfig))) {
+        if (!metricConfig.isDerived() && !metricConfig.getName().equals(ROW_COUNT)) {
+          // if metric is removed from schema and not a derived/row_count metric, deactivate it
+          LOG.info("Deactivating metric {} in {}", metricConfig.getName(), dataset);
+          metricConfig.setActive(false);
+          this.metricDAO.save(metricConfig);
+        }
+      } else {
+        if (!metricConfig.isActive()) {
+          LOG.info("Activating metric {} in {}", metricConfig.getName(), dataset);
+          metricConfig.setActive(true);
+          this.metricDAO.save(metricConfig);
         }
       }
     }

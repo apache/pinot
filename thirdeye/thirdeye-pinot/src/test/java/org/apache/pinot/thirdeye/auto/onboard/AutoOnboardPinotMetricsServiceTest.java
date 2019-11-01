@@ -28,6 +28,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
@@ -159,9 +160,11 @@ public class AutoOnboardPinotMetricsServiceTest {
   }
 
   @Test (dependsOnMethods={"testRefreshDataset"})
-  public void testRemoveDataset() throws Exception {
+  public void testDeactivate() throws Exception {
     Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
-    testAutoLoadPinotMetricsService.removeDeletedDataset(Collections.<String>emptyList());
-    Assert.assertEquals(datasetConfigDAO.findAll().size(), 0);
+    testAutoLoadPinotMetricsService.deactivateDatasets(Collections.<String>emptyList());
+    List<DatasetConfigDTO> datasets = datasetConfigDAO.findAll();
+    Assert.assertEquals(datasets.size(), 1);
+    Assert.assertFalse(datasets.get(0).isActive());
   }
 }
