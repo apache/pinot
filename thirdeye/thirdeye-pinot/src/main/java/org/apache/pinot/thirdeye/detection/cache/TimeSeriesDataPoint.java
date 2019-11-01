@@ -66,16 +66,4 @@ public class TimeSeriesDataPoint {
     return CacheUtils.hashMetricUrn(metricUrn);
   }
 
-  public static TimeSeriesDataPoint from(String[] dataPoint, String metricUrn) {
-    long timestamp = Long.valueOf(dataPoint[dataPoint.length - 1]);
-    long metricId = MetricEntity.fromURN(metricUrn).getId();
-    String dataValue = dataPoint[1];
-    return new TimeSeriesDataPoint(metricUrn, timestamp, metricId, dataValue);
-  }
-
-  public static TimeSeriesDataPoint from(String[] dataPoint, long metricId, String metricUrn) {
-    long timestamp = Long.valueOf(dataPoint[dataPoint.length - 1]);
-    String dataValue = dataPoint[1];
-    return new TimeSeriesDataPoint(metricUrn, timestamp, metricId, dataValue);
-  }
 }
