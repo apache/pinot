@@ -165,6 +165,18 @@ export function getProps() {
 }
 
 /**
+ * Preps put object
+ * @returns {Object}
+ */
+export function putProps() {
+  return {
+    method: 'put',
+    body: '',
+    headers: { 'content-type': 'text/plain' }
+  };
+}
+
+/**
  * Format conversion helper
  * @param {String} dateStr - date to convert
  */
@@ -211,6 +223,7 @@ export default {
   makeFilterString,
   parseProps,
   postProps,
+  putProps,
   toIso,
   replaceNonFiniteWithCurrent,
   stripNonFiniteValues,

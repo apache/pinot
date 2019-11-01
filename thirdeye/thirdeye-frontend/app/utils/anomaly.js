@@ -4,7 +4,8 @@ import _ from 'lodash';
 import {
   checkStatus,
   postProps,
-  getProps
+  getProps,
+  putProps
 } from 'thirdeye-frontend/utils/utils';
 import { postYamlProps } from 'thirdeye-frontend/utils/yaml-tools';
 import fetch from 'fetch';
@@ -17,6 +18,7 @@ import {
   getBoundsUrl,
   getAiAvailabilityUrl
 } from 'thirdeye-frontend/utils/api/anomaly';
+import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
 
 /**
  * Response type options for anomalies.
@@ -185,6 +187,18 @@ export function getAnomalyFiltersByAnomalyId(startTime, endTime, anomalyIds) {
 }
 
 /**
+ * Put alert active status change into backend
+ * @method putAlertActiveStatus
+ * @param {Number} detectionConfigId - id of alert's detection configuration
+ * @param {Boolean} active - what to set active flag to
+ * @return {Ember.RSVP.Promise}
+ */
+export function putAlertActiveStatus(detectionConfigId, active) {
+  const url = selfServeApiCommon.setAlertActivationUrl(detectionConfigId, active);
+  return fetch(url, putProps()).then(checkStatus);
+}
+
+/**
  * Fetch a single anomaly record for verification
  * @method verifyAnomalyFeedback
  * @param {Number} anomalyId
@@ -238,6 +252,7 @@ export default {
   getFormattedDuration,
   verifyAnomalyFeedback,
   pluralizeTime,
+  putAlertActiveStatus,
   getYamlPreviewAnomalies,
   getAnomaliesByAlertId,
   getBounds
