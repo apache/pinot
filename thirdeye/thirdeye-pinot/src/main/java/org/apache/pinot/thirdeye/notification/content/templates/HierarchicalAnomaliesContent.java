@@ -49,6 +49,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
@@ -150,7 +151,7 @@ public class HierarchicalAnomaliesContent extends BaseNotificationContent {
         anomaly.getAvgBaselineVal(),
         anomaly.getAvgCurrentVal(),
         anomaly.getImpactToGlobal(),
-        getDimensionsList(anomaly.getDimensions()),
+        getDimensionsList(anomaly.getDimensionMap()),
         getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()), // duration
         feedbackVal,
         anomaly.getFunction().getFunctionName(),

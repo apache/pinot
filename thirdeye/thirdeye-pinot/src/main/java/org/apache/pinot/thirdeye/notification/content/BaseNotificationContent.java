@@ -277,11 +277,11 @@ public abstract class BaseNotificationContent implements NotificationContent {
   /**
    * Flatten the dimension map
    */
-  protected static List<String> getDimensionsList(DimensionMap dimensionMap) {
+  protected static List<String> getDimensionsList(Multimap<String, String> dimensions) {
     List<String> dimensionsList = new ArrayList<>();
-    if (dimensionMap != null && !dimensionMap.isEmpty()) {
-      for (Map.Entry<String, String> entry : dimensionMap.entrySet()) {
-        dimensionsList.add(entry.getKey() + " : " + entry.getValue());
+    if (dimensions != null && !dimensions.isEmpty()) {
+      for (Map.Entry<String, Collection<String>> entry : dimensions.asMap().entrySet()) {
+        dimensionsList.add(entry.getKey() + " : " + String.join(",", entry.getValue()));
       }
     }
     return dimensionsList;

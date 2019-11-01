@@ -105,6 +105,7 @@ public class JiraEntity {
     sb.append(", assignee='").append(assignee).append('\'');
     sb.append(", summary='").append(summary).append('\'');
     sb.append(", labels='").append(labels).append('\'');
+    sb.append(", mergeGap='").append(mergeGap).append('\'');
     sb.append('}');
     return sb.toString();
   }

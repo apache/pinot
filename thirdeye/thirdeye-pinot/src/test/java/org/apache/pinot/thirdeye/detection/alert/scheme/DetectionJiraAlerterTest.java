@@ -16,7 +16,8 @@
 
 package org.apache.pinot.thirdeye.detection.alert.scheme;
 
-import com.atlassian.jira.rest.client.api.domain.SearchResult;
+import com.atlassian.jira.rest.client.api.domain.Issue;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,19 +37,17 @@ import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotificatio
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.apache.pinot.thirdeye.notification.commons.JiraEntity;
 import org.apache.pinot.thirdeye.notification.commons.ThirdEyeJiraClient;
+import org.apache.pinot.thirdeye.notification.formatter.channels.TestJiraContentFormatter;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.thirdeye.detection.alert.filter.AlertFilterUtils.*;
 import static org.mockito.Mockito.*;
 
 
 public class DetectionJiraAlerterTest {
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
-  private static final String FROM_ADDRESS_VALUE = "test3@test.test";
-  private static final String ALERT_NAME_VALUE = "alert_name";
   private static final String DASHBOARD_HOST_VALUE = "dashboard";
   private static final String COLLECTION_VALUE = "test_dataset";
   private static final String DETECTION_NAME_VALUE = "test detection";
@@ -79,20 +78,7 @@ public class DetectionJiraAlerterTest {
     properties.put(PROP_CLASS_NAME, "org.apache.pinot.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
     properties.put(PROP_DETECTION_CONFIG_IDS, Collections.singletonList(this.detectionConfigId));
 
-    Map<String, Set<String>> recipients = new HashMap<>();
-    recipients.put(PROP_TO, PROP_TO_VALUE);
-    recipients.put(PROP_CC, PROP_CC_VALUE);
-    recipients.put(PROP_BCC, PROP_BCC_VALUE);
-
-    Map<String, Object> emailScheme = new HashMap<>();
-    emailScheme.put("className", "org.apache.pinot.thirdeye.detection.alert.scheme.RandomAlerter");
-    emailScheme.put(PROP_RECIPIENTS, recipients);
-    this.alertConfigDTO.setAlertSchemes(Collections.singletonMap("emailScheme", emailScheme));
-    this.alertConfigDTO.setProperties(properties);
-    this.alertConfigDTO.setFrom(FROM_ADDRESS_VALUE);
-    this.alertConfigDTO.setName(ALERT_NAME_VALUE);
-    Map<Long, Long> vectorClocks = new HashMap<>();
-    this.alertConfigDTO.setVectorClocks(vectorClocks);
+    this.alertConfigDTO = TestJiraContentFormatter.createDimRecipientsDetectionAlertConfig(this.detectionConfigId);
     this.alertConfigDAO.save(this.alertConfigDTO);
 
     MergedAnomalyResultDTO anomalyResultDTO = new MergedAnomalyResultDTO();
@@ -115,6 +101,7 @@ public class DetectionJiraAlerterTest {
     thirdEyeConfig.setDashboardHost(DASHBOARD_HOST_VALUE);
     Map<String, Object> jiraProperties = new HashMap<>();
     jiraProperties.put("jiraUser", "test");
+    jiraProperties.put("jiraPassword", "test");
     jiraProperties.put("jiraUrl", "test");
     jiraProperties.put("jiraDefaultProject", "THIRDEYE");
     jiraProperties.put("jiraIssueTypeId", 19);
@@ -135,7 +122,7 @@ public class DetectionJiraAlerterTest {
   }
 
   @Test
-  public void testSendEmailSuccessful() throws Exception {
+  public void testUpdateJiraSuccessful() throws Exception {
     Map<DetectionAlertFilterNotification, Set<MergedAnomalyResultDTO>> result = new HashMap<>();
     result.put(
         new DetectionAlertFilterNotification(ConfigUtils.getMap(this.alertConfigDTO.getAlertSchemes())),
@@ -143,10 +130,13 @@ public class DetectionJiraAlerterTest {
     DetectionAlertFilterResult notificationResults = new DetectionAlertFilterResult(result);
 
     final ThirdEyeJiraClient jiraClient = mock(ThirdEyeJiraClient.class);
-    when(jiraClient.getIssue(anyString(), anyString(), anyString())).thenReturn(new SearchResult(0, 0, 0, null));
-    when(jiraClient.createIssue(any(JiraEntity.class))).thenReturn("created");
+    Issue foo = mock(Issue.class);
+    when(jiraClient.getIssues(anyString(), anyList(), anyString(), anyLong())).thenReturn(Arrays.asList(foo));
+    doNothing().when(jiraClient).reopenIssue(any(Issue.class));
+    doNothing().when(jiraClient).updateIssue(any(Issue.class), any(JiraEntity.class));
+    doNothing().when(jiraClient).addComment(any(Issue.class), anyString());
 
-    DetectionJiraAlerter jiraAlerter = new DetectionJiraAlerter(this.alertConfigDTO, this.thirdEyeConfig, notificationResults);
+    DetectionJiraAlerter jiraAlerter = new DetectionJiraAlerter(this.alertConfigDTO, this.thirdEyeConfig, notificationResults, jiraClient);
 
     // Executes successfully without errors
     jiraAlerter.run();

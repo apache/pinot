@@ -66,10 +66,10 @@ import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
  */
 @AlertFilter(type = "DIMENSIONS_ALERTER_PIPELINE")
 public class DimensionsRecipientAlertFilter extends StatefulDetectionAlertFilter {
-  protected static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
-  protected static final String PROP_DIMENSION = "dimensions";
-  protected static final String PROP_NOTIFY = "notify";
-  protected static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
+  public static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
+  public static final String PROP_DIMENSION = "dimensions";
+  public static final String PROP_NOTIFY = "notify";
+  public static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
   private static final String PROP_SEND_ONCE = "sendOnce";
 
   private Map<String, Object> defaultNotificationSchemeProps = new HashMap<>();
@@ -94,22 +94,25 @@ public class DimensionsRecipientAlertFilter extends StatefulDetectionAlertFilter
 
     Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds), minId);
 
+    // Prepare mapping from dimension-recipients to anomalies
     for (Map<String, Object> dimensionRecipient : this.dimensionRecipients) {
-      Map<String, String> dimensionFilters = ConfigUtils.getMap(dimensionRecipient.get(PROP_DIMENSION));
+      Multimap<String, String> dimensionFilters = ConfigUtils.getMultimap(dimensionRecipient.get(PROP_DIMENSION));
       Set<MergedAnomalyResultDTO> notifyAnomalies = new HashSet<>();
       for (MergedAnomalyResultDTO anomaly : anomalies) {
         Multimap<String, String> anamolousDims = MetricEntity.fromURN(anomaly.getMetricUrn()).getFilters();
-        if (anamolousDims.entries().containsAll(dimensionFilters.entrySet())) {
+        if (anamolousDims.entries().containsAll(dimensionFilters.entries())) {
           notifyAnomalies.add(anomaly);
         }
       }
 
       if (!notifyAnomalies.isEmpty()) {
-        result.addMapping(new DetectionAlertFilterNotification(ConfigUtils.getMap(dimensionRecipient.get(PROP_NOTIFY))),
+        result.addMapping(
+            new DetectionAlertFilterNotification(ConfigUtils.getMap(dimensionRecipient.get(PROP_NOTIFY)), dimensionFilters),
             notifyAnomalies);
       }
     }
 
+    // Notify the remaining anomalies to default recipients
     Set<MergedAnomalyResultDTO> notifiedAnomalies = new HashSet<>(result.getAllAnomalies());
     Set<MergedAnomalyResultDTO> defaultAnomalies = new HashSet<>();
     for (MergedAnomalyResultDTO anomaly : anomalies) {

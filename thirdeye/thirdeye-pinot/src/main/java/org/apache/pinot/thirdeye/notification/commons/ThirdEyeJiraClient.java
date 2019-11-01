@@ -23,7 +23,6 @@ import com.atlassian.jira.rest.client.api.JiraRestClient;
 import com.atlassian.jira.rest.client.api.domain.Comment;
 import com.atlassian.jira.rest.client.api.domain.Issue;
 import com.atlassian.jira.rest.client.api.domain.IssueFieldId;
-import com.atlassian.jira.rest.client.api.domain.SearchResult;
 import com.atlassian.jira.rest.client.api.domain.Transition;
 import com.atlassian.jira.rest.client.api.domain.input.FieldInput;
 import com.atlassian.jira.rest.client.api.domain.input.IssueInput;
@@ -32,7 +31,11 @@ import com.atlassian.jira.rest.client.api.domain.input.TransitionInput;
 import com.atlassian.jira.rest.client.internal.async.AsynchronousJiraRestClientFactory;
 import com.google.common.base.Joiner;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,10 +64,23 @@ public class ThirdEyeJiraClient {
   /**
    * Search for all the existing jira tickets based on the filters
    */
-  public SearchResult getIssue(String project, String summary, String reporter) {
-    LOG.info("Fetching Jira - project={}, reporter={}, labels=thirdeye, summary=\"{}\" ", project, reporter, summary);
-    return restClient.getSearchClient().searchJql("labels=thirdeye and reporter IN (" + reporter + ") and text~\""
-        + summary + "\" and project=" + project).claim();
+  public List<Issue> getIssues(String project, List<String> labels, String reporter, long lookBackMillis) {
+    List<Issue> issues = new ArrayList<>();
+    long lookBackDays = TimeUnit.MILLISECONDS.toDays(lookBackMillis);
+    String andQueryOnLabels = labels.stream()
+        .map(label -> "labels = \"" + label + "\"")
+        .collect(Collectors.joining(" and "));
+
+    StringBuilder jiraQuery = new StringBuilder();
+    jiraQuery.append("project=").append(project);
+    jiraQuery.append(" and ").append("reporter IN (").append(reporter).append(")");
+    jiraQuery.append(" and ").append(andQueryOnLabels);
+    jiraQuery.append(" and ").append("created>=").append("-").append(lookBackDays).append("d");
+
+    LOG.info("Fetching Jira tickets using query - {}", jiraQuery.toString());
+    Iterable<Issue> jiraIssuesIt = restClient.getSearchClient().searchJql(jiraQuery.toString()).claim().getIssues();
+    jiraIssuesIt.forEach(issues::add);
+    return issues;
   }
 
   /**

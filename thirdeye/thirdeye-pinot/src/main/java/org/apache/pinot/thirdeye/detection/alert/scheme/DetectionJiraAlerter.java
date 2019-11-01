@@ -27,8 +27,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
@@ -74,12 +74,18 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
   public static final String PROP_JIRA_SCHEME = "jiraScheme";
 
   public DetectionJiraAlerter(DetectionAlertConfigDTO subsConfig, ThirdEyeAnomalyConfiguration thirdeyeConfig,
-      DetectionAlertFilterResult result) throws Exception {
+      DetectionAlertFilterResult result, ThirdEyeJiraClient jiraClient) {
     super(subsConfig, result);
     this.teConfig = thirdeyeConfig;
 
     this.jiraAdminConfig = JiraConfiguration.createFromProperties(this.teConfig.getAlerterConfiguration().get(JIRA_CONFIG_KEY));
-    this.jiraClient = new ThirdEyeJiraClient(this.jiraAdminConfig);
+    this.jiraClient = jiraClient;
+  }
+
+  public DetectionJiraAlerter(DetectionAlertConfigDTO subsConfig, ThirdEyeAnomalyConfiguration thirdeyeConfig,
+      DetectionAlertFilterResult result) throws Exception {
+    this(subsConfig, thirdeyeConfig, result, new ThirdEyeJiraClient(JiraConfiguration
+        .createFromProperties(thirdeyeConfig.getAlerterConfiguration().get(JIRA_CONFIG_KEY))));
   }
 
   private void updateJiraAlert(Issue issue, JiraEntity jiraEntity) {
@@ -93,7 +99,8 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
     try {
       jiraClient.addComment(issue, jiraEntity.getDescription());
     } catch (Exception e) {
-      // Jira has a upper limit on the number of characters. In such cases we will only share a link in the comment.
+      // Jira has a upper limit on the number of characters in description. In such cases we will only
+      // share a link in the comment.
       StringBuilder sb = new StringBuilder();
       sb.append("*<Truncating details due to jira limit! Please use the below link to view all the anomalies.>*");
       sb.append(System.getProperty("line.separator"));
@@ -119,8 +126,9 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
     anomalyResultListOfGroup.sort(COMPARATOR_DESC);
 
     BaseNotificationContent content = super.buildNotificationContent(jiraClientConfig);
-    return new JiraContentFormatter(this.jiraAdminConfig, jiraClientConfig, content,
-        this.teConfig, subsConfig).getJiraEntity(anomalyResultListOfGroup);
+
+    return new JiraContentFormatter(this.jiraAdminConfig, jiraClientConfig, content, this.teConfig, subsConfig)
+        .getJiraEntity(notification.getDimensionFilters(), anomalyResultListOfGroup);
   }
 
   private void createJiraTickets(DetectionAlertFilterResult results) {
@@ -129,21 +137,18 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
     for (Map.Entry<DetectionAlertFilterNotification, Set<MergedAnomalyResultDTO>> result : results.getResult().entrySet()) {
       try {
         JiraEntity jiraEntity = buildJiraEntity(result.getKey(), result.getValue());
-        Iterable<Issue> issues = jiraClient.getIssue(jiraEntity.getJiraProject(), jiraEntity.getSummary(),
-            this.jiraAdminConfig.getJiraUser()).getIssues();
+        List<Issue> issues = jiraClient.getIssues(jiraEntity.getJiraProject(), jiraEntity.getLabels(),
+            this.jiraAdminConfig.getJiraUser(), jiraEntity.getMergeGap());
+        LOG.info("Fetched {} jira issues using project={}, reporter={}, labels IN (\"{}\"), created>=-{}d",
+            issues.size(), jiraEntity.getJiraProject(), this.jiraAdminConfig.getJiraUser(),
+            String.join(",", jiraEntity.getLabels()), TimeUnit.MILLISECONDS.toDays(jiraEntity.getMergeGap()));
 
-        Optional<Issue> latestJiraIssue = Optional.empty();
-        if (issues != null) {
-          latestJiraIssue = StreamSupport.stream(issues.spliterator(), false).max(
+        Optional<Issue> latestJiraIssue = issues.stream().max(
               (o1, o2) -> o2.getCreationDate().compareTo(o1.getCreationDate()));
-        }
 
-        String issueKey;
-        long lookBackTimestamp = System.currentTimeMillis() - jiraEntity.getMergeGap();
-        if (!latestJiraIssue.isPresent() ||
-            latestJiraIssue.get().getCreationDate().isBefore(lookBackTimestamp)) {
+        if (!latestJiraIssue.isPresent()) {
           // No existing ticket found. Create a new jira ticket
-          issueKey = jiraClient.createIssue(jiraEntity);
+          String issueKey = jiraClient.createIssue(jiraEntity);
           LOG.info("Jira created {}, anomalies reported {}", issueKey, result.getValue().size());
         } else {
           // Reopen recent existing ticket and add a comment

@@ -149,6 +149,7 @@ public class TestMetricAnomaliesContent {
     anomaly.setDetectionConfigId(detectionConfigDTO.getId());
     anomaly.setAvgCurrentVal(1.1);
     anomaly.setAvgBaselineVal(1.0);
+    anomaly.setMetricUrn("thirdeye:metric:1");
     mergedAnomalyResultDAO.save(anomaly);
     anomalies.add(anomaly);
     anomaly = DaoTestUtils.getTestMergedAnomalyResult(
@@ -158,6 +159,7 @@ public class TestMetricAnomaliesContent {
     anomaly.setDetectionConfigId(detectionConfigDTO.getId());
     anomaly.setAvgCurrentVal(0.9);
     anomaly.setAvgBaselineVal(1.0);
+    anomaly.setMetricUrn("thirdeye:metric:2");
     mergedAnomalyResultDAO.save(anomaly);
     anomalies.add(anomaly);
 

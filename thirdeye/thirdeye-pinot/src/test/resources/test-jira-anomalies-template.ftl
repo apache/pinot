@@ -8,7 +8,7 @@ ThirdEye has detected [<strong>an anomaly</strong>|test/app/#/anomalies?anomalyI
 *Description:*
 
 ||Start||Duration||Dimensions||Current||Predicted||Change||
-|[Dec 31, 16:00 PDT|test/app/#/rootcause?anomalyId=4]|0.00028 hours|-|_0_|_0_|_+100.00 %_|
+|[Dec 31, 16:00 PDT|test/app/#/rootcause?anomalyId=4]|0.00028 hours|key:value\\|_0_|_0_|_+100.00 %_|
 
 =======================================================================================
 
@@ -17,4 +17,4 @@ ThirdEye has detected [<strong>an anomaly</strong>|test/app/#/anomalies?anomalyI
 
 =======================================================================================
 
-_You are receiving this alert because you have subscribed to ThirdEye Alert Service for *alert_name*. If you have any questions regarding this report, please email ask_thirdeye@linkedin.com_
+_You are receiving this alert because you have subscribed to ThirdEye Alert Service for *alert_name1*. If you have any questions regarding this report, please email ask_thirdeye@linkedin.com_
