@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import java.io.File;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.slf4j.Logger;
 
@@ -33,16 +34,18 @@ public class SplitSegmentCommitter implements SegmentCommitter {
   private ServerSegmentCompletionProtocolHandler _protocolHandler;
   private SegmentCompletionProtocol.Response _prevResponse;
   private boolean _isEnableSplitCommitWithMetadata;
+  private IndexLoadingConfig _indexLoadingConfig;
 
   private Logger _segmentLogger;
 
-  public SplitSegmentCommitter(SegmentCompletionProtocol.Request.Params params, ServerSegmentCompletionProtocolHandler protocolHandler, SegmentCompletionProtocol.Response prevResponse, boolean isEnableSplitCommitWithMetadata, Logger segmentLogger) {
-    _params = params;
-    _protocolHandler = protocolHandler;
-    _prevResponse = prevResponse;
-    _isEnableSplitCommitWithMetadata = isEnableSplitCommitWithMetadata;
-
+  public SplitSegmentCommitter init(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
+      IndexLoadingConfig indexLoadingConfig, SegmentCompletionProtocol.Request.Params params, SegmentCompletionProtocol.Response prevResponse) {
     _segmentLogger = segmentLogger;
+    _protocolHandler = protocolHandler;
+    _indexLoadingConfig = indexLoadingConfig;
+    _params = params;
+    _prevResponse = prevResponse;
+    return this;
   }
 
   @Override

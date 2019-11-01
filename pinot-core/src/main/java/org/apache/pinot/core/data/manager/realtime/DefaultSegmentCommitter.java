@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import java.io.File;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.slf4j.Logger;
 
@@ -31,14 +32,21 @@ import org.slf4j.Logger;
 public class DefaultSegmentCommitter implements SegmentCommitter{
   private SegmentCompletionProtocol.Request.Params _params;
   private ServerSegmentCompletionProtocolHandler _protocolHandler;
+  private IndexLoadingConfig _indexLoadingConfig;
 
   private Logger _segmentLogger;
 
-  public DefaultSegmentCommitter(SegmentCompletionProtocol.Request.Params params, ServerSegmentCompletionProtocolHandler protocolHandler, Logger segmentLogger) {
-    _params = params;
-    _protocolHandler = protocolHandler;
-
+  public DefaultSegmentCommitter init(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
+      IndexLoadingConfig indexLoadingConfig, SegmentCompletionProtocol.Request.Params params, SegmentCompletionProtocol.Response prevResponse) {
     _segmentLogger = segmentLogger;
+    _protocolHandler = protocolHandler;
+    _indexLoadingConfig = indexLoadingConfig;
+    _params = params;
+    return this;
+  }
+
+  public DefaultSegmentCommitter() {
+
   }
 
   @Override

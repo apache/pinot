@@ -342,6 +342,7 @@ public class CommonConstants {
       }
 
       public static final String STATUS = "segment.realtime.status";
+      public static final String COMMITTER_CLASS = "segment.committer.class";
     }
 
     public static class Offline {

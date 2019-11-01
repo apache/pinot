@@ -33,6 +33,8 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.CompletionConfig;
@@ -49,6 +51,7 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.NetUtil;
@@ -792,13 +795,24 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
 
+    Configuration config = new PropertiesConfiguration();
+
     if (isSplitCommit) {
-      SplitSegmentCommitter splitSegmentCommitter = new SplitSegmentCommitter(params, _protocolHandler, response, _indexLoadingConfig.isEnableSplitCommitEndWithMetadata(), segmentLogger);
-      return splitSegmentCommitter.commit(_currentOffset, _numRowsConsumed, _segmentBuildDescriptor);
+      try {
+        config.setProperty(CommonConstants.Segment.Realtime.COMMITTER_CLASS, SplitSegmentCommitter.class.getName());
+      } catch (Exception e) {
+        throw new RuntimeException("Could not create configuration");
+      }
     } else {
-      DefaultSegmentCommitter defaultSegmentCommitter = new DefaultSegmentCommitter(params, _protocolHandler, segmentLogger);
-      return defaultSegmentCommitter.commit(_currentOffset, _numRowsConsumed, _segmentBuildDescriptor);
+      try {
+        config.setProperty(CommonConstants.Segment.Realtime.COMMITTER_CLASS, DefaultSegmentCommitter.class.getName());
+      } catch (Exception e) {
+        throw new RuntimeException("Could not create configuration");
+      }
     }
+    SegmentCommitterFactory.init(config);
+    SegmentCommitter segmentCommitter = SegmentCommitterFactory.create(segmentLogger, _protocolHandler, _indexLoadingConfig, params, response);
+    return segmentCommitter.commit(_currentOffset, _numRowsConsumed, _segmentBuildDescriptor);
   }
 
   protected boolean buildSegmentAndReplace() {

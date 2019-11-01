@@ -19,11 +19,33 @@
 package org.apache.pinot.core.data.manager.realtime;
 
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.slf4j.Logger;
 
 
 /**
  * For committing realtime segments.
  */
 public interface SegmentCommitter {
+  /**
+   * Initializes a committer object
+   * @param segmentLogger
+   * @param protocolHandler
+   * @param indexLoadingConfig
+   * @param params
+   * @param prevResponse
+   * @return
+   */
+  SegmentCommitter init(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
+      IndexLoadingConfig indexLoadingConfig, SegmentCompletionProtocol.Request.Params params, SegmentCompletionProtocol.Response prevResponse);
+
+  /**
+   * Commits a realtime segment
+   * @param currentOffset current offset
+   * @param numRows num rows committing
+   * @param segmentBuildDescriptor object that describes segment to be committed
+   * @return
+   */
   SegmentCompletionProtocol.Response commit(long currentOffset, int numRows, LLRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor);
 }
