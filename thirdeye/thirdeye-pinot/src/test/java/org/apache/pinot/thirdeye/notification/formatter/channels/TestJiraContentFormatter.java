@@ -257,7 +257,7 @@ public class TestJiraContentFormatter {
 
     BaseNotificationContent content = DetectionAlertScheme.buildNotificationContent(jiraClientConfig);
     JiraContentFormatter jiraContent = new JiraContentFormatter(
-        JiraConfiguration.createFromProperties(jiraConfiguration), jiraClientConfig, content, teConfig, this.alertConfigDTO);
+        JiraConfiguration.createFromProperties(jiraConfiguration), jiraClientConfig, content, teConfig, this.alertConfigDimAlerter);
 
     Multimap<String, String> dimensionKeys1 = ArrayListMultimap.create();
     dimensionKeys1.put("key", "value");

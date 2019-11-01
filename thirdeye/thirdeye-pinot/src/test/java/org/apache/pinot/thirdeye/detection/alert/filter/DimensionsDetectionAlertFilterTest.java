@@ -107,9 +107,9 @@ public class DimensionsDetectionAlertFilterTest {
     PROP_ID_VALUE.add(detectionId2);
 
     Map<String, Object> dimensionRecipient1 = new HashMap<>();
-    Map<String, Object> dimensionKeys1 = new HashMap<>();
+    Multimap<String, String> dimensionKeys1 = ArrayListMultimap.create();
     dimensionKeys1.put("key", "value");
-    dimensionRecipient1.put(PROP_DIMENSION, dimensionKeys1);
+    dimensionRecipient1.put(PROP_DIMENSION, dimensionKeys1.asMap());
     Map<String, Object> notificationValues1 = new HashMap<>();
     Map<String, Object> notificationEmailParams1 = new HashMap<>();
     Map<String, Object> recipients1 = new HashMap<>();
@@ -121,10 +121,10 @@ public class DimensionsDetectionAlertFilterTest {
     dimensionRecipient1.put(PROP_NOTIFY, notificationValues1);
 
     Map<String, Object> dimensionRecipient2 = new HashMap<>();
-    Map<String, Object> dimensionKeys2 = new HashMap<>();
+    Multimap<String, String> dimensionKeys2 = ArrayListMultimap.create();
     dimensionKeys2.put("key1", "anotherValue1");
     dimensionKeys2.put("key2", "anotherValue2");
-    dimensionRecipient2.put(PROP_DIMENSION, dimensionKeys2);
+    dimensionRecipient2.put(PROP_DIMENSION, dimensionKeys2.asMap());
     Map<String, Object> notificationValues2 = new HashMap<>();
     Map<String, Object> notificationEmailParams2 = new HashMap<>();
     Map<String, Object> recipients2 = new HashMap<>();
