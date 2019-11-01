@@ -163,11 +163,8 @@ public class YamlResource {
     this.executor = Executors.newFixedThreadPool(previewConfig.getParallelism());
     this.previewTimeout = previewConfig.getTimeout();
 
-    TimeSeriesCache timeSeriesCache =
-        new DefaultTimeSeriesCache(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(), new CouchbaseCacheDAO());
-
     TimeSeriesLoader timeseriesLoader =
-        new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(), timeSeriesCache);
+        new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getTimeSeriesCache());
 
     AggregationLoader aggregationLoader =
         new DefaultAggregationLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(),

@@ -1,3 +1,22 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 package org.apache.pinot.thirdeye.detection.cache;
 
 import java.util.ArrayList;
@@ -17,7 +36,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-public class ThirdEyeCacheResponseTests {
+public class ThirdEyeCacheResponseTest {
 
   private static final String COLLECTION = "collection";
   private static final MetricDataset METRIC = new MetricDataset("metric", COLLECTION);
@@ -52,14 +71,14 @@ public class ThirdEyeCacheResponseTests {
   }
 
   @Test
-  public void testHasNoRowsWithRows() {
-    rows.add(new TimeSeriesDataPoint(metricUrn, 2000, metricFunction.getMetricId(), "123"));
-    Assert.assertFalse(cacheResponse.hasNoRows());
+  public void testHasNoRowsWithoutRows() {
+    Assert.assertTrue(cacheResponse.hasNoRows());
   }
 
   @Test
-  public void testHasNoRowsWithoutRows() {
-    Assert.assertTrue(cacheResponse.hasNoRows());
+  public void testHasNoRowsWithRows() {
+    rows.add(new TimeSeriesDataPoint(metricUrn, 2000, metricFunction.getMetricId(), "123"));
+    Assert.assertFalse(cacheResponse.hasNoRows());
   }
 
   /**
@@ -80,6 +99,8 @@ public class ThirdEyeCacheResponseTests {
     TimeSeriesDataPoint endDataPoint = new TimeSeriesDataPoint(metricUrn, 20000, metricFunction.getMetricId(), "321");
     rows.add(startDataPoint);
     rows.add(endDataPoint);
+    cacheResponse.setFirstTimestamp(startDataPoint.getTimestamp());
+    cacheResponse.setLastTimestamp(endDataPoint.getTimestamp());
 
     Assert.assertTrue(cacheResponse.isMissingSlice(request.getStartTimeInclusive().getMillis(), request.getEndTimeExclusive().getMillis()));
   }
@@ -90,6 +111,8 @@ public class ThirdEyeCacheResponseTests {
     TimeSeriesDataPoint endDataPoint = new TimeSeriesDataPoint(metricUrn, 20000, metricFunction.getMetricId(), "321");
     rows.add(startDataPoint);
     rows.add(endDataPoint);
+    cacheResponse.setFirstTimestamp(startDataPoint.getTimestamp());
+    cacheResponse.setLastTimestamp(endDataPoint.getTimestamp());
 
     Assert.assertFalse(cacheResponse.isMissingSlice(request.getStartTimeInclusive().getMillis(), request.getEndTimeExclusive().getMillis()));
   }
@@ -101,6 +124,8 @@ public class ThirdEyeCacheResponseTests {
     TimeSeriesDataPoint endDataPoint = new TimeSeriesDataPoint(metricUrn, 20000, metricFunction.getMetricId(), "321");
     rows.add(startDataPoint);
     rows.add(endDataPoint);
+    cacheResponse.setFirstTimestamp(startDataPoint.getTimestamp());
+    cacheResponse.setLastTimestamp(endDataPoint.getTimestamp());
 
     Assert.assertFalse(cacheResponse.isMissingSlice(request.getStartTimeInclusive().getMillis(), request.getEndTimeExclusive().getMillis()));
   }
@@ -111,6 +136,8 @@ public class ThirdEyeCacheResponseTests {
     TimeSeriesDataPoint endDataPoint = new TimeSeriesDataPoint(metricUrn, 18000, metricFunction.getMetricId(), "321");
     rows.add(startDataPoint);
     rows.add(endDataPoint);
+    cacheResponse.setFirstTimestamp(startDataPoint.getTimestamp());
+    cacheResponse.setLastTimestamp(endDataPoint.getTimestamp());
 
     Assert.assertTrue(cacheResponse.isMissingSlice(request.getStartTimeInclusive().getMillis(), request.getEndTimeExclusive().getMillis()));
   }
@@ -121,6 +148,8 @@ public class ThirdEyeCacheResponseTests {
     TimeSeriesDataPoint endDataPoint = new TimeSeriesDataPoint(metricUrn, 20000, metricFunction.getMetricId(), "321");
     rows.add(startDataPoint);
     rows.add(endDataPoint);
+    cacheResponse.setFirstTimestamp(startDataPoint.getTimestamp());
+    cacheResponse.setLastTimestamp(endDataPoint.getTimestamp());
 
     Assert.assertFalse(cacheResponse.isMissingSlice(request.getStartTimeInclusive().getMillis(), request.getEndTimeExclusive().getMillis()));
   }
@@ -131,6 +160,8 @@ public class ThirdEyeCacheResponseTests {
     TimeSeriesDataPoint endDataPoint = new TimeSeriesDataPoint(metricUrn, 19500, metricFunction.getMetricId(), "321");
     rows.add(startDataPoint);
     rows.add(endDataPoint);
+    cacheResponse.setFirstTimestamp(startDataPoint.getTimestamp());
+    cacheResponse.setLastTimestamp(endDataPoint.getTimestamp());
 
     Assert.assertFalse(cacheResponse.isMissingSlice(request.getStartTimeInclusive().getMillis(), request.getEndTimeExclusive().getMillis()));
   }
@@ -139,6 +170,8 @@ public class ThirdEyeCacheResponseTests {
   public void testIsMissingSliceWithMissingStartAndEndSlices() {
     TimeSeriesDataPoint dp = new TimeSeriesDataPoint(metricUrn, 10000, metricFunction.getMetricId(), "123");
     rows.add(dp);
+    cacheResponse.setFirstTimestamp(dp.getTimestamp());
+    cacheResponse.setLastTimestamp(dp.getTimestamp());
 
     Assert.assertTrue(cacheResponse.isMissingSlice(request.getStartTimeInclusive().getMillis(), request.getEndTimeExclusive().getMillis()));
   }
@@ -149,6 +182,8 @@ public class ThirdEyeCacheResponseTests {
     TimeSeriesDataPoint endDataPoint = new TimeSeriesDataPoint(metricUrn, 25000, metricFunction.getMetricId(), "321");
     rows.add(startDataPoint);
     rows.add(endDataPoint);
+    cacheResponse.setFirstTimestamp(startDataPoint.getTimestamp());
+    cacheResponse.setLastTimestamp(endDataPoint.getTimestamp());
 
     Assert.assertFalse(cacheResponse.isMissingSlice(request.getStartTimeInclusive().getMillis(), request.getEndTimeExclusive().getMillis()));
   }
@@ -159,6 +194,8 @@ public class ThirdEyeCacheResponseTests {
     TimeSeriesDataPoint endDataPoint = new TimeSeriesDataPoint(metricUrn, 19500, metricFunction.getMetricId(), "321");
     rows.add(startDataPoint);
     rows.add(endDataPoint);
+    cacheResponse.setFirstTimestamp(startDataPoint.getTimestamp());
+    cacheResponse.setLastTimestamp(endDataPoint.getTimestamp());
 
     Assert.assertFalse(cacheResponse.isMissingSlice(request.getStartTimeInclusive().getMillis(), request.getEndTimeExclusive().getMillis()));
   }
@@ -176,6 +213,8 @@ public class ThirdEyeCacheResponseTests {
   public void testIsMissingStartSliceWithMissingStartSlice() {
     TimeSeriesDataPoint startDataPoint = new TimeSeriesDataPoint(metricUrn, 2000, metricFunction.getMetricId(), "123");
     rows.add(startDataPoint);
+    cacheResponse.setFirstTimestamp(startDataPoint.getTimestamp());
+    cacheResponse.setLastTimestamp(startDataPoint.getTimestamp());
 
     Assert.assertTrue(cacheResponse.isMissingStartSlice(request.getStartTimeInclusive().getMillis()));
   }
@@ -184,6 +223,8 @@ public class ThirdEyeCacheResponseTests {
   public void testIsMissingStartSliceWithoutMissingStartSlice() {
     TimeSeriesDataPoint startDataPoint = new TimeSeriesDataPoint(metricUrn, 1000, metricFunction.getMetricId(), "123");
     rows.add(startDataPoint);
+    cacheResponse.setFirstTimestamp(startDataPoint.getTimestamp());
+    cacheResponse.setLastTimestamp(startDataPoint.getTimestamp());
 
     Assert.assertFalse(cacheResponse.isMissingStartSlice(request.getStartTimeInclusive().getMillis()));
   }
@@ -192,6 +233,8 @@ public class ThirdEyeCacheResponseTests {
   public void testIsMissingStartSliceWithExactStartSlice() {
     TimeSeriesDataPoint startDataPoint = new TimeSeriesDataPoint(metricUrn, 1000, metricFunction.getMetricId(), "123");
     rows.add(startDataPoint);
+    cacheResponse.setFirstTimestamp(startDataPoint.getTimestamp());
+    cacheResponse.setLastTimestamp(startDataPoint.getTimestamp());
 
     Assert.assertFalse(cacheResponse.isMissingStartSlice(request.getStartTimeInclusive().getMillis()));
   }
@@ -200,6 +243,8 @@ public class ThirdEyeCacheResponseTests {
   public void testIsMissingStartSliceWithMisalignedStart() {
     TimeSeriesDataPoint startDataPoint = new TimeSeriesDataPoint(metricUrn, 1099, metricFunction.getMetricId(), "123");
     rows.add(startDataPoint);
+    cacheResponse.setFirstTimestamp(startDataPoint.getTimestamp());
+    cacheResponse.setLastTimestamp(startDataPoint.getTimestamp());
 
     Assert.assertFalse(cacheResponse.isMissingStartSlice(request.getStartTimeInclusive().getMillis()));
   }
@@ -218,6 +263,8 @@ public class ThirdEyeCacheResponseTests {
   public void testIsMissingEndSliceWithMissingEndSlice() {
     TimeSeriesDataPoint endDataPoint = new TimeSeriesDataPoint(metricUrn, 10000, metricFunction.getMetricId(), "123");
     rows.add(endDataPoint);
+    cacheResponse.setFirstTimestamp(endDataPoint.getTimestamp());
+    cacheResponse.setLastTimestamp(endDataPoint.getTimestamp());
 
     Assert.assertTrue(cacheResponse.isMissingEndSlice(request.getEndTimeExclusive().getMillis()));
   }
@@ -226,6 +273,8 @@ public class ThirdEyeCacheResponseTests {
   public void testIsMissingEndSliceWithoutMissingEndSlice() {
     TimeSeriesDataPoint endDataPoint = new TimeSeriesDataPoint(metricUrn, 19000, metricFunction.getMetricId(), "123");
     rows.add(endDataPoint);
+    cacheResponse.setFirstTimestamp(endDataPoint.getTimestamp());
+    cacheResponse.setLastTimestamp(endDataPoint.getTimestamp());
 
     Assert.assertFalse(cacheResponse.isMissingEndSlice(request.getEndTimeExclusive().getMillis()));
   }
@@ -234,6 +283,8 @@ public class ThirdEyeCacheResponseTests {
   public void testIsMissingEndSliceWithExactEndSlice() {
     TimeSeriesDataPoint endDataPoint = new TimeSeriesDataPoint(metricUrn, 20000, metricFunction.getMetricId(), "123");
     rows.add(endDataPoint);
+    cacheResponse.setFirstTimestamp(endDataPoint.getTimestamp());
+    cacheResponse.setLastTimestamp(endDataPoint.getTimestamp());
 
     Assert.assertFalse(cacheResponse.isMissingEndSlice(request.getEndTimeExclusive().getMillis()));
   }
@@ -242,6 +293,8 @@ public class ThirdEyeCacheResponseTests {
   public void testIsMissingStartSliceWithMisalignedEnd() {
     TimeSeriesDataPoint endDataPoint = new TimeSeriesDataPoint(metricUrn, 19999, metricFunction.getMetricId(), "123");
     rows.add(endDataPoint);
+    cacheResponse.setFirstTimestamp(endDataPoint.getTimestamp());
+    cacheResponse.setLastTimestamp(endDataPoint.getTimestamp());
 
     Assert.assertFalse(cacheResponse.isMissingEndSlice(request.getEndTimeExclusive().getMillis()));
   }
@@ -249,39 +302,6 @@ public class ThirdEyeCacheResponseTests {
   /**
    * ThirdEyeCacheResponse.mergeSliceIntoRows() tests
    */
-
-  @Test
-  public void testMergeSliceIntoRowsPrepend() {
-
-    List<String[]> newRows = new ArrayList<>();
-
-    for (int i = 0; i < 10; i++) {
-      String[] rawTimeSeriesDataPoint = new String[3];
-      rawTimeSeriesDataPoint[0] = String.valueOf(i);
-      rawTimeSeriesDataPoint[1] = String.valueOf(i);
-      rawTimeSeriesDataPoint[2] = String.valueOf(i * 1000);
-      newRows.add(rawTimeSeriesDataPoint);
-    }
-
-    for (int i = 10; i < 20; i++) {
-      TimeSeriesDataPoint dataPoint = new TimeSeriesDataPoint(metricUrn, i * 1000, metricFunction.getMetricId(), String.valueOf(i));
-      rows.add(dataPoint);
-    }
-
-    cacheResponse.mergeSliceIntoRows(new RelationalThirdEyeResponse(request, newRows, timeSpec), MergeSliceType.PREPEND);
-
-    Assert.assertEquals(cacheResponse.getNumRows(), 20);
-
-    List<TimeSeriesDataPoint> resultRows = cacheResponse.getRows();
-
-    for (int i = 0; i < 20; i++) {
-      TimeSeriesDataPoint dp = resultRows.get(i);
-      Assert.assertEquals(dp.getMetricId(), metricFunction.getMetricId().longValue());
-      Assert.assertEquals(dp.getMetricUrn(), metricUrn);
-      Assert.assertEquals(dp.getTimestamp(), i * 1000);
-      Assert.assertEquals(dp.getDataValue(), String.valueOf(i));
-    }
-  }
 
   @Test
   public void testMergeSliceIntoRowsAppend() {
@@ -300,7 +320,7 @@ public class ThirdEyeCacheResponseTests {
       newRows.add(rawTimeSeriesDataPoint);
     }
 
-    cacheResponse.mergeSliceIntoRows(new RelationalThirdEyeResponse(request, newRows, timeSpec), MergeSliceType.APPEND);
+    cacheResponse.mergeSliceIntoRows(new RelationalThirdEyeResponse(request, newRows, timeSpec));
 
     Assert.assertEquals(cacheResponse.getNumRows(), 20);
 

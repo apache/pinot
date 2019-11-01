@@ -24,12 +24,19 @@ import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.CacheUtils;
 
 
+/**
+ * Class used to hold data needed to make a request to centralized cache.
+ * Can be derived from ThirdEyeRequest, but it's meant to save some developer
+ * effort and abstract away some of the code that needs to be written.
+ */
 public class ThirdEyeCacheRequest {
+
   ThirdEyeRequest request;
   private long metricId;
   private String metricUrn;
   private long startTimeInclusive;
   private long endTimeExclusive;
+  private String dimensionKey;
 
   public ThirdEyeCacheRequest(ThirdEyeRequest request, long metricId, String metricUrn, long startTimeInclusive, long endTimeExclusive) {
     this.request = request;
@@ -37,8 +44,15 @@ public class ThirdEyeCacheRequest {
     this.metricUrn = metricUrn;
     this.startTimeInclusive = startTimeInclusive;
     this.endTimeExclusive = endTimeExclusive;
+
+    this.dimensionKey = CacheUtils.hashMetricUrn(metricUrn);
   }
 
+  /**
+   * shorthand to create a ThirdEyeCacheRequest from a ThirdEyeRequest
+   * @param request ThirdEyeRequest
+   * @return ThirdEyeCacheRequest
+   */
   public static ThirdEyeCacheRequest from(ThirdEyeRequest request) {
 
     long metricId = request.getMetricFunctions().get(0).getMetricId();
@@ -60,6 +74,6 @@ public class ThirdEyeCacheRequest {
   public long getEndTimeExclusive() { return endTimeExclusive; }
 
   public String getDimensionKey() {
-    return CacheUtils.hashMetricUrn(metricUrn);
+    return dimensionKey;
   }
 }

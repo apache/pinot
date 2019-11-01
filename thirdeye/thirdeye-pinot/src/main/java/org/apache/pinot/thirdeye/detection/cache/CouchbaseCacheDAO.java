@@ -35,6 +35,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * DAO class used to fetch data from Couchbase.
+ */
+
 public class CouchbaseCacheDAO {
 
   private static final Logger LOG = LoggerFactory.getLogger(CouchbaseCacheDAO.class);
@@ -42,16 +46,41 @@ public class CouchbaseCacheDAO {
   private Bucket bucket;
 
   public CouchbaseCacheDAO() {
-    this.createDataStoreConnection();
-  }
-
-  private void createDataStoreConnection() {
     if (CacheConfig.useCentralizedCache()) {
-      Cluster cluster = CouchbaseCluster.create();
-      cluster.authenticate(CacheConfig.COUCHBASE_AUTH_USERNAME, CacheConfig.COUCHBASE_AUTH_PASSWORD);
-      this.bucket = cluster.openBucket(CacheConfig.COUCHBASE_BUCKET_NAME);
+      this.createDataStoreConnection();
     }
   }
+
+  /**
+   * Initialize connection to Couchbase and open bucket where data is stored.
+   */
+  private void createDataStoreConnection() {
+    Cluster cluster = CouchbaseCluster.create();
+    cluster.authenticate(CacheConfig.COUCHBASE_AUTH_USERNAME, CacheConfig.COUCHBASE_AUTH_PASSWORD);
+    this.bucket = cluster.openBucket(CacheConfig.COUCHBASE_BUCKET_NAME);
+  }
+
+  /**
+   * Fetches time-series data from cache. Formats it into a list of TimeSeriesDataPoints before
+   * returning. The raw results will look something like this:
+   * {
+   *   {
+   *     "time": 1000,
+   *     "123456": "30.0"
+   *   },
+   *   {
+   *     "time": 2000,
+   *     "123456": "893.0"
+   *   },
+   *   {
+   *     "time": 3000,
+   *     "123456": "900.6"
+   *   }
+   * }
+   * @param request ThirdEyeCacheRequest. Wrapper for ThirdEyeRequest.
+   * @return list of TimeSeriesDataPoint
+   * @throws Exception if query threw an error
+   */
 
   // NOTE: this will be slow unless indexes are created on "time" and "metricId".
   public ThirdEyeCacheResponse tryFetchExistingTimeSeries(ThirdEyeCacheRequest request) throws Exception {
@@ -73,6 +102,11 @@ public class CouchbaseCacheDAO {
 
     if (!queryResult.finalSuccess()) {
       LOG.error("cache error occurred for window startTime = {} to endTime = {}", request.getStartTimeInclusive(), request.getEndTimeExclusive());
+
+      for (JsonObject error : queryResult.errors()) {
+        LOG.error(error.getString("msg"));
+      }
+
       ThirdeyeMetricsUtil.couchbaseExceptionCounter.inc();
       throw new Exception("query to Couchbase failed");
     }
@@ -88,6 +122,19 @@ public class CouchbaseCacheDAO {
     return new ThirdEyeCacheResponse(request, timeSeriesRows);
   }
 
+  /**
+   * Insert a TimeSeriesDataPoint into Couchbase. If a document for this data point already
+   * exists within Couchbase and the data value for the metricURN already exists in the cache,
+   * we don't do anything. An example document generated and inserted for this might look like:
+   * {
+   *   "time": 123456700000
+   *   "metricId": 123456,
+   *   "61427020": "3.0",
+   *   "83958352": "59.6",
+   *   "98648743": "0.0"
+   * }
+   * @param point data point
+   */
   public void insertTimeSeriesDataPoint(TimeSeriesDataPoint point) {
 
     JsonDocument doc = bucket.getAndTouch(point.getDocumentKey(), CacheConfig.TTL);
@@ -102,8 +149,7 @@ public class CouchbaseCacheDAO {
         return;
       }
 
-      dimensions.put(point.getMetricUrnHash(),
-          (point.getDataValue() == null || point.getDataValue().equals("null")) ? "0" : point.getDataValue());
+      dimensions.put(point.getMetricUrnHash(), point.getDataValue());
     }
 
     bucket.upsert(doc);

@@ -97,9 +97,6 @@ public class ThirdEyeCacheRegistry {
 
   public static void initCentralizedCache() {
     try {
-      // I couldn't figure out how to register the CouchbaseCacheDAO in the DAO registry, so just going to
-      // hardcode it in for now...
-
       if (INSTANCE.getTimeSeriesCache() == null) {
         TimeSeriesCache timeSeriesCache = new DefaultTimeSeriesCache(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
             ThirdEyeCacheRegistry.getInstance().getQueryCache(), new CouchbaseCacheDAO());

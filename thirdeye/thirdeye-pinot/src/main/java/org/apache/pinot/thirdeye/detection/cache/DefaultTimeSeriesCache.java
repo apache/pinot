@@ -45,6 +45,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Default implementation of TimeSeriesCache, which is used to attempt fetching
+ * data from centralized cache as an alternative to directly fetching from the
+ * data source each time.
+ */
+
 public class DefaultTimeSeriesCache implements TimeSeriesCache {
 
   private static final Logger LOG = LoggerFactory.getLogger(DefaultTimeSeriesCache.class);
@@ -61,8 +67,15 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
     this.cacheDAO = cacheDAO;
   }
 
+  /**
+   * Given a ThirdEyeRequest object, builds the CacheRequest object and attempts to fetch data
+   * from the cache. If the requested slice of data is not in the cache or is only partially in
+   * the cache, will fetch the missing slices and build the complete timeseries.
+   * @param thirdEyeRequest ThirdEyeRequest built from aligned metricSlice request.
+   * @return ThirdEyeResponse, the full response for the request
+   * @throws Exception if fetch from original data source was not successful.
+   */
   public ThirdEyeResponse fetchTimeSeries(ThirdEyeRequest thirdEyeRequest) throws Exception {
-    //LOG.info("trying to fetch data from cache...");
 
     if (!CacheConfig.useCentralizedCache()) {
       return this.queryCache.getQueryResult(thirdEyeRequest);
@@ -80,7 +93,12 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
     return buildThirdEyeResponseFromCacheResponse(cacheResponse);
   }
 
-  // fetches missing time-series slices and merges them into the cacheResponse object.
+  /**
+   * Used if cache had partial or no data for the requested time slice. Checks for which
+   * slices are missing and fetches them, then adds them to the response.
+   * @param cacheResponse cache response object
+   * @throws Exception if fetch to data source throws error.
+   */
   private void fetchMissingSlices(ThirdEyeCacheResponse cacheResponse) throws Exception {
 
     ThirdEyeRequest request = cacheResponse.getCacheRequest().getRequest();
@@ -92,16 +110,16 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
     MetricSlice slice;
 
     if (cacheResponse.hasNoRows()) {
-      ThirdEyeResponse response = this.queryCache.getQueryResult(cacheResponse.getCacheRequest().getRequest());
-      insertTimeSeriesIntoCache(response);
-      cacheResponse.mergeSliceIntoRows(response, MergeSliceType.APPEND);
+      result = this.queryCache.getQueryResult(cacheResponse.getCacheRequest().getRequest());
+      insertTimeSeriesIntoCache(result);
+      cacheResponse.mergeSliceIntoRows(result);
     }
 
     if (cacheResponse.isMissingStartSlice(requestSliceStart)) {
       slice = MetricSlice.from(metricId, requestSliceStart, cacheResponse.getFirstTimestamp(), request.getFilterSet(), request.getGroupByTimeGranularity());
       result = fetchSliceFromSource(slice);
       insertTimeSeriesIntoCache(result);
-      cacheResponse.mergeSliceIntoRows(result, MergeSliceType.PREPEND);
+      cacheResponse.mergeSliceIntoRows(result);
     }
 
     if (cacheResponse.isMissingEndSlice(requestSliceEnd)) {
@@ -109,15 +127,26 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
       slice = MetricSlice.from(metricId, cacheResponse.getLastTimestamp() + request.getGroupByTimeGranularity().toMillis(), requestSliceEnd, request.getFilterSet(), request.getGroupByTimeGranularity());
       result = fetchSliceFromSource(slice);
       insertTimeSeriesIntoCache(result);
-      cacheResponse.mergeSliceIntoRows(result, MergeSliceType.APPEND);
+      cacheResponse.mergeSliceIntoRows(result);
     }
   }
 
+  /**
+   * Shorthand to call queryCache to fetch data from the data source.
+   * @param slice MetricSlice used to build ThirdEyeRequest object for queryCache to load data
+   * @return ThirdEyeResponse, the data for the given slice
+   * @throws Exception if fetching from data source had an exception somewhere
+   */
   private ThirdEyeResponse fetchSliceFromSource(MetricSlice slice) throws Exception {
     TimeSeriesRequestContainer rc = DataFrameUtils.makeTimeSeriesRequestAligned(slice, "ref", this.metricDAO, this.datasetDAO);
     return this.queryCache.getQueryResult(rc.getRequest());
   }
 
+  /**
+   * Parses cache response object and builds a ThirdEyeResponse object from it.
+   * @param cacheResponse cache response
+   * @return ThirdEyeResponse object
+   */
   private ThirdEyeResponse buildThirdEyeResponseFromCacheResponse(ThirdEyeCacheResponse cacheResponse) {
 
     List<String[]> rows = new ArrayList<>();
@@ -131,11 +160,10 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
     for (TimeSeriesDataPoint dataPoint : cacheResponse.getRows()) {
       int timeBucketIndex = TimeRangeUtils.computeBucketIndex(
           request.getGroupByTimeGranularity(), request.getStartTimeInclusive(), new DateTime(dataPoint.getTimestamp(), timeZone));
-      String dataValue = dataPoint.getDataValue();
 
       String[] row = new String[2];
       row[0] = String.valueOf(timeBucketIndex);
-      row[1] = (dataValue == null || dataValue.equals("null")) ? "0" : dataValue;
+      row[1] = dataPoint.getDataValue();
 
       rows.add(row);
     }
@@ -143,6 +171,13 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
     return new RelationalThirdEyeResponse(request, rows, timeSpec);
   }
 
+  /**
+   * Takes a ThirdEyeResponse time-series and inserts the data points individually,
+   * in parallel. Alternatively, for dimension exploration jobs, updates the
+   * corresponding document in the cache with a new value for the current dimension
+   * combination if the document already exists in the cache.
+   * @param response a object containing the time-series to be inserted
+   */
   public void insertTimeSeriesIntoCache(ThirdEyeResponse response) {
 
     // we can consider using fixedThreadPool instead.

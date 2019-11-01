@@ -20,8 +20,8 @@
 package org.apache.pinot.thirdeye.detection.cache;
 
 public class CacheConfig {
-  private static boolean useCentralizedCache = true;
-  private static boolean useInMemoryCache = false;
+  private static boolean useCentralizedCache = false;
+  private static boolean useInMemoryCache = true;
 
   public static final String COUCHBASE_AUTH_USERNAME = "thirdeye";
   public static final String COUCHBASE_AUTH_PASSWORD = "thirdeye";

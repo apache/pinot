@@ -24,39 +24,65 @@ import java.util.zip.CRC32;
 import org.apache.pinot.thirdeye.detection.cache.TimeSeriesDataPoint;
 
 
+/**
+ * Utility methods used for fetching and writing to the centralized cache.
+ */
+
 public class CacheUtils {
 
+  // We use CRC32 as the hash function to generate keys for cache documents.
+  public static CRC32 hashGenerator = new CRC32();
+
+  /**
+   * Hashes the metricURN, so that the return value can be used as a key to
+   * the key-value pair in a cache document.
+   * @param metricUrn metricURN string
+   * @return hashed metricURN
+   */
   public static String hashMetricUrn(String metricUrn) {
-    CRC32 c = new CRC32();
-    c.update(metricUrn.getBytes());
-    return String.valueOf(c.getValue());
+    hashGenerator.update(metricUrn.getBytes());
+    String result = String.valueOf(hashGenerator.getValue());
+    hashGenerator.reset();
+    return result;
   }
 
+  /**
+   * Builds the document used to store data points in the cache.
+   * Example document:
+   * {
+   *   "time": 123456700000
+   *   "metricId": 1351714
+   *   "71252492": "100.0"
+   * }
+   * @param point some TimeSeriesDataPoint
+   * @return JsonObject with base document.
+   */
   public static JsonObject buildDocumentStructure(TimeSeriesDataPoint point) {
     JsonObject body = JsonObject.create()
         .put("time", point.getTimestamp())
         .put("metricId", point.getMetricId())
-        .put(point.getMetricUrnHash(),
-            (point.getDataValue() == null || point.getDataValue().equals("null")) ? "0" : point.getDataValue());
+        .put(point.getMetricUrnHash(), point.getDataValue());
     return body;
   }
 
+  /**
+   * Builds the N1QL query used to fetch data from Couchbase.
+   * Example query:
+   * SELECT time, `71252492` FROM `te-cache-bucket`
+   *    WHERE metricId = 1351714
+   *      AND `71252492` IS NOT MISSING
+   *        AND time BETWEEN 100000000000 AND 200000000000
+   *          ORDER BY time ASC
+   * @param parameters JsonObject containing the required data to build the query.
+   * @return query string
+   */
   public static String buildQuery(JsonObject parameters) {
-    StringBuilder sb = new StringBuilder("SELECT time, `")
-        .append(parameters.getString("dimensionKey"))
-        .append("` FROM `")
-        .append(parameters.getString("bucket"))
-        .append("` WHERE metricId = ")
-        .append(parameters.getLong("metricId"))
-        .append(" AND `")
-        .append(parameters.getString("dimensionKey"))
-        .append("` IS NOT MISSING")
-        .append(" AND time BETWEEN ")
-        .append(parameters.getLong("start"))
-        .append(" AND ")
-        .append(parameters.getLong("end"))
-        .append(" ORDER BY time ASC");
-
-    return sb.toString();
+    return String.format("SELECT time, `%s` FROM `%s` WHERE metricId = %d AND `%s` IS NOT MISSING AND time BETWEEN %d AND %d ORDER BY time ASC",
+        parameters.getString("dimensionKey"),
+        parameters.getString("bucket"),
+        parameters.getLong("metricId"),
+        parameters.getString("dimensionKey"),
+        parameters.getLong("start"),
+        parameters.getLong("end"));
   }
 }
