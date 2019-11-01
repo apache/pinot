@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
@@ -96,12 +97,20 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
    */
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    int numOperators = _operators.size();
-    CountDownLatch operatorLatch = new CountDownLatch(numOperators);
-
     int numAggregationFunctions = _brokerRequest.getAggregationsInfoSize();
     int numGroupBy = _brokerRequest.getGroupBy().getExpressionsSize();
     ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
+
+    // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
+    // futures (try to interrupt the execution if it already started).
+    // Besides the CountDownLatch, we also use a Phaser to ensure all the Futures are done (not scheduled, finished or
+    // interrupted) before the main thread returns. We need to ensure no execution left before the main thread returning
+    // because the main thread holds the reference to the segments, and if the segments are deleted/refreshed, the
+    // segments can be released after the main thread returns, which would lead to undefined behavior (even JVM crash)
+    // when executing queries against them.
+    int numOperators = _operators.size();
+    CountDownLatch operatorLatch = new CountDownLatch(numOperators);
+    Phaser phaser = new Phaser(1);
 
     Future[] futures = new Future[numOperators];
     for (int i = 0; i < numOperators; i++) {
@@ -110,9 +119,15 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
         @SuppressWarnings("unchecked")
         @Override
         public void runJob() {
-          AggregationGroupByResult aggregationGroupByResult;
-
           try {
+            // Register the thread to the phaser.
+            // If the phaser is terminated (returning negative value) when trying to register the thread, that means the
+            // query execution has timed out, and the main thread has deregistered itself and returned the result.
+            // Directly return as no execution result will be taken.
+            if (phaser.register() < 0) {
+              return;
+            }
+
             IntermediateResultsBlock intermediateResultsBlock =
                 (IntermediateResultsBlock) _operators.get(index).nextBlock();
 
@@ -134,7 +149,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
             }
 
             // Merge aggregation group-by result.
-            aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
+            AggregationGroupByResult aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
             if (aggregationGroupByResult != null) {
               // Get converter functions
               Function[] converterFunctions = new Function[numGroupBy];
@@ -164,9 +179,10 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
             LOGGER.error("Exception processing CombineGroupByOrderBy for index {}, operator {}", index,
                 _operators.get(index).getClass().getName(), e);
             mergedProcessingExceptions.add(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+          } finally {
+            operatorLatch.countDown();
+            phaser.arriveAndDeregister();
           }
-
-          operatorLatch.countDown();
         }
       });
     }
@@ -217,6 +233,8 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
           future.cancel(true);
         }
       }
+      // Deregister the main thread and wait for all threads done
+      phaser.awaitAdvance(phaser.arriveAndDeregister());
     }
   }
 
