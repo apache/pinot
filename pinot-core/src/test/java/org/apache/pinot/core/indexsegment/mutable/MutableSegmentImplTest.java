@@ -24,6 +24,7 @@ import java.util.Collections;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.common.BlockMultiValIterator;
 import org.apache.pinot.core.common.BlockSingleValIterator;
 import org.apache.pinot.core.common.DataSource;
@@ -34,6 +35,7 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -76,6 +78,7 @@ public class MutableSegmentImplTest {
     _immutableSegment = ImmutableSegmentLoader.load(new File(TEMP_DIR, driver.getSegmentName()), ReadMode.mmap);
 
     _schema = config.getSchema();
+    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(_schema, "testSegment");
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
             false);
@@ -141,7 +144,10 @@ public class MutableSegmentImplTest {
 
           int actualDictId = actualSVIterator.nextIntVal();
           int expectedDictId = expectedSVIterator.nextIntVal();
-          Assert.assertEquals(actualDictionary.get(actualDictId), expectedDictionary.get(expectedDictId));
+          // Only allow the default segment name to be different
+          if (!column.equals(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME)) {
+            Assert.assertEquals(actualDictionary.get(actualDictId), expectedDictionary.get(expectedDictId));
+          }
         }
         Assert.assertFalse(actualSVIterator.hasNext());
       }

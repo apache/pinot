@@ -19,7 +19,6 @@
 package org.apache.pinot.core.segment.virtualcolumn;
 
 import java.io.IOException;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.DataFileReader;
@@ -51,8 +50,7 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
   public ColumnMetadata buildMetadata(VirtualColumnContext context) {
     ColumnMetadata.Builder columnMetadataBuilder = super.getColumnMetadataBuilder(context);
     columnMetadataBuilder.setCardinality(context.getTotalDocCount()).setHasDictionary(true).setHasInvertedIndex(true)
-        .setFieldType(FieldSpec.FieldType.DIMENSION).setDataType(FieldSpec.DataType.INT).setSingleValue(true)
-        .setIsSorted(true);
+        .setSingleValue(true).setIsSorted(true);
 
     return columnMetadataBuilder.build();
   }

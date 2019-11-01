@@ -109,6 +109,7 @@ public class CommonConstants {
         return ServerType.REALTIME;
       }
     }
+
     public static final String SET_INSTANCE_ID_TO_HOSTNAME_KEY = "pinot.set.instance.id.to.hostname";
 
     public static final String KEY_OF_SERVER_NETTY_PORT = "pinot.server.netty.port";
@@ -333,8 +334,10 @@ public class CommonConstants {
        * During realtime segment completion, the value of this enum decides how  non-winner servers should replace  the completed segment.
        */
       public enum CompletionMode {
-        DEFAULT, // default behavior - if the in memory segment in the non-winner server is equivalent to the committed segment, then build and replace, else download
-        DOWNLOAD // non-winner servers always download the segment, never build it
+        // default behavior - if the in memory segment in the non-winner server is equivalent to the committed segment, then build and replace, else download
+        DEFAULT,
+        // non-winner servers always download the segment, never build it
+        DOWNLOAD
       }
 
       public static final String STATUS = "segment.realtime.status";
@@ -380,6 +383,12 @@ public class CommonConstants {
     public static class AssignmentStrategy {
       public static String BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY = "BalanceNumSegmentAssignmentStrategy";
       public static String REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "ReplicaGroupSegmentAssignmentStrategy";
+    }
+
+    public static class BuiltInVirtualColumn {
+      public static final String DOCID = "$docId";
+      public static final String HOSTNAME = "$hostName";
+      public static final String SEGMENTNAME = "$segmentName";
     }
 
     @Deprecated
