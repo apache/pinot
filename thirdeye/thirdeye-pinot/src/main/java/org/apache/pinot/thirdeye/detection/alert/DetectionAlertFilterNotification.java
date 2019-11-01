@@ -19,6 +19,8 @@
 
 package org.apache.pinot.thirdeye.detection.alert;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -30,13 +32,13 @@ import java.util.Objects;
 public class DetectionAlertFilterNotification {
 
   Map<String, Object> notificationSchemeProps;
-  Map<String, String> dimensionFilters;
+  Multimap<String, String> dimensionFilters;
 
   public DetectionAlertFilterNotification(Map<String, Object> notificationSchemeProps) {
-    this(notificationSchemeProps, new HashMap<>());
+    this(notificationSchemeProps, ArrayListMultimap.create());
   }
 
-  public DetectionAlertFilterNotification(Map<String, Object> notificationSchemeProps, Map<String, String> dimensionFilters) {
+  public DetectionAlertFilterNotification(Map<String, Object> notificationSchemeProps, Multimap<String, String> dimensionFilters) {
     this.notificationSchemeProps = notificationSchemeProps;
     this.dimensionFilters = dimensionFilters;
   }
@@ -49,11 +51,11 @@ public class DetectionAlertFilterNotification {
     this.notificationSchemeProps = notificationSchemeProps;
   }
 
-  public Map<String, String> getDimensionFilters() {
+  public Multimap<String, String> getDimensionFilters() {
     return dimensionFilters;
   }
 
-  public void setDimensionFilters(Map<String, String> dimensions) {
+  public void setDimensionFilters(Multimap<String, String> dimensions) {
     this.dimensionFilters = dimensions;
   }
 

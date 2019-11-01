@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.notification.formatter.channels;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
+import com.google.common.collect.Multimap;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateExceptionHandler;
@@ -92,7 +93,7 @@ public class JiraContentFormatter extends AlertContentFormatter {
     Preconditions.checkNotNull(jiraAdminConfig.getJiraHost());
   }
 
-  public JiraEntity getJiraEntity(Map<String, String> dimensionFilters, Collection<AnomalyResult> anomalies) {
+  public JiraEntity getJiraEntity(Multimap<String, String> dimensionFilters, Collection<AnomalyResult> anomalies) {
     Map<String, Object> templateData = notificationContent.format(anomalies, this.subsConfig);
     templateData.put("dashboardHost", teConfig.getDashboardHost());
     return buildJiraEntity(alertContentToTemplateMap.get(notificationContent.getTemplate()), templateData, dimensionFilters);
@@ -102,13 +103,13 @@ public class JiraContentFormatter extends AlertContentFormatter {
    * Apply the parameter map to given email template, and format it as EmailEntity
    */
   private JiraEntity buildJiraEntity(String jiraTemplate, Map<String, Object> templateValues,
-      Map<String, String> dimensionFilters) {
+      Multimap<String, String> dimensionFilters) {
     String issueSummary = BaseNotificationContent.makeSubject(super.getSubjectType(alertClientConfig), this.subsConfig, templateValues);
 
     // Append dimensional info to summary
     StringBuilder dimensions = new StringBuilder();
-    for (Map.Entry<String, String> dimFilter : dimensionFilters.entrySet()) {
-      dimensions.append(", ").append(dimFilter.getKey()).append("=").append(dimFilter.getValue());
+    for (Map.Entry<String, Collection<String>> dimFilter : dimensionFilters.asMap().entrySet()) {
+      dimensions.append(", ").append(dimFilter.getKey()).append("=").append(String.join(",", dimFilter.getValue()));
     }
     issueSummary = issueSummary + dimensions.toString();
 
@@ -131,7 +132,7 @@ public class JiraContentFormatter extends AlertContentFormatter {
     List<String> labels = ConfigUtils.getList(alertClientConfig.get(PROP_LABELS));
     labels.add(PROP_DEFAULT_LABEL);
     labels.add("subsId=" + this.subsConfig.getId().toString());
-    dimensionFilters.forEach((k,v) -> labels.add(k + "=" + v));
+    dimensionFilters.asMap().forEach((k,v) -> labels.add(k + "=" + String.join(",", v)));
     jiraEntity.setLabels(labels);
 
     HtmlEmail email = new HtmlEmail();

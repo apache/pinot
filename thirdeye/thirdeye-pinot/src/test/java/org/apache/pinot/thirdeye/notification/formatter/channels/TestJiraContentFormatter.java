@@ -19,6 +19,8 @@
 
 package org.apache.pinot.thirdeye.notification.formatter.channels;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -217,7 +219,7 @@ public class TestJiraContentFormatter {
     JiraContentFormatter jiraContent = new JiraContentFormatter(
         JiraConfiguration.createFromProperties(jiraConfiguration), jiraClientConfig, content, teConfig, this.alertConfigDTO);
 
-    JiraEntity jiraEntity = jiraContent.getJiraEntity(new HashMap<>(), new HashSet<>(this.anomalyDAO.findAll()));
+    JiraEntity jiraEntity = jiraContent.getJiraEntity(ArrayListMultimap.create(), new HashSet<>(this.anomalyDAO.findAll()));
 
     // Assert Jira fields
     Assert.assertEquals(jiraEntity.getLabels(), Arrays.asList("test-label-1", "test-label-2", "thirdeye", "subsId=" + subsId1));
@@ -257,7 +259,7 @@ public class TestJiraContentFormatter {
     JiraContentFormatter jiraContent = new JiraContentFormatter(
         JiraConfiguration.createFromProperties(jiraConfiguration), jiraClientConfig, content, teConfig, this.alertConfigDTO);
 
-    Map<String, String> dimensionKeys1 = new HashMap<>();
+    Multimap<String, String> dimensionKeys1 = ArrayListMultimap.create();
     dimensionKeys1.put("key", "value");
     JiraEntity jiraEntity = jiraContent.getJiraEntity(dimensionKeys1, new HashSet<>(this.anomalyDAO.findAll()));
 

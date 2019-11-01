@@ -16,22 +16,20 @@
 
 package org.apache.pinot.thirdeye.detection.alert.filter;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.io.IOUtils;
 import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
-import org.apache.pinot.thirdeye.dashboard.DetectionPreviewConfiguration;
 import org.apache.pinot.thirdeye.datalayer.bao.ApplicationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
-import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.ApplicationDTO;
@@ -39,7 +37,6 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
-import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilter;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
@@ -198,7 +195,7 @@ public class DimensionsDetectionAlertFilterTest {
     DetectionAlertFilterNotification recDefault = AlertFilterUtils.makeEmailNotifications();
     Assert.assertEquals(result.getResult().get(recDefault), makeSet(0, 3, 4));
 
-    Map<String, String> dimFilters = new HashMap<>();
+    Multimap<String, String> dimFilters = ArrayListMultimap.create();
     dimFilters.put("key", "value");
 
     // Send anomalies who dimensions are configured to appropriate recipients
@@ -206,7 +203,7 @@ public class DimensionsDetectionAlertFilterTest {
     recValue.setDimensionFilters(dimFilters);
     Assert.assertEquals(result.getResult().get(recValue), makeSet(1, 5));
 
-    dimFilters.remove("key");
+    dimFilters.removeAll("key");
     dimFilters.put("key1", "anotherValue1");
     dimFilters.put("key2", "anotherValue2");
 
@@ -227,7 +224,7 @@ public class DimensionsDetectionAlertFilterTest {
 
     this.detectedAnomalies.add(child);
 
-    Map<String, String> dimFilters = new HashMap<>();
+    Multimap<String, String> dimFilters = ArrayListMultimap.create();
     dimFilters.put("key", "value");
     DetectionAlertFilterNotification recValue = AlertFilterUtils.makeEmailNotifications(PROP_TO_FOR_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
     recValue.setDimensionFilters(dimFilters);
@@ -265,7 +262,7 @@ public class DimensionsDetectionAlertFilterTest {
     DetectionAlertFilterResult result = this.alertFilter.run();
     Assert.assertEquals(result.getResult().size(), 2);
 
-    Map<String, String> dimFilters = new HashMap<>();
+    Multimap<String, String> dimFilters = ArrayListMultimap.create();
     dimFilters.put("key", "value");
 
     DetectionAlertFilterNotification recDefault = AlertFilterUtils.makeEmailNotifications(PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
