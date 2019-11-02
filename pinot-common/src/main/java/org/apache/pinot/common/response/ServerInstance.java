@@ -89,6 +89,9 @@ public class ServerInstance {
 
   /**
    * Server instance name is formatted as {@code Server_<host>_<port>}
+   *
+   * Note: This static method is deprecated. Use the constructor instead to create a
+   * {@link ServerInstance} object using host and port explicitly.
    */
   @Deprecated
   public static ServerInstance forInstanceName(String instanceName) {
