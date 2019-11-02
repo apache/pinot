@@ -31,6 +31,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.helix.HelixInstanceConfigCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
@@ -98,12 +99,13 @@ public class ScatterGatherImpl implements ScatterGather {
     ScatterGatherRequest scatterGatherRequest = scatterGatherRequestContext._request;
     Map<String, List<String>> routingTable = scatterGatherRequest.getRoutingTable();
     CountDownLatch requestDispatchLatch = new CountDownLatch(routingTable.size());
+    HelixInstanceConfigCache instanceCache = HelixInstanceConfigCache.getInstance();
 
     // async checkout of connections and then dispatch of request
     List<SingleRequestHandler> handlers = new ArrayList<>(routingTable.size());
 
     for (Entry<String, List<String>> entry : routingTable.entrySet()) {
-      ServerInstance serverInstance = ServerInstance.forInstanceName(entry.getKey());
+      ServerInstance serverInstance = getServerInstance(entry.getKey(), instanceCache);
       String shortServerName = serverInstance.getShortHostName();
       if (isOfflineTable != null) {
         if (isOfflineTable) {
@@ -162,6 +164,18 @@ public class ScatterGatherImpl implements ScatterGather {
     }
 
     return response;
+  }
+
+  private ServerInstance getServerInstance(String instanceName, HelixInstanceConfigCache cache) {
+    if (cache.isInitialized()) {
+      String hostname = cache.getHostname(instanceName);
+      int port = cache.getPort(instanceName);
+      return new ServerInstance(hostname, port);
+    }
+
+    // Fallback in case Helix instance cache is not initialized for whatever reason
+    // Eg: in unit tests
+    return ServerInstance.forInstanceName(instanceName);
   }
 
   private static class ScatterGatherRequestContext {

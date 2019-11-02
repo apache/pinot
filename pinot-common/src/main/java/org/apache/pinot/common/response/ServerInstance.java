@@ -57,6 +57,8 @@ public class ServerInstance {
 
   /**
    * Use this constructor if the name and port are embedded as string with ":" as delimiter
+   *
+   * Note: This constructor is used primarily for testing.
    */
   public ServerInstance(String namePortPair) {
     this(namePortPair.split(NAME_PORT_DELIMITER)[0], Integer.parseInt(namePortPair.split(NAME_PORT_DELIMITER)[1]));
@@ -88,6 +90,7 @@ public class ServerInstance {
   /**
    * Server instance name is formatted as {@code Server_<host>_<port>}
    */
+  @Deprecated
   public static ServerInstance forInstanceName(String instanceName) {
     String[] parts = instanceName.split(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)[1]
         .split(NAME_PORT_DELIMITER_FOR_INSTANCE_NAME);

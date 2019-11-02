@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.common.helix.HelixInstanceConfigCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -65,7 +66,7 @@ public class QueryRouter {
     if (offlineBrokerRequest != null) {
       assert offlineRoutingTable != null;
       for (Map.Entry<String, List<String>> entry : offlineRoutingTable.entrySet()) {
-        Server server = new Server(entry.getKey(), TableType.OFFLINE);
+        Server server = getServer(entry.getKey(), TableType.OFFLINE);
         InstanceRequest instanceRequest = getInstanceRequest(requestId, offlineBrokerRequest, entry.getValue());
         requestMap.put(server, instanceRequest);
       }
@@ -73,7 +74,7 @@ public class QueryRouter {
     if (realtimeBrokerRequest != null) {
       assert realtimeRoutingTable != null;
       for (Map.Entry<String, List<String>> entry : realtimeRoutingTable.entrySet()) {
-        Server server = new Server(entry.getKey(), TableType.REALTIME);
+        Server server = getServer(entry.getKey(), TableType.REALTIME);
         InstanceRequest instanceRequest = getInstanceRequest(requestId, realtimeBrokerRequest, entry.getValue());
         requestMap.put(server, instanceRequest);
       }
@@ -132,5 +133,21 @@ public class QueryRouter {
     instanceRequest.setSearchSegments(segments);
     instanceRequest.setBrokerId(_brokerId);
     return instanceRequest;
+  }
+
+  /**
+   * Lookup the actual host and port information from the Instance Config cache. Create a {@link Server}
+   * object using this explicit information.
+   */
+  private Server getServer(String instanceName, TableType tableType) {
+    HelixInstanceConfigCache cache = HelixInstanceConfigCache.getInstance();
+    if (cache.isInitialized()) {
+      String hostname = cache.getHostname(instanceName);
+      int port = cache.getPort(instanceName);
+      return new Server(hostname, port, tableType);
+    }
+
+    // This is primarily used in unit tests wherein the Helix cache is not used
+    return new Server(instanceName, tableType);
   }
 }

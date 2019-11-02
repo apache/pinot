@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.broker.helix;
+package org.apache.pinot.common.helix;
 
 import org.apache.helix.HelixConstants;
 import org.apache.helix.HelixManager;

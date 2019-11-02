@@ -27,6 +27,8 @@ import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.LiveInstance;
+import org.apache.pinot.common.helix.ClusterChangeHandler;
+import org.apache.pinot.common.helix.HelixInstanceConfigCache;
 import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.transport.netty.PooledNettyClientResourceManager;
@@ -82,16 +84,9 @@ public class LiveInstanceChangeHandler implements ClusterChangeHandler {
         continue;
       }
 
-      String namePortStr = instanceId.split(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)[1];
-      String hostName = namePortStr.split("_")[0];
-      int port;
-      try {
-        port = Integer.parseInt(namePortStr.split("_")[1]);
-      } catch (Exception e) {
-        port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
-        LOGGER
-            .warn("Port for server instance {} does not appear to be numeric, defaulting to {}.", instanceId, port, e);
-      }
+      HelixInstanceConfigCache instanceCache = HelixInstanceConfigCache.getInstance();
+      String hostName = instanceCache.getHostname(instanceId);
+      int port = instanceCache.getPort(instanceId);
 
       if (_liveInstanceToSessionIdMap.containsKey(instanceId)) {
         // sessionId has changed

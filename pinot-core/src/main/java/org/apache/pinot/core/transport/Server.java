@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.transport;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.InternetDomainName;
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -45,11 +46,25 @@ public class Server {
 
   /**
    * NOTE: server instance name is of format: {@code Server_<hostName>_<port>}, e.g. {@code Server_localhost_12345}.
+   *
+   * This constructor is primarily used in unit tests.
    */
-  public Server(String instanceName, TableType tableType) {
+  @VisibleForTesting
+  Server(String instanceName, TableType tableType) {
     String[] hostNameAndPort = instanceName.split(PREFIX_OF_SERVER_INSTANCE)[1].split(NAME_PORT_DELIMITER);
     _hostName = hostNameAndPort[0];
     _port = Integer.parseInt(hostNameAndPort[1]);
+    _tableType = tableType;
+  }
+
+  /**
+   * Create a Server instance using explicit hostname and port. This is useful when the
+   * instance name can be independent of the physical address. More details can be found
+   * in this issue: https://github.com/apache/incubator-pinot/issues/4525
+   */
+  public Server(String hostname, int port, TableType tableType) {
+    _hostName = hostname;
+    _port = port;
     _tableType = tableType;
   }
 

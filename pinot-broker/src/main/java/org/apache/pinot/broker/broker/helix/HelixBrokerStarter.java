@@ -49,6 +49,9 @@ import org.apache.pinot.broker.requesthandler.ConnectionPoolBrokerRequestHandler
 import org.apache.pinot.broker.routing.HelixExternalViewBasedRouting;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TagNameUtils;
+import org.apache.pinot.common.helix.ClusterChangeHandler;
+import org.apache.pinot.common.helix.ClusterChangeMediator;
+import org.apache.pinot.common.helix.HelixInstanceConfigCache;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -167,6 +170,11 @@ public class HelixBrokerStarter {
     _propertyStore = _spectatorHelixManager.getHelixPropertyStore();
     _helixDataAccessor = _spectatorHelixManager.getHelixDataAccessor();
 
+    // Set up Instance Config Cache
+    LOGGER.info("Setting up broker instance config cache");
+    HelixInstanceConfigCache instanceConfigCache = HelixInstanceConfigCache.getInstance();
+    instanceConfigCache.init(_spectatorHelixManager);
+
     // Set up the broker server builder
     LOGGER.info("Setting up broker server builder");
     _helixExternalViewBasedRouting =
@@ -198,6 +206,7 @@ public class HelixBrokerStarter {
       instanceConfigChangeHandler.init(_spectatorHelixManager);
     }
     _instanceConfigChangeHandlers.add(_helixExternalViewBasedRouting);
+    _instanceConfigChangeHandlers.add(instanceConfigCache);
     for (ClusterChangeHandler liveInstanceChangeHandler : _liveInstanceChangeHandlers) {
       liveInstanceChangeHandler.init(_spectatorHelixManager);
     }

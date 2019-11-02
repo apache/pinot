@@ -76,7 +76,7 @@ public class ScatterGatherTest {
       String serverName = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + LOCAL_HOST
           + ServerInstance.NAME_PORT_DELIMITER_FOR_INSTANCE_NAME + serverPort;
       serverNames[i] = serverName;
-      serverInstances[i] = ServerInstance.forInstanceName(serverName);
+      serverInstances[i] = new ServerInstance(LOCAL_HOST, serverPort);
       routingTable.put(serverName, Collections.singletonList("segment_" + i));
     }
 
@@ -138,7 +138,7 @@ public class ScatterGatherTest {
       String serverName = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + LOCAL_HOST
           + ServerInstance.NAME_PORT_DELIMITER_FOR_INSTANCE_NAME + serverPort;
       serverNames[i] = serverName;
-      serverInstances[i] = ServerInstance.forInstanceName(serverName);
+      serverInstances[i] = new ServerInstance(LOCAL_HOST, serverPort);
       routingTable.put(serverName, Collections.singletonList("segment_" + i));
     }
 
@@ -202,7 +202,7 @@ public class ScatterGatherTest {
       String serverName = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + LOCAL_HOST
           + ServerInstance.NAME_PORT_DELIMITER_FOR_INSTANCE_NAME + serverPort;
       serverNames[i] = serverName;
-      serverInstances[i] = ServerInstance.forInstanceName(serverName);
+      serverInstances[i] = new ServerInstance(LOCAL_HOST, serverPort);
       routingTable.put(serverName, Collections.singletonList("segment_" + i));
     }
 

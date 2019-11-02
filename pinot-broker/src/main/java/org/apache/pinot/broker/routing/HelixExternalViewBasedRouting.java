@@ -41,7 +41,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.broker.broker.helix.ClusterChangeHandler;
+import org.apache.pinot.common.helix.ClusterChangeHandler;
 import org.apache.pinot.broker.routing.builder.RoutingTableBuilder;
 import org.apache.pinot.broker.routing.selector.SegmentSelector;
 import org.apache.pinot.broker.routing.selector.SegmentSelectorProvider;
