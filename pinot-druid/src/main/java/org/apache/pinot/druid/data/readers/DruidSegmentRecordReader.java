@@ -141,6 +141,8 @@ public class DruidSegmentRecordReader implements RecordReader {
         .stream()
         .map(columnSelectorFactory::makeColumnValueSelector)
         .collect(Collectors.toList());
+
+    System.out.println("SELECTORS FOR " + _pinotSchema.getSchemaName() + ": " + _selectors);
   }
 
   @Override
@@ -234,7 +236,8 @@ public class DruidSegmentRecordReader implements RecordReader {
         }
         if (!compareTypes(_pinotSchema.getFieldSpecFor(columnName).getDataType(), capabilities.getType())) {
           throw new IllegalArgumentException("Type for column " + columnName +
-              " in schema does not match type for column " + columnName + " in record.");
+              " in schema (" + _pinotSchema.getFieldSpecFor(columnName).getDataType() + ") does not match type for column "
+              + columnName + " in record (" + capabilities.getType() + ").");
         }
       }
     }
