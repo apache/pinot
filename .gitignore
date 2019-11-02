@@ -20,3 +20,6 @@ docs/_build
 *.ipr
 *.iws
 .*.swp
+**/.docker/
+**/.env
+kubernetes/examples/helm/charts/
