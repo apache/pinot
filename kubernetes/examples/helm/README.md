@@ -213,3 +213,41 @@ Alternatively a YAML file that specifies the values for the parameters can be pr
 ```bash
 helm install --name pinot -f values.yaml .
 ```
+
+## Use superset to query Pinot
+
+### Bring up Superset
+
+```bash
+kubectl apply -f superset.yaml
+```
+
+### Set up Admin account (First time)
+
+```bash
+kubectl exec -it pod/superset-0 -n pinot-quickstart -- bash -c 'export FLASK_APP=superset:app && flask fab create-admin'
+```
+
+### Init Superset (First time)
+
+```bash
+kubectl exec -it pod/superset-0 -n pinot-quickstart -- bash -c 'superset db upgrade'
+kubectl exec -it pod/superset-0 -n pinot-quickstart -- bash -c 'superset init'
+```
+
+### Load Demo Data source
+
+```bash
+kubectl exec -it pod/superset-0 -n pinot-quickstart -- bash -c 'superset import_datasources -p /etc/superset/pinot_example_datasource.yaml'
+kubectl exec -it pod/superset-0 -n pinot-quickstart -- bash -c 'superset import_dashboards -p /etc/superset/pinot_example_dashboard.json'
+```
+
+### Access Superset UI
+
+You can run below command to navigate superset in your browser with the previous admin credential.
+
+```bash
+./open-superset-ui.sh
+```
+
+You can open the imported dashboard by click `Dashboards` banner then click on `AirlineStats`.
