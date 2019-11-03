@@ -35,6 +35,15 @@ Below command will build docker image and tag it as `superset_version` and `late
 make latest
 ```
 
+You can also build directly with `docker build` command by setting arguments:
+```bash
+docker build \
+	--build-arg NODE_VERSION=latest \
+	--build-arg PYTHON_VERSION=3.6 \
+	--build-arg SUPERSET_VERSION=0.34.1 \
+	--tag fx19880617/pinot-superset:0.34.1 \
+	--target build .
+```
 ## How to push
 
 ```bash

@@ -17,7 +17,7 @@
 # under the License.
 #
 
-image  := fx19880617/superset
+image  := fx19880617/pinot-superset
 stages := build dist final
 shells := $(foreach stage,$(stages),shell@$(stage))
 
