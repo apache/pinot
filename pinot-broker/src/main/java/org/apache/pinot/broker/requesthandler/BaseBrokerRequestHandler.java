@@ -231,9 +231,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     if (request.has(Broker.Request.QUERY_OPTIONS)) {
-      Map<String, String> queryOptions = getOptionsFromRequest(request, Broker.Request.QUERY_OPTIONS);
-      LOGGER.debug("Query options are set to: {} for request {}: {}", queryOptions, requestId, query);
-      brokerRequest.setQueryOptions(queryOptions);
+      Map<String, String> queryOptionsFromRequest = getOptionsFromRequest(request, Broker.Request.QUERY_OPTIONS);
+      Map<String, String> queryOptions = brokerRequest.getQueryOptions();
+      if (queryOptions == null) {
+        brokerRequest.setQueryOptions(queryOptionsFromRequest);
+      } else {
+        queryOptions.putAll(queryOptionsFromRequest);
+      }
+      LOGGER
+          .debug("Query options are set to: {} for request {}: {}", brokerRequest.getQueryOptions(), requestId, query);
     }
 
     // Optimize the query
