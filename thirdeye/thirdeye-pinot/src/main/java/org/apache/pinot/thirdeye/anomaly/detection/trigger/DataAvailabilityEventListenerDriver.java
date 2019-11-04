@@ -46,11 +46,12 @@ public class DataAvailabilityEventListenerDriver {
   private List<DataAvailabilityEventListener> listeners;
 
   public DataAvailabilityEventListenerDriver(DataAvailabilityListenerConfiguration config) throws IOException {
+    String rootDir = System.getProperty("dw.rootDir");
     this.config = config;
     this.executorService = Executors.newFixedThreadPool(this.config.getNumParallelConsumer(),
         new ThreadFactoryBuilder().setNameFormat("trigger-event-consumer-%d").build());
     this.consumerProps = new Properties();
-    this.consumerProps.load(new FileInputStream(this.config.getKafkaConsumerPropPath()));
+    this.consumerProps.load(new FileInputStream(rootDir + "/" + this.config.getKafkaConsumerPropPath()));
     this.listeners = new ArrayList<>();
     DatasetTriggerInfoRepo.init(config.getDatasetWhitelistUpdateFreqInMin(), config.getDataSourceWhitelist());
   }
