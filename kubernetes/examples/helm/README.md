@@ -70,6 +70,55 @@ GCLOUD_CLUSTER=pinot-quickstart
 gcloud container clusters get-credentials ${GCLOUD_CLUSTER} --zone ${GCLOUD_ZONE} --project ${GCLOUD_PROJECT}
 ```
 
+
+## (Optional) Setup a Kubernetes cluster on Microsoft Azure
+
+### (Optional) Create a new k8s cluster on Azure
+
+- Install Azure CLI (<https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest>)
+- Login to your Azure account.
+
+```bash
+az login
+```
+
+- Create Resource Group
+
+```bash
+AKS_RESOURCE_GROUP=pinot-demo
+AKS_RESOURCE_GROUP_LOCATION=eastus
+az group create --name ${AKS_RESOURCE_GROUP} --location ${AKS_RESOURCE_GROUP_LOCATION}
+```
+
+- Create an AKS cluster
+
+```bash
+AKS_RESOURCE_GROUP=pinot-demo
+AKS_CLUSTER_NAME=pinot-quickstart
+az aks create --resource-group ${AKS_RESOURCE_GROUP}  --name ${AKS_CLUSTER_NAME} --node-count 3
+```
+
+(Optional) Please register default provider if above command failed for error: `MissingSubscriptionRegistration`
+
+```bash
+az provider register --namespace Microsoft.Network
+```
+
+### (Optional) How to connect to an existing cluster
+
+Simply run below command to get the credential for the cluster you just created or your existing cluster.
+
+```bash
+AKS_RESOURCE_GROUP=pinot-demo
+AKS_CLUSTER_NAME=pinot-quickstart
+az aks get-credentials --resource-group ${AKS_RESOURCE_GROUP} --name ${AKS_CLUSTER_NAME}
+```
+
+To verify the connection, you can run
+```bash
+kubectl get nodes
+```
+
 ## How to setup a Pinot cluster for demo
 
 ### Update helm dependency
@@ -82,6 +131,37 @@ helm dependency update
 
 ```bash
 helm install --namespace "pinot-quickstart" --name "pinot" .
+```
+
+#### Troubleshooting
+Error: Please run below command if encountering issue:
+
+```
+Error: could not find tiller".
+```
+
+Resolution:
+
+```bash
+kubectl -n kube-system delete deployment tiller-deploy
+kubectl -n kube-system delete service/tiller-deploy
+helm init --service-account tiller
+```
+
+Error: Please run below command if encountering permission issue:
+
+```Error: release pinot failed: namespaces "pinot-quickstart" is forbidden: User "system:serviceaccount:kube-system:default" cannot get resource "namespaces" in API group "" in the namespace "pinot-quickstart"```
+
+Resolution:
+
+```bash
+kubectl apply -f helm-rbac.yaml
+```
+
+#### To check deployment status
+
+```bash
+kubectl get all -n pinot-quickstart
 ```
 
 ### Pinot Realtime QuickStart
