@@ -49,7 +49,7 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private AutoOnboardConfiguration autoOnboardConfiguration = new AutoOnboardConfiguration();
   private TaskDriverConfiguration taskDriverConfiguration = new TaskDriverConfiguration();
   private DataAvailabilityListenerConfiguration
-      _dataAvailabilityListenerConfiguration = new DataAvailabilityListenerConfiguration();
+      dataAvailabilityListenerConfiguration = new DataAvailabilityListenerConfiguration();
   private String failureFromAddress;
   private String failureToAddress;
   private List<String> holidayCountriesWhitelist;
@@ -223,11 +223,11 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   }
 
   public DataAvailabilityListenerConfiguration getDataAvailabilityListenerConfiguration() {
-    return _dataAvailabilityListenerConfiguration;
+    return dataAvailabilityListenerConfiguration;
   }
 
   public void setDataAvailabilityListenerConfiguration(
       DataAvailabilityListenerConfiguration dataAvailabilityListenerConfiguration) {
-    this._dataAvailabilityListenerConfiguration = dataAvailabilityListenerConfiguration;
+    this.dataAvailabilityListenerConfiguration = dataAvailabilityListenerConfiguration;
   }
 }
