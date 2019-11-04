@@ -30,16 +30,16 @@ import java.util.Properties;
  * base class.
  */
 public abstract class DataAvailabilityKafkaConsumer {
-  protected final String _topic;
-  protected final String _groupId;
-  protected final String _bootstrapServers;
-  protected final Properties _properties;
+  protected final String topic;
+  protected final String groupId;
+  protected final String bootstrapServers;
+  protected final Properties properties;
 
   public DataAvailabilityKafkaConsumer(String topic, String groupId, String bootstrapServers, Properties properties) {
-    this._topic = topic;
-    this._groupId = groupId;
-    this._bootstrapServers = bootstrapServers;
-    this._properties = properties;
+    this.topic = topic;
+    this.groupId = groupId;
+    this.bootstrapServers = bootstrapServers;
+    this.properties = properties;
   }
 
   /**

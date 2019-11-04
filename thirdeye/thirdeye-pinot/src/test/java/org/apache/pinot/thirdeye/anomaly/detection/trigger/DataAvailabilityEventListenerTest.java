@@ -31,7 +31,7 @@ public class DataAvailabilityEventListenerTest {
   static String TEST_DATASET_PREFIX = "ds_trigger_listener_";
   static String TEST_METRIC_PREFIX = "metric_trigger_listener_";
   private DAOTestBase testDAOProvider;
-  private DataAvailabilityEventListener _dataAvailabilityEventListener;
+  private DataAvailabilityEventListener dataAvailabilityEventListener;
 
   @BeforeClass
   public void beforeCLass() {
@@ -82,12 +82,12 @@ public class DataAvailabilityEventListenerTest {
     List<DataAvailabilityEventFilter> filters = new ArrayList<>();
     filters.add(new OnTimeFilter());
     filters.add(new ActiveDatasetFilter());
-    _dataAvailabilityEventListener = new DataAvailabilityEventListener(consumer, filters, 0, 5_000);
+    dataAvailabilityEventListener = new DataAvailabilityEventListener(consumer, filters, 0, 5_000);
   }
 
   @Test
   public void testConsume1() throws InterruptedException {
-    _dataAvailabilityEventListener.processOneBatch();
+    dataAvailabilityEventListener.processOneBatch();
     DatasetConfigManager datasetConfigManager = DAORegistry.getInstance().getDatasetConfigDAO();
     DatasetConfigDTO dataset1 = datasetConfigManager.findByDataset(TEST_DATASET_PREFIX + 1);
     DatasetConfigDTO dataset2 = datasetConfigManager.findByDataset(TEST_DATASET_PREFIX + 2);
@@ -100,7 +100,7 @@ public class DataAvailabilityEventListenerTest {
 
   @Test
   public void testConsume2() throws InterruptedException {
-    _dataAvailabilityEventListener.processOneBatch();
+    dataAvailabilityEventListener.processOneBatch();
     DatasetConfigManager datasetConfigManager = DAORegistry.getInstance().getDatasetConfigDAO();
     DatasetConfigDTO dataset1 = datasetConfigManager.findByDataset(TEST_DATASET_PREFIX + 1);
     DatasetConfigDTO dataset2 = datasetConfigManager.findByDataset(TEST_DATASET_PREFIX + 2);
@@ -115,7 +115,7 @@ public class DataAvailabilityEventListenerTest {
   public void testConsume3() throws InterruptedException {
     LOG.info("in testConsume3");
 
-    _dataAvailabilityEventListener.processOneBatch();
+    dataAvailabilityEventListener.processOneBatch();
     DatasetConfigManager datasetConfigManager = DAORegistry.getInstance().getDatasetConfigDAO();
     DatasetConfigDTO dataset1 = datasetConfigManager.findByDataset(TEST_DATASET_PREFIX + 1);
     DatasetConfigDTO dataset2 = datasetConfigManager.findByDataset(TEST_DATASET_PREFIX + 2);
@@ -128,7 +128,7 @@ public class DataAvailabilityEventListenerTest {
 
   @AfterClass()
   public void afterClass() {
-    _dataAvailabilityEventListener.close();
+    dataAvailabilityEventListener.close();
     testDAOProvider.cleanup();
   }
 }
