@@ -65,7 +65,9 @@ public class HelixInstanceConfigCache implements ClusterChangeHandler {
 
   @Override
   public void init(HelixManager helixManager) {
-    Preconditions.checkState(_helixManager == null, "HelixInstanceConfigCache is already initialized");
+    if (_initialized) {
+      return;
+    }
     _helixManager = helixManager;
     _instanceNameToConfigMap = new HashMap<>();
     _initialized = true;
@@ -85,7 +87,9 @@ public class HelixInstanceConfigCache implements ClusterChangeHandler {
 
   public String getHostname(String instanceName) {
     Preconditions.checkNotNull(_instanceNameToConfigMap.get(instanceName));
-    return _instanceNameToConfigMap.get(instanceName).getHostName();
+    String helixHostName = _instanceNameToConfigMap.get(instanceName).getHostName();
+    String hostName = helixHostName.split(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)[1];
+    return hostName;
   }
 
   public int getPort(String instanceName) {
