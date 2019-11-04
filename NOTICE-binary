@@ -4,17 +4,13 @@ Copyright 2018 The Apache Software Foundation
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
 
-
 // ------------------------------------------------------------------
 // NOTICE file corresponding to the section 4d of The Apache License,
 // Version 2.0, in this case for 
 // ------------------------------------------------------------------
 
-The HermiteInterpolator class and its corresponding test have been imported from
-the orekit library distributed under the terms of the Apache 2 licence. Original
-source copyright:
-Copyright 2010-2012 CS Systèmes d'Information
-===============================================================================
+htrace-core
+Copyright 2015 The Apache Software Foundation
 
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
@@ -363,30 +359,6 @@ Copyright 2013-2018 The Apache Software Foundation
 ORC Shims
 Copyright 2013-2018 The Apache Software Foundation
 
-Apache Commons Net
-Copyright 2001-2012 The Apache Software Foundation
-
-ApacheDS Protocol Kerberos Codec
-Copyright 2003-2013 The Apache Software Foundation
-
-ApacheDS I18n
-Copyright 2003-2013 The Apache Software Foundation
-
-Apache Directory API ASN.1 API
-Copyright 2003-2013 The Apache Software Foundation
-
-Apache Directory LDAP API Utilities
-Copyright 2003-2013 The Apache Software Foundation
-
-Curator Framework
-Copyright 2011-2015 The Apache Software Foundation
-
-Curator Client
-Copyright 2011-2015 The Apache Software Foundation
-
-htrace-core
-Copyright 2015 The Apache Software Foundation
-
 Hive Storage API
 Copyright 2018 The Apache Software Foundation
 
@@ -401,6 +373,27 @@ Copyright 2006-2011 Google, Inc.
 
 Google Guice - Core Library
 Copyright 2006-2011 Google, Inc.
+
+Apache Parquet Avro
+Copyright 2015 The Apache Software Foundation
+
+Apache Parquet Column
+Copyright 2015 The Apache Software Foundation
+
+Apache Parquet Common
+Copyright 2015 The Apache Software Foundation
+
+Apache Parquet Encodings
+Copyright 2015 The Apache Software Foundation
+
+Apache Parquet Hadoop
+Copyright 2015 The Apache Software Foundation
+
+Apache Parquet Jackson
+Copyright 2015 The Apache Software Foundation
+
+Apache Parquet Format (Incubating)
+Copyright 2015 The Apache Software Foundation
 
 Apache Commons Math
 Copyright 2001-2013 The Apache Software Foundation
@@ -463,7 +456,37 @@ terms of the Apache 2 licence. Original source copyright:
 Copyright 2010 CS Systèmes d'Information
 ===============================================================================
 
+The HermiteInterpolator class and its corresponding test have been imported from
+the orekit library distributed under the terms of the Apache 2 licence. Original
+source copyright:
+Copyright 2010-2012 CS Systèmes d'Information
+===============================================================================
+
 The creation of the package "o.a.c.m.analysis.integration.gauss" was inspired
 by an original code donated by Sébastien Brisard.
 ===============================================================================
+
+Apache Commons Net
+Copyright 2001-2012 The Apache Software Foundation
+
+ApacheDS Protocol Kerberos Codec
+Copyright 2003-2013 The Apache Software Foundation
+
+ApacheDS I18n
+Copyright 2003-2013 The Apache Software Foundation
+
+Apache Directory API ASN.1 API
+Copyright 2003-2013 The Apache Software Foundation
+
+Apache Directory LDAP API Utilities
+Copyright 2003-2013 The Apache Software Foundation
+
+Curator Framework
+Copyright 2011-2015 The Apache Software Foundation
+
+Curator Client
+Copyright 2011-2015 The Apache Software Foundation
+
+Curator Recipes
+Copyright 2011-2015 The Apache Software Foundation
 
