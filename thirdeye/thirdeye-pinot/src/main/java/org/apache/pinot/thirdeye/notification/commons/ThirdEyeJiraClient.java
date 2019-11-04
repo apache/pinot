@@ -66,16 +66,25 @@ public class ThirdEyeJiraClient {
    */
   public List<Issue> getIssues(String project, List<String> labels, String reporter, long lookBackMillis) {
     List<Issue> issues = new ArrayList<>();
+
     long lookBackDays = TimeUnit.MILLISECONDS.toDays(lookBackMillis);
+    String createdByQuery = "created";
+    if (lookBackDays <= 0) {
+      createdByQuery += "<= -0m";
+    } else {
+      createdByQuery += ">= -" + lookBackDays + "d";
+    }
+
     String andQueryOnLabels = labels.stream()
         .map(label -> "labels = \"" + label + "\"")
         .collect(Collectors.joining(" and "));
 
     StringBuilder jiraQuery = new StringBuilder();
+    // Query by project first as a jira optimization
     jiraQuery.append("project=").append(project);
     jiraQuery.append(" and ").append("reporter IN (").append(reporter).append(")");
     jiraQuery.append(" and ").append(andQueryOnLabels);
-    jiraQuery.append(" and ").append("created>=").append("-").append(lookBackDays).append("d");
+    jiraQuery.append(" and ").append(createdByQuery);
 
     LOG.info("Fetching Jira tickets using query - {}", jiraQuery.toString());
     Iterable<Issue> jiraIssuesIt = restClient.getSearchClient().searchJql(jiraQuery.toString()).claim().getIssues();

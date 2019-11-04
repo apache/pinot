@@ -35,7 +35,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.mail.HtmlEmail;
@@ -127,7 +126,8 @@ public class JiraContentFormatter extends AlertContentFormatter {
       jiraEntity.setAssignee(assignee);
     }
 
-    jiraEntity.setMergeGap(MapUtils.getLong(alertClientConfig, PROP_MERGE_GAP, TimeUnit.DAYS.toMillis(1)));
+    // default - report new anomalies by reopening existing jira tickets
+    jiraEntity.setMergeGap(MapUtils.getLong(alertClientConfig, PROP_MERGE_GAP, 0L));
 
     List<String> labels = ConfigUtils.getList(alertClientConfig.get(PROP_LABELS));
     labels.add(PROP_DEFAULT_LABEL);

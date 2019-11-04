@@ -72,6 +72,7 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
   private JiraConfiguration jiraAdminConfig;
 
   public static final String PROP_JIRA_SCHEME = "jiraScheme";
+  public static final int JIRA_DESCRIPTION_MAX_LENGTH = 100000;
 
   public DetectionJiraAlerter(DetectionAlertConfigDTO subsConfig, ThirdEyeAnomalyConfiguration thirdeyeConfig,
       DetectionAlertFilterResult result, ThirdEyeJiraClient jiraClient) {
@@ -97,6 +98,11 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
     jiraClient.updateIssue(issue, jiraEntity);
 
     try {
+      // Safeguard check from ThirdEye side
+      if (jiraEntity.getDescription().length() > JIRA_DESCRIPTION_MAX_LENGTH) {
+        throw new RuntimeException("Exceeded jira description character limit of {}" + JIRA_DESCRIPTION_MAX_LENGTH);
+      }
+
       jiraClient.addComment(issue, jiraEntity.getDescription());
     } catch (Exception e) {
       // Jira has a upper limit on the number of characters in description. In such cases we will only
