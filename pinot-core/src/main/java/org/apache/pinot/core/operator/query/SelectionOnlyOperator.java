@@ -52,7 +52,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
   public SelectionOnlyOperator(IndexSegment indexSegment, Selection selection, TransformOperator transformOperator) {
     _indexSegment = indexSegment;
     _transformOperator = transformOperator;
-    _expressions = SelectionOperatorUtils.extractExpressions(selection.getSelectionColumns(), indexSegment, null);
+    _expressions = SelectionOperatorUtils.extractExpressions(selection.getSelectionColumns(), indexSegment);
 
     int numExpressions = _expressions.size();
     _blockValSets = new BlockValSet[numExpressions];

@@ -91,7 +91,7 @@ public class SelectionOperatorServiceTest {
     IndexSegment indexSegment = mock(IndexSegment.class);
     when(indexSegment.getPhysicalColumnNames()).thenReturn(new HashSet<>(Arrays.asList("foo", "bar", "foobar")));
     List<TransformExpressionTree> expressions =
-        SelectionOperatorUtils.extractExpressions(selectionColumns, indexSegment, null);
+        SelectionOperatorUtils.extractExpressions(selectionColumns, indexSegment);
     assertEquals(expressions.size(), 5);
     assertEquals(expressions.get(0).toString(), "add(foo,'1')");
     assertEquals(expressions.get(1).toString(), "foo");
@@ -100,7 +100,7 @@ public class SelectionOperatorServiceTest {
     assertEquals(expressions.get(4).toString(), "foobar");
 
     // For 'SELECT *' select only queries, should return all physical columns in alphabetical order
-    expressions = SelectionOperatorUtils.extractExpressions(Collections.singletonList("*"), indexSegment, null);
+    expressions = SelectionOperatorUtils.extractExpressions(Collections.singletonList("*"), indexSegment);
     assertEquals(expressions.size(), 3);
     assertEquals(expressions.get(0).toString(), "bar");
     assertEquals(expressions.get(1).toString(), "foo");

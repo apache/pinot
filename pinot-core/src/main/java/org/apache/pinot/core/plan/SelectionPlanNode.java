@@ -38,7 +38,7 @@ public class SelectionPlanNode implements PlanNode {
 
   private final IndexSegment _indexSegment;
   private final Selection _selection;
-  private TransformPlanNode _transformPlanNode;
+  private final TransformPlanNode _transformPlanNode;
 
   public SelectionPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     _indexSegment = indexSegment;
