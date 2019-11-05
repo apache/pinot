@@ -28,6 +28,62 @@
 - Configure kubectl to connect to the Kubernetes cluster.
   - Skip to [Section: How to setup a Pinot cluster for demo](#How to setup a Pinot cluster for demo) if a k8s cluster is already setup.
 
+
+## (Optional) Setup a Kubernetes cluster on Amazon Elastic Kubernetes Service (Amazon EKS)
+
+### (Optional) Create a new k8s cluster on AWS EKS
+
+- Install AWS CLI (<https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html#install-tool-bundled>)
+- Install AWS-IAM-AUTHENTICATOR (<https://docs.aws.amazon.com/eks/latest/userguide/install-aws-iam-authenticator.html>)
+- Install eksctl (<https://docs.aws.amazon.com/eks/latest/userguide/eksctl.html#installing-eksctl>)
+
+- Login to your AWS account.
+
+```bash
+aws configure
+```
+
+Note that environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` will override the aws configuration in file `~/.aws/credentials`.
+
+- Create an EKS cluster
+
+Please modify the parameters in the example command below:
+
+```bash
+eksctl create cluster \
+--name pinot-quickstart \
+--version 1.14 \
+--region us-west-2 \
+--nodegroup-name standard-workers \
+--node-type t3.small \
+--nodes 3 \
+--nodes-min 3 \
+--nodes-max 4 \
+--node-ami auto
+```
+You can monitor cluster status by command:
+
+```bash
+EKS_CLUSTER_NAME=pinot-quickstart
+aws eks describe-cluster --name ${EKS_CLUSTER_NAME}
+```
+
+Once the cluster is in `ACTIVE` status, it's ready to be used.
+
+### (Optional) How to connect to an existing cluster
+
+Simply run below command to get the credential for the cluster you just created or your existing cluster.
+
+```bash
+EKS_CLUSTER_NAME=pinot-quickstart
+aws eks update-kubeconfig --name ${EKS_CLUSTER_NAME}
+```
+
+To verify the connection, you can run
+```bash
+kubectl get nodes
+```
+
 ## (Optional) Setup a Kubernetes cluster on Google Kubernetes Engine(GKE)
 
 ### (Optional) Create a new k8s cluster on GKE
@@ -129,18 +185,26 @@ helm dependency update
 
 ### Start Pinot with Helm
 
+If cluster is just initialized, ensure helm is initialized by running:
+
+```bash
+helm init --service-account tiller
+```
+
+Then deploy pinot cluster by:
+
 ```bash
 helm install --namespace "pinot-quickstart" --name "pinot" .
 ```
 
 #### Troubleshooting
-Error: Please run below command if encountering issue:
+- Error: Please run below command if encountering issue:
 
 ```
 Error: could not find tiller".
 ```
 
-Resolution:
+- Resolution:
 
 ```bash
 kubectl -n kube-system delete deployment tiller-deploy
@@ -148,11 +212,11 @@ kubectl -n kube-system delete service/tiller-deploy
 helm init --service-account tiller
 ```
 
-Error: Please run below command if encountering permission issue:
+- Error: Please run below command if encountering permission issue:
 
 ```Error: release pinot failed: namespaces "pinot-quickstart" is forbidden: User "system:serviceaccount:kube-system:default" cannot get resource "namespaces" in API group "" in the namespace "pinot-quickstart"```
 
-Resolution:
+- Resolution:
 
 ```bash
 kubectl apply -f helm-rbac.yaml
@@ -196,7 +260,7 @@ Please use below script to do local port-forwarding and open Pinot query console
 ### How to clean up Pinot deployment
 
 ```bash
-kubectl delete -f pinot-example-loader.yml
+kubectl delete -f pinot-realtime-quickstart.yml
 helm del --purge kafka
 helm del --purge pinot
 ```
