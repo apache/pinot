@@ -169,7 +169,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       this.provider.fetchTimeseries(Collections.singleton(cacheSlice));
     }
 
-    List<Interval> monitoringWindows = this.getMonitoringWindows();
+    List<Interval> monitoringWindows =
+        this.getMonitoringWindows().stream().filter(i -> i.getEndMillis() <= this.endTime).collect(Collectors.toList());
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     TimeSeries predictedResult = TimeSeries.empty();
     int totalWindows = monitoringWindows.size();
@@ -183,8 +184,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       Interval window = monitoringWindows.get(i);
       DetectionResult detectionResult = DetectionResult.empty();
       try {
-        LOG.info("[Pipeline] start detection for config {} metricUrn {} window ({}/{}) - start {} end {}",
-            config.getId(), metricUrn, i + 1, monitoringWindows.size(), window.getStart(), window.getEnd());
+        LOG.info("[Pipeline] start detection for config {} detector {} metricUrn {} window ({}/{}) - start {} end {}",
+            config.getId(), this.detectorName, metricUrn, i + 1, monitoringWindows.size(), window.getStart(), window.getEnd());
         long ts = System.currentTimeMillis();
         detectionResult = anomalyDetector.runDetection(window, this.metricUrn);
         LOG.info("[Pipeline] end detection for config {} metricUrn {} window ({}/{}) - start {} end {} used {} milliseconds, detected {} anomalies",
