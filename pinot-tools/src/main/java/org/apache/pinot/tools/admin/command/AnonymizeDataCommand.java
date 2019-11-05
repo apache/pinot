@@ -35,6 +35,10 @@ import org.slf4j.LoggerFactory;
 public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AnonymizeDataCommand.class);
 
+  @Option(name = "-action", metaVar = "<String>", required = true, usage =
+      "Can take one of the 3 values: (extractFilterColumns, generateData, generateQueries) depending on whether the tool should extract the filter columns, generate data or generate queries")
+  private String _action;
+
   @Option(name = "-inputSegmentsDir", metaVar = "<String>", usage = "Absolute path of directory containing Pinot table segments")
   private String _inputSegmentsDir;
 
@@ -44,32 +48,20 @@ public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Co
   @Option(name = "-avroFileNamePrefix", metaVar = "<String>", usage = "Generated Avro file name prefix")
   private String _avroFileNamePrefix;
 
-  @Option(name = "-generateData", metaVar = "<boolean>", usage = "Should the tool generate data(false by default)")
-  private boolean _generateData = false;
-
-  @Option(name = "-generateQueries", metaVar = "<boolean>", usage = "Should the tool generate queries(false by default)")
-  private boolean _generateQueries = false;
-
   @Option(name = "-tableName", metaVar = "<String>", usage = "Table name to use for generating queries")
   private String _tableName;
 
-  @Option(name = "-queryDir", metaVar = "<String>", usage = "Absolute path of directory containing the source query file and where the generated query file will be written into")
+  @Option(name = "-queryDir", metaVar = "<String>", usage = "Absolute path of directory containing the original query file and where the generated query file will be written into")
   private String _queryDir;
 
-  @Option(name = "-queryFileName", metaVar = "<String>", usage = "Query file name in queryDir")
-  private String _queryFileName;
+  @Option(name = "-originalQueryFile", metaVar = "<String>", usage = "Original query file name in queryDir")
+  private String _originalQueryFile;
 
-  @Option(name = "-columnsToRetainDataFor", handler = StringArrayOptionHandler.class, usage = "Set of columns to retain data for (empty by default). These should generally be time columns")
+  @Option(name = "-columnsToRetainDataFor", handler = StringArrayOptionHandler.class, usage = "Set of columns to retain data for (empty by default). Values of these columns will not be anonymised. These should be columns containing values of time(e.g daysSinceEpoch, hoursSinceEpoch etc)")
   private String[] _columnsToRetainDataFor;
 
-  @Option(name = "-extractFilterColumns", metaVar = "<boolean>", usage = "Should the tool first extract filter columns (false by default)")
-  private boolean _extractFilterColumns = false;
-
-  @Option(name = "-filterColumns", handler = StringArrayOptionHandler.class, usage = "Set of filter columns to build global dictionaries for")
+  @Option(name = "-filterColumns", handler = StringArrayOptionHandler.class, usage = "Set of filter columns and their cardinalities. Global dictionaries will be built for these columns. Use -help option to see usage example")
   private String[] _columnsParticipatingInFilter;
-
-  @Option(name = "-filterColumnCardinality", handler = StringArrayOptionHandler.class, usage = "filter column cardinalities")
-  private String[] _filterColumnCardinalities;
 
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message")
   private boolean _help = false;
@@ -86,12 +78,14 @@ public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Co
   @Override
   public boolean execute()
       throws Exception {
-    if (_extractFilterColumns) {
-      Set<String> filterColumns = PinotDataAndQueryAnonymizer.FilterColumnExtractor.extractColumnsUsedInFilter(_queryDir, _queryFileName);
-      System.out.println("Columns participating in filter");
-      for (String column: filterColumns) {
-        System.out.println(column);
+    if (_action.equalsIgnoreCase("extractFilterColumns")) {
+      Set<String> filterColumns = PinotDataAndQueryAnonymizer.FilterColumnExtractor.extractColumnsUsedInFilter(_queryDir, _originalQueryFile);
+      StringBuilder sb = new StringBuilder();
+      sb.append("Columns participating in filter: ");
+      for (String column : filterColumns) {
+        sb.append(column).append(" ");
       }
+      System.out.println(sb.toString());
       // if the user has asked for extracting filter columns from a query file, then
       // we should simply return after doing that since the tool will be run subsequently
       // based on the set of filter columns it returns to the user
@@ -104,37 +98,18 @@ public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Co
     }
 
     Set<String> filterColumns = new HashSet<>();
+    Map<String, Integer> filterColumnCardinalityMap = new HashMap<>();
     if (_columnsParticipatingInFilter != null) {
-      filterColumns.addAll(Lists.newArrayList(_columnsParticipatingInFilter));
+      for (int i = 0; i < _columnsParticipatingInFilter.length; i++) {
+        String columnInfo = _columnsParticipatingInFilter[i];
+        String[] columnAndCardinality = columnInfo.split(":");
+        int cardinality = Integer.valueOf(columnAndCardinality[1]);
+        filterColumnCardinalityMap.put(columnAndCardinality[0], cardinality);
+        filterColumns.add(columnAndCardinality[0]);
+      }
     }
 
-    if (_generateData) {
-      // It is fine to not specify any set of filter columns (and cardinalities).
-      // In such case, data generation phase will skip building global dictionaries
-      // and simply generate random data. Later during query generation, we will assert
-      // if we encounter a WHERE clause. So user should choose to not specify the set of
-      // filter columns only if they are interested in generating any arbitrary data
-      // without taking care of input Pinot segment distribution/cardinality and they
-      // won't be generating queries later.
-      //
-      // However, we check for the condition that if user has specified a set of
-      // filter columns, the corresponding cardinalities are also there in equal number
-      if ((_columnsParticipatingInFilter != null && _filterColumnCardinalities == null) ||
-          (_filterColumnCardinalities != null && _columnsParticipatingInFilter == null) ||
-          (_columnsParticipatingInFilter != null && _columnsParticipatingInFilter.length != _filterColumnCardinalities.length)) {
-        throw new RuntimeException("Please correctly specify the set of filter columns and their corresponding cardinality values");
-      }
-
-      Map<String, Integer> filterColumnCardinalityMap = new HashMap<>();
-
-      if (_columnsParticipatingInFilter != null) {
-        for (int i = 0; i < _columnsParticipatingInFilter.length; i++) {
-          String filterColumn = _columnsParticipatingInFilter[i];
-          int filterColumnCardinality = Integer.valueOf(_filterColumnCardinalities[i]);
-          filterColumnCardinalityMap.put(filterColumn, filterColumnCardinality);
-        }
-      }
-
+    if (_action.equalsIgnoreCase("generateData")) {
       // generate data
       PinotDataAndQueryAnonymizer pinotDataGenerator = new PinotDataAndQueryAnonymizer(
           _inputSegmentsDir,
@@ -150,22 +125,22 @@ public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Co
       return true;
     }
 
-    if (_generateQueries) {
+    if (_action.equalsIgnoreCase("generateQueries")) {
       // generate queries from prebuilt global dictionaries
       PinotDataAndQueryAnonymizer.QueryGenerator queryGenerator = new PinotDataAndQueryAnonymizer.QueryGenerator(
-          _outputDir, _queryDir, _queryFileName, _tableName, filterColumns, columnsToRetainDataFor);
+          _outputDir, _queryDir, _originalQueryFile, _tableName, filterColumns, columnsToRetainDataFor);
       queryGenerator.generateQueries();
 
       return true;
     }
 
     throw new RuntimeException(
-        "One of the options (-extractFilterColumns, -generateDataa, -generateQueries should be true. Please use the -help option to see usage examples");
+        "-action should be either extractFilterColumns or generateData or generateQueries. Please use the -help option to see usage examples");
   }
 
   @Override
   public String description() {
-    return "Data anonymizer";
+    return "Tool to anonymize a given Pinot table data while preserving data characteristics and query patterns";
   }
 
   @Override
@@ -173,23 +148,25 @@ public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Co
     StringBuilder usage = new StringBuilder();
 
     usage.append("\n*******Usage Notes******")
-        .append("\n\nData anonymizer can be used as a sequence of multiple steps to anonymize and generate random data.")
-        .append("\nSTEP 1 - user should first extract the set of filter columns. The tool will parse the query file")
+        .append("\n\nData and Query Anonymizer can be used as a sequence of multiple steps to anonymize input Pinot table data and generate queries for anonymized data")
+        .append("\nSTEP 1 - user should first extract the set of filter columns. The tool will parse the original query file")
         .append("\nin queryDir and output the names of columns that participate in WHERE clause")
-        .append("\n\nsh pinot-admin.sh AnonymizeData -queryDir /home/user/queryDir -queryFileName queries.raw -extractFilterColumns")
-        .append("\n\nSTEP 2 - Provide the set of filter columns (extracted in STEP 1) as input here and anonymize input data.")
-        .append("\nInput data is set of Pinot segments. The tool will build global dictionaries for the set of filter")
-        .append("\ncolumns to keep the distribution of values same. For other columns, random arbitrary data will")
+        .append("\n\nsh pinot-admin.sh AnonymizeData -queryDir /home/user/queryDir -originalQueryFile queries.raw -action extractFilterColumns")
+        .append("\n\nSTEP 2 - Provide the set of filter columns (extracted in STEP 1) along with their cardinalities as input here and anonymize input data.")
+        .append("\nInput data is a set of Pinot segments. The tool will build global dictionaries for the set of filter")
+        .append("\ncolumns to keep the distribution of values same. Global dictionary for each filter column will")
+        .append("\ncontain a 1-1 mapping between original column value and corresponding random value. For other columns, random arbitrary data will")
         .append("\nbe generated. The generated data will be written in Avro files (1 per input segment) in the outputDir.")
         .append("\nThe global dictionaries and anonymous column name mapping will also be written in the same directory.")
-        .append("\n\nsh pinot-admin.sh AnonymizeData -inputSegmentsDir /home/user/pinotTable/segmentDir -outputDir /home/user/outputDir -avroFileNamePrefix Foo -filterColumns col1 col2 -filterColumnCardinality 100000 50000 -generateData")
+        .append("\n\nsh pinot-admin.sh AnonymizeData -inputSegmentsDir /home/user/pinotTable/segmentDir -outputDir /home/user/outputDir -avroFileNamePrefix Foo -filterColumns col1:100000 col2:50000 -action generateData")
         .append("\n\nSTEP 3 - Generate queries. The global dictionaries built in STEP 2 will now be used to generate PQL/SQL queries")
         .append("\non anonymized data. The use of global dictionaries helps to preserve the query patterns. The tool will parse")
-        .append("\nthe query file in queryDir and write a file with name queries.generated in the same directory.")
-        .append("\n\nsh pinot-admin.sh AnonymizeData -outputDir /home/user/outputDir -queryDir /home/user/queryDir -queryFileName queries.raw -tableName MyTable -filterColumns col1 col2 -generateQueries")
+        .append("\nthe original query file in queryDir and write a file with name queries.generated in the same directory.")
+        .append("\nThe global dictionaries will help in rewriting the predicates by substituting the original value with the corresponding anonymous value")
+        .append("\n\nsh pinot-admin.sh AnonymizeData -outputDir /home/user/outputDir -queryDir /home/user/queryDir -queryFileName queries.raw -tableName MyTable -filterColumns col1:100000 col2:50000 -action generateQueries")
         .append("\n\nAs part of STEP 2 and STEP 3, user can also specify a set of columns for which the data needs to be retained.")
         .append("\nThus no global dictionaries will be built for such columns, column value will be copied as is from input")
-        .append("\npinot segment into the Avro file. The query generation phase will also copy the value as is into")
+        .append("\npinot segment into the Avro file. The query generation phase will also copy the value as is")
         .append("\nwhen generating queries if such column happens to be part of WHERE clause. Usually such columns")
         .append("\nare time (or time related) columns where anonymizing data is not important as the time column")
         .append("\nby itself does not reveal anything. Specify the set of columns as -columnsToRetainDataFor col7 col8")

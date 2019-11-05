@@ -88,7 +88,7 @@ import org.slf4j.LoggerFactory;
  * performance, functional, evaluation of other OLAP systems etc).
  *
  * The tool understands the characteristics of the given dataset (Pinot segments)
- * and generate corresponding random data while preserving those characteristics.
+ * and generates corresponding random data while preserving those characteristics.
  * The tool can then also be used to generate queries for the random data.
  *
  * So if we have a set of production data which you want to use for testing
@@ -103,36 +103,8 @@ import org.slf4j.LoggerFactory;
  * these should be time (or time related) columns since they don't reveal anything and so
  * it is fine to copy them as is from souce segments into Avro files.
  *
- * Steps to use this tool are as follows:
- *
- * STEP 1 - Download a day’s queries (same day when we downloaded the segments) from
- * Pinot broker query log. You may have to post-process the log to remove some noise
- * and just keep queries
- *
- * STEP 2 - Point the tool to the query file. It will parse each query
- * and output the set of columns participating in filters (WHERE clause).
- *
- * STEP 3 - Point the tool to directory containing Pinot segments along with
- * the set of filter columns (identified in previous step) and their cardinalities
- * to anonymize data. This step will first read dictionaries from each input segment
- * and build a sorted global dictionary containing 1-1 mapping between an original
- * column value and corresponding column value. Global dictionary will be built
- * only for the set of filter columns. For remaining columns, we can generate any
- * arbitrary random value directly into the Avro file directly.
- *
  * Please see the implementation notes further in the code explaining the global
- * dictionary building phase and data generation phase in detail.
- *
- * STEP 4 - Point the tool to directory containing global dictionaries and column
- * name mapping -- this directory will be the same as the outputDir used in previous
- * step where the tool wrote avro files. Also point the tool to queryDir containing
- * source query files. The tool will load the global dictionaries and use them to
- * rewrite the WHERE part of the query. Similarly, the column name mapping file
- * will be used to rewrite the select list of the original query. A file named
- * "queries.generated" will be written into queryDir.
- *
- * Please see implementation notes further in the code explaining the query
- * generation phase in detail.
+ * dictionary building, and data generation and query generation phases in detail.
  *
  * Also, please see usage examples in
  * {@link org.apache.pinot.tools.admin.command.AnonymizeDataCommand} to learn
@@ -176,7 +148,7 @@ public class PinotDataAndQueryAnonymizer {
   // name of columns to build global dictionary for and corresponding total cardinality
   private final Map<String, Integer> _globalDictionaryColumns;
   // name of time (or time derived) columns for which we will retain data
-  private final Set<String> _timeColumns;
+  private final Set<String> _columnsNotAnonymized;
 
   private String[] _segmentDirectories;
 
@@ -191,7 +163,7 @@ public class PinotDataAndQueryAnonymizer {
       String outputDir,
       String fileNamePrefix,
       Map<String, Integer> globalDictionaryColumns,
-      Set<String> timeColumns) {
+      Set<String> columnsNotAnonymized) {
     _outputDir = outputDir;
     _segmentDir = segmentDir;
     _filePrefix = fileNamePrefix;
@@ -199,9 +171,9 @@ public class PinotDataAndQueryAnonymizer {
     _origToDerivedColumnsMap = new HashMap<>();
     _columnToDataTypeMap = new HashMap<>();
     _globalDictionaryColumns = globalDictionaryColumns;
-    _timeColumns = timeColumns;
+    _columnsNotAnonymized = columnsNotAnonymized;
 
-    for (String column : timeColumns) {
+    for (String column : columnsNotAnonymized) {
       // sometime the predicates can also be on columns which the user
       // wants to retain the data for as is and thus these columns will be
       // part of filter column set as well.
@@ -211,15 +183,21 @@ public class PinotDataAndQueryAnonymizer {
       _globalDictionaryColumns.remove(column);
     }
 
-    LOGGER.info("Columns to retain data for");
-    for (String column : _timeColumns) {
-      LOGGER.info("Column name: " + column);
+    StringBuilder sb = new StringBuilder();
+    sb.append("Columns to retain data for: ");
+    for (String column : _columnsNotAnonymized) {
+      sb.append(column);
     }
 
-    LOGGER.info("Columns to build global dictionary for");
+    LOGGER.info(sb.toString());
+
+    sb = new StringBuilder();
+    sb.append("Columns to build global dictionary for: ");
     for (Map.Entry<String, Integer> entry : _globalDictionaryColumns.entrySet()) {
-      LOGGER.info("Column name: " + entry.getKey() + " cardinality: " + entry.getValue());
+      sb.append("Column: ").append(entry.getKey()).append(" Cardinality: ").append(entry.getValue());
     }
+
+    LOGGER.info(sb.toString());
   }
 
   /*****************************************************
@@ -231,55 +209,43 @@ public class PinotDataAndQueryAnonymizer {
   /*
    * Global Dictionary Implementation Notes
    *
-   * We build global dictionary for a specific set of columns
-   * that participate in filter (predicates) in user queries.
+   * We build global dictionary for a specific set of columns that participate in filter (predicates)
+   * in user queries.
    *
-   * First step of using this tool is to feed in the actual
-   * queries and parse them to extract the set of columns
-   * that are there in WHERE clause.
+   * First step of using this tool is to feed in the actual queries and parse them to extract the set
+   * of columns that are there in WHERE clause.
    *
-   * Once these columns are identified, we build global
-   * dictionaries for them for two main reasons
+   * Once these columns are identified, we build global dictionaries for them for two main reasons:
    *
    * (1) cardinality of such columns is same as in source data
-   * (2) distribution and order of values in such columns is
-   *     same as in source data.
+   * (2) distribution and order of values in such columns is same as in source data.
    *
-   * This ensures that queries with =, <, >, <=, >= predicates
-   * on the actual data yield same results on generated data
+   * This ensures that queries with =, <, >, <=, >= predicates on the actual data yield same results on
+   * generated data.
    *
    * Global dictionary is built in three steps:
    *
    * Step 1:
    *
-   * Read dictionary from each segment and insert original
-   * values into the global dictionary.
+   * Read dictionary from each segment and insert original values into the global dictionary.
    *
-   * The values read from each segment dictionary will be in
-   * sorted order but that is not guaranteed across segments.
-   * Secondly, the value seen in a segment might have already
-   * been inserted into global dictionary while scanning the
-   * dictionary of previous segment.
+   * The values read from each segment dictionary will be in sorted order but that is not guaranteed across
+   * segments. Secondly, the value seen in a segment might have already been inserted into global dictionary
+   * while scanning the dictionary of previous segment.
    *
-   * Since overall (across segments) there is no sort order and
-   * we need to prevent duplicates, we do a linear search to
-   * detect if the value has already been inserted into before
+   * Since overall (across segments) there is no sort order and we need to prevent duplicates, we do a linear search
+   * to detect if the value has already been inserted into before.
    *
-   * Once we finish reading dictionaries from each segment,
-   * our global dictionary is 50% built -- it has all the
+   * Once we finish reading dictionaries from each segment, our global dictionary is 50% built -- it has all the
    * original values.
    *
    * Step 2: Sort the original value array
    *
    * Step 3: Generate derived values (sorted)
    *
-   * and this gives 1-1 mapping between original values
-   * and derived values while maintaining the order
-   *
-   * Finally, we persist the global dictionary and column
-   * name mapping to disk.
+   * Finally we have a 1-1 mapping between original values and derived values while maintaining the order. We then
+   * persist the global dictionary and column name mapping to disk.
    */
-
 
   /**
    * Per column holder to store both original values and corresponding
@@ -453,11 +419,11 @@ public class PinotDataAndQueryAnonymizer {
     addDerivedValuesToGlobalDictionaries();
 
     _timeToBuildDictionaries.stop();
-    LOGGER.info("Finished building global dictionaries. Time taken: {}secs", _timeToBuildDictionaries.elapsed(TimeUnit.SECONDS));
 
     // write global dictionaries and column mapping file to disk
     // query generator phase will load them
     writeGlobalDictionariesAndColumnMapping();
+    LOGGER.info("Finished building global dictionaries. Time taken: {}secs", _timeToBuildDictionaries.elapsed(TimeUnit.SECONDS));
   }
 
   /**
@@ -653,32 +619,22 @@ public class PinotDataAndQueryAnonymizer {
   /*
    * Data Generation Implementation Notes
    *
-   * Read each segment row by row and generate a corresponding
-   * Avro file per segment.
+   * Read each segment row by row and generate a corresponding Avro file per segment. When building the
+   * corresponding Avro row from Pinot segment row, three cases are possible for  a column:
    *
-   * When building the corresponding Avro row from Pinot segment row,
-   * three cases are possible for a column
+   * (1) Column is a global dictionary column. In this case, we consult the global dictionary to look up
+   * the original value and get the corresponding mapped derived  value. Store this derived value in avro
+   * record.
    *
-   * (1) Column is a global dictionary column. In this case, we
-   * consult the global dictionary to look up the original value
-   * and get the corresponding mapped derived  value. Store this
-   * derived value in avro record.
+   * (2) Column is a member of user supplied time/time-derived column set. In this case, store the original
+   * value as is in the avro record.
    *
-   * (2) Column is a member of user supplied time/time-derived column
-   * set. In this case, store the original value as is in the avro record
+   * (3) Column is neither of the above two -- in this case, we simply generate a random value and insert into
+   * Avro record. We don't have to remember this value ever again as it won't be used during query generation.
    *
-   * (3) Column is neither of the above two -- in this case, we simply
-   * generate a random value and insert into Avro record. We don't have
-   * to remember this value ever again as it won't be used during query
-   * generation
-   *
-   * NOTE: that currently the data generation is done immediately
-   * after global dictionary is built so data generation step
-   * doesn't load global dictionary into memory. The data structures
-   * are already in memory.
-   *
-   * The query generation is done separately and so it loads the
-   * global dictionaries and column name mapping
+   * NOTE: Currently the data generation is done immediately after global dictionary is built so data generation
+   * step doesn't load global dictionary into memory. The data structures are already in memory. The query generation
+   * is done separately and so it loads the global dictionaries and column name mapping.
    */
 
   public void generateAvroFiles()
@@ -720,7 +676,7 @@ public class PinotDataAndQueryAnonymizer {
     for (String columnName : pinotRow.getFieldNames()) {
       Object origValue = pinotRow.getValue(columnName);
       String derivedColumnName = _origToDerivedColumnsMap.get(columnName);
-      if (_timeColumns.contains(columnName)) {
+      if (_columnsNotAnonymized.contains(columnName)) {
         // retain the value
         record.put(derivedColumnName, origValue);
       } else if (_globalDictionaryColumns.containsKey(columnName)) {
@@ -905,7 +861,7 @@ public class PinotDataAndQueryAnonymizer {
     String _queryFileName;
     String _tableName;
     private final Set<String> _globalDictionaryColumns;
-    private final Set<String> _timeColumns;
+    private final Set<String> _columnsNotAnonymized;
     // query generator builds these maps by reading files in outputDir
     // these must have been written out earlier during global dictionary
     // building phase
@@ -920,7 +876,7 @@ public class PinotDataAndQueryAnonymizer {
         String queryFile,
         String tableName,
         Set<String> filterColumns,
-        Set<String> timeColumns) throws Exception {
+        Set<String> columnsNotAnonymized) throws Exception {
       _outputDir = outputDir;
       _queryDir = queryDir;
       _queryFileName = queryFile;
@@ -928,8 +884,8 @@ public class PinotDataAndQueryAnonymizer {
       _origToDerivedValueMap = new HashMap<>();
       _origToDerivedColumnsMap = new HashMap<>();
       _globalDictionaryColumns = filterColumns;
-      _timeColumns = timeColumns;
-      for (String column : timeColumns) {
+      _columnsNotAnonymized = columnsNotAnonymized;
+      for (String column : columnsNotAnonymized) {
         _globalDictionaryColumns.remove(column);
       }
       loadGlobalDictionariesAndColumnMapping();
@@ -1264,7 +1220,7 @@ public class PinotDataAndQueryAnonymizer {
       //     dictionary for them containing 1-1 mapping between original and
       //     generated value
       // (2) columns that we retained the data for as is.
-      if (_timeColumns.contains(column)) {
+      if (_columnsNotAnonymized.contains(column)) {
         // if we retained the value, simply return the original value
         return origValue;
       } else if (_globalDictionaryColumns.contains(column)) {
@@ -1292,7 +1248,6 @@ public class PinotDataAndQueryAnonymizer {
    *             Filter Column Extractor               *
    *                                                   *
    *****************************************************/
-
 
 
   public static class FilterColumnExtractor {
