@@ -60,7 +60,6 @@ import org.apache.pinot.common.utils.DataTable;
  */
 public class SelectionOperatorService {
   private final List<String> _selectionColumns;
-  private final List<SelectionSort> _sortSequence;
   private final DataSchema _dataSchema;
   private final int _offset;
   private final int _numRowsToKeep;
@@ -74,13 +73,12 @@ public class SelectionOperatorService {
    */
   public SelectionOperatorService(Selection selection, DataSchema dataSchema) {
     _selectionColumns = SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), dataSchema);
-    _sortSequence = selection.getSelectionSortSequence();
     _dataSchema = dataSchema;
     // Select rows from offset to offset + size.
     _offset = selection.getOffset();
     _numRowsToKeep = _offset + selection.getSize();
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-        getTypeCompatibleComparator());
+        getTypeCompatibleComparator(selection.getSelectionSortSequence()));
   }
 
   /**
@@ -89,9 +87,9 @@ public class SelectionOperatorService {
    *
    * @return flexible {@link Comparator} for selection rows.
    */
-  private Comparator<Serializable[]> getTypeCompatibleComparator() {
+  private Comparator<Serializable[]> getTypeCompatibleComparator(List<SelectionSort> sortSequence) {
     // Compare all single-value columns
-    int numOrderByExpressions = _sortSequence.size();
+    int numOrderByExpressions = sortSequence.size();
     List<Integer> valueIndexList = new ArrayList<>(numOrderByExpressions);
     for (int i = 0; i < numOrderByExpressions; i++) {
       if (!_dataSchema.getColumnDataType(i).isArray()) {
@@ -101,21 +99,33 @@ public class SelectionOperatorService {
 
     int numValuesToCompare = valueIndexList.size();
     int[] valueIndices = new int[numValuesToCompare];
-    Comparator[] valueComparators = new Comparator[numValuesToCompare];
+    boolean[] isNumber = new boolean[numValuesToCompare];
+    // Use multiplier -1 or 1 to control ascending/descending order
+    int[] multipliers = new int[numValuesToCompare];
     for (int i = 0; i < numValuesToCompare; i++) {
       int valueIndex = valueIndexList.get(i);
       valueIndices[i] = valueIndex;
-      if (_dataSchema.getColumnDataType(i).isNumber()) {
-        valueComparators[i] = Comparator.comparingDouble(Number::doubleValue);
-      } else {
-        valueComparators[i] = Comparator.naturalOrder();
-      }
-      if (_sortSequence.get(valueIndex).isIsAsc()) {
-        valueComparators[i] = valueComparators[i].reversed();
-      }
+      isNumber[i] = _dataSchema.getColumnDataType(valueIndex).isNumber();
+      multipliers[i] = sortSequence.get(valueIndex).isIsAsc() ? -1 : 1;
     }
 
-    return new SelectionOperatorUtils.RowComparator(valueIndices, valueComparators);
+    return (o1, o2) -> {
+      for (int i = 0; i < numValuesToCompare; i++) {
+        int index = valueIndices[i];
+        Serializable v1 = o1[index];
+        Serializable v2 = o2[index];
+        int result;
+        if (isNumber[i]) {
+          result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
+        } else {
+          result = ((String) v1).compareTo((String) v2);
+        }
+        if (result != 0) {
+          return result * multipliers[i];
+        }
+      }
+      return 0;
+    };
   }
 
   /**
