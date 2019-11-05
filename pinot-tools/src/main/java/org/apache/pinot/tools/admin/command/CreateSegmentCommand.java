@@ -434,4 +434,16 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     return fileName.endsWith(".avro") || fileName.endsWith(".csv") || fileName.endsWith(".json") || fileName
         .endsWith(".thrift") || fileName.endsWith(".parquet");
   }
+
+  public static void main(String[] args) throws Exception {
+    String dataDir = "/Users/dadapon/Desktop/getting-started/data";
+    String schemaFile = "/Users/dadapon/Desktop/getting-started/config/transcript-schema.json";
+    String tableName = "transcript";
+    String segmentName = "transcript_0";
+    String outDir = "/Users/dadapon/Desktop/getting-started/test2";
+    CreateSegmentCommand segmentCreator =
+        new CreateSegmentCommand().setDataDir(dataDir).setSchemaFile(schemaFile).setTableName(tableName)
+            .setSegmentName(segmentName).setOutDir(outDir).setOverwrite(true);
+    segmentCreator.execute();
+  }
 }
