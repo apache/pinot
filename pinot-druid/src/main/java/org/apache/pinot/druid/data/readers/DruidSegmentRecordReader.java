@@ -166,7 +166,12 @@ public class DruidSegmentRecordReader implements RecordReader {
       BaseObjectColumnValueSelector selector = _selectors.get(i);
       // If the column does not exist in the segment file, skip it.
       if (selector != null) {
-        final Object value = selector.getObject();
+        FieldSpec fieldSpec = _pinotSchema.getFieldSpecFor(_columnNames.get(i));
+        Object value = selector.getObject();
+        if (value != null && !fieldSpec.isSingleValueField()) {
+          // Assuming that multi-valued dimensions in Druid are stored as Arrays.ArrayList (this has been checked)
+          value = ((List<String>) value).toArray(new String[0]);
+        }
         reuse.putField(columnName, value);
       }
     }
@@ -219,6 +224,7 @@ public class DruidSegmentRecordReader implements RecordReader {
           throw new IllegalArgumentException("Column " + columnName
               + ": DruidSegmentRecordReader does not support complex metric columns.");
         }
+
         FieldSpec fieldSpec = _pinotSchema.getFieldSpecFor(_columnNames.get(i));
         if (!fieldSpec.isSingleValueField() && fieldSpec.getDataType() != FieldSpec.DataType.STRING) {
           throw new IllegalArgumentException("Column " + columnName
