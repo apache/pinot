@@ -95,8 +95,6 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
           DataSource dataSource = new DataSource();
           dataSource.setInitialSize(INIT_CONNECTIONS);
           dataSource.setMaxActive(MAX_CONNECTIONS);
-          System.out.println(prestoUser);
-          System.out.println(prestoPassword);
           dataSource.setUsername(prestoUser);
           dataSource.setPassword(prestoPassword);
           dataSource.setUrl(entry.getValue());

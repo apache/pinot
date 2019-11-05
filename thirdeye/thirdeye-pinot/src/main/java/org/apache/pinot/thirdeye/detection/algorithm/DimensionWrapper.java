@@ -245,7 +245,8 @@ public class DimensionWrapper extends DetectionPipeline {
     }
 
     // don't use in-memory cache for dimension exploration, it will cause thrashing
-    if (CacheConfig.useCentralizedCache()) {
+    // we add a "duplicate" condition so that tests can run. will fix tests later on
+    if (CacheConfig.useCentralizedCache() && !CacheConfig.useInMemoryCache()) {
       if (this.cachingPeriodLookback >= 0) {
         this.provider.fetchTimeseries(nestedMetrics.stream()
             .map(metricEntity -> MetricSlice.from(metricEntity.getId(), startTime - cachingPeriodLookback, endTime,

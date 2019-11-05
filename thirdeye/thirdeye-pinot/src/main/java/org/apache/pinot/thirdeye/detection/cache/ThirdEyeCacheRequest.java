@@ -73,7 +73,5 @@ public class ThirdEyeCacheRequest {
 
   public long getEndTimeExclusive() { return endTimeExclusive; }
 
-  public String getDimensionKey() {
-    return dimensionKey;
-  }
+  public String getDimensionKey() { return dimensionKey; }
 }

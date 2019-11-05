@@ -46,6 +46,7 @@ import org.apache.pinot.thirdeye.detection.DetectionPipelineException;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.PredictionResult;
+import org.apache.pinot.thirdeye.detection.cache.CacheConfig;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
 import org.apache.pinot.thirdeye.detection.spi.exception.DetectorDataInsufficientException;
 import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
@@ -163,10 +164,12 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     // 1. get the last time stamp for the time series.
     // 2. to calculate current values and  baseline values for the anomalies detected
     // 3. anomaly detection current and baseline time series value
-    if (this.cachingPeriodLookback >= 0) {
-      MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - cachingPeriodLookback, endTime,
-          this.metricEntity.getFilters());
-      this.provider.fetchTimeseries(Collections.singleton(cacheSlice));
+    if (CacheConfig.useCentralizedCache() || CacheConfig.useInMemoryCache()) {
+      if (this.cachingPeriodLookback >= 0) {
+        MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - cachingPeriodLookback, endTime,
+            this.metricEntity.getFilters());
+        this.provider.fetchTimeseries(Collections.singleton(cacheSlice));
+      }
     }
 
     List<Interval> monitoringWindows = this.getMonitoringWindows();

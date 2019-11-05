@@ -59,12 +59,14 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
   private final DatasetConfigManager datasetDAO;
   private final QueryCache queryCache;
   private CouchbaseCacheDAO cacheDAO;
+  private final ExecutorService executor;
 
-  public DefaultTimeSeriesCache(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, QueryCache queryCache, CouchbaseCacheDAO cacheDAO) {
+  public DefaultTimeSeriesCache(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, QueryCache queryCache, CouchbaseCacheDAO cacheDAO, ExecutorService executorService) {
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
     this.queryCache = queryCache;
     this.cacheDAO = cacheDAO;
+    this.executor = executorService;
   }
 
   /**
@@ -179,9 +181,6 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
    * @param response a object containing the time-series to be inserted
    */
   public void insertTimeSeriesIntoCache(ThirdEyeResponse response) {
-
-    // we can consider using fixedThreadPool instead.
-    ExecutorService executor = Executors.newCachedThreadPool();
 
     // insert points in parallel
     for (MetricFunction metric : response.getMetricFunctions()) {

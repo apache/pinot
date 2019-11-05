@@ -56,8 +56,9 @@ public class CouchbaseCacheDAO {
    */
   private void createDataStoreConnection() {
     Cluster cluster = CouchbaseCluster.create();
-    cluster.authenticate(CacheConfig.COUCHBASE_AUTH_USERNAME, CacheConfig.COUCHBASE_AUTH_PASSWORD);
-    this.bucket = cluster.openBucket(CacheConfig.COUCHBASE_BUCKET_NAME);
+
+    cluster.authenticate(CacheConfig.getAuthUsername(), CacheConfig.getAuthPassword());
+    this.bucket = cluster.openBucket(CacheConfig.getBucketName());
   }
 
   /**
@@ -88,7 +89,7 @@ public class CouchbaseCacheDAO {
 
     // NOTE: we subtract 1 granularity from the end date because Couchbase's BETWEEN clause is inclusive on both sides
     JsonObject parameters = JsonObject.create()
-        .put(CacheConstants.BUCKET, CacheConfig.COUCHBASE_BUCKET_NAME)
+        .put(CacheConstants.BUCKET, CacheConfig.getBucketName())
         .put(CacheConstants.METRIC_ID, request.getMetricId())
         .put(CacheConstants.DIMENSION_KEY, request.getDimensionKey())
         .put(CacheConstants.START, request.getStartTimeInclusive())
@@ -137,12 +138,12 @@ public class CouchbaseCacheDAO {
    */
   public void insertTimeSeriesDataPoint(TimeSeriesDataPoint point) {
 
-    JsonDocument doc = bucket.getAndTouch(point.getDocumentKey(), CacheConfig.TTL);
+    JsonDocument doc = bucket.getAndTouch(point.getDocumentKey(), CacheConfig.getCentralizedCacheSettings().getTTL());
     ThirdeyeMetricsUtil.couchbaseCallCounter.inc();
 
     if (doc == null) {
       JsonObject documentBody = CacheUtils.buildDocumentStructure(point);
-      doc = JsonDocument.create(point.getDocumentKey(), CacheConfig.TTL, documentBody);
+      doc = JsonDocument.create(point.getDocumentKey(), CacheConfig.getCentralizedCacheSettings().getTTL(), documentBody);
     } else {
       JsonObject dimensions = doc.content();
       if (dimensions.containsKey(point.getMetricUrnHash())) {

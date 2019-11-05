@@ -36,6 +36,9 @@ import java.net.URL;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.thirdeye.detection.cache.CacheConfig;
+import org.apache.pinot.thirdeye.detection.cache.CacheConfigLoader;
+import org.apache.pinot.thirdeye.detection.cache.CacheDataSource;
 import org.apache.pinot.thirdeye.detection.cache.CouchbaseCacheDAO;
 import org.apache.pinot.thirdeye.detection.cache.DefaultTimeSeriesCache;
 import org.apache.pinot.thirdeye.detection.cache.TimeSeriesCache;
@@ -72,7 +75,7 @@ public class ThirdEyeCacheRegistry {
   public static void initializeCaches(ThirdEyeConfiguration thirdeyeConfig) throws Exception {
     initDataSources(thirdeyeConfig);
     initMetaDataCaches();
-    initCentralizedCache();
+    initCentralizedCache(thirdeyeConfig);
   }
 
   /**
@@ -95,16 +98,30 @@ public class ThirdEyeCacheRegistry {
     }
   }
 
-  public static void initCentralizedCache() {
+  public static void initCentralizedCache(ThirdEyeConfiguration thirdeyeConfig) {
     try {
+      URL cacheConfigUrl = thirdeyeConfig.getCacheConfigAsUrl();
+      CacheConfig cacheConfig = CacheConfigLoader.fromCacheConfigUrl(cacheConfigUrl);
+      if (cacheConfig == null) {
+        throw new IllegalStateException("Could not get cache config from path " + cacheConfigUrl);
+      }
+
+      CacheDataSource dataSource = CacheConfig.getCentralizedCacheSettings().getDataSourceConfig();
+
+      cacheConfig.setAuthUsername(dataSource.getAuthUsername());
+      cacheConfig.setAuthPassword(dataSource.getAuthPassword());
+      cacheConfig.setBucketName(dataSource.getBucketName());
+
       if (INSTANCE.getTimeSeriesCache() == null) {
         TimeSeriesCache timeSeriesCache = new DefaultTimeSeriesCache(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
-            ThirdEyeCacheRegistry.getInstance().getQueryCache(), new CouchbaseCacheDAO());
+            ThirdEyeCacheRegistry.getInstance().getQueryCache(),
+            new CouchbaseCacheDAO(),
+            Executors.newFixedThreadPool(CacheConfig.getCentralizedCacheSettings().getMaxParallelInserts()));
 
         ThirdEyeCacheRegistry.getInstance().registerTimeSeriesCache(timeSeriesCache);
       }
     } catch (Exception e) {
-      LOGGER.info("Caught exception while initializing caches", e);
+      LOGGER.info("Caught exception while initializing centralized cache", e);
     }
   }
 
@@ -115,7 +132,7 @@ public class ThirdEyeCacheRegistry {
     ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
     QueryCache queryCache = cacheRegistry.getQueryCache();
     Preconditions.checkNotNull(queryCache,
-        "Data sources are not initialzed. Please invoke initDataSources() before this method.");
+        "Data sources are not initialized. Please invoke initDataSources() before this method.");
 
     // DatasetConfig cache
     // TODO deprecate. read from database directly
