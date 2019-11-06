@@ -22,6 +22,7 @@ import java.util.Set;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.partition.PartitionFunction;
+import org.apache.pinot.core.io.readerwriter.BaseSingleColumnSingleValueReaderWriter;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
 
@@ -30,12 +31,15 @@ import static org.apache.pinot.core.common.Constants.UNKNOWN_CARDINALITY;
 
 public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
 
+  final BaseSingleColumnSingleValueReaderWriter _forwardIndex;
   final BlockValSet _blockValSet;
   final int _numDocIds;
   final String _operatorName;
 
   public RealtimeNoDictionaryColStatistics(ColumnDataSource dataSource) {
     _operatorName = dataSource.getOperatorName();
+    // no-dictionary is only supported for SV columns
+    _forwardIndex = (BaseSingleColumnSingleValueReaderWriter)dataSource.getForwardIndex();
     Block block = dataSource.nextBlock();
     _numDocIds = block.getMetadata().getEndDocId() + 1;
     _blockValSet = block.getBlockValueSet();
@@ -63,12 +67,12 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
 
   @Override
   public int getLengthOfShortestElement() {
-    return lengthOfDataType(); // Only fixed length data types supported.
+    return _forwardIndex.getLengthOfShortestElement();
   }
 
   @Override
   public int getLengthOfLargestElement() {
-    return lengthOfDataType(); // Only fixed length data types supported.
+    return _forwardIndex.getLengthOfLongestElement();
   }
 
   @Override
@@ -104,20 +108,5 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
   @Override
   public Set<Integer> getPartitions() {
     return null;
-  }
-
-  private int lengthOfDataType() {
-    switch (_blockValSet.getValueType()) {
-      case INT:
-        return Integer.BYTES;
-      case LONG:
-        return Long.BYTES;
-      case FLOAT:
-        return Float.BYTES;
-      case DOUBLE:
-        return Double.BYTES;
-      default:
-        throw new UnsupportedOperationException();
-    }
   }
 }

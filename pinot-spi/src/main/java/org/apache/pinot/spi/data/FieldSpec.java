@@ -368,6 +368,14 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
           throw new UnsupportedOperationException("Unsupported data type: " + this);
       }
     }
+
+    /**
+     * Check if the data type is for fixed width data (INT, LONG, FLOAT, DOUBLE)
+     * or variable width data (STRING, BYTES)
+     */
+    public boolean isFixedWidth() {
+      return this != STRING && this != BYTES;
+    }
   }
 
   @Override

@@ -72,6 +72,16 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
   }
 
   @Override
+  public int getLengthOfShortestElement() {
+    return _columnSizesInBytes;
+  }
+
+  @Override
+  public int getLengthOfLongestElement() {
+    return _columnSizesInBytes;
+  }
+
+  @Override
   public void close()
       throws IOException {
     for (ReaderWithOffset reader : _readers) {
