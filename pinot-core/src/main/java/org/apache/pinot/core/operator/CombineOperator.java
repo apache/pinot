@@ -71,7 +71,6 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
     int numOperators = _operators.size();
     // Try to use all MAX_NUM_THREADS_PER_QUERY threads for the query, but ensure each thread has at least one operator
     int numThreads = Math.min(numOperators, MAX_NUM_THREADS_PER_QUERY);
-    int numOperatorsPerThread = (numOperators + numThreads - 1) / numThreads;
 
     // We use a BlockingQueue to store the results for each operator group, and track if all operator groups are
     // finished by the query timeout, and cancel the unfinished futures (try to interrupt the execution if it already
@@ -100,10 +99,8 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
               return;
             }
 
-            int start = index * numOperatorsPerThread;
-            int end = Math.min(start + numOperatorsPerThread, numOperators);
-            IntermediateResultsBlock mergedBlock = (IntermediateResultsBlock) _operators.get(start).nextBlock();
-            for (int i = start + 1; i < end; i++) {
+            IntermediateResultsBlock mergedBlock = (IntermediateResultsBlock) _operators.get(index).nextBlock();
+            for (int i = index + numThreads; i < numOperators; i += numThreads) {
               IntermediateResultsBlock blockToMerge = (IntermediateResultsBlock) _operators.get(i).nextBlock();
               try {
                 CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
