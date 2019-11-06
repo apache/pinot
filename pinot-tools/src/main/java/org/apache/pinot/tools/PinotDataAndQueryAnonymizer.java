@@ -687,8 +687,10 @@ public class PinotDataAndQueryAnonymizer {
       DataFileWriter<GenericData.Record> avroRecordWriter,
       GenericRow pinotRow) throws Exception {
     GenericData.Record record = new GenericData.Record(_avroSchema);
-    for (String columnName : pinotRow.getFieldNames()) {
-      Object origValue = pinotRow.getValue(columnName);
+    Map<String, Object> fieldToValueMap = pinotRow.getFieldToValueMap();
+    for (Map.Entry<String, Object> entry : fieldToValueMap.entrySet()) {
+      String columnName = entry.getKey();
+      Object origValue = entry.getValue();
       String derivedColumnName = _origToDerivedColumnsMap.get(columnName);
       if (_columnsNotAnonymized.contains(columnName)) {
         // retain the value
