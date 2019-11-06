@@ -612,7 +612,11 @@ public class HelixExternalViewBasedRouting implements ClusterChangeHandler, Rout
         RoutingTableBuilder routingTableBuilder = _routingTableBuilderMap.get(currentTable);
         List<Map<ServerInstance, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
         for (Map<ServerInstance, List<String>> routingTable : routingTables) {
-          entries.add(JsonUtils.objectToJsonNode(routingTable));
+          Map<String, List<String>> map = new HashMap<>();
+          for(Map.Entry<ServerInstance,List<String>> e: routingTable.entrySet()) {
+            map.put(e.getKey().getInstanceName(), e.getValue());
+          }
+          entries.add(JsonUtils.objectToJsonNode(map));
         }
         tableEntry.set("routingTableEntries", entries);
         routingTableSnapshot.add(tableEntry);

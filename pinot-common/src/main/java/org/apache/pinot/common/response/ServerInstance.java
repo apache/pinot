@@ -45,10 +45,12 @@ public class ServerInstance {
 
   private static final ConcurrentHashMap<String, HostNamePair> HOST_NAME_MAP = new ConcurrentHashMap<>();
 
+  private final String _instanceName;
   /** Host-name where the service is running **/
   private final String _hostName;
 
   private final String _shortHostName;
+
 
   /** Service Port **/
   private final int _port;
@@ -63,22 +65,33 @@ public class ServerInstance {
   }
 
   public ServerInstance(String name, int port) {
-    this(name, port, 0);
+    this(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + NAME_PORT_DELIMITER_FOR_INSTANCE_NAME + name
+        + NAME_PORT_DELIMITER_FOR_INSTANCE_NAME + port, name, port);
+  }
+
+  public ServerInstance(String instanceName, String name, int port) {
+    this(instanceName, name, port, 0);
   }
 
   public ServerInstance(String name, int port, int seq) {
+    this(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + NAME_PORT_DELIMITER_FOR_INSTANCE_NAME + name
+        + NAME_PORT_DELIMITER_FOR_INSTANCE_NAME + port, name, port, seq);
+  }
+  public ServerInstance(String instanceName, String name, int port, int seq) {
     HostNamePair hostNamePair = HOST_NAME_MAP.computeIfAbsent(name, key -> {
       String hostName = getHostName(name);
       String shortHostName = getShortHostName(hostName);
       return new HostNamePair(hostName, shortHostName);
     });
+    _instanceName = instanceName;
     _hostName = hostNamePair._hostName;
     _shortHostName = hostNamePair._shortHostName;
     _port = port;
     _seq = seq;
   }
 
-  private ServerInstance(String hostName, String shortHostName, int port, int seq) {
+  private ServerInstance(String instanceName, String hostName, String shortHostName, int port, int seq) {
+    _instanceName = instanceName;
     _hostName = hostName;
     _shortHostName = shortHostName;
     _port = port;
@@ -91,7 +104,7 @@ public class ServerInstance {
   public static ServerInstance forInstanceName(String instanceName) {
     String[] parts = instanceName.split(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)[1]
         .split(NAME_PORT_DELIMITER_FOR_INSTANCE_NAME);
-    return new ServerInstance(parts[0], Integer.parseInt(parts[1]));
+    return new ServerInstance(instanceName, parts[0], Integer.parseInt(parts[1]));
   }
 
   /**
@@ -145,12 +158,12 @@ public class ServerInstance {
   }
 
   public String getInstanceName() {
-    return toString();
+    return _instanceName;
   }
 
 
   public ServerInstance withSeq(int seq) {
-    return new ServerInstance(_hostName, _shortHostName, _port, seq);
+    return new ServerInstance(_instanceName, _hostName, _shortHostName, _port, seq);
   }
 
   @Override
