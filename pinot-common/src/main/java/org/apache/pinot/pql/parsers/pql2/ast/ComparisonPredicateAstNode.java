@@ -39,6 +39,10 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
     _operand = operand;
   }
 
+  public LiteralAstNode getLiteral() {
+    return _literal;
+  }
+
   public String getOperand() {
     return _operand;
   }

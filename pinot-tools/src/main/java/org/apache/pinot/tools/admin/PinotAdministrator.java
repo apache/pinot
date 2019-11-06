@@ -23,6 +23,7 @@ import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.admin.command.AddSchemaCommand;
 import org.apache.pinot.tools.admin.command.AddTableCommand;
 import org.apache.pinot.tools.admin.command.AddTenantCommand;
+import org.apache.pinot.tools.admin.command.AnonymizeDataCommand;
 import org.apache.pinot.tools.admin.command.ApplyTableConfigCommand;
 import org.apache.pinot.tools.admin.command.AvroSchemaToPinotSchema;
 import org.apache.pinot.tools.admin.command.BackfillDateTimeColumnCommand;
@@ -116,7 +117,8 @@ public class PinotAdministrator {
       @SubCommand(name = "CheckOfflineSegmentIntervals", impl = OfflineSegmentIntervalCheckerCommand.class),
       @SubCommand(name = "CollectMetadataForIndexTuning", impl = CollectMetadataForIndexTuning.class),
       @SubCommand(name = "EntriesScannedQuantileReport", impl = EntriesScannedQuantileReport.class),
-      @SubCommand(name = "IndexTuner", impl = IndexTunerCommand.class)
+      @SubCommand(name = "IndexTuner", impl = IndexTunerCommand.class),
+      @SubCommand(name = "AnonymizeData", impl = AnonymizeDataCommand.class)
   })
   Command _subCommand;
   //@formatter:on
