@@ -46,6 +46,7 @@
     <module>pinot-core</module>
     <module>pinot-controller</module>
     <module>pinot-hadoop</module>
+    <module>pinot-spark</module>
     <module>pinot-tools</module>
     <module>pinot-perf</module>
     <module>pinot-transport</module>
@@ -256,6 +257,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-hadoop</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-spark</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
