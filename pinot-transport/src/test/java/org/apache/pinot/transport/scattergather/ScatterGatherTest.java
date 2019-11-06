@@ -100,7 +100,7 @@ public class ScatterGatherTest {
     Assert.assertEquals(serverToResponseMap.size(), NUM_SERVERS);
     for (int i = 0; i < NUM_SERVERS; i++) {
       Assert.assertEquals(new String(serverToResponseMap.get(serverInstances[i])),
-          routingTable.get(serverNames[i]).get(0));
+          routingTable.get(serverInstances[i]).get(0));
     }
 
     // Should get empty error map
@@ -162,7 +162,7 @@ public class ScatterGatherTest {
     Assert.assertEquals(serverToResponseMap.size(), NUM_SERVERS - 1);
     for (int i = 1; i < NUM_SERVERS; i++) {
       Assert.assertEquals(new String(serverToResponseMap.get(serverInstances[i])),
-          routingTable.get(serverNames[i]).get(0));
+          routingTable.get(serverInstances[i]).get(0));
     }
 
     // Should get error from the timeout server
@@ -226,7 +226,7 @@ public class ScatterGatherTest {
     Assert.assertEquals(serverToResponseMap.size(), NUM_SERVERS - 1);
     for (int i = 1; i < NUM_SERVERS; i++) {
       Assert.assertEquals(new String(serverToResponseMap.get(serverInstances[i])),
-          routingTable.get(serverNames[i]).get(0));
+          routingTable.get(serverInstances[i]).get(0));
     }
 
     // Should get error from the error server
