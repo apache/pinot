@@ -110,12 +110,21 @@ import org.slf4j.LoggerFactory;
  * {@link org.apache.pinot.tools.admin.command.AnonymizeDataCommand} to learn
  * how this tool can be invoked from command line.
  *
- * Limitations:
+ * Future work
  * (1) Add support for multi-value columns
  * (2) Add support for BYTES type
  * (3) Add support for partitioning (where dataset is hash partitioned on column)
  * (4) Add support for ORDER BY in query generator
  * (5) Potential memory explosion for extreme high cardinality global dictionary columns
+ *     Please read the design doc for details.
+ * (6) Add support for no dictionary filter columns (Generally this should not happen since
+ *     whoever is using filter on a column should have created a dictionary for that column.
+ *     But in case the filter column does not have segment dictionary, then we will not be
+ *     able to build global dictionary)
+ * (7) Make the global dictionary building phase per column basis to reduce the memory footprint
+ * (8) Add support for generating queries when a predicate was not there in the original table
+ *     and therefore not present in global dictionary either. The current implementation won't be
+ *     able to rewrite this predicate correctly. It will substitute the original value with null.
  */
 public class PinotDataAndQueryAnonymizer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotDataAndQueryAnonymizer.class);
@@ -134,7 +143,7 @@ public class PinotDataAndQueryAnonymizer {
   private final String _filePrefix;
   // dictionaries used to generate data with same cardinality and data distribution
   // as in source table segments
-  private final Map<String, OrigAndDerivedValueHolder> _origToDerivedValueGlobalDictionary;
+  private final Map<String, OrigAndDerivedValueHolder> _columnToGlobalDictionary;
   // used to map the original column name to a generated column name
   private final Map<String, String> _origToDerivedColumnsMap;
 
@@ -167,7 +176,7 @@ public class PinotDataAndQueryAnonymizer {
     _outputDir = outputDir;
     _segmentDir = segmentDir;
     _filePrefix = fileNamePrefix;
-    _origToDerivedValueGlobalDictionary = new HashMap<>();
+    _columnToGlobalDictionary = new HashMap<>();
     _origToDerivedColumnsMap = new HashMap<>();
     _columnToDataTypeMap = new HashMap<>();
     _globalDictionaryColumns = globalDictionaryColumns;
@@ -186,7 +195,7 @@ public class PinotDataAndQueryAnonymizer {
     StringBuilder sb = new StringBuilder();
     sb.append("Columns to retain data for: ");
     for (String column : _columnsNotAnonymized) {
-      sb.append(column);
+      sb.append(column).append(", ");
     }
 
     LOGGER.info(sb.toString());
@@ -194,7 +203,7 @@ public class PinotDataAndQueryAnonymizer {
     sb = new StringBuilder();
     sb.append("Columns to build global dictionary for: ");
     for (Map.Entry<String, Integer> entry : _globalDictionaryColumns.entrySet()) {
-      sb.append("Column: ").append(entry.getKey()).append(" Cardinality: ").append(entry.getValue());
+      sb.append("Column: ").append(entry.getKey()).append(" Cardinality: ").append(entry.getValue()).append(", ");
     }
 
     LOGGER.info(sb.toString());
@@ -361,6 +370,7 @@ public class PinotDataAndQueryAnonymizer {
     // used during data generation phase.
     // since the global dictionary is fully built
     // and sorted, we can do binary search
+    // TODO: make this iterative
     int binarySearch(int low, int high, Object key) {
       if (low > high) return -1;
 
@@ -483,8 +493,8 @@ public class PinotDataAndQueryAnonymizer {
       String column,
       ColumnMetadata columnMetadata,
       int cardinality) {
-    _origToDerivedValueGlobalDictionary.putIfAbsent(column, new OrigAndDerivedValueHolder(columnMetadata.getDataType(), cardinality));
-    OrigAndDerivedValueHolder holder = _origToDerivedValueGlobalDictionary.get(column);
+    _columnToGlobalDictionary.putIfAbsent(column, new OrigAndDerivedValueHolder(columnMetadata.getDataType(), cardinality));
+    OrigAndDerivedValueHolder holder = _columnToGlobalDictionary.get(column);
     holder.addOrigValue(origValue);
   }
 
@@ -493,7 +503,7 @@ public class PinotDataAndQueryAnonymizer {
    * by sorting the original values to get sort order across all segments
    */
   private void sortOriginalValuesInGlobalDictionaries() {
-    for (Map.Entry<String, OrigAndDerivedValueHolder> entry : _origToDerivedValueGlobalDictionary.entrySet()) {
+    for (Map.Entry<String, OrigAndDerivedValueHolder> entry : _columnToGlobalDictionary.entrySet()) {
       OrigAndDerivedValueHolder valueHolder = entry.getValue();
       valueHolder.sort();
     }
@@ -510,26 +520,30 @@ public class PinotDataAndQueryAnonymizer {
   private void addDerivedValuesToGlobalDictionaries() {
     // update global dictionary for each column by adding
     // the corresponding generated value for each orig value
-    for (Map.Entry<String, OrigAndDerivedValueHolder> entry : _origToDerivedValueGlobalDictionary.entrySet()) {
+    for (Map.Entry<String, OrigAndDerivedValueHolder> entry : _columnToGlobalDictionary.entrySet()) {
       OrigAndDerivedValueHolder valueHolder = entry.getValue();
-      Object[] derivedValues = generateDerivedValuesForGlobalDictionary(valueHolder);
-      valueHolder.setDerivedValues(derivedValues);
+      generateDerivedValuesForGlobalDictionary(valueHolder);
     }
   }
 
-  private Object[] generateDerivedValuesForGlobalDictionary(OrigAndDerivedValueHolder valueHolder) {
+  private void generateDerivedValuesForGlobalDictionary(OrigAndDerivedValueHolder valueHolder) {
     int cardinality = valueHolder._index;
     switch (valueHolder._dataType) {
       case INT:
-        return generateDerivedIntValues(cardinality);
+        valueHolder.setDerivedValues(generateDerivedIntValues(cardinality));
+        break;
       case LONG:
-        return generateDerivedLongValues(cardinality);
+        valueHolder.setDerivedValues(generateDerivedLongValues(cardinality));
+        break;
       case FLOAT:
-        return generateDerivedFloatValues(cardinality);
+        valueHolder.setDerivedValues(generateDerivedFloatValues(cardinality));
+        break;
       case DOUBLE:
-        return generateDerivedDoubleValues(cardinality);
+        valueHolder.setDerivedValues(generateDerivedDoubleValues(cardinality));
+        break;
       case STRING:
-        return generateDerivedStringValues(valueHolder);
+        valueHolder.setDerivedValues(generateDerivedStringValues(valueHolder));
+        break;
       default:
         throw new UnsupportedOperationException("global dictionary currently does not support: " + valueHolder._dataType.name());
     }
@@ -594,9 +608,9 @@ public class PinotDataAndQueryAnonymizer {
     }
     columnMappingWriter.flush();
     // write global dictionary for each column
-    for (String column : _origToDerivedValueGlobalDictionary.keySet()) {
+    for (String column : _columnToGlobalDictionary.keySet()) {
       PrintWriter dictionaryWriter = new PrintWriter(new BufferedWriter(new FileWriter(_outputDir + "/" + column + DICT_FILE_EXTENSION)));
-      OrigAndDerivedValueHolder holder = _origToDerivedValueGlobalDictionary.get(column);
+      OrigAndDerivedValueHolder holder = _columnToGlobalDictionary.get(column);
       for (int i = 0; i < holder._index; i++) {
         dictionaryWriter.println(holder._origValues[i]);
         dictionaryWriter.println(holder._derivedValues[i]);
@@ -681,7 +695,7 @@ public class PinotDataAndQueryAnonymizer {
         record.put(derivedColumnName, origValue);
       } else if (_globalDictionaryColumns.containsKey(columnName)) {
         // use the randomly generated value from global dictionary
-        OrigAndDerivedValueHolder valueHolder = _origToDerivedValueGlobalDictionary.get(columnName);
+        OrigAndDerivedValueHolder valueHolder = _columnToGlobalDictionary.get(columnName);
         Object derivedValue = valueHolder.getDerivedValueForOrigValue(origValue);
         record.put(derivedColumnName, derivedValue);
       } else {
