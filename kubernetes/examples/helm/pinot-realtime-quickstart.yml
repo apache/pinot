@@ -414,21 +414,34 @@ data:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: pinot-realtime-quickstart
+  name: pinot-realtime-quickstart-pinot-schema-creation
   namespace: pinot-quickstart
 spec:
   template:
     spec:
       containers:
-        - name: loading-data-to-kafka
-          image: winedepot/pinot:0.1.13-SNAPSHOT
-          args: [ "StreamAvroIntoKafka", "-avroFile", "sample_data/airlineStats_data.avro", "-kafkaTopic", "flights-realtime", "-kafkaBrokerList", "kafka:9092", "-zkAddress", "kafka-zookeeper:2181" ]
         - name: pinot-add-example-schema
           image: winedepot/pinot:0.1.13-SNAPSHOT
           args: [ "AddSchema", "-schemaFile", "/var/pinot/examples/airlineStats_schema.json", "-controllerHost", "pinot-controller", "-controllerPort", "9000", "-exec" ]
           volumeMounts:
             - name: examples
               mountPath: /var/pinot/examples
+      restartPolicy: OnFailure
+      volumes:
+        - name: examples
+          configMap:
+            name: examples
+  backoffLimit: 100
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pinot-realtime-quickstart-pinot-table-creation
+  namespace: pinot-quickstart
+spec:
+  template:
+    spec:
+      containers:
         - name: pinot-add-example-realtime-table
           image: winedepot/pinot:0.1.13-SNAPSHOT
           args: [ "AddTable", "-filePath", "/var/pinot/examples/airlineStats_realtime_table_config.json", "-controllerHost", "pinot-controller", "-controllerPort", "9000", "-exec" ]
@@ -440,6 +453,21 @@ spec:
         - name: examples
           configMap:
             name: examples
+  backoffLimit: 100
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pinot-realtime-quickstart-load-data-into-kafka
+  namespace: pinot-quickstart
+spec:
+  template:
+    spec:
+      containers:
+        - name: loading-data-to-kafka
+          image: winedepot/pinot:0.1.13-SNAPSHOT
+          args: [ "StreamAvroIntoKafka", "-avroFile", "sample_data/airlineStats_data.avro", "-kafkaTopic", "flights-realtime", "-kafkaBrokerList", "kafka:9092", "-zkAddress", "kafka-zookeeper:2181" ]
+      restartPolicy: OnFailure
   backoffLimit: 3
 
 
