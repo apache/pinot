@@ -63,16 +63,16 @@ public class SimpleIndexedTable extends IndexedTable {
    * Non thread safe implementation of upsert to insert {@link Record} into the {@link Table}
    */
   @Override
-  public boolean upsert(Record newRecord) {
-    Key key = newRecord.getKey();
+  public boolean upsert(Key key, Record newRecord) {
     Preconditions.checkNotNull(key, "Cannot upsert record with null keys");
 
     if (_noMoreNewRecords) { // allow only existing record updates
       _lookupMap.computeIfPresent(key, (k, v) -> {
-        Object[] existingValues = v.getValues();
-        Object[] newValues = newRecord.getValues();
-        for (int i = 0; i < _numAggregations; i++) {
-          existingValues[i] = _aggregationFunctions[i].merge(existingValues[i], newValues[i]);
+        Object[] existingValues = v.getColumns();
+        Object[] newValues = newRecord.getColumns();
+        int aggNum = 0;
+        for (int i = _numKeyColumns; i < _numColumns; i++) {
+          existingValues[i] = _aggregationFunctions[aggNum++].merge(existingValues[i], newValues[i]);
         }
         return v;
       });
@@ -82,10 +82,11 @@ public class SimpleIndexedTable extends IndexedTable {
         if (v == null) {
           return newRecord;
         } else {
-          Object[] existingValues = v.getValues();
-          Object[] newValues = newRecord.getValues();
-          for (int i = 0; i < _numAggregations; i++) {
-            existingValues[i] = _aggregationFunctions[i].merge(existingValues[i], newValues[i]);
+          Object[] existingValues = v.getColumns();
+          Object[] newValues = newRecord.getColumns();
+          int aggNum = 0;
+          for (int i = _numKeyColumns; i < _numColumns; i++) {
+            existingValues[i] = _aggregationFunctions[aggNum++].merge(existingValues[i], newValues[i]);
           }
           return v;
         }
@@ -108,7 +109,7 @@ public class SimpleIndexedTable extends IndexedTable {
 
     long startTime = System.currentTimeMillis();
 
-    _indexedTableResizer.resizeRecordsMap(_lookupMap, trimToSize);
+    _tableResizer.resizeRecordsMap(_lookupMap, trimToSize);
 
     long endTime = System.currentTimeMillis();
     long timeElapsed = endTime - startTime;
@@ -121,7 +122,7 @@ public class SimpleIndexedTable extends IndexedTable {
 
     long startTime = System.currentTimeMillis();
 
-    List<Record> sortedRecords = _indexedTableResizer.resizeAndSortRecordsMap(_lookupMap, trimToSize);
+    List<Record> sortedRecords = _tableResizer.resizeAndSortRecordsMap(_lookupMap, trimToSize);
 
     long endTime = System.currentTimeMillis();
     long timeElapsed = endTime - startTime;

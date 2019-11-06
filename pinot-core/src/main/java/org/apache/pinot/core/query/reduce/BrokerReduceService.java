@@ -470,38 +470,41 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       List<AggregationInfo> aggregationInfos, GroupBy groupBy, List<SelectionSort> orderBy,
       Map<ServerInstance, DataTable> dataTableMap, boolean preserveType) {
 
-    List<String> columns = new ArrayList<>(dataSchema.size());
+    List<String> columnNames = new ArrayList<>(dataSchema.size());
     for (int i = 0; i < dataSchema.size(); i++) {
-      columns.add(dataSchema.getColumnName(i));
+      columnNames.add(dataSchema.getColumnName(i));
     }
 
     int numGroupBy = groupBy.getExpressionsSize();
     int numAggregations = aggregationInfos.size();
 
-    IndexedTable indexedTable =
-        getIndexedTable(numGroupBy, numAggregations, groupBy, aggregationInfos, orderBy, dataSchema, dataTableMap);
+    IndexedTable indexedTable = getIndexedTable(groupBy, aggregationInfos, orderBy, dataSchema, dataTableMap);
 
-    List<AggregationFunction> aggregationFunctions = new ArrayList<>(aggregationInfos.size());
-    for (AggregationInfo aggregationInfo : aggregationInfos) {
-      aggregationFunctions
-          .add(AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction());
+    AggregationFunction[] aggregationFunctions = new AggregationFunction[numAggregations];
+    for (int i = 0; i < numAggregations; i++) {
+      aggregationFunctions[i] =
+          AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfos.get(i)).getAggregationFunction();
     }
 
     List<Serializable[]> rows = new ArrayList<>();
-    int numColumns = columns.size();
+    int numColumns = columnNames.size();
     Iterator<Record> sortedIterator = indexedTable.iterator();
     int numRows = 0;
     while (numRows < groupBy.getTopN() && sortedIterator.hasNext()) {
 
       Record nextRecord = sortedIterator.next();
+      Object[] columns = nextRecord.getColumns();
       Serializable[] row = new Serializable[numColumns];
+
       int index = 0;
-      for (Object keyColumn : nextRecord.getKey().getColumns()) {
-        row[index++] = getSerializableValue(keyColumn);
+      while (index < numGroupBy) {
+        row[index] = getSerializableValue(columns[index]);
+        index++;
       }
+
       int aggNum = 0;
-      for (Object valueColumn : nextRecord.getValues()) {
-        row[index] = getSerializableValue(aggregationFunctions.get(aggNum).extractFinalResult(valueColumn));
+      while (index < numColumns) {
+        row[index] = getSerializableValue(aggregationFunctions[aggNum++].extractFinalResult(columns[index]));
         if (preserveType) {
           row[index] = AggregationFunctionUtils.formatValue(row[index]);
         }
@@ -511,19 +514,19 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       numRows++;
     }
 
-    brokerResponseNative.setResultTable(new ResultTable(columns, rows));
+    brokerResponseNative.setResultTable(new ResultTable(columnNames, rows));
   }
 
-  private IndexedTable getIndexedTable(int numGroupBy, int numAggregations, GroupBy groupBy,
-      List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy, DataSchema dataSchema,
-      Map<ServerInstance, DataTable> dataTableMap) {
+  private IndexedTable getIndexedTable(GroupBy groupBy, List<AggregationInfo> aggregationInfos,
+      List<SelectionSort> orderBy, DataSchema dataSchema, Map<ServerInstance, DataTable> dataTableMap) {
 
+    int numColumns = dataSchema.size();
     int indexedTableCapacity = GroupByUtils.getTableCapacity(groupBy, orderBy);
     IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, aggregationInfos, orderBy, indexedTableCapacity);
 
     for (DataTable dataTable : dataTableMap.values()) {
-      BiFunction[] functions = new BiFunction[dataSchema.size()];
-      for (int i = 0; i < dataSchema.size(); i++) {
+      BiFunction[] functions = new BiFunction[numColumns];
+      for (int i = 0; i < numColumns; i++) {
         ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
         BiFunction<Integer, Integer, Object> function;
         switch (columnDataType) {
@@ -554,18 +557,11 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       }
 
       for (int row = 0; row < dataTable.getNumberOfRows(); row++) {
-        Object[] key = new Object[numGroupBy];
-        int col = 0;
-        for (int j = 0; j < numGroupBy; j++) {
-          key[j] = functions[col].apply(row, col);
-          col++;
+        Object[] columns = new Object[numColumns];
+        for (int col = 0; col < numColumns; col++) {
+          columns[col] = functions[col].apply(row, col);
         }
-        Object[] value = new Object[numAggregations];
-        for (int j = 0; j < numAggregations; j++) {
-          value[j] = functions[col].apply(row, col);
-          col++;
-        }
-        Record record = new Record(new Key(key), value);
+        Record record = new Record(columns);
         indexedTable.upsert(record);
       }
     }
@@ -589,55 +585,58 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
     int numGroupBy = groupBy.getExpressionsSize();
     int numAggregations = aggregationInfos.size();
+    int numColumns = numGroupBy + numAggregations;
 
     List<String> groupByColumns = new ArrayList<>(numGroupBy);
-    for (int i = 0; i < numGroupBy; i++) {
-      groupByColumns.add(dataSchema.getColumnName(i));
+    int idx = 0;
+    while (idx < numGroupBy) {
+      groupByColumns.add(dataSchema.getColumnName(idx));
+      idx++;
     }
 
     List<String> aggregationColumns = new ArrayList<>(numAggregations);
-    for (int i = numGroupBy; i < dataSchema.size(); i++) {
-      aggregationColumns.add(dataSchema.getColumnName(i));
-    }
-
-    List<AggregationFunction> aggregationFunctions = new ArrayList<>(aggregationInfos.size());
-    for (AggregationInfo aggregationInfo : aggregationInfos) {
-      aggregationFunctions
-          .add(AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction());
-    }
-
+    AggregationFunction[] aggregationFunctions = new AggregationFunction[aggregationInfos.size()];
     List<List<GroupByResult>> groupByResults = new ArrayList<>(numAggregations);
-    for (int i = 0; i < numAggregations; i++) {
+    int aggIdx = 0;
+    while (idx < numColumns) {
+      aggregationColumns.add(dataSchema.getColumnName(idx));
+      aggregationFunctions[aggIdx] =
+          AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfos.get(aggIdx)).getAggregationFunction();
       groupByResults.add(new ArrayList<>());
+      idx++;
+      aggIdx++;
     }
 
     if (!dataTableMap.isEmpty()) {
-      IndexedTable indexedTable =
-          getIndexedTable(numGroupBy, numAggregations, groupBy, aggregationInfos, orderBy, dataSchema, dataTableMap);
+      IndexedTable indexedTable = getIndexedTable(groupBy, aggregationInfos, orderBy, dataSchema, dataTableMap);
 
       Iterator<Record> sortedIterator = indexedTable.iterator();
       int numRows = 0;
       while (numRows < groupBy.getTopN() && sortedIterator.hasNext()) {
 
         Record nextRecord = sortedIterator.next();
+        Object[] columns = nextRecord.getColumns();
 
+        int index = 0;
         List<String> group = new ArrayList<>(numGroupBy);
-        for (Object keyColumn : nextRecord.getKey().getColumns()) {
-          group.add(keyColumn.toString());
+        while (index < numGroupBy) {
+          group.add(columns[index].toString());
+          index++;
         }
 
-        Object[] values = nextRecord.getValues();
-        for (int i = 0; i < numAggregations; i++) {
+        int aggNum = 0;
+        while (index < numColumns) {
           Serializable serializableValue =
-              getSerializableValue(aggregationFunctions.get(i).extractFinalResult(values[i]));
+              getSerializableValue(aggregationFunctions[aggNum].extractFinalResult(columns[index]));
           if (preserveType) {
             serializableValue = AggregationFunctionUtils.formatValue(serializableValue);
           }
           GroupByResult groupByResult = new GroupByResult();
           groupByResult.setGroup(group);
           groupByResult.setValue(serializableValue);
-
-          groupByResults.get(i).add(groupByResult);
+          groupByResults.get(aggNum).add(groupByResult);
+          index++;
+          aggNum++;
         }
         numRows++;
       }

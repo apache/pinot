@@ -99,6 +99,7 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
   protected IntermediateResultsBlock getNextBlock() {
     int numAggregationFunctions = _brokerRequest.getAggregationsInfoSize();
     int numGroupBy = _brokerRequest.getGroupBy().getExpressionsSize();
+    int numColumns = numGroupBy + numAggregationFunctions;
     ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
 
     // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
@@ -160,19 +161,24 @@ public class CombineGroupByOrderByOperator extends BaseOperator<IntermediateResu
               // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable.
               Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
               while (groupKeyIterator.hasNext()) {
+                Object[] columns = new Object[numColumns];
+                int columnIndex = 0;
                 GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
                 String[] stringKey = groupKey._stringKey.split(GroupKeyGenerator.DELIMITER);
                 Object[] objectKey = new Object[numGroupBy];
                 for (int i = 0; i < stringKey.length; i++) {
-                  objectKey[i] = converterFunctions[i].apply(stringKey[i]);
+                  Object convertedKey = converterFunctions[i].apply(stringKey[i]);
+                  objectKey[columnIndex] = convertedKey;
+                  columns[columnIndex] = convertedKey;
+                  columnIndex++;
                 }
-                Object[] values = new Object[numAggregationFunctions];
                 for (int i = 0; i < numAggregationFunctions; i++) {
-                  values[i] = aggregationGroupByResult.getResultForKey(groupKey, i);
+                  columns[columnIndex] = aggregationGroupByResult.getResultForKey(groupKey, i);
+                  columnIndex++;
                 }
-
-                Record record = new Record(new Key(objectKey), values);
-                _indexedTable.upsert(record);
+                Key key = new Key(objectKey);
+                Record record = new Record(columns);
+                _indexedTable.upsert(key, record);
               }
             }
           } catch (Exception e) {

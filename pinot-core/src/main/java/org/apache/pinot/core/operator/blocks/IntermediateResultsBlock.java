@@ -263,14 +263,9 @@ public class IntermediateResultsBlock implements Block {
       Record record = iterator.next();
       dataTableBuilder.startRow();
       int columnIndex = 0;
-      for (Object keyColumn : record.getKey().getColumns()) {
+      for (Object column : record.getColumns()) {
         ColumnDataType columnDataType = _dataSchema.getColumnDataType(columnIndex);
-        setDataTableColumn(columnDataType, dataTableBuilder, columnIndex, keyColumn);
-        columnIndex++;
-      }
-      for (Object valueColumn : record.getValues()) {
-        ColumnDataType columnDataType = _dataSchema.getColumnDataType(columnIndex);
-        setDataTableColumn(columnDataType, dataTableBuilder, columnIndex, valueColumn);
+        setDataTableColumn(columnDataType, dataTableBuilder, columnIndex, column);
         columnIndex++;
       }
       dataTableBuilder.finishRow();

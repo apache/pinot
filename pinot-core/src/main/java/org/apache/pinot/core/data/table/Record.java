@@ -22,33 +22,24 @@ import java.util.Arrays;
 
 
 /**
- * Defines a single record in Pinot comprising of keys and values
+ * Defines a single record in Pinot
  */
 public class Record {
-  private Key _key;
-  private Object[] _values;
+  private Object[] _columns;
 
-  public Record(Key key, Object[] values) {
-    _key = key;
-    _values = values;
+  public Record(Object[] columns) {
+    _columns = columns;
   }
 
   /**
-   * Gets the key portion of the record
+   * Returns the columns contained in the Record
    */
-  public Key getKey() {
-    return _key;
-  }
-
-  /**
-   * Gets the values portion of the record
-   */
-  public Object[] getValues() {
-    return _values;
+  public Object[] getColumns() {
+    return _columns;
   }
 
   @Override
   public String toString() {
-    return _key.toString() + " " + Arrays.deepToString(_values);
+    return Arrays.deepToString(_columns);
   }
 }
