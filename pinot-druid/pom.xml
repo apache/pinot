@@ -32,6 +32,25 @@
   <artifactId>pinot-druid</artifactId>
   <name>Pinot Druid</name>
   <url>https://pinot.apache.org/</url>
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.druid</groupId>
+      <artifactId>druid-processing</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.testng</groupId>
+      <artifactId>testng</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
   </properties>
@@ -58,11 +77,7 @@
       <dependency>
         <groupId>org.apache.druid</groupId>
         <artifactId>druid-processing</artifactId>
-      </dependency>
-      <dependency>
-        <groupId>org.testng</groupId>
-        <artifactId>testng</artifactId>
-        <scope>test</scope>
+        <version>0.16.0-incubating</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
