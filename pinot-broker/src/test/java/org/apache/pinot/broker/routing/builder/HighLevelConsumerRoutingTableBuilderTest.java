@@ -30,6 +30,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
 import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.testng.Assert;
@@ -99,7 +100,7 @@ public class HighLevelConsumerRoutingTableBuilderTest {
       // Check if the routing table result is correct
       for (int run = 0; run < MAX_NUM_GROUPS * 10; run++) {
         RoutingTableLookupRequest request = new RoutingTableLookupRequest(tableNameWithType);
-        Map<String, List<String>> routingTable = routingTableBuilder.getRoutingTable(request, null);
+        Map<ServerInstance, List<String>> routingTable = routingTableBuilder.getRoutingTable(request, null);
         Set<String> coveredSegments = new HashSet<>();
         for (List<String> segmentsForServer : routingTable.values()) {
           coveredSegments.addAll(segmentsForServer);

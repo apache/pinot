@@ -31,6 +31,7 @@ import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
 import org.apache.pinot.broker.routing.selector.SegmentSelector;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.response.ServerInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -126,12 +127,12 @@ public class DefaultOfflineRoutingTableBuilder implements RoutingTableBuilder {
   }
 
   @Override
-  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request, SegmentSelector segmentSelector) {
+  public Map<ServerInstance, List<String>> getRoutingTable(RoutingTableLookupRequest request, SegmentSelector segmentSelector) {
     return _routingTableBuilder.getRoutingTable(request, segmentSelector);
   }
 
   @Override
-  public List<Map<String, List<String>>> getRoutingTables() {
+  public List<Map<ServerInstance, List<String>>> getRoutingTables() {
     return _routingTableBuilder.getRoutingTables();
   }
 }

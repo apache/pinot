@@ -144,6 +144,11 @@ public class ServerInstance {
     return _port;
   }
 
+  public String getInstanceName() {
+    return toString();
+  }
+
+
   public ServerInstance withSeq(int seq) {
     return new ServerInstance(_hostName, _shortHostName, _port, seq);
   }

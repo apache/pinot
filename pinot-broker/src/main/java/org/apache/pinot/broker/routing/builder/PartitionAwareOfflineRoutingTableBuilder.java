@@ -38,6 +38,7 @@ import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.utils.CommonConstants;
 
 
@@ -135,14 +136,14 @@ public class PartitionAwareOfflineRoutingTableBuilder extends BasePartitionAware
     }
 
     // 3. Compute the final routing look up table
-    Map<String, Map<Integer, String>> segmentToReplicaToServerMap = new HashMap<>();
+    Map<String, Map<Integer, ServerInstance>> segmentToReplicaToServerMap = new HashMap<>();
     for (String segmentName : segmentSet) {
       // Get partition_id from cached segment zk metadata
       SegmentZKMetadata segmentZKMetadata = _segmentToZkMetadataMapping.get(segmentName);
       int partitionId = getPartitionId(segmentZKMetadata);
 
       // Initialize data intermediate data structures or data
-      Map<Integer, String> replicaToServerMap = new HashMap<>();
+      Map<Integer, ServerInstance> replicaToServerMap = new HashMap<>();
       int replicaIdForNoPartitionMetadata = 0;
 
       for (Map.Entry<String, String> entry : externalView.getStateMap(segmentName).entrySet()) {
@@ -151,10 +152,10 @@ public class PartitionAwareOfflineRoutingTableBuilder extends BasePartitionAware
             && !instancePruner.isInactive(serverName)) {
           // If there's no partition number in the metadata, assign replica id sequentially.
           if (partitionId == NO_PARTITION_NUMBER) {
-            replicaToServerMap.put(replicaIdForNoPartitionMetadata++, serverName);
+            replicaToServerMap.put(replicaIdForNoPartitionMetadata++, ServerInstance.forInstanceName(serverName));
           } else {
             int replicaId = partitionToServerToReplicaMap.get(partitionId).get(serverName);
-            replicaToServerMap.put(replicaId, serverName);
+            replicaToServerMap.put(replicaId, ServerInstance.forInstanceName(serverName));
           }
         }
       }

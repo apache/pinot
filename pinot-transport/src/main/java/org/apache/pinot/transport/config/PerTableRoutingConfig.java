@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.common.response.ServerInstance;
 
 
 /**
@@ -125,10 +126,10 @@ public class PerTableRoutingConfig {
    *
    * @return
    */
-  public Map<String, List<String>> buildRequestRoutingMap() {
-    Map<String, List<String>> resultMap = new HashMap<>();
+  public Map<ServerInstance, List<String>> buildRequestRoutingMap() {
+    Map<ServerInstance, List<String>> resultMap = new HashMap<>();
     for (String serverName : _defaultServers) {
-      resultMap.put(serverName, Collections.singletonList("default"));
+      resultMap.put(ServerInstance.forInstanceName(serverName), Collections.singletonList("default"));
     }
     return resultMap;
   }

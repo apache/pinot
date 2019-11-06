@@ -28,6 +28,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.DataTable;
 import org.slf4j.Logger;
@@ -55,8 +56,8 @@ public class QueryRouter {
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
-      @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<String, List<String>> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<String, List<String>> realtimeRoutingTable,
+      @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
+      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
       long timeoutMs) {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
@@ -64,16 +65,18 @@ public class QueryRouter {
     Map<Server, InstanceRequest> requestMap = new HashMap<>();
     if (offlineBrokerRequest != null) {
       assert offlineRoutingTable != null;
-      for (Map.Entry<String, List<String>> entry : offlineRoutingTable.entrySet()) {
-        Server server = new Server(entry.getKey(), TableType.OFFLINE);
+      for (Map.Entry<ServerInstance, List<String>> entry : offlineRoutingTable.entrySet()) {
+        ServerInstance serverInstance = entry.getKey();
+        Server server = new Server(serverInstance.getHostname(), serverInstance.getPort(), TableType.OFFLINE);
         InstanceRequest instanceRequest = getInstanceRequest(requestId, offlineBrokerRequest, entry.getValue());
         requestMap.put(server, instanceRequest);
       }
     }
     if (realtimeBrokerRequest != null) {
       assert realtimeRoutingTable != null;
-      for (Map.Entry<String, List<String>> entry : realtimeRoutingTable.entrySet()) {
-        Server server = new Server(entry.getKey(), TableType.REALTIME);
+      for (Map.Entry<ServerInstance, List<String>> entry : realtimeRoutingTable.entrySet()) {
+        ServerInstance serverInstance = entry.getKey();
+        Server server = new Server(serverInstance.getHostname(), serverInstance.getPort(), TableType.REALTIME);
         InstanceRequest instanceRequest = getInstanceRequest(requestId, realtimeBrokerRequest, entry.getValue());
         requestMap.put(server, instanceRequest);
       }

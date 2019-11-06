@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableImplV2;
@@ -39,8 +40,8 @@ public class QueryRouterTest {
   private static final Server OFFLINE_SERVER = new Server(SERVER_INSTANCE_NAME, TableType.OFFLINE);
   private static final Server REALTIME_SERVER = new Server(SERVER_INSTANCE_NAME, TableType.REALTIME);
   private static final BrokerRequest BROKER_REQUEST = new BrokerRequest();
-  private static final Map<String, List<String>> ROUTING_TABLE =
-      Collections.singletonMap(SERVER_INSTANCE_NAME, Collections.emptyList());
+  private static final Map<ServerInstance, List<String>> ROUTING_TABLE =
+      Collections.singletonMap(ServerInstance.forInstanceName(SERVER_INSTANCE_NAME), Collections.emptyList());
 
   private QueryRouter _queryRouter;
 

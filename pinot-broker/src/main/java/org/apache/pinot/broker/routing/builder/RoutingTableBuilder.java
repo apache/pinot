@@ -29,6 +29,7 @@ import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
 import org.apache.pinot.broker.routing.selector.SegmentSelector;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.response.ServerInstance;
 
 
 /**
@@ -54,10 +55,10 @@ public interface RoutingTableBuilder {
    * TODO: we need to consider relocating segment selector into the routing table builder instead of passing it
    * from outside.
    */
-  Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request, SegmentSelector segmentSelector);
+  Map<ServerInstance, List<String>> getRoutingTable(RoutingTableLookupRequest request, SegmentSelector segmentSelector);
 
   /**
    * Get all pre-computed routing tables.
    */
-  List<Map<String, List<String>>> getRoutingTables();
+  List<Map<ServerInstance, List<String>>> getRoutingTables();
 }

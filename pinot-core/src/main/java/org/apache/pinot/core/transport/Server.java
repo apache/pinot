@@ -53,6 +53,12 @@ public class Server {
     _tableType = tableType;
   }
 
+  public Server(String hostName, int port, TableType tableType) {
+    _hostName = hostName;
+    _port = port;
+    _tableType = tableType;
+  }
+
   public String getHostName() {
     return _hostName;
   }

@@ -21,6 +21,7 @@ package org.apache.pinot.transport.scattergather;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.response.ServerInstance;
 
 
 /**
@@ -35,7 +36,7 @@ public interface ScatterGatherRequest {
    *
    * @return Map from server to list of segments
    */
-  Map<String, List<String>> getRoutingTable();
+  Map<ServerInstance, List<String>> getRoutingTable();
 
   /**
    * Get the request to be sent to the server.

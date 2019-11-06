@@ -20,6 +20,7 @@ package org.apache.pinot.broker.routing;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.response.ServerInstance;
 
 
 /**
@@ -33,7 +34,7 @@ public interface RoutingTable {
    * @param request Routing table lookup request
    * @return Map from server to list of segments
    */
-  Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request);
+  Map<ServerInstance, List<String>> getRoutingTable(RoutingTableLookupRequest request);
 
   /**
    * Return whether the routing table for the given table exists.

@@ -66,7 +66,7 @@ public class ScatterGatherTest {
     NettyServer[] nettyServers = new NettyServer[NUM_SERVERS];
     String[] serverNames = new String[NUM_SERVERS];
     ServerInstance[] serverInstances = new ServerInstance[NUM_SERVERS];
-    Map<String, List<String>> routingTable = new HashMap<>(NUM_SERVERS);
+    Map<ServerInstance, List<String>> routingTable = new HashMap<>(NUM_SERVERS);
 
     for (int i = 0; i < NUM_SERVERS; i++) {
       int serverPort = BASE_SERVER_PORT + i;
@@ -77,7 +77,7 @@ public class ScatterGatherTest {
           + ServerInstance.NAME_PORT_DELIMITER_FOR_INSTANCE_NAME + serverPort;
       serverNames[i] = serverName;
       serverInstances[i] = ServerInstance.forInstanceName(serverName);
-      routingTable.put(serverName, Collections.singletonList("segment_" + i));
+      routingTable.put(serverInstances[i], Collections.singletonList("segment_" + i));
     }
 
     // Setup client
@@ -122,7 +122,7 @@ public class ScatterGatherTest {
     NettyServer[] nettyServers = new NettyServer[NUM_SERVERS];
     String[] serverNames = new String[NUM_SERVERS];
     ServerInstance[] serverInstances = new ServerInstance[NUM_SERVERS];
-    Map<String, List<String>> routingTable = new HashMap<>(NUM_SERVERS);
+    Map<ServerInstance, List<String>> routingTable = new HashMap<>(NUM_SERVERS);
 
     for (int i = 0; i < NUM_SERVERS; i++) {
       int serverPort = BASE_SERVER_PORT + i;
@@ -139,7 +139,7 @@ public class ScatterGatherTest {
           + ServerInstance.NAME_PORT_DELIMITER_FOR_INSTANCE_NAME + serverPort;
       serverNames[i] = serverName;
       serverInstances[i] = ServerInstance.forInstanceName(serverName);
-      routingTable.put(serverName, Collections.singletonList("segment_" + i));
+      routingTable.put(serverInstances[i], Collections.singletonList("segment_" + i));
     }
 
     // Setup client
@@ -185,7 +185,7 @@ public class ScatterGatherTest {
     NettyServer[] nettyServers = new NettyServer[NUM_SERVERS];
     String[] serverNames = new String[NUM_SERVERS];
     ServerInstance[] serverInstances = new ServerInstance[NUM_SERVERS];
-    Map<String, List<String>> routingTable = new HashMap<>(NUM_SERVERS);
+    Map<ServerInstance, List<String>> routingTable = new HashMap<>(NUM_SERVERS);
 
     for (int i = 0; i < NUM_SERVERS; i++) {
       int serverPort = BASE_SERVER_PORT + i;
@@ -203,7 +203,7 @@ public class ScatterGatherTest {
           + ServerInstance.NAME_PORT_DELIMITER_FOR_INSTANCE_NAME + serverPort;
       serverNames[i] = serverName;
       serverInstances[i] = ServerInstance.forInstanceName(serverName);
-      routingTable.put(serverName, Collections.singletonList("segment_" + i));
+      routingTable.put(serverInstances[i], Collections.singletonList("segment_" + i));
     }
 
     // Setup client
@@ -257,16 +257,16 @@ public class ScatterGatherTest {
   }
 
   private static class TestScatterGatherRequest implements ScatterGatherRequest {
-    private final Map<String, List<String>> _routingTable;
+    private final Map<ServerInstance, List<String>> _routingTable;
     private final long _timeoutMs;
 
-    public TestScatterGatherRequest(Map<String, List<String>> routingTable, long timeoutMs) {
+    public TestScatterGatherRequest(Map<ServerInstance, List<String>> routingTable, long timeoutMs) {
       _routingTable = routingTable;
       _timeoutMs = timeoutMs;
     }
 
     @Override
-    public Map<String, List<String>> getRoutingTable() {
+    public Map<ServerInstance, List<String>> getRoutingTable() {
       return _routingTable;
     }
 

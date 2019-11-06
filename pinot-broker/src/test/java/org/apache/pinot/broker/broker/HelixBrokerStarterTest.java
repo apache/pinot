@@ -37,6 +37,7 @@ import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.utils.CommonConstants.Broker;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
@@ -138,7 +139,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
     assertTrue(routing.routingTableExists(REALTIME_TABLE_NAME));
 
     RoutingTableLookupRequest routingTableLookupRequest = new RoutingTableLookupRequest(OFFLINE_TABLE_NAME);
-    Map<String, List<String>> routingTable = routing.getRoutingTable(routingTableLookupRequest);
+    Map<ServerInstance, List<String>> routingTable = routing.getRoutingTable(routingTableLookupRequest);
     assertEquals(routingTable.size(), NUM_SERVERS);
     assertEquals(routingTable.values().iterator().next().size(), NUM_OFFLINE_SEGMENTS);
 

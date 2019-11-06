@@ -50,6 +50,7 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
+import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.JsonUtils;
@@ -112,7 +113,7 @@ public class HelixExternalViewBasedRouting implements ClusterChangeHandler, Rout
   }
 
   @Override
-  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request) {
+  public Map<ServerInstance, List<String>> getRoutingTable(RoutingTableLookupRequest request) {
     String tableName = request.getTableName();
     RoutingTableBuilder routingTableBuilder = _routingTableBuilderMap.get(tableName);
     return routingTableBuilder.getRoutingTable(request, _segmentSelectorMap.get(tableName));
@@ -609,8 +610,8 @@ public class HelixExternalViewBasedRouting implements ClusterChangeHandler, Rout
 
         ArrayNode entries = JsonUtils.newArrayNode();
         RoutingTableBuilder routingTableBuilder = _routingTableBuilderMap.get(currentTable);
-        List<Map<String, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
-        for (Map<String, List<String>> routingTable : routingTables) {
+        List<Map<ServerInstance, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
+        for (Map<ServerInstance, List<String>> routingTable : routingTables) {
           entries.add(JsonUtils.objectToJsonNode(routingTable));
         }
         tableEntry.set("routingTableEntries", entries);

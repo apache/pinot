@@ -131,8 +131,8 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
 
   @Override
   protected BrokerResponse processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<String, List<String>> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<String, List<String>> realtimeRoutingTable,
+      @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
+      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
       long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
       throws Exception {
     ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
@@ -238,7 +238,7 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
    * @return composite future used to gather responses.
    */
   private CompositeFuture<byte[]> scatterBrokerRequest(long requestId, BrokerRequest brokerRequest,
-      Map<String, List<String>> routingTable, boolean isOfflineTable, long timeoutMs,
+      Map<ServerInstance, List<String>> routingTable, boolean isOfflineTable, long timeoutMs,
       ScatterGatherStats scatterGatherStats, PhaseTimes phaseTimes)
       throws InterruptedException {
     long scatterStartTimeNs = System.nanoTime();
@@ -355,12 +355,12 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
 
   private static class ScatterGatherRequestImpl implements ScatterGatherRequest {
     private final BrokerRequest _brokerRequest;
-    private final Map<String, List<String>> _routingTable;
+    private final Map<ServerInstance, List<String>> _routingTable;
     private final long _requestId;
     private final long _requestTimeoutMs;
     private final String _brokerId;
 
-    public ScatterGatherRequestImpl(BrokerRequest request, Map<String, List<String>> routingTable, long requestId,
+    public ScatterGatherRequestImpl(BrokerRequest request, Map<ServerInstance, List<String>> routingTable, long requestId,
         long requestTimeoutMs, String brokerId) {
       _brokerRequest = request;
       _routingTable = routingTable;
@@ -370,7 +370,7 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
     }
 
     @Override
-    public Map<String, List<String>> getRoutingTable() {
+    public Map<ServerInstance, List<String>> getRoutingTable() {
       return _routingTable;
     }
 

@@ -388,7 +388,7 @@ public class ScatterGatherPerfClient implements Runnable {
   public static class SimpleScatterGatherRequest implements ScatterGatherRequest {
     private final byte[] _brokerRequest;
     private final long _requestId;
-    private final Map<String, List<String>> _pgToServersMap;
+    private final Map<ServerInstance, List<String>> _pgToServersMap;
 
     public SimpleScatterGatherRequest(byte[] q, PerTableRoutingConfig routingConfig, long requestId) {
       _brokerRequest = q;
@@ -397,7 +397,7 @@ public class ScatterGatherPerfClient implements Runnable {
     }
 
     @Override
-    public Map<String, List<String>> getRoutingTable() {
+    public Map<ServerInstance, List<String>> getRoutingTable() {
       return _pgToServersMap;
     }
 

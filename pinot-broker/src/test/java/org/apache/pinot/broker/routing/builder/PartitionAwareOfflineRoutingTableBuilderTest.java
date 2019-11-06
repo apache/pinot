@@ -41,6 +41,7 @@ import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.testng.Assert;
@@ -116,7 +117,7 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
 
       // Check the query that requires to scan all segment.
       String countStarQuery = "select count(*) from myTable";
-      Map<String, List<String>> routingTable =
+      Map<ServerInstance, List<String>> routingTable =
           routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery), null);
 
       // Check that the number of servers picked are always equal or less than the number of servers
@@ -217,10 +218,10 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
     // Compute routing table and this should not throw null pointer exception
     routingTableBuilder.computeOnExternalViewChange(OFFLINE_TABLE_NAME, newExternalView, instanceConfigs);
 
-    Set<String> servers = new HashSet<>();
+    Set<ServerInstance> servers = new HashSet<>();
     for (int i = 0; i < 100; i++) {
       String countStarQuery = "select count(*) from " + OFFLINE_TABLE_NAME;
-      Map<String, List<String>> routingTable =
+      Map<ServerInstance, List<String>> routingTable =
           routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery), null);
       Assert.assertEquals(routingTable.keySet().size(), 1);
       servers.add(routingTable.keySet().iterator().next());
@@ -278,10 +279,10 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
     RoutingTableBuilder routingTableBuilder =
         buildPartitionAwareOfflineRoutingTableBuilder(fakePropertyStore, tableConfig, externalView, instanceConfigs);
 
-    Set<String> servers = new HashSet<>();
+    Set<ServerInstance> servers = new HashSet<>();
     for (int i = 0; i < 100; i++) {
       String countStarQuery = "select count(*) from " + OFFLINE_TABLE_NAME;
-      Map<String, List<String>> routingTable =
+      Map<ServerInstance, List<String>> routingTable =
           routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery), null);
       Assert.assertEquals(routingTable.keySet().size(), 1);
       servers.add(routingTable.keySet().iterator().next());

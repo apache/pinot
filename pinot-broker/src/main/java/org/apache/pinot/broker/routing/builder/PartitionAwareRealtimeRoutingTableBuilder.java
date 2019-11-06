@@ -34,6 +34,7 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.LLCUtils;
@@ -84,12 +85,12 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwar
     RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigs);
 
     // Compute map from segment to map from replica to server
-    Map<String, Map<Integer, String>> segmentToReplicaToServerMap = new HashMap<>();
+    Map<String, Map<Integer, ServerInstance>> segmentToReplicaToServerMap = new HashMap<>();
     for (String segmentName : segmentSet) {
       int partitionId = getPartitionId(segmentName);
       SegmentName validConsumingSegment = allowedSegmentInConsumingStateByPartition.get(Integer.toString(partitionId));
 
-      Map<Integer, String> replicaToServerMap = new HashMap<>();
+      Map<Integer, ServerInstance> replicaToServerMap = new HashMap<>();
       int replicaId = 0;
       for (Map.Entry<String, String> entry : externalView.getStateMap(segmentName).entrySet()) {
         String serverName = entry.getKey();
@@ -102,13 +103,13 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwar
 
         // If the server is in ONLINE status, it's always to safe to add
         if (state.equals(CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
-          replicaToServerMap.put(replicaId++, serverName);
+          replicaToServerMap.put(replicaId++, ServerInstance.forInstanceName(serverName));
         }
 
         // If the server is in CONSUMING status, the segment has to be match with the valid consuming segment
         if (state.equals(CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING)
             && validConsumingSegment != null && segmentName.equals(validConsumingSegment.getSegmentName())) {
-          replicaToServerMap.put(replicaId++, serverName);
+          replicaToServerMap.put(replicaId++, ServerInstance.forInstanceName(serverName));
         }
       }
 
@@ -129,7 +130,7 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwar
 
     // Get the unique set of replica ids and find the maximum id to update the number of replicas
     Set<Integer> replicaGroupIds = new HashSet<>();
-    for (Map<Integer, String> replicaToServer : segmentToReplicaToServerMap.values()) {
+    for (Map<Integer, ServerInstance> replicaToServer : segmentToReplicaToServerMap.values()) {
       replicaGroupIds.addAll(replicaToServer.keySet());
     }
     int numReplicas = Collections.max(replicaGroupIds) + 1;

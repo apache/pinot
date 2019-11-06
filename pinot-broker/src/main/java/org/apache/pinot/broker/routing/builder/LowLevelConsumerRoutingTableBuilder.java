@@ -30,6 +30,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCUtils;
 import org.apache.pinot.common.utils.SegmentName;
@@ -66,7 +67,7 @@ public class LowLevelConsumerRoutingTableBuilder extends GeneratorBasedRoutingTa
   }
 
   @Override
-  protected Map<String, List<String>> computeSegmentToServersMapFromExternalView(ExternalView externalView,
+  protected Map<String, List<ServerInstance>> computeSegmentToServersMapFromExternalView(ExternalView externalView,
       List<InstanceConfig> instanceConfigs) {
     // We build the segment to servers mapping here. What we want to do is to make sure that we uphold
     // the guarantees clients expect (no duplicate records, eventual consistency) and spreading the load as equally as
@@ -80,7 +81,7 @@ public class LowLevelConsumerRoutingTableBuilder extends GeneratorBasedRoutingTa
     // The upstream code in BaseRoutingTableGenerator will generate routing tables based on taking a subset of servers
     // if the cluster is large enough as well as ensure that the best routing tables are used for routing.
 
-    Map<String, List<String>> segmentToServersMap = new HashMap<>();
+    Map<String, List<ServerInstance>> segmentToServersMap = new HashMap<>();
 
     // 1. Gather all segments and group them by partition, sorted by sequence number
     Map<String, SortedSet<SegmentName>> sortedSegmentsByStreamPartition =
@@ -103,7 +104,7 @@ public class LowLevelConsumerRoutingTableBuilder extends GeneratorBasedRoutingTa
       SegmentName validConsumingSegment = allowedSegmentInConsumingStateByPartition.get(partitionId);
 
       for (SegmentName segmentName : segmentNames) {
-        List<String> validServers = new ArrayList<>();
+        List<ServerInstance> validServers = new ArrayList<>();
         String segmentNameStr = segmentName.getSegmentName();
         Map<String, String> externalViewState = externalView.getStateMap(segmentNameStr);
 
@@ -118,14 +119,14 @@ public class LowLevelConsumerRoutingTableBuilder extends GeneratorBasedRoutingTa
 
           // Replicas in ONLINE state are always allowed
           if (state.equalsIgnoreCase(CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
-            validServers.add(instance);
+            validServers.add(ServerInstance.forInstanceName(instance));
             continue;
           }
 
           // If the server is in CONSUMING status, the segment has to be match with the valid consuming segment
           if (state.equals(CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING)
               && validConsumingSegment != null && segmentNameStr.equals(validConsumingSegment.getSegmentName())) {
-            validServers.add(instance);
+            validServers.add(ServerInstance.forInstanceName(instance));
           }
         }
 

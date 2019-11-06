@@ -37,6 +37,7 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.response.ServerInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,7 +63,7 @@ public abstract class BasePartitionAwareRoutingTableBuilder implements RoutingTa
 
   // Map from segment name to map from replica id to server
   // Set variable as volatile so all threads can get the up-to-date map
-  protected volatile Map<String, Map<Integer, String>> _segmentToReplicaToServerMap;
+  protected volatile Map<String, Map<Integer, ServerInstance>> _segmentToReplicaToServerMap;
 
   // Cache for segment zk metadata to reduce the lookup to ZK store
   protected Map<String, SegmentZKMetadata> _segmentToZkMetadataMapping = new ConcurrentHashMap<>();
@@ -87,9 +88,9 @@ public abstract class BasePartitionAwareRoutingTableBuilder implements RoutingTa
   }
 
   @Override
-  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request, SegmentSelector segmentSelector) {
+  public Map<ServerInstance, List<String>> getRoutingTable(RoutingTableLookupRequest request, SegmentSelector segmentSelector) {
     // Copy the reference for the current segment to replica to server mapping for snapshot
-    Map<String, Map<Integer, String>> segmentToReplicaToServerMap = _segmentToReplicaToServerMap;
+    Map<String, Map<Integer, ServerInstance>> segmentToReplicaToServerMap = _segmentToReplicaToServerMap;
 
     // Get all available segments for table
     Set<String> segmentsToQuery = segmentToReplicaToServerMap.keySet();
@@ -99,7 +100,7 @@ public abstract class BasePartitionAwareRoutingTableBuilder implements RoutingTa
       segmentsToQuery = segmentSelector.selectSegments(request, segmentsToQuery);
     }
 
-    Map<String, List<String>> routingTable = new HashMap<>();
+    Map<ServerInstance, List<String>> routingTable = new HashMap<>();
     SegmentPrunerContext prunerContext = new SegmentPrunerContext(request.getBrokerRequest());
 
     // Shuffle the replica group ids in order to satisfy:
@@ -119,19 +120,19 @@ public abstract class BasePartitionAwareRoutingTableBuilder implements RoutingTa
 
       if (!segmentPruned) {
         // 2b. Segment cannot be pruned. Assign the segment to a server based on the shuffled replica group ids
-        Map<Integer, String> replicaIdToServerMap = segmentToReplicaToServerMap.get(segmentName);
+        Map<Integer, ServerInstance> replicaIdToServerMap = segmentToReplicaToServerMap.get(segmentName);
 
-        String serverName = null;
+        ServerInstance serverInstance = null;
         for (int i = 0; i < _numReplicas; i++) {
-          serverName = replicaIdToServerMap.get(shuffledReplicaGroupIds[i]);
+          serverInstance = replicaIdToServerMap.get(shuffledReplicaGroupIds[i]);
           // If a server is found, update routing table for the current segment
-          if (serverName != null) {
+          if (serverInstance != null) {
             break;
           }
         }
 
-        if (serverName != null) {
-          routingTable.computeIfAbsent(serverName, k -> new ArrayList<>()).add(segmentName);
+        if (serverInstance != null) {
+          routingTable.computeIfAbsent(serverInstance, k -> new ArrayList<>()).add(segmentName);
         } else {
           // No server is found for this segment if the code reach here
 
@@ -145,7 +146,7 @@ public abstract class BasePartitionAwareRoutingTableBuilder implements RoutingTa
   }
 
   @Override
-  public List<Map<String, List<String>>> getRoutingTables() {
+  public List<Map<ServerInstance, List<String>>> getRoutingTables() {
     throw new UnsupportedOperationException("Partition aware routing table cannot be pre-computed");
   }
 

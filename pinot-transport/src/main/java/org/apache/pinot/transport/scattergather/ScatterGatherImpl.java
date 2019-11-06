@@ -96,14 +96,14 @@ public class ScatterGatherImpl implements ScatterGather {
       ScatterGatherStats scatterGatherStats, Boolean isOfflineTable, BrokerMetrics brokerMetrics)
       throws InterruptedException {
     ScatterGatherRequest scatterGatherRequest = scatterGatherRequestContext._request;
-    Map<String, List<String>> routingTable = scatterGatherRequest.getRoutingTable();
+    Map<ServerInstance, List<String>> routingTable = scatterGatherRequest.getRoutingTable();
     CountDownLatch requestDispatchLatch = new CountDownLatch(routingTable.size());
 
     // async checkout of connections and then dispatch of request
     List<SingleRequestHandler> handlers = new ArrayList<>(routingTable.size());
 
-    for (Entry<String, List<String>> entry : routingTable.entrySet()) {
-      ServerInstance serverInstance = ServerInstance.forInstanceName(entry.getKey());
+    for (Entry<ServerInstance, List<String>> entry : routingTable.entrySet()) {
+      ServerInstance serverInstance = entry.getKey();
       String shortServerName = serverInstance.getShortHostName();
       if (isOfflineTable != null) {
         if (isOfflineTable) {
