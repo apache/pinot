@@ -19,21 +19,20 @@
 
   <article class="dashboard-container__body">
     <section class="dashboard-container__application-header">
-      <h3 class="dashboard-container__title">Anomalies Filtered by: </h3>
-      {{#power-select
-        triggerId="dash-anomalies-by"
-        triggerClass="te-anomaly-table__select te-anomaly-table__select--margin-left"
-        options=anomaliesByOptions
-        searchEnabled=false
-        selected=anomaliesBySelected
-        onchange=(action "onAnomaliesBy")
-        as |getBy|
-      }}
-        {{getBy}}
-      {{/power-select}}
+      <div class="dashboard-container__application-or-subgroup">
+        <strong>Anomalies filter by:  </strong>
+        {{#each anomaliesByOptions as |option|}}
+          <div class="dashboard-container__radio-button-item">
+            {{#radio-button value=option groupValue=anomaliesBySelected changed=(action "onAnomaliesBy")}}
+              <span class="te-radio__option">{{option}}</span>
+            {{/radio-button}}
+          </div>
+        {{/each}}
+      </div>
 
       {{#if byApplication}}
         <div class="dashboard-container__application-header-dropdown">
+          <label class="te-label te-label--small">Application</label>
           {{#power-select
             options=sortedApplications
             selected=appNameSelected
@@ -47,6 +46,7 @@
         </div>
       {{else}}
         <div class="dashboard-container__application-header-dropdown">
+          <label class="te-label te-label--small">Subscription Group</label>
           {{#power-select
             options=sortedSubscriptionGroups
             selected=subGroupSelected
@@ -59,16 +59,30 @@
           {{/power-select}}
         </div>
       {{/if}}
+
+      <div>
+        {{#if byApplication}}
+          <h3 class="dashboard-container__title">{{appName}}</h3>
+        {{else}}
+          <h3 class="dashboard-container__title">{{subGroup}}</h3>
+        {{/if}}
+      </div>
     </section>
 
-  {{#if (gt anomaliesCount 0)}}
+  {{#if isLoading}}
+    <div class="dashboard-container__spinner-wrapper">
+      {{ember-spinner lines=30 radius=20 length=0 width=10 opacity=0 trail=75 color='blue'}}
+    </div>
+  {{/if}}
+
+  {{#if areAnomaliesCurrent}}
     <section>
       {{stats-cards stats=stats}}
     </section>
 
     <section>
       <div class="dashboard-container__application-filter-by">
-        <strong>Filter by</strong>
+        Filter by Feedback
         {{#power-select
           triggerId="dash-filter-by"
           triggerClass="te-anomaly-table__select te-anomaly-table__select--margin-left"
@@ -82,7 +96,13 @@
           {{feedbackType}}
         {{/power-select}}
 
-        <button class="pull-right te-button te-button--outline" {{action 'toggleAllAccordions'}}>{{if toggleCollapsed "Show tables" "Hide tables"}}</button>
+        <a class="pull-right thirdeye-link" {{action 'toggleAllAccordions'}}>
+          {{#if toggleCollapsed}}
+            Expand all  <i class="glyphicon glyphicon-menu-down"></i>
+          {{else}}
+            Collapse all  <i class="glyphicon glyphicon-menu-up"></i>
+          {{/if}}
+        </a>
       </div>
 
       {{#bs-accordion as |accordion|}}
@@ -91,7 +111,7 @@
             {{#aitem.title}}
               <section class="dashboard-container__title">Metric:
                 <span>{{metric}} ({{humanizedEntityList.length}} {{if (gt humanizedEntityList.length 1) "anomalies" "anomaly"}})</span>
-                <span class="pull-right"><i class="glyphicon glyphicon-menu-{{if toggleCollapsed "down" "up"}}"></i></span>
+                <span><i class="glyphicon glyphicon-menu-{{if toggleCollapsed "down" "up"}}"></i></span>
               </section>
             {{/aitem.title}}
             {{#aitem.body collapsed=toggleCollapsed}}

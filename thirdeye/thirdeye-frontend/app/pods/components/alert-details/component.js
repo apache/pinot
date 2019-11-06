@@ -579,7 +579,7 @@ export default Component.extend({
               valuesCurrent.push(series.Current.values[i]);
               anomalyEdgeValues.push(series.Current.values[i]);
               anomalyEdgeTimestamps.push(series.Current.timestamps[i]);
-            } else {
+            } else if (i > 0) {
               anomalyEdgeValues.push(series.Current.values[i-1]);
               anomalyEdgeTimestamps.push(series.Current.timestamps[i-1]);
               valuesCurrent.push(null);
@@ -635,7 +635,7 @@ export default Component.extend({
               valuesOld.push(1.0);
               anomalyEdgeValues.push(1.0);
               anomalyEdgeTimestamps.push(series.Current.timestamps[i]);
-            } else {
+            } else if (i > 0) {
               anomalyEdgeValues.push(1.0);
               anomalyEdgeTimestamps.push(series.Current.timestamps[i-1]);
               valuesOld.push(null);
@@ -659,7 +659,6 @@ export default Component.extend({
           axis: 'y2'
         };
       }
-
       return series;
     }
   ),
@@ -1030,7 +1029,7 @@ export default Component.extend({
         // We distinguish these because it only needs the route's info on init.  After that, component manages state
         metricUrnList: this.get('metricUrnListRoute'),
         metricUrn: this.get('metricUrnRoute')
-      })
+      });
     }
   },
 
