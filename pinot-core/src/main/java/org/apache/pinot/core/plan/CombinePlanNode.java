@@ -97,7 +97,6 @@ public class CombinePlanNode implements PlanNode {
 
       int numThreads = Math.min((numPlanNodes + TARGET_NUM_PLANS_PER_THREAD - 1) / TARGET_NUM_PLANS_PER_THREAD,
           MAX_NUM_THREADS_PER_QUERY);
-      int numPlansPerThread = (numPlanNodes + numThreads - 1) / numThreads;
 
       // Use a Phaser to ensure all the Futures are done (not scheduled, finished or interrupted) before the main thread
       // returns. We need to ensure no execution left before the main thread returning because the main thread holds the
@@ -123,9 +122,7 @@ public class CombinePlanNode implements PlanNode {
               }
 
               List<Operator> operators = new ArrayList<>();
-              int start = index * numPlansPerThread;
-              int end = Math.min(start + numPlansPerThread, numPlanNodes);
-              for (int i = start; i < end; i++) {
+              for (int i = index; i < numPlanNodes; i += numThreads) {
                 operators.add(_planNodes.get(i).run());
               }
               return operators;
