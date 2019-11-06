@@ -183,6 +183,10 @@ public class ControllerStarter {
     return _helixResourceManager;
   }
 
+  public SegmentCompletionManager getSegmentCompletionManager() {
+    return _segmentCompletionManager;
+  }
+
   /**
    * Gets the Helix Manager connected as Helix controller.
    */

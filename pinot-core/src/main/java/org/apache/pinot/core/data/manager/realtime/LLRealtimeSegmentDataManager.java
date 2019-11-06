@@ -630,7 +630,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return CompletionMode.DEFAULT;
   }
 
-  private File makeSegmentDirPath() {
+  public File makeSegmentDirPath() {
     return new File(_resourceDataDir, _segmentZKMetadata.getSegmentName());
   }
 

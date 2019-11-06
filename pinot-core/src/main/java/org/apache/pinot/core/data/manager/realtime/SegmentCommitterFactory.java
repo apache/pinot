@@ -33,7 +33,8 @@ public class SegmentCommitterFactory {
   private static ServerSegmentCompletionProtocolHandler _protocolHandler;
 
   // Prevent factory from being instantiated.
-  public SegmentCommitterFactory(Logger segmentLogger, IndexLoadingConfig indexLoadingConfig, ServerSegmentCompletionProtocolHandler protocolHandler) {
+  public SegmentCommitterFactory(Logger segmentLogger, IndexLoadingConfig indexLoadingConfig,
+      ServerSegmentCompletionProtocolHandler protocolHandler) {
     LOGGER = segmentLogger;
     _indexLoadingConfig = indexLoadingConfig;
     _protocolHandler = protocolHandler;
