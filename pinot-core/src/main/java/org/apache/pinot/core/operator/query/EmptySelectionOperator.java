@@ -45,7 +45,7 @@ public class EmptySelectionOperator extends BaseOperator<IntermediateResultsBloc
 
   public EmptySelectionOperator(IndexSegment indexSegment, Selection selection, TransformOperator transformOperator) {
     List<TransformExpressionTree> expressions =
-        SelectionOperatorUtils.extractExpressions(selection.getSelectionColumns(), indexSegment, null);
+        SelectionOperatorUtils.extractExpressions(selection.getSelectionColumns(), indexSegment);
 
     int numExpressions = expressions.size();
     String[] columnNames = new String[numExpressions];

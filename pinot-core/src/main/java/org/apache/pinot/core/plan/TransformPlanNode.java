@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.plan;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -59,6 +60,7 @@ public class TransformPlanNode implements PlanNode {
    * Helper method to extract projection columns and transform expressions from the given broker request.
    */
   private void extractColumnsAndTransforms(BrokerRequest brokerRequest, IndexSegment indexSegment) {
+    Set<String> columns = new HashSet<>();
     if (brokerRequest.isSetAggregationsInfo()) {
       // Extract aggregation expressions
       for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
@@ -66,19 +68,14 @@ public class TransformPlanNode implements PlanNode {
           // 'DISTINCT(col1, col2 ...)' is modeled as one single aggregation function
           String[] distinctColumns = AggregationFunctionUtils.getColumn(aggregationInfo)
               .split(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR);
-          for (String column : distinctColumns) {
-            addExpressionColumn(column);
-          }
+          columns.addAll(Arrays.asList(distinctColumns));
         } else if (!aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-          addExpressionColumn(AggregationFunctionUtils.getColumn(aggregationInfo));
+          columns.add(AggregationFunctionUtils.getColumn(aggregationInfo));
         }
       }
-
       // Extract group-by expressions
       if (brokerRequest.isSetGroupBy()) {
-        for (String column : brokerRequest.getGroupBy().getExpressions()) {
-          addExpressionColumn(column);
-        }
+        columns.addAll(brokerRequest.getGroupBy().getExpressions());
       }
     } else {
       Selection selection = brokerRequest.getSelections();
@@ -91,9 +88,7 @@ public class TransformPlanNode implements PlanNode {
           _expressions.add(new TransformExpressionTree(new IdentifierAstNode(column)));
         }
       } else {
-        for (String column : selectionColumns) {
-          addExpressionColumn(column);
-        }
+        columns.addAll(selectionColumns);
       }
 
       // Extract order-by expressions and update maxDocPerNextCall
@@ -104,7 +99,10 @@ public class TransformPlanNode implements PlanNode {
           _maxDocPerNextCall = Math.min(selection.getSize(), _maxDocPerNextCall);
         } else {
           for (SelectionSort selectionSort : sortSequence) {
-            addExpressionColumn(selectionSort.getColumn());
+            String orderByColumn = selectionSort.getColumn();
+            if (!_projectionColumns.contains(orderByColumn)) {
+              columns.add(orderByColumn);
+            }
           }
         }
       } else {
@@ -113,12 +111,11 @@ public class TransformPlanNode implements PlanNode {
         _maxDocPerNextCall = 1;
       }
     }
-  }
-
-  private void addExpressionColumn(String column) {
-    TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(column);
-    expression.getColumns(_projectionColumns);
-    _expressions.add(expression);
+    for (String column : columns) {
+      TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(column);
+      expression.getColumns(_projectionColumns);
+      _expressions.add(expression);
+    }
   }
 
   @Override
