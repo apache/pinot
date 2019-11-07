@@ -220,29 +220,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // Set extra settings into broker request
-    if (request.has(Broker.Request.TRACE) && request.get(Broker.Request.TRACE).asBoolean()) {
-      LOGGER.debug("Enable trace for request {}: {}", requestId, query);
-      brokerRequest.setEnableTrace(true);
-    }
-
-    if (request.has(Broker.Request.DEBUG_OPTIONS)) {
-      Map<String, String> debugOptions = getOptionsFromJson(request, Broker.Request.DEBUG_OPTIONS);
-      LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
-      brokerRequest.setDebugOptions(debugOptions);
-    }
-
-    Map<String, String> queryOptions = new HashMap<>();
-    Map<String, String> queryOptionsFromBrokerRequest = brokerRequest.getQueryOptions();
-    if (queryOptionsFromBrokerRequest != null) {
-      queryOptions.putAll(queryOptionsFromBrokerRequest);
-    }
-    if (request.has(Broker.Request.QUERY_OPTIONS)) {
-      Map<String, String> queryOptionsFromJson = getOptionsFromJson(request, Broker.Request.QUERY_OPTIONS);
-      queryOptions.putAll(queryOptionsFromJson);
-    }
-    brokerRequest.setQueryOptions(queryOptions);
-    LOGGER
-        .debug("Query options are set to: {} for request {}: {}", brokerRequest.getQueryOptions(), requestId, query);
+    setOptions(requestId, query, request, brokerRequest);
 
     // Optimize the query
     // TODO: get time column name from schema or table config so that we can apply it for REALTIME only case
@@ -350,7 +328,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return brokerResponse;
   }
 
-  private Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
+  private static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
     return Splitter.on(';')
         .omitEmptyStrings()
         .trimResults()
@@ -386,6 +364,38 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     return false;
+  }
+
+  /**
+   * Sets brokerRequest extra options
+   */
+  @VisibleForTesting
+  static void setOptions(long requestId, String query, JsonNode jsonRequest, BrokerRequest brokerRequest) {
+    if (jsonRequest.has(Broker.Request.TRACE) && jsonRequest.get(Broker.Request.TRACE).asBoolean()) {
+      LOGGER.debug("Enable trace for request {}: {}", requestId, query);
+      brokerRequest.setEnableTrace(true);
+    }
+
+    if (jsonRequest.has(Broker.Request.DEBUG_OPTIONS)) {
+      Map<String, String> debugOptions = getOptionsFromJson(jsonRequest, Broker.Request.DEBUG_OPTIONS);
+      LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
+      brokerRequest.setDebugOptions(debugOptions);
+    }
+
+    Map<String, String> queryOptions = new HashMap<>();
+    if (jsonRequest.has(Broker.Request.QUERY_OPTIONS)) {
+      Map<String, String> queryOptionsFromJson = getOptionsFromJson(jsonRequest, Broker.Request.QUERY_OPTIONS);
+      queryOptions.putAll(queryOptionsFromJson);
+    }
+    Map<String, String> queryOptionsFromBrokerRequest = brokerRequest.getQueryOptions();
+    if (queryOptionsFromBrokerRequest != null) {
+      queryOptions.putAll(queryOptionsFromBrokerRequest);
+    }
+    if (!queryOptions.isEmpty()) {
+      brokerRequest.setQueryOptions(queryOptions);
+      LOGGER
+          .debug("Query options are set to: {} for request {}: {}", brokerRequest.getQueryOptions(), requestId, query);
+    }
   }
 
   /**
