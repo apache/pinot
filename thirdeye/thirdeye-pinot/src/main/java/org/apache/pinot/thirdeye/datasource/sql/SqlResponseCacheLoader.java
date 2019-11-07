@@ -56,6 +56,7 @@ import static org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeDataF
  */
 public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResultSetGroup> {
   private static final Logger LOG = LoggerFactory.getLogger(SqlResponseCacheLoader.class);
+
   private static final int INIT_CONNECTIONS = 20;
   private static int MAX_CONNECTIONS = 50;
   private static final String PRESTO = "Presto";
