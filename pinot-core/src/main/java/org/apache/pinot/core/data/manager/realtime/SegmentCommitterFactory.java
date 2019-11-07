@@ -32,7 +32,6 @@ public class SegmentCommitterFactory {
   private IndexLoadingConfig _indexLoadingConfig;
   private ServerSegmentCompletionProtocolHandler _protocolHandler;
 
-  // Prevent factory from being instantiated.
   public SegmentCommitterFactory(Logger segmentLogger, IndexLoadingConfig indexLoadingConfig,
       ServerSegmentCompletionProtocolHandler protocolHandler) {
     LOGGER = segmentLogger;
