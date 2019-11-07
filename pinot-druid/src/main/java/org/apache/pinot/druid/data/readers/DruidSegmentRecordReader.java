@@ -169,7 +169,10 @@ public class DruidSegmentRecordReader implements RecordReader {
         FieldSpec fieldSpec = _pinotSchema.getFieldSpecFor(_columnNames.get(i));
         Object value = selector.getObject();
         if (value != null && !fieldSpec.isSingleValueField()) {
-          // Assuming that multi-valued dimensions in Druid are stored as Arrays.ArrayList (this has been checked)
+          // Multi-valued dimensions in Druid are stored as Arrays.ArrayList (this has been checked)
+          Preconditions.checkArgument(value.getClass() == java.util.Arrays.asList().getClass(), "The multi-valued dimension " + columnName +
+              " should be java.util.Arrays$ArrayList, but it is " + value.getClass());
+          // Store the multi-valued dimension as a String[] to follow Pinot format; null if empty
           value = ((List<String>) value).toArray(new String[0]);
         }
         reuse.putField(columnName, value);
@@ -240,7 +243,8 @@ public class DruidSegmentRecordReader implements RecordReader {
         }
         if (!compareTypes(_pinotSchema.getFieldSpecFor(columnName).getDataType(), capabilities.getType())) {
           throw new IllegalArgumentException("Type for column " + columnName +
-              " in schema does not match type for column " + columnName + " in record.");
+              " in schema (" + _pinotSchema.getFieldSpecFor(columnName).getDataType() + ") does not match type for column "
+              + columnName + " in record (" + capabilities.getType() + ").");
         }
       }
     }
