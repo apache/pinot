@@ -33,18 +33,18 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
  */
 public abstract class BaseTable implements Table {
 
-  AggregationFunction[] _aggregationFunctions;
-  int _numAggregations;
-  DataSchema _dataSchema;
-  int _numColumns;
+  final AggregationFunction[] _aggregationFunctions;
+  final int _numAggregations;
+  final DataSchema _dataSchema;
+  final int _numColumns;
 
   // the capacity we need to trim to
-  int _capacity;
+  final int _capacity;
   // the capacity with added buffer, in order to collect more records than capacity for better precision
-  int _maxCapacity;
+  final int _maxCapacity;
 
-  boolean _isOrderBy;
-  TableResizer _tableResizer;
+  final boolean _isOrderBy;
+  final TableResizer _tableResizer;
 
   /**
    * Initializes the variables and comparators needed for the table
@@ -73,6 +73,7 @@ public abstract class BaseTable implements Table {
       }
     } else {
       _maxCapacity = capacity;
+      _tableResizer = null;
     }
     _capacity = capacity;
   }

@@ -493,18 +493,18 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     while (numRows < groupBy.getTopN() && sortedIterator.hasNext()) {
 
       Record nextRecord = sortedIterator.next();
-      Object[] columns = nextRecord.getColumns();
+      Object[] values = nextRecord.getValues();
       Serializable[] row = new Serializable[numColumns];
 
       int index = 0;
       while (index < numGroupBy) {
-        row[index] = getSerializableValue(columns[index]);
+        row[index] = getSerializableValue(values[index]);
         index++;
       }
 
       int aggNum = 0;
       while (index < numColumns) {
-        row[index] = getSerializableValue(aggregationFunctions[aggNum++].extractFinalResult(columns[index]));
+        row[index] = getSerializableValue(aggregationFunctions[aggNum++].extractFinalResult(values[index]));
         if (preserveType) {
           row[index] = AggregationFunctionUtils.formatValue(row[index]);
         }
@@ -615,19 +615,19 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       while (numRows < groupBy.getTopN() && sortedIterator.hasNext()) {
 
         Record nextRecord = sortedIterator.next();
-        Object[] columns = nextRecord.getColumns();
+        Object[] values = nextRecord.getValues();
 
         int index = 0;
         List<String> group = new ArrayList<>(numGroupBy);
         while (index < numGroupBy) {
-          group.add(columns[index].toString());
+          group.add(values[index].toString());
           index++;
         }
 
         int aggNum = 0;
         while (index < numColumns) {
           Serializable serializableValue =
-              getSerializableValue(aggregationFunctions[aggNum].extractFinalResult(columns[index]));
+              getSerializableValue(aggregationFunctions[aggNum].extractFinalResult(values[index]));
           if (preserveType) {
             serializableValue = AggregationFunctionUtils.formatValue(serializableValue);
           }

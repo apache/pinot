@@ -273,7 +273,7 @@ class TableResizer {
 
     @Override
     Comparable extract(Record record) {
-      Object keyColumn = record.getColumns()[_index];
+      Object keyColumn = record.getValues()[_index];
       return (Comparable) keyColumn;
     }
   }
@@ -296,7 +296,7 @@ class TableResizer {
 
     @Override
     Comparable extract(Record record) {
-      Object aggregationColumn = record.getColumns()[_index];
+      Object aggregationColumn = record.getValues()[_index];
       return _convertorFunction.apply(aggregationColumn);
     }
   }

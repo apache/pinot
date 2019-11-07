@@ -68,8 +68,8 @@ public class SimpleIndexedTable extends IndexedTable {
 
     if (_noMoreNewRecords) { // allow only existing record updates
       _lookupMap.computeIfPresent(key, (k, v) -> {
-        Object[] existingValues = v.getColumns();
-        Object[] newValues = newRecord.getColumns();
+        Object[] existingValues = v.getValues();
+        Object[] newValues = newRecord.getValues();
         int aggNum = 0;
         for (int i = _numKeyColumns; i < _numColumns; i++) {
           existingValues[i] = _aggregationFunctions[aggNum++].merge(existingValues[i], newValues[i]);
@@ -82,8 +82,8 @@ public class SimpleIndexedTable extends IndexedTable {
         if (v == null) {
           return newRecord;
         } else {
-          Object[] existingValues = v.getColumns();
-          Object[] newValues = newRecord.getColumns();
+          Object[] existingValues = v.getValues();
+          Object[] newValues = newRecord.getValues();
           int aggNum = 0;
           for (int i = _numKeyColumns; i < _numColumns; i++) {
             existingValues[i] = _aggregationFunctions[aggNum++].merge(existingValues[i], newValues[i]);

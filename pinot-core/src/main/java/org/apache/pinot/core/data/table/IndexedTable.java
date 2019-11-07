@@ -30,8 +30,8 @@ import org.apache.pinot.common.utils.DataSchema;
  */
 public abstract class IndexedTable extends BaseTable {
 
-  private KeyExtractor _keyExtractor;
-  int _numKeyColumns;
+  private final KeyExtractor _keyExtractor;
+  final int _numKeyColumns;
 
   /**
    * Initializes the variables and comparators needed for the table
@@ -65,7 +65,7 @@ public abstract class IndexedTable extends BaseTable {
      * Returns the Key from the Record
      */
     Key extractKey(Record record) {
-      Object[] keys = Arrays.copyOf(record.getColumns(), _keyIndexes);
+      Object[] keys = Arrays.copyOf(record.getValues(), _keyIndexes);
       return new Key(keys);
     }
   }

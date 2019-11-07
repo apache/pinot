@@ -25,21 +25,21 @@ import java.util.Arrays;
  * Defines a single record in Pinot
  */
 public class Record {
-  private Object[] _columns;
+  private Object[] _values;
 
-  public Record(Object[] columns) {
-    _columns = columns;
+  public Record(Object[] values) {
+    _values = values;
   }
 
   /**
-   * Returns the columns contained in the Record
+   * Returns the column values contained in the Record
    */
-  public Object[] getColumns() {
-    return _columns;
+  public Object[] getValues() {
+    return _values;
   }
 
   @Override
   public String toString() {
-    return Arrays.deepToString(_columns);
+    return Arrays.deepToString(_values);
   }
 }

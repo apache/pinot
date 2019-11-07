@@ -393,7 +393,7 @@ public class TableResizerTest {
           _tableResizer.getIntermediateRecord(key, record);
       Assert.assertEquals(intermediateRecord._key, key);
       Assert.assertEquals(intermediateRecord._values.length, 1);
-      Assert.assertEquals(intermediateRecord._values[0], record.getColumns()[1]);
+      Assert.assertEquals(intermediateRecord._values[0], record.getValues()[1]);
     }
 
     // sum(m1)
@@ -407,7 +407,7 @@ public class TableResizerTest {
           _tableResizer.getIntermediateRecord(key, record);
       Assert.assertEquals(intermediateRecord._key, key);
       Assert.assertEquals(intermediateRecord._values.length, 1);
-      Assert.assertEquals(intermediateRecord._values[0], record.getColumns()[3]);
+      Assert.assertEquals(intermediateRecord._values[0], record.getValues()[3]);
     }
 
     // d1, max(m2)
@@ -422,8 +422,8 @@ public class TableResizerTest {
           _tableResizer.getIntermediateRecord(key, record);
       Assert.assertEquals(intermediateRecord._key, key);
       Assert.assertEquals(intermediateRecord._values.length, 2);
-      Assert.assertEquals(intermediateRecord._values[0], record.getColumns()[0]);
-      Assert.assertEquals(intermediateRecord._values[1], record.getColumns()[4]);
+      Assert.assertEquals(intermediateRecord._values[0], record.getValues()[0]);
+      Assert.assertEquals(intermediateRecord._values[1], record.getValues()[4]);
     }
 
     // d2, sum(m1), d3
@@ -439,9 +439,9 @@ public class TableResizerTest {
           _tableResizer.getIntermediateRecord(key, record);
       Assert.assertEquals(intermediateRecord._key, key);
       Assert.assertEquals(intermediateRecord._values.length, 3);
-      Assert.assertEquals(intermediateRecord._values[0], record.getColumns()[1]);
-      Assert.assertEquals(intermediateRecord._values[1], record.getColumns()[3]);
-      Assert.assertEquals(intermediateRecord._values[2], record.getColumns()[2]);
+      Assert.assertEquals(intermediateRecord._values[0], record.getValues()[1]);
+      Assert.assertEquals(intermediateRecord._values[1], record.getValues()[3]);
+      Assert.assertEquals(intermediateRecord._values[2], record.getValues()[2]);
     }
 
     // non-comparable intermediate result
@@ -458,7 +458,7 @@ public class TableResizerTest {
       Assert.assertEquals(intermediateRecord._key, key);
       Assert.assertEquals(intermediateRecord._values.length, 1);
       Assert.assertEquals(intermediateRecord._values[0],
-          distinctCountFunction.extractFinalResult(record.getColumns()[5]));
+          distinctCountFunction.extractFinalResult(record.getValues()[5]));
     }
   }
 }

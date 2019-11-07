@@ -282,7 +282,7 @@ public class IndexedTableTest {
     Iterator<Record> iterator = indexedTable.iterator();
     List<String> d1 = new ArrayList<>();
     while (iterator.hasNext()) {
-      d1.add((String) iterator.next().getColumns()[0]);
+      d1.add((String) iterator.next().getValues()[0]);
     }
     for (String s : evicted) {
       Assert.assertFalse(d1.contains(s));
@@ -293,7 +293,7 @@ public class IndexedTableTest {
     Assert.assertEquals(survivors.size(), indexedTable.size());
     Iterator<Record> iterator = indexedTable.iterator();
     for (String survivor : survivors) {
-      Assert.assertEquals(survivor, iterator.next().getColumns()[0]);
+      Assert.assertEquals(survivor, iterator.next().getValues()[0]);
     }
   }
 
