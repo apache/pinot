@@ -64,7 +64,7 @@ public abstract class BaseTable implements Table {
     if (_isOrderBy) {
       _tableResizer = new TableResizer(dataSchema, aggregationInfos, orderBy);
 
-      // TODO: tune these numbers
+      // TODO: tune these numbers and come up with a better formula (github ISSUE-4801)
       // Based on the capacity and maxCapacity, the resizer will smartly choose to evict/retain recors from the PQ
       if (capacity <= 100_000) { // Capacity is small, make a very large buffer. Make PQ of records to retain, during resize
         _maxCapacity = 1_000_000;
