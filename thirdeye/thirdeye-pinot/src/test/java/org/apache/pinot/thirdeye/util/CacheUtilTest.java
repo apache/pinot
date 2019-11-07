@@ -22,12 +22,9 @@ package org.apache.pinot.thirdeye.util;
 
 import com.couchbase.client.java.document.json.JsonObject;
 import org.apache.pinot.thirdeye.detection.cache.TimeSeriesDataPoint;
-import org.apache.pinot.thirdeye.util.CacheUtils;
-import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 public class CacheUtilTest {
