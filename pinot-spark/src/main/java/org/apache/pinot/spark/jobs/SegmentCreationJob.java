@@ -23,11 +23,9 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.Serializable;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import javax.annotation.Nullable;
@@ -57,6 +55,7 @@ import org.apache.pinot.core.segment.name.SegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.spark.utils.JobPreparationHelper;
 import org.apache.pinot.spark.utils.PushLocation;
+import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.slf4j.Logger;
@@ -360,7 +359,7 @@ public class SegmentCreationJob extends BaseSegmentJob {
     }
     _properties.put(JobConfigConstants.SCHEMA, getSchema().toSingleLineJsonString());
 
-    JavaSparkContext sparkContext = new JavaSparkContext();
+    JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
     addDepsJarToDistributedCache(sparkContext);
     JavaRDD<String> pathRDD = sparkContext.parallelize(dataFilePathStrs, numDataFiles);
     pathRDD.zipWithIndex().foreach(tuple2 -> {
