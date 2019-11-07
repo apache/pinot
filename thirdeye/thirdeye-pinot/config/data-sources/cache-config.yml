@@ -12,6 +12,8 @@ centralizedCacheSettings:
   cacheDataStoreName: couchbase
   cacheDataSources:
     couchbase:
+      # host can just be localhost if you're using this locally.
+      host: your_host
       authUsername: your_username
       authPassword: your_password
       bucketName: your_bucket_name

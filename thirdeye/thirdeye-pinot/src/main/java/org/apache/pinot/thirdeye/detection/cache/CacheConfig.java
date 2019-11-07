@@ -35,6 +35,7 @@ public class CacheConfig {
    * config values for accessing the centralized cache. should be set from CentralizedCacheConfig values.
    * these are added here for ease-of-access and making code a little more readable.
    */
+  private static String host;
   private static String authUsername;
   private static String authPassword;
   private static String bucketName;
@@ -51,6 +52,7 @@ public class CacheConfig {
   public static boolean useInMemoryCache() { return useInMemoryCache; }
   public static CentralizedCacheConfig getCentralizedCacheSettings() { return centralizedCacheSettings; }
 
+  public static String getHost() { return host; }
   public static String getAuthUsername() { return authUsername; }
   public static String getAuthPassword() { return authPassword; }
   public static String getBucketName() { return bucketName; }
@@ -59,6 +61,7 @@ public class CacheConfig {
   public void setUseInMemoryCache(boolean toggle) { useInMemoryCache = toggle; }
   public void setCentralizedCacheSettings(CentralizedCacheConfig centralizedCacheConfig) { centralizedCacheSettings = centralizedCacheConfig; }
 
+  public void setHost(String host) { CacheConfig.host = host; }
   public void setAuthUsername(String authUsername) { CacheConfig.authUsername = authUsername; }
   public void setAuthPassword(String authPassword) { CacheConfig.authPassword = authPassword; }
   public void setBucketName(String bucketName) { CacheConfig.bucketName = bucketName; }

@@ -55,8 +55,7 @@ public class CouchbaseCacheDAO {
    * Initialize connection to Couchbase and open bucket where data is stored.
    */
   private void createDataStoreConnection() {
-    Cluster cluster = CouchbaseCluster.create();
-
+    Cluster cluster = CouchbaseCluster.create(CacheConfig.getHost());
     cluster.authenticate(CacheConfig.getAuthUsername(), CacheConfig.getAuthPassword());
     this.bucket = cluster.openBucket(CacheConfig.getBucketName());
   }

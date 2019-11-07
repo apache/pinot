@@ -28,6 +28,7 @@ public class CacheDataSource {
   /**
    * authentication stuff.
    */
+  private String host;
   private String authUsername;
   private String authPassword;
   private String bucketName;
@@ -35,10 +36,12 @@ public class CacheDataSource {
   // left blank
   public CacheDataSource() {}
 
+  public String getHost() { return host; }
   public String getAuthUsername() { return authUsername; }
   public String getAuthPassword() { return authPassword; }
   public String getBucketName() { return bucketName; }
 
+  public void setHost(String host) { this.host = host; }
   public void setAuthUsername(String authUsername) { this.authUsername = authUsername; }
   public void setAuthPassword(String authPassword) { this.authPassword = authPassword; }
   public void setBucketName(String bucketName) { this.bucketName = bucketName; }

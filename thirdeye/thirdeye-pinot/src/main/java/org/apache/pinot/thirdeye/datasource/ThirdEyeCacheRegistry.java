@@ -108,6 +108,7 @@ public class ThirdEyeCacheRegistry {
 
       CacheDataSource dataSource = CacheConfig.getCentralizedCacheSettings().getDataSourceConfig();
 
+      cacheConfig.setHost(dataSource.getHost());
       cacheConfig.setAuthUsername(dataSource.getAuthUsername());
       cacheConfig.setAuthPassword(dataSource.getAuthPassword());
       cacheConfig.setBucketName(dataSource.getBucketName());
