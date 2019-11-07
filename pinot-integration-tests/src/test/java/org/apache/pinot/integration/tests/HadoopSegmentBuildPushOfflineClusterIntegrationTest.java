@@ -44,10 +44,10 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.hadoop.job.JobConfigConstants;
-import org.apache.pinot.hadoop.job.SegmentCreationJob;
-import org.apache.pinot.hadoop.job.SegmentPreprocessingJob;
-import org.apache.pinot.hadoop.job.SegmentTarPushJob;
+import org.apache.pinot.hadoop.job.HadoopSegmentCreationJob;
+import org.apache.pinot.hadoop.job.HadoopSegmentPreprocessingJob;
+import org.apache.pinot.ingestion.common.JobConfigConstants;
+import org.apache.pinot.ingestion.jobs.SegmentTarPushJob;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -182,17 +182,17 @@ public class HadoopSegmentBuildPushOfflineClusterIntegrationTest extends BaseClu
     preComputeProperties.setProperty(JobConfigConstants.PREPROCESS_PATH_TO_OUTPUT, _preprocessingDir.getPath());
 
     // Run segment pre-processing job
-    SegmentPreprocessingJob segmentPreprocessingJob = new SegmentPreprocessingJob(preComputeProperties);
+    HadoopSegmentPreprocessingJob hadoopSegmentPreprocessingJob = new HadoopSegmentPreprocessingJob(preComputeProperties);
     Configuration preComputeConfig = _mrCluster.getConfig();
-    segmentPreprocessingJob.setConf(preComputeConfig);
-    segmentPreprocessingJob.run();
+    hadoopSegmentPreprocessingJob.setConf(preComputeConfig);
+    hadoopSegmentPreprocessingJob.run();
     LOGGER.info("Segment preprocessing job finished.");
 
     // Verify partitioning and sorting.
     verifyPreprocessingJob(preComputeConfig);
 
     // Run segment creation job
-    SegmentCreationJob creationJob = new SegmentCreationJob(properties);
+    HadoopSegmentCreationJob creationJob = new HadoopSegmentCreationJob(properties);
     Configuration config = _mrCluster.getConfig();
     creationJob.setConf(config);
     creationJob.run();
