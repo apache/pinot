@@ -29,8 +29,8 @@ import org.slf4j.Logger;
  */
 public class SegmentCommitterFactory {
   private static Logger LOGGER;
-  private static IndexLoadingConfig _indexLoadingConfig;
-  private static ServerSegmentCompletionProtocolHandler _protocolHandler;
+  private IndexLoadingConfig _indexLoadingConfig;
+  private ServerSegmentCompletionProtocolHandler _protocolHandler;
 
   // Prevent factory from being instantiated.
   public SegmentCommitterFactory(Logger segmentLogger, IndexLoadingConfig indexLoadingConfig,
@@ -44,7 +44,7 @@ public class SegmentCommitterFactory {
     return new SplitSegmentCommitter(LOGGER, _protocolHandler, _indexLoadingConfig, params, prevResponse);
   }
 
-  public SegmentCommitter createDefaultSegmentCommitter(SegmentCompletionProtocol.Request.Params params, SegmentCompletionProtocol.Response prevResponse) {
-    return new DefaultSegmentCommitter(LOGGER, _protocolHandler, _indexLoadingConfig, params, prevResponse);
+  public SegmentCommitter createDefaultSegmentCommitter(SegmentCompletionProtocol.Request.Params params) {
+    return new DefaultSegmentCommitter(LOGGER, _protocolHandler, params);
   }
 }

@@ -20,7 +20,6 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import java.io.File;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.slf4j.Logger;
 
@@ -29,14 +28,13 @@ import org.slf4j.Logger;
  * Sends segmentCommit() to the controller.
  * If that succeeds, swap in-memory segment with the one built.
  */
-public class DefaultSegmentCommitter implements SegmentCommitter{
+public class DefaultSegmentCommitter implements SegmentCommitter {
   private SegmentCompletionProtocol.Request.Params _params;
   private ServerSegmentCompletionProtocolHandler _protocolHandler;
 
   private Logger _segmentLogger;
 
-  public DefaultSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
-      IndexLoadingConfig indexLoadingConfig, SegmentCompletionProtocol.Request.Params params, SegmentCompletionProtocol.Response prevResponse) {
+  public DefaultSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler, SegmentCompletionProtocol.Request.Params params) {
     _segmentLogger = segmentLogger;
     _protocolHandler = protocolHandler;
     _params = params;

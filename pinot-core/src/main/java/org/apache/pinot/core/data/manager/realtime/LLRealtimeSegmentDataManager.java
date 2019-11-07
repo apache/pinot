@@ -33,8 +33,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.CompletionConfig;
@@ -138,6 +136,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   private static int MINIMUM_CONSUME_TIME_MINUTES = 10;
 
+  @VisibleForTesting
   public class SegmentBuildDescriptor {
     final String _segmentTarFilePath;
     final Map<String, File> _metadataFileMap;
@@ -630,7 +629,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return CompletionMode.DEFAULT;
   }
 
-  public File makeSegmentDirPath() {
+  private File makeSegmentDirPath() {
     return new File(_resourceDataDir, _segmentZKMetadata.getSegmentName());
   }
 
@@ -794,13 +793,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
 
-    Configuration config = new PropertiesConfiguration();
     SegmentCommitter segmentCommitter;
 
     if (response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit()) {
       segmentCommitter = _segmentCommitterFactory.createSplitSegmentCommitter(params, response);
     } else {
-      segmentCommitter = _segmentCommitterFactory.createDefaultSegmentCommitter(params, response);
+      segmentCommitter = _segmentCommitterFactory.createDefaultSegmentCommitter(params);
     }
 
     return segmentCommitter.commit(_currentOffset, _numRowsConsumed, _segmentBuildDescriptor);
