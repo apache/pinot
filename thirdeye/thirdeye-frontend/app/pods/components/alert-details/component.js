@@ -689,11 +689,11 @@ export default Component.extend({
       let fakeId = 0;
       if (anomaliesOld) {
         anomaliesOld.forEach(a => {
-          // 'settings' field only matters if column for settings shown
           const dimensionKeys = Object.keys(a.dimensions || {});
           const dimensionValues = dimensionKeys.map(d => a.dimensions[d]);
           const dimensionsString = [...dimensionKeys, ...dimensionValues].join();
           set(a, 'dimensionStr', dimensionsString);
+          // 'settings' field only matters if column for settings shown
           set(a, 'settings', ((stateOfAnomaliesAndTimeSeries === 2) && this.get('isEditMode')) ? 'Current' : 'Old');
           // settingsNum is for sorting anomalies by 'new' vs 'old' regardless of label given
           set(a, 'settingsNum', 1);
@@ -716,6 +716,10 @@ export default Component.extend({
       }
       if (anomaliesCurrent) {
         anomaliesCurrent.forEach(a => {
+          const dimensionKeys = Object.keys(a.dimensions || {});
+          const dimensionValues = dimensionKeys.map(d => a.dimensions[d]);
+          const dimensionsString = [...dimensionKeys, ...dimensionValues].join();
+          set(a, 'dimensionStr', dimensionsString);
           // 'settings' field only matters if column for settings shown
           set(a, 'settings', 'New');
           // settingsNum is for sorting anomalies by 'new' vs 'old' regardless of label given
@@ -1030,7 +1034,7 @@ export default Component.extend({
         // We distinguish these because it only needs the route's info on init.  After that, component manages state
         metricUrnList: this.get('metricUrnListRoute'),
         metricUrn: this.get('metricUrnRoute')
-      })
+      });
     }
   },
 
