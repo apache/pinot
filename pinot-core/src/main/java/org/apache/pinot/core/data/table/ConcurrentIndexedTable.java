@@ -76,7 +76,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
       _lookupMap.computeIfPresent(key, (k, v) -> {
         Object[] existingValues = v.getValues();
         Object[] newValues = newRecord.getValues();
-        int aggNum =0;
+        int aggNum = 0;
         for (int i = _numKeyColumns; i < _numColumns; i++) {
           existingValues[i] = _aggregationFunctions[aggNum++].merge(existingValues[i], newValues[i]);
         }
