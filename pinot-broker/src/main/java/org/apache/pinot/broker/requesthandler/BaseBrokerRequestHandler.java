@@ -25,6 +25,7 @@ import com.google.common.util.concurrent.RateLimiter;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -225,22 +226,23 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     if (request.has(Broker.Request.DEBUG_OPTIONS)) {
-      Map<String, String> debugOptions = getOptionsFromRequest(request, Broker.Request.DEBUG_OPTIONS);
+      Map<String, String> debugOptions = getOptionsFromJson(request, Broker.Request.DEBUG_OPTIONS);
       LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
       brokerRequest.setDebugOptions(debugOptions);
     }
 
-    if (request.has(Broker.Request.QUERY_OPTIONS)) {
-      Map<String, String> queryOptionsFromRequest = getOptionsFromRequest(request, Broker.Request.QUERY_OPTIONS);
-      Map<String, String> queryOptions = brokerRequest.getQueryOptions();
-      if (queryOptions == null) {
-        brokerRequest.setQueryOptions(queryOptionsFromRequest);
-      } else {
-        queryOptions.putAll(queryOptionsFromRequest);
-      }
-      LOGGER
-          .debug("Query options are set to: {} for request {}: {}", brokerRequest.getQueryOptions(), requestId, query);
+    Map<String, String> queryOptions = new HashMap<>();
+    Map<String, String> queryOptionsFromBrokerRequest = brokerRequest.getQueryOptions();
+    if (queryOptionsFromBrokerRequest != null) {
+      queryOptions.putAll(queryOptionsFromBrokerRequest);
     }
+    if (request.has(Broker.Request.QUERY_OPTIONS)) {
+      Map<String, String> queryOptionsFromJson = getOptionsFromJson(request, Broker.Request.QUERY_OPTIONS);
+      queryOptions.putAll(queryOptionsFromJson);
+    }
+    brokerRequest.setQueryOptions(queryOptions);
+    LOGGER
+        .debug("Query options are set to: {} for request {}: {}", brokerRequest.getQueryOptions(), requestId, query);
 
     // Optimize the query
     // TODO: get time column name from schema or table config so that we can apply it for REALTIME only case
@@ -348,7 +350,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return brokerResponse;
   }
 
-  private Map<String, String> getOptionsFromRequest(JsonNode request, String optionsKey) {
+  private Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
     return Splitter.on(';')
         .omitEmptyStrings()
         .trimResults()
