@@ -18,11 +18,12 @@
  */
 package org.apache.pinot.spark.utils;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
 
-public class PushLocation {
+public class PushLocation implements Serializable {
   private final String _host;
   private final int _port;
 
