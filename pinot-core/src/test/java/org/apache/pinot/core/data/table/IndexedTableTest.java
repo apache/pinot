@@ -21,11 +21,9 @@ package org.apache.pinot.core.data.table;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -82,38 +80,38 @@ public class IndexedTableTest {
     ExecutorService executorService = Executors.newFixedThreadPool(10);
     try {
       Callable<Void> c1 = () -> {
-        indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
-        indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
-        indexedTable.upsert(getRecord(new Object[]{"c", 3, 30d}, new Object[]{10000d, 300d})); // eviction candidate
-        indexedTable.upsert(getRecord(new Object[]{"d", 4, 40d}, new Object[]{10d, 400d}));
-        indexedTable.upsert(getRecord(new Object[]{"d", 4, 40d}, new Object[]{10d, 400d}));
-        indexedTable.upsert(getRecord(new Object[]{"e", 5, 50d}, new Object[]{10d, 500d}));
+        indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}), getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
+        indexedTable.upsert(getKey(new Object[]{"b", 2, 20d}), getRecord(new Object[]{"b", 2, 20d, 10d, 200d}));
+        indexedTable.upsert(getKey(new Object[]{"c", 3, 30d}), getRecord(new Object[]{"c", 3, 30d, 10000d, 300d})); // eviction candidate
+        indexedTable.upsert(getKey(new Object[]{"d", 4, 40d}), getRecord(new Object[]{"d", 4, 40d, 10d, 400d}));
+        indexedTable.upsert(getKey(new Object[]{"d", 4, 40d}), getRecord(new Object[]{"d", 4, 40d, 10d, 400d}));
+        indexedTable.upsert(getKey(new Object[]{"e", 5, 50d}), getRecord(new Object[]{"e", 5, 50d, 10d, 500d}));
         return null;
       };
 
       Callable<Void> c2 = () -> {
-        indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
-        indexedTable.upsert(getRecord(new Object[]{"f", 6, 60d}, new Object[]{20000d, 600d})); // eviction candidate
-        indexedTable.upsert(getRecord(new Object[]{"g", 7, 70d}, new Object[]{10d, 700d}));
-        indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
-        indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
-        indexedTable.upsert(getRecord(new Object[]{"h", 8, 80d}, new Object[]{10d, 800d}));
-        indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
-        indexedTable.upsert(getRecord(new Object[]{"i", 9, 90d}, new Object[]{500d, 900d}));
+        indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}), getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
+        indexedTable.upsert(getKey(new Object[]{"f", 6, 60d}), getRecord(new Object[]{"f", 6, 60d,20000d, 600d})); // eviction candidate
+        indexedTable.upsert(getKey(new Object[]{"g", 7, 70d}), getRecord(new Object[]{"g", 7, 70d,10d, 700d}));
+        indexedTable.upsert(getKey(new Object[]{"b", 2, 20d}), getRecord(new Object[]{"b", 2, 20d,10d, 200d}));
+        indexedTable.upsert(getKey(new Object[]{"b", 2, 20d}), getRecord(new Object[]{"b", 2, 20d,10d, 200d}));
+        indexedTable.upsert(getKey(new Object[]{"h", 8, 80d}), getRecord(new Object[]{"h", 8, 80d,10d, 800d}));
+        indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}), getRecord(new Object[]{"a", 1, 10d,10d, 100d}));
+        indexedTable.upsert(getKey(new Object[]{"i", 9, 90d}), getRecord(new Object[]{"i", 9, 90d,500d, 900d}));
         return null;
       };
 
       Callable<Void> c3 = () -> {
-        indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
-        indexedTable.upsert(getRecord(new Object[]{"j", 10, 100d}, new Object[]{10d, 1000d}));
-        indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
-        indexedTable.upsert(getRecord(new Object[]{"k", 11, 110d}, new Object[]{10d, 1100d}));
-        indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
-        indexedTable.upsert(getRecord(new Object[]{"l", 12, 120d}, new Object[]{10d, 1200d}));
-        indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d})); // trimming candidate
-        indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
-        indexedTable.upsert(getRecord(new Object[]{"m", 13, 130d}, new Object[]{10d, 1300d}));
-        indexedTable.upsert(getRecord(new Object[]{"n", 14, 140d}, new Object[]{10d, 1400d}));
+        indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}), getRecord(new Object[]{"a", 1, 10d,10d, 100d}));
+        indexedTable.upsert(getKey(new Object[]{"j", 10, 100d}), getRecord(new Object[]{"j", 10, 100d,10d, 1000d}));
+        indexedTable.upsert(getKey(new Object[]{"b", 2, 20d}), getRecord(new Object[]{"b", 2, 20d,10d, 200d}));
+        indexedTable.upsert(getKey(new Object[]{"k", 11, 110d}), getRecord(new Object[]{"k", 11, 110d,10d, 1100d}));
+        indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}), getRecord(new Object[]{"a", 1, 10d,10d, 100d}));
+        indexedTable.upsert(getKey(new Object[]{"l", 12, 120d}), getRecord(new Object[]{"l", 12, 120d,10d, 1200d}));
+        indexedTable.upsert(getKey(new Object[]{"a", 1, 10d}), getRecord(new Object[]{"a", 1, 10d,10d, 100d})); // trimming candidate
+        indexedTable.upsert(getKey(new Object[]{"b", 2, 20d}), getRecord(new Object[]{"b", 2, 20d,10d, 200d}));
+        indexedTable.upsert(getKey(new Object[]{"m", 13, 130d}), getRecord(new Object[]{"m", 13, 130d,10d, 1300d}));
+        indexedTable.upsert(getKey(new Object[]{"n", 14, 140d}), getRecord(new Object[]{"n", 14, 140d,10d, 1400d}));
         return null;
       };
 
@@ -231,41 +229,41 @@ public class IndexedTableTest {
   private void testNonConcurrent(IndexedTable indexedTable, IndexedTable mergeTable) {
 
     // 2 unique rows
-    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d, 1000}, new Object[]{10d, 100d}));
+    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d, 1000, 10d, 100d}));
     Assert.assertEquals(indexedTable.size(), 1);
-    indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d, 1000}, new Object[]{10d, 200d}));
+    indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d, 1000, 10d, 200d}));
     Assert.assertEquals(indexedTable.size(), 2);
 
     // repeat row a
-    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d, 1000}, new Object[]{10d, 100d}));
-    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d, 1000}, new Object[]{10d, 100d}));
+    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d, 1000, 10d, 100d}));
+    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d, 1000, 10d, 100d}));
     Assert.assertEquals(indexedTable.size(), 2);
 
-    indexedTable.upsert(getRecord(new Object[]{"c", 3, 30d, 1000}, new Object[]{10d, 300d}));
-    indexedTable.upsert(getRecord(new Object[]{"c", 3, 30d, 1000}, new Object[]{10d, 300d}));
-    indexedTable.upsert(getRecord(new Object[]{"d", 4, 40d, 1000}, new Object[]{10d, 400d}));
-    indexedTable.upsert(getRecord(new Object[]{"d", 4, 40d, 1000}, new Object[]{10d, 400d}));
-    indexedTable.upsert(getRecord(new Object[]{"e", 5, 50d, 1000}, new Object[]{10d, 500d}));
-    indexedTable.upsert(getRecord(new Object[]{"e", 5, 50d, 1000}, new Object[]{10d, 500d}));
+    indexedTable.upsert(getRecord(new Object[]{"c", 3, 30d, 1000, 10d, 300d}));
+    indexedTable.upsert(getRecord(new Object[]{"c", 3, 30d, 1000, 10d, 300d}));
+    indexedTable.upsert(getRecord(new Object[]{"d", 4, 40d, 1000, 10d, 400d}));
+    indexedTable.upsert(getRecord(new Object[]{"d", 4, 40d, 1000, 10d, 400d}));
+    indexedTable.upsert(getRecord(new Object[]{"e", 5, 50d, 1000, 10d, 500d}));
+    indexedTable.upsert(getRecord(new Object[]{"e", 5, 50d, 1000, 10d, 500d}));
     Assert.assertEquals(indexedTable.size(), 5);
 
     // able to insert more, maxCapacity is very high
-    indexedTable.upsert(getRecord(new Object[]{"f", 6, 60d, 1000}, new Object[]{10d, 600d}));
-    indexedTable.upsert(getRecord(new Object[]{"g", 7, 70d, 1000}, new Object[]{10d, 700d}));
-    indexedTable.upsert(getRecord(new Object[]{"h", 8, 80d, 1000}, new Object[]{10d, 800d}));
-    indexedTable.upsert(getRecord(new Object[]{"i", 9, 90d, 1000}, new Object[]{10d, 900d}));
-    indexedTable.upsert(getRecord(new Object[]{"j", 10, 100d, 1000}, new Object[]{10d, 1000d}));
+    indexedTable.upsert(getRecord(new Object[]{"f", 6, 60d, 1000, 10d, 600d}));
+    indexedTable.upsert(getRecord(new Object[]{"g", 7, 70d, 1000, 10d, 700d}));
+    indexedTable.upsert(getRecord(new Object[]{"h", 8, 80d, 1000, 10d, 800d}));
+    indexedTable.upsert(getRecord(new Object[]{"i", 9, 90d, 1000, 10d, 900d}));
+    indexedTable.upsert(getRecord(new Object[]{"j", 10, 100d, 1000, 10d, 1000d}));
     Assert.assertEquals(indexedTable.size(), 10);
 
     // repeat row b
-    indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d, 1000}, new Object[]{10d, 200d}));
+    indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d, 1000, 10d, 200d}));
     Assert.assertEquals(indexedTable.size(), 10);
 
     // create merge table, 2 new records for indexedTable, 2 repeat records
-    mergeTable.upsert(getRecord(new Object[]{"j", 10, 100d, 1000}, new Object[]{10d, 1000d}));
-    mergeTable.upsert(getRecord(new Object[]{"k", 11, 110d, 1000}, new Object[]{10d, 1100d}));
-    mergeTable.upsert(getRecord(new Object[]{"b", 2, 20d, 1000}, new Object[]{10d, 200d}));
-    mergeTable.upsert(getRecord(new Object[]{"l", 12, 120d, 1000}, new Object[]{10d, 1200d}));
+    mergeTable.upsert(getRecord(new Object[]{"j", 10, 100d, 1000, 10d, 1000d}));
+    mergeTable.upsert(getRecord(new Object[]{"k", 11, 110d, 1000, 10d, 1100d}));
+    mergeTable.upsert(getRecord(new Object[]{"b", 2, 20d, 1000, 10d, 200d}));
+    mergeTable.upsert(getRecord(new Object[]{"l", 12, 120d, 1000, 10d, 1200d}));
     Assert.assertEquals(mergeTable.size(), 4);
     mergeTable.finish(false);
 
@@ -274,9 +272,9 @@ public class IndexedTableTest {
     Assert.assertEquals(indexedTable.size(), 12);
 
     // insert more
-    indexedTable.upsert(getRecord(new Object[]{"h", 8, 80d, 1000}, new Object[]{100d, 800d}));
-    indexedTable.upsert(getRecord(new Object[]{"i", 9, 90d, 1000}, new Object[]{50d, 900d}));
-    indexedTable.upsert(getRecord(new Object[]{"m", 13, 130d, 1000}, new Object[]{600d, 1300d}));
+    indexedTable.upsert(getRecord(new Object[]{"h", 8, 80d, 1000, 100d, 800d}));
+    indexedTable.upsert(getRecord(new Object[]{"i", 9, 90d, 1000, 50d, 900d}));
+    indexedTable.upsert(getRecord(new Object[]{"m", 13, 130d, 1000, 600d, 1300d}));
     Assert.assertEquals(indexedTable.size(), 13);
   }
 
@@ -284,7 +282,7 @@ public class IndexedTableTest {
     Iterator<Record> iterator = indexedTable.iterator();
     List<String> d1 = new ArrayList<>();
     while (iterator.hasNext()) {
-      d1.add((String) iterator.next().getKey().getColumns()[0]);
+      d1.add((String) iterator.next().getValues()[0]);
     }
     for (String s : evicted) {
       Assert.assertFalse(d1.contains(s));
@@ -295,12 +293,15 @@ public class IndexedTableTest {
     Assert.assertEquals(survivors.size(), indexedTable.size());
     Iterator<Record> iterator = indexedTable.iterator();
     for (String survivor : survivors) {
-      Assert.assertEquals(survivor, iterator.next().getKey().getColumns()[0]);
+      Assert.assertEquals(survivor, iterator.next().getValues()[0]);
     }
   }
 
-  private Record getRecord(Object[] keys, Object[] values) {
-    return new Record(new Key(keys), values);
+  private Key getKey(Object[] keys) {
+    return new Key(keys);
+  }
+  private Record getRecord(Object[] columns) {
+    return new Record(columns);
   }
 
   @Test
@@ -330,24 +331,24 @@ public class IndexedTableTest {
 
   private void testNoMoreNewRecordsInTable(IndexedTable indexedTable) {
     // Insert 7 records. Check that last 2 never made it.
-    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
-    indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
-    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
-    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d}, new Object[]{10d, 100d}));
+    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
+    indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d, 10d, 200d}));
+    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
+    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
     Assert.assertEquals(indexedTable.size(), 2);
 
-    indexedTable.upsert(getRecord(new Object[]{"c", 3, 30d}, new Object[]{10d, 300d}));
-    indexedTable.upsert(getRecord(new Object[]{"d", 4, 40d}, new Object[]{10d, 400d}));
-    indexedTable.upsert(getRecord(new Object[]{"e", 5, 50d}, new Object[]{10d, 500d}));
+    indexedTable.upsert(getRecord(new Object[]{"c", 3, 30d, 10d, 300d}));
+    indexedTable.upsert(getRecord(new Object[]{"d", 4, 40d, 10d, 400d}));
+    indexedTable.upsert(getRecord(new Object[]{"e", 5, 50d, 10d, 500d}));
     Assert.assertEquals(indexedTable.size(), 5);
 
     // no resize. no more records allowed
-    indexedTable.upsert(getRecord(new Object[]{"f", 6, 60d}, new Object[]{10d, 600d}));
-    indexedTable.upsert(getRecord(new Object[]{"g", 7, 70d}, new Object[]{10d, 700d}));
+    indexedTable.upsert(getRecord(new Object[]{"f", 6, 60d, 10d, 600d}));
+    indexedTable.upsert(getRecord(new Object[]{"g", 7, 70d, 10d, 700d}));
     Assert.assertEquals(indexedTable.size(), 5);
 
     // existing row allowed
-    indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d}, new Object[]{10d, 200d}));
+    indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d, 10d, 200d}));
     Assert.assertEquals(indexedTable.size(), 5);
 
     indexedTable.finish(false);

@@ -122,9 +122,10 @@ public class BenchmarkIndexedTable {
   }
 
   private Record getNewRecord() {
-    Object[] keys = new Object[]{_d1.get(_random.nextInt(_d1.size())), _d2.get(_random.nextInt(_d2.size()))};
-    Object[] values = new Object[]{(double) _random.nextInt(1000), (double) _random.nextInt(1000)};
-    return new Record(new Key(keys), values);
+    Object[] columns =
+        new Object[]{_d1.get(_random.nextInt(_d1.size())), _d2.get(_random.nextInt(_d2.size())), (double) _random
+            .nextInt(1000), (double) _random.nextInt(1000)};
+    return new Record(columns);
   }
 
   @Benchmark

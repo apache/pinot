@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Thread safe {@link Table} implementation for aggregating TableRecords based on combination of keys
+ * Thread safe {@link Table} implementation for aggregating Records based on combination of keys
  */
 public class ConcurrentIndexedTable extends IndexedTable {
 
@@ -68,17 +68,17 @@ public class ConcurrentIndexedTable extends IndexedTable {
    * Thread safe implementation of upsert for inserting {@link Record} into {@link Table}
    */
   @Override
-  public boolean upsert(Record newRecord) {
+  public boolean upsert(Key key, Record newRecord) {
 
-    Key key = newRecord.getKey();
     Preconditions.checkNotNull(key, "Cannot upsert record with null keys");
 
     if (_noMoreNewRecords.get()) { // allow only existing record updates
       _lookupMap.computeIfPresent(key, (k, v) -> {
         Object[] existingValues = v.getValues();
         Object[] newValues = newRecord.getValues();
-        for (int i = 0; i < _numAggregations; i++) {
-          existingValues[i] = _aggregationFunctions[i].merge(existingValues[i], newValues[i]);
+        int aggNum = 0;
+        for (int i = _numKeyColumns; i < _numColumns; i++) {
+          existingValues[i] = _aggregationFunctions[aggNum++].merge(existingValues[i], newValues[i]);
         }
         return v;
       });
@@ -92,8 +92,9 @@ public class ConcurrentIndexedTable extends IndexedTable {
           } else {
             Object[] existingValues = v.getValues();
             Object[] newValues = newRecord.getValues();
-            for (int i = 0; i < _numAggregations; i++) {
-              existingValues[i] = _aggregationFunctions[i].merge(existingValues[i], newValues[i]);
+            int aggNum = 0;
+            for (int i = _numKeyColumns; i < _numColumns; i++) {
+              existingValues[i] = _aggregationFunctions[aggNum++].merge(existingValues[i], newValues[i]);
             }
             return v;
           }
@@ -137,7 +138,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
     long startTime = System.currentTimeMillis();
 
-    _indexedTableResizer.resizeRecordsMap(_lookupMap, trimToSize);
+    _tableResizer.resizeRecordsMap(_lookupMap, trimToSize);
 
     long endTime = System.currentTimeMillis();
     long timeElapsed = endTime - startTime;
@@ -150,7 +151,7 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
     long startTime = System.currentTimeMillis();
 
-    List<Record> sortedRecords = _indexedTableResizer.resizeAndSortRecordsMap(_lookupMap, trimToSize);
+    List<Record> sortedRecords = _tableResizer.resizeAndSortRecordsMap(_lookupMap, trimToSize);
 
     long endTime = System.currentTimeMillis();
     long timeElapsed = endTime - startTime;

@@ -39,13 +39,13 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 /**
  * Helper class for trimming and sorting records in the IndexedTable, based on the order by information
  */
-class IndexedTableResizer {
+class TableResizer {
 
   private OrderByValueExtractor[] _orderByValueExtractors;
   private Comparator<IntermediateRecord> _intermediateRecordComparator;
   private int _numOrderBy;
 
-  IndexedTableResizer(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy) {
+  TableResizer(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy) {
 
     // NOTE: the assumption here is that the key columns will appear before the aggregation columns in the data schema
     // This is handled in the only in the AggregationGroupByOrderByOperator for now
@@ -69,27 +69,27 @@ class IndexedTableResizer {
     _orderByValueExtractors = new OrderByValueExtractor[_numOrderBy];
     Comparator[] comparators = new Comparator[_numOrderBy];
 
-    for (int i = 0; i < _numOrderBy; i++) {
-      SelectionSort selectionSort = orderBy.get(i);
+    for (int orderByIdx = 0; orderByIdx < _numOrderBy; orderByIdx++) {
+      SelectionSort selectionSort = orderBy.get(orderByIdx);
       String column = selectionSort.getColumn();
 
       if (columnIndexMap.containsKey(column)) {
         int index = columnIndexMap.get(column);
         if (index < numKeyColumns) {
-          _orderByValueExtractors[i] = new KeyColumnExtractor(index);
+          _orderByValueExtractors[orderByIdx] = new KeyColumnExtractor(index);
         } else {
           AggregationInfo aggregationInfo = aggregationColumnToInfo.get(column);
           AggregationFunction aggregationFunction =
               AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction();
-          _orderByValueExtractors[i] = new AggregationColumnExtractor(index - numKeyColumns, aggregationFunction);
+          _orderByValueExtractors[orderByIdx] = new AggregationColumnExtractor(index, aggregationFunction);
         }
       } else {
         throw new IllegalStateException("Could not find column " + column + " in data schema");
       }
 
-      comparators[i] = Comparator.naturalOrder();
+      comparators[orderByIdx] = Comparator.naturalOrder();
       if (!selectionSort.isIsAsc()) {
-        comparators[i] = comparators[i].reversed();
+        comparators[orderByIdx] = comparators[orderByIdx].reversed();
       }
     }
 
@@ -112,12 +112,12 @@ class IndexedTableResizer {
    * For aggregation values in the order by, the final result is extracted if the intermediate result is non-comparable
    */
   @VisibleForTesting
-  IntermediateRecord getIntermediateRecord(Record record) {
+  IntermediateRecord getIntermediateRecord(Key key, Record record) {
     Comparable[] intermediateRecordValues = new Comparable[_numOrderBy];
     for (int i = 0; i < _numOrderBy; i++) {
       intermediateRecordValues[i] = _orderByValueExtractors[i].extract(record);
     }
-    return new IntermediateRecord(record.getKey(), intermediateRecordValues);
+    return new IntermediateRecord(key, intermediateRecordValues);
   }
 
   /**
@@ -158,9 +158,9 @@ class IndexedTableResizer {
       Comparator<IntermediateRecord> comparator) {
     PriorityQueue<IntermediateRecord> priorityQueue = new PriorityQueue<>(size, comparator);
 
-    for (Record record : recordsMap.values()) {
+    for (Map.Entry<Key, Record> entry : recordsMap.entrySet()) {
 
-      IntermediateRecord intermediateRecord = getIntermediateRecord(record);
+      IntermediateRecord intermediateRecord = getIntermediateRecord(entry.getKey(), entry.getValue());
       if (priorityQueue.size() < size) {
         priorityQueue.offer(intermediateRecord);
       } else {
@@ -178,8 +178,8 @@ class IndexedTableResizer {
     int numRecords = recordsMap.size();
     List<Record> sortedRecords = new ArrayList<>(numRecords);
     List<IntermediateRecord> intermediateRecords = new ArrayList<>(numRecords);
-    for (Record record : recordsMap.values()) {
-      intermediateRecords.add(getIntermediateRecord(record));
+    for (Map.Entry<Key, Record> entry : recordsMap.entrySet()) {
+      intermediateRecords.add(getIntermediateRecord(entry.getKey(), entry.getValue()));
     }
     intermediateRecords.sort(_intermediateRecordComparator);
     for (IntermediateRecord intermediateRecord : intermediateRecords) {
@@ -273,7 +273,7 @@ class IndexedTableResizer {
 
     @Override
     Comparable extract(Record record) {
-      Object keyColumn = record.getKey().getColumns()[_index];
+      Object keyColumn = record.getValues()[_index];
       return (Comparable) keyColumn;
     }
   }

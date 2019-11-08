@@ -23,7 +23,7 @@ import org.apache.pinot.common.utils.DataSchema;
 
 
 /**
- * Table to host {@link Record}s which will be passed between operators
+ * A container for {@link Record}s
  */
 public interface Table {
 
@@ -31,6 +31,11 @@ public interface Table {
    * Update the table with the given record
    */
   boolean upsert(Record record);
+
+  /**
+   * Update the table with the given record, indexed on Key
+   */
+  boolean upsert(Key key, Record record);
 
   /**
    * Merge all records from given table
