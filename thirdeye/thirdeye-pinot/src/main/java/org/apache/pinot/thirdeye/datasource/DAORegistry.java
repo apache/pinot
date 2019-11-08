@@ -90,7 +90,7 @@ public class DAORegistry {
   /**
    * internal constructor.
    */
-  private DAORegistry() { }
+  private DAORegistry() {}
 
   /****************************************************************************
    * GETTERS/SETTERS

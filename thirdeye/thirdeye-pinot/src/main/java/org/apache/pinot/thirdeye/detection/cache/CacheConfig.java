@@ -25,6 +25,8 @@ package org.apache.pinot.thirdeye.detection.cache;
  */
 public class CacheConfig {
 
+  public static CacheConfig instance = new CacheConfig();
+
   /**
    * flags for which cache to use; recommended to only use one at a time
    */
@@ -47,6 +49,8 @@ public class CacheConfig {
 
   // left blank
   public CacheConfig() {}
+
+  public static CacheConfig getInstance() { return instance; }
 
   public static boolean useCentralizedCache() { return useCentralizedCache; }
   public static boolean useInMemoryCache() { return useInMemoryCache; }

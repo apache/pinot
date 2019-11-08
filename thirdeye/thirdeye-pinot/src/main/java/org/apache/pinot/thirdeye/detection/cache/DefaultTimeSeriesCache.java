@@ -181,7 +181,6 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
    * @param response a object containing the time-series to be inserted
    */
   public void insertTimeSeriesIntoCache(ThirdEyeResponse response) {
-
     // insert points in parallel
     for (MetricFunction metric : response.getMetricFunctions()) {
       String metricUrn = MetricEntity.fromMetric(response.getRequest().getFilterSet().asMap(), metric.getMetricId()).getUrn();
