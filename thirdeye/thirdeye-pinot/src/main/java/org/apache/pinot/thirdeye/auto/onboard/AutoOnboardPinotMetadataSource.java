@@ -45,17 +45,17 @@ import org.apache.pinot.common.data.TimeGranularitySpec;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
-import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean.DimensionAsMetricProperties;
-import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.MetadataSourceConfig;
 import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.thirdeye.auto.onboard.ConfigGenerator.*;
 
 /**
  * This is a service to onboard datasets automatically to thirdeye from pinot
@@ -210,6 +210,7 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
     checkMetricChanges(dataset, datasetConfig, schema);
     checkTimeFieldChanges(datasetConfig, schema);
     appendNewCustomConfigs(datasetConfig, customConfigs);
+    checkNonAdditive(datasetConfig);
     datasetConfig.setActive(true);
   }
 
