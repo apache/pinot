@@ -248,11 +248,7 @@ public class SqlUtils {
 
     sb.append("SELECT ").append(selectionClause).append(" FROM ").append(tableName);
     String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec, sourceName);
-    String datePartitionClause = getDatePartitionClause(startTime);
     sb.append(" WHERE ");
-    if (sourceName.equals(PRESTO)) {
-      sb.append(datePartitionClause).append(" AND ");
-    }
     sb.append(betweenClause);
 
 
@@ -275,20 +271,11 @@ public class SqlUtils {
   }
 
   static String getMaxDataTimeSQL(String timeColumn, String tableName, String sourceName) {
-    if (sourceName.equals(PRESTO)) {
-      return "SELECT MAX(" + timeColumn + ") FROM " + tableName + " WHERE datepartition >= daysago(1)";
-    } else {
-      return "SELECT MAX(" + timeColumn + ") FROM " + tableName;
-    }
-
+    return "SELECT MAX(" + timeColumn + ") FROM " + tableName;
   }
 
   static String getDimensionFiltersSQL(String dimension, String tableName, String sourceName) {
-    if (sourceName.equals(PRESTO)) {
-      return "SELECT DISTINCT(" + dimension + ") FROM " + tableName + " WHERE datepartition >= daysago(1)";
-    } else {
-      return "SELECT DISTINCT(" + dimension + ") FROM " + tableName;
-    }
+    return "SELECT DISTINCT(" + dimension + ") FROM " + tableName;
   }
 
   private static String getSelectionClause(MetricConfigDTO metricConfig, MetricFunction metricFunction, List<String> groupByKeys, TimeGranularity granularity, TimeSpec dateTimeSpec) {
