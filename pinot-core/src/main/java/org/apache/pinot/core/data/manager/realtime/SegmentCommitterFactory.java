@@ -29,8 +29,8 @@ import org.slf4j.Logger;
  */
 public class SegmentCommitterFactory {
   private static Logger LOGGER;
-  private IndexLoadingConfig _indexLoadingConfig;
-  private ServerSegmentCompletionProtocolHandler _protocolHandler;
+  private final IndexLoadingConfig _indexLoadingConfig;
+  private final ServerSegmentCompletionProtocolHandler _protocolHandler;
 
   public SegmentCommitterFactory(Logger segmentLogger, IndexLoadingConfig indexLoadingConfig,
       ServerSegmentCompletionProtocolHandler protocolHandler) {

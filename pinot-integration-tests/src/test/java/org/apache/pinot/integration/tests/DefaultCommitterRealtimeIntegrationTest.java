@@ -22,9 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.io.Files;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -52,8 +50,7 @@ import static org.mockito.Mockito.*;
 
 
 /**
- * Integration test that extends RealtimeClusterIntegrationTest but uses low-level Kafka consumer.
- * TODO: Add separate module-level tests and remove the randomness of this test
+ * Integration test that extends RealtimeClusterIntegrationTest to test default commit but uses low-level Kafka consumer.
  */
 public class DefaultCommitterRealtimeIntegrationTest extends RealtimeClusterIntegrationTest {
   private File _indexDir;
@@ -120,10 +117,6 @@ public class DefaultCommitterRealtimeIntegrationTest extends RealtimeClusterInte
 
     when(segmentBuildDescriptor.getSegmentTarFilePath()).thenReturn(_realtimeSegmentUntarred + TARGZ_SUFFIX);
     when(segmentBuildDescriptor.getBuildTimeMillis()).thenReturn(0L);
-    Map<String, File> metadataPaths = new HashMap();
-    metadataPaths.put(metadata.getSegmentName(), new File(_indexDir, METADATA_FILE_NAME));
-
-    when(segmentBuildDescriptor.getMetadataFiles()).thenReturn(metadataPaths);
     when(segmentBuildDescriptor.getOffset()).thenReturn(END_OFFSET);
     when(segmentBuildDescriptor.getSegmentSizeBytes()).thenReturn(0L);
     when(segmentBuildDescriptor.getWaitTimeMillis()).thenReturn(0L);

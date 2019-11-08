@@ -30,12 +30,12 @@ import org.slf4j.Logger;
  * If that succeeds, swap in-memory segment with the one built.
  */
 public class SplitSegmentCommitter implements SegmentCommitter {
-  private SegmentCompletionProtocol.Request.Params _params;
-  private ServerSegmentCompletionProtocolHandler _protocolHandler;
-  private SegmentCompletionProtocol.Response _prevResponse;
-  private IndexLoadingConfig _indexLoadingConfig;
+  private final SegmentCompletionProtocol.Request.Params _params;
+  private final ServerSegmentCompletionProtocolHandler _protocolHandler;
+  private final SegmentCompletionProtocol.Response _prevResponse;
+  private final IndexLoadingConfig _indexLoadingConfig;
 
-  private Logger _segmentLogger;
+  private final Logger _segmentLogger;
 
   public SplitSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
       IndexLoadingConfig indexLoadingConfig, SegmentCompletionProtocol.Request.Params params, SegmentCompletionProtocol.Response prevResponse) {
@@ -67,13 +67,12 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    _params.withOffset(currentOffset).withSegmentLocation(segmentCommitUploadResponse.getSegmentLocation())
-        .withNumRows(numRowsConsumed);
+    _params.withSegmentLocation(segmentCommitUploadResponse.getSegmentLocation());
 
     SegmentCompletionProtocol.Response commitEndResponse;
     if (_indexLoadingConfig.isEnableSplitCommitEndWithMetadata()) {
       commitEndResponse =
-          _protocolHandler.segmentCommitEndWithMetadata(params, segmentBuildDescriptor.getMetadataFiles());
+          _protocolHandler.segmentCommitEndWithMetadata(_params, segmentBuildDescriptor.getMetadataFiles());
     } else {
       commitEndResponse = _protocolHandler.segmentCommitEnd(params);
     }

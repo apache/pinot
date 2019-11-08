@@ -29,10 +29,10 @@ import org.slf4j.Logger;
  * If that succeeds, swap in-memory segment with the one built.
  */
 public class DefaultSegmentCommitter implements SegmentCommitter {
-  private SegmentCompletionProtocol.Request.Params _params;
-  private ServerSegmentCompletionProtocolHandler _protocolHandler;
+  private final SegmentCompletionProtocol.Request.Params _params;
+  private final ServerSegmentCompletionProtocolHandler _protocolHandler;
 
-  private Logger _segmentLogger;
+  private final Logger _segmentLogger;
 
   public DefaultSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler, SegmentCompletionProtocol.Request.Params params) {
     _segmentLogger = segmentLogger;
