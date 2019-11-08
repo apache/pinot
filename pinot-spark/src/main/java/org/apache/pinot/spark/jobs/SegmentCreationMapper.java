@@ -26,6 +26,7 @@ import java.io.Serializable;
 import java.net.URI;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -53,7 +54,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class SegmentCreationMapper implements Serializable {
-  protected static final String LOCAL_TEMP_DIR = "pinot_hadoop_tmp";
+  protected static final String LOCAL_TEMP_DIR = "pinot_spark_tmp";
 
   protected final Logger _logger = LoggerFactory.getLogger(getClass());
 
@@ -130,7 +131,7 @@ public class SegmentCreationMapper implements Serializable {
 
     // Working directories
     _hdfsSegmentTarDir = new Path(workerOutputPath, JobConfigConstants.SEGMENT_TAR_DIR);
-    _localStagingDir = new File(LOCAL_TEMP_DIR);
+    _localStagingDir = new File(String.format("%s_%s", LOCAL_TEMP_DIR, UUID.randomUUID().toString()));
     _localInputDir = new File(_localStagingDir, "inputData");
     _localSegmentDir = new File(_localStagingDir, "segments");
     _localSegmentTarDir = new File(_localStagingDir, JobConfigConstants.SEGMENT_TAR_DIR);
