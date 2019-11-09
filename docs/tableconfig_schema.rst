@@ -374,7 +374,7 @@ Important ones to note here are:
    If you specify ``smallest`` then the consumption starts from the earliest event avaiable in the
    data stream.
 
-All the confifurations that are prefixed with the streamtype are expected to be used by the underlying
+All the configurations that are prefixed with the streamtype are expected to be used by the underlying
 stream. So, you can set any of the configurations described in the
 `Kafka configuraton page <https://kafka.apache.org/documentation/#consumerconfigs>`_ can be set using
 the prefix ``stream.kafka`` and Kafka should pay attention to it.
