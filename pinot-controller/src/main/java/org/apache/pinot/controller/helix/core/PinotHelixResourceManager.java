@@ -37,6 +37,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -1812,7 +1813,7 @@ public class PinotHelixResourceManager {
    * Returns a map from server instance to list of segments it serves for the given table.
    */
   public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType) {
-    Map<String, List<String>> serverToSegmentsMap = new HashMap<>();
+    Map<String, List<String>> serverToSegmentsMap = new TreeMap<>();
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
     if (idealState == null) {
       throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
@@ -1881,7 +1882,7 @@ public class PinotHelixResourceManager {
     }
 
     // Create crc information
-    Map<String, String> resultCrcMap = new HashMap<>();
+    Map<String, String> resultCrcMap = new TreeMap<>();
     for (String segment : segmentList) {
       resultCrcMap.put(segment, String.valueOf(_segmentCrcMap.get(tableName).get(segment)));
     }
@@ -1899,65 +1900,6 @@ public class PinotHelixResourceManager {
 
   public String buildPathForSegmentMetadata(String tableName, String segmentName) {
     return "/SEGMENTS/" + tableName + "/" + segmentName;
-  }
-
-  /**
-   * Toggle the status of segment between ONLINE (enable = true) and OFFLINE (enable = FALSE).
-   *
-   * @param tableName: Name of table to which the segment belongs.
-   * @param segments: List of segment for which to toggle the status.
-   * @param enable: True for ONLINE, False for OFFLINE.
-   * @param timeoutInSeconds Time out for toggling segment state.
-   * @return
-   */
-  public PinotResourceManagerResponse toggleSegmentState(String tableName, List<String> segments, boolean enable,
-      long timeoutInSeconds) {
-    String status = (enable) ? "ONLINE" : "OFFLINE";
-
-    HelixDataAccessor helixDataAccessor = _helixZkManager.getHelixDataAccessor();
-    PropertyKey idealStatePropertyKey = _keyBuilder.idealStates(tableName);
-
-    boolean updateSuccessful;
-    boolean externalViewUpdateSuccessful = true;
-    long deadline = System.currentTimeMillis() + 1000 * timeoutInSeconds;
-
-    // Set all partitions to offline to unload them from the servers
-    do {
-      final IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
-
-      for (String segmentName : segments) {
-        final Set<String> instanceSet = idealState.getInstanceSet(segmentName);
-        if (instanceSet == null || instanceSet.isEmpty()) {
-          return PinotResourceManagerResponse.failure("Segment " + segmentName + " not found");
-        }
-        for (final String instance : instanceSet) {
-          idealState.setPartitionState(segmentName, instance, status);
-        }
-      }
-      updateSuccessful = helixDataAccessor.updateProperty(idealStatePropertyKey, idealState);
-    } while (!updateSuccessful && (System.currentTimeMillis() <= deadline));
-
-    // Check that the ideal state has been updated.
-    LOGGER.info("Ideal state successfully updated, waiting to update external view");
-    IdealState updatedIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
-    for (String segmentName : segments) {
-      Map<String, String> instanceStateMap = updatedIdealState.getInstanceStateMap(segmentName);
-      for (String state : instanceStateMap.values()) {
-        if (!status.equals(state)) {
-          return PinotResourceManagerResponse
-              .failure("Failed to update ideal state when setting status " + status + " for segment " + segmentName);
-        }
-      }
-
-      // Wait until all segments match with the expected external view state
-      if (!ifExternalViewChangeReflectedForState(tableName, segmentName, status, (timeoutInSeconds * 1000), true)) {
-        externalViewUpdateSuccessful = false;
-      }
-    }
-
-    return (externalViewUpdateSuccessful) ? PinotResourceManagerResponse
-        .success("Segments " + segments + " now " + status)
-        : PinotResourceManagerResponse.failure("Timed out. External view not completely updated");
   }
 
   public boolean hasTable(String tableNameWithType) {

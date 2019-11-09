@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -36,7 +34,6 @@ import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
-import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
@@ -55,7 +52,6 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -63,9 +59,7 @@ import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.URIUtils;
-import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.access.AccessControl;
@@ -73,7 +67,6 @@ import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.upload.SegmentValidator;
 import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import org.apache.pinot.core.crypt.NoOpPinotCrypter;
 import org.apache.pinot.core.crypt.PinotCrypter;
 import org.apache.pinot.core.crypt.PinotCrypterFactory;
@@ -89,8 +82,8 @@ import org.slf4j.LoggerFactory;
 
 @Api(tags = Constants.SEGMENT_TAG)
 @Path("/")
-public class PinotSegmentUploadRestletResource {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentUploadRestletResource.class);
+public class PinotSegmentUploadDownloadRestletResource {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentUploadDownloadRestletResource.class);
   private static final String TMP_DIR_PREFIX = "tmp-";
   private static final String ENCRYPTED_SUFFIX = "_encrypted";
 
@@ -114,44 +107,6 @@ public class PinotSegmentUploadRestletResource {
 
   @Inject
   LeadControllerManager _leadControllerManager;
-
-  @GET
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("/segments")
-  @Deprecated
-  public String listAllSegmentNames()
-      throws Exception {
-    FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
-    ArrayNode ret = JsonUtils.newArrayNode();
-    for (final File file : provider.getBaseDataDir().listFiles()) {
-      final String fileName = file.getName();
-      if (fileName.equalsIgnoreCase("fileUploadTemp") || fileName.equalsIgnoreCase("schemasTemp")) {
-        continue;
-      }
-
-      final String url = _controllerConf.generateVipUrl() + "/segments/" + fileName;
-      ret.add(url);
-    }
-    return ret.toString();
-  }
-
-  @GET
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("/segments/{tableName}")
-  @ApiOperation(value = "Lists names of all segments of a table", notes = "Lists names of all segment names of a table")
-  public String listAllSegmentNames(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
-    ArrayNode ret = JsonUtils.newArrayNode();
-    CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
-    if (tableTypeStr == null) {
-      ret.add(formatSegments(tableName, CommonConstants.Helix.TableType.OFFLINE));
-      ret.add(formatSegments(tableName, CommonConstants.Helix.TableType.REALTIME));
-    } else {
-      ret.add(formatSegments(tableName, tableType));
-    }
-    return ret.toString();
-  }
 
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
@@ -191,43 +146,6 @@ public class PinotSegmentUploadRestletResource {
     builder.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + dataFile.getName());
     builder.header(HttpHeaders.CONTENT_LENGTH, dataFile.length());
     return builder.build();
-  }
-
-  @DELETE
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("/segments/{tableName}/{segmentName}")
-  @ApiOperation(value = "Deletes a segment", notes = "Deletes a segment")
-  public SuccessResponse deleteOneSegment(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr) {
-    CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
-    if (tableType == null) {
-      throw new ControllerApplicationException(LOGGER, "Table type must not be null", Response.Status.BAD_REQUEST);
-    }
-    segmentName = URIUtils.decode(segmentName);
-    PinotSegmentRestletResource
-        .toggleStateInternal(tableName, StateType.DROP, tableType, segmentName, _pinotHelixResourceManager);
-
-    return new SuccessResponse("Segment deleted");
-  }
-
-  @DELETE
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("/segments/{tableName}")
-  @ApiOperation(value = "Deletes all segments of a table", notes = "Deletes all segments of a table")
-  public SuccessResponse deleteAllSegments(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr) {
-    CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
-    if (tableType == null) {
-      throw new ControllerApplicationException(LOGGER, "Table type must not be null", Response.Status.BAD_REQUEST);
-    }
-    PinotSegmentRestletResource
-        .toggleStateInternal(tableName, StateType.DROP, tableType, null, _pinotHelixResourceManager);
-
-    return new SuccessResponse(
-        "All segments of table " + TableNameBuilder.forType(tableType).tableNameWithType(tableName) + " deleted");
   }
 
   private SuccessResponse uploadSegment(@Nullable String tableName, FormDataMultiPart multiPart,
@@ -502,40 +420,6 @@ public class PinotSegmentUploadRestletResource {
     } else {
       return FileUploadDownloadClient.FileUploadType.getDefaultUploadType();
     }
-  }
-
-  private JsonNode formatSegments(String tableName, CommonConstants.Helix.TableType tableType) {
-    return JsonUtils.newObjectNode().set(tableType.toString(), getSegments(tableName, tableType.toString()));
-  }
-
-  private ArrayNode getSegments(String tableName, String tableType) {
-    ArrayNode segments = JsonUtils.newArrayNode();
-
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-
-    String tableNameWithType;
-    if (CommonConstants.Helix.TableType.valueOf(tableType).toString().equals("REALTIME")) {
-      tableNameWithType = realtimeTableName;
-    } else {
-      tableNameWithType = offlineTableName;
-    }
-
-    List<String> segmentList = _pinotHelixResourceManager.getSegmentsFor(tableNameWithType);
-    IdealState idealState =
-        HelixHelper.getTableIdealState(_pinotHelixResourceManager.getHelixZkManager(), tableNameWithType);
-
-    for (String segmentName : segmentList) {
-      Map<String, String> map = idealState.getInstanceStateMap(segmentName);
-      if (map == null) {
-        continue;
-      }
-      if (!map.containsValue(PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE)) {
-        segments.add(segmentName);
-      }
-    }
-
-    return segments;
   }
 
   // Validate that there is one file that is in the input.

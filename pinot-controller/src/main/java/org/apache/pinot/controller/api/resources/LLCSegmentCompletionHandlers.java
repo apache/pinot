@@ -537,7 +537,7 @@ public class LLCSegmentCompletionHandlers {
   private File uploadFileToLocalTmpFile(FormDataMultiPart multiPart, String instanceId, String segmentName) {
     try {
       Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
-      if (!PinotSegmentUploadRestletResource.validateMultiPart(map, segmentName)) {
+      if (!PinotSegmentUploadDownloadRestletResource.validateMultiPart(map, segmentName)) {
         return null;
       }
       String name = map.keySet().iterator().next();

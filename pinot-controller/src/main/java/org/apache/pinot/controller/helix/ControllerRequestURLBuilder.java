@@ -212,15 +212,6 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName + "?type=" + tableType);
   }
 
-  public String forDeleteSegmentWithGetAPI(String tableName, String segmentName, String tableType) {
-    return URIUtils.getPath(_baseUrl, "tables", tableName, "segments", URIUtils.encode(segmentName))
-        + "?state=drop&type=" + tableType;
-  }
-
-  public String forDeleteAllSegmentsWithTypeWithGetAPI(String tableName, String tableType) {
-    return StringUtil.join("/", _baseUrl, "tables", tableName, "segments" + "?state=drop&" + "type=" + tableType);
-  }
-
   public String forSegmentListAPIWithTableType(String tableName, String tableType) {
     return StringUtil.join("/", _baseUrl, "segments", tableName + "?type=" + tableType);
   }
