@@ -45,7 +45,7 @@ import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.config.QueryExecutorConfig;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
-import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,7 +102,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       if (brokerRequest.isSetGroupBy()) {
         Map<String, String> queryOptions = brokerRequest.getQueryOptions();
         // new Combine operator only when GROUP_BY_MODE explicitly set to SQL
-        if (GroupByUtils.isGroupByMode(Request.SQL, queryOptions)) {
+        if (QueryOptionsUtils.isGroupByMode(Request.SQL, queryOptions)) {
           return new AggregationGroupByOrderByPlanNode(indexSegment, brokerRequest, _maxInitialResultHolderCapacity,
               _numGroupsLimit);
         }

@@ -23,32 +23,31 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.io.Serializable;
 import java.util.List;
+import org.apache.pinot.common.utils.DataSchema;
 
 
 /**
- * Holds the results in a standard tabular structure
- *
- * FIXME: Column types and Multi-value support are missing, and deserialize might not work properly
+ * A tabular structure for representing result rows
  */
-@JsonPropertyOrder({"columns", "rows"})
+@JsonPropertyOrder({"dataSchema", "rows"})
 public class ResultTable {
-  private final List<String> _columns;
-  private final List<Serializable[]> _rows;
+  private final DataSchema _dataSchema;
+  private final List<Object[]> _rows;
 
   @JsonCreator
-  public ResultTable(@JsonProperty("columns") List<String> columns,
-      @JsonProperty("rows") List<Serializable[]> rows) {
-    _columns = columns;
+  public ResultTable(@JsonProperty("dataSchema") DataSchema dataSchema,
+      @JsonProperty("rows") List<Object[]> rows) {
+    _dataSchema = dataSchema;
     _rows = rows;
   }
 
-  @JsonProperty("columns")
-  public List<String> getColumns() {
-    return _columns;
+  @JsonProperty("dataSchema")
+  public DataSchema getDataSchema() {
+    return _dataSchema;
   }
 
-  @JsonProperty("results")
-  public List<Serializable[]> getRows() {
+  @JsonProperty("rows")
+  public List<Object[]> getRows() {
     return _rows;
   }
 }

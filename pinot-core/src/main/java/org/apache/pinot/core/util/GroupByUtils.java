@@ -54,20 +54,4 @@ public final class GroupByUtils {
       return topN;
     }
   }
-
-  public static boolean isGroupByMode(String groupByMode, Map<String, String> queryOptions) {
-    if (queryOptions != null) {
-      String groupByModeValue = queryOptions.get(QueryOptionKey.GROUP_BY_MODE);
-      return groupByModeValue != null && groupByModeValue.equalsIgnoreCase(groupByMode);
-    }
-    return false;
-  }
-
-  public static boolean isResponseFormat(String responseFormat, Map<String, String> queryOptions) {
-    if (queryOptions != null) {
-      String responseFormatValue = queryOptions.get(QueryOptionKey.RESPONSE_FORMAT);
-      return responseFormatValue != null && responseFormatValue.equalsIgnoreCase(responseFormat);
-    }
-    return false;
-  }
 }

@@ -70,6 +70,7 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmin
 import org.apache.pinot.core.query.selection.SelectionOperatorService;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -220,9 +221,9 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
     // Parse the option from request whether to preserve the type
     Map<String, String> queryOptions = brokerRequest.getQueryOptions();
-    String preserveTypeString =
-        (queryOptions == null) ? "false" : queryOptions.getOrDefault(QueryOptionKey.PRESERVE_TYPE, "false");
-    boolean preserveType = Boolean.valueOf(preserveTypeString);
+    boolean preserveType = QueryOptionsUtils.isPreserveType(queryOptions);
+    boolean groupByModeSql = QueryOptionsUtils.isGroupByMode(Request.SQL, queryOptions);
+    boolean responseFormatSql = QueryOptionsUtils.isResponseFormat(Request.SQL, queryOptions);
 
     Selection selection = brokerRequest.getSelections();
     if (dataTableMap.isEmpty()) {
@@ -232,10 +233,9 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           List<String> selectionColumns = SelectionOperatorUtils
               .getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), cachedDataSchema);
           brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, new ArrayList<>(0)));
-        } else if (brokerRequest.isSetGroupBy() && GroupByUtils.isGroupByMode(Request.SQL, queryOptions) && GroupByUtils
-            .isResponseFormat(Request.SQL, queryOptions)) {
+        } else if (brokerRequest.isSetGroupBy() && groupByModeSql && responseFormatSql) {
           setSQLGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
-              brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap, preserveType);
+              brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap);
         }
       }
     } else {
@@ -274,15 +274,15 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           // Aggregation group-by query.
           // read results as records if  GROUP_BY_MODE is explicitly set to SQL
 
-          if (GroupByUtils.isGroupByMode(Request.SQL, queryOptions)) {
+          if (groupByModeSql) {
             // sql + order by
 
             int resultSize = 0;
 
             // if RESPONSE_FORMAT is SQL, return results in {@link ResultTable}
-            if (GroupByUtils.isResponseFormat(Request.SQL, queryOptions)) {
+            if (responseFormatSql) {
               setSQLGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
-                  brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap, preserveType);
+                  brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap);
               resultSize = brokerResponseNative.getResultTable().getRows().size();
             } else {
               setPQLGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
@@ -468,7 +468,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
    */
   private void setSQLGroupByOrderByResults(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
       List<AggregationInfo> aggregationInfos, GroupBy groupBy, List<SelectionSort> orderBy,
-      Map<ServerInstance, DataTable> dataTableMap, boolean preserveType) {
+      Map<ServerInstance, DataTable> dataTableMap) {
 
     List<String> columnNames = new ArrayList<>(dataSchema.size());
     for (int i = 0; i < dataSchema.size(); i++) {
@@ -486,7 +486,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfos.get(i)).getAggregationFunction();
     }
 
-    List<Serializable[]> rows = new ArrayList<>();
+    List<Object[]> rows = new ArrayList<>();
     int numColumns = columnNames.size();
     Iterator<Record> sortedIterator = indexedTable.iterator();
     int numRows = 0;
@@ -494,27 +494,18 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
       Record nextRecord = sortedIterator.next();
       Object[] values = nextRecord.getValues();
-      Serializable[] row = new Serializable[numColumns];
 
-      int index = 0;
-      while (index < numGroupBy) {
-        row[index] = getSerializableValue(values[index]);
-        index++;
-      }
-
+      int index = numGroupBy;
       int aggNum = 0;
       while (index < numColumns) {
-        row[index] = getSerializableValue(aggregationFunctions[aggNum++].extractFinalResult(values[index]));
-        if (preserveType) {
-          row[index] = AggregationFunctionUtils.formatValue(row[index]);
-        }
+        values[index] = aggregationFunctions[aggNum++].extractFinalResult(values[index]);
         index++;
       }
-      rows.add(row);
+      rows.add(values);
       numRows++;
     }
 
-    brokerResponseNative.setResultTable(new ResultTable(columnNames, rows));
+    brokerResponseNative.setResultTable(new ResultTable(dataSchema, rows));
   }
 
   private IndexedTable getIndexedTable(GroupBy groupBy, List<AggregationInfo> aggregationInfos,
@@ -628,7 +619,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         while (index < numColumns) {
           Serializable serializableValue =
               getSerializableValue(aggregationFunctions[aggNum].extractFinalResult(values[index]));
-          if (preserveType) {
+          if (!preserveType) {
             serializableValue = AggregationFunctionUtils.formatValue(serializableValue);
           }
           GroupByResult groupByResult = new GroupByResult();

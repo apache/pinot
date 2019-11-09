@@ -29,30 +29,45 @@ import java.util.Map;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.*;
-
-
 /**
  * Tests order by queries
  */
 public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQueriesTest {
 
-  @Test(dataProvider = "orderByResultTableProvider")
-  public void testGroupByOrderBy(String query, List<Serializable[]> expectedResults, long expectedNumDocsScanned,
+  @Test(dataProvider = "orderBySQLResultTableProvider")
+  public void testGroupByOrderBySQL(String query, List<Object[]> expectedResults, long expectedNumDocsScanned,
       long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs) {
     Map<String, String> queryOptions = new HashMap<>(2);
-    queryOptions.put(QueryOptionKey.GROUP_BY_MODE, SQL);
-    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, SQL);
+    queryOptions.put(QueryOptionKey.GROUP_BY_MODE, Request.SQL);
+    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
     BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
-    QueriesTestUtils.testInterSegmentGroupByOrderByResult(brokerResponse, expectedNumDocsScanned,
+    QueriesTestUtils.testInterSegmentGroupByOrderByResultSQL(brokerResponse, expectedNumDocsScanned,
         expectedNumEntriesScannedInFilter, expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, expectedResults);
+  }
+
+  @Test(dataProvider = "orderByPQLResultProvider")
+  public void testGroupByOrderByPQL(String query, List<String[]> expectedGroups, List<List<Serializable>> expectedValues,
+      long expectedNumDocsScanned, long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter,
+      long expectedNumTotalDocs) {
+    Map<String, String> queryOptions = new HashMap<>(2);
+    queryOptions.put(QueryOptionKey.GROUP_BY_MODE, Request.SQL);
+    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.PQL);
+    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    QueriesTestUtils.testInterSegmentGroupByOrderByResultPQL(brokerResponse, expectedNumDocsScanned,
+        expectedNumEntriesScannedInFilter, expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, expectedGroups,
+        expectedValues, false);
+
+    queryOptions.put(QueryOptionKey.PRESERVE_TYPE, "true");
+    brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    QueriesTestUtils.testInterSegmentGroupByOrderByResultPQL(brokerResponse, expectedNumDocsScanned,
+        expectedNumEntriesScannedInFilter, expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, expectedGroups,
+        expectedValues, true);
   }
 
   /**
@@ -74,22 +89,22 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
 
     // PQL, PQL - don't execute order by, return aggregationResults
     queryOptions = new HashMap<>(2);
-    queryOptions.put(QueryOptionKey.GROUP_BY_MODE, PQL);
-    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, PQL);
+    queryOptions.put(QueryOptionKey.GROUP_BY_MODE, Request.PQL);
+    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.PQL);
     brokerResponse = getBrokerResponseForQuery(query, queryOptions);
     Assert.assertNotNull(brokerResponse.getAggregationResults());
     Assert.assertNull(brokerResponse.getResultTable());
 
     // PQL, SQL - don't execute order by, return aggregationResults.
-    queryOptions.put(QueryOptionKey.GROUP_BY_MODE, PQL);
-    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, SQL);
+    queryOptions.put(QueryOptionKey.GROUP_BY_MODE, Request.PQL);
+    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
     brokerResponse = getBrokerResponseForQuery(query, queryOptions);
     Assert.assertNotNull(brokerResponse.getAggregationResults());
     Assert.assertNull(brokerResponse.getResultTable());
 
     // SQL, PQL - execute the order by, but return aggregationResults. Keys should be same across aggregation functions.
-    queryOptions.put(QueryOptionKey.GROUP_BY_MODE, SQL);
-    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, PQL);
+    queryOptions.put(QueryOptionKey.GROUP_BY_MODE, Request.SQL);
+    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.PQL);
     brokerResponse = getBrokerResponseForQuery(query, queryOptions);
     Assert.assertNotNull(brokerResponse.getAggregationResults());
     Assert.assertNull(brokerResponse.getResultTable());
@@ -104,8 +119,8 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     }
 
     // SQL, SQL - execute order by, return resultsTable
-    queryOptions.put(QueryOptionKey.GROUP_BY_MODE, SQL);
-    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, SQL);
+    queryOptions.put(QueryOptionKey.GROUP_BY_MODE, Request.SQL);
+    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
     brokerResponse = getBrokerResponseForQuery(query, queryOptions);
     Assert.assertNull(brokerResponse.getAggregationResults());
     Assert.assertNotNull(brokerResponse.getResultTable());
@@ -115,12 +130,12 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
    * Provides various combinations of order by in ResultTable.
    * In order to calculate the expected results, the results from a group by were taken, and then ordered accordingly.
    */
-  @DataProvider(name = "orderByResultTableProvider")
-  public Object[][] orderByResultTableProvider() {
+  @DataProvider(name = "orderBySQLResultTableProvider")
+  public Object[][] orderBySQLResultTableProvider() {
 
     List<Object[]> data = new ArrayList<>();
     String query;
-    List<Serializable[]> results;
+    List<Object[]> results;
     long numDocsScanned = 120000;
     long numEntriesScannedInFilter = 0;
     long numEntriesScannedPostFilter;
@@ -128,9 +143,9 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
 
     // order by one of the group by columns
     query = "SELECT SUM(column1) FROM testTable GROUP BY column11 ORDER BY column11";
-    results = Lists.newArrayList(new Serializable[]{"", 5935285005452.0}, new Serializable[]{"P", 88832999206836.0},
-        new Serializable[]{"gFuH", 63202785888.0}, new Serializable[]{"o", 18105331533948.0},
-        new Serializable[]{"t", 16331923219264.0});
+    results = Lists.newArrayList(new Object[]{"", 5935285005452.0}, new Object[]{"P", 88832999206836.0},
+        new Object[]{"gFuH", 63202785888.0}, new Object[]{"o", 18105331533948.0}, new Object[]{"t", 16331923219264.0});
+
     numEntriesScannedPostFilter = 240000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
@@ -154,16 +169,13 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
 
     // group by 2 dimensions, order by both, tie breaker
     query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY column11, column12";
-    results = Lists.newArrayList(new Serializable[]{"", "HEuxNvH", 3789390396216.0},
-        new Serializable[]{"", "KrNxpdycSiwoRohEiTIlLqDHnx", 733802350944.00000},
-        new Serializable[]{"", "MaztCmmxxgguBUxPti", 1333941430664.00000},
-        new Serializable[]{"", "dJWwFk", 55470665124.0000},
-        new Serializable[]{"", "oZgnrlDEtjjVpUoFLol", 22680162504.00000},
-        new Serializable[]{"P", "HEuxNvH", 21998672845052.00000},
-        new Serializable[]{"P", "KrNxpdycSiwoRohEiTIlLqDHnx", 18069909216728.00000},
-        new Serializable[]{"P", "MaztCmmxxgguBUxPti", 27177029040008.00000},
-        new Serializable[]{"P", "TTltMtFiRqUjvOG", 4462670055540.00000},
-        new Serializable[]{"P", "XcBNHe", 120021767504.00000});
+    results = Lists.newArrayList(new Object[]{"", "HEuxNvH", 3789390396216.0},
+        new Object[]{"", "KrNxpdycSiwoRohEiTIlLqDHnx", 733802350944.00000},
+        new Object[]{"", "MaztCmmxxgguBUxPti", 1333941430664.00000}, new Object[]{"", "dJWwFk", 55470665124.0000},
+        new Object[]{"", "oZgnrlDEtjjVpUoFLol", 22680162504.00000}, new Object[]{"P", "HEuxNvH", 21998672845052.00000},
+        new Object[]{"P", "KrNxpdycSiwoRohEiTIlLqDHnx", 18069909216728.00000},
+        new Object[]{"P", "MaztCmmxxgguBUxPti", 27177029040008.00000},
+        new Object[]{"P", "TTltMtFiRqUjvOG", 4462670055540.00000}, new Object[]{"P", "XcBNHe", 120021767504.00000});
     numEntriesScannedPostFilter = 360000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
@@ -171,174 +183,157 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     // group by 2 columns, order by both, TOP more than default
     query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY column11, column12 TOP 15";
     results = Lists.newArrayList(results);
-    results.add(new Serializable[]{"P", "dJWwFk", 6224665921376.00000});
-    results.add(new Serializable[]{"P", "fykKFqiw", 1574451324140.00000});
-    results.add(new Serializable[]{"P", "gFuH", 860077643636.00000});
-    results.add(new Serializable[]{"P", "oZgnrlDEtjjVpUoFLol", 8345501392852.00000});
-    results.add(new Serializable[]{"gFuH", "HEuxNvH", 29872400856.00000});
+    results.add(new Object[]{"P", "dJWwFk", 6224665921376.00000});
+    results.add(new Object[]{"P", "fykKFqiw", 1574451324140.00000});
+    results.add(new Object[]{"P", "gFuH", 860077643636.00000});
+    results.add(new Object[]{"P", "oZgnrlDEtjjVpUoFLol", 8345501392852.00000});
+    results.add(new Object[]{"gFuH", "HEuxNvH", 29872400856.00000});
     numEntriesScannedPostFilter = 360000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
     // group by 2 columns, order by both, one of them DESC
     query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY column11, column12 DESC";
-    results = Lists.newArrayList(new Serializable[]{"", "oZgnrlDEtjjVpUoFLol", 22680162504.00000},
-        new Serializable[]{"", "dJWwFk", 55470665124.0000},
-        new Serializable[]{"", "MaztCmmxxgguBUxPti", 1333941430664.00000},
-        new Serializable[]{"", "KrNxpdycSiwoRohEiTIlLqDHnx", 733802350944.00000},
-        new Serializable[]{"", "HEuxNvH", 3789390396216.00000},
-        new Serializable[]{"P", "oZgnrlDEtjjVpUoFLol", 8345501392852.00000},
-        new Serializable[]{"P", "gFuH", 860077643636.00000}, new Serializable[]{"P", "fykKFqiw", 1574451324140.00000},
-        new Serializable[]{"P", "dJWwFk", 6224665921376.00000}, new Serializable[]{"P", "XcBNHe", 120021767504.00000});
+    results = Lists.newArrayList(new Object[]{"", "oZgnrlDEtjjVpUoFLol", 22680162504.00000},
+        new Object[]{"", "dJWwFk", 55470665124.0000}, new Object[]{"", "MaztCmmxxgguBUxPti", 1333941430664.00000},
+        new Object[]{"", "KrNxpdycSiwoRohEiTIlLqDHnx", 733802350944.00000},
+        new Object[]{"", "HEuxNvH", 3789390396216.00000}, new Object[]{"P", "oZgnrlDEtjjVpUoFLol", 8345501392852.00000},
+        new Object[]{"P", "gFuH", 860077643636.00000}, new Object[]{"P", "fykKFqiw", 1574451324140.00000},
+        new Object[]{"P", "dJWwFk", 6224665921376.00000}, new Object[]{"P", "XcBNHe", 120021767504.00000});
     numEntriesScannedPostFilter = 360000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
     // order by group by column and an aggregation
     query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY column11, SUM(column1)";
-    results = Lists.newArrayList(new Serializable[]{"", "oZgnrlDEtjjVpUoFLol", 22680162504.00000},
-        new Serializable[]{"", "dJWwFk", 55470665124.0000},
-        new Serializable[]{"", "KrNxpdycSiwoRohEiTIlLqDHnx", 733802350944.00000},
-        new Serializable[]{"", "MaztCmmxxgguBUxPti", 1333941430664.00000},
-        new Serializable[]{"", "HEuxNvH", 3789390396216.00000}, new Serializable[]{"P", "XcBNHe", 120021767504.00000},
-        new Serializable[]{"P", "gFuH", 860077643636.00000}, new Serializable[]{"P", "fykKFqiw", 1574451324140.00000},
-        new Serializable[]{"P", "TTltMtFiRqUjvOG", 4462670055540.00000},
-        new Serializable[]{"P", "dJWwFk", 6224665921376.00000});
+    results = Lists.newArrayList(new Object[]{"", "oZgnrlDEtjjVpUoFLol", 22680162504.00000},
+        new Object[]{"", "dJWwFk", 55470665124.0000},
+        new Object[]{"", "KrNxpdycSiwoRohEiTIlLqDHnx", 733802350944.00000},
+        new Object[]{"", "MaztCmmxxgguBUxPti", 1333941430664.00000}, new Object[]{"", "HEuxNvH", 3789390396216.00000},
+        new Object[]{"P", "XcBNHe", 120021767504.00000}, new Object[]{"P", "gFuH", 860077643636.00000},
+        new Object[]{"P", "fykKFqiw", 1574451324140.00000}, new Object[]{"P", "TTltMtFiRqUjvOG", 4462670055540.00000},
+        new Object[]{"P", "dJWwFk", 6224665921376.00000});
     numEntriesScannedPostFilter = 360000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
     // order by only aggregation, DESC, TOP
     query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY SUM(column1) DESC TOP 50";
-    results = Lists.newArrayList(new Serializable[]{"P", "MaztCmmxxgguBUxPti", 27177029040008.00000},
-        new Serializable[]{"P", "HEuxNvH", 21998672845052.00000},
-        new Serializable[]{"P", "KrNxpdycSiwoRohEiTIlLqDHnx", 18069909216728.00000},
-        new Serializable[]{"P", "oZgnrlDEtjjVpUoFLol", 8345501392852.00000},
-        new Serializable[]{"o", "MaztCmmxxgguBUxPti", 6905624581072.00000},
-        new Serializable[]{"P", "dJWwFk", 6224665921376.00000}, new Serializable[]{"o", "HEuxNvH", 5026384681784.00000},
-        new Serializable[]{"t", "MaztCmmxxgguBUxPti", 4492405624940.00000},
-        new Serializable[]{"P", "TTltMtFiRqUjvOG", 4462670055540.00000},
-        new Serializable[]{"t", "HEuxNvH", 4424489490364.00000},
-        new Serializable[]{"o", "KrNxpdycSiwoRohEiTIlLqDHnx", 4051812250524.00000},
-        new Serializable[]{"", "HEuxNvH", 3789390396216.00000},
-        new Serializable[]{"t", "KrNxpdycSiwoRohEiTIlLqDHnx", 3529048341192.00000},
-        new Serializable[]{"P", "fykKFqiw", 1574451324140.00000},
-        new Serializable[]{"t", "dJWwFk", 1349058948804.00000},
-        new Serializable[]{"", "MaztCmmxxgguBUxPti", 1333941430664.00000},
-        new Serializable[]{"o", "dJWwFk", 1152689463360.00000},
-        new Serializable[]{"t", "oZgnrlDEtjjVpUoFLol", 1039101333316.00000},
-        new Serializable[]{"P", "gFuH", 860077643636.00000},
-        new Serializable[]{"", "KrNxpdycSiwoRohEiTIlLqDHnx", 733802350944.00000},
-        new Serializable[]{"o", "oZgnrlDEtjjVpUoFLol", 699381633640.00000},
-        new Serializable[]{"t", "TTltMtFiRqUjvOG", 675238030848.00000},
-        new Serializable[]{"t", "fykKFqiw", 480973878052.00000}, new Serializable[]{"t", "gFuH", 330331507792.00000},
-        new Serializable[]{"o", "TTltMtFiRqUjvOG", 203835153352.00000},
-        new Serializable[]{"P", "XcBNHe", 120021767504.00000}, new Serializable[]{"o", "fykKFqiw", 62975165296.00000},
-        new Serializable[]{"", "dJWwFk", 55470665124.0000}, new Serializable[]{"gFuH", "HEuxNvH", 29872400856.00000},
-        new Serializable[]{"gFuH", "MaztCmmxxgguBUxPti", 29170832184.00000},
-        new Serializable[]{"", "oZgnrlDEtjjVpUoFLol", 22680162504.00000},
-        new Serializable[]{"t", "XcBNHe", 11276063956.00000},
-        new Serializable[]{"gFuH", "KrNxpdycSiwoRohEiTIlLqDHnx", 4159552848.00000},
-        new Serializable[]{"o", "gFuH", 2628604920.00000});
+    results = Lists.newArrayList(new Object[]{"P", "MaztCmmxxgguBUxPti", 27177029040008.00000},
+        new Object[]{"P", "HEuxNvH", 21998672845052.00000},
+        new Object[]{"P", "KrNxpdycSiwoRohEiTIlLqDHnx", 18069909216728.00000},
+        new Object[]{"P", "oZgnrlDEtjjVpUoFLol", 8345501392852.00000},
+        new Object[]{"o", "MaztCmmxxgguBUxPti", 6905624581072.00000}, new Object[]{"P", "dJWwFk", 6224665921376.00000},
+        new Object[]{"o", "HEuxNvH", 5026384681784.00000}, new Object[]{"t", "MaztCmmxxgguBUxPti", 4492405624940.00000},
+        new Object[]{"P", "TTltMtFiRqUjvOG", 4462670055540.00000}, new Object[]{"t", "HEuxNvH", 4424489490364.00000},
+        new Object[]{"o", "KrNxpdycSiwoRohEiTIlLqDHnx", 4051812250524.00000},
+        new Object[]{"", "HEuxNvH", 3789390396216.00000},
+        new Object[]{"t", "KrNxpdycSiwoRohEiTIlLqDHnx", 3529048341192.00000},
+        new Object[]{"P", "fykKFqiw", 1574451324140.00000}, new Object[]{"t", "dJWwFk", 1349058948804.00000},
+        new Object[]{"", "MaztCmmxxgguBUxPti", 1333941430664.00000}, new Object[]{"o", "dJWwFk", 1152689463360.00000},
+        new Object[]{"t", "oZgnrlDEtjjVpUoFLol", 1039101333316.00000}, new Object[]{"P", "gFuH", 860077643636.00000},
+        new Object[]{"", "KrNxpdycSiwoRohEiTIlLqDHnx", 733802350944.00000},
+        new Object[]{"o", "oZgnrlDEtjjVpUoFLol", 699381633640.00000},
+        new Object[]{"t", "TTltMtFiRqUjvOG", 675238030848.00000}, new Object[]{"t", "fykKFqiw", 480973878052.00000},
+        new Object[]{"t", "gFuH", 330331507792.00000}, new Object[]{"o", "TTltMtFiRqUjvOG", 203835153352.00000},
+        new Object[]{"P", "XcBNHe", 120021767504.00000}, new Object[]{"o", "fykKFqiw", 62975165296.00000},
+        new Object[]{"", "dJWwFk", 55470665124.0000}, new Object[]{"gFuH", "HEuxNvH", 29872400856.00000},
+        new Object[]{"gFuH", "MaztCmmxxgguBUxPti", 29170832184.00000},
+        new Object[]{"", "oZgnrlDEtjjVpUoFLol", 22680162504.00000}, new Object[]{"t", "XcBNHe", 11276063956.00000},
+        new Object[]{"gFuH", "KrNxpdycSiwoRohEiTIlLqDHnx", 4159552848.00000},
+        new Object[]{"o", "gFuH", 2628604920.00000});
     numEntriesScannedPostFilter = 360000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
     // multiple aggregations
     query = "SELECT SUM(column1), MIN(column6) FROM testTable GROUP BY column11 ORDER BY column11";
-    results = Lists.newArrayList(new Serializable[]{"", 5935285005452.0, 2.96467636E8},
-        new Serializable[]{"P", 88832999206836.0, 1689277.0}, new Serializable[]{"gFuH", 63202785888.0, 2.96467636E8},
-        new Serializable[]{"o", 18105331533948.0, 2.96467636E8}, new Serializable[]{"t", 16331923219264.0, 1980174.0});
+    results = Lists
+        .newArrayList(new Object[]{"", 5935285005452.0, 2.96467636E8}, new Object[]{"P", 88832999206836.0, 1689277.0},
+            new Object[]{"gFuH", 63202785888.0, 2.96467636E8}, new Object[]{"o", 18105331533948.0, 2.96467636E8},
+            new Object[]{"t", 16331923219264.0, 1980174.0});
     numEntriesScannedPostFilter = 360000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
     // order by aggregation with space/tab in order by
     query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY SUM  ( column1) DESC TOP 3";
-    results = Lists.newArrayList(new Serializable[]{"P", "MaztCmmxxgguBUxPti", 27177029040008.00000},
-        new Serializable[]{"P", "HEuxNvH", 21998672845052.00000},
-        new Serializable[]{"P", "KrNxpdycSiwoRohEiTIlLqDHnx", 18069909216728.00000});
+    results = Lists.newArrayList(new Object[]{"P", "MaztCmmxxgguBUxPti", 27177029040008.00000},
+        new Object[]{"P", "HEuxNvH", 21998672845052.00000},
+        new Object[]{"P", "KrNxpdycSiwoRohEiTIlLqDHnx", 18069909216728.00000});
     numEntriesScannedPostFilter = 360000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
     // order by an aggregation DESC, and group by column
     query = "SELECT MIN(column6) FROM testTable GROUP BY column12 ORDER BY MIN(column6) DESC, column12";
-    results = Lists
-        .newArrayList(new Serializable[]{"XcBNHe", 329467557.00000}, new Serializable[]{"fykKFqiw", 296467636.00000},
-            new Serializable[]{"gFuH", 296467636.00000}, new Serializable[]{"HEuxNvH", 6043515.00000},
-            new Serializable[]{"MaztCmmxxgguBUxPti", 6043515.00000}, new Serializable[]{"dJWwFk", 6043515.00000},
-            new Serializable[]{"KrNxpdycSiwoRohEiTIlLqDHnx", 1980174.00000},
-            new Serializable[]{"TTltMtFiRqUjvOG", 1980174.00000},
-            new Serializable[]{"oZgnrlDEtjjVpUoFLol", 1689277.00000});
+    results = Lists.newArrayList(new Object[]{"XcBNHe", 329467557.00000}, new Object[]{"fykKFqiw", 296467636.00000},
+        new Object[]{"gFuH", 296467636.00000}, new Object[]{"HEuxNvH", 6043515.00000},
+        new Object[]{"MaztCmmxxgguBUxPti", 6043515.00000}, new Object[]{"dJWwFk", 6043515.00000},
+        new Object[]{"KrNxpdycSiwoRohEiTIlLqDHnx", 1980174.00000}, new Object[]{"TTltMtFiRqUjvOG", 1980174.00000},
+        new Object[]{"oZgnrlDEtjjVpUoFLol", 1689277.00000});
     numEntriesScannedPostFilter = 240000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
     // numeric dimension should follow numeric ordering
     query = "select count(*) from testTable group by column17 order by column17 top 15";
-    results = Lists.newArrayList(new Serializable[]{83386499, 2924L}, new Serializable[]{217787432, 3892L},
-        new Serializable[]{227908817, 6564L}, new Serializable[]{402773817, 7304L},
-        new Serializable[]{423049234, 6556L}, new Serializable[]{561673250, 7420L},
-        new Serializable[]{635942547, 3308L}, new Serializable[]{638936844, 3816L},
-        new Serializable[]{939479517, 3116L}, new Serializable[]{984091268, 3824L},
-        new Serializable[]{1230252339, 5620L}, new Serializable[]{1284373442, 7428L},
-        new Serializable[]{1555255521, 2900L}, new Serializable[]{1618904660, 2744L},
-        new Serializable[]{1670085862, 3388L});
+    results = Lists
+        .newArrayList(new Object[]{83386499, 2924L}, new Object[]{217787432, 3892L}, new Object[]{227908817, 6564L},
+            new Object[]{402773817, 7304L}, new Object[]{423049234, 6556L}, new Object[]{561673250, 7420L},
+            new Object[]{635942547, 3308L}, new Object[]{638936844, 3816L}, new Object[]{939479517, 3116L},
+            new Object[]{984091268, 3824L}, new Object[]{1230252339, 5620L}, new Object[]{1284373442, 7428L},
+            new Object[]{1555255521, 2900L}, new Object[]{1618904660, 2744L}, new Object[]{1670085862, 3388L});
     numEntriesScannedPostFilter = 120000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
     // group by UDF order by UDF
     query = "SELECT COUNT(*) FROM testTable GROUP BY sub(column1, 100000) TOP 3 ORDER BY sub(column1, 100000)";
-    results = Lists.newArrayList(new Serializable[]{140528.0, 28L}, new Serializable[]{194355.0, 12L},
-        new Serializable[]{532157.0, 12L});
+    results = Lists.newArrayList(new Object[]{140528.0, 28L}, new Object[]{194355.0, 12L}, new Object[]{532157.0, 12L});
     numEntriesScannedPostFilter = 120000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
     // spaces in UDF
     query = "SELECT COUNT(*) FROM testTable GROUP BY sub(column1, 100000) TOP 3 ORDER BY SUB(   column1, 100000 )";
-    results = Lists.newArrayList(new Serializable[]{140528.0, 28L}, new Serializable[]{194355.0, 12L},
-        new Serializable[]{532157.0, 12L});
+    results = Lists.newArrayList(new Object[]{140528.0, 28L}, new Object[]{194355.0, 12L}, new Object[]{532157.0, 12L});
     numEntriesScannedPostFilter = 120000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
     // Object type aggregation - comparable intermediate results (AVG, MINMAXRANGE)
     query = "SELECT AVG(column6) FROM testTable GROUP BY column11  ORDER BY column11";
-    results = Lists.newArrayList(new Serializable[]{"", 296467636.0}, new Serializable[]{"P", 909380310.3521485},
-        new Serializable[]{"gFuH", 296467636.0}, new Serializable[]{"o", 296467636.0},
-        new Serializable[]{"t", 526245333.3900426});
+    results = Lists.newArrayList(new Object[]{"", 296467636.0}, new Object[]{"P", 909380310.3521485},
+        new Object[]{"gFuH", 296467636.0}, new Object[]{"o", 296467636.0}, new Object[]{"t", 526245333.3900426});
     numEntriesScannedPostFilter = 240000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
     query = "SELECT AVG(column6) FROM testTable GROUP BY column11 ORDER BY AVG(column6), column11 DESC";
-    results = Lists.newArrayList(new Serializable[]{"o", 296467636.0}, new Serializable[]{"gFuH", 296467636.0},
-        new Serializable[]{"", 296467636.0}, new Serializable[]{"t", 526245333.3900426},
-        new Serializable[]{"P", 909380310.3521485});
+    results = Lists
+        .newArrayList(new Object[]{"o", 296467636.0}, new Object[]{"gFuH", 296467636.0}, new Object[]{"", 296467636.0},
+            new Object[]{"t", 526245333.3900426}, new Object[]{"P", 909380310.3521485});
     numEntriesScannedPostFilter = 240000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
     // Object type aggregation - non comparable intermediate results (DISTINCTCOUNT)
     query = "SELECT DISTINCTCOUNT(column11) FROM testTable GROUP BY column12 ORDER BY column12";
-    results = Lists.newArrayList(new Serializable[]{"HEuxNvH", 5}, new Serializable[]{"KrNxpdycSiwoRohEiTIlLqDHnx", 5},
-        new Serializable[]{"MaztCmmxxgguBUxPti", 5}, new Serializable[]{"TTltMtFiRqUjvOG", 3},
-        new Serializable[]{"XcBNHe", 2}, new Serializable[]{"dJWwFk", 4}, new Serializable[]{"fykKFqiw", 3},
-        new Serializable[]{"gFuH", 3}, new Serializable[]{"oZgnrlDEtjjVpUoFLol", 4});
+    results = Lists.newArrayList(new Object[]{"HEuxNvH", 5}, new Object[]{"KrNxpdycSiwoRohEiTIlLqDHnx", 5},
+        new Object[]{"MaztCmmxxgguBUxPti", 5}, new Object[]{"TTltMtFiRqUjvOG", 3}, new Object[]{"XcBNHe", 2},
+        new Object[]{"dJWwFk", 4}, new Object[]{"fykKFqiw", 3}, new Object[]{"gFuH", 3},
+        new Object[]{"oZgnrlDEtjjVpUoFLol", 4});
     numEntriesScannedPostFilter = 240000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
     query =
         "SELECT DISTINCTCOUNT(column11) FROM testTable GROUP BY column12 ORDER BY DISTINCTCOUNT(column11), column12 DESC";
-    results = Lists
-        .newArrayList(new Serializable[]{"XcBNHe", 2}, new Serializable[]{"gFuH", 3}, new Serializable[]{"fykKFqiw", 3},
-            new Serializable[]{"TTltMtFiRqUjvOG", 3}, new Serializable[]{"oZgnrlDEtjjVpUoFLol", 4},
-            new Serializable[]{"dJWwFk", 4}, new Serializable[]{"MaztCmmxxgguBUxPti", 5},
-            new Serializable[]{"KrNxpdycSiwoRohEiTIlLqDHnx", 5}, new Serializable[]{"HEuxNvH", 5});
+    results = Lists.newArrayList(new Object[]{"XcBNHe", 2}, new Object[]{"gFuH", 3}, new Object[]{"fykKFqiw", 3},
+        new Object[]{"TTltMtFiRqUjvOG", 3}, new Object[]{"oZgnrlDEtjjVpUoFLol", 4}, new Object[]{"dJWwFk", 4},
+        new Object[]{"MaztCmmxxgguBUxPti", 5}, new Object[]{"KrNxpdycSiwoRohEiTIlLqDHnx", 5},
+        new Object[]{"HEuxNvH", 5});
     numEntriesScannedPostFilter = 240000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
@@ -351,6 +346,266 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     numEntriesScannedPostFilter = 0;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
+
+    return data.toArray(new Object[data.size()][]);
+  }
+
+  /**
+   * Provides various combinations of order by in ResultTable.
+   * In order to calculate the expected results, the results from a group by were taken, and then ordered accordingly.
+   */
+  @DataProvider(name = "orderByPQLResultProvider")
+  public Object[][] orderByPQLResultProvider() {
+
+    List<Object[]> data = new ArrayList<>();
+    String query;
+    List<String[]> groups;
+    List<Serializable> result1;
+    List<Serializable> result2;
+    List<List<Serializable>> results;
+    long numDocsScanned = 120000;
+    long numEntriesScannedInFilter = 0;
+    long numEntriesScannedPostFilter;
+    long numTotalDocs = 120000;
+
+    // order by one of the group by columns
+    query = "SELECT SUM(column1) FROM testTable GROUP BY column11 ORDER BY column11";
+    groups = Lists
+        .newArrayList(new String[]{""}, new String[]{"P"}, new String[]{"gFuH"}, new String[]{"o"}, new String[]{"t"});
+    result1 = Lists.newArrayList(5935285005452.0, 88832999206836.0, 63202785888.0, 18105331533948.0, 16331923219264.0);
+    results = new ArrayList<>();
+    results.add(result1);
+    numEntriesScannedPostFilter = 240000;
+    data.add(new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
+
+    // order by one of the group by columns DESC
+    query = "SELECT SUM(column1) FROM testTable GROUP BY column11 ORDER BY column11 DESC";
+    groups = Lists.newArrayList(groups);
+    Collections.reverse(groups);
+    result1 = Lists.newArrayList(result1);
+    Collections.reverse(result1);
+    results = new ArrayList<>();
+    results.add(result1);
+    numEntriesScannedPostFilter = 240000;
+    data.add(new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
+
+    // order by one of the group by columns, TOP less than default
+    query = "SELECT SUM(column1) FROM testTable GROUP BY column11 ORDER BY column11 TOP 3";
+    groups = Lists.newArrayList(groups);
+    Collections.reverse(groups);
+    groups = groups.subList(0, 3);
+    result1 = Lists.newArrayList(result1);
+    Collections.reverse(result1);
+    result1 = result1.subList(0, 3);
+    results = new ArrayList<>();
+    results.add(result1);
+    numEntriesScannedPostFilter = 240000;
+    data.add(new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
+
+    // group by 2 dimensions, order by both, tie breaker
+    query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY column11, column12";
+    groups = Lists.newArrayList(new String[]{"", "HEuxNvH"}, new String[]{"", "KrNxpdycSiwoRohEiTIlLqDHnx"},
+        new String[]{"", "MaztCmmxxgguBUxPti"}, new String[]{"", "dJWwFk"}, new String[]{"", "oZgnrlDEtjjVpUoFLol"},
+        new String[]{"P", "HEuxNvH"}, new String[]{"P", "KrNxpdycSiwoRohEiTIlLqDHnx"},
+        new String[]{"P", "MaztCmmxxgguBUxPti"}, new String[]{"P", "TTltMtFiRqUjvOG"}, new String[]{"P", "XcBNHe"});
+    result1 = Lists
+        .newArrayList(3789390396216.0, 733802350944.00000, 1333941430664.00000, 55470665124.0000, 22680162504.00000,
+            21998672845052.00000, 18069909216728.00000, 27177029040008.00000, 4462670055540.00000, 120021767504.00000);
+    results = new ArrayList<>();
+    results.add(result1);
+    numEntriesScannedPostFilter = 360000;
+    data.add(new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
+
+    // group by 2 columns, order by both, TOP more than default
+    query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY column11, column12 TOP 15";
+    groups = Lists.newArrayList(groups);
+    groups.add(new String[]{"P", "dJWwFk"});
+    groups.add(new String[]{"P", "fykKFqiw"});
+    groups.add(new String[]{"P", "gFuH"});
+    groups.add(new String[]{"P", "oZgnrlDEtjjVpUoFLol"});
+    groups.add(new String[]{"gFuH", "HEuxNvH"});
+    result1 = Lists.newArrayList(result1);
+    result1.add(6224665921376.00000);
+    result1.add(1574451324140.00000);
+    result1.add(860077643636.00000);
+    result1.add(8345501392852.00000);
+    result1.add(29872400856.00000);
+    results = new ArrayList<>();
+    results.add(result1);
+    numEntriesScannedPostFilter = 360000;
+    data.add(new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
+
+    // group by 2 columns, order by both, one of them DESC
+    query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY column11, column12 DESC";
+    groups = Lists.newArrayList(new String[]{"", "oZgnrlDEtjjVpUoFLol"}, new String[]{"", "dJWwFk"},
+        new String[]{"", "MaztCmmxxgguBUxPti"}, new String[]{"", "KrNxpdycSiwoRohEiTIlLqDHnx"},
+        new String[]{"", "HEuxNvH"}, new String[]{"P", "oZgnrlDEtjjVpUoFLol"}, new String[]{"P", "gFuH"},
+        new String[]{"P", "fykKFqiw"}, new String[]{"P", "dJWwFk"}, new String[]{"P", "XcBNHe"});
+    result1 = Lists
+        .newArrayList(22680162504.00000, 55470665124.0000, 1333941430664.00000, 733802350944.00000, 3789390396216.00000,
+            8345501392852.00000, 860077643636.00000, 1574451324140.00000, 6224665921376.00000, 120021767504.00000);
+    results = new ArrayList<>();
+    results.add(result1);
+    numEntriesScannedPostFilter = 360000;
+    data.add(new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
+
+    // order by group by column and an aggregation
+    query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY column11, SUM(column1)";
+    groups = Lists.newArrayList(new String[]{"", "oZgnrlDEtjjVpUoFLol"}, new String[]{"", "dJWwFk"},
+        new String[]{"", "KrNxpdycSiwoRohEiTIlLqDHnx"}, new String[]{"", "MaztCmmxxgguBUxPti"},
+        new String[]{"", "HEuxNvH"}, new String[]{"P", "XcBNHe"}, new String[]{"P", "gFuH"},
+        new String[]{"P", "fykKFqiw"}, new String[]{"P", "TTltMtFiRqUjvOG"}, new String[]{"P", "dJWwFk"});
+    result1 = Lists
+        .newArrayList(22680162504.00000, 55470665124.0000, 733802350944.00000, 1333941430664.00000, 3789390396216.00000,
+            120021767504.00000, 860077643636.00000, 1574451324140.00000, 4462670055540.00000, 6224665921376.00000);
+    results = new ArrayList<>();
+    results.add(result1);
+    numEntriesScannedPostFilter = 360000;
+    data.add(new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
+
+    // order by only aggregation, DESC, TOP
+    query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY SUM(column1) DESC TOP 50";
+    groups = Lists.newArrayList(new String[]{"P", "MaztCmmxxgguBUxPti"}, new String[]{"P", "HEuxNvH"},
+        new String[]{"P", "KrNxpdycSiwoRohEiTIlLqDHnx"}, new String[]{"P", "oZgnrlDEtjjVpUoFLol"},
+        new String[]{"o", "MaztCmmxxgguBUxPti"}, new String[]{"P", "dJWwFk"}, new String[]{"o", "HEuxNvH"},
+        new String[]{"t", "MaztCmmxxgguBUxPti"}, new String[]{"P", "TTltMtFiRqUjvOG"}, new String[]{"t", "HEuxNvH"},
+        new String[]{"o", "KrNxpdycSiwoRohEiTIlLqDHnx"}, new String[]{"", "HEuxNvH"},
+        new String[]{"t", "KrNxpdycSiwoRohEiTIlLqDHnx"}, new String[]{"P", "fykKFqiw"}, new String[]{"t", "dJWwFk"},
+        new String[]{"", "MaztCmmxxgguBUxPti"}, new String[]{"o", "dJWwFk"}, new String[]{"t", "oZgnrlDEtjjVpUoFLol"},
+        new String[]{"P", "gFuH"}, new String[]{"", "KrNxpdycSiwoRohEiTIlLqDHnx"},
+        new String[]{"o", "oZgnrlDEtjjVpUoFLol"}, new String[]{"t", "TTltMtFiRqUjvOG"}, new String[]{"t", "fykKFqiw"},
+        new String[]{"t", "gFuH"}, new String[]{"o", "TTltMtFiRqUjvOG"}, new String[]{"P", "XcBNHe"},
+        new String[]{"o", "fykKFqiw"}, new String[]{"", "dJWwFk"}, new String[]{"gFuH", "HEuxNvH"},
+        new String[]{"gFuH", "MaztCmmxxgguBUxPti"}, new String[]{"", "oZgnrlDEtjjVpUoFLol"},
+        new String[]{"t", "XcBNHe"}, new String[]{"gFuH", "KrNxpdycSiwoRohEiTIlLqDHnx"}, new String[]{"o", "gFuH"});
+    result1 = Lists.newArrayList(27177029040008.00000, 21998672845052.00000, 18069909216728.00000, 8345501392852.00000,
+        6905624581072.00000, 6224665921376.00000, 5026384681784.00000, 4492405624940.00000, 4462670055540.00000,
+        4424489490364.00000, 4051812250524.00000, 3789390396216.00000, 3529048341192.00000, 1574451324140.00000,
+        1349058948804.00000, 1333941430664.00000, 1152689463360.00000, 1039101333316.00000, 860077643636.00000,
+        733802350944.00000, 699381633640.00000, 675238030848.00000, 480973878052.00000, 330331507792.00000,
+        203835153352.00000, 120021767504.00000, 62975165296.00000, 55470665124.0000, 29872400856.00000,
+        29170832184.00000, 22680162504.00000, 11276063956.00000, 4159552848.00000, 2628604920.00000);
+    results = new ArrayList<>();
+    results.add(result1);
+    numEntriesScannedPostFilter = 360000;
+    data.add(new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
+
+    // multiple aggregations
+    query = "SELECT SUM(column1), MIN(column6) FROM testTable GROUP BY column11 ORDER BY column11";
+    groups = Lists
+        .newArrayList(new String[]{""}, new String[]{"P"}, new String[]{"gFuH"}, new String[]{"o"}, new String[]{"t"});
+    result1 = Lists.newArrayList(5935285005452.0, 88832999206836.0, 63202785888.0, 18105331533948.0, 16331923219264.0);
+    result2 = Lists.newArrayList(2.96467636E8, 1689277.0, 2.96467636E8, 2.96467636E8, 1980174.0);
+    results = new ArrayList<>();
+    results.add(result1);
+    results.add(result2);
+    numEntriesScannedPostFilter = 360000;
+    data.add(new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
+
+    // order by aggregation with space/tab in order by
+    query = "SELECT SUM(column1) FROM testTable GROUP BY column11, column12 ORDER BY SUM  ( column1) DESC TOP 3";
+    groups = Lists.newArrayList(new String[]{"P", "MaztCmmxxgguBUxPti"}, new String[]{"P", "HEuxNvH"},
+        new String[]{"P", "KrNxpdycSiwoRohEiTIlLqDHnx"});
+    result1 = Lists.newArrayList(27177029040008.00000, 21998672845052.00000, 18069909216728.00000);
+    results = new ArrayList<>();
+    results.add(result1);
+    numEntriesScannedPostFilter = 360000;
+    data.add(new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
+
+    // order by an aggregation DESC, and group by column
+    query = "SELECT MIN(column6) FROM testTable GROUP BY column12 ORDER BY MIN(column6) DESC, column12";
+    groups = Lists
+        .newArrayList(new String[]{"XcBNHe"}, new String[]{"fykKFqiw"}, new String[]{"gFuH"}, new String[]{"HEuxNvH"},
+            new String[]{"MaztCmmxxgguBUxPti"}, new String[]{"dJWwFk"}, new String[]{"KrNxpdycSiwoRohEiTIlLqDHnx"},
+            new String[]{"TTltMtFiRqUjvOG"}, new String[]{"oZgnrlDEtjjVpUoFLol"});
+    result1 = Lists
+        .newArrayList(329467557.00000, 296467636.00000, 296467636.00000, 6043515.00000, 6043515.00000, 6043515.00000,
+            1980174.00000, 1980174.00000, 1689277.00000);
+    results = new ArrayList<>();
+    results.add(result1);
+    numEntriesScannedPostFilter = 240000;
+    data.add(new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
+
+    // numeric dimension should follow numeric ordering
+    query = "select count(*) from testTable group by column17 order by column17 top 15";
+    groups = Lists.newArrayList(new String[]{"83386499"}, new String[]{"217787432"}, new String[]{"227908817"},
+        new String[]{"402773817"}, new String[]{"423049234"}, new String[]{"561673250"}, new String[]{"635942547"},
+        new String[]{"638936844"}, new String[]{"939479517"}, new String[]{"984091268"}, new String[]{"1230252339"},
+        new String[]{"1284373442"}, new String[]{"1555255521"}, new String[]{"1618904660"}, new String[]{"1670085862"});
+    result1 = Lists
+        .newArrayList(2924L, 3892L, 6564L, 7304L, 6556L, 7420L, 3308L, 3816L, 3116L, 3824L, 5620L, 7428L, 2900L, 2744L, 3388L);
+    results = new ArrayList<>();
+    results.add(result1);
+    numEntriesScannedPostFilter = 120000;
+    data.add(new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
+
+    // group by UDF order by UDF
+    query = "SELECT COUNT(*) FROM testTable GROUP BY sub(column1, 100000) TOP 3 ORDER BY sub(column1, 100000)";
+    groups = Lists.newArrayList(new String[]{"140528.0"}, new String[]{"194355.0"}, new String[]{"532157.0"});
+    result1 = Lists.newArrayList(28L, 12L, 12L);
+    results = new ArrayList<>();
+    results.add(result1);
+    numEntriesScannedPostFilter = 120000;
+    data.add(new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
+
+    // spaces in UDF
+    query = "SELECT COUNT(*) FROM testTable GROUP BY sub(column1, 100000) TOP 3 ORDER BY SUB(   column1, 100000 )";
+    groups = Lists.newArrayList(new String[]{"140528.0"}, new String[]{"194355.0"}, new String[]{"532157.0"});
+    result1 = Lists.newArrayList(28L, 12L, 12L);
+    results = new ArrayList<>();
+    results.add(result1);
+    numEntriesScannedPostFilter = 120000;
+    data.add(new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
+
+    // Object type aggregation - comparable intermediate results (AVG, MINMAXRANGE)
+    query = "SELECT AVG(column6) FROM testTable GROUP BY column11  ORDER BY column11";
+    groups = Lists
+        .newArrayList(new String[]{""}, new String[]{"P"}, new String[]{"gFuH"}, new String[]{"o"}, new String[]{"t"});
+    result1 = Lists.newArrayList(296467636.0, 909380310.3521485, 296467636.0, 296467636.0, 526245333.3900426);
+    results = new ArrayList<>();
+    results.add(result1);
+    numEntriesScannedPostFilter = 240000;
+    data.add(new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
+
+    query = "SELECT AVG(column6) FROM testTable GROUP BY column11 ORDER BY AVG(column6), column11 DESC";
+    groups = Lists
+        .newArrayList(new String[]{"o"}, new String[]{"gFuH"}, new String[]{""}, new String[]{"t"}, new String[]{"P"});
+    result1 = Lists.newArrayList(296467636.0, 296467636.0, 296467636.0, 526245333.3900426, 909380310.3521485);
+    results = new ArrayList<>();
+    results.add(result1);
+    numEntriesScannedPostFilter = 240000;
+    data.add(new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
+
+    // Object type aggregation - non comparable intermediate results (DISTINCTCOUNT)
+    query = "SELECT DISTINCTCOUNT(column11) FROM testTable GROUP BY column12 ORDER BY column12";
+    groups = Lists.newArrayList(new String[]{"HEuxNvH"}, new String[]{"KrNxpdycSiwoRohEiTIlLqDHnx"},
+        new String[]{"MaztCmmxxgguBUxPti"}, new String[]{"TTltMtFiRqUjvOG"}, new String[]{"XcBNHe"},
+        new String[]{"dJWwFk"}, new String[]{"fykKFqiw"}, new String[]{"gFuH"}, new String[]{"oZgnrlDEtjjVpUoFLol"});
+    result1 = Lists.newArrayList(5, 5, 5, 3, 2, 4, 3, 3, 4);
+    results = new ArrayList<>();
+    results.add(result1);
+    numEntriesScannedPostFilter = 240000;
+    data.add(new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
+
+    query =
+        "SELECT DISTINCTCOUNT(column11) FROM testTable GROUP BY column12 ORDER BY DISTINCTCOUNT(column11), column12 DESC";
+    groups = Lists.newArrayList(new String[]{"XcBNHe"}, new String[]{"gFuH"}, new String[]{"fykKFqiw"},
+        new String[]{"TTltMtFiRqUjvOG"}, new String[]{"oZgnrlDEtjjVpUoFLol"}, new String[]{"dJWwFk"},
+        new String[]{"MaztCmmxxgguBUxPti"}, new String[]{"KrNxpdycSiwoRohEiTIlLqDHnx"}, new String[]{"HEuxNvH"});
+    result1 = Lists.newArrayList(2, 3, 3, 3, 4, 4, 5, 5, 5);
+    results = new ArrayList<>();
+    results.add(result1);
+    numEntriesScannedPostFilter = 240000;
+    data.add(new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
+
+    // empty results
+    query =
+        "SELECT MIN(column6) FROM testTable where column12='non-existent-value' GROUP BY column11 order by column11";
+    groups = new ArrayList<>(0);
+    results = new ArrayList<>(0);
+    numDocsScanned = 0;
+    numEntriesScannedPostFilter = 0;
+    data.add(new Object[]{query, groups, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs});
 
     return data.toArray(new Object[data.size()][]);
   }
