@@ -142,22 +142,25 @@ public class PinotSegmentUploadDownloadRestletResource {
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
-    segmentName = URIUtils.decode(segmentName);
-    final URI segmentFileURI = URIUtils.getUri(provider.getBaseDataDirURI().toString(), tableName, segmentName);
-    PinotFS pinotFS = PinotFSFactory.create(provider.getBaseDataDirURI().getScheme());
 
-    if (!pinotFS.exists(segmentFileURI)) {
-      throw new ControllerApplicationException(LOGGER,
-          "Segment " + segmentName + " or table " + tableName + " not found in " + segmentFileURI.toString(), Response.Status.NOT_FOUND);
-    }
     Response.ResponseBuilder builder = Response.ok();
     File segmentFile;
     // If the segment file is local, just use it as the return entity; otherwise copy it from remote to local first.
-    if (CommonConstants.Segment.LOCAL_SEGMENT_SCHEME.equals(segmentFileURI.getScheme())) {
-      segmentFile = new File(provider.getBaseDataDir(), StringUtil.join(File.separator, tableName, segmentName));
+    if (CommonConstants.Segment.LOCAL_SEGMENT_SCHEME.equals(provider.getBaseDataDirURI().getScheme())) {
+      segmentFile = new File(provider.getBaseDataDir(), StringUtil.join(File.separator, tableName, URIUtils.decode(segmentName)));
+      if (!segmentFile.exists()) {
+        throw new ControllerApplicationException(LOGGER,
+            "Segment " + segmentName + " or table " + tableName + " not found in " + segmentFile.getAbsolutePath(), Response.Status.NOT_FOUND);
+      }
       builder.entity(segmentFile);
     } else {
-      segmentFile = new File(StringUtil.join("/", _controllerConf.getLocalTempDir(), tableName,
+      final URI segmentFileURI = URIUtils.getUri(provider.getBaseDataDirURI().toString(), tableName, URIUtils.decode(segmentName));
+      PinotFS pinotFS = PinotFSFactory.create(provider.getBaseDataDirURI().getScheme());
+      if (!pinotFS.exists(segmentFileURI)) {
+        throw new ControllerApplicationException(LOGGER,
+            "Segment " + segmentName + " or table " + tableName + " not found in " + segmentFileURI, Response.Status.NOT_FOUND);
+      }
+      segmentFile = new File(StringUtil.join(File.separator, _controllerConf.getLocalTempDir(), tableName,
           StringUtil.join("_", segmentName, String.valueOf(System.nanoTime()))));
       pinotFS.copyToLocalFile(segmentFileURI, segmentFile);
       // Streaming in the tmp file and delete it afterward.
