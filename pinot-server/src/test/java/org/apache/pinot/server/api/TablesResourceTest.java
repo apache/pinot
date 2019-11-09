@@ -19,12 +19,21 @@
 package org.apache.pinot.server.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Preconditions;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
 import java.util.List;
 import javax.ws.rs.core.Response;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
@@ -147,6 +156,52 @@ public class TablesResourceTest extends BaseResourceTest {
       String segmentName = immutableSegment.getSegmentName();
       String crc = immutableSegment.getSegmentMetadata().getCrc();
       Assert.assertEquals(segmentsCrc.get(segmentName).asText(), crc);
+    }
+  }
+
+  @Test
+  public void testDownloadSegment() throws Exception {
+    IndexSegment defaultSegment = _indexSegments.get(0);
+    String segmentPath = "/segments/" + TABLE_NAME + "/" + defaultSegment.getSegmentName();
+
+    // Download the segment and save to a temp local file.
+    Response response = _webTarget.path(segmentPath).request().get(Response.class);
+    File segmentFile = response.readEntity(File.class);
+
+    // Verify the content of the downloaded file.
+    Assert.assertTrue(verifySegmentContent(segmentFile));
+  }
+
+  // Verify metadata file from segments.
+  private boolean verifySegmentContent(File segmentFile) {
+    File tempMetadataDir = new File(FileUtils.getTempDirectory(), "segment_metadata");
+    try (// Extract metadata.properties
+        InputStream metadataPropertiesInputStream = TarGzCompressionUtils
+            .unTarOneFile(new FileInputStream(segmentFile), V1Constants.MetadataKeys.METADATA_FILE_NAME);
+        // Extract creation.meta
+        InputStream creationMetaInputStream = TarGzCompressionUtils
+            .unTarOneFile(new FileInputStream(segmentFile), V1Constants.SEGMENT_CREATION_META)) {
+      Preconditions.checkState(tempMetadataDir.mkdirs(), "Failed to create directory: %s", tempMetadataDir.getAbsolutePath());
+
+      Preconditions.checkNotNull(metadataPropertiesInputStream, "%s does not exist",
+          V1Constants.MetadataKeys.METADATA_FILE_NAME);
+      java.nio.file.Path metadataPropertiesPath =
+          FileSystems.getDefault().getPath(tempMetadataDir.getAbsolutePath(), V1Constants.MetadataKeys.METADATA_FILE_NAME);
+      Files.copy(metadataPropertiesInputStream, metadataPropertiesPath);
+
+      Preconditions.checkNotNull(creationMetaInputStream, "%s does not exist", V1Constants.SEGMENT_CREATION_META);
+      java.nio.file.Path creationMetaPath =
+          FileSystems.getDefault().getPath(tempMetadataDir.getAbsolutePath(), V1Constants.SEGMENT_CREATION_META);
+      Files.copy(creationMetaInputStream, creationMetaPath);
+      // Load segment metadata
+      SegmentMetadataImpl metadata = new SegmentMetadataImpl(tempMetadataDir);
+
+      Assert.assertEquals(TABLE_NAME,metadata.getTableName());
+      return true;
+    } catch (Exception e) {
+      return false;
+    } finally {
+      FileUtils.deleteQuietly(tempMetadataDir);
     }
   }
 }
