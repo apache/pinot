@@ -36,7 +36,6 @@ import java.util.Map;
 import java.util.Properties;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.mail.HtmlEmail;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
@@ -48,6 +47,8 @@ import org.apache.pinot.thirdeye.notification.content.templates.MetricAnomaliesC
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.thirdeye.notification.commons.ThirdEyeJiraClient.*;
+
 
 /**
  * This class formats the content for jira alerts
@@ -58,11 +59,6 @@ public class JiraContentFormatter extends AlertContentFormatter {
   private JiraConfiguration jiraAdminConfig;
 
   private static final String CHARSET = "UTF-8";
-  static final String PROP_ISSUE_TYPE = "issuetype";
-  static final String PROP_PROJECT = "project";
-  static final String PROP_ASSIGNEE = "assignee";
-  static final String PROP_MERGE_GAP = "mergeGap";
-  static final String PROP_LABELS = "labels";
   static final String PROP_DEFAULT_LABEL = "thirdeye";
 
   public static final int MAX_JIRA_SUMMARY_LENGTH = 255;
@@ -150,17 +146,14 @@ public class JiraContentFormatter extends AlertContentFormatter {
     return description;
   }
 
-  private String buildSnapshot() {
-    HtmlEmail email = new HtmlEmail();
-    String cid = "";
+  private File buildSnapshot() {
+    File snapshotFile = null;
     try {
-      if (StringUtils.isNotBlank(this.notificationContent.getSnaphotPath())) {
-        cid = email.embed(new File(this.notificationContent.getSnaphotPath()));
-      }
+      snapshotFile = new File(this.notificationContent.getSnaphotPath());
     } catch (Exception e) {
-      LOG.error("Exception while embedding screenshot for anomaly", e);
+      LOG.error("Exception while loading snapshot {}", this.notificationContent.getSnaphotPath(), e);
     }
-    return cid;
+    return snapshotFile;
   }
 
   /**
@@ -176,6 +169,7 @@ public class JiraContentFormatter extends AlertContentFormatter {
     jiraEntity.setMergeGap(MapUtils.getLong(alertClientConfig, PROP_MERGE_GAP, -1L)); // Default - Always merge
     jiraEntity.setLabels(buildLabels(dimensionFilters));
     jiraEntity.setDescription(buildDescription(jiraTemplate, templateValues));
+    jiraEntity.setComponents(ConfigUtils.getList(alertClientConfig.get(PROP_COMPONENTS)));
     jiraEntity.setSnapshot(buildSnapshot());
 
     return jiraEntity;

@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.notification.commons;
 
+import java.io.File;
 import java.util.List;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
@@ -32,9 +33,13 @@ public class JiraEntity {
   private Long jiraIssueTypeId;
   private String summary;
   private String description;
-  private String snapshot;
+  private File snapshot;
   private String assignee;
   private List<String> labels;
+  private List<String> components;
+
+  // Report new anomalies by reopening jira tickets created within
+  // the last mergeGap milliseconds
   private long mergeGap;
 
   public JiraEntity(String jiraProject, Long jiraIssueTypeId, String issueSummary) {
@@ -75,11 +80,11 @@ public class JiraEntity {
     this.description = description;
   }
 
-  public String getSnapshot() {
+  public File getSnapshot() {
     return snapshot;
   }
 
-  public void setSnapshot(String snapshot) {
+  public void setSnapshot(File snapshot) {
     this.snapshot = snapshot;
   }
 
@@ -107,22 +112,31 @@ public class JiraEntity {
     this.labels = labels;
   }
 
+  public List<String> getComponents() {
+    return components;
+  }
+
+  public void setComponents(List<String> components) {
+    this.components = components;
+  }
+
   @Override
   public String toString() {
     final StringBuilder sb = new StringBuilder("Jira{");
     sb.append("project='").append(jiraProject).append('\'');
-    sb.append(", type='").append(jiraIssueTypeId).append('\'');
+    sb.append(", issuetype='").append(jiraIssueTypeId).append('\'');
     sb.append(", assignee='").append(assignee).append('\'');
     sb.append(", summary='").append(summary).append('\'');
     sb.append(", labels='").append(labels).append('\'');
+    sb.append(", components='").append(components).append('\'');
     sb.append(", mergeGap='").append(mergeGap).append('\'');
-    sb.append(", snapshot='").append(StringUtils.isBlank(snapshot) ? "no-snapshot" : "has-snapshot").append('\'');
+    sb.append(", snapshot='").append(snapshot == null ? "" : snapshot.getName()).append('\'');
     sb.append('}');
     return sb.toString();
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(jiraProject, jiraIssueTypeId, assignee, summary, labels, mergeGap, snapshot);
+    return Objects.hash(jiraProject, jiraIssueTypeId, assignee, summary, labels, mergeGap, snapshot, components);
   }
 }
