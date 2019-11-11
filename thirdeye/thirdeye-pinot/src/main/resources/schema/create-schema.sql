@@ -60,6 +60,10 @@ create index task_status_idx on task_index(status);
 create index task_type_idx on task_index(type);
 create index task_job_idx on task_index(job_id);
 create index task_base_id_idx ON task_index(base_id);
+create index task_name_idx ON task_index(name);
+create index task_start_time_idx on task_index(start_time);
+create index task_create_time_idx on task_index(create_time);
+create index task_status_start_time_idx on task_index(status, start_time);
 
 create table if not exists anomaly_feedback_index (
     type varchar(100) not null,
