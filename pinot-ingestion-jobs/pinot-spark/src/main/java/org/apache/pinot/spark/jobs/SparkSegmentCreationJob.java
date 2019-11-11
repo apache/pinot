@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
@@ -44,7 +43,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class SparkSegmentCreationJob extends SegmentCreationJob {
-  protected static final Logger LOGGER = LoggerFactory.getLogger(SparkSegmentCreationJob.class);
+  private static final Logger _logger = LoggerFactory.getLogger(SparkSegmentCreationJob.class);
 
   public SparkSegmentCreationJob(Properties properties) {
     super(properties);
@@ -60,7 +59,7 @@ public class SparkSegmentCreationJob extends SegmentCreationJob {
 
   public void run()
       throws Exception {
-    LOGGER.info("Starting {}", getClass().getSimpleName());
+    _logger.info("Starting {}", getClass().getSimpleName());
 
     Path inputPattern = new Path(_inputPattern);
     Path outputDir = new Path(_stagingDir);
@@ -78,10 +77,10 @@ public class SparkSegmentCreationJob extends SegmentCreationJob {
     int numDataFiles = dataFilePaths.size();
     if (numDataFiles == 0) {
       String errorMessage = "No data file founded with pattern: " + inputPattern;
-      LOGGER.error(errorMessage);
+      _logger.error(errorMessage);
       throw new RuntimeException(errorMessage);
     } else {
-      LOGGER.info("Creating segments with data files: {}", dataFilePaths);
+      _logger.info("Creating segments with data files: {}", dataFilePaths);
       for (int i = 0; i < numDataFiles; i++) {
         Path dataFilePath = dataFilePaths.get(i);
         try (DataOutputStream dataOutputStream = outputDirFileSystem
@@ -119,7 +118,7 @@ public class SparkSegmentCreationJob extends SegmentCreationJob {
     moveSegmentsToOutputDir(outputDirFileSystem, _stagingDir, _outputDir);
 
     // Delete the staging directory
-    LOGGER.info("Deleting the staging directory: {}", stagingDir);
+    _logger.info("Deleting the staging directory: {}", stagingDir);
     outputDirFileSystem.delete(stagingDir, true);
   }
 
@@ -144,13 +143,9 @@ public class SparkSegmentCreationJob extends SegmentCreationJob {
   }
 
   protected void moveSegmentsToOutputDir(FileSystem outputDirFileSystem, String stagingDir, String outputDir)
-      throws IOException {
+          throws IOException {
     Path segmentTarDir = new Path(new Path(stagingDir, "output"), JobConfigConstants.SEGMENT_TAR_DIR);
-    for (FileStatus segmentTarStatus : outputDirFileSystem.listStatus(segmentTarDir)) {
-      Path segmentTarPath = segmentTarStatus.getPath();
-      Path dest = new Path(outputDir, segmentTarPath.getName());
-      LOGGER.info("Moving segment tar file from: {} to: {}", segmentTarPath, dest);
-      outputDirFileSystem.rename(segmentTarPath, dest);
-    }
+    _logger.info("Moving all segment tar files from: {} to: {}", stagingDir, outputDir);
+    movePath(outputDirFileSystem, segmentTarDir.toString(), outputDir, true);
   }
 }

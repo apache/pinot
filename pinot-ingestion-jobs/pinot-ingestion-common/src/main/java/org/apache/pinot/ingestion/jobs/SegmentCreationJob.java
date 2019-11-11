@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.pinot.common.data.Schema;
@@ -50,7 +51,6 @@ public abstract class SegmentCreationJob extends BaseSegmentJob {
 
   public SegmentCreationJob(Properties properties) {
     super(properties);
-    getConf().set("mapreduce.job.user.classpath.first", "true");
 
     _inputPattern = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.PATH_TO_INPUT));
     _outputDir = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.PATH_TO_OUTPUT));
@@ -126,6 +126,33 @@ public abstract class SegmentCreationJob extends BaseSegmentJob {
             .open(new Path(_schemaFile))) {
           return Schema.fromInputSteam(inputStream);
         }
+      }
+    }
+  }
+
+
+  protected void movePath(FileSystem fileSystem, String source, String destination, boolean override)
+          throws IOException {
+    for (FileStatus sourceFileStatus : fileSystem.listStatus(new Path(source))) {
+      Path srcPath = sourceFileStatus.getPath();
+      Path destPath = new Path(destination, srcPath.getName());
+      if (fileSystem.isFile(srcPath)) {
+        if (fileSystem.exists(destPath)) {
+          if (override) {
+            _logger.warn("The destination path {} already exists, trying to override it.", destPath);
+            fileSystem.delete(destPath, false);
+          } else {
+            _logger.warn("The destination path {} already exists, skip it.", destPath);
+            continue;
+          }
+        }
+        _logger.info("Moving file from: {} to: {}", srcPath, destPath);
+        if (fileSystem.exists(destPath.getParent())) {
+          fileSystem.mkdirs(destPath.getParent());
+        }
+        fileSystem.rename(srcPath, destPath);
+      } else {
+        movePath(fileSystem,srcPath.toString(), destPath.toString(), override);
       }
     }
   }

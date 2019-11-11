@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
@@ -54,6 +53,7 @@ public class HadoopSegmentCreationJob extends SegmentCreationJob {
 
   public HadoopSegmentCreationJob(Properties properties) {
     super(properties);
+    getConf().set("mapreduce.job.user.classpath.first", "true");
   }
 
   public void run()
@@ -174,11 +174,6 @@ public class HadoopSegmentCreationJob extends SegmentCreationJob {
   protected void moveSegmentsToOutputDir()
       throws IOException {
     Path segmentTarDir = new Path(new Path(_stagingDir, "output"), JobConfigConstants.SEGMENT_TAR_DIR);
-    for (FileStatus segmentTarStatus : _outputDirFileSystem.listStatus(segmentTarDir)) {
-      Path segmentTarPath = segmentTarStatus.getPath();
-      Path dest = new Path(_outputDir, segmentTarPath.getName());
-      _logger.info("Moving segment tar file from: {} to: {}", segmentTarPath, dest);
-      _outputDirFileSystem.rename(segmentTarPath, dest);
-    }
+    movePath(_outputDirFileSystem, segmentTarDir.toString(), _outputDir, true);
   }
 }
