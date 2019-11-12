@@ -54,8 +54,6 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.BytesUtils;
-import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
-import org.apache.pinot.common.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
@@ -70,7 +68,7 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmin
 import org.apache.pinot.core.query.selection.SelectionOperatorService;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.core.util.QueryOptionsUtils;
+import org.apache.pinot.core.util.QueryOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -220,11 +218,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     }
 
     // Parse the option from request whether to preserve the type
-    Map<String, String> queryOptions = brokerRequest.getQueryOptions();
-    boolean preserveType = QueryOptionsUtils.isPreserveType(queryOptions);
-    boolean groupByModeSql = QueryOptionsUtils.isGroupByMode(Request.SQL, queryOptions);
-    boolean responseFormatSql = QueryOptionsUtils.isResponseFormat(Request.SQL, queryOptions);
-
+    QueryOptions queryOptions = new QueryOptions(brokerRequest.getQueryOptions());
     Selection selection = brokerRequest.getSelections();
     if (dataTableMap.isEmpty()) {
       // For empty data table map, construct empty result using the cached data schema for selection query if exists
@@ -233,7 +227,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           List<String> selectionColumns = SelectionOperatorUtils
               .getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), cachedDataSchema);
           brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, new ArrayList<>(0)));
-        } else if (brokerRequest.isSetGroupBy() && groupByModeSql && responseFormatSql) {
+        } else if (brokerRequest.isSetGroupBy() && queryOptions.isGroupByModeSQL() && queryOptions
+            .isResponseFormatSQL()) {
           setSQLGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
               brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap);
         }
@@ -261,7 +256,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           }
         }
 
-        setSelectionResults(brokerResponseNative, selection, dataTableMap, cachedDataSchema, preserveType);
+        setSelectionResults(brokerResponseNative, selection, dataTableMap, cachedDataSchema,
+            queryOptions.isPreserveType());
       } else {
         // Aggregation query
 
@@ -269,24 +265,24 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         if (!brokerRequest.isSetGroupBy()) {
           // Aggregation only query.
           setAggregationResults(brokerResponseNative, aggregationFunctions, dataTableMap, cachedDataSchema,
-              preserveType);
+              queryOptions.isPreserveType());
         } else {
           // Aggregation group-by query.
           // read results as records if  GROUP_BY_MODE is explicitly set to SQL
 
-          if (groupByModeSql) {
+          if (queryOptions.isGroupByModeSQL()) {
             // sql + order by
 
             int resultSize = 0;
 
             // if RESPONSE_FORMAT is SQL, return results in {@link ResultTable}
-            if (responseFormatSql) {
+            if (queryOptions.isResponseFormatSQL()) {
               setSQLGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
                   brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap);
               resultSize = brokerResponseNative.getResultTable().getRows().size();
             } else {
               setPQLGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
-                  brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap, preserveType);
+                  brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap, queryOptions.isPreserveType());
               if (!brokerResponseNative.getAggregationResults().isEmpty()) {
                 resultSize = brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size();
               }
@@ -300,7 +296,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
                 AggregationFunctionUtils.getAggregationFunctionsSelectStatus(brokerRequest.getAggregationsInfo());
             setGroupByHavingResults(brokerResponseNative, aggregationFunctions, aggregationFunctionSelectStatus,
                 brokerRequest.getGroupBy(), dataTableMap, brokerRequest.getHavingFilterQuery(),
-                brokerRequest.getHavingFilterSubQueryMap(), preserveType);
+                brokerRequest.getHavingFilterSubQueryMap(), queryOptions.isPreserveType());
             if (brokerMetrics != null && (!brokerResponseNative.getAggregationResults().isEmpty())) {
               // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the same.
               // Thus, we can just emit the one from the 1st result.

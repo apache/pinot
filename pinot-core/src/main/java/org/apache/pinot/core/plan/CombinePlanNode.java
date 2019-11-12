@@ -21,19 +21,17 @@ package org.apache.pinot.core.plan;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.CombineGroupByOperator;
 import org.apache.pinot.core.operator.CombineGroupByOrderByOperator;
 import org.apache.pinot.core.operator.CombineOperator;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
-import org.apache.pinot.core.util.QueryOptionsUtils;
+import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.core.util.trace.TraceCallable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -164,9 +162,9 @@ public class CombinePlanNode implements PlanNode {
     // TODO: use the same combine operator for both aggregation and selection query.
     if (_brokerRequest.isSetAggregationsInfo() && _brokerRequest.getGroupBy() != null) {
       // Aggregation group-by query
-      Map<String, String> queryOptions = _brokerRequest.getQueryOptions();
+      QueryOptions queryOptions = new QueryOptions(_brokerRequest.getQueryOptions());
       // new Combine operator only when GROUP_BY_MODE explicitly set to SQL
-      if (QueryOptionsUtils.isGroupByMode(Request.SQL, queryOptions)) {
+      if (queryOptions.isGroupByModeSQL()) {
         return new CombineGroupByOrderByOperator(operators, _brokerRequest, _executorService, _timeOutMs);
       }
       return new CombineGroupByOperator(operators, _brokerRequest, _executorService, _timeOutMs, _numGroupsLimit);
