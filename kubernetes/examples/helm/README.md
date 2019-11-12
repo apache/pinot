@@ -395,3 +395,93 @@ You can run below command to navigate superset in your browser with the previous
 ```
 
 You can open the imported dashboard by click `Dashboards` banner then click on `AirlineStats`.
+
+## Access Pinot Using Presto
+
+### Deploy Presto with Pinot Plugin
+
+You can run below command to deploy a customized Presto with Pinot plugin.
+
+```bash
+kubectl apply -f presto-coordinator.yaml
+```
+
+### Query Presto using Presto CLI
+
+Once Presto is deployed, you could run below command.
+
+```bash
+./pinot-presto-cli.sh
+```
+
+### Sample queries to execute
+
+- List all catalogs
+
+```
+presto:default> show catalogs;
+```
+```
+ Catalog
+---------
+ pinot
+ system
+(2 rows)
+
+Query 20191112_050827_00003_xkm4g, FINISHED, 1 node
+Splits: 19 total, 19 done (100.00%)
+0:01 [0 rows, 0B] [0 rows/s, 0B/s]
+
+```
+
+- List All tables
+
+```
+presto:default> show tables;
+```
+```
+    Table
+--------------
+ airlinestats
+(1 row)
+
+Query 20191112_050907_00004_xkm4g, FINISHED, 1 node
+Splits: 19 total, 19 done (100.00%)
+0:01 [1 rows, 29B] [1 rows/s, 41B/s]
+```
+
+- Show schema
+
+```
+presto:default> DESCRIBE pinot.dontcare.airlinestats;
+```
+```
+        Column        |  Type   | Extra | Comment
+----------------------+---------+-------+---------
+ flightnum            | integer |       |
+ origin               | varchar |       |
+ quarter              | integer |       |
+ lateaircraftdelay    | integer |       |
+ divactualelapsedtime | integer |       |
+......
+
+Query 20191112_051021_00005_xkm4g, FINISHED, 1 node
+Splits: 19 total, 19 done (100.00%)
+0:02 [80 rows, 6.06KB] [35 rows/s, 2.66KB/s]
+```
+
+- Count total documents
+
+```
+presto:default> select count(*) as cnt from pinot.dontcare.airlinestats limit 10;
+```
+```
+ cnt
+------
+ 9745
+(1 row)
+
+Query 20191112_051114_00006_xkm4g, FINISHED, 1 node
+Splits: 17 total, 17 done (100.00%)
+0:00 [1 rows, 8B] [2 rows/s, 19B/s]
+```
