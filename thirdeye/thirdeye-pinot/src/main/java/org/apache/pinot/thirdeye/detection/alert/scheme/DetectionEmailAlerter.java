@@ -203,8 +203,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
         if (emailClientConfigs.get(PROP_RECIPIENTS) != null) {
           Map<String, Object> emailRecipients = ConfigUtils.getMap(emailClientConfigs.get(PROP_RECIPIENTS));
           if (emailRecipients.get(PROP_TO) == null || ConfigUtils.getList(emailRecipients.get(PROP_TO)).isEmpty()) {
-            LOG.warn("Skipping! No email recipients found for alert {}.", this.subsConfig.getId());
-            return;
+            throw new IllegalArgumentException("No email recipients found for alert " + this.subsConfig.getId());
           }
 
           DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
@@ -214,8 +213,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
           sendEmail(prepareEmailContent(emailClientConfigs, anomalyResultListOfGroup, recipients));
         }
       } catch (IllegalArgumentException e) {
-        LOG.warn("Skipping! Found illegal arguments while sending {} anomalies for alert {}."
-            + " Exception message: ", result.getValue().size(), this.subsConfig.getId(), e);
+        super.handleAlertFailure(result.getValue().size(), e);
       }
     }
   }

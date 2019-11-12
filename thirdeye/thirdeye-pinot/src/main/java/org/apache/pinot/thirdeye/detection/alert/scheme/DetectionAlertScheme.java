@@ -80,4 +80,17 @@ public abstract class DetectionAlertScheme {
     LOG.info("Using " + content.getClass().getSimpleName() + " to render the template.");
     return content;
   }
+
+  /**
+   * Fail the alert task if unable to notify owner. However, in case of dimensions recipient alerter,
+   * do not fail the alert if a subset of recipients are invalid.
+   */
+  void handleAlertFailure(int size, IllegalArgumentException e) {
+    if (this.result.getResult().size() == 1) {
+      throw e;
+    } else {
+      LOG.warn("Skipping! Found illegal arguments while sending {} anomalies for alert {}." + " Exception message: ",
+          size, this.subsConfig.getId(), e);
+    }
+  }
 }

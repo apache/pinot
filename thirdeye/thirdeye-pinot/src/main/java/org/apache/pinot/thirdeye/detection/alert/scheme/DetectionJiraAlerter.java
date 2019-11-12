@@ -162,8 +162,7 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
           LOG.info("Jira updated {}, anomalies reported = {}", latestJiraIssue.get().getKey(), result.getValue().size());
         }
       } catch (IllegalArgumentException e) {
-        LOG.warn("Skipping! Found illegal arguments while sending {} anomalies for alert {}."
-            + " Exception message: ", result.getValue().size(), this.subsConfig.getId(), e);
+        super.handleAlertFailure(result.getValue().size(), e);
       }
     }
   }
