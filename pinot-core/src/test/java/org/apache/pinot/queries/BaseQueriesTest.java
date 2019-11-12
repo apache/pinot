@@ -26,6 +26,7 @@ import java.util.concurrent.Executors;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
@@ -102,7 +103,8 @@ public abstract class BaseQueriesTest {
     brokerRequest.setQueryOptions(queryOptions);
 
     // Server side.
-    Plan plan = planMaker.makeInterSegmentPlan(getSegmentDataManagers(), brokerRequest, EXECUTOR_SERVICE, 10_000);
+    Plan plan = planMaker.makeInterSegmentPlan(getSegmentDataManagers(), brokerRequest, EXECUTOR_SERVICE,
+        CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     DataTable instanceResponse = plan.execute();
 
     // Broker side.
