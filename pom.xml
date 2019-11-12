@@ -1359,6 +1359,7 @@
             <exclude>**/*.csv</exclude>
             <exclude>**/*.avro</exclude>
             <exclude>**/*.conf</exclude>
+            <exclude>**/*.config</exclude>
             <exclude>**/*.yml</exclude>
             <exclude>**/*.yaml</exclude>
             <exclude>**/*.properties</exclude>
