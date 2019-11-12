@@ -31,6 +31,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.common.utils.DataSchema;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -124,6 +125,11 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     brokerResponse = getBrokerResponseForQuery(query, queryOptions);
     Assert.assertNull(brokerResponse.getAggregationResults());
     Assert.assertNotNull(brokerResponse.getResultTable());
+    DataSchema dataSchema = brokerResponse.getResultTable().getDataSchema();
+    Assert.assertEquals(dataSchema.size(), 3);
+    Assert.assertEquals(dataSchema.getColumnNames(), new String[]{"column11", "sum(column1)", "min(column6)"});
+    Assert.assertEquals(dataSchema.getColumnDataTypes(), new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING,
+        DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
   }
 
   /**
