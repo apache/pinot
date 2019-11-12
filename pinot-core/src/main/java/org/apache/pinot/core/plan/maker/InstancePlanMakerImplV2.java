@@ -22,13 +22,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
@@ -45,7 +43,7 @@ import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.config.QueryExecutorConfig;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
-import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.core.util.QueryOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,9 +98,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public PlanNode makeInnerSegmentPlan(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     if (brokerRequest.isSetAggregationsInfo()) {
       if (brokerRequest.isSetGroupBy()) {
-        Map<String, String> queryOptions = brokerRequest.getQueryOptions();
+        QueryOptions queryOptions = new QueryOptions(brokerRequest.getQueryOptions());
         // new Combine operator only when GROUP_BY_MODE explicitly set to SQL
-        if (GroupByUtils.isGroupByMode(Request.SQL, queryOptions)) {
+        if (queryOptions.isGroupByModeSQL()) {
           return new AggregationGroupByOrderByPlanNode(indexSegment, brokerRequest, _maxInitialResultHolderCapacity,
               _numGroupsLimit);
         }
