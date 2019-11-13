@@ -92,6 +92,12 @@ public class JiraContentFormatter extends AlertContentFormatter {
     Preconditions.checkNotNull(jiraAdminConfig.getJiraHost());
   }
 
+  /**
+   * Format and construct a {@link JiraEntity} by rendering the anomalies and properties
+   *
+   * @param dimensionFilters dimensions configured in the multi-dimensions alerter
+   * @param anomalies anomalies to be reported to recipients configured in (@link #jiraClientConfig}
+   */
   public JiraEntity getJiraEntity(Multimap<String, String> dimensionFilters, Collection<AnomalyResult> anomalies) {
     Map<String, Object> templateData = notificationContent.format(anomalies, this.subsConfig);
     templateData.put("dashboardHost", teConfig.getDashboardHost());
@@ -158,7 +164,7 @@ public class JiraContentFormatter extends AlertContentFormatter {
   }
 
   /**
-   * Apply the parameter map to given email template, and format it as EmailEntity
+   * Apply the parameter map to given jira template, and format it as JiraEntity
    */
   private JiraEntity buildJiraEntity(String jiraTemplate, Map<String, Object> templateValues,
       Multimap<String, String> dimensionFilters) {
