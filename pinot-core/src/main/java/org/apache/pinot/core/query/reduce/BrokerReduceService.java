@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -38,7 +40,6 @@ import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
-import org.apache.pinot.common.query.ReduceService;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.GroupBy;
@@ -46,7 +47,6 @@ import org.apache.pinot.common.request.HavingFilterQuery;
 import org.apache.pinot.common.request.HavingFilterQueryMap;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
-import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
@@ -67,6 +67,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import org.apache.pinot.core.query.selection.SelectionOperatorService;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptions;
 import org.slf4j.Logger;
@@ -78,12 +79,11 @@ import org.slf4j.LoggerFactory;
  * to {@link BrokerResponseNative}.
  */
 @ThreadSafe
-public class BrokerReduceService implements ReduceService<BrokerResponseNative> {
+public class BrokerReduceService {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerReduceService.class);
 
-  @Override
   public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest,
-      Map<ServerInstance, DataTable> dataTableMap, @Nullable BrokerMetrics brokerMetrics) {
+      Map<ServerRoutingInstance, DataTable> dataTableMap, @Nullable BrokerMetrics brokerMetrics) {
     if (dataTableMap.size() == 0) {
       // Empty response.
       return BrokerResponseNative.empty();
@@ -106,17 +106,16 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     DataSchema cachedDataSchema = null;
 
     // Process server response metadata.
-    Iterator<Map.Entry<ServerInstance, DataTable>> iterator = dataTableMap.entrySet().iterator();
+    Iterator<Map.Entry<ServerRoutingInstance, DataTable>> iterator = dataTableMap.entrySet().iterator();
     while (iterator.hasNext()) {
-      Map.Entry<ServerInstance, DataTable> entry = iterator.next();
-      ServerInstance serverInstance = entry.getKey();
+      Map.Entry<ServerRoutingInstance, DataTable> entry = iterator.next();
       DataTable dataTable = entry.getValue();
       Map<String, String> metadata = dataTable.getMetadata();
 
       // Reduce on trace info.
       if (brokerRequest.isEnableTrace()) {
         brokerResponseNative.getTraceInfo()
-            .put(serverInstance.getHostname(), metadata.get(DataTable.TRACE_INFO_METADATA_KEY));
+            .put(entry.getKey().getHostname(), metadata.get(DataTable.TRACE_INFO_METADATA_KEY));
       }
 
       // Reduce on exceptions.
@@ -168,7 +167,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       if (numTotalRawDocsString != null) {
         numTotalRawDocs += Long.parseLong(numTotalRawDocsString);
       }
-      numGroupsLimitReached |= Boolean.valueOf(metadata.get(DataTable.NUM_GROUPS_LIMIT_REACHED_KEY));
+      numGroupsLimitReached |= Boolean.parseBoolean(metadata.get(DataTable.NUM_GROUPS_LIMIT_REACHED_KEY));
 
       // After processing the metadata, remove data tables without data rows inside.
       DataSchema dataSchema = dataTable.getDataSchema();
@@ -230,7 +229,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         } else if (brokerRequest.isSetGroupBy() && queryOptions.isGroupByModeSQL() && queryOptions
             .isResponseFormatSQL()) {
           setSQLGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
-              brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap);
+              brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), Collections.emptyList());
         }
       }
     } else {
@@ -242,12 +241,12 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
         // For data table map with more than one data tables, remove conflicting data tables
         if (dataTableMap.size() > 1) {
-          List<String> droppedServers = removeConflictingResponses(cachedDataSchema, dataTableMap);
+          List<ServerRoutingInstance> droppedServers = removeConflictingResponses(cachedDataSchema, dataTableMap);
           if (!droppedServers.isEmpty()) {
             String errorMessage =
                 QueryException.MERGE_RESPONSE_ERROR.getMessage() + ": responses for table: " + tableName
                     + " from servers: " + droppedServers + " got dropped due to data schema inconsistency.";
-            LOGGER.info(errorMessage);
+            LOGGER.warn(errorMessage);
             if (brokerMetrics != null) {
               brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1L);
             }
@@ -256,7 +255,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           }
         }
 
-        setSelectionResults(brokerResponseNative, selection, dataTableMap, cachedDataSchema,
+        setSelectionResults(brokerResponseNative, selection, dataTableMap.values(), cachedDataSchema,
             queryOptions.isPreserveType());
       } else {
         // Aggregation query
@@ -264,7 +263,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(brokerRequest);
         if (!brokerRequest.isSetGroupBy()) {
           // Aggregation only query.
-          setAggregationResults(brokerResponseNative, aggregationFunctions, dataTableMap, cachedDataSchema,
+          setAggregationResults(brokerResponseNative, aggregationFunctions, dataTableMap.values(), cachedDataSchema,
               queryOptions.isPreserveType());
         } else {
           // Aggregation group-by query.
@@ -278,11 +277,12 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
             // if RESPONSE_FORMAT is SQL, return results in {@link ResultTable}
             if (queryOptions.isResponseFormatSQL()) {
               setSQLGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
-                  brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap);
+                  brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap.values());
               resultSize = brokerResponseNative.getResultTable().getRows().size();
             } else {
               setPQLGroupByOrderByResults(brokerResponseNative, cachedDataSchema, brokerRequest.getAggregationsInfo(),
-                  brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap, queryOptions.isPreserveType());
+                  brokerRequest.getGroupBy(), brokerRequest.getOrderBy(), dataTableMap.values(),
+                  queryOptions.isPreserveType());
               if (!brokerResponseNative.getAggregationResults().isEmpty()) {
                 resultSize = brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size();
               }
@@ -295,7 +295,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
             boolean[] aggregationFunctionSelectStatus =
                 AggregationFunctionUtils.getAggregationFunctionsSelectStatus(brokerRequest.getAggregationsInfo());
             setGroupByHavingResults(brokerResponseNative, aggregationFunctions, aggregationFunctionSelectStatus,
-                brokerRequest.getGroupBy(), dataTableMap, brokerRequest.getHavingFilterQuery(),
+                brokerRequest.getGroupBy(), dataTableMap.values(), brokerRequest.getHavingFilterQuery(),
                 brokerRequest.getHavingFilterSubQueryMap(), queryOptions.isPreserveType());
             if (brokerMetrics != null && (!brokerResponseNative.getAggregationResults().isEmpty())) {
               // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the same.
@@ -318,15 +318,16 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
    * @param dataTableMap map from server to data table.
    * @return list of server names where the data table got removed.
    */
-  private List<String> removeConflictingResponses(DataSchema dataSchema, Map<ServerInstance, DataTable> dataTableMap) {
-    List<String> droppedServers = new ArrayList<>();
-    Iterator<Map.Entry<ServerInstance, DataTable>> iterator = dataTableMap.entrySet().iterator();
+  private List<ServerRoutingInstance> removeConflictingResponses(DataSchema dataSchema,
+      Map<ServerRoutingInstance, DataTable> dataTableMap) {
+    List<ServerRoutingInstance> droppedServers = new ArrayList<>();
+    Iterator<Map.Entry<ServerRoutingInstance, DataTable>> iterator = dataTableMap.entrySet().iterator();
     while (iterator.hasNext()) {
-      Map.Entry<ServerInstance, DataTable> entry = iterator.next();
+      Map.Entry<ServerRoutingInstance, DataTable> entry = iterator.next();
       DataSchema dataSchemaToCompare = entry.getValue().getDataSchema();
       assert dataSchemaToCompare != null;
       if (!dataSchema.isTypeCompatibleWith(dataSchemaToCompare)) {
-        droppedServers.add(entry.getKey().toString());
+        droppedServers.add(entry.getKey());
         iterator.remove();
       } else {
         dataSchema.upgradeToCover(dataSchemaToCompare);
@@ -340,23 +341,23 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
    *
    * @param brokerResponseNative broker response.
    * @param selection selection information.
-   * @param dataTableMap map from server to data table.
+   * @param dataTables Collection of data tables
    * @param dataSchema data schema.
    */
   private void setSelectionResults(BrokerResponseNative brokerResponseNative, Selection selection,
-      Map<ServerInstance, DataTable> dataTableMap, DataSchema dataSchema, boolean preserveType) {
+      Collection<DataTable> dataTables, DataSchema dataSchema, boolean preserveType) {
     int selectionSize = selection.getSize();
     if (selectionSize > 0 && selection.isSetSelectionSortSequence()) {
       // Selection order-by
       SelectionOperatorService selectionService = new SelectionOperatorService(selection, dataSchema);
-      selectionService.reduceWithOrdering(dataTableMap);
+      selectionService.reduceWithOrdering(dataTables);
       brokerResponseNative.setSelectionResults(selectionService.renderSelectionResultsWithOrdering(preserveType));
     } else {
       // Selection only
       List<String> selectionColumns =
           SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), dataSchema);
       brokerResponseNative.setSelectionResults(SelectionOperatorUtils.renderSelectionResultsWithoutOrdering(
-          SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap, selectionSize), dataSchema, selectionColumns,
+          SelectionOperatorUtils.reduceWithoutOrdering(dataTables, selectionSize), dataSchema, selectionColumns,
           preserveType));
     }
   }
@@ -370,18 +371,18 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
    *
    * @param brokerResponseNative broker response.
    * @param aggregationFunctions array of aggregation functions.
-   * @param dataTableMap map from server to data table.
+   * @param dataTables Collection of data tables
    * @param dataSchema data schema.
    */
   @SuppressWarnings("unchecked")
   private void setAggregationResults(BrokerResponseNative brokerResponseNative,
-      AggregationFunction[] aggregationFunctions, Map<ServerInstance, DataTable> dataTableMap, DataSchema dataSchema,
+      AggregationFunction[] aggregationFunctions, Collection<DataTable> dataTables, DataSchema dataSchema,
       boolean preserveType) {
     int numAggregationFunctions = aggregationFunctions.length;
 
     // Merge results from all data tables.
     Object[] intermediateResults = new Object[numAggregationFunctions];
-    for (DataTable dataTable : dataTableMap.values()) {
+    for (DataTable dataTable : dataTables) {
       for (int i = 0; i < numAggregationFunctions; i++) {
         Object intermediateResultToMerge;
         ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
@@ -460,12 +461,11 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
    * @param aggregationInfos aggregations info
    * @param groupBy group by info
    * @param orderBy order by info
-   * @param dataTableMap map from server to data table
+   * @param dataTables Collection of data tables
    */
   private void setSQLGroupByOrderByResults(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
       List<AggregationInfo> aggregationInfos, GroupBy groupBy, List<SelectionSort> orderBy,
-      Map<ServerInstance, DataTable> dataTableMap) {
-
+      Collection<DataTable> dataTables) {
     List<String> columnNames = new ArrayList<>(dataSchema.size());
     for (int i = 0; i < dataSchema.size(); i++) {
       columnNames.add(dataSchema.getColumnName(i));
@@ -474,7 +474,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     int numGroupBy = groupBy.getExpressionsSize();
     int numAggregations = aggregationInfos.size();
 
-    IndexedTable indexedTable = getIndexedTable(groupBy, aggregationInfos, orderBy, dataSchema, dataTableMap);
+    IndexedTable indexedTable = getIndexedTable(groupBy, aggregationInfos, orderBy, dataSchema, dataTables);
 
     AggregationFunction[] aggregationFunctions = new AggregationFunction[numAggregations];
     for (int i = 0; i < numAggregations; i++) {
@@ -505,13 +505,13 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
   }
 
   private IndexedTable getIndexedTable(GroupBy groupBy, List<AggregationInfo> aggregationInfos,
-      List<SelectionSort> orderBy, DataSchema dataSchema, Map<ServerInstance, DataTable> dataTableMap) {
+      List<SelectionSort> orderBy, DataSchema dataSchema, Collection<DataTable> dataTables) {
 
     int numColumns = dataSchema.size();
     int indexedTableCapacity = GroupByUtils.getTableCapacity(groupBy, orderBy);
     IndexedTable indexedTable = new ConcurrentIndexedTable(dataSchema, aggregationInfos, orderBy, indexedTableCapacity);
 
-    for (DataTable dataTable : dataTableMap.values()) {
+    for (DataTable dataTable : dataTables) {
       BiFunction[] functions = new BiFunction[numColumns];
       for (int i = 0; i < numColumns; i++) {
         ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
@@ -564,12 +564,11 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
    * @param aggregationInfos aggregations info
    * @param groupBy group by info
    * @param orderBy order by info
-   * @param dataTableMap map from server to data table
+   * @param dataTables Collection of data tables
    */
   private void setPQLGroupByOrderByResults(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
       List<AggregationInfo> aggregationInfos, GroupBy groupBy, List<SelectionSort> orderBy,
-      Map<ServerInstance, DataTable> dataTableMap, boolean preserveType) {
-
+      Collection<DataTable> dataTables, boolean preserveType) {
     int numGroupBy = groupBy.getExpressionsSize();
     int numAggregations = aggregationInfos.size();
     int numColumns = numGroupBy + numAggregations;
@@ -594,8 +593,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       aggIdx++;
     }
 
-    if (!dataTableMap.isEmpty()) {
-      IndexedTable indexedTable = getIndexedTable(groupBy, aggregationInfos, orderBy, dataSchema, dataTableMap);
+    if (!dataTables.isEmpty()) {
+      IndexedTable indexedTable = getIndexedTable(groupBy, aggregationInfos, orderBy, dataSchema, dataTables);
 
       Iterator<Record> sortedIterator = indexedTable.iterator();
       int numRows = 0;
@@ -652,21 +651,21 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
    * @param brokerResponseNative broker response.
    * @param aggregationFunctions array of aggregation functions.
    * @param groupBy group-by information.
-   * @param dataTableMap map from server to data table.
+   * @param dataTables Collection of data tables
    * @param havingFilterQuery having filter query
    * @param havingFilterQueryMap having filter query map
    */
   @SuppressWarnings("unchecked")
   private void setGroupByHavingResults(BrokerResponseNative brokerResponseNative,
       AggregationFunction[] aggregationFunctions, boolean[] aggregationFunctionsSelectStatus, GroupBy groupBy,
-      Map<ServerInstance, DataTable> dataTableMap, HavingFilterQuery havingFilterQuery,
-      HavingFilterQueryMap havingFilterQueryMap, boolean preserveType) {
+      Collection<DataTable> dataTables, HavingFilterQuery havingFilterQuery, HavingFilterQueryMap havingFilterQueryMap,
+      boolean preserveType) {
     int numAggregationFunctions = aggregationFunctions.length;
 
     // Merge results from all data tables.
     String[] columnNames = new String[numAggregationFunctions];
     Map<String, Object>[] intermediateResultMaps = new Map[numAggregationFunctions];
-    for (DataTable dataTable : dataTableMap.values()) {
+    for (DataTable dataTable : dataTables) {
       for (int i = 0; i < numAggregationFunctions; i++) {
         if (columnNames[i] == null) {
           columnNames[i] = dataTable.getString(i, 0);

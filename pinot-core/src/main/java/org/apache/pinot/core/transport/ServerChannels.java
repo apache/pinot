@@ -48,7 +48,7 @@ import org.apache.thrift.protocol.TCompactProtocol;
 public class ServerChannels {
   private final QueryRouter _queryRouter;
   private final BrokerMetrics _brokerMetrics;
-  private final ConcurrentHashMap<Server, ServerChannel> _serverToChannelMap = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<ServerRoutingInstance, ServerChannel> _serverToChannelMap = new ConcurrentHashMap<>();
   private final EventLoopGroup _eventLoopGroup = new NioEventLoopGroup();
 
   public ServerChannels(QueryRouter queryRouter, BrokerMetrics brokerMetrics) {
@@ -56,9 +56,9 @@ public class ServerChannels {
     _brokerMetrics = brokerMetrics;
   }
 
-  public void sendRequest(Server server, InstanceRequest instanceRequest)
+  public void sendRequest(ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest)
       throws Exception {
-    _serverToChannelMap.computeIfAbsent(server, ServerChannel::new).sendRequest(instanceRequest);
+    _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new).sendRequest(instanceRequest);
   }
 
   public void shutDown() {
@@ -69,14 +69,14 @@ public class ServerChannels {
   @ThreadSafe
   private class ServerChannel {
     final TSerializer _serializer = new TSerializer(new TCompactProtocol.Factory());
-    final Server _server;
+    final ServerRoutingInstance _serverRoutingInstance;
     final Bootstrap _bootstrap;
     Channel _channel;
 
-    ServerChannel(Server server) {
-      _server = server;
-      _bootstrap = new Bootstrap().remoteAddress(server.getHostName(), server.getPort()).group(_eventLoopGroup)
-          .channel(NioSocketChannel.class).option(ChannelOption.SO_KEEPALIVE, true)
+    ServerChannel(ServerRoutingInstance serverRoutingInstance) {
+      _serverRoutingInstance = serverRoutingInstance;
+      _bootstrap = new Bootstrap().remoteAddress(serverRoutingInstance.getHostname(), serverRoutingInstance.getPort())
+          .group(_eventLoopGroup).channel(NioSocketChannel.class).option(ChannelOption.SO_KEEPALIVE, true)
           .handler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {
@@ -85,7 +85,7 @@ public class ServerChannels {
                       new LengthFieldPrepender(Integer.BYTES),
                       // NOTE: data table de-serialization happens inside this handler
                       // Revisit if this becomes a bottleneck
-                      new DataTableHandler(_queryRouter, _server, _brokerMetrics));
+                      new DataTableHandler(_queryRouter, _serverRoutingInstance, _brokerMetrics));
             }
           });
     }

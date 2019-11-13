@@ -34,7 +34,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.DataSchema;
@@ -374,17 +373,12 @@ public class SelectionOperatorUtils {
   }
 
   /**
-   * Reduce a collection of {@link DataTable}s to selection rows for selection queries without <code>ORDER BY</code>.
+   * Reduces a collection of {@link DataTable}s to selection rows for selection queries without <code>ORDER BY</code>.
    * (Broker side)
-   *
-   * @param selectionResults {@link Map} from {@link ServerInstance} to {@link DataTable}.
-   * @param selectionSize size of the selection.
-   * @return reduced results.
    */
-  public static List<Serializable[]> reduceWithoutOrdering(Map<ServerInstance, DataTable> selectionResults,
-      int selectionSize) {
+  public static List<Serializable[]> reduceWithoutOrdering(Collection<DataTable> dataTables, int selectionSize) {
     List<Serializable[]> rows = new ArrayList<>(selectionSize);
-    for (DataTable dataTable : selectionResults.values()) {
+    for (DataTable dataTable : dataTables) {
       int numRows = dataTable.getNumberOfRows();
       for (int rowId = 0; rowId < numRows; rowId++) {
         if (rows.size() < selectionSize) {

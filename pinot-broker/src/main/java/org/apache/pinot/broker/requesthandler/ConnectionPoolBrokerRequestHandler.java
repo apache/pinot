@@ -50,8 +50,10 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
+import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.serde.SerDe;
 import org.apache.pinot.transport.common.CompositeFuture;
 import org.apache.pinot.transport.conf.TransportClientConf;
@@ -187,7 +189,7 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
 
     //Step 3: deserialize the server responses
     int numServersResponded = 0;
-    Map<ServerInstance, DataTable> dataTableMap = new HashMap<>();
+    Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
     // Add a long variable to sum the total response sizes from both realtime and offline servers.
     long totalServerResponseSize = 0;
     if (offlineServerResponseMap != null) {
@@ -299,18 +301,19 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
    * @return total server response size.
    */
   private long deserializeServerResponses(Map<ServerInstance, byte[]> responseMap, boolean isOfflineTable,
-      Map<ServerInstance, DataTable> dataTableMap, String tableNameWithType,
+      Map<ServerRoutingInstance, DataTable> dataTableMap, String tableNameWithType,
       List<ProcessingException> processingExceptions) {
     long totalResponseSize = 0L;
     for (Entry<ServerInstance, byte[]> entry : responseMap.entrySet()) {
       ServerInstance serverInstance = entry.getKey();
-      if (!isOfflineTable) {
-        serverInstance = serverInstance.withSeq(1);
-      }
+      TableType tableType = isOfflineTable ? TableType.OFFLINE : TableType.REALTIME;
+      ServerRoutingInstance serverRoutingInstance =
+          new ServerRoutingInstance(serverInstance.getHostname(), serverInstance.getPort(), tableType);
+
       byte[] responseInBytes = entry.getValue();
       totalResponseSize += responseInBytes.length;
       try {
-        dataTableMap.put(serverInstance, DataTableFactory.getDataTable(responseInBytes));
+        dataTableMap.put(serverRoutingInstance, DataTableFactory.getDataTable(responseInBytes));
       } catch (Exception e) {
         LOGGER.error("Caught exceptions while deserializing response for table: {} from server: {}", tableNameWithType,
             serverInstance, e);

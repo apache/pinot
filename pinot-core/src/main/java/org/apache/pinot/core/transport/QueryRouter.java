@@ -61,21 +61,21 @@ public class QueryRouter {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
     // Build map from server to request based on the routing table
-    Map<Server, InstanceRequest> requestMap = new HashMap<>();
+    Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
     if (offlineBrokerRequest != null) {
       assert offlineRoutingTable != null;
       for (Map.Entry<String, List<String>> entry : offlineRoutingTable.entrySet()) {
-        Server server = new Server(entry.getKey(), TableType.OFFLINE);
+        ServerRoutingInstance serverRoutingInstance = new ServerRoutingInstance(entry.getKey(), TableType.OFFLINE);
         InstanceRequest instanceRequest = getInstanceRequest(requestId, offlineBrokerRequest, entry.getValue());
-        requestMap.put(server, instanceRequest);
+        requestMap.put(serverRoutingInstance, instanceRequest);
       }
     }
     if (realtimeBrokerRequest != null) {
       assert realtimeRoutingTable != null;
       for (Map.Entry<String, List<String>> entry : realtimeRoutingTable.entrySet()) {
-        Server server = new Server(entry.getKey(), TableType.REALTIME);
+        ServerRoutingInstance serverRoutingInstance = new ServerRoutingInstance(entry.getKey(), TableType.REALTIME);
         InstanceRequest instanceRequest = getInstanceRequest(requestId, realtimeBrokerRequest, entry.getValue());
-        requestMap.put(server, instanceRequest);
+        requestMap.put(serverRoutingInstance, instanceRequest);
       }
     }
 
@@ -83,14 +83,14 @@ public class QueryRouter {
     AsyncQueryResponse asyncQueryResponse =
         new AsyncQueryResponse(this, requestId, requestMap.keySet(), System.currentTimeMillis(), timeoutMs);
     _asyncQueryResponseMap.put(requestId, asyncQueryResponse);
-    for (Map.Entry<Server, InstanceRequest> entry : requestMap.entrySet()) {
-      Server server = entry.getKey();
+    for (Map.Entry<ServerRoutingInstance, InstanceRequest> entry : requestMap.entrySet()) {
+      ServerRoutingInstance serverRoutingInstance = entry.getKey();
       try {
-        _serverChannels.sendRequest(server, entry.getValue());
-        asyncQueryResponse.markRequestSubmitted(server);
+        _serverChannels.sendRequest(serverRoutingInstance, entry.getValue());
+        asyncQueryResponse.markRequestSubmitted(serverRoutingInstance);
       } catch (Exception e) {
-        LOGGER.error("Caught exception while sending request {} to server: {}, marking query failed", requestId, server,
-            e);
+        LOGGER.error("Caught exception while sending request {} to server: {}, marking query failed", requestId,
+            serverRoutingInstance, e);
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_SEND_EXCEPTIONS, 1);
         asyncQueryResponse.markQueryFailed();
         break;
@@ -104,19 +104,20 @@ public class QueryRouter {
     _serverChannels.shutDown();
   }
 
-  void receiveDataTable(Server server, DataTable dataTable, long responseSize, long deserializationTimeMs) {
+  void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, long responseSize,
+      long deserializationTimeMs) {
     long requestId = Long.parseLong(dataTable.getMetadata().get(DataTable.REQUEST_ID_METADATA_KEY));
     AsyncQueryResponse asyncQueryResponse = _asyncQueryResponseMap.get(requestId);
 
     // Query future might be null if the query is already done (maybe due to failure)
     if (asyncQueryResponse != null) {
-      asyncQueryResponse.receiveDataTable(server, dataTable, responseSize, deserializationTimeMs);
+      asyncQueryResponse.receiveDataTable(serverRoutingInstance, dataTable, responseSize, deserializationTimeMs);
     }
   }
 
-  void markServerDown(Server server) {
+  void markServerDown(ServerRoutingInstance serverRoutingInstance) {
     for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
-      asyncQueryResponse.markServerDown(server);
+      asyncQueryResponse.markServerDown(serverRoutingInstance);
     }
   }
 
