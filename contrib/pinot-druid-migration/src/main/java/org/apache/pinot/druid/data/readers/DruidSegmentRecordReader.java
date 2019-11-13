@@ -49,6 +49,7 @@ import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.joda.time.chrono.ISOChronology;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -143,7 +144,7 @@ public class DruidSegmentRecordReader implements RecordReader {
         .collect(Collectors.toList());
   }
 
-  @Override
+  //@Override
   public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
 
   }
@@ -224,27 +225,26 @@ public class DruidSegmentRecordReader implements RecordReader {
         LOGGER.warn("Column {} is not in record", columnName);
       } else {
         if (capabilities.getType() == ValueType.COMPLEX) {
-          throw new IllegalArgumentException("Column " + columnName
-              + ": DruidSegmentRecordReader does not support complex metric columns.");
+          throw new IllegalArgumentException(
+              String.format("Column {}: DruidSegmentRecordReader does not support complex metric columns.", columnName));
         }
 
         FieldSpec fieldSpec = _pinotSchema.getFieldSpecFor(_columnNames.get(i));
         if (!fieldSpec.isSingleValueField() && fieldSpec.getDataType() != FieldSpec.DataType.STRING) {
-          throw new IllegalArgumentException("Column " + columnName
-              + ": DruidSegmentRecordReader does not support non-STRING multi-value dimensions.");
+          throw new IllegalArgumentException(
+              String.format("Column {}: DruidSegmentRecordReader does not support non-STRING multi-value dimensions.", columnName));
         }
         if (fieldSpec.isSingleValueField() && capabilities.hasMultipleValues()) {
-          throw new IllegalArgumentException("Column " + columnName
-              + " in Pinot schema is single-valued, but column {} in " + "record is multi-valued.");
+          throw new IllegalArgumentException(
+              String.format("Column {}: Column in Pinot schema is single-valued, but column in record is multi-valued.", columnName));
         }
         if (!fieldSpec.isSingleValueField() && !capabilities.hasMultipleValues()) {
-          throw new IllegalArgumentException("Column " + columnName
-              + " in Pinot schema is multi-valued, but column {} in" + "record is single-valued");
+          throw new IllegalArgumentException(String.format("Column {}: Column in Pinot schema is multi-valued, but column in record is single-valued.", columnName));
         }
         if (!compareTypes(_pinotSchema.getFieldSpecFor(columnName).getDataType(), capabilities.getType())) {
-          throw new IllegalArgumentException("Type for column " + columnName +
-              " in schema (" + _pinotSchema.getFieldSpecFor(columnName).getDataType() + ") does not match type for column "
-              + columnName + " in record (" + capabilities.getType() + ").");
+          throw new IllegalArgumentException(
+              String.format("Column {}: Type in schema ({}) does not match type in record {}.",
+                  columnName, _pinotSchema.getFieldSpecFor(columnName).getDataType(), capabilities.getType()));
         }
       }
     }
