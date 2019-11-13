@@ -31,11 +31,11 @@ import org.apache.pinot.ingestion.utils.PushLocation;
 
 
 public class SegmentUriPushJob extends BaseSegmentJob {
-  private final String _segmentUriPrefix;
-  private final String _segmentUriSuffix;
-  private final Path _segmentPattern;
-  private final List<PushLocation> _pushLocations;
-  private final String _rawTableName;
+  protected final String _segmentUriPrefix;
+  protected final String _segmentUriSuffix;
+  protected final Path _segmentPattern;
+  protected final List<PushLocation> _pushLocations;
+  protected final String _rawTableName;
 
   public SegmentUriPushJob(Properties properties) {
     super(properties);

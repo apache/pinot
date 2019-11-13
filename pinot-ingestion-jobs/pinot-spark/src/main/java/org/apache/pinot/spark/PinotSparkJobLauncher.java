@@ -22,9 +22,9 @@ import java.io.FileInputStream;
 import java.util.Arrays;
 import java.util.Properties;
 import org.apache.pinot.ingestion.common.PinotIngestionJobType;
-import org.apache.pinot.ingestion.jobs.SegmentTarPushJob;
-import org.apache.pinot.ingestion.jobs.SegmentUriPushJob;
 import org.apache.pinot.spark.jobs.SparkSegmentCreationJob;
+import org.apache.pinot.spark.jobs.SparkSegmentTarPushJob;
+import org.apache.pinot.spark.jobs.SparkSegmentUriPushJob;
 
 
 public class PinotSparkJobLauncher {
@@ -45,18 +45,18 @@ public class PinotSparkJobLauncher {
         new SparkSegmentCreationJob(jobConf).run();
         break;
       case SegmentTarPush:
-        new SegmentTarPushJob(jobConf).run();
+        new SparkSegmentTarPushJob(jobConf).run();
         break;
       case SegmentUriPush:
-        new SegmentUriPushJob(jobConf).run();
+        new SparkSegmentUriPushJob(jobConf).run();
         break;
       case SegmentCreationAndTarPush:
         new SparkSegmentCreationJob(jobConf).run();
-        new SegmentTarPushJob(jobConf).run();
+        new SparkSegmentTarPushJob(jobConf).run();
         break;
       case SegmentCreationAndUriPush:
         new SparkSegmentCreationJob(jobConf).run();
-        new SegmentUriPushJob(jobConf).run();
+        new SparkSegmentUriPushJob(jobConf).run();
         break;
       default:
         throw new RuntimeException("Not a valid jobType - " + jobType);

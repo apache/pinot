@@ -36,10 +36,10 @@ import org.apache.pinot.ingestion.utils.PushLocation;
 
 
 public class SegmentTarPushJob extends BaseSegmentJob {
-  private final Path _segmentPattern;
-  private final List<PushLocation> _pushLocations;
-  private final String _rawTableName;
-  private final boolean _deleteExtraSegments;
+  protected final Path _segmentPattern;
+  protected final List<PushLocation> _pushLocations;
+  protected final String _rawTableName;
+  protected final boolean _deleteExtraSegments;
 
   public SegmentTarPushJob(Properties properties) {
     super(properties);

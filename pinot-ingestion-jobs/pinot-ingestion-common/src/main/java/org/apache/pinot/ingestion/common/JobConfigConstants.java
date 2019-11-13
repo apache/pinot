@@ -62,4 +62,7 @@ public class JobConfigConstants {
 
   // This setting is used to match output segments hierarchy along with input file hierarchy.
   public static final String USE_RELATIVE_PATH = "use.relative.path";
+
+  // This setting enables segment push in parallel.
+  public static final String ENABLE_PARALLEL_PUSH = "enable.parallel.push";
 }
