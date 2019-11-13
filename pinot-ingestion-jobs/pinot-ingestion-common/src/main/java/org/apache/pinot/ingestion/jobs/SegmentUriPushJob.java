@@ -33,7 +33,7 @@ import org.apache.pinot.ingestion.utils.PushLocation;
 public class SegmentUriPushJob extends BaseSegmentJob {
   protected final String _segmentUriPrefix;
   protected final String _segmentUriSuffix;
-  protected final Path _segmentPattern;
+  protected final String _segmentPattern;
   protected final List<PushLocation> _pushLocations;
   protected final String _rawTableName;
 
@@ -41,11 +41,16 @@ public class SegmentUriPushJob extends BaseSegmentJob {
     super(properties);
     _segmentUriPrefix = properties.getProperty("uri.prefix", "");
     _segmentUriSuffix = properties.getProperty("uri.suffix", "");
-    _segmentPattern = Preconditions.checkNotNull(getPathFromProperty(JobConfigConstants.PATH_TO_OUTPUT));
-    String[] hosts = StringUtils.split(properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS), ',');
-    int port = Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_TO_PORT));
+    _segmentPattern = Preconditions.checkNotNull(properties.getProperty(JobConfigConstants.PATH_TO_OUTPUT),
+        String.format("Config: %s is missing in job property file.", JobConfigConstants.PATH_TO_OUTPUT));
+    String[] hosts = StringUtils.split(Preconditions
+        .checkNotNull(properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS),
+            String.format("Config: %s is missing in job property file.", JobConfigConstants.PUSH_TO_HOSTS)), ',');
+    int port = Integer.parseInt(Preconditions.checkNotNull(properties.getProperty(JobConfigConstants.PUSH_TO_PORT),
+        String.format("Config: %s is missing in job property file.", JobConfigConstants.PUSH_TO_PORT)));
     _pushLocations = PushLocation.getPushLocations(hosts, port);
-    _rawTableName = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME));
+    _rawTableName = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME),
+        String.format("Config: %s is missing in job property file.", JobConfigConstants.SEGMENT_TABLE_NAME));
   }
 
   @Override

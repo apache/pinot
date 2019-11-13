@@ -52,10 +52,13 @@ public abstract class SegmentCreationJob extends BaseSegmentJob {
   public SegmentCreationJob(Properties properties) {
     super(properties);
 
-    _inputPattern = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.PATH_TO_INPUT));
-    _outputDir = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.PATH_TO_OUTPUT));
+    _inputPattern = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.PATH_TO_INPUT),
+        String.format("Config: %s is missing in job property file.", JobConfigConstants.PATH_TO_INPUT));
+    _outputDir = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.PATH_TO_OUTPUT),
+        String.format("Config: %s is missing in job property file.", JobConfigConstants.PATH_TO_OUTPUT));
     _stagingDir = new Path(_outputDir, UUID.randomUUID().toString()).toString();
-    _rawTableName = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME));
+    _rawTableName = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME),
+        String.format("Config: %s is missing in job property file.", JobConfigConstants.SEGMENT_TABLE_NAME));
 
     // Optional
     _depsJarDir = _properties.getProperty(JobConfigConstants.PATH_TO_DEPS_JAR);
@@ -130,9 +133,8 @@ public abstract class SegmentCreationJob extends BaseSegmentJob {
     }
   }
 
-
   protected void movePath(FileSystem fileSystem, String source, String destination, boolean override)
-          throws IOException {
+      throws IOException {
     for (FileStatus sourceFileStatus : fileSystem.listStatus(new Path(source))) {
       Path srcPath = sourceFileStatus.getPath();
       Path destPath = new Path(destination, srcPath.getName());
@@ -152,7 +154,7 @@ public abstract class SegmentCreationJob extends BaseSegmentJob {
         }
         fileSystem.rename(srcPath, destPath);
       } else {
-        movePath(fileSystem,srcPath.toString(), destPath.toString(), override);
+        movePath(fileSystem, srcPath.toString(), destPath.toString(), override);
       }
     }
   }

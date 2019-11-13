@@ -36,16 +36,20 @@ import org.apache.pinot.ingestion.utils.PushLocation;
 
 
 public class SegmentTarPushJob extends BaseSegmentJob {
-  protected final Path _segmentPattern;
+  protected final String _segmentPattern;
   protected final List<PushLocation> _pushLocations;
   protected final String _rawTableName;
   protected final boolean _deleteExtraSegments;
 
   public SegmentTarPushJob(Properties properties) {
     super(properties);
-    _segmentPattern = Preconditions.checkNotNull(getPathFromProperty(JobConfigConstants.PATH_TO_OUTPUT));
-    String[] hosts = StringUtils.split(properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS), ',');
-    int port = Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_TO_PORT));
+    _segmentPattern = Preconditions.checkNotNull(properties.getProperty(JobConfigConstants.PATH_TO_OUTPUT),
+        String.format("Config: %s is missing in job property file.", JobConfigConstants.PATH_TO_OUTPUT));
+    String[] hosts = StringUtils.split(Preconditions
+        .checkNotNull(properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS),
+            String.format("Config: %s is missing in job property file.", JobConfigConstants.PUSH_TO_HOSTS)), ',');
+    int port = Integer.parseInt(Preconditions.checkNotNull(properties.getProperty(JobConfigConstants.PUSH_TO_PORT),
+        String.format("Config: %s is missing in job property file.", JobConfigConstants.PUSH_TO_PORT)));
     _pushLocations = PushLocation.getPushLocations(hosts, port);
     _rawTableName = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME));
     _deleteExtraSegments =
@@ -59,7 +63,7 @@ public class SegmentTarPushJob extends BaseSegmentJob {
 
   public void run()
       throws Exception {
-    FileSystem fileSystem = FileSystem.get(_segmentPattern.toUri(), getConf());
+    FileSystem fileSystem = FileSystem.get(new Path(_segmentPattern).toUri(), getConf());
     List<Path> segmentsToPush = getDataFilePaths(_segmentPattern);
     try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
       // TODO: Deal with invalid prefixes in the future

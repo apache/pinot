@@ -48,7 +48,7 @@ public class SparkSegmentTarPushJob extends SegmentTarPushJob {
     if (!_enableParallelPush) {
       super.run();
     } else {
-      FileSystem fileSystem = FileSystem.get(_segmentPattern.toUri(), getConf());
+      FileSystem fileSystem = FileSystem.get(new Path(_segmentPattern).toUri(), getConf());
       List<Path> segmentPathsToPush = getDataFilePaths(_segmentPattern);
       List<String> segmentsToPush = new ArrayList<>();
       segmentPathsToPush.forEach(path -> {
