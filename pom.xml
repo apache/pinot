@@ -120,7 +120,7 @@
     <parquet.version>1.8.0</parquet.version>
     <helix.version>0.8.4</helix.version>
     <zkclient.version>0.7</zkclient.version>
-    <jackson.version>2.9.8</jackson.version>
+    <jackson.version>2.10.1</jackson.version>
     <async-http-client.version>1.9.21</async-http-client.version>
     <jersey.version>2.28</jersey.version>
     <swagger.version>1.5.16</swagger.version>
