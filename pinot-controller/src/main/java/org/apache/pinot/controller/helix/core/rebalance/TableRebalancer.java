@@ -68,8 +68,9 @@ import org.slf4j.LoggerFactory;
 public class TableRebalancer {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableRebalancer.class);
 
+  // TODO: make them configurable
   private static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 second
-  private static final long EXTERNAL_VIEW_STABILIZATION_MAX_WAIT_MS = 20 * 60_000L; // 20 minutes
+  private static final long EXTERNAL_VIEW_STABILIZATION_MAX_WAIT_MS = 60 * 60_000L; // 1 hour
 
   private final HelixManager _helixManager;
   private final HelixDataAccessor _helixDataAccessor;
