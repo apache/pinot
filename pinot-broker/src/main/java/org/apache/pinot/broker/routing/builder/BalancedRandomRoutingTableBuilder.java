@@ -22,12 +22,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.core.transport.ServerInstance;
 
 
 /**
@@ -46,16 +46,14 @@ public class BalancedRandomRoutingTableBuilder extends BaseRoutingTableBuilder {
     _numRoutingTables = configuration.getInt(NUM_ROUTING_TABLES_KEY, DEFAULT_NUM_ROUTING_TABLES);
   }
 
-  protected List<Map<String, List<String>>> computeRoutingTablesFromSegmentToServersMap(
-      Map<String, List<String>> segmentToServersMap) {
-    List<Map<String, List<String>>> routingTables = new ArrayList<>(_numRoutingTables);
-    Set<String> segmentsToQuery = segmentToServersMap.keySet();
-
+  @Override
+  protected List<Map<ServerInstance, List<String>>> computeRoutingTablesFromSegmentToServersMap(
+      Map<String, List<ServerInstance>> segmentToServersMap) {
+    List<Map<ServerInstance, List<String>>> routingTables = new ArrayList<>(_numRoutingTables);
     for (int i = 0; i < _numRoutingTables; i++) {
-      Map<String, List<String>> routingTable = new HashMap<>();
-      for (String segmentName : segmentsToQuery) {
-        List<String> servers = segmentToServersMap.get(segmentName);
-        routingTable.get(getServerWithLeastSegmentsAssigned(servers, routingTable)).add(segmentName);
+      Map<ServerInstance, List<String>> routingTable = new HashMap<>();
+      for (Map.Entry<String, List<ServerInstance>> entry : segmentToServersMap.entrySet()) {
+        assignSegmentToLeastAssignedServer(entry.getKey(), entry.getValue(), routingTable);
       }
       routingTables.add(routingTable);
     }

@@ -32,6 +32,7 @@ import org.apache.pinot.broker.routing.selector.SegmentSelector;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.SegmentName;
+import org.apache.pinot.core.transport.ServerInstance;
 
 
 /**
@@ -73,7 +74,8 @@ public class DefaultRealtimeRoutingTableBuilder implements RoutingTableBuilder {
   }
 
   @Override
-  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request, SegmentSelector segmentSelector) {
+  public Map<ServerInstance, List<String>> getRoutingTable(RoutingTableLookupRequest request,
+      SegmentSelector segmentSelector) {
     boolean forceLLC = false;
     boolean forceHLC = false;
     for (String routingOption : request.getRoutingOptions()) {
@@ -105,7 +107,7 @@ public class DefaultRealtimeRoutingTableBuilder implements RoutingTableBuilder {
   }
 
   @Override
-  public List<Map<String, List<String>>> getRoutingTables() {
+  public List<Map<ServerInstance, List<String>>> getRoutingTables() {
     if (_hasLLC) {
       return _realtimeLLCRoutingTableBuilder.getRoutingTables();
     } else if (_hasHLC) {

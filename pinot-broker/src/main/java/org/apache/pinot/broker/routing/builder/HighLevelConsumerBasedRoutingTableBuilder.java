@@ -27,26 +27,37 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.HLCSegmentName;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.SegmentName;
+import org.apache.pinot.core.transport.ServerInstance;
 
 
 public class HighLevelConsumerBasedRoutingTableBuilder extends BaseRoutingTableBuilder {
 
   @Override
-  protected Map<String, List<String>> computeSegmentToServersMapFromExternalView(ExternalView externalView,
+  protected Map<String, List<ServerInstance>> computeSegmentToServersMapFromExternalView(ExternalView externalView,
       List<InstanceConfig> instanceConfigs) {
-    Map<String, List<String>> segmentToServersMap = new HashMap<>();
-    RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigs);
-    for (String segmentName : externalView.getPartitionSet()) {
-      List<String> servers = new ArrayList<>();
-      for (Map.Entry<String, String> entry : externalView.getStateMap(segmentName).entrySet()) {
-        String serverName = entry.getKey();
-        if (entry.getValue().equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)
-            && !instancePruner.isInactive(serverName) && SegmentName.isHighLevelConsumerSegmentName(segmentName)) {
-          servers.add(serverName);
+    Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
+    Map<String, List<ServerInstance>> segmentToServersMap =
+        new HashMap<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
+    InstanceConfigManager instanceConfigManager = new InstanceConfigManager(instanceConfigs);
+    for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
+      String segmentName = entry.getKey();
+      if (!SegmentName.isHighLevelConsumerSegmentName(segmentName)) {
+        continue;
+      }
+      Map<String, String> instanceStateMap = entry.getValue();
+      List<ServerInstance> servers = new ArrayList<>(instanceStateMap.size());
+      for (Map.Entry<String, String> instanceStateEntry : instanceStateMap.entrySet()) {
+        if (instanceStateEntry.getValue()
+            .equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)) {
+          InstanceConfig instanceConfig = instanceConfigManager.getActiveInstanceConfig(instanceStateEntry.getKey());
+          if (instanceConfig != null) {
+            servers.add(new ServerInstance(instanceConfig));
+          }
         }
       }
-      if (servers.size() != 0) {
+      if (!servers.isEmpty()) {
         segmentToServersMap.put(segmentName, servers);
       } else {
         handleNoServingHost(segmentName);
@@ -56,30 +67,28 @@ public class HighLevelConsumerBasedRoutingTableBuilder extends BaseRoutingTableB
   }
 
   @Override
-  protected List<Map<String, List<String>>> computeRoutingTablesFromSegmentToServersMap(
-      Map<String, List<String>> segmentsToServerMap) {
-    List<Map<String, List<String>>> routingTables = new ArrayList<>();
-    Map<String, Map<String, List<String>>> groupIdToRouting = new HashMap<>();
-    for (Map.Entry<String, List<String>> entry : segmentsToServerMap.entrySet()) {
+  protected List<Map<ServerInstance, List<String>>> computeRoutingTablesFromSegmentToServersMap(
+      Map<String, List<ServerInstance>> segmentsToServerMap) {
+    Map<String, Map<ServerInstance, List<String>>> groupIdToRouting = new HashMap<>();
+    for (Map.Entry<String, List<ServerInstance>> entry : segmentsToServerMap.entrySet()) {
       String segmentName = entry.getKey();
       HLCSegmentName hlcSegmentName = new HLCSegmentName(segmentName);
       String groupId = hlcSegmentName.getGroupId();
-      Map<String, List<String>> routingTableForGroupId =
+      Map<ServerInstance, List<String>> routingTableForGroupId =
           groupIdToRouting.computeIfAbsent(groupId, k -> new HashMap<>());
 
-      List<String> servers = entry.getValue();
-      for (String serverName : servers) {
-        List<String> segmentsForServer = routingTableForGroupId.computeIfAbsent(serverName, k -> new ArrayList<>());
+      List<ServerInstance> serverInstances = entry.getValue();
+      for (ServerInstance serverInstance : serverInstances) {
+        List<String> segmentsForServer = routingTableForGroupId.computeIfAbsent(serverInstance, k -> new ArrayList<>());
         segmentsForServer.add(segmentName);
       }
     }
-    routingTables.addAll(groupIdToRouting.values());
-    return routingTables;
+    return new ArrayList<>(groupIdToRouting.values());
   }
 
   @Override
-  public Map<String, List<String>> computeDynamicRoutingTable(Map<String, List<String>> segmentToServersMap,
-      Set<String> segmentsToQuery) {
+  public Map<ServerInstance, List<String>> computeDynamicRoutingTable(
+      Map<String, List<ServerInstance>> segmentToServersMap, Set<String> segmentsToQuery) {
     throw new UnsupportedOperationException(
         "Dynamic routing table computation for high level consumer base routing is not supported");
   }

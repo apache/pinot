@@ -22,7 +22,6 @@ import com.google.common.net.InternetDomainName;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 
 
@@ -34,7 +33,6 @@ import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
  */
 @ThreadSafe
 public class ServerRoutingInstance {
-  private static final String HOSTNAME_PORT_DELIMITER = "_";
   private static final String SHORT_OFFLINE_SUFFIX = "_O";
   private static final String SHORT_REALTIME_SUFFIX = "_R";
   private static final Map<String, String> SHORT_HOSTNAME_MAP = new ConcurrentHashMap<>();
@@ -42,16 +40,6 @@ public class ServerRoutingInstance {
   private final String _hostname;
   private final int _port;
   private final TableType _tableType;
-
-  /**
-   * NOTE: server instance name is of format: {@code Server_<hostname>_<port>}, e.g. {@code Server_localhost_12345}.
-   */
-  public ServerRoutingInstance(String instanceName, TableType tableType) {
-    String[] hostnameAndPort = instanceName.split(Helix.PREFIX_OF_SERVER_INSTANCE)[1].split(HOSTNAME_PORT_DELIMITER);
-    _hostname = hostnameAndPort[0];
-    _port = Integer.parseInt(hostnameAndPort[1]);
-    _tableType = tableType;
-  }
 
   public ServerRoutingInstance(String hostname, int port, TableType tableType) {
     _hostname = hostname;

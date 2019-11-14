@@ -36,6 +36,7 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableConfig.Builder;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -65,7 +66,8 @@ public class RandomRoutingTableTest {
     routing.markDataResourceOnline(generateTableConfig(tableName), externalView, instanceConfigs);
 
     for (int i = 0; i < NUM_ROUNDS; i++) {
-      Map<String, List<String>> routingTable = routing.getRoutingTable(new RoutingTableLookupRequest(tableName));
+      Map<ServerInstance, List<String>> routingTable =
+          routing.getRoutingTable(new RoutingTableLookupRequest(tableName));
       Assert.assertEquals(routingTable.size(), numServersInEV);
       int numSegments = 0;
       for (List<String> segmentsForServer : routingTable.values()) {

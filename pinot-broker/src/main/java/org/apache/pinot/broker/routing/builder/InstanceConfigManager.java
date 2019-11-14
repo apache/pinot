@@ -21,59 +21,61 @@ package org.apache.pinot.broker.routing.builder;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Helix;
+import org.apache.pinot.common.utils.HashUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Routing table instance pruner, which is used to remove inactive and disabled instances during routing table creation.
+ * The {@code InstanceConfigManager} class manages instance configs during routing table creation.
  */
-public class RoutingTableInstancePruner {
-  private static final Logger LOGGER = LoggerFactory.getLogger(RoutingTableInstancePruner.class);
+public class InstanceConfigManager {
+  private static final Logger LOGGER = LoggerFactory.getLogger(InstanceConfigManager.class);
 
-  private final Map<String, InstanceConfig> _instanceConfigMap = new HashMap<>();
+  private final Map<String, InstanceConfig> _instanceConfigMap;
 
-  public RoutingTableInstancePruner(List<InstanceConfig> instanceConfigs) {
+  public InstanceConfigManager(List<InstanceConfig> instanceConfigs) {
+    _instanceConfigMap = new HashMap<>(HashUtil.getHashMapCapacity(instanceConfigs.size()));
     for (InstanceConfig instanceConfig : instanceConfigs) {
       _instanceConfigMap.put(instanceConfig.getInstanceName(), instanceConfig);
     }
   }
 
   /**
-   * Returns True iff:
-   * - The given instance is disabled in Helix.
-   * - The instance is being shutdown.
-   * False otherwise
-   *
-   * @param instanceName Name of instance to check.
-   * @return True if instance is disabled in helix, or is being shutdown, False otherwise.
+   * Returns the instance config for the given instance if it is active, or {@code null} otherwise.
+   * <p>Instance is active iff:
+   * <ul>
+   *   <li>Instance exists in the instance config map</li>
+   *   <li>Instance is enabled in Helix</li>
+   *   <li>Instance does not have {@link Helix#IS_SHUTDOWN_IN_PROGRESS} or {@link Helix#QUERIES_DISABLED} set</li>
+   * </ul>
    */
-  public boolean isInactive(String instanceName) {
+  @Nullable
+  public InstanceConfig getActiveInstanceConfig(String instanceName) {
     InstanceConfig instanceConfig = _instanceConfigMap.get(instanceName);
     if (instanceConfig == null) {
-      LOGGER.error("Instance config for instance '{}' does not exist", instanceName);
-      return true;
+      LOGGER.warn("Instance config for instance '{}' does not exist", instanceName);
+      return null;
     }
 
     if (!instanceConfig.getInstanceEnabled()) {
       LOGGER.info("Instance '{}' is disabled", instanceName);
-      return true;
+      return null;
     }
 
-    if (Boolean
-        .parseBoolean(instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS))) {
+    if (Boolean.parseBoolean(instanceConfig.getRecord().getSimpleField(Helix.IS_SHUTDOWN_IN_PROGRESS))) {
       LOGGER.info("Instance '{}' is shutting down", instanceName);
-      return true;
+      return null;
     }
 
-    if (Boolean
-        .parseBoolean(instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.QUERIES_DISABLED))) {
+    if (Boolean.parseBoolean(instanceConfig.getRecord().getSimpleField(Helix.QUERIES_DISABLED))) {
       LOGGER.info("Instance '{}' has disabled queries", instanceName);
-      return true;
+      return null;
     }
 
-    return false;
+    return instanceConfig;
   }
 }

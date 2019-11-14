@@ -29,6 +29,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
 import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -50,13 +51,13 @@ public class BalancedRandomRoutingTableBuilderTest {
 
     // Build routing table
     routingTableBuilder.computeOnExternalViewChange("dummy", externalView, instanceConfigList);
-    List<Map<String, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
+    List<Map<ServerInstance, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
 
     // Check that at least two routing tables are different
-    Iterator<Map<String, List<String>>> routingTableIterator = routingTables.iterator();
-    Map<String, List<String>> previous = routingTableIterator.next();
+    Iterator<Map<ServerInstance, List<String>>> routingTableIterator = routingTables.iterator();
+    Map<ServerInstance, List<String>> previous = routingTableIterator.next();
     while (routingTableIterator.hasNext()) {
-      Map<String, List<String>> current = routingTableIterator.next();
+      Map<ServerInstance, List<String>> current = routingTableIterator.next();
       if (!current.equals(previous)) {
         return;
       }
@@ -83,7 +84,7 @@ public class BalancedRandomRoutingTableBuilderTest {
     // Build routing table
     routingTableBuilder.computeOnExternalViewChange("dummy", externalView, instanceConfigList);
     RoutingTableLookupRequest request = new RoutingTableLookupRequest(tableNameWithType);
-    Map<String, List<String>> routingTable = routingTableBuilder.getRoutingTable(request, null);
+    Map<ServerInstance, List<String>> routingTable = routingTableBuilder.getRoutingTable(request, null);
 
     Set<String> segmentsInRoutingTable = new HashSet<>();
     for (List<String> segments : routingTable.values()) {
