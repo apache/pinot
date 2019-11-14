@@ -26,8 +26,7 @@
 
 import Component from '@ember/component';
 import moment from 'moment';
-import { get, set } from '@ember/object';
-import { buildDateEod } from 'thirdeye-frontend/utils/utils';
+import { get, set, computed } from '@ember/object';
 
 const RANGE_FORMAT = 'YYYY-MM-DD HH:mm';
 const DEFAULT_END_DATE = moment().startOf('day').add(1, 'days');
@@ -40,13 +39,14 @@ export default Component.extend({
    * Properties we expect to receive for the date-range-picker
    */
   maxTime: '',
-  timeRangeOptions: '',
+  timeRangeOptions: [],
   timePickerIncrement: 5,
   activeRangeStart: '',
   activeRangeEnd: '',
   uiDateFormat: 'MMM D, YYYY',
   serverFormat: RANGE_FORMAT,
-
+  // default value if not set by parent
+  placeholder: 'Choose a value  ',
   /**
    * A set of arbitrary time ranges to help user with quick selection in date-time-picker
    */
@@ -56,6 +56,41 @@ export default Component.extend({
     'Last 2 months': [moment().subtract(2, 'months').startOf('day'), DEFAULT_END_DATE]
   },
 
+  fixedTimeRangeOptions: computed(
+    'timeRangeOptions.@each',
+    function() {
+      const timeRangeOptions = get(this, 'timeRangeOptions');
+      return timeRangeOptions.filter(option => option.name !== 'Custom');
+    }
+  ),
+
+  triggerClass: computed(
+    'timeRangeOptions.@each',
+    function() {
+      const timeRangeOptions = get(this, 'timeRangeOptions');
+      const active = timeRangeOptions.find(option => option.isActive === true);
+      if (active && active.name !== 'Custom') {
+        return 'range-pill-selectors__option--active';
+      }
+      return 'range-pill-selectors__option';
+    }
+  ),
+
+  customRange: computed(
+    'timeRangeOptions.@each',
+    function() {
+      const timeRangeOptions = get(this, 'timeRangeOptions');
+      return timeRangeOptions.find(option => option.name === 'Custom');
+    }
+  ),
+
+  isCustomRange: computed(
+    'customRange',
+    function() {
+      return !(this.get('customRange') == null);
+    }
+  ),
+
   /**
    * Pick a custom date range input class (width) based on the incoming date format
    */
@@ -64,9 +99,24 @@ export default Component.extend({
     const uiDateFormat = get(this, 'uiDateFormat');
     const pickerClassName = 'range-pill-selectors__range-picker';
     let dateMode = 'default';
-    if (uiDateFormat.includes('h a')) { dateMode = 'hours' }
-    if (uiDateFormat.includes('hh:mm a')) { dateMode = 'minutes' }
+    if (uiDateFormat.includes('h a')) { dateMode = 'hours'; }
+    if (uiDateFormat.includes('hh:mm a')) { dateMode = 'minutes'; }
     set(this, 'inputClassName', `${pickerClassName} ${pickerClassName}--${dateMode}`);
+    const {
+      selectedRange,
+      fixedTimeRangeOptions
+    } = this.getProperties('selectedRange', 'fixedTimeRangeOptions');
+    if (!selectedRange) {
+      if (fixedTimeRangeOptions) {
+        const selected = fixedTimeRangeOptions.find(option => {
+          if (typeof option === 'object') {
+            return option.isActive === true;
+          }
+          return false;
+        });
+        set(this, 'selectedRange', selected);
+      }
+    }
   },
 
   /**
@@ -123,6 +173,9 @@ export default Component.extend({
      */
     async onRangeOptionClick(rangeOption) {
       const { value, start, isActive, name } = rangeOption;
+      if (rangeOption.name !== 'Custom') {
+        set(this, 'selectedRange', rangeOption);
+      }
       // Handle as a 'range click' only if inactive and not a custom range
       if (value !== 'custom' && !isActive) {
         // Set date picker defaults to new start/end dates
