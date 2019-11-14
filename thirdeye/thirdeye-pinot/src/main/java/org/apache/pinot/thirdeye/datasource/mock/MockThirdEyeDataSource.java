@@ -19,8 +19,11 @@
 
 package org.apache.pinot.thirdeye.datasource.mock;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
+import java.io.File;
+import java.util.Scanner;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.StringSeries;
 import org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils;
@@ -29,6 +32,8 @@ import org.apache.pinot.thirdeye.datasource.ThirdEyeDataSource;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
 import org.apache.pinot.thirdeye.datasource.csv.CSVThirdEyeDataSource;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
+import org.apache.pinot.thirdeye.datasource.sql.SqlDataset;
+import org.apache.pinot.thirdeye.datasource.sql.SqlUtils;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -45,14 +50,18 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.math3.distribution.NormalDistribution;
+import org.apache.tomcat.jdbc.pool.DataSource;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
 import org.joda.time.PeriodType;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
+import static org.apache.pinot.thirdeye.datasource.sql.SqlResponseCacheLoader.*;
 
 
 /**
@@ -68,8 +77,8 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
 
   private static final String PROP_POPULATE_META_DATA = "populateMetaData";
   private static final String PROP_LOOKBACK = "lookback";
-  private static final String PROP_DATASETS = "datasets";
   private static final String PROP_DATASET_METRICS = "metrics";
+  private static final DateTime MIN_DATETIME = DateTime.parse("1970-01-01");
 
   final Map<String, MockDataset> datasets;
 
@@ -85,9 +94,11 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
    * @throws Exception if properties cannot be parsed
    */
   public MockThirdEyeDataSource(Map<String, Object> properties) throws Exception {
+    loadMockCSVData(properties);
+
     // datasets
     this.datasets = new HashMap<>();
-    Map<String, Object> config = ConfigUtils.getMap(properties.get(PROP_DATASETS));
+    Map<String, Object> config = ConfigUtils.getMap(properties.get(DATASETS));
     for (Map.Entry<String, Object> entry : config.entrySet()) {
       this.datasets.put(entry.getKey(), MockDataset.fromMap(
           entry.getKey(), ConfigUtils.<String, Object>getMap(entry.getValue())
@@ -203,6 +214,80 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
 
       onboarding.runAdhoc();
     }
+  }
+
+  private void loadMockCSVData(Map<String, Object> properties) throws Exception {
+    if (properties.containsKey(H2)) {
+      DataSource h2DataSource = new DataSource();
+      Map<String, Object> objMap = ConfigUtils.getMap(properties.get(H2));
+
+      h2DataSource.setInitialSize(INIT_CONNECTIONS);
+      h2DataSource.setMaxActive(MAX_CONNECTIONS);
+      String h2User = (String) objMap.get(USER);
+      String h2Password = getPassword(objMap);
+      String h2Url = (String) objMap.get(DB);
+      h2DataSource.setUsername(h2User);
+      h2DataSource.setPassword(h2Password);
+      h2DataSource.setUrl(h2Url);
+
+      // Timeout before an abandoned(in use) connection can be removed.
+      h2DataSource.setRemoveAbandonedTimeout(ABANDONED_TIMEOUT);
+      h2DataSource.setRemoveAbandoned(true);
+
+      DateTime maxDateTime = MIN_DATETIME;
+      List<String[]> h2Rows = new ArrayList<>();
+      if (objMap.containsKey(DATASETS)) {
+        try {
+          ObjectMapper mapper = new ObjectMapper();
+          List<Object> objs = (List) objMap.get(DATASETS);
+          for (Object obj : objs) {
+            SqlDataset dataset = mapper.convertValue(obj, SqlDataset.class);
+
+            String[] tableNameSplit = dataset.getTableName().split("\\.");
+            String tableName = tableNameSplit[tableNameSplit.length - 1];
+
+            List<String> metrics = new ArrayList<>(dataset.getMetrics().keySet());
+
+            SqlUtils.createTableOverride(h2DataSource, tableName, dataset.getTimeColumn(), metrics, dataset.getDimensions());
+            SqlUtils.onBoardSqlDataset(dataset);
+
+            DateTimeFormatter fmt = DateTimeFormat.forPattern(dataset.getTimeFormat()).withZone(DateTimeZone.forID(dataset.getTimezone()));
+
+            if (dataset.getDataFile().length() > 0) {
+              String thirdEyeConfigDir = System.getProperty("dw.rootDir");
+              String fileURI = thirdEyeConfigDir + "/data/" + dataset.getDataFile();
+              File file = new File(fileURI);
+              try (Scanner scanner = new Scanner(file)) {
+                String columnNames = scanner.nextLine();
+                while (scanner.hasNextLine()) {
+                  String line = scanner.nextLine();
+                  String[] columnValues = line.split(",");
+                  DateTime dateTime = DateTime.parse(columnValues[0], fmt);
+                  if (dateTime.isAfter(maxDateTime)) {
+                    maxDateTime = dateTime;
+                  }
+                  h2Rows.add(columnValues);
+                }
+                int days = (int) ((DateTime.now().getMillis() - maxDateTime.getMillis()) / TimeUnit.DAYS.toMillis(1));
+                for (String[] columnValues : h2Rows) {
+                  columnValues[0] = fmt.print(DateTime.parse(columnValues[0], fmt).plusDays(days));
+                  SqlUtils.insertCSVRow(h2DataSource, tableName, columnNames, columnValues);
+                }
+              }
+            }
+          }
+        } catch (Exception e) {
+          LOG.error(e.getMessage());
+          throw e;
+        }
+      }
+    }
+  }
+
+  private String getPassword(Map<String, Object> objMap) {
+    String password = (String) objMap.get(PASSWORD);
+    password = (password == null) ? "" : password;
+    return password;
   }
 
   @Override

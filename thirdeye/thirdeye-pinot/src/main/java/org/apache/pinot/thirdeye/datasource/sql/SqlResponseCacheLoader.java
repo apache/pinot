@@ -26,14 +26,11 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.dashboard.Utils;
@@ -59,21 +56,19 @@ import static org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeDataF
 public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResultSetGroup> {
   private static final Logger LOG = LoggerFactory.getLogger(SqlResponseCacheLoader.class);
 
-  private static final int INIT_CONNECTIONS = 20;
-  private static int MAX_CONNECTIONS = 50;
   private static final String PRESTO = "Presto";
   private static final String MYSQL = "MySQL";
   private static final String VERTICA = "Vertica";
-  private static final String DATASETS = "datasets";
-  private static final String H2 = "H2";
-  private static final String USER = "user";
-  private static final String DB = "db";
-  private static final String PASSWORD = "password";
-  private static final String DRIVER = "driver";
-  private static final DateTime MIN_DATETIME = DateTime.parse("1970-01-01");
-  private static final int ABANDONED_TIMEOUT = 60000;
-  private static final List<String> DEMO_DATASETS =
-      Collections.unmodifiableList(new ArrayList<>(Arrays.asList("daily", "hourly")));
+
+  public static final int INIT_CONNECTIONS = 20;
+  public static int MAX_CONNECTIONS = 50;
+  public static final String DATASETS = "datasets";
+  public static final String H2 = "H2";
+  public static final String USER = "user";
+  public static final String DB = "db";
+  public static final String PASSWORD = "password";
+  public static final String DRIVER = "driver";
+  public static final int ABANDONED_TIMEOUT = 60000;
 
   private Map<String, DataSource> prestoDBNameToDataSourceMap = new HashMap<>();
   private Map<String, DataSource> mysqlDBNameToDataSourceMap = new HashMap<>();
@@ -196,15 +191,13 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
             SqlDataset dataset = mapper.convertValue(obj, SqlDataset.class);
 
             String[] tableNameSplit = dataset.getTableName().split("\\.");
-            String tableName = tableNameSplit[tableNameSplit.length-1];
+            String tableName = tableNameSplit[tableNameSplit.length - 1];
 
             List<String> metrics = new ArrayList<>(dataset.getMetrics().keySet());
 
             SqlUtils.createTableOverride(h2DataSource, tableName, dataset.getTimeColumn(), metrics, dataset.getDimensions());
             SqlUtils.onBoardSqlDataset(dataset);
 
-            List<String[]> h2Rows = new ArrayList<>();
-            DateTime maxDateTime = MIN_DATETIME;
             DateTimeFormatter fmt = DateTimeFormat.forPattern(dataset.getTimeFormat()).withZone(DateTimeZone.forID(dataset.getTimezone()));
 
             if (dataset.getDataFile().length() > 0) {
@@ -213,32 +206,11 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
               File file = new File(fileURI);
               try (Scanner scanner = new Scanner(file)) {
                 String columnNames = scanner.nextLine();
-
-                // For demo datasets, we want to show some sample plots for recent time period.
-                // We do this by sliding the historical static data stored in [daily|hourly].csv
-                // to the current timestamp.
-                if (isDemoDataset(tableName)) {
-                  while (scanner.hasNextLine()) {
-                    String line = scanner.nextLine();
-                    String[] columnValues = line.split(",");
-                    DateTime dateTime = DateTime.parse(columnValues[0], fmt);
-                    if (dateTime.isAfter(maxDateTime)) {
-                      maxDateTime = dateTime;
-                    }
-                    h2Rows.add(columnValues);
-                  }
-                  int days = (int) ((DateTime.now().getMillis() - maxDateTime.getMillis()) / TimeUnit.DAYS.toMillis(1));
-                  for (String[] columnValues : h2Rows) {
-                    columnValues[0] = fmt.print(DateTime.parse(columnValues[0], fmt).plusDays(days));
-                    SqlUtils.insertCSVRow(h2DataSource, tableName, columnNames, columnValues);
-                  }
-                } else {
-                  while (scanner.hasNextLine()) {
-                    String line = scanner.nextLine();
-                    String[] columnValues = line.split(",");
-                    columnValues[0] = fmt.print(DateTime.parse(columnValues[0], fmt));
-                    SqlUtils.insertCSVRow(h2DataSource, tableName, columnNames, columnValues);
-                  }
+                while (scanner.hasNextLine()) {
+                  String line = scanner.nextLine();
+                  String[] columnValues = line.split(",");
+                  columnValues[0] = fmt.print(DateTime.parse(columnValues[0], fmt));
+                  SqlUtils.insertCSVRow(h2DataSource, tableName, columnNames, columnValues);
                 }
               }
             }
@@ -249,10 +221,6 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
         }
       }
     }
-  }
-
-  private boolean isDemoDataset(String tableName) {
-    return DEMO_DATASETS.contains(tableName);
   }
 
   private String getPassword(Map<String, Object> objMap) {

@@ -115,6 +115,8 @@ public class SqlUtils {
 
     String sql = sb.toString();
 
+    LOG.info("Creating H2 table: " + sql);
+
     try (Connection connection = ds.getConnection();
         Statement statement = connection.createStatement()){
       statement.execute(sql);
