@@ -20,7 +20,6 @@
 package org.apache.pinot.thirdeye.notification.formatter.channels;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
 import com.google.common.collect.Multimap;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
@@ -69,6 +68,7 @@ public class JiraContentFormatter extends AlertContentFormatter {
   public static final int MAX_JIRA_SUMMARY_LENGTH = 255;
 
   private static final Map<String, String> alertContentToTemplateMap;
+
   static {
     Map<String, String> aMap = new HashMap<>();
     aMap.put(MetricAnomaliesContent.class.getSimpleName(), "jira-metric-anomalies-template.ftl");
@@ -92,18 +92,22 @@ public class JiraContentFormatter extends AlertContentFormatter {
     Preconditions.checkNotNull(jiraAdminConfig.getJiraHost());
   }
 
+  /**
+   * Format and construct a {@link JiraEntity} by rendering the anomalies and properties
+   *
+   * @param dimensionFilters dimensions configured in the multi-dimensions alerter
+   * @param anomalies anomalies to be reported to recipients configured in (@link #jiraClientConfig}
+   */
   public JiraEntity getJiraEntity(Multimap<String, String> dimensionFilters, Collection<AnomalyResult> anomalies) {
     Map<String, Object> templateData = notificationContent.format(anomalies, this.subsConfig);
     templateData.put("dashboardHost", teConfig.getDashboardHost());
-    return buildJiraEntity(alertContentToTemplateMap.get(notificationContent.getTemplate()), templateData, dimensionFilters);
+    return buildJiraEntity(alertContentToTemplateMap.get(notificationContent.getTemplate()), templateData,
+        dimensionFilters);
   }
 
-  /**
-   * Apply the parameter map to given email template, and format it as EmailEntity
-   */
-  private JiraEntity buildJiraEntity(String jiraTemplate, Map<String, Object> templateValues,
-      Multimap<String, String> dimensionFilters) {
-    String issueSummary = BaseNotificationContent.makeSubject(super.getSubjectType(alertClientConfig), this.subsConfig, templateValues);
+  private String buildSummary(Map<String, Object> templateValues, Multimap<String, String> dimensionFilters) {
+    String issueSummary =
+        BaseNotificationContent.makeSubject(super.getSubjectType(alertClientConfig), this.subsConfig, templateValues);
 
     // Append dimensional info to summary
     StringBuilder dimensions = new StringBuilder();
@@ -113,38 +117,19 @@ public class JiraContentFormatter extends AlertContentFormatter {
     issueSummary = issueSummary + dimensions.toString();
 
     // Truncate summary due to jira character limit
-    issueSummary = StringUtils.abbreviate(issueSummary, MAX_JIRA_SUMMARY_LENGTH);
+    return StringUtils.abbreviate(issueSummary, MAX_JIRA_SUMMARY_LENGTH);
+  }
 
-    // Fetch the jira project and issue type fields if overridden by user
-    String jiraProject = MapUtils.getString(alertClientConfig, PROP_PROJECT, this.jiraAdminConfig.getJiraDefaultProjectKey());
-    Long jiraIssueTypeId = MapUtils.getLong(alertClientConfig, PROP_ISSUE_TYPE, this.jiraAdminConfig.getJiraIssueTypeId());
-
-    JiraEntity jiraEntity = new JiraEntity(jiraProject, jiraIssueTypeId, issueSummary);
-
-    String assignee = MapUtils.getString(alertClientConfig, PROP_ASSIGNEE);
-    if (StringUtils.isNotBlank(assignee)) {
-      jiraEntity.setAssignee(assignee);
-    }
-
-    // default - report new anomalies by reopening existing jira tickets
-    jiraEntity.setMergeGap(MapUtils.getLong(alertClientConfig, PROP_MERGE_GAP, 0L));
-
+  private List<String> buildLabels(Multimap<String, String> dimensionFilters) {
     List<String> labels = ConfigUtils.getList(alertClientConfig.get(PROP_LABELS));
     labels.add(PROP_DEFAULT_LABEL);
     labels.add("subsId=" + this.subsConfig.getId().toString());
-    dimensionFilters.asMap().forEach((k,v) -> labels.add(k + "=" + String.join(",", v)));
-    jiraEntity.setLabels(labels);
+    dimensionFilters.asMap().forEach((k, v) -> labels.add(k + "=" + String.join(",", v)));
+    return labels;
+  }
 
-    HtmlEmail email = new HtmlEmail();
-    String cid = "";
-    try {
-      if (StringUtils.isNotBlank(this.notificationContent.getSnaphotPath())) {
-        cid = email.embed(new File(this.notificationContent.getSnaphotPath()));
-      }
-    } catch (Exception e) {
-      LOG.error("Exception while embedding screenshot for anomaly", e);
-    }
-    templateValues.put("cid", cid);
+  private String buildDescription(String jiraTemplate, Map<String, Object> templateValues) {
+    String description;
 
     // Render the values in templateValues map to the jira ftl template file
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -156,12 +141,42 @@ public class JiraContentFormatter extends AlertContentFormatter {
       Template template = freemarkerConfig.getTemplate(jiraTemplate);
       template.process(templateValues, out);
 
-      String alertEmailHtml = new String(baos.toByteArray(), CHARSET);
-
-      jiraEntity.setDescription(alertEmailHtml);
+      description = new String(baos.toByteArray(), CHARSET);
     } catch (Exception e) {
-      Throwables.propagate(e);
+      description = "Found an exception while constructing the description content. Pls report & reach out"
+          + " to the Thirdeye team. Exception = " + e.getMessage();
     }
+
+    return description;
+  }
+
+  private String buildSnapshot() {
+    HtmlEmail email = new HtmlEmail();
+    String cid = "";
+    try {
+      if (StringUtils.isNotBlank(this.notificationContent.getSnaphotPath())) {
+        cid = email.embed(new File(this.notificationContent.getSnaphotPath()));
+      }
+    } catch (Exception e) {
+      LOG.error("Exception while embedding screenshot for anomaly", e);
+    }
+    return cid;
+  }
+
+  /**
+   * Apply the parameter map to given jira template, and format it as JiraEntity
+   */
+  private JiraEntity buildJiraEntity(String jiraTemplate, Map<String, Object> templateValues,
+      Multimap<String, String> dimensionFilters) {
+    String jiraProject = MapUtils.getString(alertClientConfig, PROP_PROJECT, this.jiraAdminConfig.getJiraDefaultProjectKey());
+    Long jiraIssueTypeId = MapUtils.getLong(alertClientConfig, PROP_ISSUE_TYPE, this.jiraAdminConfig.getJiraIssueTypeId());
+
+    JiraEntity jiraEntity = new JiraEntity(jiraProject, jiraIssueTypeId, buildSummary(templateValues, dimensionFilters));
+    jiraEntity.setAssignee(MapUtils.getString(alertClientConfig, PROP_ASSIGNEE, "")); // Default - Unassigned
+    jiraEntity.setMergeGap(MapUtils.getLong(alertClientConfig, PROP_MERGE_GAP, -1L)); // Default - Always merge
+    jiraEntity.setLabels(buildLabels(dimensionFilters));
+    jiraEntity.setDescription(buildDescription(jiraTemplate, templateValues));
+    jiraEntity.setSnapshot(buildSnapshot());
 
     return jiraEntity;
   }

@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.notification.commons;
 
 import java.util.List;
 import java.util.Objects;
+import org.apache.commons.lang3.StringUtils;
 
 
 /**
@@ -31,6 +32,7 @@ public class JiraEntity {
   private Long jiraIssueTypeId;
   private String summary;
   private String description;
+  private String snapshot;
   private String assignee;
   private List<String> labels;
   private long mergeGap;
@@ -73,6 +75,14 @@ public class JiraEntity {
     this.description = description;
   }
 
+  public String getSnapshot() {
+    return snapshot;
+  }
+
+  public void setSnapshot(String snapshot) {
+    this.snapshot = snapshot;
+  }
+
   public String getAssignee() {
     return assignee;
   }
@@ -106,12 +116,13 @@ public class JiraEntity {
     sb.append(", summary='").append(summary).append('\'');
     sb.append(", labels='").append(labels).append('\'');
     sb.append(", mergeGap='").append(mergeGap).append('\'');
+    sb.append(", snapshot='").append(StringUtils.isBlank(snapshot) ? "no-snapshot" : "has-snapshot").append('\'');
     sb.append('}');
     return sb.toString();
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(jiraProject, jiraIssueTypeId, assignee, summary, labels, mergeGap);
+    return Objects.hash(jiraProject, jiraIssueTypeId, assignee, summary, labels, mergeGap, snapshot);
   }
 }

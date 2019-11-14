@@ -61,30 +61,36 @@ public class ThirdEyeJiraClient {
         jiraAdminConfig.getJiraPassword());
   }
 
+  private String buildQueryOnCreatedBy(long lookBackMillis) {
+    long lookBackDays = TimeUnit.MILLISECONDS.toDays(lookBackMillis);
+    String createdByQuery = "created";
+    if (lookBackDays < 0) {
+      createdByQuery += "<= -0m";
+    } else {
+      createdByQuery += ">= -" + lookBackDays + "d";
+    }
+
+    return createdByQuery;
+  }
+
+  private String buildQueryOnLabels(List<String> labels) {
+    return labels.stream()
+        .map(label -> "labels = \"" + label + "\"")
+        .collect(Collectors.joining(" and "));
+  }
+
   /**
    * Search for all the existing jira tickets based on the filters
    */
   public List<Issue> getIssues(String project, List<String> labels, String reporter, long lookBackMillis) {
     List<Issue> issues = new ArrayList<>();
 
-    long lookBackDays = TimeUnit.MILLISECONDS.toDays(lookBackMillis);
-    String createdByQuery = "created";
-    if (lookBackDays <= 0) {
-      createdByQuery += "<= -0m";
-    } else {
-      createdByQuery += ">= -" + lookBackDays + "d";
-    }
-
-    String andQueryOnLabels = labels.stream()
-        .map(label -> "labels = \"" + label + "\"")
-        .collect(Collectors.joining(" and "));
-
     StringBuilder jiraQuery = new StringBuilder();
     // Query by project first as a jira optimization
     jiraQuery.append("project=").append(project);
     jiraQuery.append(" and ").append("reporter IN (").append(reporter).append(")");
-    jiraQuery.append(" and ").append(andQueryOnLabels);
-    jiraQuery.append(" and ").append(createdByQuery);
+    jiraQuery.append(" and ").append(buildQueryOnLabels(labels));
+    jiraQuery.append(" and ").append(buildQueryOnCreatedBy(lookBackMillis));
 
     LOG.info("Fetching Jira tickets using query - {}", jiraQuery.toString());
     Iterable<Issue> jiraIssuesIt = restClient.getSearchClient().searchJql(jiraQuery.toString()).claim().getIssues();
@@ -96,7 +102,6 @@ public class ThirdEyeJiraClient {
    * Adds the specified comment to the jira ticket
    */
   public void addComment(Issue issue, String comment) {
-    // TODO: handle comments longer than X characters!
     Comment resComment = Comment.valueOf(comment);
     LOG.info("Commenting Jira {} with new anomalies", issue.getKey());
     restClient.getIssueClient().addComment(issue.getCommentsUri(), resComment).claim();
@@ -128,28 +133,36 @@ public class ThirdEyeJiraClient {
    * Updates existing issue with assignee and labels
    */
   public void updateIssue(Issue issue, JiraEntity jiraEntity) {
-    IssueInput input = new IssueInputBuilder()
+    IssueInput issueInput = new IssueInputBuilder()
         .setAssigneeName(jiraEntity.getAssignee())
         .setFieldInput(new FieldInput(IssueFieldId.LABELS_FIELD, jiraEntity.getLabels()))
+        // TODO: Will test this in the subsequent PR and then enable it
+        //.setFieldInput(new FieldInput(IssueFieldId.ATTACHMENT_FIELD, jiraEntity.getSnapshot()))
         .build();
-    String prevAssignee = issue.getAssignee() == null ? "unassigned" : issue.getAssignee().getName();
 
+    String prevAssignee = issue.getAssignee() == null ? "unassigned" : issue.getAssignee().getName();
     LOG.info("Updating Jira {} with [assignee={}, labels={}]. Previous state [assignee={}, labels={}]", issue.getKey(),
         jiraEntity.getAssignee(), jiraEntity.getLabels(), prevAssignee, issue.getLabels());
-    restClient.getIssueClient().updateIssue(issue.getKey(), input).claim();
+    restClient.getIssueClient().updateIssue(issue.getKey(), issueInput).claim();
   }
 
   /**
    * Creates a new jira ticket with specified settings
    */
   public String createIssue(JiraEntity jiraEntity) {
+    LOG.info("Creating Jira with settings {}", jiraEntity.toString());
+    return restClient.getIssueClient().createIssue(buildIssue(jiraEntity)).claim().getKey();
+  }
+
+  private IssueInput buildIssue(JiraEntity jiraEntity) {
     IssueInputBuilder issueBuilder = new IssueInputBuilder(
         jiraEntity.getJiraProject(), jiraEntity.getJiraIssueTypeId(), jiraEntity.getSummary());
     issueBuilder.setAssigneeName(jiraEntity.getAssignee());
     issueBuilder.setFieldInput(new FieldInput(IssueFieldId.LABELS_FIELD, jiraEntity.getLabels()));
+    // TODO: Will test this in the subsequent PR and then enable it
+    // issueBuilder.setFieldInput(new FieldInput(IssueFieldId.ATTACHMENT_FIELD, jiraEntity.getSnapshot()));
     issueBuilder.setDescription(jiraEntity.getDescription());
 
-    LOG.info("Creating Jira with settings {}", jiraEntity.toString());
-    return restClient.getIssueClient().createIssue(issueBuilder.build()).claim().getKey();
+    return issueBuilder.build();
   }
 }
