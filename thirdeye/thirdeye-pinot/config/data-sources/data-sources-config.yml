@@ -200,6 +200,7 @@ dataSourceConfigs:
             granularity: "1DAYS"
             timeFormat: "yyyy-MM-dd"
             timezone: "UTC"
+            dimensions: []
             metrics:
               value: "SUM"
             dataFile: "daily.csv"
@@ -208,6 +209,8 @@ dataSourceConfigs:
             granularity: "1HOURS"
             timeFormat: "yyyy-MM-dd HH:mm:ss"
             timezone: "UTC"
+            dimensions: []
             metrics:
               value: "SUM"
             dataFile: "hourly.csv"
+

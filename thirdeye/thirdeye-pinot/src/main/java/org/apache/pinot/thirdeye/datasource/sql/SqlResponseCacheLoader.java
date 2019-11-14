@@ -26,6 +26,8 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -70,6 +72,8 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
   private static final String DRIVER = "driver";
   private static final DateTime MIN_DATETIME = DateTime.parse("1970-01-01");
   private static final int ABANDONED_TIMEOUT = 60000;
+  private static final List<String> DEMO_DATASETS =
+      Collections.unmodifiableList(new ArrayList<>(Arrays.asList("daily", "hourly")));
 
   private Map<String, DataSource> prestoDBNameToDataSourceMap = new HashMap<>();
   private Map<String, DataSource> mysqlDBNameToDataSourceMap = new HashMap<>();
@@ -196,10 +200,10 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
 
             List<String> metrics = new ArrayList<>(dataset.getMetrics().keySet());
 
-            SqlUtils.createTable(h2DataSource, tableName, dataset.getTimeColumn(), metrics, dataset.getDimensions());
+            SqlUtils.createTableOverride(h2DataSource, tableName, dataset.getTimeColumn(), metrics, dataset.getDimensions());
             SqlUtils.onBoardSqlDataset(dataset);
 
-            List<H2Row> h2Rows = new ArrayList<>();
+            List<String[]> h2Rows = new ArrayList<>();
             DateTime maxDateTime = MIN_DATETIME;
             DateTimeFormatter fmt = DateTimeFormat.forPattern(dataset.getTimeFormat()).withZone(DateTimeZone.forID(dataset.getTimezone()));
 
@@ -209,22 +213,32 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
               File file = new File(fileURI);
               try (Scanner scanner = new Scanner(file)) {
                 String columnNames = scanner.nextLine();
-                while (scanner.hasNextLine()) {
-                  String line = scanner.nextLine();
-                  String[] items = line.split(",");
-                  DateTime dateTime = DateTime.parse(items[0], fmt);
-                  if (dateTime.isAfter(maxDateTime)) {
-                    maxDateTime = dateTime;
+
+                // For demo datasets, we want to show some sample plots for recent time period.
+                // We do this by sliding the historical static data stored in [daily|hourly].csv
+                // to the current timestamp.
+                if (isDemoDataset(tableName)) {
+                  while (scanner.hasNextLine()) {
+                    String line = scanner.nextLine();
+                    String[] columnValues = line.split(",");
+                    DateTime dateTime = DateTime.parse(columnValues[0], fmt);
+                    if (dateTime.isAfter(maxDateTime)) {
+                      maxDateTime = dateTime;
+                    }
+                    h2Rows.add(columnValues);
                   }
-                  h2Rows.add(new H2Row(dateTime, items[1]));
-                }
-                // Calculate the day difference between today and the last day of data point
-                int days = (int) ((DateTime.now().getMillis() - maxDateTime.getMillis()) / TimeUnit.DAYS.toMillis(1));
-                for (H2Row h2Row: h2Rows) {
-                  String[] items = new String[2];
-                  items[0] = fmt.print(h2Row.getDateTime().plusDays(days));
-                  items[1] = h2Row.getVal();
-                  SqlUtils.insertCSVRow(h2DataSource, tableName, columnNames, items);
+                  int days = (int) ((DateTime.now().getMillis() - maxDateTime.getMillis()) / TimeUnit.DAYS.toMillis(1));
+                  for (String[] columnValues : h2Rows) {
+                    columnValues[0] = fmt.print(DateTime.parse(columnValues[0], fmt).plusDays(days));
+                    SqlUtils.insertCSVRow(h2DataSource, tableName, columnNames, columnValues);
+                  }
+                } else {
+                  while (scanner.hasNextLine()) {
+                    String line = scanner.nextLine();
+                    String[] columnValues = line.split(",");
+                    columnValues[0] = fmt.print(DateTime.parse(columnValues[0], fmt));
+                    SqlUtils.insertCSVRow(h2DataSource, tableName, columnNames, columnValues);
+                  }
                 }
               }
             }
@@ -235,6 +249,10 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
         }
       }
     }
+  }
+
+  private boolean isDemoDataset(String tableName) {
+    return DEMO_DATASETS.contains(tableName);
   }
 
   private String getPassword(Map<String, Object> objMap) {
@@ -388,25 +406,6 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
       return verticaDBNameToDataSourceMap.get(dbName);
     } else {
       return h2DataSource;
-    }
-  }
-
-  // Container class for one row in H2 CSV
-  final static class H2Row {
-    DateTime dateTime;
-    String val;
-
-    H2Row(DateTime dateTime, String val) {
-      this.dateTime = dateTime;
-      this.val = val;
-    }
-
-    public DateTime getDateTime() {
-      return dateTime;
-    }
-
-    public String getVal() {
-      return val;
     }
   }
 }
