@@ -48,7 +48,6 @@ public class SparkSegmentTarPushJob extends SegmentTarPushJob {
     if (!_enableParallelPush) {
       super.run();
     } else {
-      FileSystem fileSystem = FileSystem.get(new Path(_segmentPattern).toUri(), getConf());
       List<Path> segmentPathsToPush = getDataFilePaths(_segmentPattern);
       List<String> segmentsToPush = new ArrayList<>();
       segmentPathsToPush.forEach(path -> {
@@ -58,6 +57,7 @@ public class SparkSegmentTarPushJob extends SegmentTarPushJob {
       JavaRDD<String> pathRDD = sparkContext.parallelize(segmentsToPush, segmentsToPush.size());
       pathRDD.foreach(segmentTarPath -> {
         try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
+          FileSystem fileSystem = FileSystem.get(new Path(segmentTarPath).toUri(), getConf());
           // TODO: Deal with invalid prefixes in the future
           List<String> currentSegments = controllerRestApi.getAllSegments("OFFLINE");
           controllerRestApi.pushSegments(fileSystem, Arrays.asList(new Path(segmentTarPath)));
