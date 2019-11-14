@@ -352,10 +352,10 @@ public class PinotSegmentUploadRestletResource {
     if (baseDataDirURI.getScheme().equalsIgnoreCase(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
       return URIUtils.constructDownloadUrl(provider.getVip(), rawTableName, segmentName);
     } else {
-      // Receiving .tar.gz segment upload for pluggable storage
-      LOGGER.info("Using configured data dir {} for segment {} of table {}", _controllerConf.getDataDir(), segmentName,
-          rawTableName);
-      return URIUtils.constructDownloadUrl(baseDataDirURI.toString(), rawTableName, segmentName);
+      // Receiving .tar.gz segment upload for pluggable storage. Download URI is the same as final segment location.
+      String downloadUri = URIUtils.getPath(baseDataDirURI.toString(), rawTableName, URIUtils.encode(segmentName));
+      LOGGER.info("Using download uri: {} for segment: {} of table {}", downloadUri, segmentName, rawTableName);
+      return downloadUri;
     }
   }
 
