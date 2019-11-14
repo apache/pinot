@@ -24,9 +24,9 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
@@ -35,6 +35,7 @@ import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
+import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 
 
@@ -104,14 +105,14 @@ public abstract class BaseQueriesTest {
 
     // Server side.
     Plan plan = planMaker.makeInterSegmentPlan(getSegmentDataManagers(), brokerRequest, EXECUTOR_SERVICE,
-        CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+        Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     DataTable instanceResponse = plan.execute();
 
     // Broker side.
     BrokerReduceService brokerReduceService = new BrokerReduceService();
-    Map<ServerInstance, DataTable> dataTableMap = new HashMap<>();
-    dataTableMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    dataTableMap.put(new ServerInstance("localhost:1111"), instanceResponse);
+    Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
+    dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE), instanceResponse);
+    dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME), instanceResponse);
     return brokerReduceService.reduceOnDataTable(brokerRequest, dataTableMap, null);
   }
 

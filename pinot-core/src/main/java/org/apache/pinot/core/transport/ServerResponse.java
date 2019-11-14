@@ -23,7 +23,7 @@ import org.apache.pinot.common.utils.DataTable;
 
 
 /**
- * The {@code ServerResponse} class contains the response and time info from a {@link Server}.
+ * The {@code ServerResponse} class contains the response and time info from a {@link ServerRoutingInstance}.
  */
 @ThreadSafe
 public class ServerResponse {

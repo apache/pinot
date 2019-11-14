@@ -33,24 +33,25 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataTableHandler.class);
 
   private final QueryRouter _queryRouter;
-  private final Server _server;
+  private final ServerRoutingInstance _serverRoutingInstance;
   private final BrokerMetrics _brokerMetrics;
 
-  public DataTableHandler(QueryRouter queryRouter, Server server, BrokerMetrics brokerMetrics) {
+  public DataTableHandler(QueryRouter queryRouter, ServerRoutingInstance serverRoutingInstance,
+      BrokerMetrics brokerMetrics) {
     _queryRouter = queryRouter;
-    _server = server;
+    _serverRoutingInstance = serverRoutingInstance;
     _brokerMetrics = brokerMetrics;
   }
 
   @Override
   public void channelActive(ChannelHandlerContext ctx) {
-    LOGGER.info("Channel for server: {} is now active", _server);
+    LOGGER.info("Channel for server: {} is now active", _serverRoutingInstance);
   }
 
   @Override
   public void channelInactive(ChannelHandlerContext ctx) {
-    LOGGER.error("Channel for server: {} is now inactive, marking server down", _server);
-    _queryRouter.markServerDown(_server);
+    LOGGER.error("Channel for server: {} is now inactive, marking server down", _serverRoutingInstance);
+    _queryRouter.markServerDown(_serverRoutingInstance);
   }
 
   @Override
@@ -60,18 +61,18 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
     try {
       long deserializationStartTimeMs = System.currentTimeMillis();
       DataTable dataTable = DataTableFactory.getDataTable(msg.nioBuffer());
-      _queryRouter
-          .receiveDataTable(_server, dataTable, responseSize, System.currentTimeMillis() - deserializationStartTimeMs);
+      _queryRouter.receiveDataTable(_serverRoutingInstance, dataTable, responseSize,
+          System.currentTimeMillis() - deserializationStartTimeMs);
     } catch (Exception e) {
-      LOGGER.error("Caught exception while deserializing data table of size: {} from server: {}", responseSize, _server,
-          e);
+      LOGGER.error("Caught exception while deserializing data table of size: {} from server: {}", responseSize,
+          _serverRoutingInstance, e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.DATA_TABLE_DESERIALIZATION_EXCEPTIONS, 1);
     }
   }
 
   @Override
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-    LOGGER.error("Caught exception while handling response from server: {}", _server, cause);
+    LOGGER.error("Caught exception while handling response from server: {}", _serverRoutingInstance, cause);
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.RESPONSE_FETCH_EXCEPTIONS, 1);
   }
 }

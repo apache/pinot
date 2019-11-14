@@ -39,6 +39,14 @@ public class HashUtil {
     return Math.max(MIN_FASTUTIL_HASHSET_SIZE, expected);
   }
 
+  /**
+   * Returns a capacity that is sufficient to keep the map from being resized as long as it grows no larger than
+   * expectedSize and the load factor is >= its default (0.75).
+   */
+  public static int getHashMapCapacity(int expectedSize) {
+    return (int) ((float) expectedSize / 0.75f + 1f);
+  }
+
   public static long compute(IntBuffer buff) {
     buff.rewind();
     ByteBuffer bBuff = ByteBuffer.allocate(buff.array().length * 4);
@@ -95,10 +103,9 @@ public class HashUtil {
       case 2:
         h ^= (long) (data[(length & ~7) + 1] & 0xff) << 8;
       case 1:
-        h ^= (long) (data[length & ~7] & 0xff);
+        h ^= data[length & ~7] & 0xff;
         h *= m;
     }
-    ;
 
     h ^= h >>> r;
     h *= m;

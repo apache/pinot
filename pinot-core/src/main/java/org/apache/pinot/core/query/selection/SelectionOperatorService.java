@@ -20,14 +20,13 @@ package org.apache.pinot.core.query.selection;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.PriorityQueue;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
-import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
@@ -138,13 +137,11 @@ public class SelectionOperatorService {
   }
 
   /**
-   * Reduce a collection of {@link DataTable}s to selection rows for selection queries with <code>ORDER BY</code>.
+   * Reduces a collection of {@link DataTable}s to selection rows for selection queries with <code>ORDER BY</code>.
    * (Broker side)
-   *
-   * @param selectionResults {@link Map} from {@link ServerInstance} to {@link DataTable}.
    */
-  public void reduceWithOrdering(Map<ServerInstance, DataTable> selectionResults) {
-    for (DataTable dataTable : selectionResults.values()) {
+  public void reduceWithOrdering(Collection<DataTable> dataTables) {
+    for (DataTable dataTable : dataTables) {
       int numRows = dataTable.getNumberOfRows();
       for (int rowId = 0; rowId < numRows; rowId++) {
         Serializable[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
