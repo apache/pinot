@@ -115,21 +115,24 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
       result = this.queryCache.getQueryResult(cacheResponse.getCacheRequest().getRequest());
       insertTimeSeriesIntoCache(result);
       cacheResponse.mergeSliceIntoRows(result);
-    }
+    } else {
 
-    if (cacheResponse.isMissingStartSlice(requestSliceStart)) {
-      slice = MetricSlice.from(metricId, requestSliceStart, cacheResponse.getFirstTimestamp(), request.getFilterSet(), request.getGroupByTimeGranularity());
-      result = fetchSliceFromSource(slice);
-      insertTimeSeriesIntoCache(result);
-      cacheResponse.mergeSliceIntoRows(result);
-    }
+      if (cacheResponse.isMissingStartSlice(requestSliceStart)) {
+        slice = MetricSlice.from(metricId, requestSliceStart, cacheResponse.getFirstTimestamp(), request.getFilterSet(),
+            request.getGroupByTimeGranularity());
+        result = fetchSliceFromSource(slice);
+        insertTimeSeriesIntoCache(result);
+        cacheResponse.mergeSliceIntoRows(result);
+      }
 
-    if (cacheResponse.isMissingEndSlice(requestSliceEnd)) {
-      // we add one time granularity to start because the start is inclusive.
-      slice = MetricSlice.from(metricId, cacheResponse.getLastTimestamp() + request.getGroupByTimeGranularity().toMillis(), requestSliceEnd, request.getFilterSet(), request.getGroupByTimeGranularity());
-      result = fetchSliceFromSource(slice);
-      insertTimeSeriesIntoCache(result);
-      cacheResponse.mergeSliceIntoRows(result);
+      if (cacheResponse.isMissingEndSlice(requestSliceEnd)) {
+        // we add one time granularity to start because the start is inclusive.
+        slice = MetricSlice.from(metricId, cacheResponse.getLastTimestamp() + request.getGroupByTimeGranularity().toMillis(), requestSliceEnd,
+            request.getFilterSet(), request.getGroupByTimeGranularity());
+        result = fetchSliceFromSource(slice);
+        insertTimeSeriesIntoCache(result);
+        cacheResponse.mergeSliceIntoRows(result);
+      }
     }
   }
 

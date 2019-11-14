@@ -68,33 +68,26 @@ public class ThirdEyeConfiguration extends Configuration {
    * @return the url of the data source
    */
   public URL getDataSourcesAsUrl() {
-    try {
-      return new URL(this.dataSources);
-    } catch (MalformedURLException ignore) {
-      // ignore
-    }
-
-    try {
-      URL rootUrl = new URL(String.format("file:%s/", this.rootDir));
-      return new URL(rootUrl, this.dataSources);
-    } catch (MalformedURLException e) {
-      throw new IllegalArgumentException(String.format("Could not parse relative path for rootDir '%s' and dataSources '%s'", this.rootDir, this.dataSources));
-    }
+    return getSourceAsUrl(this.dataSources);
   }
 
   // same as above but for cache config
   public URL getCacheConfigAsUrl() {
+    return getSourceAsUrl(this.cacheDataSource);
+  }
+
+  private URL getSourceAsUrl(String path) {
     try {
-      return new URL(this.cacheDataSource);
+      return new URL(path);
     } catch (MalformedURLException ignore) {
       // ignore
     }
 
     try {
       URL rootUrl = new URL(String.format("file:%s/", this.rootDir));
-      return new URL(rootUrl, this.cacheDataSource);
+      return new URL(rootUrl, path);
     } catch (MalformedURLException e) {
-      throw new IllegalArgumentException(String.format("Could not parse relative path for rootDir '%s' and cacheDataSource '%s'", this.rootDir, this.cacheDataSource));
+      throw new IllegalArgumentException(String.format("Could not parse relative path for rootDir '%s' and dataSources/cacheConfig '%s'", this.rootDir, path));
     }
   }
 
