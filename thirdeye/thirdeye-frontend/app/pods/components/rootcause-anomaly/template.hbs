@@ -1,7 +1,13 @@
 {{#if anomaly}}
   <div class="row card-container card-container--md card-container--box-shadow">
     <div class="rootcause-anomaly__header">
-      <span class="rootcause-anomaly__title">Anomaly #{{anomalyId}} {{functionName}}</span>
+      {{#if detectionConfigId}}
+        <span class="rootcause-anomaly__title">
+          Anomaly #{{anomalyId}} {{#link-to "manage.explore" detectionConfigId}}{{functionName}}{{/link-to}}
+        </span>
+      {{else}}
+        <span class="rootcause-anomaly__title">Anomaly #{{anomalyId}} {{functionName}}</span>
+      {{/if}}
       {{#each-in anomalyLinks as |type url|}}
         <span class="rootcause-anomaly__link">
           <a target="_blank" href="{{url}}">{{type}}</a>

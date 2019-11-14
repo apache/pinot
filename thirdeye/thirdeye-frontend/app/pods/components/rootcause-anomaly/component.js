@@ -1,7 +1,6 @@
 import Component from "@ember/component";
 import {
   computed,
-  observer,
   setProperties,
   getProperties,
   get,
@@ -150,6 +149,12 @@ export default Component.extend({
    * @type {string}
    */
   functionName: reads('anomaly.attributes.function.firstObject'),
+
+  /**
+   * Anomaly detection (alert) id
+   * @type {string}
+   */
+  detectionConfigId: reads('anomaly.attributes.detectionConfigId.firstObject'),
 
   /**
    * Anomaly metric name from anomaly attributes
