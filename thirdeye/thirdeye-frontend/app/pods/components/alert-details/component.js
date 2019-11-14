@@ -328,6 +328,14 @@ export default Component.extend({
     }
   }),
 
+  disableRerunButton: computed(
+    'alertYaml',
+    'isLoading',
+    'dataIsCurrent',
+    function() {
+      return (!get(this, 'alertYaml')|| get(this, 'isLoading') || get(this, 'dataIsCurrent'));
+    }
+  ),
   disablePreviewButton: computed(
     'alertYaml',
     '_getAnomalies.isIdle',
