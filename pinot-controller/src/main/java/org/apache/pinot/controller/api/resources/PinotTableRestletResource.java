@@ -29,7 +29,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
@@ -166,7 +165,7 @@ public class PinotTableRestletResource {
     }
   }
 
-  private String listTableConfigs(@Nonnull String tableName, @Nullable String tableTypeStr) {
+  private String listTableConfigs(String tableName, @Nullable String tableTypeStr) {
     try {
       ObjectNode ret = JsonUtils.newObjectNode();
 
@@ -255,7 +254,7 @@ public class PinotTableRestletResource {
     List<String> tablesDeleted = new LinkedList<>();
     try {
       boolean tableExist = false;
-      if (verifyTableType(tableName, tableType, tableType.OFFLINE)) {
+      if (verifyTableType(tableName, tableType, TableType.OFFLINE)) {
         tableExist = _pinotHelixResourceManager.hasOfflineTable(tableName);
         // Even the table name does not exist, still go on to delete remaining table metadata in case a previous delete
         // did not complete.
@@ -264,7 +263,7 @@ public class PinotTableRestletResource {
           tablesDeleted.add(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
         }
       }
-      if (verifyTableType(tableName, tableType, tableType.REALTIME)) {
+      if (verifyTableType(tableName, tableType, TableType.REALTIME)) {
         tableExist = _pinotHelixResourceManager.hasRealtimeTable(tableName);
         // Even the table name does not exist, still go on to delete remaining table metadata in case a previous delete
         // did not complete.
@@ -280,7 +279,7 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
     throw new ControllerApplicationException(LOGGER,
-          "Table '" + tableName + "' with type " + tableType + " does not exist", Response.Status.NOT_FOUND);
+        "Table '" + tableName + "' with type " + tableType + " does not exist", Response.Status.NOT_FOUND);
   }
 
   //   Return true iff the table is of the expectedType based on the given tableName and tableType. The truth table:
@@ -462,24 +461,25 @@ public class PinotTableRestletResource {
     LOGGER.info("Finished validating tables config for Table: {}", rawTableName);
   }
 
-  /**
-   * Rebalance a table.
-   * @return if in DRY_RUN, the target idealstate/partition-map is returned. Else an indication of success/failure in
-   *         triggering the rebalance is returned.
-   */
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/rebalance")
   @ApiOperation(value = "Rebalances segments of a table across servers", notes = "Rebalances segments of a table across servers")
   public RebalanceResult rebalance(
-      @ApiParam(value = "Name of the table to rebalance") @Nonnull @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @Nonnull @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Name of the table to rebalance", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Whether to rebalance table in dry-run mode") @DefaultValue("false") @QueryParam("dryRun") boolean dryRun,
       @ApiParam(value = "Whether to reassign instances before rebalancing the table") @DefaultValue("false") @QueryParam("reassignInstances") boolean reassignInstances,
       @ApiParam(value = "Whether to rebalance CONSUMING segments for real-time table") @DefaultValue("false") @QueryParam("includeConsuming") boolean includeConsuming,
       @ApiParam(value = "Whether to allow downtime (0 replicas up) for rebalance") @DefaultValue("false") @QueryParam("downtime") boolean downtime,
       @ApiParam(value = "Minimum number of replicas to keep alive during rebalance (if downtime is false), or maximum number of replicas allowed to be unavailable if value is negative") @DefaultValue("1") @QueryParam("minAvailableReplicas") int minAvailableReplicas) {
-    TableType tableType = Constants.validateTableType(tableTypeStr);
+    TableType tableType;
+    try {
+      tableType = TableType.valueOf(tableTypeStr.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      throw new ControllerApplicationException(LOGGER, "Illegal table type: " + tableTypeStr,
+          Response.Status.BAD_REQUEST);
+    }
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
 
     Configuration rebalanceConfig = new BaseConfiguration();
