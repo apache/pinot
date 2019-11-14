@@ -102,7 +102,7 @@ public class SqlUtils {
   public static void createTableOverride(DataSource ds, String tableName,
       String timeColumn, List<String> metrics, List<String> dimensions) throws SQLException {
     StringBuilder sb = new StringBuilder();
-    sb.append("drop table ").append(tableName).append(";");
+    sb.append("drop table if exists ").append(tableName).append(";");
     sb.append("create table ").append(tableName).append(" (");
 
     for (String metric: metrics) {
