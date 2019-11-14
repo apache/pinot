@@ -52,6 +52,12 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
   private static final String FIND_BY_STATUS_ORDER_BY_CREATE_TIME_DESC =
       " WHERE status = :status order by startTime desc limit 10";
 
+  private static final String FIND_BY_NAME_ORDER_BY_CREATE_TIME_ASC =
+      " WHERE name = :name order by createTime asc limit ";
+
+  private static final String FIND_BY_NAME_ORDER_BY_CREATE_TIME_DESC =
+      " WHERE name = :name order by createTime desc limit ";
+
   private static final String COUNT_WAITING_TASKS =
       "SELECT COUNT(*) FROM task_index WHERE status = 'WAITING'";
 
@@ -83,6 +89,20 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
   }
 
   @Override
+  public List<TaskDTO> findByNameOrderByCreateTime(String name, int fetchSize, boolean asc) {
+    Map<String, Object> parameterMap = new HashMap<>();
+    parameterMap.put("name", name);
+    String queryClause = (asc) ? FIND_BY_NAME_ORDER_BY_CREATE_TIME_ASC + fetchSize
+        : FIND_BY_NAME_ORDER_BY_CREATE_TIME_DESC + fetchSize;
+    List<TaskBean>  list = genericPojoDao.executeParameterizedSQL(queryClause, parameterMap, TaskBean.class);
+    List<TaskDTO> result = new ArrayList<>();
+    for (TaskBean bean : list) {
+      result.add(MODEL_MAPPER.map(bean, TaskDTO.class));
+    }
+    return result;
+  }
+
+  @Override
   public List<TaskDTO> findByStatusOrderByCreateTime(TaskStatus status, int fetchSize, boolean asc) {
     Map<String, Object> parameterMap = new HashMap<>();
     parameterMap.put("status", status.toString());
@@ -98,11 +118,12 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
 
   @Override
   public boolean updateStatusAndWorkerId(Long workerId, Long id, Set<TaskStatus> permittedOldStatus,
-      TaskStatus newStatus, int expectedVersion) {
+      int expectedVersion) {
     TaskDTO task = findById(id);
     if (permittedOldStatus.contains(task.getStatus())) {
-      task.setStatus(newStatus);
+      task.setStatus(TaskStatus.RUNNING);
       task.setWorkerId(workerId);
+      task.setStartTime(System.currentTimeMillis());
       //increment the version
       task.setVersion(expectedVersion + 1);
       Predicate predicate = Predicate.AND(
@@ -159,6 +180,17 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
     Predicate statusPredicate = Predicate.EQ("status", status.toString());
     Predicate timestampPredicate = Predicate.GE("createTime", activeTimestamp);
     return findByPredicate(Predicate.AND(statusPredicate, timestampPredicate));
+  }
+
+  @Override
+  public List<TaskDTO> findByStatusesAndTypeWithinDays(List<TaskStatus> statuses,
+      TaskConstants.TaskType type, int days) {
+    DateTime activeDate = new DateTime().minusDays(days);
+    Timestamp activeTimestamp = new Timestamp(activeDate.getMillis());
+    Predicate statusPredicate = Predicate.IN("status", statuses.stream().map(Enum::toString).toArray());
+    Predicate typePredicate = Predicate.EQ("type", type.toString());
+    Predicate timestampPredicate = Predicate.GE("createTime", activeTimestamp);
+    return findByPredicate(Predicate.AND(statusPredicate, typePredicate, timestampPredicate));
   }
 
   @Override

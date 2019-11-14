@@ -21,11 +21,10 @@ package org.apache.pinot.thirdeye.anomaly.detection.trigger.utils;
 
 import java.util.List;
 
-
 /**
  * Configuration class for DataAvailabilityListener.
  */
-public class DataAvailabilityListenerConfiguration {
+public class DataAvailabilitySchedulingConfiguration {
   private String consumerClass;
   private String kafkaBootstrapServers;
   private String kafkaTopic;
@@ -37,6 +36,10 @@ public class DataAvailabilityListenerConfiguration {
   private long consumerPollTimeInMilli = 5_000; // consumer wait 5 secs by default for the buffer to be filled
   private List<String> dataSourceWhitelist;
   private List<String> filterClassList;
+  // delay time after each run for the scheduler to reduce DB polling
+  private long schedulerDelayInSec = 300;
+  // default threshold if detection level threshold is not set
+  private long taskTriggerFallBackTimeInSec = 24 * 60;
 
   public String getConsumerClass() {
     return consumerClass;
@@ -124,5 +127,21 @@ public class DataAvailabilityListenerConfiguration {
 
   public void setFilterClassList(List<String> filterClassList) {
     this.filterClassList = filterClassList;
+  }
+
+  public long getSchedulerDelayInSec() {
+    return schedulerDelayInSec;
+  }
+
+  public void setSchedulerDelayInSec(long schedulerDelayInSec) {
+    this.schedulerDelayInSec = schedulerDelayInSec;
+  }
+
+  public long getTaskTriggerFallBackTimeInSec() {
+    return taskTriggerFallBackTimeInSec;
+  }
+
+  public void setTaskTriggerFallBackTimeInSec(long taskTriggerFallBackTimeInSec) {
+    this.taskTriggerFallBackTimeInSec = taskTriggerFallBackTimeInSec;
   }
 }
