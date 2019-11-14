@@ -65,6 +65,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
   public static final String ATTR_METRIC_GRANULARITY = "metricGranularity";
   public static final String ATTR_STATUS_CLASSIFICATION = "statusClassification";
   public static final String ATTR_AGGREGATE_MULTIPLIER = "aggregateMultiplier";
+  public static final String ATTR_DETECTION_ID = "detectionConfigId";
 
   private final MergedAnomalyResultManager anomalyDAO;
   private final MetricConfigManager metricDAO;
@@ -103,6 +104,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
 
     DatasetConfigDTO dataset = this.datasetDAO.findByDataset(metric.getDataset());
     String functionName = "unknown";
+    Long detectionConfigId = null;
 
     if (anomaly.getDetectionConfigId() != null){
       DetectionConfigDTO detectionConfigDTO = detectionDAO.findById(anomaly.getDetectionConfigId());
@@ -110,6 +112,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
         throw new IllegalArgumentException(String.format("could not resolve detection config id %d", anomaly.getDetectionConfigId()));
       }
       functionName = detectionConfigDTO.getName();
+      detectionConfigId = anomaly.getDetectionConfigId();
     }
 
     if (anomaly.getFunctionId() != null){
@@ -120,6 +123,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
     }
 
     attributes.put(ATTR_FUNCTION, functionName);
+    attributes.put(ATTR_DETECTION_ID, String.valueOf(detectionConfigId));
 
     String comment = "";
     AnomalyFeedbackType status = AnomalyFeedbackType.NO_FEEDBACK;
