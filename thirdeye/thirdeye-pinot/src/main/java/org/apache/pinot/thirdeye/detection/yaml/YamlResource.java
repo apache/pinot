@@ -28,20 +28,18 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 import javax.annotation.security.PermitAll;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.Consumes;
@@ -77,6 +75,8 @@ import org.apache.pinot.thirdeye.datalayer.dto.SessionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.cache.metadata.FormattedDetectionConfigsCacheLoader;
+import org.apache.pinot.thirdeye.datasource.cache.metadata.MetaDataCollectionCache;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
@@ -95,7 +95,6 @@ import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
 import org.apache.pinot.thirdeye.detection.validators.SubscriptionConfigValidator;
 import org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator;
 import org.apache.pinot.thirdeye.detection.yaml.translator.SubscriptionConfigTranslator;
-import org.apache.pinot.thirdeye.formatter.DetectionConfigFormatter;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -144,7 +143,7 @@ public class YamlResource {
   private final Yaml yaml;
   private final ExecutorService executor;
   private final long previewTimeout;
-  private final DetectionConfigFormatter detectionConfigFormatter;
+  private final MetaDataCollectionCache<List<Map<String, Object>>> formattedDetectionConfigsCache;
 
   public YamlResource(DetectionPreviewConfiguration previewConfig) {
     this.detectionConfigDAO = DAORegistry.getInstance().getDetectionConfigManager();
@@ -173,7 +172,8 @@ public class YamlResource {
 
     this.detectionValidator = new DetectionConfigValidator(this.provider);
     this.subscriptionValidator = new SubscriptionConfigValidator();
-    this.detectionConfigFormatter = new DetectionConfigFormatter(metricDAO, datasetDAO);
+    this.formattedDetectionConfigsCache = new MetaDataCollectionCache<>(
+        new FormattedDetectionConfigsCacheLoader(this.detectionConfigDAO, this.metricDAO, this.datasetDAO));
   }
 
   /*
@@ -866,20 +866,12 @@ public class YamlResource {
 
   /**
    * List all yaml configurations as JSON enhanced with detection config id, isActive and createBy information.
-   *
-   * @param id id of a specific detection config yaml to list (optional)
    * @return the yaml configuration converted in to JSON, with enhanced information from detection config DTO.
    */
   @GET
   @Path("/list")
   @Produces(MediaType.APPLICATION_JSON)
-  public List<Object> listYamls(@QueryParam("id") Long id){
-    List<DetectionConfigDTO> detectionConfigDTOs;
-    if (id == null) {
-      detectionConfigDTOs = this.detectionConfigDAO.findAll();
-    } else {
-      detectionConfigDTOs = Collections.singletonList(this.detectionConfigDAO.findById(id));
-    }
-    return detectionConfigDTOs.parallelStream().map(this.detectionConfigFormatter::format).collect(Collectors.toList());
+  public List<Map<String, Object>> listYamls() throws ExecutionException {
+    return formattedDetectionConfigsCache.get();
   }
 }

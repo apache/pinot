@@ -70,6 +70,8 @@ import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.cache.metadata.DetectionAlertConfigsCacheLoader;
+import org.apache.pinot.thirdeye.datasource.cache.metadata.MetaDataCollectionCache;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
@@ -115,6 +117,7 @@ public class DetectionResource {
   private final DetectionAlertConfigManager detectionAlertConfigDAO;
   private final DetectionConfigFormatter detectionConfigFormatter;
   private final DetectionAlertConfigFormatter subscriptionConfigFormatter;
+  private final MetaDataCollectionCache<List<DetectionAlertConfigDTO>> detectionAlertConfigsCache;
 
   public DetectionResource() {
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
@@ -138,6 +141,7 @@ public class DetectionResource {
     this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, evaluationDAO, timeseriesLoader, aggregationLoader, loader);
     this.detectionConfigFormatter = new DetectionConfigFormatter(metricDAO, datasetDAO);
     this.subscriptionConfigFormatter = new DetectionAlertConfigFormatter();
+    this.detectionAlertConfigsCache = new MetaDataCollectionCache<>(new DetectionAlertConfigsCacheLoader(this.detectionAlertConfigDAO));
   }
 
   @Path("/{id}")
@@ -168,7 +172,7 @@ public class DetectionResource {
   @GET
   @ApiOperation("get a list of detection alert configs for a given detection config id")
   public Response getSubscriptionGroups(@ApiParam("the detection config id") @PathParam("id") long id){
-    List<DetectionAlertConfigDTO> detectionAlertConfigDTOs = this.detectionAlertConfigDAO.findAll();
+    List<DetectionAlertConfigDTO> detectionAlertConfigDTOs = this.detectionAlertConfigsCache.get();
     Set<DetectionAlertConfigDTO> subscriptionGroupAlertDTOs = new HashSet<>();
     for (DetectionAlertConfigDTO alertConfigDTO : detectionAlertConfigDTOs){
       if (alertConfigDTO.getVectorClocks().containsKey(id) || ConfigUtils.getLongs(alertConfigDTO.getProperties().get("detectionConfigIds")).contains(id)){
@@ -183,7 +187,7 @@ public class DetectionResource {
   @GET
   @ApiOperation("get all detection alert configs")
   public Response getAllSubscriptionGroups(){
-    List<DetectionAlertConfigDTO> detectionAlertConfigDTOs = this.detectionAlertConfigDAO.findAll();
+    List<DetectionAlertConfigDTO> detectionAlertConfigDTOs = this.detectionAlertConfigsCache.get();
     return Response.ok(detectionAlertConfigDTOs.stream().map(this.subscriptionConfigFormatter::format).collect(Collectors.toList())).build();
   }
 

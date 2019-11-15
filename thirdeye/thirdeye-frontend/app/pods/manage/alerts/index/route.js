@@ -28,7 +28,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
   model() {
     return hash({
       applications: fetch('/thirdeye/entity/APPLICATION').then(checkStatus),
-      detectionAlertConfig: fetch('/thirdeye/entity/DETECTION_ALERT_CONFIG').then(checkStatus),
+      detectionAlertConfig: fetch('/detection/subscription-groups').then(checkStatus),
       polishedDetectionYaml: fetch('/yaml/list').then(checkStatus)
     });
   },
@@ -60,7 +60,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
 
     // Iterate through detection alerter to enhance all yaml alert with extra properties (group name, application)
     for (let subscriptionGroup of model.detectionAlertConfig){
-      const detectionConfigIds = Object.keys(subscriptionGroup.vectorClocks);
+      const detectionConfigIds = subscriptionGroup.detectionConfigIds;
       for (let id of detectionConfigIds) {
         let foundAlert = alerts.find(yamlAlert => yamlAlert.id.toString() === id);
         if (foundAlert) {

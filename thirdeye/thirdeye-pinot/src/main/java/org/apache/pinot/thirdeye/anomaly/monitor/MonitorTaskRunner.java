@@ -26,6 +26,8 @@ import org.apache.pinot.thirdeye.anomaly.task.TaskContext;
 import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
 import org.apache.pinot.thirdeye.anomaly.task.TaskResult;
 import org.apache.pinot.thirdeye.anomaly.task.TaskRunner;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.JobDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
@@ -37,6 +39,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.thirdeye.detection.health.DetectionHealth;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,8 +117,32 @@ public class MonitorTaskRunner implements TaskRunner {
           LOG.info("COMPLETED jobs {}", scheduledJobs.keySet());
         }
       }
+
+      // update detection health
+      updateDetectionHealth();
     } catch (Exception e) {
       LOG.error("Exception in monitor update task", e);
+    }
+  }
+
+  private void updateDetectionHealth() {
+    DetectionConfigManager detectionDAO = DAO_REGISTRY.getDetectionConfigManager();
+    List<DetectionConfigDTO> detectionConfigs = detectionDAO.findAllActive();
+    for (DetectionConfigDTO config : detectionConfigs) {
+      // update detection health status
+      try {
+        DateTime healthStatusWindowEnd = DateTime.now();
+        config.setHealth(new DetectionHealth.Builder(config.getId(), healthStatusWindowEnd.minusDays(30).getMillis(),
+            healthStatusWindowEnd.getMillis()).addRegressionStatus(DAO_REGISTRY.getEvaluationManager())
+            .addAnomalyCoverageStatus(DAO_REGISTRY.getMergedAnomalyResultDAO())
+            .addDetectionTaskStatus(DAO_REGISTRY.getTaskDAO())
+            .addOverallHealth()
+            .build());
+        detectionDAO.update(config);
+        LOG.info("Updated detection health for {}", config.getId());
+      } catch (Exception e) {
+        LOG.info("Update detection health for {} failed", config.getId(), e);
+      }
     }
   }
 

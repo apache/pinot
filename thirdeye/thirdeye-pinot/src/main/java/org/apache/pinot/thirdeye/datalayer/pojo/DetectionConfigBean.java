@@ -23,6 +23,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.pinot.thirdeye.detection.health.DetectionHealth;
+
 
 /**
  * ConfigBean holds namespaced key-value configuration values.  Values are serialized into the
@@ -45,6 +47,7 @@ public class DetectionConfigBean extends AbstractBean {
   List<String> owners;
   boolean isDataAvailabilitySchedule;
   long taskTriggerFallBackTimeInSec;
+  DetectionHealth health;
 
   public List<String> getOwners() {
     return owners;
@@ -140,6 +143,14 @@ public class DetectionConfigBean extends AbstractBean {
 
   public void setTaskTriggerFallBackTimeInSec(long taskTriggerFallBackTimeInSec) {
     this.taskTriggerFallBackTimeInSec = taskTriggerFallBackTimeInSec;
+  }
+
+  public DetectionHealth getHealth() {
+    return health;
+  }
+
+  public void setHealth(DetectionHealth health) {
+    this.health = health;
   }
 
   @Override

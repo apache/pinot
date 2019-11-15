@@ -18,31 +18,25 @@
  *
  */
 
-package org.apache.pinot.thirdeye.formatter;
+package org.apache.pinot.thirdeye.datasource.cache.metadata;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 
 
 /**
- * The detection alert config formatter
+ * The cache loader to load the list of detection alert config
  */
-public class DetectionAlertConfigFormatter implements DTOFormatter<DetectionAlertConfigDTO> {
-  private static final String ATTR_NAME = "name";
-  private static final String ATTR_YAML = "yaml";
-  private static final String ATTR_ACTIVE = "active";
-  private static final String ATTR_ID = "id";
-  private static final String ATTR_DETECTION_CONFIG_IDS = "detectionConfigIds";
+public class DetectionAlertConfigsCacheLoader implements MetadataCacheLoader<List<DetectionAlertConfigDTO>> {
+  private final DetectionAlertConfigManager detectionAlertConfigManager;
+
+  public DetectionAlertConfigsCacheLoader(DetectionAlertConfigManager detectionAlertConfigManager) {
+    this.detectionAlertConfigManager = detectionAlertConfigManager;
+  }
 
   @Override
-  public Map<String, Object> format(DetectionAlertConfigDTO config) {
-    Map<String, Object> output = new HashMap<>();
-    output.put(ATTR_NAME, config.getName());
-    output.put(ATTR_YAML, config.getYaml());
-    output.put(ATTR_ID, config.getId());
-    output.put(ATTR_ACTIVE, config.isActive());
-    output.put(ATTR_DETECTION_CONFIG_IDS, config.getVectorClocks().keySet());
-    return output;
+  public List<DetectionAlertConfigDTO> loadMetaData() {
+    return this.detectionAlertConfigManager.findAll();
   }
 }

@@ -143,6 +143,17 @@ public class DetectionHealth {
     }
 
     /**
+     * Add the detection task health status in the health report built by the builder. Do not return any task details
+     * @param taskDAO the task dao
+     * @return the builder
+     */
+    public Builder addDetectionTaskStatus(TaskManager taskDAO) {
+      this.taskDAO = taskDAO;
+      this.taskLimit = 0;
+      return this;
+    }
+
+    /**
      * Add the global health status in the report built by the builder, consider both regression health, coverage ratio and task health.
      * The overall health can be generated only if regression health, coverage ratio and task health are available.
      * @return the builder
