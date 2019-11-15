@@ -24,8 +24,8 @@ Below are the examples of Pinot Kubernetes deployments on different Cloud enviro
 
 ## Deploy Pinot Cluster using [Helm](<https://helm.sh/docs/using_helm/#installing-helm>)
 
-Please go to directory `helm` for the detailed example.
+Please go to directory [helm](helm) for the detailed example.
 
 ## Deploy Pinot Cluster using [Skaffold](<https://skaffold.dev/docs/getting-started>) on [Google Kubernetes Engine(GKE)](https://cloud.google.com/kubernetes-engine/)
 
-Please go to directory `skaffold/gke` for the detailed example.
+Please go to directory [skaffold/gke](skaffold/gke) for the detailed example.
