@@ -19,11 +19,15 @@
 
 package org.apache.pinot.thirdeye.detection.cache;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -31,14 +35,17 @@ import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
  */
 
 public class ThirdEyeCacheResponse {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeCacheResponse.class);
+
   private final ThirdEyeCacheRequest request;
-  private List<TimeSeriesDataPoint> rows;
+  private List<TimeSeriesDataPoint> timeSeriesRows;
   private long firstTimestamp;
   private long lastTimestamp;
 
-  public ThirdEyeCacheResponse(ThirdEyeCacheRequest request, List<TimeSeriesDataPoint> rows) {
+  public ThirdEyeCacheResponse(ThirdEyeCacheRequest request, List<TimeSeriesDataPoint> timeSeriesRows) {
     this.request = request;
-    this.rows = rows;
+    this.timeSeriesRows = timeSeriesRows;
     this.initializeFirstAndLastTimestamps();
   }
 
@@ -53,23 +60,22 @@ public class ThirdEyeCacheResponse {
       this.setFirstTimestamp(Long.MAX_VALUE);
       this.setLastTimestamp(Long.MIN_VALUE);
     } else {
-      this.setFirstTimestamp(rows.get(0).getTimestamp());
-      this.setLastTimestamp(rows.get(rows.size() - 1).getTimestamp());
+      this.setFirstTimestamp(timeSeriesRows.get(0).getTimestamp());
+      this.setLastTimestamp(timeSeriesRows.get(timeSeriesRows.size() - 1).getTimestamp());
     }
   }
 
   public ThirdEyeCacheRequest getCacheRequest() { return request; }
-  public List<TimeSeriesDataPoint> getRows() { return rows; }
+  public List<TimeSeriesDataPoint> getTimeSeriesRows() { return timeSeriesRows; }
 
-  public int getNumRows() { return rows.size(); }
-  public boolean hasNoRows() { return rows.isEmpty(); }
+  public int getNumRows() { return timeSeriesRows.size(); }
+  public boolean hasNoRows() { return timeSeriesRows.isEmpty(); }
   public long getFirstTimestamp() { return firstTimestamp; }
   public long getLastTimestamp() { return lastTimestamp; }
 
   public void setFirstTimestamp(long timestamp) {
     this.firstTimestamp = timestamp;
   }
-
   public void setLastTimestamp(long timestamp) {
     this.lastTimestamp = timestamp;
   }
@@ -82,6 +88,7 @@ public class ThirdEyeCacheResponse {
    */
 
   public boolean isMissingSlice(long sliceStart, long sliceEnd) {
+    checkAndLogMissingMiddleSlices();
     return isMissingStartSlice(sliceStart) || isMissingEndSlice(sliceEnd);
   }
 
@@ -114,6 +121,36 @@ public class ThirdEyeCacheResponse {
   }
 
   /**
+   * Checks if there is missing data in the middle of a time-series, and logs them
+   * if there are. May be "inaccurate" if the original time-series is also missing
+   * data points from the middle of the series.
+   */
+  private void checkAndLogMissingMiddleSlices() {
+
+    List<String> missingTimestamps = new ArrayList<>();
+    long timeGranularity = request.getRequest().getGroupByTimeGranularity().toMillis();
+
+    // remember that we return the cached timeseries in sorted order,
+    // but this assumption is not necessarily true if mergeSliceIntoRows() has been called.
+    for (int i = 1; i < timeSeriesRows.size(); i++) {
+      long previousTimestamp = timeSeriesRows.get(i - 1).getTimestamp();
+      long currentTimestamp = timeSeriesRows.get(i).getTimestamp();
+
+      // add all missing timestamps between previous timestamp and current timestamp to
+      // the list of missing timestamps.
+      while (previousTimestamp + timeGranularity < currentTimestamp) {
+        missingTimestamps.add(String.valueOf(previousTimestamp + timeGranularity));
+        previousTimestamp += timeGranularity;
+      }
+    }
+
+    if (missingTimestamps.size() > 0) {
+      LOG.info("cached time-series for metricUrn {} was missing data points in the middle for {} timestamps: {}",
+          request.getMetricUrn(), missingTimestamps.size(), String.join(",", missingTimestamps));
+    }
+  }
+
+  /**
    * Used to merge in some new time-series slice into the rows we currently have.
    * The main use case is for when we have a partial cache hit, i.e. only part of the
    * requested data was found in the cache, and need to merge in the new slice that
@@ -137,7 +174,7 @@ public class ThirdEyeCacheResponse {
           this.setLastTimestamp(timestamp);
         }
 
-        rows.add(new TimeSeriesDataPoint(metricUrn, timestamp, metric.getMetricId(), row.get(metric.toString())));
+        timeSeriesRows.add(new TimeSeriesDataPoint(metricUrn, timestamp, metric.getMetricId(), row.get(metric.toString())));
       }
     }
   }

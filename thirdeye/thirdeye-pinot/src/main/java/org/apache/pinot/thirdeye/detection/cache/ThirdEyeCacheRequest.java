@@ -32,20 +32,13 @@ import org.apache.pinot.thirdeye.util.CacheUtils;
 public class ThirdEyeCacheRequest {
 
   ThirdEyeRequest request;
-  private long metricId;
   private String metricUrn;
-  private long startTimeInclusive;
-  private long endTimeExclusive;
   private String dimensionKey;
 
-  public ThirdEyeCacheRequest(ThirdEyeRequest request, long metricId, String metricUrn, long startTimeInclusive, long endTimeExclusive) {
+  public ThirdEyeCacheRequest(ThirdEyeRequest request) {
     this.request = request;
-    this.metricId = metricId;
-    this.metricUrn = metricUrn;
-    this.startTimeInclusive = startTimeInclusive;
-    this.endTimeExclusive = endTimeExclusive;
-
-    this.dimensionKey = CacheUtils.hashMetricUrn(metricUrn);
+    this.metricUrn = MetricEntity.fromMetric(request.getFilterSet().asMap(), this.getMetricId()).getUrn();
+    this.dimensionKey = CacheUtils.hashMetricUrn(this.metricUrn);
   }
 
   /**
@@ -54,24 +47,18 @@ public class ThirdEyeCacheRequest {
    * @return ThirdEyeCacheRequest
    */
   public static ThirdEyeCacheRequest from(ThirdEyeRequest request) {
-
-    long metricId = request.getMetricFunctions().get(0).getMetricId();
-    String metricUrn = MetricEntity.fromMetric(request.getFilterSet().asMap(), metricId).getUrn();
-    long startTime = request.getStartTimeInclusive().getMillis();
-    long endTime = request.getEndTimeExclusive().getMillis();
-
-    return new ThirdEyeCacheRequest(request, metricId, metricUrn, startTime, endTime);
+    return new ThirdEyeCacheRequest(request);
   }
 
   public ThirdEyeRequest getRequest() { return request; }
 
-  public long getMetricId() { return metricId; }
+  public long getMetricId() { return request.getMetricFunctions().get(0).getMetricId(); }
 
   public String getMetricUrn() { return metricUrn; }
 
-  public long getStartTimeInclusive() { return startTimeInclusive; }
+  public long getStartTimeInclusive() { return request.getStartTimeInclusive().getMillis(); }
 
-  public long getEndTimeExclusive() { return endTimeExclusive; }
+  public long getEndTimeExclusive() { return request.getEndTimeExclusive().getMillis(); }
 
   public String getDimensionKey() { return dimensionKey; }
 }

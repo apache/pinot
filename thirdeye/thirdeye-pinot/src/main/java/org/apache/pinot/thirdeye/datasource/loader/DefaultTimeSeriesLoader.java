@@ -61,7 +61,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
 
     TimeSeriesRequestContainer rc = DataFrameUtils.makeTimeSeriesRequestAligned(slice, "ref", this.metricDAO, this.datasetDAO);
     ThirdEyeResponse response;
-    if (CacheConfig.useCentralizedCache()) {
+    if (CacheConfig.getInstance().useCentralizedCache()) {
       response = this.timeSeriesCache.fetchTimeSeries(rc.getRequest());
     } else {
       response = this.queryCache.getQueryResult(rc.getRequest());

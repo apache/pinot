@@ -62,6 +62,16 @@ public class TimeSeriesDataPoint {
   }
 
   /**
+   * gets data value as a double for storing into cache. We don't want to
+   * directly use something like Double.parseDouble(dataValue) in other parts
+   * of the code because handling the possible null values would be messy.
+   * @return data value as double, or 0 if it is null
+   */
+  public double getDataValueAsDouble() {
+    return Double.parseDouble(this.getDataValue());
+  }
+
+  /**
    * We use this the hashed metricURN (using CRC32) as the key for the
    * associated key-value pair in Couchbase.
    * @return hashed metricURN

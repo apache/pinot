@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
@@ -79,7 +78,7 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
    */
   public ThirdEyeResponse fetchTimeSeries(ThirdEyeRequest thirdEyeRequest) throws Exception {
 
-    if (!CacheConfig.useCentralizedCache()) {
+    if (!CacheConfig.getInstance().useCentralizedCache()) {
       return this.queryCache.getQueryResult(thirdEyeRequest);
     }
 
@@ -104,9 +103,6 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
   private void fetchMissingSlices(ThirdEyeCacheResponse cacheResponse) throws Exception {
 
     ThirdEyeRequest request = cacheResponse.getCacheRequest().getRequest();
-    long metricId = request.getMetricFunctions().get(0).getMetricId();
-    long requestSliceStart = request.getStartTimeInclusive().getMillis();
-    long requestSliceEnd = request.getEndTimeExclusive().getMillis();
 
     ThirdEyeResponse result;
     MetricSlice slice;
@@ -116,6 +112,10 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
       insertTimeSeriesIntoCache(result);
       cacheResponse.mergeSliceIntoRows(result);
     } else {
+
+      long metricId = request.getMetricFunctions().get(0).getMetricId();
+      long requestSliceStart = request.getStartTimeInclusive().getMillis();
+      long requestSliceEnd = request.getEndTimeExclusive().getMillis();
 
       if (cacheResponse.isMissingStartSlice(requestSliceStart)) {
         slice = MetricSlice.from(metricId, requestSliceStart, cacheResponse.getFirstTimestamp(), request.getFilterSet(),
@@ -162,7 +162,7 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
     TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetDTO);
     DateTimeZone timeZone = DateTimeZone.forID(datasetDTO.getTimezone());
 
-    for (TimeSeriesDataPoint dataPoint : cacheResponse.getRows()) {
+    for (TimeSeriesDataPoint dataPoint : cacheResponse.getTimeSeriesRows()) {
       int timeBucketIndex = TimeRangeUtils.computeBucketIndex(
           request.getGroupByTimeGranularity(), request.getStartTimeInclusive(), new DateTime(dataPoint.getTimestamp(), timeZone));
 

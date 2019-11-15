@@ -23,12 +23,16 @@ package org.apache.pinot.thirdeye.detection.cache;
   Constants used for centralized-cache related code.
  */
 public class CacheConstants {
+  // timestamp field used to get timestamp in RelationalThirdEyeResponse
   public static final String TIMESTAMP = "timestamp";
 
   // couchbase document field names
   public static final String BUCKET = "bucket";
-  public static final String TIME = "time";
+
+  // metricId
   public static final String METRIC_ID = "metricId";
+
+  // used to designate start and end timestamps for Couchbase query
   public static final String START = "start";
   public static final String END = "end";
 

@@ -96,7 +96,7 @@ public class DefaultDataProvider implements DataProvider {
     this.aggregationLoader = aggregationLoader;
     this.loader = loader;
 
-    if (CacheConfig.useInMemoryCache()) {
+    if (CacheConfig.getInstance().useInMemoryCache()) {
       if (DETECTION_TIME_SERIES_CACHE == null) {
         // don't use more than one third of memory for detection time series
         long cacheSize = Runtime.getRuntime().freeMemory() / 3;
@@ -129,7 +129,7 @@ public class DefaultDataProvider implements DataProvider {
       Map<MetricSlice, DataFrame> output = new HashMap<>();
 
       // if the time series slice is already in cache, return directly
-      if (CacheConfig.useInMemoryCache()) {
+      if (CacheConfig.getInstance().useInMemoryCache()) {
         for (MetricSlice slice : slices) {
           LOG.info(slice.toString());
           for (Map.Entry<MetricSlice, DataFrame> entry : DETECTION_TIME_SERIES_CACHE.asMap().entrySet()) {
@@ -179,7 +179,7 @@ public class DefaultDataProvider implements DataProvider {
         alignedMetricSlicesToOriginalSlice.put(alignSlice(slice), slice);
       }
       Map<MetricSlice, DataFrame> cacheResult;
-      if (CacheConfig.useInMemoryCache()) {
+      if (CacheConfig.getInstance().useInMemoryCache()) {
         cacheResult = DETECTION_TIME_SERIES_CACHE.getAll(alignedMetricSlicesToOriginalSlice.keySet());
       } else {
         cacheResult = loadTimeseries(alignedMetricSlicesToOriginalSlice.keySet());

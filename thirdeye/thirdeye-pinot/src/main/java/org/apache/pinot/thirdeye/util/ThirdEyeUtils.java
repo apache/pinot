@@ -641,6 +641,27 @@ public abstract class ThirdEyeUtils {
     }
   }
 
+  public static long getCachingPeriodLookback(TimeGranularity granularity) {
+    long period;
+    switch (granularity.getUnit()) {
+      case DAYS:
+        // 90 days data for daily detection
+        period = TimeUnit.DAYS.toMillis(90);
+        break;
+      case HOURS:
+        // 60 days data for hourly detection
+        period = TimeUnit.DAYS.toMillis(60);
+        break;
+      case MINUTES:
+        // disable minute level cache warmup by default.
+        period = -1;
+        break;
+      default:
+        period = -1;
+    }
+    return period;
+  }
+
   /**
    * Combine two components with comma separated.
    * For example, will combine "component1" and "component2" into "component1, component2".

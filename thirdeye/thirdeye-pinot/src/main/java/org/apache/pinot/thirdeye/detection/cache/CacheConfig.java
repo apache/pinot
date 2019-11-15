@@ -52,14 +52,14 @@ public class CacheConfig {
 
   public static CacheConfig getInstance() { return instance; }
 
-  public static boolean useCentralizedCache() { return useCentralizedCache; }
-  public static boolean useInMemoryCache() { return useInMemoryCache; }
-  public static CentralizedCacheConfig getCentralizedCacheSettings() { return centralizedCacheSettings; }
+  public boolean useCentralizedCache() { return useCentralizedCache; }
+  public boolean useInMemoryCache() { return useInMemoryCache; }
+  public CentralizedCacheConfig getCentralizedCacheSettings() { return centralizedCacheSettings; }
 
-  public static String getHost() { return host; }
-  public static String getAuthUsername() { return authUsername; }
-  public static String getAuthPassword() { return authPassword; }
-  public static String getBucketName() { return bucketName; }
+  public String getHost() { return host; }
+  public String getAuthUsername() { return authUsername; }
+  public String getAuthPassword() { return authPassword; }
+  public String getBucketName() { return bucketName; }
 
   public void setUseCentralizedCache(boolean toggle) { useCentralizedCache = toggle; }
   public void setUseInMemoryCache(boolean toggle) { useInMemoryCache = toggle; }

@@ -69,7 +69,7 @@ public class CacheUtilTest {
 
     Assert.assertEquals(mappedDataPoint.getLong("time").longValue(), 1234567);
     Assert.assertEquals(mappedDataPoint.getLong("metricId").longValue(), 1);
-    Assert.assertEquals(mappedDataPoint.getString(dataPoint.getMetricUrnHash()), "100.0");
+    Assert.assertEquals(mappedDataPoint.getDouble(dataPoint.getMetricUrnHash()), (double)100);
   }
 
   @Test
@@ -77,7 +77,7 @@ public class CacheUtilTest {
     dataPoint.setDataValue(null);
     JsonObject mappedDataPoint = CacheUtils.buildDocumentStructure(dataPoint);
 
-    Assert.assertEquals(mappedDataPoint.getString(dataPoint.getMetricUrnHash()), "0");
+    Assert.assertEquals(mappedDataPoint.getDouble(dataPoint.getMetricUrnHash()), (double)0);
   }
 
   @Test
@@ -85,7 +85,7 @@ public class CacheUtilTest {
     dataPoint.setDataValue("null");
     JsonObject mappedDataPoint = CacheUtils.buildDocumentStructure(dataPoint);
 
-    Assert.assertEquals(mappedDataPoint.getString(dataPoint.getMetricUrnHash()), "0");
+    Assert.assertEquals(mappedDataPoint.getDouble(dataPoint.getMetricUrnHash()), (double)0);
   }
 
   @Test

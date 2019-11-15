@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -49,6 +50,7 @@ import org.apache.pinot.thirdeye.detection.PredictionResult;
 import org.apache.pinot.thirdeye.detection.cache.CacheConfig;
 import org.apache.pinot.thirdeye.detection.spi.exception.DetectorDataInsufficientException;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
@@ -246,7 +248,7 @@ public class DimensionWrapper extends DetectionPipeline {
 
     // don't use in-memory cache for dimension exploration, it will cause thrashing
     // we add a "duplicate" condition so that tests can run. will fix tests later on
-    if (CacheConfig.useCentralizedCache() && !CacheConfig.useInMemoryCache()) {
+    if (CacheConfig.getInstance().useCentralizedCache() && !CacheConfig.getInstance().useInMemoryCache()) {
       if (this.cachingPeriodLookback >= 0) {
         this.provider.fetchTimeseries(nestedMetrics.stream()
             .map(metricEntity -> MetricSlice.from(metricEntity.getId(), startTime - cachingPeriodLookback, endTime,

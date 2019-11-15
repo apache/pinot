@@ -39,6 +39,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.detection.cache.CacheConfig;
 import org.apache.pinot.thirdeye.detection.cache.CacheConfigLoader;
 import org.apache.pinot.thirdeye.detection.cache.CacheDataSource;
+import org.apache.pinot.thirdeye.detection.cache.CentralizedCacheConfig;
 import org.apache.pinot.thirdeye.detection.cache.CouchbaseCacheDAO;
 import org.apache.pinot.thirdeye.detection.cache.DefaultTimeSeriesCache;
 import org.apache.pinot.thirdeye.detection.cache.TimeSeriesCache;
@@ -103,26 +104,35 @@ public class ThirdEyeCacheRegistry {
       URL cacheConfigUrl = thirdeyeConfig.getCacheConfigAsUrl();
       CacheConfig cacheConfig = CacheConfigLoader.fromCacheConfigUrl(cacheConfigUrl);
       if (cacheConfig == null) {
-        throw new IllegalStateException("Could not get cache config from path " + cacheConfigUrl);
+        LOGGER.error("Could not get cache config from path {} - using default settings", cacheConfigUrl);
+
+        CentralizedCacheConfig cfg = new CentralizedCacheConfig();
+        cfg.setMaxParallelInserts(1);
+
+        CacheConfig.getInstance().setUseCentralizedCache(false);
+        CacheConfig.getInstance().setUseInMemoryCache(true);
+        CacheConfig.getInstance().setCentralizedCacheSettings(cfg);
+      } else {
+        CacheDataSource dataSource = CacheConfig.getInstance().getCentralizedCacheSettings().getDataSourceConfig();
+
+        cacheConfig.setHost(dataSource.getHost());
+        cacheConfig.setAuthUsername(dataSource.getAuthUsername());
+        cacheConfig.setAuthPassword(dataSource.getAuthPassword());
+        cacheConfig.setBucketName(dataSource.getBucketName());
       }
 
-      CacheDataSource dataSource = CacheConfig.getCentralizedCacheSettings().getDataSourceConfig();
-
-      cacheConfig.setHost(dataSource.getHost());
-      cacheConfig.setAuthUsername(dataSource.getAuthUsername());
-      cacheConfig.setAuthPassword(dataSource.getAuthPassword());
-      cacheConfig.setBucketName(dataSource.getBucketName());
-
       if (INSTANCE.getTimeSeriesCache() == null) {
+        // TODO: add generic cache DAO
         TimeSeriesCache timeSeriesCache = new DefaultTimeSeriesCache(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
             ThirdEyeCacheRegistry.getInstance().getQueryCache(),
             new CouchbaseCacheDAO(),
-            Executors.newFixedThreadPool(CacheConfig.getCentralizedCacheSettings().getMaxParallelInserts()));
+            Executors.newFixedThreadPool(CacheConfig.getInstance().getCentralizedCacheSettings().getMaxParallelInserts()));
 
         ThirdEyeCacheRegistry.getInstance().registerTimeSeriesCache(timeSeriesCache);
       }
     } catch (Exception e) {
-      LOGGER.info("Caught exception while initializing centralized cache", e);
+      LOGGER.error("Caught exception while initializing centralized cache", e);
+      System.exit(1);
     }
   }
 

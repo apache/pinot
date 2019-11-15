@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.util;
 
 import com.couchbase.client.java.document.json.JsonObject;
 import java.util.zip.CRC32;
+import org.apache.pinot.thirdeye.detection.cache.CacheConstants;
 import org.apache.pinot.thirdeye.detection.cache.TimeSeriesDataPoint;
 
 
@@ -59,9 +60,9 @@ public class CacheUtils {
    */
   public static JsonObject buildDocumentStructure(TimeSeriesDataPoint point) {
     JsonObject body = JsonObject.create()
-        .put("time", point.getTimestamp())
-        .put("metricId", point.getMetricId())
-        .put(point.getMetricUrnHash(), point.getDataValue());
+        .put(CacheConstants.TIMESTAMP, point.getTimestamp())
+        .put(CacheConstants.METRIC_ID, point.getMetricId())
+        .put(point.getMetricUrnHash(), point.getDataValueAsDouble());
     return body;
   }
 
@@ -77,7 +78,7 @@ public class CacheUtils {
    * @return query string
    */
   public static String buildQuery(JsonObject parameters) {
-    return String.format("SELECT time, `%s` FROM `%s` WHERE metricId = %d AND `%s` IS NOT MISSING AND time BETWEEN %d AND %d ORDER BY time ASC",
+    return String.format("SELECT timestamp, `%s` FROM `%s` WHERE metricId = %d AND `%s` IS NOT MISSING AND timestamp BETWEEN %d AND %d ORDER BY time ASC",
         parameters.getString("dimensionKey"),
         parameters.getString("bucket"),
         parameters.getLong("metricId"),

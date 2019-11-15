@@ -46,7 +46,7 @@ public class CouchbaseCacheDAO {
   private Bucket bucket;
 
   public CouchbaseCacheDAO() {
-    if (CacheConfig.useCentralizedCache()) {
+    if (CacheConfig.getInstance().useCentralizedCache()) {
       this.createDataStoreConnection();
     }
   }
@@ -55,9 +55,10 @@ public class CouchbaseCacheDAO {
    * Initialize connection to Couchbase and open bucket where data is stored.
    */
   private void createDataStoreConnection() {
-    Cluster cluster = CouchbaseCluster.create(CacheConfig.getHost());
-    cluster.authenticate(CacheConfig.getAuthUsername(), CacheConfig.getAuthPassword());
-    this.bucket = cluster.openBucket(CacheConfig.getBucketName());
+    Cluster cluster = CouchbaseCluster.create(CacheConfig.getInstance().getHost());
+    cluster.authenticate(CacheConfig.getInstance().getAuthUsername(),
+                         CacheConfig.getInstance().getAuthPassword());
+    this.bucket = cluster.openBucket(CacheConfig.getInstance().getBucketName());
   }
 
   /**
@@ -88,7 +89,7 @@ public class CouchbaseCacheDAO {
 
     // NOTE: we subtract 1 granularity from the end date because Couchbase's BETWEEN clause is inclusive on both sides
     JsonObject parameters = JsonObject.create()
-        .put(CacheConstants.BUCKET, CacheConfig.getBucketName())
+        .put(CacheConstants.BUCKET, CacheConfig.getInstance().getBucketName())
         .put(CacheConstants.METRIC_ID, request.getMetricId())
         .put(CacheConstants.DIMENSION_KEY, request.getDimensionKey())
         .put(CacheConstants.START, request.getStartTimeInclusive())
@@ -114,9 +115,9 @@ public class CouchbaseCacheDAO {
     List<TimeSeriesDataPoint> timeSeriesRows = new ArrayList<>();
 
     for (N1qlQueryRow row : queryResult) {
-      long timestamp = row.value().getLong(CacheConstants.TIME);
-      String dataValue = row.value().getString(dimensionKey);
-      timeSeriesRows.add(new TimeSeriesDataPoint(request.getMetricUrn(), timestamp, request.getMetricId(), dataValue));
+      long timestamp = row.value().getLong(CacheConstants.TIMESTAMP);
+      Double dataValue = row.value().getDouble(dimensionKey);
+      timeSeriesRows.add(new TimeSeriesDataPoint(request.getMetricUrn(), timestamp, request.getMetricId(), String.valueOf(dataValue)));
     }
 
     return new ThirdEyeCacheResponse(request, timeSeriesRows);
@@ -137,19 +138,19 @@ public class CouchbaseCacheDAO {
    */
   public void insertTimeSeriesDataPoint(TimeSeriesDataPoint point) {
 
-    JsonDocument doc = bucket.getAndTouch(point.getDocumentKey(), CacheConfig.getCentralizedCacheSettings().getTTL());
+    JsonDocument doc = bucket.getAndTouch(point.getDocumentKey(), CacheConfig.getInstance().getCentralizedCacheSettings().getTTL());
     ThirdeyeMetricsUtil.couchbaseCallCounter.inc();
 
     if (doc == null) {
       JsonObject documentBody = CacheUtils.buildDocumentStructure(point);
-      doc = JsonDocument.create(point.getDocumentKey(), CacheConfig.getCentralizedCacheSettings().getTTL(), documentBody);
+      doc = JsonDocument.create(point.getDocumentKey(), CacheConfig.getInstance().getCentralizedCacheSettings().getTTL(), documentBody);
     } else {
       JsonObject dimensions = doc.content();
       if (dimensions.containsKey(point.getMetricUrnHash())) {
         return;
       }
 
-      dimensions.put(point.getMetricUrnHash(), point.getDataValue());
+      dimensions.put(point.getMetricUrnHash(), point.getDataValueAsDouble());
     }
 
     bucket.upsert(doc);

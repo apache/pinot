@@ -181,6 +181,8 @@ public class ThirdEyeConfiguration extends Configuration {
     this.dataSources = dataSources;
   }
 
+  public void setCacheDataSource(String cacheDataSource) { this.cacheDataSource = cacheDataSource; }
+
   public Map<String, Map<String, Object>> getAlerterConfiguration() {
     return alerterConfigurations;
   }
