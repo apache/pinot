@@ -149,7 +149,7 @@ public abstract class SegmentCreationJob extends BaseSegmentJob {
           }
         }
         _logger.info("Moving file from: {} to: {}", srcPath, destPath);
-        if (fileSystem.exists(destPath.getParent())) {
+        if (!fileSystem.exists(destPath.getParent())) {
           fileSystem.mkdirs(destPath.getParent());
         }
         fileSystem.rename(srcPath, destPath);
