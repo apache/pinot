@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spark.jobs;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.pinot.ingestion.common.ControllerRestApi;
@@ -57,7 +58,7 @@ public class SparkSegmentTarPushJob extends SegmentTarPushJob {
       JavaRDD<String> pathRDD = sparkContext.parallelize(segmentsToPush, segmentsToPush.size());
       pathRDD.foreach(segmentTarPath -> {
         try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
-          FileSystem fileSystem = FileSystem.get(new Path(segmentTarPath).toUri(), getConf());
+          FileSystem fileSystem = FileSystem.get(new Path(segmentTarPath).toUri(), new Configuration());
           // TODO: Deal with invalid prefixes in the future
           List<String> currentSegments = controllerRestApi.getAllSegments("OFFLINE");
           controllerRestApi.pushSegments(fileSystem, Arrays.asList(new Path(segmentTarPath)));
