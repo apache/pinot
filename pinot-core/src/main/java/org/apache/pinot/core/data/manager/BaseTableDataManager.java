@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -53,10 +54,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected String _tableDataDir;
   protected File _indexDir;
   protected Logger _logger;
+  protected HelixAdmin _helixAdmin;
+  protected String _clusterName;
 
   @Override
   public void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics) {
+      ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixAdmin admin, String clusterName) {
     LOGGER.info("Initializing table data manager for table: {}", tableDataManagerConfig.getTableName());
 
     _tableDataManagerConfig = tableDataManagerConfig;

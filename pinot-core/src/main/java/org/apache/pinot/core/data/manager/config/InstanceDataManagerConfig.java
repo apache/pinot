@@ -50,4 +50,6 @@ public interface InstanceDataManagerConfig {
   boolean isDirectRealtimeOffheapAllocation();
 
   int getMaxParallelSegmentBuilds();
+
+  boolean isEnableSegmentUploadToController();
 }

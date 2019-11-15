@@ -59,6 +59,7 @@ public class IndexLoadingConfig {
   private boolean _isRealtimeOffheapAllocation;
   private boolean _isDirectRealtimeOffheapAllocation;
   private boolean _enableSplitCommitEndWithMetadata;
+  private boolean _enableSegmentUploadToController;
 
   public IndexLoadingConfig(@Nonnull InstanceDataManagerConfig instanceDataManagerConfig,
       @Nonnull TableConfig tableConfig) {
@@ -166,6 +167,7 @@ public class IndexLoadingConfig {
       _realtimeAvgMultiValueCount = Integer.valueOf(avgMultiValueCount);
     }
     _enableSplitCommitEndWithMetadata = instanceDataManagerConfig.isEnableSplitCommitEndWithMetadata();
+    _enableSegmentUploadToController = instanceDataManagerConfig.isEnableSegmentUploadToController();
   }
 
   /**
@@ -306,5 +308,9 @@ public class IndexLoadingConfig {
 
   public int getRealtimeAvgMultiValueCount() {
     return _realtimeAvgMultiValueCount;
+  }
+
+  public boolean isEnableSegmentUploadToController() {
+    return _enableSegmentUploadToController;
   }
 }

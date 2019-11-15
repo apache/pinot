@@ -27,6 +27,7 @@ import java.util.Map;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.segment.ReadMode;
@@ -134,7 +135,7 @@ public abstract class BaseResourceTest {
     when(tableDataManagerConfig.getDataDir()).thenReturn(INDEX_DIR.getAbsolutePath());
     TableDataManager tableDataManager = TableDataManagerProvider
         .getTableDataManager(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class),
-            mock(ServerMetrics.class));
+            mock(ServerMetrics.class), mock(HelixAdmin.class), "testCluster");
     tableDataManager.start();
     _tableDataManagerMap.put(tableName, tableDataManager);
   }

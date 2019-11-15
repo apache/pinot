@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -43,7 +44,8 @@ public interface InstanceDataManager {
    * Initializes the data manager.
    * <p>Should be called only once and before calling any other method.
    */
-  void init(Configuration config, HelixManager helixManager, ServerMetrics serverMetrics)
+  void init(Configuration config, HelixManager helixManager, ServerMetrics serverMetrics,
+      HelixAdmin helixAdmin, String clusterName)
       throws ConfigurationException;
 
   /**

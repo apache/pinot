@@ -136,7 +136,10 @@ public class HelixServerStarter {
     ServerSegmentCompletionProtocolHandler
         .init(_serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
     ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_serverConf);
-    _serverInstance = new ServerInstance(serverInstanceConfig, _helixManager);
+    LOGGER.info("Connecting Helix manager");
+    _helixManager.connect();
+    _helixAdmin = _helixManager.getClusterManagmentTool();
+    _serverInstance = new ServerInstance(serverInstanceConfig, _helixManager, _helixAdmin, _helixClusterName);
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     SegmentFetcherAndLoader fetcherAndLoader = new SegmentFetcherAndLoader(_serverConf, instanceDataManager);
     StateModelFactory<?> stateModelFactory =
@@ -147,9 +150,6 @@ public class HelixServerStarter {
     // access the property store, but before receiving state transitions
     _helixManager.addPreConnectCallback(_serverInstance::start);
 
-    LOGGER.info("Connecting Helix manager");
-    _helixManager.connect();
-    _helixAdmin = _helixManager.getClusterManagmentTool();
     updateInstanceConfigIfNeeded(host, port);
 
     // Start restlet server for admin API endpoint

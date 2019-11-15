@@ -70,6 +70,8 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final String ENABLE_SPLIT_COMMIT = "enable.split.commit";
   // Key of whether to enable split commit end with segment metadata files.
   private static final String ENABLE_SPLIT_COMMIT_END_WITH_METADATA = "enable.commitend.metadata";
+  // Key to control whether a commit server uploads segment to Pinot controller in LLC segment completion protocol.
+  private static final String ENABLE_SEGMENT_UPLOAD_TO_CONTROLLER = "enable.upload.segment.to.controller";
 
   // Whether memory for realtime consuming segments should be allocated off-heap.
   private static final String REALTIME_OFFHEAP_ALLOCATION = "realtime.alloc.offheap";
@@ -191,6 +193,10 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   public int getMaxParallelSegmentBuilds() {
     return _instanceDataManagerConfiguration.getInt(MAX_PARALLEL_SEGMENT_BUILDS, 0);
+  }
+
+  public boolean isEnableSegmentUploadToController() {
+    return _instanceDataManagerConfiguration.getBoolean(ENABLE_SEGMENT_UPLOAD_TO_CONTROLLER, true);
   }
 
   @Override

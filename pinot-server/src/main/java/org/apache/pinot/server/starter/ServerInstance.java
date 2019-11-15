@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.LongAccumulator;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.MetricsHelper;
+import org.apache.helix.HelixAdmin;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
@@ -54,7 +55,7 @@ public class ServerInstance {
 
   private boolean _started = false;
 
-  public ServerInstance(ServerConf serverConf, HelixManager helixManager)
+  public ServerInstance(ServerConf serverConf, HelixManager helixManager, HelixAdmin helixAdmin, String helixClusterName)
       throws Exception {
     LOGGER.info("Initializing server instance");
 
@@ -69,7 +70,8 @@ public class ServerInstance {
     String instanceDataManagerClassName = serverConf.getInstanceDataManagerClassName();
     LOGGER.info("Initializing instance data manager of class: {}", instanceDataManagerClassName);
     _instanceDataManager = (InstanceDataManager) Class.forName(instanceDataManagerClassName).newInstance();
-    _instanceDataManager.init(serverConf.getInstanceDataManagerConfig(), helixManager, _serverMetrics);
+    _instanceDataManager.init(serverConf.getInstanceDataManagerConfig(), helixManager, _serverMetrics,
+        helixAdmin, helixClusterName);
 
     String queryExecutorClassName = serverConf.getQueryExecutorClassName();
     LOGGER.info("Initializing query executor of class: {}", queryExecutorClassName);

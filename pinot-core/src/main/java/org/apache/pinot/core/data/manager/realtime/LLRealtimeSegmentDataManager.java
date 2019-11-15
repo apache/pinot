@@ -591,6 +591,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                     response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit());
                 if (success) {
                   _state = State.COMMITTED;
+                  // TODO (tingchen) Asynchronously upload the segment file to Pinot FS for backup.
                 } else {
                   // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
                   // Change the state to HOLDING before looping around.
