@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.druid.tools;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -59,19 +58,21 @@ public class DruidToPinotSegmentConverter {
   }
 
   public static void main(String[] args) {
-    // Arg format is segmentPath, outDir, schemaPath, segmentName, tableName
-    Preconditions.checkArgument(args.length == 5);
-    _druidSegmentPath = args[0];
-    _outPath = args[1];
-    _schemaFilePath = args[2];
-    _segmentName = args[3];
-    _tableName = args[4];
+    if (args.length != 5) {
+      System.out.println("Convert a Druid segment into Pinot format.");
+      System.out.println("Use with arguments: <table-name> <segment-name> <segment-path> <schema-path> <output-directory>");
+    } else {
+      _tableName = args[0];
+      _segmentName = args[1];
+      _druidSegmentPath = args[2];
+      _schemaFilePath = args[3];
+      _outPath = args[4];
 
-    try {
-      convertSegment();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+      try {
+        convertSegment();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
     }
-
   }
 }

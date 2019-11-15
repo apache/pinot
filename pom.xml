@@ -56,7 +56,6 @@
     <module>pinot-orc</module>
     <module>pinot-parquet</module>
     <module>pinot-connectors</module>
-    <module>contrib/pinot-druid-migration</module>
   </modules>
 
   <licenses>

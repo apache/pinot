@@ -171,8 +171,8 @@ public class DruidSegmentRecordReader implements RecordReader {
         Object value = selector.getObject();
         if (value != null && !fieldSpec.isSingleValueField()) {
           // Multi-valued dimensions in Druid are stored as Arrays.ArrayList (this has been checked)
-          Preconditions.checkArgument(value.getClass() == java.util.Arrays.asList().getClass(), "The multi-valued dimension " + columnName +
-              " should be java.util.Arrays$ArrayList, but it is " + value.getClass());
+          Preconditions.checkArgument(value.getClass() == java.util.Arrays.asList().getClass(),
+              String.format("The multi-valued dimension %s should be java.util.Arrays$ArrayList, but it is %s.", columnName, value.getClass()));
           // Store the multi-valued dimension as a String[] to follow Pinot format; null if empty
           value = ((List<String>) value).toArray(new String[0]);
         }
@@ -222,28 +222,28 @@ public class DruidSegmentRecordReader implements RecordReader {
       final String columnName = _columnNames.get(i);
       ColumnCapabilities capabilities = adapter.getColumnCapabilities(columnName);
       if (capabilities == null) {
-        LOGGER.warn("Column {} is not in record", columnName);
+        LOGGER.warn("Column %s is not in record", columnName);
       } else {
         if (capabilities.getType() == ValueType.COMPLEX) {
           throw new IllegalArgumentException(
-              String.format("Column {}: DruidSegmentRecordReader does not support complex metric columns.", columnName));
+              String.format("Column %s: DruidSegmentRecordReader does not support complex metric columns.", columnName));
         }
 
         FieldSpec fieldSpec = _pinotSchema.getFieldSpecFor(_columnNames.get(i));
         if (!fieldSpec.isSingleValueField() && fieldSpec.getDataType() != FieldSpec.DataType.STRING) {
           throw new IllegalArgumentException(
-              String.format("Column {}: DruidSegmentRecordReader does not support non-STRING multi-value dimensions.", columnName));
+              String.format("Column %s: DruidSegmentRecordReader does not support non-STRING multi-value dimensions.", columnName));
         }
         if (fieldSpec.isSingleValueField() && capabilities.hasMultipleValues()) {
           throw new IllegalArgumentException(
-              String.format("Column {}: Column in Pinot schema is single-valued, but column in record is multi-valued.", columnName));
+              String.format("Column %s: Column in Pinot schema is single-valued, but column in record is multi-valued.", columnName));
         }
         if (!fieldSpec.isSingleValueField() && !capabilities.hasMultipleValues()) {
-          throw new IllegalArgumentException(String.format("Column {}: Column in Pinot schema is multi-valued, but column in record is single-valued.", columnName));
+          throw new IllegalArgumentException(String.format("Column %s: Column in Pinot schema is multi-valued, but column in record is single-valued.", columnName));
         }
         if (!compareTypes(_pinotSchema.getFieldSpecFor(columnName).getDataType(), capabilities.getType())) {
           throw new IllegalArgumentException(
-              String.format("Column {}: Type in schema ({}) does not match type in record {}.",
+              String.format("Column %s: Type in schema (%s) does not match type in record (%s).",
                   columnName, _pinotSchema.getFieldSpecFor(columnName).getDataType(), capabilities.getType()));
         }
       }

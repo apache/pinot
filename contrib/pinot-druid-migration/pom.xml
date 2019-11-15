@@ -28,7 +28,7 @@
   <version>0.2.0-SNAPSHOT</version>
   <modelVersion>4.0.0</modelVersion>
 
-  <name>Pinot Druid</name>
+  <name>Pinot Druid Migration</name>
   <url>https://pinot.apache.org/</url>
   <dependencies>
     <dependency>
