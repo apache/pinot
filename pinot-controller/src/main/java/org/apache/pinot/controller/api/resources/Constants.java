@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.api.resources;
 
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Response.Status;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,8 +47,7 @@ public class Constants {
       return CommonConstants.Helix.TableType.valueOf(tableTypeStr.toUpperCase());
     } catch (IllegalArgumentException e) {
       LOGGER.info("Illegal table type '{}'", tableTypeStr);
-      throw new WebApplicationException("Illegal table type '" + tableTypeStr + "'",
-          PinotSegmentRestletResource.BAD_REQUEST);
+      throw new WebApplicationException("Illegal table type '" + tableTypeStr + "'", Status.BAD_REQUEST);
     }
   }
 
@@ -59,7 +59,7 @@ public class Constants {
       return StateType.valueOf(stateStr.toUpperCase());
     } catch (IllegalArgumentException e) {
       LOGGER.info("Illegal state '{}'", stateStr);
-      throw new WebApplicationException("Illegal state '" + stateStr + "'", PinotSegmentRestletResource.BAD_REQUEST);
+      throw new WebApplicationException("Illegal state '" + stateStr + "'", Status.BAD_REQUEST);
     }
   }
 }

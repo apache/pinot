@@ -237,7 +237,7 @@ public class PinotSchemaRestletResource {
   private Schema getSchemaFromMultiPart(FormDataMultiPart multiPart) {
     try {
       Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
-      if (!PinotSegmentUploadRestletResource.validateMultiPart(map, null)) {
+      if (!PinotSegmentUploadDownloadRestletResource.validateMultiPart(map, null)) {
         throw new ControllerApplicationException(LOGGER, "Found not exactly one file from the multi-part fields",
             Response.Status.BAD_REQUEST);
       }
