@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -106,6 +107,12 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
    * <p>This column data type is used for transferring data in data table.
    */
   ColumnDataType getIntermediateResultColumnType();
+
+  /**
+   * Returns the {@link ColumnDataType} of the final result.
+   * <p>This column data type is used in the {@link ResultTable::_dataSchema}
+   */
+  ColumnDataType getFinalResultColumnType();
 
   /**
    * Extracts the final result used in the broker response from the given intermediate result.

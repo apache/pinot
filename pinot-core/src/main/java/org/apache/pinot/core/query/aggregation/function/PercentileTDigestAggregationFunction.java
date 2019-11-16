@@ -189,6 +189,11 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   }
 
   @Override
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.DOUBLE;
+  }
+
+  @Override
   public Double extractFinalResult(TDigest intermediateResult) {
     return intermediateResult.quantile(_percentile / 100.0);
   }

@@ -34,6 +34,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.DataSchema;
@@ -411,6 +412,33 @@ public class SelectionOperatorUtils {
       }
     }
     return new SelectionResults(selectionColumns, rows);
+  }
+
+  /**
+   * Render the selection rows to a formatted {@link ResultTable} object for selection queries without
+   * <code>ORDER BY</code>. (Broker side)
+   * <p>{@link ResultTable} object will be used to build the broker response.
+   * <p>Should be called after method "reduceWithoutOrdering()".
+   *
+   * @param rows unformatted selection rows.
+   * @param dataSchema data schema.
+   * @return {@link ResultTable} object results.
+   */
+  public static ResultTable renderResultTableWithoutOrdering(List<Serializable[]> rows, DataSchema dataSchema,
+      boolean preserveType) {
+
+    List<Object[]> resultRows = new ArrayList<>(rows.size());
+    int numRows = rows.size();
+    if (!preserveType) {
+      for (int i = 0; i < numRows; i++) {
+        resultRows.add(formatRowWithoutOrdering(rows.get(i), dataSchema));
+      }
+    } else {
+      for (int i = 0; i < numRows; i++) {
+        resultRows.add(rows.get(i));
+      }
+    }
+    return new ResultTable(dataSchema, resultRows);
   }
 
   /**

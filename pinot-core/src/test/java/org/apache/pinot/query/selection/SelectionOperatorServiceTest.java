@@ -29,6 +29,7 @@ import java.util.PriorityQueue;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
@@ -235,6 +236,35 @@ public class SelectionOperatorServiceTest {
   }
 
   @Test
+  public void testCompatibleRowsRenderResultTableWithoutOrdering() {
+    // Replace byte[] with String because it is already converted to String at this stage
+    Serializable[] row1 = _row1.clone();
+    row1[10] = "1020";
+    Serializable[] compatibleRow1 = _compatibleRow1.clone();
+    compatibleRow1[10] = "5060";
+
+    List<Serializable[]> rows = new ArrayList<>(2);
+    rows.add(row1);
+    rows.add(compatibleRow1);
+    ResultTable resultTable = SelectionOperatorUtils.renderResultTableWithoutOrdering(rows, _upgradedDataSchema, true);
+    List<Object[]> resultRows = resultTable.getRows();
+    assertSame(resultRows.get(0), row1);
+    assertSame(resultRows.get(1), compatibleRow1);
+
+    rows = new ArrayList<>(2);
+    rows.add(row1);
+    rows.add(compatibleRow1);
+    SelectionOperatorUtils.renderResultTableWithoutOrdering(rows, _upgradedDataSchema, false);
+    resultRows = resultTable.getRows();
+    Object[] expectedFormattedRow1 =
+        {"0", "1.0", "2.0", "3.0", "4", new String[]{"5"}, new String[]{"6.0"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9"}, "1020"};
+    Object[] expectedFormattedRow2 =
+        {"1", "2.0", "3.0", "4.0", "5", new String[]{"6"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9.0"}, new String[]{"10"}, "5060"};
+    assertTrue(Arrays.deepEquals(resultRows.get(0), expectedFormattedRow1));
+    assertTrue(Arrays.deepEquals(resultRows.get(1), expectedFormattedRow2));
+  }
+
+  @Test
   public void testCompatibleRowsRenderSelectionResultsWithOrdering() {
     // Replace byte[] with String because it is already converted to String at this stage
     Serializable[] row1 = _row1.clone();
@@ -267,6 +297,44 @@ public class SelectionOperatorServiceTest {
     Serializable[] expectedFormattedRow1 =
         {"1", "2.0", "3.0", "4.0", "5", new String[]{"6"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9.0"}, new String[]{"10"}, "5060"};
     Serializable[] expectedFormattedRow2 =
+        {"0", "1.0", "2.0", "3.0", "4", new String[]{"5"}, new String[]{"6.0"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9"}, "1020"};
+    assertTrue(Arrays.deepEquals(resultRows.get(0), expectedFormattedRow1));
+    assertTrue(Arrays.deepEquals(resultRows.get(1), expectedFormattedRow2));
+  }
+
+  @Test
+  public void testCompatibleRowsRenderResultTableWithOrdering() {
+    // Replace byte[] with String because it is already converted to String at this stage
+    Serializable[] row1 = _row1.clone();
+    row1[10] = "1020";
+    Serializable[] compatibleRow1 = _compatibleRow1.clone();
+    compatibleRow1[10] = "5060";
+    Serializable[] compatibleRow2 = _compatibleRow2.clone();
+    compatibleRow2[10] = "7000";
+
+    SelectionOperatorService selectionOperatorService =
+        new SelectionOperatorService(_selectionOrderBy, _upgradedDataSchema);
+    PriorityQueue<Serializable[]> rows = selectionOperatorService.getRows();
+    rows.offer(row1);
+    rows.offer(compatibleRow1);
+    rows.offer(compatibleRow2);
+    ResultTable resultTable = selectionOperatorService.renderResultTableWithOrdering(true);
+    List<Object[]> resultRows = resultTable.getRows();
+    assertNotSame(resultRows.get(0), compatibleRow1);
+    assertEquals(resultRows.get(0), compatibleRow1);
+    assertNotSame(resultRows.get(1), row1);
+    assertEquals(resultRows.get(1), row1);
+
+    selectionOperatorService = new SelectionOperatorService(_selectionOrderBy, _upgradedDataSchema);
+    rows = selectionOperatorService.getRows();
+    rows.offer(row1);
+    rows.offer(compatibleRow1);
+    rows.offer(compatibleRow2);
+    resultTable = selectionOperatorService.renderResultTableWithOrdering(false);
+    resultRows = resultTable.getRows();
+    Object[] expectedFormattedRow1 =
+        {"1", "2.0", "3.0", "4.0", "5", new String[]{"6"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9.0"}, new String[]{"10"}, "5060"};
+    Object[] expectedFormattedRow2 =
         {"0", "1.0", "2.0", "3.0", "4", new String[]{"5"}, new String[]{"6.0"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9"}, "1020"};
     assertTrue(Arrays.deepEquals(resultRows.get(0), expectedFormattedRow1));
     assertTrue(Arrays.deepEquals(resultRows.get(1), expectedFormattedRow2));

@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.queries;
 
+import com.google.common.collect.Lists;
 import java.io.Serializable;
+import java.util.List;
 import java.util.function.Function;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
@@ -450,4 +453,89 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     Assert.assertEquals(selectionResults.getColumns().get(1), "column3");
     Assert.assertEquals(selectionResults.getRows().size(), 21968);
   }
+
+ /* *//**
+   * Tests Selection with SelectionResults and also ResultTable
+   *//*
+  @Test
+  public void testSelection() {
+    // select *
+    String query = "SELECT * FROM testTable";
+    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query);
+    SelectionResults selectionResults = brokerResponse.getSelectionResults();
+    query = "SELECT * FROM testTable option(responseFormat=sql)";
+    BrokerResponseNative brokerResponseSQL = getBrokerResponseForQuery(query);
+    ResultTable resultTable = brokerResponseSQL.getResultTable();
+
+    Assert.assertEquals(resultTable.getDataSchema().getColumnNames().length, 11);
+    Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), Lists
+        .newArrayList("column1", "column11", "column12", "column17", "column18", "column3", "column5", "column6",
+            "column7", "column9", "daysSinceEpoch"));
+    Assert.assertEquals(resultTable.getRows().size(), 10);
+    Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), selectionResults.getColumns());
+
+    // select * limit infinite
+    query = "SELECT * FROM testTable limit 50";
+    brokerResponse = getBrokerResponseForQuery(query);
+    selectionResults = brokerResponse.getSelectionResults();
+    query = "SELECT * FROM testTable LIMIT 50 option(responseFormat=sql)";
+    brokerResponseSQL = getBrokerResponseForQuery(query);
+    resultTable = brokerResponseSQL.getResultTable();
+
+    Assert.assertEquals(resultTable.getDataSchema().getColumnNames().length, 11);
+    Assert.assertEquals(resultTable.getColumns(), Lists
+        .newArrayList("column1", "column11", "column12", "column17", "column18", "column3", "column5", "column6",
+            "column7", "column9", "daysSinceEpoch"));
+    Assert.assertEquals(resultTable.getRows().size(), 50);
+    Assert.assertEquals(resultTable.getColumns(), selectionResults.getColumns());
+
+    // select 1
+    query = "SELECT column3 FROM testTable";
+    brokerResponse = getBrokerResponseForQuery(query);
+    selectionResults = brokerResponse.getSelectionResults();
+    query = "SELECT column3 FROM testTable option(responseFormat=sql)";
+    brokerResponseSQL = getBrokerResponseForQuery(query);
+    resultTable = brokerResponseSQL.getResultTable();
+
+    Assert.assertEquals(resultTable.getDataSchema().getColumnNames().length, 1);
+    Assert.assertEquals(resultTable.getColumns(), Lists.newArrayList("column3"));
+    Assert.assertEquals(resultTable.getRows().size(), 10);
+    Assert.assertEquals(resultTable.getColumns(), selectionResults.getColumns());
+
+    // select 3
+    query = "SELECT column1, column3, column11 FROM testTable";
+    brokerResponse = getBrokerResponseForQuery(query);
+    selectionResults = brokerResponse.getSelectionResults();
+    query = "SELECT column1, column3, column11 FROM testTable option(responseFormat=sql)";
+    brokerResponseSQL = getBrokerResponseForQuery(query);
+    resultTable = brokerResponseSQL.getResultTable();
+
+    Assert.assertEquals(resultTable.getDataSchema().getColumnNames().length, 3);
+    Assert.assertEquals(resultTable.getColumns(), Lists.newArrayList("column1", "column3", "column11"));
+    Assert.assertEquals(resultTable.getRows().size(), 10);
+    Assert.assertEquals(resultTable.getColumns(), selectionResults.getColumns());
+
+    // select + order by
+    query = "SELECT column1, column3 FROM testTable ORDER BY column3";
+    brokerResponse = getBrokerResponseForQuery(query);
+    selectionResults = brokerResponse.getSelectionResults();
+    query = "SELECT column1, column3 FROM testTable ORDER BY column3 option(responseFormat=sql)";
+    brokerResponseSQL = getBrokerResponseForQuery(query);
+    resultTable = brokerResponseSQL.getResultTable();
+
+    Assert.assertEquals(resultTable.getDataSchema().getColumnNames().length, 2);
+    Assert.assertEquals(resultTable.getColumns(), Lists.newArrayList("column1", "column3"));
+    Assert.assertEquals(resultTable.getRows().size(), 10);
+    List<Serializable[]> rows = Lists
+        .newArrayList(new Serializable[]{"142002934", "17891"}, new Serializable[]{"142002934", "17891"},
+            new Serializable[]{"142002934", "17891"}, new Serializable[]{"142002934", "17891"},
+            new Serializable[]{"33273941", "84046"}, new Serializable[]{"33273941", "84046"},
+            new Serializable[]{"33273941", "84046"}, new Serializable[]{"33273941", "84046"},
+            new Serializable[]{"1002250922", "177388"}, new Serializable[]{"1002250922", "177388"});
+    Assert.assertEquals(resultTable.getColumns(), selectionResults.getColumns());
+    for (int i = 0; i < 10; i++) {
+      Assert.assertEquals(selectionResults.getRows().get(i), resultTable.getRows().get(i));
+      Assert.assertEquals(resultTable.getRows().get(i), rows.get(i));
+    }
+  }*/
 }

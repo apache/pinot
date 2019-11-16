@@ -214,6 +214,11 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
   }
 
   @Override
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.INT;
+  }
+
+  @Override
   public Integer extractFinalResult(IntOpenHashSet intermediateResult) {
     return intermediateResult.size();
   }

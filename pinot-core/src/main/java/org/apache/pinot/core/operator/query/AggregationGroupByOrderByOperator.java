@@ -28,6 +28,7 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
@@ -80,8 +81,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
 
     // extract column names and data types for aggregations
     for (AggregationFunctionContext functionContext : functionContexts) {
-      columnNames[index] = functionContext.getAggregationFunction().getType().toString().toLowerCase() + "("
-          + functionContext.getColumn() + ")";
+      columnNames[index] = AggregationFunctionUtils.getAggregationColumnName(functionContext);
       columnDataTypes[index] = functionContext.getAggregationFunction().getIntermediateResultColumnType();
       index++;
     }

@@ -129,6 +129,11 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
   }
 
   @Override
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.OBJECT;
+  }
+
+  @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
     throw new UnsupportedOperationException("Operation not supported for DISTINCT aggregation function");
   }

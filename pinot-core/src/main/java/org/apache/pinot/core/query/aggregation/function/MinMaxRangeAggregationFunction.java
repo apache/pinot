@@ -189,6 +189,11 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
   }
 
   @Override
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.DOUBLE;
+  }
+
+  @Override
   public Double extractFinalResult(MinMaxRangePair intermediateResult) {
     return intermediateResult.getMax() - intermediateResult.getMin();
   }

@@ -50,8 +50,17 @@ public class AggregationFunctionUtils {
   }
 
   public static String getAggregationColumnName(AggregationInfo aggregationInfo) {
-    return aggregationInfo.getAggregationType().toLowerCase() + "(" + AggregationFunctionUtils.getColumn(aggregationInfo)
-        + ")";
+    return aggregationInfo.getAggregationType().toLowerCase() + "(" + AggregationFunctionUtils
+        .getColumn(aggregationInfo) + ")";
+  }
+
+  public static String getAggregationColumnName(AggregationFunctionContext functionContext) {
+    return functionContext.getAggregationFunction().getType().toString().toLowerCase() + "(" + functionContext
+        .getColumn() + ")";
+  }
+
+  public static String getAggregationColumnName(AggregationFunction aggregationFunction, String column) {
+    return aggregationFunction.getType().toString().toLowerCase() + "(" + column + ")";
   }
 
   /**

@@ -41,15 +41,18 @@ import org.testng.annotations.Test;
  */
 public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQueriesTest {
 
-  @Test(dataProvider = "orderBySQLResultTableProvider")
-  public void testGroupByOrderBySQL(String query, List<Object[]> expectedResults, long expectedNumDocsScanned,
-      long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs) {
+  @Test//(dataProvider = "orderBySQLResultTableProvider")
+  public void testGroupByOrderBySQL() {//(String query, List<Object[]> expectedResults, long expectedNumDocsScanned,
+      //long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
+    // DataSchema expectedDataSchema) {
     Map<String, String> queryOptions = new HashMap<>(2);
-    queryOptions.put(QueryOptionKey.GROUP_BY_MODE, Request.SQL);
+    //queryOptions.put(QueryOptionKey.GROUP_BY_MODE, Request.SQL);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
+    String query = "select column11, column12 from testTable order by column12, column11";
     BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
-    QueriesTestUtils.testInterSegmentGroupByOrderByResultSQL(brokerResponse, expectedNumDocsScanned,
-        expectedNumEntriesScannedInFilter, expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, expectedResults);
+    //QueriesTestUtils.testInterSegmentResultTable(brokerResponse, expectedNumDocsScanned,
+    //    expectedNumEntriesScannedInFilter, expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, expectedResults,
+    //    expectedResults.size(), expectedDataSchema);
   }
 
   @Test(dataProvider = "orderByPQLResultProvider")

@@ -187,6 +187,11 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
   }
 
   @Override
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.LONG;
+  }
+
+  @Override
   public Long extractFinalResult(QuantileDigest intermediateResult) {
     return intermediateResult.getQuantile(_percentile / 100.0);
   }

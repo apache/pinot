@@ -22,11 +22,14 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
@@ -178,5 +181,45 @@ public class SelectionOperatorService {
     }
 
     return new SelectionResults(_selectionColumns, rowsInSelectionResults);
+  }
+
+  /**
+   * Render the selection rows to a {@link ResultTable} object for selection queries with
+   * <code>ORDER BY</code>. (Broker side)
+   * <p>{@link ResultTable} object will be used to build the broker response.
+   * <p>Should be called after method "reduceWithOrdering()".
+   *
+   * @return {@link SelectionResults} object results.
+   */
+  public ResultTable renderResultTableWithOrdering(boolean preserveType) {
+    LinkedList<Object[]> rowsInSelectionResults = new LinkedList<>();
+
+    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(_selectionColumns, _dataSchema);
+    DataSchema.ColumnDataType[] columnDataTypes;
+    if (preserveType) {
+      columnDataTypes = null;
+    } else {
+      int numColumns = _selectionColumns.size();
+      columnDataTypes = new DataSchema.ColumnDataType[numColumns];
+      for (int i = 0; i < numColumns; i++) {
+        columnDataTypes[i] = _dataSchema.getColumnDataType(columnIndices[i]);
+      }
+    }
+    while (_rows.size() > _offset) {
+      rowsInSelectionResults
+          .addFirst(SelectionOperatorUtils.extractColumns(_rows.poll(), columnIndices, columnDataTypes));
+    }
+
+    Map<String, DataSchema.ColumnDataType> columnNameToDataType = new HashMap<>();
+    int numColumns = _dataSchema.size();
+    for (int i = 0; i < numColumns; i++) {
+      columnNameToDataType.put(_dataSchema.getColumnName(i), _dataSchema.getColumnDataType(i));
+    }
+    columnDataTypes = new DataSchema.ColumnDataType[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      columnDataTypes[i] = columnNameToDataType.get(_selectionColumns.get(i));
+    }
+    return new ResultTable(new DataSchema(_selectionColumns.toArray(new String[0]), columnDataTypes),
+        rowsInSelectionResults);
   }
 }

@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
+import org.apache.pinot.common.utils.DataSchema;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -36,13 +37,14 @@ public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQuer
 
   @Test(dataProvider = "orderByDataProvider")
   public void testAggregationOrderedGroupByResults(String query, List<Object[]> expectedResults,
-      long expectedNumEntriesScannedPostFilter) {
+      long expectedNumEntriesScannedPostFilter, DataSchema expectedDataSchema) {
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(Request.QueryOptionKey.GROUP_BY_MODE, Request.SQL);
     queryOptions.put(Request.QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
     BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
-    QueriesTestUtils.testInterSegmentGroupByOrderByResultSQL(brokerResponse, 400000L, 0,
-        expectedNumEntriesScannedPostFilter, 400000L, expectedResults);
+    QueriesTestUtils
+        .testInterSegmentResultTable(brokerResponse, 400000L, 0, expectedNumEntriesScannedPostFilter, 400000L,
+            expectedResults, expectedResults.size(), expectedDataSchema);
   }
 
   /**
@@ -66,47 +68,46 @@ public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQuer
 
     query = "SELECT SUMMV(column7) FROM testTable GROUP BY column5 ORDER BY column5 DESC TOP 4";
     results = Lists.newArrayList(new Object[]{"yQkJTLOQoOqqhkAClgC", 61100215182228.00000},
-        new Object[]{"mhoVvrJm", 5806796153884.00000},
-        new Object[]{"kCMyNVGCASKYDdQbftOPaqVMWc", 51891832239248.00000},
+        new Object[]{"mhoVvrJm", 5806796153884.00000}, new Object[]{"kCMyNVGCASKYDdQbftOPaqVMWc", 51891832239248.00000},
         new Object[]{"PbQd", 36532997335388.00000});
     numEntriesScannedPostFilter = 800000;
     data.add(new Object[]{query, results, numEntriesScannedPostFilter});
 
     query = "SELECT SUMMV(column7) FROM testTable GROUP BY column5 ORDER BY SUMMV(column7) TOP 5";
-    results = Lists.newArrayList(new Object[]{"NCoFku", 489626381288.00000},
-        new Object[]{"mhoVvrJm", 5806796153884.00000},
-        new Object[]{"JXRmGakTYafZFPm", 18408231081808.00000}, new Object[]{"PbQd", 36532997335388.00000},
-        new Object[]{"OKyOqU", 51067166589176.00000});
+    results = Lists
+        .newArrayList(new Object[]{"NCoFku", 489626381288.00000}, new Object[]{"mhoVvrJm", 5806796153884.00000},
+            new Object[]{"JXRmGakTYafZFPm", 18408231081808.00000}, new Object[]{"PbQd", 36532997335388.00000},
+            new Object[]{"OKyOqU", 51067166589176.00000});
     numEntriesScannedPostFilter = 800000;
     data.add(new Object[]{query, results, numEntriesScannedPostFilter});
 
     // object type aggregations
     query = "SELECT MINMAXRANGEMV(column7) FROM testTable GROUP BY column5 ORDER BY column5";
-    results = Lists.newArrayList(new Object[]{"AKXcXcIqsqOJFsdwxZ", 2147483446.00000},
-        new Object[]{"EOFxevm", 2147483446.00000}, new Object[]{"JXRmGakTYafZFPm", 2147483443.00000},
-        new Object[]{"NCoFku", 2147483436.00000}, new Object[]{"OKyOqU", 2147483443.00000},
-        new Object[]{"PbQd", 2147483443.00000},
-        new Object[]{"kCMyNVGCASKYDdQbftOPaqVMWc", 2147483446.00000},
-        new Object[]{"mhoVvrJm", 2147483438.00000}, new Object[]{"yQkJTLOQoOqqhkAClgC", 2147483446.00000});
+    results = Lists
+        .newArrayList(new Object[]{"AKXcXcIqsqOJFsdwxZ", 2147483446.00000}, new Object[]{"EOFxevm", 2147483446.00000},
+            new Object[]{"JXRmGakTYafZFPm", 2147483443.00000}, new Object[]{"NCoFku", 2147483436.00000},
+            new Object[]{"OKyOqU", 2147483443.00000}, new Object[]{"PbQd", 2147483443.00000},
+            new Object[]{"kCMyNVGCASKYDdQbftOPaqVMWc", 2147483446.00000}, new Object[]{"mhoVvrJm", 2147483438.00000},
+            new Object[]{"yQkJTLOQoOqqhkAClgC", 2147483446.00000});
     numEntriesScannedPostFilter = 800000;
     data.add(new Object[]{query, results, numEntriesScannedPostFilter});
 
     // object type aggregations
     query =
         "SELECT MINMAXRANGEMV(column7) FROM testTable GROUP BY column5 ORDER BY MINMAXRANGEMV(column7), column5 desc";
-    results = Lists.newArrayList(new Object[]{"NCoFku", 2147483436.00000},
-        new Object[]{"mhoVvrJm", 2147483438.00000}, new Object[]{"PbQd", 2147483443.00000},
-        new Object[]{"OKyOqU", 2147483443.00000}, new Object[]{"JXRmGakTYafZFPm", 2147483443.00000},
-        new Object[]{"yQkJTLOQoOqqhkAClgC", 2147483446.00000},
-        new Object[]{"kCMyNVGCASKYDdQbftOPaqVMWc", 2147483446.00000},
-        new Object[]{"EOFxevm", 2147483446.00000}, new Object[]{"AKXcXcIqsqOJFsdwxZ", 2147483446.00000});
+    results = Lists.newArrayList(new Object[]{"NCoFku", 2147483436.00000}, new Object[]{"mhoVvrJm", 2147483438.00000},
+        new Object[]{"PbQd", 2147483443.00000}, new Object[]{"OKyOqU", 2147483443.00000},
+        new Object[]{"JXRmGakTYafZFPm", 2147483443.00000}, new Object[]{"yQkJTLOQoOqqhkAClgC", 2147483446.00000},
+        new Object[]{"kCMyNVGCASKYDdQbftOPaqVMWc", 2147483446.00000}, new Object[]{"EOFxevm", 2147483446.00000},
+        new Object[]{"AKXcXcIqsqOJFsdwxZ", 2147483446.00000});
     numEntriesScannedPostFilter = 800000;
     data.add(new Object[]{query, results, numEntriesScannedPostFilter});
 
     // object type aggregations - non comparable intermediate results
     query = "SELECT DISTINCTCOUNTMV(column7) FROM testTable GROUP BY column5 ORDER BY DISTINCTCOUNTMV(column7) top 5";
-    results = Lists.newArrayList(new Object[]{"NCoFku", 26}, new Object[]{"mhoVvrJm", 65},
-        new Object[]{"JXRmGakTYafZFPm", 126}, new Object[]{"PbQd", 211}, new Object[]{"OKyOqU", 216});
+    results = Lists
+        .newArrayList(new Object[]{"NCoFku", 26}, new Object[]{"mhoVvrJm", 65}, new Object[]{"JXRmGakTYafZFPm", 126},
+            new Object[]{"PbQd", 211}, new Object[]{"OKyOqU", 216});
     numEntriesScannedPostFilter = 800000;
     data.add(new Object[]{query, results, numEntriesScannedPostFilter});
 
