@@ -131,7 +131,7 @@ public class DataAvailabilityTaskScheduler implements Runnable {
         MetricEntity me = MetricEntity.fromURN(urn);
         if (!metricCache.containsKey(me.getId())) {
           datasets.addAll(ThirdEyeUtils.getDatasetConfigsFromMetricUrn(urn)
-              .stream().map(DatasetConfigDTO::getName).collect(Collectors.toList()));
+              .stream().map(DatasetConfigDTO::getDataset).collect(Collectors.toList()));
           // cache the mapping in memory to avoid duplicate retrieval
           metricCache.put(me.getId(), datasets);
         } else {

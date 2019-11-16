@@ -49,7 +49,7 @@ public class DataAvailabilityEventListenerDriver {
     String rootDir = System.getProperty("dw.rootDir");
     this.config = config;
     this.executorService = Executors.newFixedThreadPool(this.config.getNumParallelConsumer(),
-        new ThreadFactoryBuilder().setNameFormat("trigger-event-consumer-%d").build());
+        new ThreadFactoryBuilder().setNameFormat("data-avail-event-consumer-%d").build());
     this.consumerProps = new Properties();
     this.consumerProps.load(new FileInputStream(rootDir + "/" + this.config.getKafkaConsumerPropPath()));
     this.listeners = new ArrayList<>();
@@ -65,7 +65,7 @@ public class DataAvailabilityEventListenerDriver {
       listeners.add(listener);
       executorService.submit(listener);
     }
-    LOG.info("Started {} TriggerEventListener...", listeners.size());
+    LOG.info("Started {} DataAvailabilityEventListener...", listeners.size());
   }
 
   public void shutdown() {
@@ -79,6 +79,7 @@ public class DataAvailabilityEventListenerDriver {
     try {
       Constructor<?> constructor = Class.forName(className)
           .getConstructor(String.class, String.class, String.class, Properties.class);
+      LOG.info("Loaded consumer class: {}", className);
       return (DataAvailabilityKafkaConsumer) constructor.newInstance(config.getKafkaTopic(),
           config.getKafkaConsumerGroupId(), config.getKafkaBootstrapServers(), consumerProps);
     } catch (Exception e) {
@@ -92,6 +93,7 @@ public class DataAvailabilityEventListenerDriver {
       try {
         DataAvailabilityEventFilter filter = (DataAvailabilityEventFilter) Class.forName(filterClassName).newInstance();
         filters.add(filter);
+        LOG.info("Loaded event filter: {}", filterClassName);
       } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
         throw new IllegalArgumentException("Failed to initialize trigger event filter.", e.getCause());
       }

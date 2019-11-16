@@ -101,7 +101,7 @@ public class DataAvailabilityEventListenerTest {
   }
 
   @Test
-  public void testConsume1() throws InterruptedException {
+  public void testUpdateOneDataset() throws InterruptedException {
     _dataAvailabilityEventListener.processOneBatch();
     DatasetConfigManager datasetConfigManager = DAORegistry.getInstance().getDatasetConfigDAO();
     DatasetConfigDTO dataset1 = datasetConfigManager.findByDataset(TEST_DATASET_PREFIX + 1);
@@ -113,8 +113,8 @@ public class DataAvailabilityEventListenerTest {
     Assert.assertEquals(dataset2.getLastRefreshTime(), 3000);
   }
 
-  @Test
-  public void testConsume2() throws InterruptedException {
+  @Test(dependsOnMethods = { "testUpdateOneDataset" })
+  public void testUpdateTwoDataset() throws InterruptedException {
     _dataAvailabilityEventListener.processOneBatch();
     DatasetConfigManager datasetConfigManager = DAORegistry.getInstance().getDatasetConfigDAO();
     DatasetConfigDTO dataset1 = datasetConfigManager.findByDataset(TEST_DATASET_PREFIX + 1);
@@ -126,10 +126,8 @@ public class DataAvailabilityEventListenerTest {
     Assert.assertEquals(dataset2.getLastRefreshTime(), 3000);
   }
 
-  @Test
-  public void testConsume3() throws InterruptedException {
-    LOG.info("in testConsume3");
-
+  @Test(dependsOnMethods = { "testUpdateTwoDataset" })
+  public void testNoUpdate() throws InterruptedException {
     _dataAvailabilityEventListener.processOneBatch();
     DatasetConfigManager datasetConfigManager = DAORegistry.getInstance().getDatasetConfigDAO();
     DatasetConfigDTO dataset1 = datasetConfigManager.findByDataset(TEST_DATASET_PREFIX + 1);

@@ -113,7 +113,7 @@ public class DatasetTriggerInfoRepo {
         }
         List<DatasetConfigDTO> datasetConfigs = ThirdEyeUtils.getDatasetConfigsFromMetricUrn(urn);
         for (DatasetConfigDTO datasetConfig : datasetConfigs) {
-          String datasetName = datasetConfig.getName();
+          String datasetName = datasetConfig.getDataset();
           if (!datasetRefreshTimeMap.containsKey(datasetName)
               && dataSourceWhitelist.contains(datasetConfig.getDataSource())) {
             datasetRefreshTimeMap.put(datasetName, datasetConfig.getLastRefreshTime());
