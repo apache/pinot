@@ -20,6 +20,8 @@ package org.apache.pinot.broker.routing;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.core.transport.ServerInstance;
 
 
 /**
@@ -28,27 +30,27 @@ import java.util.Map;
 public interface RoutingTable {
 
   /**
-   * Get the routing table (map from server to list of segments) based on the lookup request.
+   * Returns the routing table (map from server instance to list of segments hosted by the server) based on the lookup
+   * request.
    *
    * @param request Routing table lookup request
-   * @return Map from server to list of segments
+   * @return Map from server instance to list of segments hosted by the server
    */
-  Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request);
+  Map<ServerInstance, List<String>> getRoutingTable(RoutingTableLookupRequest request);
 
   /**
-   * Return whether the routing table for the given table exists.
+   * Returns whether the routing table for the given table exists.
    *
-   * @param tableName Table name
+   * @param tableNameWithType Table name with type suffix
    * @return Whether the routing table exists
    */
-  boolean routingTableExists(String tableName);
+  boolean routingTableExists(String tableNameWithType);
 
   /**
-   * Dump a snapshot of all the routing tables for the given table.
+   * Dumps a snapshot of all the routing tables for the given table.
    *
-   * @param tableName Table name or null for all tables.
-   * @throws Exception
+   * @param tableName Table name (with or without type suffix) or null for all tables
    */
-  String dumpSnapshot(String tableName)
+  String dumpSnapshot(@Nullable String tableName)
       throws Exception;
 }

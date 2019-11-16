@@ -50,6 +50,7 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
@@ -133,9 +134,11 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
 
   @Override
   protected BrokerResponse processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<String, List<String>> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<String, List<String>> realtimeRoutingTable,
-      long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
+      @Nullable BrokerRequest offlineBrokerRequest,
+      @Nullable Map<org.apache.pinot.core.transport.ServerInstance, List<String>> offlineRoutingTable,
+      @Nullable BrokerRequest realtimeBrokerRequest,
+      @Nullable Map<org.apache.pinot.core.transport.ServerInstance, List<String>> realtimeRoutingTable, long timeoutMs,
+      ServerStats serverStats, RequestStatistics requestStatistics)
       throws Exception {
     ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
     PhaseTimes phaseTimes = new PhaseTimes();
@@ -149,15 +152,15 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
       assert offlineRoutingTable != null;
       offlineTableName = offlineBrokerRequest.getQuerySource().getTableName();
       offlineCompositeFuture =
-          scatterBrokerRequest(requestId, offlineBrokerRequest, offlineRoutingTable, true, timeoutMs,
-              scatterGatherStats, phaseTimes);
+          scatterBrokerRequest(requestId, offlineBrokerRequest, convertToOldRoutingTable(offlineRoutingTable), true,
+              timeoutMs, scatterGatherStats, phaseTimes);
     }
     if (realtimeBrokerRequest != null) {
       assert realtimeRoutingTable != null;
       realtimeTableName = realtimeBrokerRequest.getQuerySource().getTableName();
       realtimeCompositeFuture =
-          scatterBrokerRequest(requestId, realtimeBrokerRequest, realtimeRoutingTable, false, timeoutMs,
-              scatterGatherStats, phaseTimes);
+          scatterBrokerRequest(requestId, realtimeBrokerRequest, convertToOldRoutingTable(realtimeRoutingTable), false,
+              timeoutMs, scatterGatherStats, phaseTimes);
     }
 
     // Step 2: gather response from the servers
@@ -232,6 +235,19 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
         .addMeteredQueryValue(originalBrokerRequest, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE, totalServerResponseSize);
 
     return brokerResponse;
+  }
+
+  // For backward-compatible
+  private Map<String, List<String>> convertToOldRoutingTable(
+      Map<org.apache.pinot.core.transport.ServerInstance, List<String>> routingTable) {
+    Map<String, List<String>> oldRoutingTable = new HashMap<>();
+    for (Entry<org.apache.pinot.core.transport.ServerInstance, List<String>> entry : routingTable.entrySet()) {
+      org.apache.pinot.core.transport.ServerInstance serverInstance = entry.getKey();
+      String serverInstanceName =
+          Helix.PREFIX_OF_SERVER_INSTANCE + serverInstance.getHostname() + "_" + serverInstance.getPort();
+      oldRoutingTable.put(serverInstanceName, entry.getValue());
+    }
+    return oldRoutingTable;
   }
 
   /**

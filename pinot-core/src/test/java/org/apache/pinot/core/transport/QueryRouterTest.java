@@ -35,14 +35,14 @@ import org.testng.annotations.Test;
 
 public class QueryRouterTest {
   private static final int TEST_PORT = 12345;
-  private static final String SERVER_INSTANCE_NAME = "Server_localhost_" + TEST_PORT;
+  private static final ServerInstance SERVER_INSTANCE = new ServerInstance("localhost", TEST_PORT);
   private static final ServerRoutingInstance OFFLINE_SERVER_ROUTING_INSTANCE =
-      new ServerRoutingInstance(SERVER_INSTANCE_NAME, TableType.OFFLINE);
+      SERVER_INSTANCE.toServerRoutingInstance(TableType.OFFLINE);
   private static final ServerRoutingInstance REALTIME_SERVER_ROUTING_INSTANCE =
-      new ServerRoutingInstance(SERVER_INSTANCE_NAME, TableType.REALTIME);
+      SERVER_INSTANCE.toServerRoutingInstance(TableType.REALTIME);
   private static final BrokerRequest BROKER_REQUEST = new BrokerRequest();
-  private static final Map<String, List<String>> ROUTING_TABLE =
-      Collections.singletonMap(SERVER_INSTANCE_NAME, Collections.emptyList());
+  private static final Map<ServerInstance, List<String>> ROUTING_TABLE =
+      Collections.singletonMap(SERVER_INSTANCE, Collections.emptyList());
 
   private QueryRouter _queryRouter;
 

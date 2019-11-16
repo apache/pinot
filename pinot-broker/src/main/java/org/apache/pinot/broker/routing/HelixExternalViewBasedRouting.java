@@ -55,6 +55,7 @@ import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -112,15 +113,15 @@ public class HelixExternalViewBasedRouting implements ClusterChangeHandler, Rout
   }
 
   @Override
-  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request) {
+  public Map<ServerInstance, List<String>> getRoutingTable(RoutingTableLookupRequest request) {
     String tableName = request.getTableName();
     RoutingTableBuilder routingTableBuilder = _routingTableBuilderMap.get(tableName);
     return routingTableBuilder.getRoutingTable(request, _segmentSelectorMap.get(tableName));
   }
 
   @Override
-  public boolean routingTableExists(String tableName) {
-    return _routingTableBuilderMap.containsKey(tableName);
+  public boolean routingTableExists(String tableNameWithType) {
+    return _routingTableBuilderMap.containsKey(tableNameWithType);
   }
 
   public void setBrokerMetrics(BrokerMetrics brokerMetrics) {
@@ -228,15 +229,14 @@ public class HelixExternalViewBasedRouting implements ClusterChangeHandler, Rout
           currentInstanceConfig.getRecord().getSimpleField(CommonConstants.Helix.QUERIES_DISABLED);
 
       boolean instancesChanged =
-          !EqualityUtils.isEqual(wasEnabled, isEnabled) || !EqualityUtils.isEqual(wasShuttingDown, isShuttingDown) ||
-          !EqualityUtils.isEqual(wasQueriesDisabled, isQueriesDisabled);
+          !EqualityUtils.isEqual(wasEnabled, isEnabled) || !EqualityUtils.isEqual(wasShuttingDown, isShuttingDown)
+              || !EqualityUtils.isEqual(wasQueriesDisabled, isQueriesDisabled);
 
       if (instancesChanged) {
-        LOGGER.info(
-            "Routing table for table {} requires rebuild due to at least one instance changing state " +
-                "(instance {} enabled: {} -> {}; shutting down {} -> {}; queries disabled {} -> {})",
-            tableName, instanceName, wasEnabled, isEnabled, wasShuttingDown, isShuttingDown,
-            wasQueriesDisabled, isQueriesDisabled);
+        LOGGER.info("Routing table for table {} requires rebuild due to at least one instance changing state "
+                + "(instance {} enabled: {} -> {}; shutting down {} -> {}; queries disabled {} -> {})", tableName,
+            instanceName, wasEnabled, isEnabled, wasShuttingDown, isShuttingDown, wasQueriesDisabled,
+            isQueriesDisabled);
         return true;
       } else {
         // Update the instance config in our last known instance config, since it hasn't changed
@@ -609,8 +609,8 @@ public class HelixExternalViewBasedRouting implements ClusterChangeHandler, Rout
 
         ArrayNode entries = JsonUtils.newArrayNode();
         RoutingTableBuilder routingTableBuilder = _routingTableBuilderMap.get(currentTable);
-        List<Map<String, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
-        for (Map<String, List<String>> routingTable : routingTables) {
+        List<Map<ServerInstance, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
+        for (Map<ServerInstance, List<String>> routingTable : routingTables) {
           entries.add(JsonUtils.objectToJsonNode(routingTable));
         }
         tableEntry.set("routingTableEntries", entries);

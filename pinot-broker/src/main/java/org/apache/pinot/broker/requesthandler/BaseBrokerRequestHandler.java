@@ -58,6 +58,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Broker;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -247,8 +248,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // Calculate routing table for the query
     long routingStartTimeNs = System.nanoTime();
-    Map<String, List<String>> offlineRoutingTable = null;
-    Map<String, List<String>> realtimeRoutingTable = null;
+    Map<ServerInstance, List<String>> offlineRoutingTable = null;
+    Map<ServerInstance, List<String>> realtimeRoutingTable = null;
     if (offlineBrokerRequest != null) {
       offlineRoutingTable = _routingTable.getRoutingTable(new RoutingTableLookupRequest(offlineBrokerRequest));
       if (offlineRoutingTable.isEmpty()) {
@@ -329,10 +330,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   private static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
-    return Splitter.on(';')
-        .omitEmptyStrings()
-        .trimResults()
-        .withKeyValueSeparator('=')
+    return Splitter.on(';').omitEmptyStrings().trimResults().withKeyValueSeparator('=')
         .split(request.get(optionsKey).asText());
   }
 
@@ -359,11 +357,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // If response time is more than 1 sec, force the log
-    if (totalTimeMs > 1000L) {
-      return true;
-    }
-
-    return false;
+    return totalTimeMs > 1000L;
   }
 
   /**
@@ -458,7 +452,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    *
    * Note that DISTINCT(transform_func(col)) is supported as in this case,
    * the output of transform_func(col) is piped into DISTINCT.
-   * See {@link org.apache.pinot.queries.DistinctQueriesTest} for tests.
    */
   @VisibleForTesting
   static void validateRequest(BrokerRequest brokerRequest, int queryResponseLimit) {
@@ -595,8 +588,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Processes the optimized broker requests for both OFFLINE and REALTIME table.
    */
   protected abstract BrokerResponse processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<String, List<String>> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<String, List<String>> realtimeRoutingTable,
+      @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
+      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
       long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
       throws Exception;
 

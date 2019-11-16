@@ -34,6 +34,7 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentName;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -135,13 +136,13 @@ public class LowLevelConsumerRoutingTableBuilderTest {
       long startTime = System.nanoTime();
       routingTableBuilder.computeOnExternalViewChange("table_REALTIME", externalView, instanceConfigs);
 
-      List<Map<String, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
+      List<Map<ServerInstance, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
 
       long endTime = System.nanoTime();
       totalNanos += endTime - startTime;
 
       // Check that all routing tables generated match all segments, with no duplicates
-      for (Map<String, List<String>> routingTable : routingTables) {
+      for (Map<ServerInstance, List<String>> routingTable : routingTables) {
         Set<String> assignedSegments = new HashSet<>();
 
         for (List<String> segmentsForServer : routingTable.values()) {
@@ -198,8 +199,8 @@ public class LowLevelConsumerRoutingTableBuilderTest {
     externalView.setState(consumingSegment2, instance2, RealtimeSegmentOnlineOfflineStateModel.CONSUMING);
 
     routingTableBuilder.computeOnExternalViewChange(realtimeTableName, externalView, instanceConfigs);
-    List<Map<String, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
-    for (Map<String, List<String>> routingTable : routingTables) {
+    List<Map<ServerInstance, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
+    for (Map<ServerInstance, List<String>> routingTable : routingTables) {
       ArrayList<String> segmentsInRoutingTable = new ArrayList<>();
       for (List<String> segmentsForServer : routingTable.values()) {
         segmentsInRoutingTable.addAll(segmentsForServer);
@@ -248,22 +249,22 @@ public class LowLevelConsumerRoutingTableBuilderTest {
     }
 
     routingTableBuilder.computeOnExternalViewChange(rawTableName, externalView, instanceConfigs);
-    List<Map<String, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
-    for (Map<String, List<String>> routingTable : routingTables) {
+    List<Map<ServerInstance, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
+    for (Map<ServerInstance, List<String>> routingTable : routingTables) {
       Assert.assertTrue(routingTable.isEmpty());
     }
 
     instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, "false");
     routingTableBuilder.computeOnExternalViewChange(rawTableName, externalView, instanceConfigs);
     routingTables = routingTableBuilder.getRoutingTables();
-    for (Map<String, List<String>> routingTable : routingTables) {
+    for (Map<ServerInstance, List<String>> routingTable : routingTables) {
       Assert.assertFalse(routingTable.isEmpty());
     }
 
     instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.QUERIES_DISABLED, "true");
     routingTableBuilder.computeOnExternalViewChange(rawTableName, externalView, instanceConfigs);
     routingTables = routingTableBuilder.getRoutingTables();
-    for (Map<String, List<String>> routingTable : routingTables) {
+    for (Map<ServerInstance, List<String>> routingTable : routingTables) {
       Assert.assertTrue(routingTable.isEmpty());
     }
   }
