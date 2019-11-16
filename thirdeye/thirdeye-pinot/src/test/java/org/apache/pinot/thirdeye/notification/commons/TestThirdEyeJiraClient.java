@@ -54,9 +54,7 @@ public class TestThirdEyeJiraClient {
         .getValuesMap().values().toString(), "[test_project]");
 
     // Assert if all the required fields are sets
-    Assert.assertEquals(issueInput.getFields().size(), 11);
-    Assert.assertTrue(issueInput.getFields().keySet().contains("requiredfield"));
-    Assert.assertEquals(issueInput.getField("requiredfield").getValue(), "");
+    Assert.assertEquals(issueInput.getFields().size(), 7);
     Assert.assertTrue(issueInput.getFields().keySet().contains("anotherrequiredfield"));
     Assert.assertFalse(issueInput.getFields().keySet().contains("notrequiredfield"));
   }
