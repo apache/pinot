@@ -39,6 +39,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -181,11 +182,17 @@ public class ThirdEyeJiraClient {
 
   private Map<String, CimFieldInfo> getIssueRequiredCreateFields(JiraEntity jiraEntity) {
     Map<String, CimFieldInfo> requiredCreateFields = new HashMap<>();
-    CimProject project = getProjectMetadata(jiraEntity).iterator().next();
-    CimIssueType issueType = project.getIssueTypes().iterator().next();
-    for (Map.Entry<String, CimFieldInfo> issueField : issueType.getFields().entrySet()) {
-      if (issueField.getValue().isRequired()) {
-        requiredCreateFields.put(issueField.getKey(), issueField.getValue());
+    Iterator<CimProject> projectIt = getProjectMetadata(jiraEntity).iterator();
+    if (projectIt.hasNext()) {
+      CimProject project = projectIt.next();
+      Iterator<CimIssueType> issueTypeIt = project.getIssueTypes().iterator();
+      if (issueTypeIt.hasNext()) {
+        CimIssueType issueType = issueTypeIt.next();
+        for (Map.Entry<String, CimFieldInfo> issueField : issueType.getFields().entrySet()) {
+          if (issueField.getValue().isRequired()) {
+            requiredCreateFields.put(issueField.getKey(), issueField.getValue());
+          }
+        }
       }
     }
 
