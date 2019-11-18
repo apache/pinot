@@ -216,12 +216,8 @@ public class ThirdEyeJiraClient {
     // For required/compulsory jira fields, we will automatically set a value from the "allowed values" list.
     // If there are no allowed values configured for that field in jira, required field won't be set by ThirdEye.
     for (Map.Entry<String, CimFieldInfo> reqFieldToInfoMap : getIssueRequiredCreateFields(jiraEntity).entrySet()) {
-      String requiredField = reqFieldToInfoMap.getKey();
       Iterable<Object> allowedValues = reqFieldToInfoMap.getValue().getAllowedValues();
-      if (allowedValues != null && allowedValues.iterator().hasNext()
-          && !requiredField.equalsIgnoreCase(PROP_PROJECT)
-          && !requiredField.equalsIgnoreCase(PROP_SUMMARY)
-          && !requiredField.equalsIgnoreCase(PROP_ISSUE_TYPE)) {
+      if (allowedValues != null && allowedValues.iterator().hasNext()) {
         if (reqFieldToInfoMap.getValue().getSchema().getType().equals("array")) {
           issueBuilder.setFieldValue(reqFieldToInfoMap.getKey(),
               Collections.singletonList(allowedValues.iterator().next()));
