@@ -448,17 +448,21 @@ public class PinotSegmentRestletResource {
     if (numSegments == 0) {
       throw new ControllerApplicationException(LOGGER, "Segments must be provided", Status.BAD_REQUEST);
     }
-    boolean realtimeSegment = SegmentName.isRealtimeSegmentName(segments.get(0));
+    boolean isRealtimeSegment = SegmentName.isRealtimeSegmentName(segments.get(0));
     for (int i = 1; i < numSegments; i++) {
-      if (SegmentName.isRealtimeSegmentName(segments.get(i)) != realtimeSegment) {
+      if (SegmentName.isRealtimeSegmentName(segments.get(i)) != isRealtimeSegment) {
         throw new ControllerApplicationException(LOGGER, "All segments must be of the same type (OFFLINE|REALTIME)",
             Status.BAD_REQUEST);
       }
     }
-    TableType tableType = realtimeSegment ? TableType.REALTIME : TableType.OFFLINE;
+    TableType tableType = isRealtimeSegment ? TableType.REALTIME : TableType.OFFLINE;
     String tableNameWithType = getExistingTableNamesWithType(tableName, tableType).get(0);
     deleteSegmentsInternal(tableNameWithType, segments);
-    return new SuccessResponse("Deleted segments: " + segments + " from table: " + tableNameWithType);
+    if (numSegments <= 5) {
+      return new SuccessResponse("Deleted segments: " + segments + " from table: " + tableNameWithType);
+    } else {
+      return new SuccessResponse("Deleted " + numSegments + " segments from table: " + tableNameWithType);
+    }
   }
 
   private void deleteSegmentsInternal(String tableNameWithType, List<String> segments) {
