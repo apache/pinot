@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
@@ -415,7 +416,7 @@ public class PinotSegmentRestletResource {
     segmentName = URIUtils.decode(segmentName);
     TableType tableType = SegmentName.isRealtimeSegmentName(segmentName) ? TableType.REALTIME : TableType.OFFLINE;
     String tableNameWithType = getExistingTableNamesWithType(tableName, tableType).get(0);
-    deleteSegments(tableNameWithType, Collections.singletonList(segmentName));
+    deleteSegmentsInternal(tableNameWithType, Collections.singletonList(segmentName));
     return new SuccessResponse("Segment deleted");
   }
 
@@ -431,11 +432,40 @@ public class PinotSegmentRestletResource {
       throw new ControllerApplicationException(LOGGER, "Table type must not be null", Status.BAD_REQUEST);
     }
     String tableNameWithType = getExistingTableNamesWithType(tableName, tableType).get(0);
-    deleteSegments(tableNameWithType, _pinotHelixResourceManager.getSegmentsFor(tableNameWithType));
+    deleteSegmentsInternal(tableNameWithType, _pinotHelixResourceManager.getSegmentsFor(tableNameWithType));
     return new SuccessResponse("All segments of table " + tableNameWithType + " deleted");
   }
 
-  private void deleteSegments(String tableNameWithType, List<String> segments) {
+  @POST
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/segments/{tableName}/delete")
+  @ApiOperation(value = "Delete the segments in the JSON array payload", notes = "Delete the segments in the JSON array payload")
+  public SuccessResponse deleteSegments(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      List<String> segments) {
+    int numSegments = segments.size();
+    if (numSegments == 0) {
+      throw new ControllerApplicationException(LOGGER, "Segments must be provided", Status.BAD_REQUEST);
+    }
+    boolean isRealtimeSegment = SegmentName.isRealtimeSegmentName(segments.get(0));
+    for (int i = 1; i < numSegments; i++) {
+      if (SegmentName.isRealtimeSegmentName(segments.get(i)) != isRealtimeSegment) {
+        throw new ControllerApplicationException(LOGGER, "All segments must be of the same type (OFFLINE|REALTIME)",
+            Status.BAD_REQUEST);
+      }
+    }
+    TableType tableType = isRealtimeSegment ? TableType.REALTIME : TableType.OFFLINE;
+    String tableNameWithType = getExistingTableNamesWithType(tableName, tableType).get(0);
+    deleteSegmentsInternal(tableNameWithType, segments);
+    if (numSegments <= 5) {
+      return new SuccessResponse("Deleted segments: " + segments + " from table: " + tableNameWithType);
+    } else {
+      return new SuccessResponse("Deleted " + numSegments + " segments from table: " + tableNameWithType);
+    }
+  }
+
+  private void deleteSegmentsInternal(String tableNameWithType, List<String> segments) {
     PinotResourceManagerResponse response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segments);
     if (!response.isSuccessful()) {
       throw new ControllerApplicationException(LOGGER,
