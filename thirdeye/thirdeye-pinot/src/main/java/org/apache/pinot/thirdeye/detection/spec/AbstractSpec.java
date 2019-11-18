@@ -28,6 +28,7 @@ import org.modelmapper.convention.MatchingStrategies;
  * Base class for component specs
  */
 public abstract class AbstractSpec {
+  static final String DEFAULT_TIMEZONE = "America/Los_Angeles";
 
   public static <T extends AbstractSpec> T fromProperties(Map<String, Object> properties, Class<T> specClass) {
     // don't reuse model mapper instance. It caches typeMaps and will result in unexpected mappings
