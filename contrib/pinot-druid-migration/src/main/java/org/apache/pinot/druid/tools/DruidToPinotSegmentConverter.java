@@ -57,22 +57,18 @@ public class DruidToPinotSegmentConverter {
     driver.build();
   }
 
-  public static void main(String[] args) {
+  public static void main(String[] args)
+      throws Exception {
     if (args.length != 5) {
-      System.out.println("Convert a Druid segment into Pinot format.");
-      System.out.println("Use with arguments: <table-name> <segment-name> <segment-path> <schema-path> <output-directory>");
+      System.out.println("Usage: ");
+      System.out.println("./pinot-druid-converter.sh <pinot_table_name> <pinot_segment_name>  <pinot_schema_path> <druid_segment_path> <output_path>");
     } else {
       _tableName = args[0];
       _segmentName = args[1];
-      _druidSegmentPath = args[2];
-      _schemaFilePath = args[3];
+      _schemaFilePath = args[2];
+      _druidSegmentPath = args[3];
       _outPath = args[4];
-
-      try {
-        convertSegment();
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
+      convertSegment();
     }
   }
 }
