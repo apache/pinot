@@ -104,8 +104,8 @@ public class QueryRouter {
     _serverChannels.shutDown();
   }
 
-  void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, long responseSize,
-      long deserializationTimeMs) {
+  void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
+      int deserializationTimeMs) {
     long requestId = Long.parseLong(dataTable.getMetadata().get(DataTable.REQUEST_ID_METADATA_KEY));
     AsyncQueryResponse asyncQueryResponse = _asyncQueryResponseMap.get(requestId);
 

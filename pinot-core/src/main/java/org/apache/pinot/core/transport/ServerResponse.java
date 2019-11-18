@@ -29,10 +29,10 @@ import org.apache.pinot.common.utils.DataTable;
 public class ServerResponse {
   private final long _startTimeMs;
   private volatile long _submitRequestTimeMs;
-  private volatile long _receiveDataTabTimeMs;
+  private volatile long _receiveDataTableTimeMs;
   private volatile DataTable _dataTable;
-  private volatile long _responseSize;
-  private volatile long _deserializationTimeMs;
+  private volatile int _responseSize;
+  private volatile int _deserializationTimeMs;
 
   public ServerResponse(long startTimeMs) {
     _startTimeMs = startTimeMs;
@@ -42,27 +42,27 @@ public class ServerResponse {
     return _dataTable;
   }
 
-  public long getSubmitDelayMs() {
+  public int getSubmitDelayMs() {
     if (_submitRequestTimeMs != 0) {
-      return _submitRequestTimeMs - _startTimeMs;
+      return (int) (_submitRequestTimeMs - _startTimeMs);
     } else {
       return -1;
     }
   }
 
-  public long getResponseDelayMs() {
-    if (_receiveDataTabTimeMs != 0) {
-      return _receiveDataTabTimeMs - _submitRequestTimeMs;
+  public int getResponseDelayMs() {
+    if (_receiveDataTableTimeMs != 0) {
+      return (int) (_receiveDataTableTimeMs - _submitRequestTimeMs);
     } else {
       return -1;
     }
   }
 
-  public long getResponseSize() {
+  public int getResponseSize() {
     return _responseSize;
   }
 
-  public long getDeserializationTimeMs() {
+  public int getDeserializationTimeMs() {
     return _deserializationTimeMs;
   }
 
@@ -76,8 +76,8 @@ public class ServerResponse {
     _submitRequestTimeMs = System.currentTimeMillis();
   }
 
-  void receiveDataTable(DataTable dataTable, long responseSize, long deserializationTimeMs) {
-    _receiveDataTabTimeMs = System.currentTimeMillis();
+  void receiveDataTable(DataTable dataTable, int responseSize, int deserializationTimeMs) {
+    _receiveDataTableTimeMs = System.currentTimeMillis();
     _dataTable = dataTable;
     _responseSize = responseSize;
     _deserializationTimeMs = deserializationTimeMs;

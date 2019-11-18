@@ -19,6 +19,7 @@
 package org.apache.pinot.core.transport;
 
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
@@ -99,9 +100,8 @@ public class ServerChannels {
             System.currentTimeMillis() - startTime);
       }
       byte[] requestBytes = _serializer.serialize(instanceRequest);
-      _channel
-          .writeAndFlush(_channel.alloc().buffer(requestBytes.length).writeBytes(requestBytes), _channel.voidPromise());
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_REQUESTS_SENT, 1L);
+      _channel.writeAndFlush(Unpooled.wrappedBuffer(requestBytes), _channel.voidPromise());
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_REQUESTS_SENT, 1);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_SENT, requestBytes.length);
     }
   }
