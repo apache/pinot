@@ -65,4 +65,7 @@ public class JobConfigConstants {
 
   // This setting enables segment push in parallel.
   public static final String ENABLE_PARALLEL_PUSH = "enable.parallel.push";
+  public static final String DEFAULT_ENABLE_PARALLEL_PUSH = "false";
+  public static final String PUSH_JOB_PARALLELISM = "push.job.parallelism";
+  public static final String DEFAULT_PUSH_JOB_PARALLELISM = "4";
 }

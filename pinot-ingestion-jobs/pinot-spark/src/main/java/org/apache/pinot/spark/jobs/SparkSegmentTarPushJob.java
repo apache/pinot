@@ -36,11 +36,14 @@ import java.util.Properties;
 
 public class SparkSegmentTarPushJob extends SegmentTarPushJob {
   private final boolean _enableParallelPush;
+  private int _pushJobParallelism;
 
   public SparkSegmentTarPushJob(Properties properties) {
     super(properties);
     _enableParallelPush =
-        Boolean.parseBoolean(properties.getProperty(JobConfigConstants.ENABLE_PARALLEL_PUSH, "false"));
+        Boolean.parseBoolean(properties.getProperty(JobConfigConstants.ENABLE_PARALLEL_PUSH, JobConfigConstants.DEFAULT_ENABLE_PARALLEL_PUSH));
+    _pushJobParallelism =
+        Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_JOB_PARALLELISM, JobConfigConstants.DEFAULT_PUSH_JOB_PARALLELISM));
   }
 
   @Override
@@ -55,7 +58,10 @@ public class SparkSegmentTarPushJob extends SegmentTarPushJob {
         segmentsToPush.add(path.toString());
       });
       JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
-      JavaRDD<String> pathRDD = sparkContext.parallelize(segmentsToPush, segmentsToPush.size());
+      if (_pushJobParallelism == -1) {
+        _pushJobParallelism = segmentsToPush.size();
+      }
+      JavaRDD<String> pathRDD = sparkContext.parallelize(segmentsToPush, _pushJobParallelism);
       pathRDD.foreach(segmentTarPath -> {
         try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
           FileSystem fileSystem = FileSystem.get(new Path(segmentTarPath).toUri(), new Configuration());
