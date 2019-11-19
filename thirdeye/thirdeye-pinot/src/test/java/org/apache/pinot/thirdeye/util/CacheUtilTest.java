@@ -67,7 +67,7 @@ public class CacheUtilTest {
   public void testBuildDocumentStructureShouldMapToJsonObject() {
     JsonObject mappedDataPoint = CacheUtils.buildDocumentStructure(dataPoint);
 
-    Assert.assertEquals(mappedDataPoint.getLong("time").longValue(), 1234567);
+    Assert.assertEquals(mappedDataPoint.getLong("timestamp").longValue(), 1234567);
     Assert.assertEquals(mappedDataPoint.getLong("metricId").longValue(), 1);
     Assert.assertEquals(mappedDataPoint.getDouble(dataPoint.getMetricUrnHash()), (double)100);
   }
@@ -97,7 +97,7 @@ public class CacheUtilTest {
         .put(END, 200);
 
     String query = CacheUtils.buildQuery(jsonObject);
-    String expectedQuery = "SELECT time, `624972944` FROM `TestBucket` WHERE metricId = 1 AND `624972944` IS NOT MISSING AND time BETWEEN 100 AND 200 ORDER BY time ASC";
+    String expectedQuery = "SELECT timestamp, `624972944` FROM `TestBucket` WHERE metricId = 1 AND `624972944` IS NOT MISSING AND timestamp BETWEEN 100 AND 200 ORDER BY time ASC";
 
     Assert.assertEquals(query, expectedQuery);
   }
