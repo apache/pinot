@@ -29,7 +29,7 @@ import org.apache.pinot.druid.data.readers.DruidSegmentRecordReader;
  * The DruidToPinotSegmentConverter is a CLI tool that converts a Druid segment to a Pinot segment.
  */
 public class DruidToPinotSegmentConverter {
-  private static String _schemaFilePath;
+  private static String _pinotSchemaFilePath;
   private static String _druidSegmentPath;
   private static String _outPath;
   private static String _segmentName;
@@ -39,7 +39,7 @@ public class DruidToPinotSegmentConverter {
   public static void convertSegment()
       throws Exception {
     File segment = new File(_druidSegmentPath);
-    Schema schema = Schema.fromFile(new File(_schemaFilePath));
+    Schema schema = Schema.fromFile(new File(_pinotSchemaFilePath));
 
     final SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig();
     segmentGeneratorConfig.setDataDir(_druidSegmentPath);
@@ -47,7 +47,6 @@ public class DruidToPinotSegmentConverter {
     segmentGeneratorConfig.setOverwrite(true);
     segmentGeneratorConfig.setTableName(_tableName);
     segmentGeneratorConfig.setSegmentName(_segmentName);
-    segmentGeneratorConfig.setSchemaFile(_schemaFilePath);
     segmentGeneratorConfig.setSchema(schema);
 
     final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -59,15 +58,17 @@ public class DruidToPinotSegmentConverter {
 
   public static void main(String[] args)
       throws Exception {
+    args = new String[]{"1", "2", "3", "4", "5"};
     if (args.length != 5) {
       System.out.println("Usage: ");
       System.out.println("./pinot-druid-converter.sh <pinot_table_name> <pinot_segment_name>  <pinot_schema_path> <druid_segment_path> <output_path>");
     } else {
       _tableName = args[0];
       _segmentName = args[1];
-      _schemaFilePath = args[2];
+      _pinotSchemaFilePath = args[2];
       _druidSegmentPath = args[3];
       _outPath = args[4];
+
       convertSegment();
     }
   }

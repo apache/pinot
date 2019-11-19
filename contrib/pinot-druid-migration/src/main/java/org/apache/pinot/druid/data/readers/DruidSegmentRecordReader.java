@@ -64,7 +64,7 @@ public class DruidSegmentRecordReader implements RecordReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(DruidSegmentRecordReader.class);
 
   private Schema _pinotSchema;
-  private ArrayList<String> _columnNames;
+  private List<String> _columnNames;
   private Cursor _cursor;
   private List<BaseObjectColumnValueSelector> _selectors;
   private QueryableIndex _index;
@@ -171,7 +171,8 @@ public class DruidSegmentRecordReader implements RecordReader {
         if (value != null && !pinotFieldSpec.isSingleValueField()) {
           // Multi-valued dimensions in Druid are stored as Arrays.ArrayList (this has been checked)
           Preconditions.checkState(value instanceof List,
-              String.format("The multi-valued dimension %s should be java.util.Arrays$ArrayList, but it is %s.", columnName, value.getClass()));
+              String.format("The multi-valued dimension %s should be java.util.Arrays$ArrayList, but it is %s.",
+                  columnName, value.getClass()));
           // Store the multi-valued dimension as a String[] to follow Pinot format; null if empty
           value = ((List<String>) value).toArray(new String[0]);
         }
@@ -199,8 +200,6 @@ public class DruidSegmentRecordReader implements RecordReader {
 
   private boolean compareTypes(FieldSpec.DataType pinotColumnType, ValueType druidColumnType) {
     switch (pinotColumnType) {
-      case INT:
-        return false;
       case LONG:
         return druidColumnType == ValueType.LONG;
       case FLOAT:
@@ -209,10 +208,11 @@ public class DruidSegmentRecordReader implements RecordReader {
         return druidColumnType == ValueType.DOUBLE;
       case STRING:
         return druidColumnType == ValueType.STRING;
+      case INT:
       case BOOLEAN:
       case BYTES:
       default:
-        throw new UnsupportedOperationException("Unsupported Druid type: " + pinotColumnType.name());
+        throw new UnsupportedOperationException("Druid does not support Pinot DataType " + pinotColumnType.name());
     }
   }
 
@@ -238,7 +238,8 @@ public class DruidSegmentRecordReader implements RecordReader {
               String.format("Column %s: Column in Pinot schema is single-valued, but column in record is multi-valued.", columnName));
         }
         if (!fieldSpec.isSingleValueField() && !druidColumnCapabilities.hasMultipleValues()) {
-          throw new IllegalArgumentException(String.format("Column %s: Column in Pinot schema is multi-valued, but column in record is single-valued.", columnName));
+          throw new IllegalArgumentException(
+              String.format("Column %s: Column in Pinot schema is multi-valued, but column in record is single-valued.", columnName));
         }
         if (!compareTypes(_pinotSchema.getFieldSpecFor(columnName).getDataType(), druidColumnCapabilities.getType())) {
           throw new IllegalArgumentException(
