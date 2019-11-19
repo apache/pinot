@@ -36,7 +36,7 @@ import org.testng.annotations.Test;
 public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQueriesTest {
 
   @Test(dataProvider = "orderByDataProvider")
-  public void testAggregationOrderedGroupByResults(String query, List<Object[]> expectedResults,
+  public void testGroupByOrderByMVSQLResults(String query, List<Object[]> expectedResults,
       long expectedNumEntriesScannedPostFilter, DataSchema expectedDataSchema) {
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(Request.QueryOptionKey.GROUP_BY_MODE, Request.SQL);
@@ -57,29 +57,33 @@ public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQuer
     List<Object[]> data = new ArrayList<>();
     String query;
     List<Object[]> results;
+    DataSchema dataSchema;
     long numEntriesScannedPostFilter;
 
     query = "SELECT SUMMV(column7) FROM testTable GROUP BY column3 ORDER BY column3";
     results = Lists.newArrayList(new Object[]{"", 63917703269308.0}, new Object[]{"L", 33260235267900.0},
         new Object[]{"P", 212961658305696.0}, new Object[]{"PbQd", 2001454759004.0},
         new Object[]{"w", 116831822080776.0});
+    dataSchema = new DataSchema(new String[]{"column3", "summv(column7)"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     numEntriesScannedPostFilter = 800000;
-    data.add(new Object[]{query, results, numEntriesScannedPostFilter});
+    data.add(new Object[]{query, results, numEntriesScannedPostFilter, dataSchema});
 
     query = "SELECT SUMMV(column7) FROM testTable GROUP BY column5 ORDER BY column5 DESC TOP 4";
     results = Lists.newArrayList(new Object[]{"yQkJTLOQoOqqhkAClgC", 61100215182228.00000},
         new Object[]{"mhoVvrJm", 5806796153884.00000}, new Object[]{"kCMyNVGCASKYDdQbftOPaqVMWc", 51891832239248.00000},
         new Object[]{"PbQd", 36532997335388.00000});
+    dataSchema = new DataSchema(new String[]{"column5", "summv(column7)"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     numEntriesScannedPostFilter = 800000;
-    data.add(new Object[]{query, results, numEntriesScannedPostFilter});
+    data.add(new Object[]{query, results, numEntriesScannedPostFilter, dataSchema});
 
     query = "SELECT SUMMV(column7) FROM testTable GROUP BY column5 ORDER BY SUMMV(column7) TOP 5";
     results = Lists
         .newArrayList(new Object[]{"NCoFku", 489626381288.00000}, new Object[]{"mhoVvrJm", 5806796153884.00000},
             new Object[]{"JXRmGakTYafZFPm", 18408231081808.00000}, new Object[]{"PbQd", 36532997335388.00000},
             new Object[]{"OKyOqU", 51067166589176.00000});
+    dataSchema = new DataSchema(new String[]{"column5", "summv(column7)"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     numEntriesScannedPostFilter = 800000;
-    data.add(new Object[]{query, results, numEntriesScannedPostFilter});
+    data.add(new Object[]{query, results, numEntriesScannedPostFilter, dataSchema});
 
     // object type aggregations
     query = "SELECT MINMAXRANGEMV(column7) FROM testTable GROUP BY column5 ORDER BY column5";
@@ -89,8 +93,9 @@ public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQuer
             new Object[]{"OKyOqU", 2147483443.00000}, new Object[]{"PbQd", 2147483443.00000},
             new Object[]{"kCMyNVGCASKYDdQbftOPaqVMWc", 2147483446.00000}, new Object[]{"mhoVvrJm", 2147483438.00000},
             new Object[]{"yQkJTLOQoOqqhkAClgC", 2147483446.00000});
+    dataSchema = new DataSchema(new String[]{"column5", "minmaxrangemv(column7)"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     numEntriesScannedPostFilter = 800000;
-    data.add(new Object[]{query, results, numEntriesScannedPostFilter});
+    data.add(new Object[]{query, results, numEntriesScannedPostFilter, dataSchema});
 
     // object type aggregations
     query =
@@ -100,16 +105,18 @@ public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQuer
         new Object[]{"JXRmGakTYafZFPm", 2147483443.00000}, new Object[]{"yQkJTLOQoOqqhkAClgC", 2147483446.00000},
         new Object[]{"kCMyNVGCASKYDdQbftOPaqVMWc", 2147483446.00000}, new Object[]{"EOFxevm", 2147483446.00000},
         new Object[]{"AKXcXcIqsqOJFsdwxZ", 2147483446.00000});
+    dataSchema = new DataSchema(new String[]{"column5", "minmaxrangemv(column7)"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     numEntriesScannedPostFilter = 800000;
-    data.add(new Object[]{query, results, numEntriesScannedPostFilter});
+    data.add(new Object[]{query, results, numEntriesScannedPostFilter, dataSchema});
 
     // object type aggregations - non comparable intermediate results
     query = "SELECT DISTINCTCOUNTMV(column7) FROM testTable GROUP BY column5 ORDER BY DISTINCTCOUNTMV(column7) top 5";
     results = Lists
         .newArrayList(new Object[]{"NCoFku", 26}, new Object[]{"mhoVvrJm", 65}, new Object[]{"JXRmGakTYafZFPm", 126},
             new Object[]{"PbQd", 211}, new Object[]{"OKyOqU", 216});
+    dataSchema = new DataSchema(new String[]{"column5", "distinctcountmv(column7)"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
     numEntriesScannedPostFilter = 800000;
-    data.add(new Object[]{query, results, numEntriesScannedPostFilter});
+    data.add(new Object[]{query, results, numEntriesScannedPostFilter, dataSchema});
 
     return data.toArray(new Object[data.size()][]);
   }

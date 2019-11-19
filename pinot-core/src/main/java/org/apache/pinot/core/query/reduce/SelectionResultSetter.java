@@ -42,6 +42,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Helper class to set Selection results into the BrokerResponseNative
+ */
 public class SelectionResultSetter extends ResultSetter {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SelectionResultSetter.class);
@@ -52,17 +55,22 @@ public class SelectionResultSetter extends ResultSetter {
     super(tableName, brokerRequest, dataSchema, dataTableMap, brokerResponseNative, brokerMetrics);
   }
 
+  /**
+   * Sets selection results into ResultTable if responseFormat = sql
+   * By default, sets the selection results into SelectionResults
+   */
   public void setSelectionResults() {
     Selection selection = _brokerRequest.getSelections();
 
     if (_dataTableMap.isEmpty()) {
       // For empty data table map, construct empty result using the cached data schema for selection query if exists
       if (_dataSchema != null) {
+        List<String> selectionColumns =
+            SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), _dataSchema);
         if (_responseFormatSql) {
-          _brokerResponseNative.setResultTable(new ResultTable(_dataSchema, new ArrayList<>(0)));
+          DataSchema selectionDataSchema = SelectionOperatorUtils.getResultTableDataSchema(_dataSchema, selectionColumns);
+          _brokerResponseNative.setResultTable(new ResultTable(selectionDataSchema, new ArrayList<>(0)));
         } else {
-          List<String> selectionColumns =
-              SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), _dataSchema);
           _brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, new ArrayList<>(0)));
         }
       }
@@ -93,6 +101,8 @@ public class SelectionResultSetter extends ResultSetter {
         SelectionOperatorService selectionService = new SelectionOperatorService(selection, _dataSchema);
         selectionService.reduceWithOrdering(_dataTables);
         if (_responseFormatSql) {
+          // TODO: Selection uses Serializable[] in all its operations
+          //   Converting that to Object[] end to end would be a big change, and will be done in future PRs
           _brokerResponseNative.setResultTable(selectionService.renderResultTableWithOrdering(_preserveType));
         } else {
           _brokerResponseNative.setSelectionResults(selectionService.renderSelectionResultsWithOrdering(_preserveType));
@@ -104,6 +114,8 @@ public class SelectionResultSetter extends ResultSetter {
         List<Serializable[]> reducedRows =
             SelectionOperatorUtils.reduceWithoutOrdering(_dataTables, selectionSize);
         if (_responseFormatSql) {
+          // TODO: Selection uses Serializable[] in all its operations
+          //   Converting that to Object[] end to end would be a big change, and will be done in future PRs
           _brokerResponseNative.setResultTable(
               SelectionOperatorUtils.renderResultTableWithoutOrdering(reducedRows, _dataSchema, _preserveType));
         } else {

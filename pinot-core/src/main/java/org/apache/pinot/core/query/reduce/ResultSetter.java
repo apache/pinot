@@ -29,6 +29,9 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.QueryOptions;
 
 
+/**
+ * Sets the result into the BrokerResponseNative, given the dataTableMap
+ */
 public abstract class ResultSetter {
 
   String _tableName;

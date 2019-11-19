@@ -54,6 +54,9 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 
 
+/**
+ * Helper class to set group by results into the BrokerResponseNative
+ */
 public class GroupByResultSetter extends ResultSetter {
 
   public GroupByResultSetter(String tableName, BrokerRequest brokerRequest, DataSchema dataSchema,
@@ -62,8 +65,12 @@ public class GroupByResultSetter extends ResultSetter {
     super(tableName, brokerRequest, dataSchema, dataTableMap, brokerResponseNative, brokerMetrics);
   }
 
+  /**
+   * Sets group by results into ResultTable, if responseFormat = sql
+   * By default, sets group by results into GroupByResults
+   */
   public void setAggregationGroupByResults() {
-    if (_dataTableMap.isEmpty()) {
+    if (_dataTableMap.isEmpty() && !_responseFormatSql) {
       return;
     }
 
@@ -118,24 +125,17 @@ public class GroupByResultSetter extends ResultSetter {
   private void setSQLGroupByOrderByResults(List<AggregationInfo> aggregationInfos, GroupBy groupBy,
       List<SelectionSort> orderBy) {
 
-    List<String> columnNames = new ArrayList<>(_dataSchema.size());
-    for (int i = 0; i < _dataSchema.size(); i++) {
-      columnNames.add(_dataSchema.getColumnName(i));
-    }
-
     int numGroupBy = groupBy.getExpressionsSize();
     int numAggregations = aggregationInfos.size();
-    int numColumns = columnNames.size();
-
-    IndexedTable indexedTable = getIndexedTable(groupBy, aggregationInfos, orderBy);
-
+    int numColumns = _dataSchema.size();
     AggregationFunction[] aggregationFunctions = new AggregationFunction[numAggregations];
-    DataSchema.ColumnDataType[] finalColumnDataTypes = new DataSchema.ColumnDataType[numColumns];
+
     for (int i = 0; i < numAggregations; i++) {
       aggregationFunctions[i] =
           AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfos.get(i)).getAggregationFunction();
-      finalColumnDataTypes[i] = aggregationFunctions[i].getFinalResultColumnType();
     }
+
+    IndexedTable indexedTable = getIndexedTable(groupBy, aggregationInfos, orderBy);
 
     List<Object[]> rows = new ArrayList<>();
     Iterator<Record> sortedIterator = indexedTable.iterator();
@@ -155,8 +155,49 @@ public class GroupByResultSetter extends ResultSetter {
       numRows++;
     }
 
-    DataSchema finalDataSchema = new DataSchema(_dataSchema.getColumnNames(), finalColumnDataTypes);
+    DataSchema finalDataSchema =
+        getResultTableSchema(_dataSchema.getColumnNames(), numColumns, numGroupBy, aggregationInfos,
+            aggregationFunctions);
     _brokerResponseNative.setResultTable(new ResultTable(finalDataSchema, rows));
+  }
+
+  /**
+   * Constructs the final result table schema for sql mode execution
+   */
+  private DataSchema getResultTableSchema(String[] columns, int numColumns, int numGroupBy,
+      List<AggregationInfo> aggregationInfos, AggregationFunction[] aggregationFunctions) {
+    DataSchema.ColumnDataType[] finalColumnDataTypes = new DataSchema.ColumnDataType[numColumns];
+    int aggIdx = 0;
+    for (int i = 0; i < numColumns; i++) {
+      if (i < numGroupBy) {
+        finalColumnDataTypes[i] = _dataSchema.getColumnDataType(i);
+      } else {
+        aggregationFunctions[aggIdx] =
+            AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfos.get(aggIdx))
+                .getAggregationFunction();
+        finalColumnDataTypes[i] = aggregationFunctions[aggIdx].getFinalResultColumnType();
+        aggIdx++;
+      }
+    }
+    return new DataSchema(columns, finalColumnDataTypes);
+  }
+
+  /**
+   * Constructs the final result table schema for PQL execution mode
+   */
+  private DataSchema getResultTableSchema(int numColumns, int numGroupBy, GroupBy groupBy, String finalAggregationName,
+      AggregationFunction aggregationFunction) {
+    String[] finalDataSchemaColumns = new String[numColumns];
+    DataSchema.ColumnDataType[] finalColumnDataTypes = new DataSchema.ColumnDataType[numColumns];
+    int i;
+    List<String> groupByExpressions = groupBy.getExpressions();
+    for (i = 0; i < numGroupBy; i++) {
+      finalDataSchemaColumns[i] = groupByExpressions.get(i);
+      finalColumnDataTypes[i] = DataSchema.ColumnDataType.STRING;
+    }
+    finalDataSchemaColumns[i] = finalAggregationName;
+    finalColumnDataTypes[i] = aggregationFunction.getFinalResultColumnType();
+    return new DataSchema(finalDataSchemaColumns, finalColumnDataTypes);
   }
 
   private IndexedTable getIndexedTable(GroupBy groupBy, List<AggregationInfo> aggregationInfos,
@@ -410,6 +451,8 @@ public class GroupByResultSetter extends ResultSetter {
           count++;
         }
       }
+      // TODO: The aggregation results are available in Serializable after the Trimming
+      //  Converting this to Object would be quite a big change, and will be done in future PRs
       // Trim the final result maps to topN and set them into the broker response.
       AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
           new AggregationGroupByTrimmingService(finalAggregationFunctions, (int) groupBy.getTopN());
@@ -440,17 +483,9 @@ public class GroupByResultSetter extends ResultSetter {
           row[i] = groupByResult.getValue();
           rows.add(row);
         }
-        String[] finalDataSchemaColumns = new String[numColumns];
-        DataSchema.ColumnDataType[] finalColumnDataTypes = new DataSchema.ColumnDataType[numColumns];
-        int i;
-        List<String> groupByExpressions = groupBy.getExpressions();
-        for (i = 0; i < numGroupBy; i++) {
-          finalDataSchemaColumns[i] = groupByExpressions.get(i);
-          finalColumnDataTypes[i] = DataSchema.ColumnDataType.STRING;
-        }
-        finalDataSchemaColumns[i] = finalResultTableColumnNames[0];
-        finalColumnDataTypes[i] = aggregationFunctions[0].getFinalResultColumnType();
-        DataSchema finalDataSchema = new DataSchema(finalDataSchemaColumns, finalColumnDataTypes);
+        DataSchema finalDataSchema =
+            getResultTableSchema(numColumns, numGroupBy, groupBy, finalResultTableColumnNames[0],
+                finalAggregationFunctions[0]);
         _brokerResponseNative.setResultTable(new ResultTable(finalDataSchema, rows));
       } else {
 

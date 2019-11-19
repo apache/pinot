@@ -19,9 +19,7 @@
 package org.apache.pinot.queries;
 
 import com.google.common.collect.Lists;
-import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,10 +36,10 @@ import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
 
-
+/**
+ * Tests Response Format = sql for selection, distinct, aggregations and aggregation group bys
+ */
 public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleValueQueriesTest {
   private static String GROUP_BY = " group by column9";
 
@@ -64,14 +62,15 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 0L, 120000L, rows, expectedResultsSize, dataSchema);
 
+    // preserve type
     queryOptions.put(QueryOptionKey.PRESERVE_TYPE, "true");
     brokerResponse = getBrokerResponseForQuery(query, queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{120000L});
-    expectedResultsSize = 1;
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 0L, 120000L, rows, expectedResultsSize, dataSchema);
 
+    // filter
     queryOptions.remove(QueryOptionKey.PRESERVE_TYPE);
     brokerResponse = getBrokerResponseForQuery(query + getFilter(), queryOptions);
     rows = new ArrayList<>();
@@ -80,6 +79,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 0L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
+    // group by
     brokerResponse = getBrokerResponseForQuery(query + GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column9", "count(*)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
@@ -90,6 +90,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 120000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
+    // filter + group by
     brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{"296467636", "17080"});
@@ -97,12 +98,21 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 24516L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
+    // group by + filter + preserve type
     queryOptions.put(QueryOptionKey.PRESERVE_TYPE, "true");
     brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{"296467636", 17080L});
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 24516L, 120000L, rows, expectedResultsSize,
+            dataSchema);
+
+    // empty results
+    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + " where column5='non-existent-value'", queryOptions);
+    rows = new ArrayList<>();
+    expectedResultsSize = 0;
+    QueriesTestUtils
+        .testInterSegmentResultTable(brokerResponse, 0, 0, 0, 120000L, rows, expectedResultsSize,
             dataSchema);
   }
 

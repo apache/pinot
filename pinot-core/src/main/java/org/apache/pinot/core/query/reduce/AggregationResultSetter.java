@@ -42,6 +42,10 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 
 
+/**
+ * Helper class to set Aggregation results into the BrokerResponseNative
+ * Also handles Distinct results
+ */
 public class AggregationResultSetter extends ResultSetter {
 
   public AggregationResultSetter(String tableName, BrokerRequest brokerRequest, DataSchema dataSchema,
@@ -50,26 +54,47 @@ public class AggregationResultSetter extends ResultSetter {
     super(tableName, brokerRequest, dataSchema, dataTableMap, brokerResponseNative, brokerMetrics);
   }
 
+  /**
+   * Sets aggregations results into ResultTable, if responseFormat = sql
+   * By default, sets aggregation results into AggregationResults, and distinct results into SelectionResults
+   */
   public void setAggregationResults() {
+
+    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(_brokerRequest);
+    List<AggregationInfo> aggregationInfos = _brokerRequest.getAggregationsInfo();
+    int numAggregationFunctions = aggregationFunctions.length;
 
     if (_dataTableMap.isEmpty()) {
       if (_responseFormatSql) {
-        _brokerResponseNative.setResultTable(new ResultTable(_dataSchema, new ArrayList<>(0)));
+        DataSchema finalDataSchema =
+            getResultTableDataSchema(aggregationInfos, aggregationFunctions, numAggregationFunctions);
+        _brokerResponseNative.setResultTable(new ResultTable(finalDataSchema, new ArrayList<>(0)));
       }
       return;
     }
 
     assert _dataSchema != null;
 
-    AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(_brokerRequest);
-    int numAggregationFunctions = aggregationFunctions.length;
     Object[] intermediateResults = mergeAggregationResults(aggregationFunctions, numAggregationFunctions);
     if (isDistinct(aggregationFunctions)) {
       setDistinctResults(intermediateResults);
     } else {
-      setAggregationResults(aggregationFunctions, numAggregationFunctions, _brokerRequest.getAggregationsInfo(),
-          intermediateResults);
+      setAggregationResults(aggregationFunctions, numAggregationFunctions, aggregationInfos, intermediateResults);
     }
+  }
+
+  /**
+   * Constructs the data schema for the final results table
+   */
+  private DataSchema getResultTableDataSchema(List<AggregationInfo> aggregationInfos,
+      AggregationFunction[] aggregationFunctions, int numAggregationFunctions) {
+    String[] finalColumnNames = new String[numAggregationFunctions];
+    DataSchema.ColumnDataType[] finalColumnDataTypes = new DataSchema.ColumnDataType[numAggregationFunctions];
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      finalColumnNames[i] = AggregationFunctionUtils.getAggregationColumnName(aggregationInfos.get(i));
+      finalColumnDataTypes[i] = aggregationFunctions[i].getFinalResultColumnType();
+    }
+    return new DataSchema(finalColumnNames, finalColumnDataTypes);
   }
 
   /**
@@ -131,6 +156,9 @@ public class AggregationResultSetter extends ResultSetter {
     }
   }
 
+  /**
+   * Sets distinct results into ResultsTable
+   */
   private void setSqlDistinctResults(DistinctTable distinctTable) {
     String[] columnNames = distinctTable.getColumnNames();
     List<Object[]> resultSet = new ArrayList<>(distinctTable.size());
@@ -143,13 +171,16 @@ public class AggregationResultSetter extends ResultSetter {
           "Error: unexpected number of columns in RecordHolder for DISTINCT");
       resultSet.add(columns);
     }
-    // FIXME: how do we get these data types?
+    // FIXME: how do we get the correct data types?
     DataSchema.ColumnDataType[] finalColumnDataTypes = new DataSchema.ColumnDataType[columnNames.length];
     Arrays.fill(finalColumnDataTypes, DataSchema.ColumnDataType.OBJECT);
     DataSchema finalDataSchema = new DataSchema(columnNames, finalColumnDataTypes);
     _brokerResponseNative.setResultTable(new ResultTable(finalDataSchema, resultSet));
   }
 
+  /**
+   * Sets distinct results into SelectionResults
+   */
   private void setPqlDistinctResults(DistinctTable distinctTable) {
     String[] columnNames = distinctTable.getColumnNames();
     List<Serializable[]> resultSet = new ArrayList<>(distinctTable.size());
@@ -179,27 +210,30 @@ public class AggregationResultSetter extends ResultSetter {
     }
   }
 
+  /**
+   * Sets aggregation results into ResultsTable
+   */
   private void setSqlAggregationResult(AggregationFunction[] aggregationFunctions, int numAggregationFunctions,
       List<AggregationInfo> aggregationInfos, Object[] intermediateResults) {
     List<Object[]> rows = new ArrayList<>(1);
     Object[] row = new Object[numAggregationFunctions];
-    String[] finalColumnNames = new String[numAggregationFunctions];
-    DataSchema.ColumnDataType[] finalColumnDataTypes = new DataSchema.ColumnDataType[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       row[i] = aggregationFunctions[i].extractFinalResult(intermediateResults[i]);
       // Format the value into string if required
       if (!_preserveType) {
         row[i] = AggregationFunctionUtils.formatValue(row[i]);
       }
-      finalColumnNames[i] = AggregationFunctionUtils.getAggregationColumnName(aggregationInfos.get(i));
-      finalColumnDataTypes[i] = aggregationFunctions[i].getFinalResultColumnType();
     }
     rows.add(row);
 
-    DataSchema finalDataSchema = new DataSchema(finalColumnNames, finalColumnDataTypes);
+    DataSchema finalDataSchema =
+        getResultTableDataSchema(aggregationInfos, aggregationFunctions, numAggregationFunctions);
     _brokerResponseNative.setResultTable(new ResultTable(finalDataSchema, rows));
   }
 
+  /**
+   * Sets aggregation results into AggregationResults
+   */
   private void setPqlAggregationResult(AggregationFunction[] aggregationFunctions, int numAggregationFunctions,
       Object[] intermediateResults) {
     // Extract final results and set them into the broker response.

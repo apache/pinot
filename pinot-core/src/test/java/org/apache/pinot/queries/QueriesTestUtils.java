@@ -132,6 +132,7 @@ public class QueriesTestUtils {
     Assert.assertEquals(brokerResponse.getTotalDocs(), expectedNumTotalDocs);
 
     ResultTable resultTable = brokerResponse.getResultTable();
+
     DataSchema actualDataSchema = resultTable.getDataSchema();
     List<Object[]> actualResults = resultTable.getRows();
 
@@ -143,6 +144,7 @@ public class QueriesTestUtils {
     for (int i = 0; i < expectedResults.size(); i++) {
       Assert.assertEquals(Arrays.asList(actualResults.get(i)), Arrays.asList(expectedResults.get(i)));
     }
+
   }
 
   static void testInterSegmentGroupByOrderByResultPQL(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,

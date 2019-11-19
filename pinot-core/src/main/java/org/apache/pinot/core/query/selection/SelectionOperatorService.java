@@ -22,7 +22,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -194,12 +193,12 @@ public class SelectionOperatorService {
   public ResultTable renderResultTableWithOrdering(boolean preserveType) {
     LinkedList<Object[]> rowsInSelectionResults = new LinkedList<>();
 
+    int numColumns = _selectionColumns.size();
     int[] columnIndices = SelectionOperatorUtils.getColumnIndices(_selectionColumns, _dataSchema);
     DataSchema.ColumnDataType[] columnDataTypes;
     if (preserveType) {
       columnDataTypes = null;
     } else {
-      int numColumns = _selectionColumns.size();
       columnDataTypes = new DataSchema.ColumnDataType[numColumns];
       for (int i = 0; i < numColumns; i++) {
         columnDataTypes[i] = _dataSchema.getColumnDataType(columnIndices[i]);
@@ -210,16 +209,8 @@ public class SelectionOperatorService {
           .addFirst(SelectionOperatorUtils.extractColumns(_rows.poll(), columnIndices, columnDataTypes));
     }
 
-    Map<String, DataSchema.ColumnDataType> columnNameToDataType = new HashMap<>();
-    int numColumns = _dataSchema.size();
-    for (int i = 0; i < numColumns; i++) {
-      columnNameToDataType.put(_dataSchema.getColumnName(i), _dataSchema.getColumnDataType(i));
-    }
-    columnDataTypes = new DataSchema.ColumnDataType[numColumns];
-    for (int i = 0; i < numColumns; i++) {
-      columnDataTypes[i] = columnNameToDataType.get(_selectionColumns.get(i));
-    }
-    return new ResultTable(new DataSchema(_selectionColumns.toArray(new String[0]), columnDataTypes),
-        rowsInSelectionResults);
+    // final data schema in ResultTable should be created based on order in _selectionColumns
+    DataSchema finalDataSchema = SelectionOperatorUtils.getResultTableDataSchema(_dataSchema, _selectionColumns);
+    return new ResultTable(finalDataSchema, rowsInSelectionResults);
   }
 }

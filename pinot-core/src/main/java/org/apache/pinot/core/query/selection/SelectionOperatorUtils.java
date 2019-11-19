@@ -185,6 +185,25 @@ public class SelectionOperatorUtils {
   }
 
   /**
+   * Constructs the final selection DataSchema based on the order of selection columns (data schema can have a different order, depending on order by clause)
+   * @param dataSchema data schema used for execution and ordering
+   * @param selectionColumns the selection order
+   * @return data schema for final results
+   */
+  public static DataSchema getResultTableDataSchema(DataSchema dataSchema, List<String> selectionColumns) {
+    int numColumns = selectionColumns.size();
+    Map<String, DataSchema.ColumnDataType> columnNameToDataType = new HashMap<>();
+    DataSchema.ColumnDataType[] finalColumnDataTypes = new DataSchema.ColumnDataType[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      columnNameToDataType.put(dataSchema.getColumnName(i), dataSchema.getColumnDataType(i));
+    }
+    for (int i = 0; i < numColumns; i++) {
+      finalColumnDataTypes[i] = columnNameToDataType.get(selectionColumns.get(i));
+    }
+    return new DataSchema(selectionColumns.toArray(new String[0]), finalColumnDataTypes);
+  }
+
+  /**
    * Merge two partial results for selection queries without <code>ORDER BY</code>. (Server side)
    *
    * @param mergedRows partial results 1.
@@ -428,15 +447,12 @@ public class SelectionOperatorUtils {
       boolean preserveType) {
 
     List<Object[]> resultRows = new ArrayList<>(rows.size());
-    int numRows = rows.size();
     if (!preserveType) {
-      for (int i = 0; i < numRows; i++) {
-        resultRows.add(formatRowWithoutOrdering(rows.get(i), dataSchema));
+      for (Serializable[] row : rows) {
+        resultRows.add(formatRowWithoutOrdering(row, dataSchema));
       }
     } else {
-      for (int i = 0; i < numRows; i++) {
-        resultRows.add(rows.get(i));
-      }
+      resultRows.addAll(rows);
     }
     return new ResultTable(dataSchema, resultRows);
   }
