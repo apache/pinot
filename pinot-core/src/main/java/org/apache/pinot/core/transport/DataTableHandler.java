@@ -29,6 +29,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * The {@code DataTableHandler} is the Netty inbound handler on Pinot Broker side to handle the serialized data table
+ * responses sent from Pinot Server.
+ */
 public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataTableHandler.class);
 
