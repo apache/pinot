@@ -51,8 +51,8 @@ for processing messages in a non-blocking fashion.
 *Yammer* metrics is used to register and expose metrics from Pinot components.
 
 In addition, Pinot relies on several key external libraries for some of its core functionality:
-*Roaring Bitmaps*: Pinot's inverted indices are built using `this <https://github.com/RoaringBitmap/RoaringBitmap>`_ library.
-*t-Digest*: Pinot's digest based percentile calculations are based on `this <https://github.com/tdunning/t-digest>`_ library.
+*Roaring Bitmaps*: Pinot's inverted indices are built using `RoaringBitmap <https://github.com/RoaringBitmap/RoaringBitmap>`_ library.
+*t-Digest*: Pinot's digest based percentile calculations are based on `T-Digest <https://github.com/tdunning/t-digest>`_ library.
 
 Pinot Modules
 -------------
