@@ -82,8 +82,8 @@ public class AsyncQueryResponse {
     _responseMap.get(serverRoutingInstance).markRequestSubmitted();
   }
 
-  void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, long responseSize,
-      long deserializationTimeMs) {
+  void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
+      int deserializationTimeMs) {
     _responseMap.get(serverRoutingInstance).receiveDataTable(dataTable, responseSize, deserializationTimeMs);
     _countDownLatch.countDown();
   }
