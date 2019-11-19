@@ -185,6 +185,15 @@ helm dependency update
 
 ### Start Pinot with Helm
 
+- For helm v3.0.0
+
+```bash
+kubectl create ns pinot-quickstart
+helm install -n pinot-quickstart pinot .
+```
+
+- For helm v2.12.1
+
 If cluster is just initialized, ensure helm is initialized by running:
 
 ```bash
@@ -197,7 +206,7 @@ Then deploy pinot cluster by:
 helm install --namespace "pinot-quickstart" --name "pinot" .
 ```
 
-#### Troubleshooting
+#### Troubleshooting (For helm v2.12.1)
 - Error: Please run below command if encountering issue:
 
 ```
@@ -232,6 +241,15 @@ kubectl get all -n pinot-quickstart
 
 #### Bring up a Kafka Cluster for realtime data ingestion
 
+- For helm v3.0.0
+
+```bash
+helm repo add incubator http://storage.googleapis.com/kubernetes-charts-incubator
+helm install -n pinot-quickstart kafka incubator/kafka
+```
+
+- For helm v2.12.1
+
 ```bash
 helm repo add incubator http://storage.googleapis.com/kubernetes-charts-incubator
 helm install --namespace "pinot-quickstart"  --name kafka incubator/kafka
@@ -241,6 +259,7 @@ helm install --namespace "pinot-quickstart"  --name kafka incubator/kafka
 
 ```bash
 kubectl -n pinot-quickstart exec kafka-0 -- kafka-topics --zookeeper kafka-zookeeper:2181 --topic flights-realtime --create --partitions 1 --replication-factor 1
+kubectl -n pinot-quickstart exec kafka-0 -- kafka-topics --zookeeper kafka-zookeeper:2181 --topic flights-realtime-avro --create --partitions 1 --replication-factor 1
 ```
 
 #### Load data into Kafka and create Pinot schema/table
@@ -255,14 +274,6 @@ Please use below script to do local port-forwarding and open Pinot query console
 
 ```bash
 ./query-pinot-data.sh
-```
-
-### How to clean up Pinot deployment
-
-```bash
-kubectl delete -f pinot-realtime-quickstart.yml
-helm del --purge kafka
-helm del --purge pinot
 ```
 
 ## Configuring the Chart
@@ -484,4 +495,10 @@ presto:default> select count(*) as cnt from pinot.dontcare.airlinestats limit 10
 Query 20191112_051114_00006_xkm4g, FINISHED, 1 node
 Splits: 17 total, 17 done (100.00%)
 0:00 [1 rows, 8B] [2 rows/s, 19B/s]
+```
+
+## How to clean up Pinot deployment
+
+```bash
+kubectl delete ns pinot-quickstart
 ```

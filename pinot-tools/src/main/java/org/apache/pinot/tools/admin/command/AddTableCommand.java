@@ -120,7 +120,10 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
         .sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableCreate(), node.toString());
 
     LOGGER.info(res);
-    return true;
+    if (res.contains("succesfully added")) {
+      return true;
+    }
+    return false;
   }
 
   @Override
