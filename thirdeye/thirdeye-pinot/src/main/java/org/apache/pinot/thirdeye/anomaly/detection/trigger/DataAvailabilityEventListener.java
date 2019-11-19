@@ -74,18 +74,18 @@ public class DataAvailabilityEventListener implements Runnable {
     List<DataAvailabilityEvent> events = consumer.poll(pollTimeInMilli);
     ThirdeyeMetricsUtil.triggerEventCounter.inc(events.size());
     for (DataAvailabilityEvent event : events) {
-      try {
-        if (checkAllFiltersPassed(event)) {
+      if (checkAllFiltersPassed(event)) {
+        try {
           LOG.info("Processing event: " + event.getDatasetName() + " with watermark " + event.getHighWatermark());
           String dataset = event.getDatasetName();
           datasetTriggerInfoRepo.setLastUpdateTimestamp(dataset, event.getHighWatermark());
           //Note: Batch update the timestamps of dataset if the event traffic spike
           datasetConfigManager.updateLastRefreshTime(dataset, event.getHighWatermark());
           ThirdeyeMetricsUtil.processedTriggerEventCounter.inc();
-          LOG.info("Finished processing event: " + event.getDatasetName());
+          LOG.debug("Finished processing event: " + event.getDatasetName());
+        } catch (Exception e) {
+          LOG.error("Error in processing event for {}, so skipping...", event.getDatasetName(), e);
         }
-      } catch (Exception e) {
-        LOG.error("Error in processing event for {}, so skipping...", event.getDatasetName(), e);
       }
     }
     if (!events.isEmpty()) {

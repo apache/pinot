@@ -100,7 +100,7 @@ public class DatasetTriggerInfoRepoTest {
     Assert.assertEquals(datasetTriggerInfoRepo.getLastUpdateTimestamp(TEST_DATASET_PREFIX + 3), 0);
   }
 
-  @Test
+  @Test(dependsOnMethods = { "testInitAndGetInstance" })
   public void testSetLastUpdateTimestamp() {
     DatasetTriggerInfoRepo datasetTriggerInfoRepo = DatasetTriggerInfoRepo.getInstance();
     datasetTriggerInfoRepo.setLastUpdateTimestamp(TEST_DATASET_PREFIX + 1, 3000);
@@ -109,7 +109,7 @@ public class DatasetTriggerInfoRepoTest {
     Assert.assertEquals(datasetTriggerInfoRepo.getLastUpdateTimestamp(TEST_DATASET_PREFIX + 4), 0);
   }
 
-  @Test
+  @Test(dependsOnMethods = { "testSetLastUpdateTimestamp" })
   public void testRefresh() throws InterruptedException {
     DetectionConfigManager detectionConfigManager = DAORegistry.getInstance().getDetectionConfigManager();
     MetricConfigManager metricConfigManager = DAORegistry.getInstance().getMetricConfigDAO();
