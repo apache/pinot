@@ -143,12 +143,10 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
     for (Map.Entry<DetectionAlertFilterNotification, Set<MergedAnomalyResultDTO>> result : results.getResult().entrySet()) {
       try {
         JiraEntity jiraEntity = buildJiraEntity(result.getKey(), result.getValue());
+
+        // Fetch the most recent reported issue
         List<Issue> issues = jiraClient.getIssues(jiraEntity.getJiraProject(), jiraEntity.getLabels(),
             this.jiraAdminConfig.getJiraUser(), jiraEntity.getMergeGap());
-        LOG.info("Fetched {} jira issues using project={}, reporter={}, labels IN (\"{}\"), created>=-{}d",
-            issues.size(), jiraEntity.getJiraProject(), this.jiraAdminConfig.getJiraUser(),
-            String.join(",", jiraEntity.getLabels()), TimeUnit.MILLISECONDS.toDays(jiraEntity.getMergeGap()));
-
         Optional<Issue> latestJiraIssue = issues.stream().max(
               (o1, o2) -> o2.getCreationDate().compareTo(o1.getCreationDate()));
 

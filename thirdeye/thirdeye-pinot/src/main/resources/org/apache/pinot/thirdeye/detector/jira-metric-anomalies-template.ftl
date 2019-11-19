@@ -1,5 +1,5 @@
 <#if anomalyCount == 1>
-  ThirdEye has detected [<strong>an anomaly</strong>|${dashboardHost}/app/#/anomalies?anomalyIds=${anomalyIds}] on the metric<#list metricsMap?keys as id>*${metricsMap[id].name}*</#list>between *${startTime}* and *${endTime}* (${timeZone})
+  ThirdEye has detected *[an anomaly|${dashboardHost}/app/#/anomalies?anomalyIds=${anomalyIds}]* on the metric <#list metricsMap?keys as id>*${metricsMap[id].name}*</#list> between *${startTime}* and *${endTime}* (${timeZone})
 <#else>
   ThirdEye has detected [*${anomalyCount} anomalies*|${dashboardHost}/app/#/anomalies?anomalyIds=${anomalyIds}] on the metrics listed below between *${startTime}* and *${endTime}* (${timeZone})
 </#if>

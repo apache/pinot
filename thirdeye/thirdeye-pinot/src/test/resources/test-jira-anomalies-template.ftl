@@ -1,4 +1,4 @@
-ThirdEye has detected [<strong>an anomaly</strong>|test/app/#/anomalies?anomalyIds=4] on the metric*test_metric*between *Dec 31, 16:00* and *Dec 31, 16:00* (PDT)
+ThirdEye has detected *[an anomaly|test/app/#/anomalies?anomalyIds=4]* on the metric *test_metric* between *Dec 31, 16:00* and *Dec 31, 16:00* (PDT)
 
 ------------------------------------------------------------------------------------------------------------------------------------------------------------
 *Metric:*&nbsp;_test_metric_

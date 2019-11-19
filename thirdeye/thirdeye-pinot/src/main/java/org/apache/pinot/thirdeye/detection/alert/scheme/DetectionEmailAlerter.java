@@ -203,7 +203,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
         if (emailClientConfigs.get(PROP_RECIPIENTS) != null) {
           Map<String, Object> emailRecipients = ConfigUtils.getMap(emailClientConfigs.get(PROP_RECIPIENTS));
           if (emailRecipients.get(PROP_TO) == null || ConfigUtils.getList(emailRecipients.get(PROP_TO)).isEmpty()) {
-            throw new IllegalArgumentException("No email recipients found for alert " + this.subsConfig.getId());
+            throw new IllegalArgumentException("No email recipients found in subscription group " + this.subsConfig.getId());
           }
 
           DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(

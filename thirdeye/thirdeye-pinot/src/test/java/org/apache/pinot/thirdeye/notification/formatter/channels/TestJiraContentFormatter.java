@@ -54,6 +54,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.thirdeye.detection.alert.filter.DimensionsRecipientAlertFilter.*;
 import static org.apache.pinot.thirdeye.notification.commons.JiraConfiguration.*;
+import static org.apache.pinot.thirdeye.notification.commons.ThirdEyeJiraClient.*;
 import static org.apache.pinot.thirdeye.notification.formatter.channels.JiraContentFormatter.*;
 
 
