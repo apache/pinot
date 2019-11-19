@@ -25,7 +25,7 @@ import java.util.Map;
 
 
 public class SitewideImpactRuleAnomalyFilterSpec extends AbstractSpec {
-  private String timezone = "UTC";
+  private String timezone = DEFAULT_TIMEZONE;
   private double threshold = Double.NaN;
   private String offset;
   private String pattern = "UP_OR_DOWN";

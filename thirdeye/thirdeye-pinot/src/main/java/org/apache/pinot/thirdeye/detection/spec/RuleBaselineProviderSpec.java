@@ -24,7 +24,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class RuleBaselineProviderSpec extends AbstractSpec{
-  private String timezone = "UTC";
+  private String timezone = DEFAULT_TIMEZONE;
   private String offset = "wo1w";
 
   public RuleBaselineProviderSpec(String timezone, String offset) {
