@@ -19,4 +19,5 @@
 package org.apache.pinot.druid.tools;
 
 public class DruidToPinotSegmentConverterHadoopJob {
+
 }

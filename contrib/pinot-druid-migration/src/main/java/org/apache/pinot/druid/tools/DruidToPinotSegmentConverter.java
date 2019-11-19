@@ -58,7 +58,6 @@ public class DruidToPinotSegmentConverter {
 
   public static void main(String[] args)
       throws Exception {
-    args = new String[]{"1", "2", "3", "4", "5"};
     if (args.length != 5) {
       System.out.println("Usage: ");
       System.out.println("./pinot-druid-converter.sh <pinot_table_name> <pinot_segment_name>  <pinot_schema_path> <druid_segment_path> <output_path>");

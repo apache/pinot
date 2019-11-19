@@ -1285,6 +1285,9 @@
             <!-- Top level directories -->
             <exclude>thirdeye/**</exclude>
 
+            <!-- Pinot-Druid Benchmark and Pinot-Druid Migration Tool (not part of the distribution) -->
+            <exclude>contrib/**</exclude>
+
             <!-- Note: this will exclude all single character directories under the root directory.
             We use this to exclude the temporary files generated during build -->
             <exclude>?/**</exclude>
@@ -1378,7 +1381,7 @@
             <!-- Test Resources -->
             <exclude>**/test/resources/**</exclude>
 
-            <!-- Pinot-Druid Benchmark (not part of the distribution) -->
+            <!-- Pinot-Druid Benchmark and Pinot-Druid Migration Tool (not part of the distribution) -->
             <exclude>contrib/**</exclude>
 
             <!-- Third eye (not part of the distribution) -->

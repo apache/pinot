@@ -61,44 +61,6 @@
   <build>
     <plugins>
       <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>appassembler-maven-plugin</artifactId>
-        <configuration>
-          <programs>
-            <program>
-              <mainClass>org.apache.pinot.druid.tools.DruidToPinotSegmentConverter</mainClass>
-              <name>pinot-druid-converter</name>
-              <jvmSettings>
-                <initialMemorySize>4G</initialMemorySize>
-                <maxMemorySize>4G</maxMemorySize>
-                <extraArguments>
-                  <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
-                  <extraArgument>-Dlog4j2.configurationFile=test/resources/log4j2.xml</extraArgument>
-                </extraArguments>
-              </jvmSettings>
-            </program>
-          </programs>
-          <binFileExtensions>
-            <unix>.sh</unix>
-          </binFileExtensions>
-
-          <!-- Set the target configuration directory to be used in the bin scripts -->
-          <configurationDirectory>conf</configurationDirectory>
-          <!-- Copy the contents from "/src/main/config" to the target configuration directory in the assembled application -->
-          <copyConfigurationDirectory>false</copyConfigurationDirectory>
-          <!-- Include the target configuration directory in the beginning of the classpath declaration in the bin scripts -->
-          <includeConfigurationDirectoryInClasspath>false</includeConfigurationDirectoryInClasspath>
-          <assembleDirectory>${project.build.directory}/${project.artifactId}-pkg</assembleDirectory>
-          <unixScriptTemplate>${project.basedir}/src/main/resources/appAssemblerScriptTemplate.sh</unixScriptTemplate>
-          <!-- Generate bin scripts for windows and unix pr default -->
-          <platforms>
-            <platform>unix</platform>
-          </platforms>
-          <repositoryLayout>flat</repositoryLayout>
-          <repositoryName>lib</repositoryName>
-        </configuration>
-      </plugin>
-      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
         <version>3.0.0-M2</version>
@@ -113,19 +75,29 @@
           <compilerVersion>1.8</compilerVersion>
         </configuration>
       </plugin>
-<!--      <plugin>-->
-<!--        <artifactId>maven-assembly-plugin</artifactId>-->
-<!--        <configuration>-->
-<!--          <archive>-->
-<!--            <manifest>-->
-<!--              <mainClass>org.apache.pinot.druid.tools.DruidToPinotSegmentConverter</mainClass>-->
-<!--            </manifest>-->
-<!--          </archive>-->
-<!--          <descriptorRefs>-->
-<!--            <descriptorRef>jar-with-dependencies</descriptorRef>-->
-<!--          </descriptorRefs>-->
-<!--        </configuration>-->
-<!--      </plugin>-->
+      <plugin>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>build-pinot-druid-migration</id>
+            <configuration>
+              <descriptorRefs>
+                <descriptorRef>jar-with-dependencies</descriptorRef>
+              </descriptorRefs>
+              <archive>
+                <manifest>
+                  <mainClass>org.apache.pinot.druid.tools.DruidToPinotSegmentConverter</mainClass>
+                </manifest>
+              </archive>
+              <finalName>pinot-druid-migration</finalName>
+            </configuration>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 
