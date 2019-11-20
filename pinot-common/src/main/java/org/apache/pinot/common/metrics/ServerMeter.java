@@ -27,6 +27,7 @@ import org.apache.pinot.common.Utils;
 public enum ServerMeter implements AbstractMetrics.Meter {
   QUERIES("queries", true),
   UNCAUGHT_EXCEPTIONS("exceptions", true),
+  REQUEST_FETCH_EXCEPTIONS("exceptions", true),
   REQUEST_DESERIALIZATION_EXCEPTIONS("exceptions", true),
   RESPONSE_SERIALIZATION_EXCEPTIONS("exceptions", true),
   SCHEDULING_TIMEOUT_EXCEPTIONS("exceptions", true),
@@ -59,7 +60,12 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NUM_SEGMENTS_MATCHED("numSegmentsMatched", false),
   NUM_MISSING_SEGMENTS("segments", false),
   RELOAD_FAILURES("segments", false),
-  REFRESH_FAILURES("segments", false);
+  REFRESH_FAILURES("segments", false),
+
+  // Netty connection metrics
+  NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
+  NETTY_CONNECTION_RESPONSES_SENT("nettyConnection", true),
+  NETTY_CONNECTION_BYTES_SENT("nettyConnection", true);
 
   private final String meterName;
   private final String unit;

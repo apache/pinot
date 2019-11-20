@@ -18,36 +18,37 @@
  */
 package org.apache.pinot.core.transport;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.query.scheduler.QueryScheduler;
 
 
 /**
- * The {@code DummyServer} class is a Netty server that always responds with the given bytes and the given delay.
+ * The {@code QueryServer} is the Netty server that runs on Pinot Server to handle the instance requests sent from Pinot
+ * Brokers.
  */
-public class DummyServer implements Runnable {
+public class QueryServer implements Runnable {
   private final int _port;
-  private final long _responseDelayMs;
-  private final byte[] _responseBytes;
+  private final QueryScheduler _queryScheduler;
+  private final ServerMetrics _serverMetrics;
 
   private volatile Channel _channel;
 
-  public DummyServer(int port, long responseDelayMs, byte[] responseBytes) {
+  public QueryServer(int port, QueryScheduler queryScheduler, ServerMetrics serverMetrics) {
     _port = port;
-    _responseDelayMs = responseDelayMs;
-    _responseBytes = responseBytes;
+    _queryScheduler = queryScheduler;
+    _serverMetrics = serverMetrics;
   }
 
   @Override
@@ -63,15 +64,8 @@ public class DummyServer implements Runnable {
             protected void initChannel(SocketChannel ch) {
               ch.pipeline()
                   .addLast(new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, Integer.BYTES, 0, Integer.BYTES),
-                      new LengthFieldPrepender(Integer.BYTES), new SimpleChannelInboundHandler<ByteBuf>() {
-                        @Override
-                        protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg)
-                            throws Exception {
-                          Thread.sleep(_responseDelayMs);
-                          ctx.writeAndFlush(ctx.alloc().buffer(_responseBytes.length).writeBytes(_responseBytes),
-                              ctx.voidPromise());
-                        }
-                      });
+                      new LengthFieldPrepender(Integer.BYTES),
+                      new InstanceRequestHandler(_queryScheduler, _serverMetrics));
             }
           }).bind(_port).sync().channel();
       _channel.closeFuture().sync();
@@ -84,14 +78,15 @@ public class DummyServer implements Runnable {
     }
   }
 
-  public boolean isReady() {
-    return _channel != null;
-  }
-
   public void shutDown() {
     if (_channel != null) {
       _channel.close();
       _channel = null;
     }
+  }
+
+  @VisibleForTesting
+  boolean isNotReady() {
+    return _channel == null;
   }
 }
