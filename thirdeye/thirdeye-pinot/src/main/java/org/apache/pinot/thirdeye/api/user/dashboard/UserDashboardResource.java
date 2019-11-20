@@ -236,8 +236,15 @@ public class UserDashboardResource {
       if (anomaly.getDetectionConfigId() != null) {
         long detectionConfigId = anomaly.getDetectionConfigId();
         DetectionConfigDTO detectionDTO = this.detectionDAO.findById(detectionConfigId);
-        summary.setFunctionName(detectionDTO.getName());
-        summary.setDetectionConfigId(detectionConfigId);
+        if (detectionDTO != null) {
+          summary.setFunctionName(detectionDTO.getName());
+          summary.setDetectionConfigId(detectionConfigId);
+        } else {
+          // this can happen when legacy anomalies are retrieved
+          LOG.error("Cannot find detectionConfig with id {}, so skipping the anomaly {}...",
+              detectionConfigId, anomaly.getId());
+          continue;
+        }
       }
 
       summary.setMetricName(anomaly.getMetric());
