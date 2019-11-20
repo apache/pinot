@@ -29,24 +29,18 @@ import org.apache.pinot.druid.data.readers.DruidSegmentRecordReader;
  * The DruidToPinotSegmentConverter is a CLI tool that converts a Druid segment to a Pinot segment.
  */
 public class DruidToPinotSegmentConverter {
-  private static String _pinotSchemaFilePath;
-  private static String _druidSegmentPath;
-  private static String _outputPath;
-  private static String _pinotSegmentName;
-  private static String _pinotTableName;
-
   // TODO: Change implementation to use the Command framework like the CreateSegmentCommand
-  public static void convertSegment()
+  public static void convertSegment(String pinotTableName, String pinotSegmentName, String pinotSchemaFilePath, String druidSegmentPath, String outputPath)
       throws Exception {
-    File segment = new File(_druidSegmentPath);
-    Schema schema = Schema.fromFile(new File(_pinotSchemaFilePath));
+    File segment = new File(druidSegmentPath);
+    Schema schema = Schema.fromFile(new File(pinotSchemaFilePath));
 
     final SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig();
-    segmentGeneratorConfig.setDataDir(_druidSegmentPath);
-    segmentGeneratorConfig.setOutDir(_outputPath);
+    segmentGeneratorConfig.setDataDir(druidSegmentPath);
+    segmentGeneratorConfig.setOutDir(outputPath);
     segmentGeneratorConfig.setOverwrite(true);
-    segmentGeneratorConfig.setTableName(_pinotTableName);
-    segmentGeneratorConfig.setSegmentName(_pinotSegmentName);
+    segmentGeneratorConfig.setTableName(pinotTableName);
+    segmentGeneratorConfig.setSegmentName(pinotSegmentName);
     segmentGeneratorConfig.setSchema(schema);
 
     final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -60,15 +54,9 @@ public class DruidToPinotSegmentConverter {
       throws Exception {
     if (args.length != 5) {
       System.out.println("Usage:");
-      System.out.println("./pinot-druid-converter.sh <pinot_table_name> <pinot_segment_name> <pinot_schema_path> <druid_segment_path> <output_path>");
+      System.out.println("java -jar pinot-druid-migration-jar-with-dependencies.jar <pinot_table_name> <pinot_segment_name> <pinot_schema_path> <druid_segment_path> <output_path>");
     } else {
-      _pinotTableName = args[0];
-      _pinotSegmentName = args[1];
-      _pinotSchemaFilePath = args[2];
-      _druidSegmentPath = args[3];
-      _outputPath = args[4];
-
-      convertSegment();
+      convertSegment(args[0], args[1], args[2], args[3], args[4]);
     }
   }
 }
