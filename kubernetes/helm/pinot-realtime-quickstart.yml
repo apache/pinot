@@ -63,6 +63,47 @@ data:
       }
     }
 
+  airlineStatsAvro_realtime_table_config.json: |-
+    {
+      "tableName": "airlineStatsAvro",
+      "tableType": "REALTIME",
+      "segmentsConfig": {
+        "timeColumnName": "DaysSinceEpoch",
+        "timeType": "DAYS",
+        "retentionTimeUnit": "DAYS",
+        "retentionTimeValue": "3650",
+        "segmentPushType": "APPEND",
+        "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+        "schemaName": "airlineStats",
+        "replication": "1",
+        "replicasPerPartition": "1"
+      },
+      "tenants": {
+        "broker": "airline_broker",
+        "server": "airline"
+      },
+      "tableIndexConfig": {
+        "loadMode": "MMAP",
+        "streamConfigs": {
+          "streamType": "kafka",
+          "stream.kafka.consumer.type": "simple",
+          "stream.kafka.topic.name": "flights-realtime-avro",
+          "stream.kafka.decoder.class.name": "org.apache.pinot.core.realtime.stream.SimpleAvroMessageDecoder",
+          "stream.kafka.decoder.prop.schema": "{\"type\":\"record\",\"name\":\"Flight\",\"namespace\":\"pinot\",\"fields\":[{\"name\":\"DaysSinceEpoch\",\"type\":[\"int\"]},{\"name\":\"Year\",\"type\":[\"int\"]},{\"name\":\"Quarter\",\"type\":[\"int\"]},{\"name\":\"Month\",\"type\":[\"int\"]},{\"name\":\"DayofMonth\",\"type\":[\"int\"]},{\"name\":\"DayOfWeek\",\"type\":[\"int\"]},{\"name\":\"FlightDate\",\"type\":[\"string\"]},{\"name\":\"UniqueCarrier\",\"type\":[\"string\"]},{\"name\":\"AirlineID\",\"type\":[\"int\"]},{\"name\":\"Carrier\",\"type\":[\"string\"]},{\"name\":\"TailNum\",\"type\":[\"string\",\"null\"]},{\"name\":\"FlightNum\",\"type\":[\"int\"]},{\"name\":\"OriginAirportID\",\"type\":[\"int\"]},{\"name\":\"OriginAirportSeqID\",\"type\":[\"int\"]},{\"name\":\"OriginCityMarketID\",\"type\":[\"int\"]},{\"name\":\"Origin\",\"type\":[\"string\"]},{\"name\":\"OriginCityName\",\"type\":[\"string\"]},{\"name\":\"OriginState\",\"type\":[\"string\"]},{\"name\":\"OriginStateFips\",\"type\":[\"int\"]},{\"name\":\"OriginStateName\",\"type\":[\"string\"]},{\"name\":\"OriginWac\",\"type\":[\"int\"]},{\"name\":\"DestAirportID\",\"type\":[\"int\"]},{\"name\":\"DestAirportSeqID\",\"type\":[\"int\"]},{\"name\":\"DestCityMarketID\",\"type\":[\"int\"]},{\"name\":\"Dest\",\"type\":[\"string\"]},{\"name\":\"DestCityName\",\"type\":[\"string\"]},{\"name\":\"DestState\",\"type\":[\"string\"]},{\"name\":\"DestStateFips\",\"type\":[\"int\"]},{\"name\":\"DestStateName\",\"type\":[\"string\"]},{\"name\":\"DestWac\",\"type\":[\"int\"]},{\"name\":\"CRSDepTime\",\"type\":[\"int\"]},{\"name\":\"DepTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"DepDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"DepDelayMinutes\",\"type\":[\"int\",\"null\"]},{\"name\":\"DepDel15\",\"type\":[\"int\",\"null\"]},{\"name\":\"DepartureDelayGroups\",\"type\":[\"int\",\"null\"]},{\"name\":\"DepTimeBlk\",\"type\":[\"string\"]},{\"name\":\"TaxiOut\",\"type\":[\"int\",\"null\"]},{\"name\":\"WheelsOff\",\"type\":[\"int\",\"null\"]},{\"name\":\"WheelsOn\",\"type\":[\"int\",\"null\"]},{\"name\":\"TaxiIn\",\"type\":[\"int\",\"null\"]},{\"name\":\"CRSArrTime\",\"type\":[\"int\"]},{\"name\":\"ArrTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"ArrDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"ArrDelayMinutes\",\"type\":[\"int\",\"null\"]},{\"name\":\"ArrDel15\",\"type\":[\"int\",\"null\"]},{\"name\":\"ArrivalDelayGroups\",\"type\":[\"int\",\"null\"]},{\"name\":\"ArrTimeBlk\",\"type\":[\"string\"]},{\"name\":\"Cancelled\",\"type\":[\"int\"]},{\"name\":\"CancellationCode\",\"type\":[\"string\",\"null\"]},{\"name\":\"Diverted\",\"type\":[\"int\"]},{\"name\":\"CRSElapsedTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"ActualElapsedTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"AirTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"Flights\",\"type\":[\"int\"]},{\"name\":\"Distance\",\"type\":[\"int\"]},{\"name\":\"DistanceGroup\",\"type\":[\"int\"]},{\"name\":\"CarrierDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"WeatherDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"NASDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"SecurityDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"LateAircraftDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"FirstDepTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"TotalAddGTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"LongestAddGTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"DivAirportLandings\",\"type\":[\"int\"]},{\"name\":\"DivReachedDest\",\"type\":[\"int\",\"null\"]},{\"name\":\"DivActualElapsedTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"DivArrDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"DivDistance\",\"type\":[\"int\",\"null\"]},{\"name\":\"DivAirports\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"DivAirportIDs\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"DivAirportSeqIDs\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"DivWheelsOns\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"DivTotalGTimes\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"DivLongestGTimes\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"DivWheelsOffs\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"DivTailNums\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"RandomAirports\",\"type\":{\"type\":\"array\",\"items\":\"string\"}}]}",
+          "stream.kafka.consumer.factory.class.name": "org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory",
+          "stream.kafka.hlc.zk.connect.string": "kafka-zookeeper:2181",
+          "stream.kafka.zk.broker.url": "kafka-zookeeper:2181",
+          "stream.kafka.broker.list": "kafka:9092",
+          "realtime.segment.flush.threshold.time": "3600000",
+          "realtime.segment.flush.threshold.size": "50000",
+          "stream.kafka.consumer.prop.auto.offset.reset": "smallest"
+        }
+      },
+      "metadata": {
+        "customConfigs": {}
+      }
+    }
+
   airlineStats_schema.json: |-
     {
       "metricFieldSpecs": [
@@ -421,8 +462,11 @@ spec:
     spec:
       containers:
         - name: pinot-add-example-schema
-          image: winedepot/pinot:0.1.13-SNAPSHOT
+          image: fx19880617/pinot:0.2.0-SNAPSHOT
           args: [ "AddSchema", "-schemaFile", "/var/pinot/examples/airlineStats_schema.json", "-controllerHost", "pinot-controller", "-controllerPort", "9000", "-exec" ]
+          env:
+            - name: JAVA_OPTS
+              value: "-Xms4G -Xmx4G -Dpinot.admin.system.exit=true"
           volumeMounts:
             - name: examples
               mountPath: /var/pinot/examples
@@ -442,9 +486,21 @@ spec:
   template:
     spec:
       containers:
-        - name: pinot-add-example-realtime-table
-          image: winedepot/pinot:0.1.13-SNAPSHOT
+        - name: pinot-add-example-realtime-table-json
+          image: fx19880617/pinot:0.2.0-SNAPSHOT
           args: [ "AddTable", "-filePath", "/var/pinot/examples/airlineStats_realtime_table_config.json", "-controllerHost", "pinot-controller", "-controllerPort", "9000", "-exec" ]
+          env:
+            - name: JAVA_OPTS
+              value: "-Xms4G -Xmx4G -Dpinot.admin.system.exit=true"
+          volumeMounts:
+            - name: examples
+              mountPath: /var/pinot/examples
+        - name: pinot-add-example-realtime-table-avro
+          image: fx19880617/pinot:0.2.0-SNAPSHOT
+          args: [ "AddTable", "-filePath", "/var/pinot/examples/airlineStatsAvro_realtime_table_config.json", "-controllerHost", "pinot-controller", "-controllerPort", "9000", "-exec" ]
+          env:
+            - name: JAVA_OPTS
+              value: "-Xms4G -Xmx4G -Dpinot.admin.system.exit=true"
           volumeMounts:
             - name: examples
               mountPath: /var/pinot/examples
@@ -464,9 +520,12 @@ spec:
   template:
     spec:
       containers:
-        - name: loading-data-to-kafka
-          image: winedepot/pinot:0.1.13-SNAPSHOT
+        - name: loading-json-data-to-kafka
+          image: fx19880617/pinot:0.2.0-SNAPSHOT
           args: [ "StreamAvroIntoKafka", "-avroFile", "sample_data/airlineStats_data.avro", "-kafkaTopic", "flights-realtime", "-kafkaBrokerList", "kafka:9092", "-zkAddress", "kafka-zookeeper:2181" ]
+        - name: loading-avro-data-to-kafka
+          image: fx19880617/pinot:0.2.0-SNAPSHOT
+          args: [ "StreamAvroIntoKafka", "-avroFile", "sample_data/airlineStats_data.avro", "-kafkaTopic", "flights-realtime-avro", "-kafkaBrokerList", "kafka:9092", "-zkAddress", "kafka-zookeeper:2181", "-outputFormat", "avro" ]
       restartPolicy: OnFailure
   backoffLimit: 3
 

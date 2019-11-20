@@ -120,8 +120,10 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
       fileUploadDownloadClient.addSchema(
           FileUploadDownloadClient.getUploadSchemaHttpURI(_controllerHost, Integer.parseInt(_controllerPort)),
           schema.getSchemaName(), schemaFile);
+    } catch (Exception e) {
+      LOGGER.error("Got Exception to upload Pinot Schema: " + schema.getSchemaName(), e);
+      return false;
     }
-
     return true;
   }
 }
