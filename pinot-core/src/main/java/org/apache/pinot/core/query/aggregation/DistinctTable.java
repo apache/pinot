@@ -20,17 +20,22 @@ package org.apache.pinot.core.query.aggregation;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
+import org.apache.pinot.core.data.table.BaseTable;
 import org.apache.pinot.core.data.table.Key;
-
+import org.apache.pinot.core.data.table.Record;
 
 /**
  * This serves the following purposes:
@@ -38,86 +43,57 @@ import org.apache.pinot.core.data.table.Key;
  * (1) Intermediate result object for Distinct aggregation function
  * (2) The same object is serialized by the server inside the data table
  * for sending the results to broker. Broker deserializes it.
+ * (3) This is also another concrete implementation of {@link BaseTable} and
+ * uses {@link Set} to store unique records.
  */
-public class DistinctTable {
+public class DistinctTable extends BaseTable {
   private static final double LOAD_FACTOR = 0.75;
   private static final int MAX_INITIAL_CAPACITY = 64 * 1024;
-  private FieldSpec.DataType[] _columnTypes;
-  private String[] _columnNames;
-  private Set<Key> _table;
+  private Set<Record> _uniqueRecordsSet;
+  private boolean _noMoreNewRecords;
+  private Iterator<Record> _sortedIterator;
 
-  /**
-   * Add a row to hash table
-   * @param key multi-column key to add
-   */
-  public void addKey(final Key key) {
-    _table.add(key);
-  }
-
-  public DistinctTable(int limit) {
+  public DistinctTable(DataSchema dataSchema, List<SelectionSort> orderBy, int limit) {
     // TODO: see if 64k is the right max initial capacity to use
     // if it turns out that users always use LIMIT N > 0.75 * 64k and
     // there are indeed that many records, then there will be resizes.
     // The current method of setting the initial capacity as
     // min(64k, limit/loadFactor) will not require resizes for LIMIT N
     // where N <= 48000
+    super(dataSchema, Collections.emptyList(), orderBy, limit);
     int initialCapacity = Math.min(MAX_INITIAL_CAPACITY, Math.abs(nextPowerOfTwo((int) (limit / LOAD_FACTOR))));
-    _table = new HashSet<>(initialCapacity);
+    _uniqueRecordsSet = new HashSet<>(initialCapacity);
+    _noMoreNewRecords = false;
   }
 
-  /**
-   * DESERIALIZE: Broker side
-   * @param byteBuffer data to deserialize
-   * @throws IOException
-   */
-  public DistinctTable(ByteBuffer byteBuffer)
-      throws IOException {
-    DataTable dataTable = DataTableFactory.getDataTable(byteBuffer);
-    DataSchema dataSchema = dataTable.getDataSchema();
-    int numRows = dataTable.getNumberOfRows();
-    int numColumns = dataSchema.size();
+  @Override
+  public boolean upsert(Key key, Record record) {
+    throw new UnsupportedOperationException("Operation not supported");
+  }
 
-    _table = new HashSet<>();
-
-    // extract rows from the datatable
-    for (int rowIndex = 0; rowIndex < numRows; rowIndex++) {
-      Object[] columnValues = new Object[numColumns];
-      for (int colIndex = 0; colIndex < numColumns; colIndex++) {
-        DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(colIndex);
-        switch (columnDataType) {
-          case INT:
-            columnValues[colIndex] = dataTable.getInt(rowIndex, colIndex);
-            break;
-          case LONG:
-            columnValues[colIndex] = dataTable.getLong(rowIndex, colIndex);
-            break;
-          case FLOAT:
-            columnValues[colIndex] = dataTable.getFloat(rowIndex, colIndex);
-            break;
-          case DOUBLE:
-            columnValues[colIndex] = dataTable.getDouble(rowIndex, colIndex);
-            break;
-          case STRING:
-            columnValues[colIndex] = dataTable.getString(rowIndex, colIndex);
-            break;
-          case BYTES:
-            columnValues[colIndex] = dataTable.getString(rowIndex, colIndex);
-          default:
-            throw new IllegalStateException(
-                "Unexpected column data type " + columnDataType + " while deserializing data table for DISTINCT query");
-        }
-      }
-
-      _table.add(new Key(columnValues));
+  @Override
+  public boolean upsert(Record newRecord) {
+    if (_noMoreNewRecords) {
+      // for no ORDER BY queries, if we have reached the N as specified
+      // in LIMIT N (or default 10 if user didn't specify anything)
+      // then this function is NOOP
+      return false;
     }
 
-    _columnNames = dataSchema.getColumnNames();
+    _uniqueRecordsSet.add(newRecord);
 
-    // note: when deserializing at broker, we don't need to build
-    // FieldSpec.DataType since the work is already done.
-    // we have the column names and unique rows in set and that
-    // is all what we need to set the broker response. the deserialized
-    // column data types from schema are enough to work with each cell
+    if (_uniqueRecordsSet.size() >= _maxCapacity) {
+      if (_isOrderBy) {
+        // ORDER BY; capacity < maxCapacity so trim to capacity
+        resize(_capacity);
+      } else {
+        // No ORDER BY; capacity == maxCapacity == user specified limit
+        // we can simply stop accepting anymore records from now on
+        _noMoreNewRecords = true;
+      }
+    }
+
+    return true;
   }
 
   /**
@@ -127,48 +103,21 @@ public class DistinctTable {
    */
   public byte[] toBytes()
       throws IOException {
-    final String[] columnNames = new String[_columnNames.length];
-    final DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[_columnNames.length];
-
-    // set actual column names and column data types in data schema
-    for (int i = 0; i < _columnNames.length; i++) {
-      columnNames[i] = _columnNames[i];
-      switch (_columnTypes[i]) {
-        case INT:
-          columnDataTypes[i] = DataSchema.ColumnDataType.INT;
-          break;
-        case LONG:
-          columnDataTypes[i] = DataSchema.ColumnDataType.LONG;
-          break;
-        case FLOAT:
-          columnDataTypes[i] = DataSchema.ColumnDataType.FLOAT;
-          break;
-        case DOUBLE:
-          columnDataTypes[i] = DataSchema.ColumnDataType.DOUBLE;
-          break;
-        case STRING:
-          columnDataTypes[i] = DataSchema.ColumnDataType.STRING;
-          break;
-        case BYTES:
-          columnDataTypes[i] = DataSchema.ColumnDataType.BYTES;
-        default:
-          throw new IllegalStateException(
-              "Unexpected column data type " + _columnTypes[i] + " while serializing data table for DISTINCT query");
-      }
-    }
-
     // build rows for data table
-    DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnDataTypes));
-
-    final Iterator<Key> iterator = _table.iterator();
+    // Only after the server level merge is done by CombineOperator to merge all the indexed tables
+    // of segments 1 .. N - 1 into the indexed table of 0th segment, we do finish(false) as that
+    // time we need the iterator as well and we send a trimmed set of records to the broker.
+    // finish is NOOP for non ORDER BY queries.
+    finish(false);
+    DataTableBuilder dataTableBuilder = new DataTableBuilder(_dataSchema);
+    Iterator<Record> iterator = iterator();
     while (iterator.hasNext()) {
       dataTableBuilder.startRow();
-      final Key key = iterator.next();
-      serializeColumns(key.getColumns(), columnDataTypes, dataTableBuilder);
+      final Record record = iterator.next();
+      serializeColumns(record.getValues(), _dataSchema.getColumnDataTypes(), dataTableBuilder);
       dataTableBuilder.finishRow();
     }
-
-    final DataTable dataTable = dataTableBuilder.build();
+    DataTable dataTable = dataTableBuilder.build();
     return dataTable.toBytes();
   }
 
@@ -197,28 +146,71 @@ public class DistinctTable {
     }
   }
 
-  public int size() {
-    return _table.size();
+  /**
+   * DESERIALIZE: Broker side
+   * @param byteBuffer data to deserialize
+   * @throws IOException
+   */
+  public DistinctTable(ByteBuffer byteBuffer) throws IOException {
+    // This is called by the BrokerReduceService when it de-serializes the
+    // DISTINCT result from the DataTable. As of now we don't have all the
+    // information to pass to super class so just pass null, empty lists
+    // and the broker will set the correct information before merging the
+    // data tables.
+    super(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]), Collections.emptyList(), new ArrayList<>(), 0);
+    DataTable dataTable = DataTableFactory.getDataTable(byteBuffer);
+    _dataSchema = dataTable.getDataSchema();
+    _uniqueRecordsSet = new HashSet<>();
+
+    int numRows = dataTable.getNumberOfRows();
+    int numColumns = _dataSchema.size();
+
+    // extract rows from the datatable
+    for (int rowIndex = 0; rowIndex < numRows; rowIndex++) {
+      Object[] columnValues = new Object[numColumns];
+      for (int colIndex = 0; colIndex < numColumns; colIndex++) {
+        DataSchema.ColumnDataType columnDataType = _dataSchema.getColumnDataType(colIndex);
+        switch (columnDataType) {
+          case INT:
+            columnValues[colIndex] = dataTable.getInt(rowIndex, colIndex);
+            break;
+          case LONG:
+            columnValues[colIndex] = dataTable.getLong(rowIndex, colIndex);
+            break;
+          case FLOAT:
+            columnValues[colIndex] = dataTable.getFloat(rowIndex, colIndex);
+            break;
+          case DOUBLE:
+            columnValues[colIndex] = dataTable.getDouble(rowIndex, colIndex);
+            break;
+          case STRING:
+            columnValues[colIndex] = dataTable.getString(rowIndex, colIndex);
+            break;
+          case BYTES:
+            columnValues[colIndex] = dataTable.getString(rowIndex, colIndex);
+          default:
+            throw new IllegalStateException(
+                "Unexpected column data type " + columnDataType + " while deserializing data table for DISTINCT query");
+        }
+      }
+
+      Record record = new Record(columnValues);
+      _uniqueRecordsSet.add(record);
+    }
   }
 
-  public Iterator<Key> getIterator() {
-    return _table.iterator();
-  }
-
-  public void setColumnNames(String[] columnNames) {
-    _columnNames = columnNames;
-  }
-
-  public void setColumnTypes(FieldSpec.DataType[] columnTypes) {
-    _columnTypes = columnTypes;
-  }
-
-  public String[] getColumnNames() {
-    return _columnNames;
-  }
-
-  public FieldSpec.DataType[] getColumnTypes() {
-    return _columnTypes;
+  /**
+   * Called by {@link org.apache.pinot.core.query.reduce.BrokerReduceService}
+   * just before it attempts to invoke merge() on
+   * {@link org.apache.pinot.core.query.aggregation.function.AggregationFunction}
+   * for DISTINCT. Since the DISTINCT uses IndexedTable underneath as the main
+   * data structure to hold unique tuples/rows and also for resizing/trimming/sorting,
+   * we need to pass info on limit, order by to super class
+   * {@link org.apache.pinot.core.data.table.IndexedTable}.
+   * @param brokerRequest broker request
+   */
+  public void addLimitAndOrderByInfo(BrokerRequest brokerRequest) {
+    addCapacityAndOrderByInfo(brokerRequest.getOrderBy(), brokerRequest.getLimit());
   }
 
   private static int nextPowerOfTwo(int val) {
@@ -230,6 +222,32 @@ public class DistinctTable {
       return val;
     } else {
       return highestBit << 1;
+    }
+  }
+
+  private void resize(int trimToSize) {
+    _tableResizer.resizeRecordsSet(_uniqueRecordsSet, trimToSize);
+  }
+
+  @Override
+  public int size() {
+    return _uniqueRecordsSet.size();
+  }
+
+  @Override
+  public Iterator<Record> iterator() {
+    return _sortedIterator != null ? _sortedIterator : _uniqueRecordsSet.iterator();
+  }
+
+  @Override
+  public void finish(boolean sort) {
+    if (_isOrderBy) {
+      if (sort) {
+        List<Record> sortedRecords = _tableResizer.resizeAndSortRecordSet(_uniqueRecordsSet, _capacity);
+        _sortedIterator = sortedRecords.iterator();
+      } else {
+        resize(_capacity);
+      }
     }
   }
 }

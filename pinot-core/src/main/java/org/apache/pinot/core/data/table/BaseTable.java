@@ -35,21 +35,23 @@ public abstract class BaseTable implements Table {
 
   final AggregationFunction[] _aggregationFunctions;
   final int _numAggregations;
-  final DataSchema _dataSchema;
+  protected DataSchema _dataSchema;
   final int _numColumns;
 
   // the capacity we need to trim to
-  final int _capacity;
+  protected int _capacity;
   // the capacity with added buffer, in order to collect more records than capacity for better precision
-  final int _maxCapacity;
+  protected int _maxCapacity;
 
-  final boolean _isOrderBy;
-  final TableResizer _tableResizer;
+  protected boolean _isOrderBy;
+  protected TableResizer _tableResizer;
+
+  private final List<AggregationInfo> _aggregationInfos;
 
   /**
    * Initializes the variables and comparators needed for the table
    */
-  BaseTable(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy, int capacity) {
+  public BaseTable(DataSchema dataSchema, List<AggregationInfo> aggregationInfos, List<SelectionSort> orderBy, int capacity) {
     _dataSchema = dataSchema;
     _numColumns = dataSchema.size();
 
@@ -60,9 +62,14 @@ public abstract class BaseTable implements Table {
           AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfos.get(i)).getAggregationFunction();
     }
 
+    _aggregationInfos = aggregationInfos;
+    addCapacityAndOrderByInfo(orderBy, capacity);
+  }
+
+  protected void addCapacityAndOrderByInfo(List<SelectionSort> orderBy, int capacity) {
     _isOrderBy = CollectionUtils.isNotEmpty(orderBy);
     if (_isOrderBy) {
-      _tableResizer = new TableResizer(dataSchema, aggregationInfos, orderBy);
+      _tableResizer = new TableResizer(_dataSchema, _aggregationInfos, orderBy);
 
       // TODO: tune these numbers and come up with a better formula (github ISSUE-4801)
       // Based on the capacity and maxCapacity, the resizer will smartly choose to evict/retain recors from the PQ

@@ -126,14 +126,6 @@ public class CalciteSqlParser {
     switch (sqlNode.getKind()) {
       case ORDER_BY:
         selectOrderBySqlNode = (SqlOrderBy) sqlNode;
-        SqlNode sqlSelectNode = selectOrderBySqlNode.query;
-        if (sqlSelectNode instanceof SqlSelect) {
-          SqlSelect sqlSelect = (SqlSelect) sqlSelectNode;
-          if (sqlSelect.getModifierNode(SqlSelectKeyword.DISTINCT) != null) {
-            // TODO: add support for ORDER BY with DISTINCT
-            throw new SqlCompilationException("DISTINCT with ORDER BY is not supported");
-          }
-        }
         if (selectOrderBySqlNode.orderList != null) {
           pinotQuery.setOrderByList(convertOrderByList(selectOrderBySqlNode.orderList));
         }

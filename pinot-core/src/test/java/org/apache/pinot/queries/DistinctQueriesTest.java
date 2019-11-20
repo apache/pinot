@@ -26,7 +26,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.data.FieldSpec;
@@ -34,12 +33,13 @@ import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.data.readers.RecordReader;
-import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
@@ -53,6 +53,7 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import org.testng.collections.Lists;
 
 
 /**
@@ -89,10 +90,10 @@ public class DistinctQueriesTest extends BaseQueriesTest {
 
   private List<IndexSegment> _indexSegments = new ArrayList<>(NUM_SEGMENTS);
   private List<SegmentDataManager> _segmentDataManagers;
-  private final Set<Key> _expectedAddTransformResults = new HashSet<>();
-  private final Set<Key> _expectedSubTransformResults = new HashSet<>();
-  private final Set<Key> _expectedAddSubTransformResults = new HashSet<>();
-  private final Set<Key> _expectedResults = new HashSet<>();
+  private final Set<Record> _expectedAddTransformResults = new HashSet<>();
+  private final Set<Record> _expectedSubTransformResults = new HashSet<>();
+  private final Set<Record> _expectedAddSubTransformResults = new HashSet<>();
+  private final Set<Record> _expectedResults = new HashSet<>();
   private final FieldSpec.DataType[] _dataTypes =
       new FieldSpec.DataType[]{FieldSpec.DataType.STRING, FieldSpec.DataType.STRING, FieldSpec.DataType.INT, FieldSpec.DataType.LONG};
 
@@ -211,13 +212,13 @@ public class DistinctQueriesTest extends BaseQueriesTest {
 
       // compute expected result for multi column distinct
       if (!duplicate) {
-        Key key = new Key(new Object[]{columnValues[0], columnValues[1], columnValues[2], columnValues[3]});
-        _expectedResults.add(key);
+        Record record = new Record(new Object[]{columnValues[0], columnValues[1], columnValues[2], columnValues[3]});
+        _expectedResults.add(record);
       }
 
-      _expectedAddTransformResults.add(new Key(new Object[]{addition}));
-      _expectedSubTransformResults.add(new Key(new Object[]{subtraction}));
-      _expectedAddSubTransformResults.add(new Key(new Object[]{addition, subtraction}));
+      _expectedAddTransformResults.add(new Record(new Object[]{addition}));
+      _expectedSubTransformResults.add(new Record(new Object[]{subtraction}));
+      _expectedAddSubTransformResults.add(new Record(new Object[]{addition, subtraction}));
     }
   }
 
@@ -297,18 +298,18 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         // default: 10 unique rows should be returned
         query = "SELECT DISTINCT(add(INT_COL,LONG_COL)) FROM DistinctTestTable";
         innerSegmentTransformQueryTestHelper(query, 10, 1, new String[]{"add(INT_COL,LONG_COL)"},
-            new FieldSpec.DataType[]{FieldSpec.DataType.DOUBLE});
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE});
 
         // default: 10 unique rows should be returned
         query = "SELECT DISTINCT(sub(LONG_COL,INT_COL)) FROM DistinctTestTable";
         innerSegmentTransformQueryTestHelper(query, 10, 2, new String[]{"sub(LONG_COL,INT_COL)"},
-            new FieldSpec.DataType[]{FieldSpec.DataType.DOUBLE});
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE});
 
         // 100k unique rows should be returned
         query = "SELECT DISTINCT(add(INT_COL,LONG_COL),sub(LONG_COL,INT_COL)) FROM DistinctTestTable LIMIT 100000 ";
         innerSegmentTransformQueryTestHelper(query, 100000, 3,
             new String[]{"add(INT_COL,LONG_COL)", "sub(LONG_COL,INT_COL)"},
-            new FieldSpec.DataType[]{FieldSpec.DataType.DOUBLE, FieldSpec.DataType.DOUBLE});
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
       }
     } finally {
       destroySegments();
@@ -324,36 +325,27 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     // compile to broker request and directly run the operator
     AggregationOperator aggregationOperator = getOperatorForQuery(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
-    final List<Object> operatorResult = resultsBlock.getAggregationResult();
+    List<Object> operatorResult = resultsBlock.getAggregationResult();
 
     // verify resultset
     Assert.assertNotNull(operatorResult);
     Assert.assertEquals(operatorResult.size(), 1);
     Assert.assertTrue(operatorResult.get(0) instanceof DistinctTable);
 
-    final DistinctTable distinctTable = (DistinctTable) operatorResult.get(0);
+    DistinctTable distinctTable = (DistinctTable) operatorResult.get(0);
     Assert.assertEquals(_expectedResults.size(), NUM_UNIQUE_TUPLES);
     Assert.assertEquals(distinctTable.size(), expectedSize);
 
-    final String[] columnNames = distinctTable.getColumnNames();
-    Assert.assertEquals(columnNames.length, 4);
-    Assert.assertEquals(columnNames[0], D1);
-    Assert.assertEquals(columnNames[1], D2);
-    Assert.assertEquals(columnNames[2], M1);
-    Assert.assertEquals(columnNames[3], M2);
+    DataSchema dataSchema = distinctTable.getDataSchema();
+    Assert.assertEquals(dataSchema.getColumnNames(), new String[]{D1, D2, M1, M2});
+    Assert.assertEquals(dataSchema.getColumnDataTypes(),
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG});
 
-    final FieldSpec.DataType[] dataTypes = distinctTable.getColumnTypes();
-    Assert.assertEquals(dataTypes.length, 4);
-    Assert.assertEquals(dataTypes[0], FieldSpec.DataType.STRING);
-    Assert.assertEquals(dataTypes[1], FieldSpec.DataType.STRING);
-    Assert.assertEquals(dataTypes[2], FieldSpec.DataType.INT);
-    Assert.assertEquals(dataTypes[3], FieldSpec.DataType.LONG);
-
-    Iterator<Key> iterator = distinctTable.getIterator();
+    Iterator<Record> iterator = distinctTable.iterator();
     while (iterator.hasNext()) {
-      Key key = iterator.next();
-      Assert.assertEquals(key.getColumns().length, 4);
-      Assert.assertTrue(_expectedResults.contains(key));
+      Record record = iterator.next();
+      Assert.assertEquals(record.getValues().length, 4);
+      Assert.assertTrue(_expectedResults.contains(record));
     }
   }
 
@@ -363,7 +355,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    * @param expectedSize expected result size
    */
   private void innerSegmentTransformQueryTestHelper(final String query, final int expectedSize, final int op,
-      final String[] columnNames, final FieldSpec.DataType[] columnTypes) {
+      final String[] columnNames, final DataSchema.ColumnDataType[] columnTypes) {
     // compile to broker request and directly run the operator
     AggregationOperator aggregationOperator = getOperatorForQuery(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
@@ -377,21 +369,20 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     final DistinctTable distinctTable = (DistinctTable) operatorResult.get(0);
     Assert.assertEquals(distinctTable.size(), expectedSize);
 
-    Assert.assertEquals(distinctTable.getColumnNames().length, columnNames.length);
-    Assert.assertEquals(distinctTable.getColumnNames(), columnNames);
-    Assert.assertEquals(distinctTable.getColumnTypes().length, columnNames.length);
-    Assert.assertEquals(distinctTable.getColumnTypes(), columnTypes);
+    DataSchema dataSchema = distinctTable.getDataSchema();
+    Assert.assertEquals(dataSchema.getColumnNames(), columnNames);
+    Assert.assertEquals(dataSchema.getColumnDataTypes(), columnTypes);
 
-    Iterator<Key> iterator = distinctTable.getIterator();
+    Iterator<Record> iterator = distinctTable.iterator();
     while (iterator.hasNext()) {
-      Key key = iterator.next();
-      Assert.assertEquals(key.getColumns().length, columnNames.length);
+     Record record = iterator.next();
+      Assert.assertEquals(record.getValues().length, columnNames.length);
       if (op == 1) {
-        Assert.assertTrue(_expectedAddTransformResults.contains(key));
+        Assert.assertTrue(_expectedAddTransformResults.contains(record));
       } else if (op == 2) {
-        Assert.assertTrue(_expectedSubTransformResults.contains(key));
+        Assert.assertTrue(_expectedSubTransformResults.contains(record));
       } else {
-        Assert.assertTrue(_expectedAddSubTransformResults.contains(key));
+        Assert.assertTrue(_expectedAddSubTransformResults.contains(record));
       }
     }
   }
@@ -467,6 +458,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     final SelectionResults selectionResults = brokerResponse.getSelectionResults();
 
     Assert.assertEquals(selectionResults.getColumns().size(), 4);
+
     Assert.assertEquals(selectionResults.getColumns().get(0), D1);
     Assert.assertEquals(selectionResults.getColumns().get(1), D2);
     Assert.assertEquals(selectionResults.getColumns().get(2), M1);
@@ -477,8 +469,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
 
     for (Serializable[] row : selectionResults.getRows()) {
       Assert.assertEquals(row.length, 4);
-      Key key = new Key(row);
-      Assert.assertTrue(_expectedResults.contains(key));
+      Record record = new Record(row);
+      Assert.assertTrue(_expectedResults.contains(record));
     }
   }
 
@@ -492,7 +484,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    * @throws Exception
    */
   @Test(dependsOnMethods = {"testDistinctInterSegmentInterServer"})
-  public void testDistinctInnerSegmentWithFilter()
+  public void testDistinctWithFilter()
       throws Exception {
     try {
       String tableName = TABLE_NAME + "WithFilter";
@@ -502,34 +494,197 @@ public class DistinctQueriesTest extends BaseQueriesTest {
           .addSingleValueDimension("City", FieldSpec.DataType.STRING).addMetric("SaleAmount", FieldSpec.DataType.INT)
           .build();
 
-      final String query1 = "SELECT DISTINCT(State, City) FROM " + tableName + " WHERE SaleAmount >= 200000";
-      final String query2 = "SELECT DISTINCT(State, City) FROM " + tableName + " WHERE SaleAmount >= 400000";
-      final String query3 =
-          "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " WHERE SaleAmount >= 200000";
-      final String query4 =
-          "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " WHERE SaleAmount >= 400000";
+      String query1 = "SELECT DISTINCT(State, City) FROM " + tableName + " WHERE SaleAmount >= 200000";
+      String query2 = "SELECT DISTINCT(State, City) FROM " + tableName + " WHERE SaleAmount >= 400000";
+      String query3 = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " WHERE SaleAmount >= 200000";
+      String query4 = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " WHERE SaleAmount >= 400000";
 
-      final Set<Key> q1ExpectedResults = new HashSet<>();
-      final Set<Key> q2ExpectedResults = new HashSet<>();
-      final Set<Key> q3ExpectedResults = new HashSet<>();
-      final Set<Key> q4ExpectedResults = new HashSet<>();
+      Set<Record> q1ExpectedResults = new HashSet<>();
+      Set<Record> q2ExpectedResults = new HashSet<>();
+      Set<Record> q3ExpectedResults = new HashSet<>();
+      Set<Record> q4ExpectedResults = new HashSet<>();
 
-      final List<GenericRow> rows =
+      List<GenericRow> rows =
           createSimpleTable(q1ExpectedResults, q2ExpectedResults, q3ExpectedResults, q4ExpectedResults);
 
       try (RecordReader recordReader = new GenericRowRecordReader(rows, schema)) {
         createSegment(schema, recordReader, SEGMENT_NAME_1, tableName);
         final ImmutableSegment segment = loadSegment(SEGMENT_NAME_1);
         _indexSegments.add(segment);
+        _segmentDataManagers = Arrays.asList(new ImmutableSegmentDataManager(segment), new ImmutableSegmentDataManager(segment));
 
-        runAndVerifyFilterQuery(q1ExpectedResults, query1, new String[]{"State", "City"},
-            new FieldSpec.DataType[]{FieldSpec.DataType.STRING, FieldSpec.DataType.STRING});
-        runAndVerifyFilterQuery(q2ExpectedResults, query2, new String[]{"State", "City"},
-            new FieldSpec.DataType[]{FieldSpec.DataType.STRING, FieldSpec.DataType.STRING});
-        runAndVerifyFilterQuery(q3ExpectedResults, query3, new String[]{"State", "City", "SaleAmount"},
-            new FieldSpec.DataType[]{FieldSpec.DataType.STRING, FieldSpec.DataType.STRING, FieldSpec.DataType.INT});
-        runAndVerifyFilterQuery(q4ExpectedResults, query4, new String[]{"State", "City", "SaleAmount"},
-            new FieldSpec.DataType[]{FieldSpec.DataType.STRING, FieldSpec.DataType.STRING, FieldSpec.DataType.INT});
+        // without ORDER BY
+        runFilterQueryInnerSegment(q1ExpectedResults, query1, new String[]{"State", "City"},
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
+        runFilterQueryInnerSegment(q2ExpectedResults, query2, new String[]{"State", "City"},
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
+        runFilterQueryInnerSegment(q3ExpectedResults, query3, new String[]{"State", "City", "SaleAmount"},
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+        runFilterQueryInnerSegment(q4ExpectedResults, query4, new String[]{"State", "City", "SaleAmount"},
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+
+        // with ORDER BY ASC/DESC
+        String orderByQuery = query1 + " ORDER BY State, City LIMIT 100";
+        List<Record> sortedResults = new ArrayList<>();
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View"}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo"}));
+        sortedResults.add(new Record(new Object[]{"California", "Sunnyvale"}));
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City"});
+
+        orderByQuery = query1 + " ORDER BY State, City LIMIT 2";
+        sortedResults = new ArrayList<>();
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View"}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo"}));
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City"});
+
+        orderByQuery = query1 + " ORDER BY State, City DESC LIMIT 100";
+        sortedResults = new ArrayList<>();
+        sortedResults.add(new Record(new Object[]{"California", "Sunnyvale"}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo"}));
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View"}));
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City"});
+
+        orderByQuery = query1 + " ORDER BY State, City DESC LIMIT 2";
+        sortedResults = new ArrayList<>();
+        sortedResults.add(new Record(new Object[]{"California", "Sunnyvale"}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo"}));
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City"});
+
+        orderByQuery = query2 + " ORDER BY State, City LIMIT 100";
+        sortedResults = new ArrayList<>();
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View"}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo"}));
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City"});
+
+        orderByQuery = query2 + " ORDER BY State, City LIMIT 1";
+        sortedResults = new ArrayList<>();
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View"}));
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City"});
+
+        orderByQuery = query2 + " ORDER BY State, City DESC LIMIT 100";
+        sortedResults = new ArrayList<>();
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo"}));
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View"}));
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City"});
+
+        orderByQuery = query2 + " ORDER BY State, City DESC LIMIT 1";
+        sortedResults = new ArrayList<>();
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo"}));
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City"});
+
+        orderByQuery = query3 + " ORDER BY State, City, SaleAmount LIMIT 100";
+        sortedResults = new ArrayList<>();
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View", 200000}));
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View", 700000}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo", 400000}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo", 500000}));
+        sortedResults.add(new Record(new Object[]{"California", "Sunnyvale", 300000}));
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
+
+        orderByQuery = query3 + " ORDER BY State, City, SaleAmount LIMIT 3";
+        sortedResults = new ArrayList<>();
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View", 200000}));
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View", 700000}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo", 400000}));
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
+
+        orderByQuery = query3 + " ORDER BY State, City, SaleAmount DESC LIMIT 100";
+        sortedResults = new ArrayList<>();
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View", 700000}));
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View", 200000}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo", 500000}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo", 400000}));
+        sortedResults.add(new Record(new Object[]{"California", "Sunnyvale", 300000}));
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
+
+        orderByQuery = query3 + " ORDER BY State, City, SaleAmount DESC LIMIT 3";
+        sortedResults = new ArrayList<>();
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View", 700000}));
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View", 200000}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo", 500000}));
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
+
+        orderByQuery = query4 + " ORDER BY State, City, SaleAmount LIMIT 100";
+        sortedResults = new ArrayList<>();
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View", 700000}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo", 400000}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo", 500000}));
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
+
+        orderByQuery = query4 + " ORDER BY State, City, SaleAmount LIMIT 2";
+        sortedResults = new ArrayList<>();
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View", 700000}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo", 400000}));
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
+
+        orderByQuery = query4 + " ORDER BY State, City, SaleAmount DESC LIMIT 100";
+        sortedResults = new ArrayList<>();
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View", 700000}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo", 500000}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo", 400000}));
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
+
+        orderByQuery = query4 + " ORDER BY State, City, SaleAmount DESC LIMIT 2";
+        sortedResults = new ArrayList<>();
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View", 700000}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo", 500000}));
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
+
+        orderByQuery = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " ORDER BY State, City, SaleAmount LIMIT 100";
+        sortedResults = new ArrayList<>();
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View", 200000}));
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View", 700000}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo", 400000}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo", 500000}));
+        sortedResults.add(new Record(new Object[]{"California", "Sunnyvale", 300000}));
+        sortedResults.add(new Record(new Object[]{"Oregon", "Portland", 50000}));
+        sortedResults.add(new Record(new Object[]{"Oregon", "Portland", 100000}));
+        sortedResults.add(new Record(new Object[]{"Washington", "Bellevue", 100000}));
+        sortedResults.add(new Record(new Object[]{"Washington", "Bellevue", 150000}));
+        sortedResults.add(new Record(new Object[]{"Washington", "Seattle", 100000}));
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
+
+        orderByQuery = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " ORDER BY State, City, SaleAmount LIMIT 10";
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
+
+        orderByQuery = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " ORDER BY State, City, SaleAmount LIMIT 5";
+        sortedResults = sortedResults.subList(0, 5);
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
+
+        orderByQuery = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " ORDER BY State, City, SaleAmount DESC LIMIT 100";
+        sortedResults = new ArrayList<>();
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View", 700000}));
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View", 200000}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo", 500000}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo", 400000}));
+        sortedResults.add(new Record(new Object[]{"California", "Sunnyvale", 300000}));
+        sortedResults.add(new Record(new Object[]{"Oregon", "Portland", 100000}));
+        sortedResults.add(new Record(new Object[]{"Oregon", "Portland", 50000}));
+        sortedResults.add(new Record(new Object[]{"Washington", "Bellevue", 150000}));
+        sortedResults.add(new Record(new Object[]{"Washington", "Bellevue", 100000}));
+        sortedResults.add(new Record(new Object[]{"Washington", "Seattle", 100000}));
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
+
+        orderByQuery = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " ORDER BY State, City, SaleAmount DESC LIMIT 10";
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
+
+        orderByQuery = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " ORDER BY State, City, SaleAmount DESC LIMIT 5";
+        sortedResults = sortedResults.subList(0, 5);
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
+
+        orderByQuery = "SELECT DISTINCT(State, City, SaleAmount) FROM " + tableName + " ORDER BY State DESC, City, SaleAmount DESC LIMIT 100";
+        sortedResults = new ArrayList<>();
+        sortedResults.add(new Record(new Object[]{"Washington", "Bellevue", 150000}));
+        sortedResults.add(new Record(new Object[]{"Washington", "Bellevue", 100000}));
+        sortedResults.add(new Record(new Object[]{"Washington", "Seattle", 100000}));
+        sortedResults.add(new Record(new Object[]{"Oregon", "Portland", 100000}));
+        sortedResults.add(new Record(new Object[]{"Oregon", "Portland", 50000}));
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View", 700000}));
+        sortedResults.add(new Record(new Object[]{"California", "Mountain View", 200000}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo", 500000}));
+        sortedResults.add(new Record(new Object[]{"California", "San Mateo", 400000}));
+        sortedResults.add(new Record(new Object[]{"California", "Sunnyvale", 300000}));
+        runQueryInterSegmentWithOrderBy(orderByQuery, sortedResults, new String[]{"State", "City", "SaleAmount"});
       }
     } finally {
       destroySegments();
@@ -543,8 +698,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    * @param columnNames name of columns
    * @param types data types
    */
-  private void runAndVerifyFilterQuery(final Set<Key> expectedTable, final String query, String[] columnNames,
-      FieldSpec.DataType[] types) {
+  private void runFilterQueryInnerSegment(final Set<Record> expectedTable, final String query, String[] columnNames,
+      DataSchema.ColumnDataType[] types) {
     AggregationOperator aggregationOperator = getOperatorForQuery(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     List<Object> operatorResult = resultsBlock.getAggregationResult();
@@ -553,17 +708,32 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(operatorResult.size(), 1);
     Assert.assertTrue(operatorResult.get(0) instanceof DistinctTable);
 
-    final DistinctTable distinctTable = (DistinctTable) operatorResult.get(0);
+    DistinctTable distinctTable = (DistinctTable) operatorResult.get(0);
     Assert.assertEquals(distinctTable.size(), expectedTable.size());
-    Assert.assertEquals(distinctTable.getColumnNames(), columnNames);
-    Assert.assertEquals(distinctTable.getColumnTypes(), types);
 
-    Iterator<Key> iterator = distinctTable.getIterator();
+    DataSchema dataSchema = distinctTable.getDataSchema();
+    Assert.assertEquals(dataSchema.getColumnNames(), columnNames);
+    Assert.assertEquals(dataSchema.getColumnDataTypes(), types);
 
+    Iterator<Record> iterator = distinctTable.iterator();
     while (iterator.hasNext()) {
-      Key key = iterator.next();
-      Assert.assertEquals(key.getColumns().length, columnNames.length);
-      Assert.assertTrue(expectedTable.contains(key));
+      Record record = iterator.next();
+      Assert.assertEquals(record.getValues().length, columnNames.length);
+      Assert.assertTrue(expectedTable.contains(record));
+    }
+  }
+
+  private void runQueryInterSegmentWithOrderBy(String query, List<Record> orderedResults, String[] columnNames) {
+    BrokerResponseNative brokerResponseNative = getBrokerResponseForQuery(query);
+    final SelectionResults selectionResults = brokerResponseNative.getSelectionResults();
+    Assert.assertEquals(selectionResults.getColumns(), Lists.newArrayList(columnNames));
+    List<Serializable[]> rows = selectionResults.getRows();
+    Assert.assertEquals(rows.size(), orderedResults.size());
+    int counter = 0;
+    for (Serializable[] row : rows) {
+      Assert.assertEquals(row.length, columnNames.length);
+      Record actualRecord = new Record(row);
+      Assert.assertEquals(actualRecord, orderedResults.get(counter++));
     }
   }
 
@@ -575,11 +745,10 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    * @param q4ExpectedResults expected results of filter query 1
    * @return list of generic rows
    */
-  private List<GenericRow> createSimpleTable(final Set<Key> q1ExpectedResults, final Set<Key> q2ExpectedResults,
-      final Set<Key> q3ExpectedResults, final Set<Key> q4ExpectedResults) {
-    final ThreadLocalRandom random = ThreadLocalRandom.current();
-    final int numRows = 10;
-    final List<GenericRow> rows = new ArrayList<>(numRows);
+  private List<GenericRow> createSimpleTable(final Set<Record> q1ExpectedResults, final Set<Record> q2ExpectedResults,
+      final Set<Record> q3ExpectedResults, final Set<Record> q4ExpectedResults) {
+    int numRows = 10;
+    List<GenericRow> rows = new ArrayList<>(numRows);
     Object[] columns;
 
     // ROW 1
@@ -590,12 +759,12 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     row.putField("SaleAmount", columns[2]);
     rows.add(row);
 
-    Key key = new Key(new Object[]{columns[0], columns[1]});
-    q1ExpectedResults.add(key);
-    q2ExpectedResults.add(key);
-    key = new Key(new Object[]{columns[0], columns[1], columns[2]});
-    q3ExpectedResults.add(key);
-    q4ExpectedResults.add(key);
+    Record record = new Record(new Object[]{columns[0], columns[1]});
+    q1ExpectedResults.add(record);
+    q2ExpectedResults.add(record);
+    record = new Record(new Object[]{columns[0], columns[1], columns[2]});
+    q3ExpectedResults.add(record);
+    q4ExpectedResults.add(record);
 
     // ROW 2
     row = new GenericRow();
@@ -605,9 +774,9 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     row.putField("SaleAmount", columns[2]);
     rows.add(row);
 
-    key = new Key(new Object[]{columns[0], columns[1], columns[2]});
-    q3ExpectedResults.add(key);
-    q4ExpectedResults.add(key);
+    record = new Record(new Object[]{columns[0], columns[1], columns[2]});
+    q3ExpectedResults.add(record);
+    q4ExpectedResults.add(record);
 
     // ROW 3
     row = new GenericRow();
@@ -617,10 +786,10 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     row.putField("SaleAmount", columns[2]);
     rows.add(row);
 
-    key = new Key(new Object[]{columns[0], columns[1]});
-    q1ExpectedResults.add(key);
-    key = new Key(new Object[]{columns[0], columns[1], columns[2]});
-    q3ExpectedResults.add(key);
+    record = new Record(new Object[]{columns[0], columns[1]});
+    q1ExpectedResults.add(record);
+    record = new Record(new Object[]{columns[0], columns[1], columns[2]});
+    q3ExpectedResults.add(record);
 
     // ROW 4
     row = new GenericRow();
@@ -638,12 +807,12 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     row.putField("SaleAmount", columns[2]);
     rows.add(row);
 
-    key = new Key(new Object[]{columns[0], columns[1]});
-    q1ExpectedResults.add(key);
-    q2ExpectedResults.add(key);
-    key = new Key(new Object[]{columns[0], columns[1], columns[2]});
-    q3ExpectedResults.add(key);
-    q4ExpectedResults.add(key);
+    record = new Record(new Object[]{columns[0], columns[1]});
+    q1ExpectedResults.add(record);
+    q2ExpectedResults.add(record);
+    record = new Record(new Object[]{columns[0], columns[1], columns[2]});
+    q3ExpectedResults.add(record);
+    q4ExpectedResults.add(record);
 
     // ROW 6
     row = new GenericRow();
@@ -661,8 +830,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     row.putField("SaleAmount", columns[2]);
     rows.add(row);
 
-    key = new Key(new Object[]{columns[0], columns[1], columns[2]});
-    q3ExpectedResults.add(key);
+    record = new Record(new Object[]{columns[0], columns[1], columns[2]});
+    q3ExpectedResults.add(record);
 
     // ROW 8
     row = new GenericRow();
@@ -683,6 +852,22 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     // ROW 10
     row = new GenericRow();
     columns = new Object[]{"Oregon", "Portland", 50000};
+    row.putField("State", columns[0]);
+    row.putField("City", columns[1]);
+    row.putField("SaleAmount", columns[2]);
+    rows.add(row);
+
+    // ROW 11
+    row = new GenericRow();
+    columns = new Object[]{"Washington", "Bellevue", 150000};
+    row.putField("State", columns[0]);
+    row.putField("City", columns[1]);
+    row.putField("SaleAmount", columns[2]);
+    rows.add(row);
+
+    // ROW 12
+    row = new GenericRow();
+    columns = new Object[]{"Oregon", "Portland", 100000};
     row.putField("State", columns[0]);
     row.putField("City", columns[1]);
     row.putField("SaleAmount", columns[2]);
