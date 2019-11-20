@@ -56,7 +56,6 @@ public class DefaultCommitterRealtimeIntegrationTest extends RealtimeClusterInte
   private File _indexDir;
   private File _realtimeSegmentUntarred;
 
-  private static final String METADATA_FILE_NAME = "metadata.properties";
   private static final String TARGZ_SUFFIX = ".tar.gz";
   private static final long END_OFFSET = 500L;
   private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
@@ -115,6 +114,7 @@ public class DefaultCommitterRealtimeIntegrationTest extends RealtimeClusterInte
 
     TarGzCompressionUtils.createTarGzOfDirectory(_realtimeSegmentUntarred.getAbsolutePath());
 
+    // SegmentBuildDescriptor is currently not a static class, so we will mock this object.
     when(segmentBuildDescriptor.getSegmentTarFilePath()).thenReturn(_realtimeSegmentUntarred + TARGZ_SUFFIX);
     when(segmentBuildDescriptor.getBuildTimeMillis()).thenReturn(0L);
     when(segmentBuildDescriptor.getOffset()).thenReturn(END_OFFSET);

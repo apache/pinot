@@ -579,7 +579,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 // We could not build the segment. Go into error state.
                 _state = State.ERROR;
               } else {
-                success = commitSegment(response);
+                success = commitSegment(response.getControllerVipUrl(), response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit());
                 if (success) {
                   _state = State.COMMITTED;
                 } else {
@@ -763,17 +763,15 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  protected boolean commitSegment(SegmentCompletionProtocol.Response response) {
+  protected boolean commitSegment(String controllerVipUrl, boolean isSplitCommit) {
     final String segTarFileName = _segmentBuildDescriptor.getSegmentTarFilePath();
     File segTarFile = new File(segTarFileName);
     if (!segTarFile.exists()) {
       throw new RuntimeException("Segment file does not exist:" + segTarFileName);
     }
-    SegmentCompletionProtocol.Response returnedResponse;
+    SegmentCompletionProtocol.Response commitResponse = commit(controllerVipUrl, isSplitCommit);
 
-    returnedResponse = commit(response);
-
-    if (!returnedResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
+    if (!commitResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
       return false;
     }
 
@@ -782,7 +780,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return true;
   }
 
-  protected SegmentCompletionProtocol.Response commit(SegmentCompletionProtocol.Response response) {
+  protected SegmentCompletionProtocol.Response commit(String controllerVipUrl, boolean isSplitCommit) {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
 
     params.withSegmentName(_segmentNameStr).withOffset(_currentOffset).withNumRows(_numRowsConsumed)
@@ -795,8 +793,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     SegmentCommitter segmentCommitter;
 
-    if (response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit()) {
-      segmentCommitter = _segmentCommitterFactory.createSplitSegmentCommitter(params, response);
+    if (isSplitCommit) {
+      segmentCommitter = _segmentCommitterFactory.createSplitSegmentCommitter(params, controllerVipUrl);
     } else {
       segmentCommitter = _segmentCommitterFactory.createDefaultSegmentCommitter(params);
     }

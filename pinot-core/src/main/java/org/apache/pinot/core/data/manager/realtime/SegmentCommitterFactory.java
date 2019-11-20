@@ -39,8 +39,14 @@ public class SegmentCommitterFactory {
     _protocolHandler = protocolHandler;
   }
 
-  public SegmentCommitter createSplitSegmentCommitter(SegmentCompletionProtocol.Request.Params params, SegmentCompletionProtocol.Response prevResponse) {
-    return new SplitSegmentCommitter(LOGGER, _protocolHandler, _indexLoadingConfig, params, prevResponse);
+  /**
+   * Takes given params and returns params with segment location
+   * @param params
+   * @param controllerVipUrl
+   * @return
+   */
+  public SegmentCommitter createSplitSegmentCommitter(SegmentCompletionProtocol.Request.Params params, String controllerVipUrl) {
+    return new SplitSegmentCommitter(LOGGER, _protocolHandler, _indexLoadingConfig, params, controllerVipUrl);
   }
 
   public SegmentCommitter createDefaultSegmentCommitter(SegmentCompletionProtocol.Request.Params params) {

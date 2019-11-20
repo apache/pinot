@@ -32,18 +32,18 @@ import org.slf4j.Logger;
 public class SplitSegmentCommitter implements SegmentCommitter {
   private final SegmentCompletionProtocol.Request.Params _params;
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
-  private final SegmentCompletionProtocol.Response _prevResponse;
+  private final String _controllerVipUrl;
   private final IndexLoadingConfig _indexLoadingConfig;
 
   private final Logger _segmentLogger;
 
   public SplitSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
-      IndexLoadingConfig indexLoadingConfig, SegmentCompletionProtocol.Request.Params params, SegmentCompletionProtocol.Response prevResponse) {
+      IndexLoadingConfig indexLoadingConfig, SegmentCompletionProtocol.Request.Params params, String controllerVipUrl) {
     _segmentLogger = segmentLogger;
     _protocolHandler = protocolHandler;
     _indexLoadingConfig = indexLoadingConfig;
     _params = params;
-    _prevResponse = prevResponse;
+    _controllerVipUrl = controllerVipUrl;
   }
 
   @Override
@@ -57,10 +57,8 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-    params.withInstanceId(_params.getInstanceId()).withOffset(currentOffset).withSegmentName(_params.getSegmentName());
     SegmentCompletionProtocol.Response segmentCommitUploadResponse =
-        _protocolHandler.segmentCommitUpload(params, segmentTarFile, _prevResponse.getControllerVipUrl());
+        _protocolHandler.segmentCommitUpload(_params, segmentTarFile, _controllerVipUrl);
     if (!segmentCommitUploadResponse.getStatus()
         .equals(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS)) {
       _segmentLogger.warn("Segment upload failed with response {}", segmentCommitUploadResponse.toJsonString());
@@ -74,7 +72,7 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       commitEndResponse =
           _protocolHandler.segmentCommitEndWithMetadata(_params, segmentBuildDescriptor.getMetadataFiles());
     } else {
-      commitEndResponse = _protocolHandler.segmentCommitEnd(params);
+      commitEndResponse = _protocolHandler.segmentCommitEnd(_params);
     }
 
     if (!commitEndResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
