@@ -54,7 +54,6 @@ public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements A
   public void populateFrom(AnomalyResult anomalyResult) {
     setStartTime(anomalyResult.getStartTime());
     setEndTime(anomalyResult.getEndTime());
-    setDimensions(anomalyResult.getDimensions());
     setScore(anomalyResult.getScore());
     setWeight(anomalyResult.getWeight());
     setAvgCurrentVal(anomalyResult.getAvgCurrentVal());

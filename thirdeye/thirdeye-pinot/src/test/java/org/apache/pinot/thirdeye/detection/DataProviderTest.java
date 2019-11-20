@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.thirdeye.anomaly.AnomalyType;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
@@ -118,6 +119,9 @@ public class DataProviderTest {
     this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(null, detectionIds.get(0), 8000000L, 12000000L, Arrays.asList("a=1", "c=4"))));
     this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(null, detectionIds.get(1), 604800000L, 1209600000L, Collections.<String>emptyList())));
     this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(null, detectionIds.get(1), 14400000L, 18000000L, Arrays.asList("a=1", "c=3"))));
+    this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(null, detectionIds.get(1), 14400000L, 18000000L, Arrays.asList("a=1", "a=2", "c=3"))));
+    this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(null, detectionIds.get(1), 14400000L, 18000000L, Arrays.asList("a=1", "a=3", "c=3"))));
+    this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(null, detectionIds.get(1), 14400000L, 18000000L, Arrays.asList("a=1", "a=2", "c=3", "d=4"))));
 
     // metrics
     this.metricIds = new ArrayList<>();
@@ -274,10 +278,23 @@ public class DataProviderTest {
 
     Collection<MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(Collections.singleton(slice)).get(slice);
 
-    Assert.assertEquals(anomalies.size(), 3);
+    Assert.assertEquals(anomalies.size(), 2);
     Assert.assertTrue(anomalies.contains(makeAnomaly(this.anomalyIds.get(0), detectionIds.get(0), 4000000L, 8000000L, Arrays.asList("a=1", "c=3", "b=2"))));
-    Assert.assertTrue(anomalies.contains(makeAnomaly(this.anomalyIds.get(2), detectionIds.get(1), 604800000L, 1209600000L, Collections.<String>emptyList())));
     Assert.assertTrue(anomalies.contains(makeAnomaly(this.anomalyIds.get(3), detectionIds.get(1), 14400000L, 18000000L, Arrays.asList("a=1", "c=3"))));
+
+    Assert.assertFalse(anomalies.contains(makeAnomaly(this.anomalyIds.get(2), detectionIds.get(1), 604800000L, 1209600000L, Collections.<String>emptyList())));
+  }
+
+  @Test
+  public void testAnomalyMultiDimensions() {
+    AnomalySlice slice = makeAnomalySlice(0, -1, Arrays.asList("a=1", "a=2", "c=3"));
+
+    Collection<MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(Collections.singleton(slice), -1).get(slice);
+    Assert.assertEquals(anomalies.size(), 2);
+    Assert.assertTrue(anomalies.contains(makeAnomaly(this.anomalyIds.get(4), detectionIds.get(1), 14400000L, 18000000L, Arrays.asList("a=1", "a=2", "c=3"))));
+    Assert.assertTrue(anomalies.contains(makeAnomaly(this.anomalyIds.get(6), detectionIds.get(1), 14400000L, 18000000L, Arrays.asList("a=1", "a=2", "c=3", "d=4"))));
+    Assert.assertFalse(anomalies.contains(makeAnomaly(this.anomalyIds.get(3), detectionIds.get(1), 14400000L, 18000000L, Arrays.asList("a=1", "c=3"))));
+    Assert.assertFalse(anomalies.contains(makeAnomaly(this.anomalyIds.get(5), detectionIds.get(1), 14400000L, 18000000L, Arrays.asList("a=1", "a=3", "c=3"))));
   }
 
   //
@@ -291,14 +308,14 @@ public class DataProviderTest {
     anomaly.setEndTime(end);
     anomaly.setId(id);
     anomaly.setChildIds(new HashSet<>());
+    anomaly.setType(AnomalyType.DEVIATION);
 
-    DimensionMap filters = new DimensionMap();
+    StringBuilder filterUrn = new StringBuilder();
     for (String fs : filterStrings) {
-      String[] parts = fs.split("=");
-      filters.put(parts[0], parts[1]);
+      filterUrn.append(":").append(fs);
     }
 
-    anomaly.setDimensions(filters);
+    anomaly.setMetricUrn("thirdeye:metric:1234" + filterUrn.toString());
     return anomaly;
   }
 

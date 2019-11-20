@@ -16,9 +16,7 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao;
 
-import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
-import org.apache.pinot.thirdeye.datalayer.DaoTestUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
@@ -34,19 +32,14 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import org.apache.pinot.thirdeye.anomaly.merge.AnomalyMergeConfig;
-import org.apache.pinot.thirdeye.anomaly.merge.AnomalyTimeBasedSummarizer;
 import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 
 public class TestMergedAnomalyResultManager{
   private MergedAnomalyResultDTO mergedResult = null;
-  private AnomalyFunctionDTO function = DaoTestUtils.getTestFunctionSpec("metric", "dataset");
 
   private DAOTestBase testDAOProvider;
-  private AnomalyFunctionManager anomalyFunctionDAO;
   private DetectionConfigManager detectionConfigDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
 
@@ -54,7 +47,6 @@ public class TestMergedAnomalyResultManager{
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
     DAORegistry daoRegistry = DAORegistry.getInstance();
-    anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
     detectionConfigDAO = daoRegistry.getDetectionConfigManager();
     mergedAnomalyResultDAO = daoRegistry.getMergedAnomalyResultDAO();
   }
@@ -64,46 +56,7 @@ public class TestMergedAnomalyResultManager{
     testDAOProvider.cleanup();
   }
 
-  @Test
-  public void testMergedResultCRUD() {
-    long functionId = anomalyFunctionDAO.save(function);
-    Assert.assertNotNull(function.getId());
-
-    // create anomaly result
-    AnomalyResult rawAnomaly = DaoTestUtils.getAnomalyResult();
-
-    // Let's create merged result
-    List<AnomalyResult> rawResults = new ArrayList<>();
-    rawResults.add(rawAnomaly);
-
-    AnomalyMergeConfig mergeConfig = new AnomalyMergeConfig();
-
-    List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer.mergeAnomalies(rawResults, mergeConfig);
-    Assert.assertEquals(mergedResults.get(0).getStartTime(), rawAnomaly.getStartTime());
-    Assert.assertEquals(mergedResults.get(0).getEndTime(), rawAnomaly.getEndTime());
-
-    // Let's persist the merged result
-    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
-    mergedResults.get(0).setFunction(anomalyFunction);
-    mergedResults.get(0).setCollection(anomalyFunction.getCollection());
-    mergedResults.get(0).setMetric(anomalyFunction.getTopicMetric());
-
-    mergedAnomalyResultDAO.save(mergedResults.get(0));
-    mergedResult = mergedResults.get(0);
-    Assert.assertNotNull(mergedResult.getId());
-
-    // verify the merged result
-    MergedAnomalyResultDTO mergedResultById = mergedAnomalyResultDAO.findById(mergedResult.getId());
-    Assert.assertEquals(mergedResultById.getDimensions(), rawAnomaly.getDimensions());
-
-    List<MergedAnomalyResultDTO> mergedResultsByMetricDimensionsTime = mergedAnomalyResultDAO
-        .findByCollectionMetricDimensionsTime(mergedResult.getCollection(), mergedResult.getMetric(),
-            mergedResult.getDimensions().toString(), 0, System.currentTimeMillis());
-
-    Assert.assertEquals(mergedResultsByMetricDimensionsTime.get(0), mergedResult);
-  }
-
-  @Test(dependsOnMethods = {"testMergedResultCRUD"})
+  @Test(dependsOnMethods = {"testSaveChildren"})
   public void testFeedback() {
     MergedAnomalyResultDTO anomalyMergedResult = mergedAnomalyResultDAO.findById(mergedResult.getId());
     AnomalyFeedbackDTO feedback = new AnomalyFeedbackDTO();
@@ -120,9 +73,9 @@ public class TestMergedAnomalyResultManager{
 
   @Test
   public void testSaveChildren() {
-    MergedAnomalyResultDTO parent = new MergedAnomalyResultDTO();
-    parent.setStartTime(1000);
-    parent.setEndTime(2000);
+    mergedResult = new MergedAnomalyResultDTO();
+    mergedResult.setStartTime(1000);
+    mergedResult.setEndTime(2000);
 
     MergedAnomalyResultDTO child1 = new MergedAnomalyResultDTO();
     child1.setStartTime(1000);
@@ -132,11 +85,11 @@ public class TestMergedAnomalyResultManager{
     child2.setStartTime(1500);
     child2.setEndTime(2000);
 
-    parent.setChildren(new HashSet<>(Arrays.asList(child1, child2)));
+    mergedResult.setChildren(new HashSet<>(Arrays.asList(child1, child2)));
 
-    this.mergedAnomalyResultDAO.save(parent);
+    this.mergedAnomalyResultDAO.save(mergedResult);
 
-    Assert.assertNotNull(parent.getId());
+    Assert.assertNotNull(mergedResult.getId());
     Assert.assertNotNull(child1.getId());
     Assert.assertNotNull(child2.getId());
   }

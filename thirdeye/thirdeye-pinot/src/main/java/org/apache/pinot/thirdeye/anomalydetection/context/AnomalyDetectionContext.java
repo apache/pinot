@@ -20,7 +20,6 @@
 package org.apache.pinot.thirdeye.anomalydetection.context;
 
 import org.apache.pinot.thirdeye.anomalydetection.function.AnomalyDetectionFunction;
-import org.apache.pinot.thirdeye.anomalydetection.model.prediction.PredictionModel;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 
 import java.util.ArrayList;
@@ -49,8 +48,6 @@ public class AnomalyDetectionContext {
   // The followings are intermediate results and are appended during anomaly detection
   private Map<String, TimeSeries> transformedCurrent = new HashMap<>();
   private Map<String, List<TimeSeries>> transformedBaselines = new HashMap<>();
-
-  private Map<String, PredictionModel> trainedPredictionModel = new HashMap<>();
 
   /**
    * Returns the key of the time series, which contains metric name and dimension map.
@@ -168,19 +165,5 @@ public class AnomalyDetectionContext {
    */
   public void setTransformedBaselines(String metricName, List<TimeSeries> transformedBaselines) {
     this.transformedBaselines.put(metricName, transformedBaselines);
-  }
-
-  /**
-   * Returns the trained prediction model.
-   */
-  public PredictionModel getTrainedPredictionModel(String metricName) {
-    return trainedPredictionModel.get(metricName);
-  }
-
-  /**
-   * Sets the trained prediction model, which is supposed to be set by the anomaly function.
-   */
-  public void setTrainedPredictionModel(String metricName, PredictionModel trainedPredictionModel) {
-    this.trainedPredictionModel.put(metricName, trainedPredictionModel);
   }
 }

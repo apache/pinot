@@ -38,6 +38,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 /**
  * Given list of {@link AnomalyResult} and merge parameters, this utility performs time based merge
  */
+@Deprecated
 public abstract class AnomalyTimeBasedSummarizer {
   private final static Logger LOG = LoggerFactory.getLogger(AnomalyTimeBasedSummarizer.class);
 
