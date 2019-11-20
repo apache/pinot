@@ -43,6 +43,8 @@ import org.apache.pinot.core.data.table.Record;
  * (1) Intermediate result object for Distinct aggregation function
  * (2) The same object is serialized by the server inside the data table
  * for sending the results to broker. Broker deserializes it.
+ * (3) This is also another concrete implementation of {@link BaseTable} and
+ * uses {@link Set} to store unique records.
  */
 public class DistinctTable extends BaseTable {
   private static final double LOAD_FACTOR = 0.75;
