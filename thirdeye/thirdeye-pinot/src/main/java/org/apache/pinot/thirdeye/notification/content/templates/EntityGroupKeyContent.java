@@ -66,6 +66,7 @@ public class EntityGroupKeyContent extends BaseNotificationContent {
   private DetectionConfigManager configDAO = null;
   private Multimap<String, AnomalyReportEntity> entityToAnomaliesMap = ArrayListMultimap.create();
   private Multimap<String, AnomalyReportEntity> entityToSortedAnomaliesMap = ArrayListMultimap.create();
+  private Set<Long> visitedAnomaliesSet = new HashSet<>();
 
   // WhitelistMetric is usually a top level metric which should be given special status in the alert report.
   // This map holds info on all the whitelisted metric anomalies which will appear at the top of the alert report.
@@ -193,7 +194,12 @@ public class EntityGroupKeyContent extends BaseNotificationContent {
       }
     } else {
       for (MergedAnomalyResultDTO childAnomaly : anomaly.getChildren()) {
-        updateEntityToAnomalyDetailsMap(childAnomaly, detectionConfig);
+        // Since an anomaly can have two parents (due to merge across entity reports), we do not want them
+        // to be displayed twice in the notification report.
+        if (!visitedAnomaliesSet.contains(anomaly.getId())) {
+          visitedAnomaliesSet.add(anomaly.getId());
+          updateEntityToAnomalyDetailsMap(childAnomaly, detectionConfig);
+        }
       }
     }
   }
