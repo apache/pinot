@@ -27,9 +27,6 @@ import org.apache.pinot.common.utils.EqualityUtils;
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableTaskConfig {
-
-  @ConfigKey("taskConfig")
-  @UseChildKeyHandler(TaskConfigMapChildKeyHandler.class)
   private Map<String, Map<String, String>> _taskTypeConfigsMap;
 
   public void setTaskTypeConfigsMap(Map<String, Map<String, String>> taskTypeConfigsMap) {

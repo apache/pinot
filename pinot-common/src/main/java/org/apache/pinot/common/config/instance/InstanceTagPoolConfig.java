@@ -20,28 +20,23 @@ package org.apache.pinot.common.config.instance;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.List;
-import org.apache.pinot.common.config.ConfigDoc;
-import org.apache.pinot.common.config.ConfigKey;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class InstanceTagPoolConfig {
 
-  @ConfigKey("tag")
-  @ConfigDoc(value = "Tag of the instances to select", mandatory = true)
+  @JsonPropertyDescription("Tag of the instances to select (mandatory)")
   private String _tag;
 
-  @ConfigKey("poolBased")
-  @ConfigDoc("Whether to use pool based selection, false by default")
+  @JsonPropertyDescription("Whether to use pool based selection, false by default")
   private boolean _poolBased;
 
-  @ConfigKey("numPools")
-  @ConfigDoc("Number of pools to select for pool based selection, contradict to pools, select all pools if neither of them are specified")
+  @JsonPropertyDescription("Number of pools to select for pool based selection, contradict to pools, select all pools if neither of them are specified")
   private int _numPools;
 
-  @ConfigKey("pools")
-  @ConfigDoc("Pools to select for pool based selection, contradict to numPools, select all pools if neither of them are specified")
+  @JsonPropertyDescription("Pools to select for pool based selection, contradict to numPools, select all pools if neither of them are specified")
   private List<Integer> _pools;
 
   @JsonProperty

@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.tools.tuner.strategy;
 
-import io.vavr.Tuple2;
 import java.util.ArrayList;
 import java.util.HashMap;
 import javax.annotation.concurrent.NotThreadSafe;
+import org.apache.commons.lang3.tuple.Pair;
 
 
 /**
@@ -32,7 +32,7 @@ public class QuantileAnalysisAccumulator extends AbstractAccumulator {
 
   private ArrayList<Long> _timeList;
   private ArrayList<Long> _inFilterList;
-  private HashMap<Tuple2<Long, Long>, Tuple2<Long, Long>> _minBin;
+  private HashMap<Pair<Long, Long>, Pair<Long, Long>> _minBin;
 
   public ArrayList<Long> getTimeList() {
     return _timeList;
@@ -42,7 +42,7 @@ public class QuantileAnalysisAccumulator extends AbstractAccumulator {
     return _inFilterList;
   }
 
-  public HashMap<Tuple2<Long, Long>, Tuple2<Long, Long>> getMinBin() {
+  public HashMap<Pair<Long, Long>, Pair<Long, Long>> getMinBin() {
     return _minBin;
   }
 
@@ -56,13 +56,13 @@ public class QuantileAnalysisAccumulator extends AbstractAccumulator {
     super.increaseCount();
     _timeList.add(time);
     _inFilterList.add(inFilter);
-    Tuple2<Long, Long> key = new Tuple2<>(inFilter / binLen, postFilter / binLen);
+    Pair<Long, Long> key = Pair.of(inFilter / binLen, postFilter / binLen);
     if (_minBin.containsKey(key)) {
-      if (_minBin.get(key)._2() > time) {
-        _minBin.put(key, new Tuple2<>(indexUsed, time));
+      if (_minBin.get(key).getRight() > time) {
+        _minBin.put(key, Pair.of(indexUsed, time));
       }
     } else {
-      _minBin.put(new Tuple2<>(inFilter / binLen, postFilter / binLen), new Tuple2<>(indexUsed, time));
+      _minBin.put(Pair.of(inFilter / binLen, postFilter / binLen), Pair.of(indexUsed, time));
     }
   }
 
@@ -72,7 +72,7 @@ public class QuantileAnalysisAccumulator extends AbstractAccumulator {
     _inFilterList.addAll(o2._inFilterList);
     o2._minBin.forEach((key, val) -> {
       if (_minBin.containsKey(key)) {
-        if (_minBin.get(key)._2() > val._2()) {
+        if (_minBin.get(key).getRight() > val.getRight()) {
           _minBin.put(key, val);
         }
       } else {
@@ -83,6 +83,7 @@ public class QuantileAnalysisAccumulator extends AbstractAccumulator {
 
   @Override
   public String toString() {
-    return "OLSMergerObj{" + "_timeList=" + _timeList + ", _inFilterList=" + _inFilterList + ", _minBin=" + _minBin + '}';
+    return "OLSMergerObj{" + "_timeList=" + _timeList + ", _inFilterList=" + _inFilterList + ", _minBin=" + _minBin
+        + '}';
   }
 }

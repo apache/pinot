@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests;
 
 import com.google.common.base.Function;
 import java.io.File;
-import java.io.IOException;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -30,14 +29,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.common.config.ColumnPartitionConfig;
-import org.apache.pinot.common.config.CombinedConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
-import org.apache.pinot.common.config.Serializer;
 import org.apache.pinot.common.config.TableTaskConfig;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.data.Schema;
@@ -87,17 +83,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /**
    * The following getters can be overridden to change default settings.
    */
-  @Nonnull
   protected String getTableName() {
     return DEFAULT_TABLE_NAME;
   }
 
-  @Nonnull
   protected String getSchemaFileName() {
     return DEFAULT_SCHEMA_FILE_NAME;
   }
 
-  @Nonnull
   protected String getAvroTarFileName() {
     return DEFAULT_AVRO_TAR_FILE_NAME;
   }
@@ -106,7 +99,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return DEFAULT_COUNT_STAR_RESULT;
   }
 
-  @Nonnull
   protected String getKafkaTopic() {
     return getClass().getSimpleName();
   }
@@ -212,7 +204,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    *
    * @return Pinot connection
    */
-  @Nonnull
   protected org.apache.pinot.client.Connection getPinotConnection() {
     if (_pinotConnection == null) {
       _pinotConnection = ConnectionFactory.fromZookeeper(ZkStarter.DEFAULT_ZK_STR + "/" + getHelixClusterName());
@@ -225,7 +216,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    *
    * @return H2 connection
    */
-  @Nonnull
   protected Connection getH2Connection() {
     Assert.assertNotNull(_h2Connection, "H2 Connection has not been initialized");
     return _h2Connection;
@@ -236,7 +226,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    *
    * @return Query generator.
    */
-  @Nonnull
   protected QueryGenerator getQueryGenerator() {
     Assert.assertNotNull(_queryGenerator, "Query Generator has not been initialized");
     return _queryGenerator;
@@ -249,7 +238,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @param executor Executor
    * @throws Exception
    */
-  protected void setUpH2Connection(@Nonnull final List<File> avroFiles, @Nonnull Executor executor)
+  protected void setUpH2Connection(final List<File> avroFiles, Executor executor)
       throws Exception {
     Assert.assertNull(_h2Connection);
     Class.forName("org.h2.Driver");
@@ -272,7 +261,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @param avroFiles List of Avro files
    * @param executor Executor
    */
-  protected void setUpQueryGenerator(@Nonnull final List<File> avroFiles, @Nonnull Executor executor) {
+  protected void setUpQueryGenerator(final List<File> avroFiles, Executor executor) {
     Assert.assertNull(_queryGenerator);
     final String tableName = getTableName();
     executor.execute(new Runnable() {
@@ -288,7 +277,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    *
    * @return Schema file
    */
-  @Nonnull
   protected File getSchemaFile() {
     URL resourceUrl = BaseClusterIntegrationTest.class.getClassLoader().getResource(getSchemaFileName());
     Assert.assertNotNull(resourceUrl);
@@ -302,8 +290,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @return List of files unpacked.
    * @throws Exception
    */
-  @Nonnull
-  protected List<File> unpackAvroData(@Nonnull File outputDir)
+  protected List<File> unpackAvroData(File outputDir)
       throws Exception {
     URL resourceUrl = BaseClusterIntegrationTest.class.getClassLoader().getResource(getAvroTarFileName());
     Assert.assertNotNull(resourceUrl);
@@ -317,8 +304,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @param kafkaTopic Kafka topic
    * @param executor Executor
    */
-  protected void pushAvroIntoKafka(@Nonnull final List<File> avroFiles, @Nonnull final String kafkaTopic,
-      @Nonnull Executor executor) {
+  protected void pushAvroIntoKafka(final List<File> avroFiles, final String kafkaTopic, Executor executor) {
     executor.execute(new Runnable() {
       @Override
       public void run() {
@@ -333,7 +319,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected void startKafka() {
-
     _kafkaStarters = KafkaStarterUtils
         .startServers(getNumKafkaBrokers(), KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_ZK_STR,
             KafkaStarterUtils.getDefaultKafkaConfiguration());
@@ -387,7 +372,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @param sqlQueries H2 query
    * @throws Exception
    */
-  protected void testQuery(@Nonnull String pqlQuery, @Nullable List<String> sqlQueries)
+  protected void testQuery(String pqlQuery, @Nullable List<String> sqlQueries)
       throws Exception {
     ClusterIntegrationTestUtils
         .testQuery(pqlQuery, "pql", _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
@@ -400,14 +385,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @param sqlQueries H2 query
    * @throws Exception
    */
-  protected void testSqlQuery(@Nonnull String sqlQuery, @Nullable List<String> sqlQueries)
+  protected void testSqlQuery(String sqlQuery, @Nullable List<String> sqlQueries)
       throws Exception {
     ClusterIntegrationTestUtils
         .testQuery(sqlQuery, "sql", _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
   }
 
-  protected void setUpRealtimeTable(File avroFile,
-      int numReplicas, boolean useLLC, String tableName) throws Exception {
+  protected void setUpRealtimeTable(File avroFile, int numReplicas, boolean useLLC, String tableName)
+      throws Exception {
     File schemaFile = getSchemaFile();
     Schema schema = Schema.fromFile(schemaFile);
     String schemaName = schema.getSchemaName();
@@ -424,19 +409,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         getBrokerTenant(), getServerTenant(), getLoadMode(), getSortedColumn(), getInvertedIndexColumns(),
         getBloomFilterIndexColumns(), getRawIndexColumns(), getTaskConfig(), getStreamConsumerFactoryClassName(),
         numReplicas);
-
-    completeTableConfiguration();
   }
 
   protected void setUpRealtimeTable(File avroFile)
       throws Exception {
     setUpRealtimeTable(avroFile, 1, useLlc(), getTableName());
-  }
-
-  protected void completeTableConfiguration() throws IOException {
-    if (isUsingNewConfigFormat()) {
-      CombinedConfig combinedConfig = new CombinedConfig(_offlineTableConfig, _realtimeTableConfig, _schema);
-      sendPostRequest(_controllerRequestURLBuilder.forNewTableCreate(), Serializer.serializeToString(combinedConfig));
-    }
   }
 }

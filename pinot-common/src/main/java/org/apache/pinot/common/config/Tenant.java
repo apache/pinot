@@ -103,36 +103,35 @@ public class Tenant {
   }
 
   public static class TenantBuilder {
-    Tenant tenant;
+    private final Tenant _tenant;
 
     public TenantBuilder(String name) {
-      tenant = new Tenant();
-      tenant.setTenantName(name);
+      _tenant = new Tenant();
+      _tenant.setTenantName(name);
     }
 
     public TenantBuilder setRole(TenantRole role) {
-      tenant.setTenantRole(role);
+      _tenant.setTenantRole(role);
       return this;
     }
 
     public TenantBuilder setTotalInstances(int totalInstances) {
-      tenant.setNumberOfInstances(totalInstances);
+      _tenant.setNumberOfInstances(totalInstances);
       return this;
     }
 
-    public TenantBuilder setOfflineInstances(int totalInstances) {
-      tenant.setOfflineInstances(totalInstances);
+    public TenantBuilder setOfflineInstances(int offlineInstances) {
+      _tenant.setOfflineInstances(offlineInstances);
       return this;
     }
 
-    public TenantBuilder setRealtimeInstances(int totalInstances) {
-      tenant.setRealtimeInstances(totalInstances);
+    public TenantBuilder setRealtimeInstances(int realtimeInstances) {
+      _tenant.setRealtimeInstances(realtimeInstances);
       return this;
     }
 
     public Tenant build() {
-      tenant.isCoLocated();
-      return tenant;
+      return _tenant;
     }
   }
 }

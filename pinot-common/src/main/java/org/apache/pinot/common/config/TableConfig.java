@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.config;
 
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -32,15 +33,12 @@ import javax.annotation.Nullable;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
-import org.apache.pinot.common.config.instance.InstanceAssignmentConfigMapChildKeyHandler;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.JsonUtils;
 
 
 @SuppressWarnings({"Duplicates", "unused"})
-@ConfigDoc(value = "Configuration for a table", mandatory = true)
-@ConfigKey("table")
 public class TableConfig {
   public static final String TABLE_NAME_KEY = "tableName";
   public static final String TABLE_TYPE_KEY = "tableType";
@@ -55,38 +53,22 @@ public class TableConfig {
 
   private static final String FIELD_MISSING_MESSAGE_TEMPLATE = "Mandatory field '%s' is missing";
 
-  @ConfigKey("name")
-  @ConfigDoc(value = "The name for the table (with type suffix)", mandatory = true, exampleValue = "myTable_OFFLINE")
+  @JsonPropertyDescription("The name for the table (with type suffix), e.g. \"myTable_OFFLINE\" (mandatory)")
   private String _tableName;
 
-  @ConfigKey("type")
-  @ConfigDoc(value = "The type of the table (OFFLINE|REALTIME)", mandatory = true)
+  @JsonPropertyDescription(value = "The type of the table (OFFLINE|REALTIME) (mandatory)")
   private TableType _tableType;
 
-  @NestedConfig
   private SegmentsValidationAndRetentionConfig _validationConfig;
-
-  @NestedConfig
   private TenantConfig _tenantConfig;
-
-  @NestedConfig
   private IndexingConfig _indexingConfig;
-
-  @NestedConfig
   private TableCustomConfig _customConfig;
 
-  @ConfigKey("quota")
-  @ConfigDoc("Resource quota associated with this table")
+  @JsonPropertyDescription("Resource quota associated with this table")
   private QuotaConfig _quotaConfig;
 
-  @NestedConfig
   private TableTaskConfig _taskConfig;
-
-  @NestedConfig
   private RoutingConfig _routingConfig;
-
-  @ConfigKey(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY)
-  @UseChildKeyHandler(InstanceAssignmentConfigMapChildKeyHandler.class)
   private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
 
   /**

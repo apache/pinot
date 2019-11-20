@@ -122,8 +122,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     addOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1, getInvertedIndexColumns(),
         getBloomFilterIndexColumns(), getTaskConfig(), null, null);
 
-    completeTableConfiguration();
-
     // Upload all segments
     uploadSegments(getTableName(), _tarDir);
 
@@ -227,8 +225,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     updateOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1,
         UPDATED_INVERTED_INDEX_COLUMNS, null, getTaskConfig(), null, null);
 
-    updateTableConfiguration();
-
     sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);
 
     TestUtils.waitForCondition(aVoid -> {
@@ -253,8 +249,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Update table config and trigger reload
     updateOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1, null,
         UPDATED_BLOOM_FILTER_COLUMNS, getTaskConfig(), null, null);
-
-    updateTableConfiguration();
 
     sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);
 
@@ -313,8 +307,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     } else {
       sendSchema(SCHEMA_WITH_MISSING_COLUMNS);
     }
-
-    updateTableConfiguration();
 
     // Trigger reload
     sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);
@@ -816,11 +808,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     pql = "SELECT DISTINCT(Carrier, DestAirportID, DestCityName) FROM mytable LIMIT 1000000";
     sql = "SELECT DISTINCT Carrier, DestAirportID, DestCityName FROM mytable";
     testQuery(pql, Collections.singletonList(sql));
-  }
-
-  @Override
-  protected boolean isUsingNewConfigFormat() {
-    return true;
   }
 
   @Test

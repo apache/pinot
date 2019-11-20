@@ -20,7 +20,6 @@ package org.apache.pinot.common.config;
 
 import java.util.HashMap;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import org.apache.helix.task.TaskConfig;
 import org.apache.pinot.common.utils.EqualityUtils;
 
@@ -33,28 +32,24 @@ public class PinotTaskConfig {
   private final String _taskType;
   private final Map<String, String> _configs;
 
-  public PinotTaskConfig(@Nonnull String taskType, @Nonnull Map<String, String> configs) {
+  public PinotTaskConfig(String taskType, Map<String, String> configs) {
     _taskType = taskType;
     _configs = configs;
   }
 
-  @Nonnull
   public String getTaskType() {
     return _taskType;
   }
 
-  @Nonnull
   public Map<String, String> getConfigs() {
     return _configs;
   }
 
-  @Nonnull
-  public TaskConfig toHelixTaskConfig(@Nonnull String taskName) {
+  public TaskConfig toHelixTaskConfig(String taskName) {
     return new TaskConfig(_taskType, new HashMap<>(_configs), taskName, null);
   }
 
-  @Nonnull
-  public static PinotTaskConfig fromHelixTaskConfig(@Nonnull TaskConfig helixTaskConfig) {
+  public static PinotTaskConfig fromHelixTaskConfig(TaskConfig helixTaskConfig) {
     Map<String, String> configs = new HashMap<>(helixTaskConfig.getConfigMap());
 
     // Inside Helix task config map, there are 3 extra Helix properties: TASK_COMMAND, TASK_ID, TASK_TARGET_PARTITION

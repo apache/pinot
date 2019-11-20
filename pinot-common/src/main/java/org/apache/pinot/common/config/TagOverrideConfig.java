@@ -19,6 +19,7 @@
 package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import org.apache.pinot.common.utils.EqualityUtils;
 
 
@@ -43,34 +44,32 @@ import org.apache.pinot.common.utils.EqualityUtils;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TagOverrideConfig {
 
-  @ConfigKey("realtimeConsuming")
-  @ConfigDoc("Tag override for realtime consuming segments")
-  private String realtimeConsuming;
+  @JsonPropertyDescription("Tag override for realtime consuming segments")
+  private String _realtimeConsuming;
 
-  @ConfigKey("realtimeCompleted")
-  @ConfigDoc("Tag override for realtime completed segments")
-  private String realtimeCompleted;
+  @JsonPropertyDescription("Tag override for realtime completed segments")
+  private String _realtimeCompleted;
 
   public String getRealtimeConsuming() {
-    return realtimeConsuming;
+    return _realtimeConsuming;
   }
 
   public void setRealtimeConsuming(String realtimeConsuming) {
-    this.realtimeConsuming = realtimeConsuming;
+    _realtimeConsuming = realtimeConsuming;
   }
 
   public String getRealtimeCompleted() {
-    return realtimeCompleted;
+    return _realtimeCompleted;
   }
 
   public void setRealtimeCompleted(String realtimeCompleted) {
-    this.realtimeCompleted = realtimeCompleted;
+    _realtimeCompleted = realtimeCompleted;
   }
 
   @Override
   public String toString() {
-    return "TagOverrideConfig{" + "realtimeConsuming='" + realtimeConsuming + '\'' + ", realtimeCompleted="
-        + realtimeCompleted + '}';
+    return "TagOverrideConfig{" + "realtimeConsuming='" + _realtimeConsuming + '\'' + ", realtimeCompleted="
+        + _realtimeCompleted + '}';
   }
 
   @Override
@@ -85,14 +84,14 @@ public class TagOverrideConfig {
 
     TagOverrideConfig that = (TagOverrideConfig) o;
 
-    return EqualityUtils.isEqual(realtimeConsuming, that.realtimeConsuming) && EqualityUtils
-        .isEqual(realtimeCompleted, that.realtimeCompleted);
+    return EqualityUtils.isEqual(_realtimeConsuming, that._realtimeConsuming) && EqualityUtils
+        .isEqual(_realtimeCompleted, that._realtimeCompleted);
   }
 
   @Override
   public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(realtimeConsuming);
-    result = EqualityUtils.hashCodeOf(result, realtimeCompleted);
+    int result = EqualityUtils.hashCodeOf(_realtimeConsuming);
+    result = EqualityUtils.hashCodeOf(result, _realtimeCompleted);
     return result;
   }
 }

@@ -28,9 +28,7 @@ import org.apache.pinot.common.utils.EqualityUtils;
 public class RoutingConfig {
   public static final String ENABLE_DYNAMIC_COMPUTING_KEY = "enableDynamicComputing";
 
-  @ConfigKey("routingTableBuilderName")
   private String _routingTableBuilderName;
-
   private Map<String, String> _routingTableBuilderOptions = new HashMap<>();
 
   public String getRoutingTableBuilderName() {

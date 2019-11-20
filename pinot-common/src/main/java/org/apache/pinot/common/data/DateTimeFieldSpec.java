@@ -22,18 +22,13 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import javax.annotation.Nonnull;
-import org.apache.pinot.common.config.ConfigKey;
 import org.apache.pinot.common.utils.EqualityUtils;
 
 
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class DateTimeFieldSpec extends FieldSpec {
-  @ConfigKey("format")
   private String _format;
-
-  @ConfigKey("granularity")
   private String _granularity;
 
   public enum TimeFormat {
@@ -73,8 +68,7 @@ public final class DateTimeFieldSpec extends FieldSpec {
    *       2) if a time column is defined in hoursSinceEpoch (format=1:HOURS:EPOCH), and the data buckets are 1 hours,
    *          the granularity will be 1:HOURS
    */
-  public DateTimeFieldSpec(@Nonnull String name, @Nonnull DataType dataType, @Nonnull String format,
-      @Nonnull String granularity) {
+  public DateTimeFieldSpec(String name, DataType dataType, String format, String granularity) {
     super(name, dataType, true);
     Preconditions.checkNotNull(name);
     Preconditions.checkNotNull(dataType);
@@ -86,7 +80,6 @@ public final class DateTimeFieldSpec extends FieldSpec {
   }
 
   @JsonIgnore
-  @Nonnull
   @Override
   public FieldType getFieldType() {
     return FieldType.DATE_TIME;
@@ -98,27 +91,24 @@ public final class DateTimeFieldSpec extends FieldSpec {
     Preconditions.checkArgument(isSingleValueField, "Unsupported multi-value for date time field.");
   }
 
-  @Nonnull
   public String getFormat() {
     return _format;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setFormat(@Nonnull String format) {
+  public void setFormat(String format) {
     _format = format;
   }
 
-  @Nonnull
   public String getGranularity() {
     return _granularity;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setGranularity(@Nonnull String granularity) {
+  public void setGranularity(String granularity) {
     _granularity = granularity;
   }
 
-  @Nonnull
   @Override
   public ObjectNode toJsonObject() {
     ObjectNode jsonObject = super.toJsonObject();
