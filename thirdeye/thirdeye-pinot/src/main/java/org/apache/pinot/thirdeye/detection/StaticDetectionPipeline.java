@@ -20,6 +20,8 @@
 package org.apache.pinot.thirdeye.detection;
 
 import com.google.common.collect.Multimap;
+import java.util.Collection;
+import java.util.HashSet;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.detection.spi.model.InputData;
 import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
@@ -80,7 +82,12 @@ public abstract class StaticDetectionPipeline extends DetectionPipeline {
     InputDataSpec dataSpec = this.getInputDataSpec();
     Map<MetricSlice, DataFrame> timeseries = this.provider.fetchTimeseries(dataSpec.getTimeseriesSlices());
     Map<MetricSlice, DataFrame> aggregates = this.provider.fetchAggregates(dataSpec.getAggregateSlices(), Collections.<String>emptyList());
-    Multimap<AnomalySlice, MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(dataSpec.getAnomalySlices(), this.config.getId());
+
+    Collection<AnomalySlice> updatedSlices = new HashSet<>();
+    for (AnomalySlice slice : dataSpec.getAnomalySlices()) {
+      updatedSlices.add(slice.withDetectionId(this.config.getId()));
+    }
+    Multimap<AnomalySlice, MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(updatedSlices);
     Multimap<EventSlice, EventDTO> events = this.provider.fetchEvents(dataSpec.getEventSlices());
 
     InputData data = new InputData(

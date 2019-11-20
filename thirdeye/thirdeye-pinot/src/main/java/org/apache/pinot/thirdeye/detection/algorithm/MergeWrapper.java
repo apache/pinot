@@ -156,10 +156,11 @@ public class MergeWrapper extends DetectionPipeline {
 
   protected List<MergedAnomalyResultDTO> retrieveAnomaliesFromDatabase(List<MergedAnomalyResultDTO> generated) {
     AnomalySlice effectiveSlice = this.slice
+        .withDetectionId(this.config.getId())
         .withStart(this.getStartTime(generated) - this.maxGap - 1)
         .withEnd(this.getEndTime(generated) + this.maxGap + 1);
 
-    return new ArrayList<>(this.provider.fetchAnomalies(Collections.singleton(effectiveSlice), this.config.getId()).get(effectiveSlice));
+    return new ArrayList<>(this.provider.fetchAnomalies(Collections.singleton(effectiveSlice)).get(effectiveSlice));
   }
 
   private boolean isExistingAnomaly(MergedAnomalyResultDTO anomaly) {

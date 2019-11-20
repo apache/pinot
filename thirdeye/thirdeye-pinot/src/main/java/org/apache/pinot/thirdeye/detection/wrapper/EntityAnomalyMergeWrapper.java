@@ -56,11 +56,12 @@ public class EntityAnomalyMergeWrapper extends BaselineFillingMergeWrapper {
   @Override
   protected List<MergedAnomalyResultDTO> retrieveAnomaliesFromDatabase(List<MergedAnomalyResultDTO> generated) {
     AnomalySlice effectiveSlice = this.slice
+        .withDetectionId(this.config.getId())
         .withStart(this.getStartTime(generated) - this.maxGap - 1)
         .withEnd(this.getEndTime(generated) + this.maxGap + 1)
         .withDetectionCompNames(this.getDetectionCompNames(generated));
 
-    Collection<MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(Collections.singleton(effectiveSlice), this.config.getId()).get(effectiveSlice);
+    Collection<MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(Collections.singleton(effectiveSlice)).get(effectiveSlice);
 
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       if(anomaly.getId() != null) this.existingAnomalies.put(anomaly.getId(), copyAnomalyInfo(anomaly, new MergedAnomalyResultDTO()));
