@@ -23,7 +23,9 @@ public class MockConsumerDataAvailability extends DataAvailabilityKafkaConsumer 
       res.add(createEvent(1, 2000, 3000));
       res.add(createEvent(1, 2000, 3000));
       res.add(createEvent(1, 1000, 2000));
+      res.add(createEvent(2, 1000, 3000));
     } else if (callCount == 2) {
+      res.add(createEvent(1, 0, 1000));
       res.add(createEvent(3, 1000, 2000));
       res.add(createEvent(4, 1000, 2000));
     }

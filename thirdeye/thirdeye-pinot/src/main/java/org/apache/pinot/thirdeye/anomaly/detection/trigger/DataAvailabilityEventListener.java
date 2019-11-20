@@ -58,12 +58,12 @@ public class DataAvailabilityEventListener implements Runnable {
       while (!(Thread.interrupted())) {
         processOneBatch();
       }
-    } catch (InterruptedException e) {
-      LOG.error("Caught Interrupted Exception", e);
+    } catch (Exception e) {
+      LOG.error("Caught an exception while processing event.", e);
     } finally {
       consumer.close();
     }
-    LOG.info("TriggerEventListener under thread {} is closed.", Thread.currentThread().getName());
+    LOG.info("DataAvailabilityEventListener under thread {} is closed.", Thread.currentThread().getName());
   }
 
   public void close() {
@@ -75,13 +75,17 @@ public class DataAvailabilityEventListener implements Runnable {
     ThirdeyeMetricsUtil.triggerEventCounter.inc(events.size());
     for (DataAvailabilityEvent event : events) {
       if (checkAllFiltersPassed(event)) {
-        LOG.info("Processing event: " + event.getDatasetName() + " with watermark " + event.getHighWatermark());
-        String dataset = event.getDatasetName();
-        datasetTriggerInfoRepo.setLastUpdateTimestamp(dataset, event.getHighWatermark());
-        //Note: Batch update the timestamps of dataset if the event traffic spike
-        datasetConfigManager.updateLastRefreshTime(dataset, event.getHighWatermark());
-        ThirdeyeMetricsUtil.processedTriggerEventCounter.inc();
-        LOG.info("Finished processing event: " + event.getDatasetName());
+        try {
+          LOG.info("Processing event: " + event.getDatasetName() + " with watermark " + event.getHighWatermark());
+          String dataset = event.getDatasetName();
+          datasetTriggerInfoRepo.setLastUpdateTimestamp(dataset, event.getHighWatermark());
+          //Note: Batch update the timestamps of dataset if the event traffic spike
+          datasetConfigManager.updateLastRefreshTime(dataset, event.getHighWatermark());
+          ThirdeyeMetricsUtil.processedTriggerEventCounter.inc();
+          LOG.debug("Finished processing event: " + event.getDatasetName());
+        } catch (Exception e) {
+          LOG.error("Error in processing event for {}, so skipping...", event.getDatasetName(), e);
+        }
       }
     }
     if (!events.isEmpty()) {

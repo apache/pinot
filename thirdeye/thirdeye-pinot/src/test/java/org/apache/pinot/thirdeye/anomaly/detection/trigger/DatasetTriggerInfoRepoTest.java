@@ -32,7 +32,9 @@ import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 public class DatasetTriggerInfoRepoTest {
@@ -41,8 +43,8 @@ public class DatasetTriggerInfoRepoTest {
   private static String TEST_METRIC_PREFIX = "test_metric_";
   private DAOTestBase testDAOProvider;
 
-  @BeforeClass
-  public void BeforeClass() {
+  @BeforeMethod
+  public void BeforeMethod() {
     testDAOProvider = DAOTestBase.getInstance();
     DetectionConfigManager detectionConfigManager = DAORegistry.getInstance().getDetectionConfigManager();
     MetricConfigManager metricConfigManager = DAORegistry.getInstance().getMetricConfigDAO();
@@ -84,11 +86,11 @@ public class DatasetTriggerInfoRepoTest {
     ds2.setDataSource(TEST_DATA_SOURCE);
     ds2.setLastRefreshTime(2000);
     datasetConfigDAO.save(ds2);
+    DatasetTriggerInfoRepo.init(1, Collections.singletonList(TEST_DATA_SOURCE));
   }
 
   @Test
   public void testInitAndGetInstance () {
-    DatasetTriggerInfoRepo.init(1, Collections.singletonList(TEST_DATA_SOURCE));
     DatasetTriggerInfoRepo datasetTriggerInfoRepo = DatasetTriggerInfoRepo.getInstance();
         Assert.assertSame(datasetTriggerInfoRepo, DatasetTriggerInfoRepo.getInstance());
     Assert.assertSame(datasetTriggerInfoRepo, DatasetTriggerInfoRepo.getInstance());
@@ -100,7 +102,7 @@ public class DatasetTriggerInfoRepoTest {
     Assert.assertEquals(datasetTriggerInfoRepo.getLastUpdateTimestamp(TEST_DATASET_PREFIX + 3), 0);
   }
 
-  @Test
+  @Test(dependsOnMethods = { "testInitAndGetInstance" })
   public void testSetLastUpdateTimestamp() {
     DatasetTriggerInfoRepo datasetTriggerInfoRepo = DatasetTriggerInfoRepo.getInstance();
     datasetTriggerInfoRepo.setLastUpdateTimestamp(TEST_DATASET_PREFIX + 1, 3000);
@@ -109,7 +111,7 @@ public class DatasetTriggerInfoRepoTest {
     Assert.assertEquals(datasetTriggerInfoRepo.getLastUpdateTimestamp(TEST_DATASET_PREFIX + 4), 0);
   }
 
-  @Test
+  @Test(dependsOnMethods = { "testSetLastUpdateTimestamp" })
   public void testRefresh() throws InterruptedException {
     DetectionConfigManager detectionConfigManager = DAORegistry.getInstance().getDetectionConfigManager();
     MetricConfigManager metricConfigManager = DAORegistry.getInstance().getMetricConfigDAO();
@@ -144,8 +146,8 @@ public class DatasetTriggerInfoRepoTest {
     Assert.assertEquals(datasetTriggerInfoRepo.getLastUpdateTimestamp(TEST_DATASET_PREFIX + 3), 3000);
   }
 
-  @AfterClass
-  public void afterClass() {
+  @AfterMethod
+  public void afterMethod() {
     DatasetTriggerInfoRepo datasetTriggerInfoRepo = DatasetTriggerInfoRepo.getInstance();
     datasetTriggerInfoRepo.close();
     testDAOProvider.cleanup();
