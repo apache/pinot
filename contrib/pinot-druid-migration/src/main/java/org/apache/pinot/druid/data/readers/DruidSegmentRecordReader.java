@@ -143,7 +143,7 @@ public class DruidSegmentRecordReader implements RecordReader {
         .collect(Collectors.toList());
   }
 
-  //@Override
+  @Override
   public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
 
   }

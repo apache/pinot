@@ -101,9 +101,7 @@
     </plugins>
   </build>
 
-  <!--
-  dependencyManagement section added to resolve dependency convergence issues with Druid
-  -->
+  <!-- dependencyManagement section added to resolve dependency convergence issues with Druid -->
   <dependencyManagement>
     <dependencies>
       <dependency>

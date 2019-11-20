@@ -31,9 +31,9 @@ import org.apache.pinot.druid.data.readers.DruidSegmentRecordReader;
 public class DruidToPinotSegmentConverter {
   private static String _pinotSchemaFilePath;
   private static String _druidSegmentPath;
-  private static String _outPath;
-  private static String _segmentName;
-  private static String _tableName;
+  private static String _outputPath;
+  private static String _pinotSegmentName;
+  private static String _pinotTableName;
 
   // TODO: Change implementation to use the Command framework like the CreateSegmentCommand
   public static void convertSegment()
@@ -43,10 +43,10 @@ public class DruidToPinotSegmentConverter {
 
     final SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig();
     segmentGeneratorConfig.setDataDir(_druidSegmentPath);
-    segmentGeneratorConfig.setOutDir(_outPath);
+    segmentGeneratorConfig.setOutDir(_outputPath);
     segmentGeneratorConfig.setOverwrite(true);
-    segmentGeneratorConfig.setTableName(_tableName);
-    segmentGeneratorConfig.setSegmentName(_segmentName);
+    segmentGeneratorConfig.setTableName(_pinotTableName);
+    segmentGeneratorConfig.setSegmentName(_pinotSegmentName);
     segmentGeneratorConfig.setSchema(schema);
 
     final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -59,14 +59,14 @@ public class DruidToPinotSegmentConverter {
   public static void main(String[] args)
       throws Exception {
     if (args.length != 5) {
-      System.out.println("Usage: ");
-      System.out.println("./pinot-druid-converter.sh <pinot_table_name> <pinot_segment_name>  <pinot_schema_path> <druid_segment_path> <output_path>");
+      System.out.println("Usage:");
+      System.out.println("./pinot-druid-converter.sh <pinot_table_name> <pinot_segment_name> <pinot_schema_path> <druid_segment_path> <output_path>");
     } else {
-      _tableName = args[0];
-      _segmentName = args[1];
+      _pinotTableName = args[0];
+      _pinotSegmentName = args[1];
       _pinotSchemaFilePath = args[2];
       _druidSegmentPath = args[3];
-      _outPath = args[4];
+      _outputPath = args[4];
 
       convertSegment();
     }
