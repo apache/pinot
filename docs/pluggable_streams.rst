@@ -22,10 +22,14 @@
 Pluggable Streams
 =================
 
-Prior to commit `ba9f2d <https://github.com/apache/incubator-pinot/commit/ba9f2ddfc0faa42fadc2cc48df1d77fec6b174fb>`_, Pinot was only able to support reading
+.. note::
+
+  This section is a pre-read if you are planning to develop plug-ins for streams other than Kafka. Pinot supports Kafka out of the box.
+
+Prior to commit `ba9f2d <https://github.com/apache/incubator-pinot/commit/ba9f2ddfc0faa42fadc2cc48df1d77fec6b174fb>`_, Pinot was only able to support consuming
 from `Kafka <https://kafka.apache.org/documentation/>`_ stream.
 
-Pinot now enables its users to write plug-ins to read from pub-sub streams
+Pinot now enables its users to write plug-ins to consume from pub-sub streams
 other than Kafka. (Please refer to `Issue #2583 <https://github.com/apache/incubator-pinot/issues/2583>`_)
 
 Some of the streams for which plug-ins can be added are:
@@ -75,7 +79,9 @@ properties:
   * (optionally) get the offset of an event that was published at a specified time
 
 * Stream should provide a mechanism to consume a set of events from a partition starting from a specified offset.
-* Events with higher offsets should be more recent (the offsets of events need not be contiguous)
+* Pinot assumes that the offsets of incoming events are monotonically increasing; *i.e.*, if Pinot
+  consumes an event at offset ``o1``, then the offset ``o2`` of the following event should be such that
+  ``o2 > o1``.
 
 In addition, we have an operational requirement that the number of partitions should not be
 reduced over time.
@@ -115,7 +121,7 @@ All values should be strings. For example:
 
     "streamType" : "foo",
     "stream.foo.topic.name" : "SomeTopic",
-    "stream.foo.consumer.type": "lowlevel",
+    "stream.foo.consumer.type": "LowLevel",
     "stream.foo.consumer.factory.class.name": "fully.qualified.pkg.ConsumerFactoryClassName",
     "stream.foo.consumer.prop.auto.offset.reset": "largest",
     "stream.foo.decoder.class.name" : "fully.qualified.pkg.DecoderClassName",
@@ -205,7 +211,7 @@ Below is a sample table config used to create a realtime table with Kafka Partit
       "loadMode": "MMAP",
       "streamConfigs": {
         "streamType": "kafka",
-        "stream.kafka.consumer.type": "simple",
+        "stream.kafka.consumer.type": "LowLevel",
         "stream.kafka.topic.name": "meetupRSVPEvents",
         "stream.kafka.decoder.class.name": "org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder",
         "stream.kafka.consumer.factory.class.name": "org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory",
@@ -221,7 +227,7 @@ Below is a sample table config used to create a realtime table with Kafka Partit
 Please note:
 
 1. Config ``replicasPerPartition`` under ``segmentsConfig`` is required to specify table replication.
-#. Config ``stream.kafka.consumer.type`` should be specified as ``simple`` to use partition level consumer.
+#. Config ``stream.kafka.consumer.type`` should be specified as ``LowLevel`` to use partition level consumer. (The use of ``simple`` instead of ``LowLevel`` is deprecated)
 #. Configs ``stream.kafka.zk.broker.url`` and ``stream.kafka.broker.list`` are required under ``tableIndexConfig.streamConfigs`` to provide kafka related information.
 
 Upgrade from Kafka 0.9 connector to Kafka 2.x connector

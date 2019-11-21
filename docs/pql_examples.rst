@@ -247,8 +247,8 @@ Supported transform functions
    of ``date`` column.
 
 ``DATETRUNC``
-   (Presto) SQL compatible date truncation, equivalent to the Presto function `date_trunc
-<https://mode.com/blog/date-trunc-sql-timestamp-function-count-on>`_. Takes atleast 3 and upto 5 arguments, converts the value into a specified output granularity seconds since UTC epoch that is bucketed on a unit in a specified timezone.
+   (Presto) SQL compatible date truncation, equivalent to the Presto function `date_trunc <https://mode.com/blog/date-trunc-sql-timestamp-function-count-on>`_.
+   Takes atleast 3 and upto 5 arguments, converts the value into a specified output granularity seconds since UTC epoch that is bucketed on a unit in a specified timezone.
 
    *e.g.* ``DATETRUNC('week', time_in_seconds, 'SECONDS')`` This expression
    converts the column ``time_in_seconds``, which is a long containing seconds

@@ -295,7 +295,10 @@ StreamType of ``kafka`` is supported natively in Pinot.
 You can use default decoder classes and consumer factory classes.
 Pinot allows you to use other stream types with their own consumer factory
 and decoder classes (or, even other decoder and consumer factory for ``kafka`` if
-your installation formats kafka messages differently). See :ref:`pluggable-streams`.
+your installation formats kafka messages differently).
+
+If you are considering adding support for streams other than Kafka,
+please see section :ref:`pluggable-streams`.
 
 There are some configurations that are generic to all stream types, and others that
 are specific to stream types.
