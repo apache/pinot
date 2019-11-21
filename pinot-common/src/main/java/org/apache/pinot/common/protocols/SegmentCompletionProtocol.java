@@ -215,6 +215,19 @@ public class SegmentCompletionProtocol {
         _segmentSizeBytes = SEGMENT_SIZE_BYTES_DEFAULT;
       }
 
+      public Params(Params params) {
+        _offset = params.getOffset();
+        _segmentName = params.getSegmentName();
+        _instanceId = params.getInstanceId();
+        _numRows = params.getNumRows();
+        _buildTimeMillis = params.getBuildTimeMillis();
+        _waitTimeMillis = params.getWaitTimeMillis();
+        _extraTimeSec = params.getExtraTimeSec();
+        _segmentLocation = params.getSegmentLocation();
+        _memoryUsedBytes = params.getMemoryUsedBytes();
+        _segmentSizeBytes = params.getSegmentSizeBytes();
+      }
+
       public Params withOffset(long offset) {
         _offset = offset;
         return this;

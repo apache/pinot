@@ -136,7 +136,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   private static int MINIMUM_CONSUME_TIME_MINUTES = 10;
 
-  protected class SegmentBuildDescriptor {
+  @VisibleForTesting
+  public class SegmentBuildDescriptor {
     final String _segmentTarFilePath;
     final Map<String, File> _metadataFileMap;
     final long _offset;
@@ -145,7 +146,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     final String _segmentDirPath;
     final long _segmentSizeBytes;
 
-    SegmentBuildDescriptor(String segmentTarFilePath, Map<String, File> metadataFileMap, long offset,
+    public SegmentBuildDescriptor(String segmentTarFilePath, Map<String, File> metadataFileMap, long offset,
         String segmentDirPath, long buildTimeMillis, long waitTimeMillis, long segmentSizeBytes) {
       _segmentTarFilePath = segmentTarFilePath;
       _metadataFileMap = metadataFileMap;
@@ -260,6 +261,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final Semaphore _segBuildSemaphore;
   private final boolean _isOffHeap;
   private final boolean _nullHandlingEnabled;
+  private final SegmentCommitterFactory _segmentCommitterFactory;
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
@@ -577,7 +579,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 // We could not build the segment. Go into error state.
                 _state = State.ERROR;
               } else {
-                success = commitSegment(response);
+                success = commitSegment(response.getControllerVipUrl(), response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit());
                 if (success) {
                   _state = State.COMMITTED;
                 } else {
@@ -761,8 +763,24 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  private SegmentCompletionProtocol.Response doSplitCommit(SegmentCompletionProtocol.Response prevResponse) {
-    final File segmentTarFile = new File(_segmentBuildDescriptor.getSegmentTarFilePath());
+  protected boolean commitSegment(String controllerVipUrl, boolean isSplitCommit) {
+    final String segTarFileName = _segmentBuildDescriptor.getSegmentTarFilePath();
+    File segTarFile = new File(segTarFileName);
+    if (!segTarFile.exists()) {
+      throw new RuntimeException("Segment file does not exist:" + segTarFileName);
+    }
+    SegmentCompletionProtocol.Response commitResponse = commit(controllerVipUrl, isSplitCommit);
+
+    if (!commitResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
+      return false;
+    }
+
+    _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
+    removeSegmentFile();
+    return true;
+  }
+
+  protected SegmentCompletionProtocol.Response commit(String controllerVipUrl, boolean isSplitCommit) {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
 
     params.withSegmentName(_segmentNameStr).withOffset(_currentOffset).withNumRows(_numRowsConsumed)
@@ -772,89 +790,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
-    SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(params);
-    if (!segmentCommitStartResponse.getStatus()
-        .equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE)) {
-      segmentLogger.warn("CommitStart failed  with response {}", segmentCommitStartResponse.toJsonString());
-      return SegmentCompletionProtocol.RESP_FAILED;
-    }
 
-    params = new SegmentCompletionProtocol.Request.Params();
-    params.withOffset(_currentOffset).withSegmentName(_segmentNameStr).withInstanceId(_instanceId);
-    SegmentCompletionProtocol.Response segmentCommitUploadResponse =
-        _protocolHandler.segmentCommitUpload(params, segmentTarFile, prevResponse.getControllerVipUrl());
-    if (!segmentCommitUploadResponse.getStatus()
-        .equals(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS)) {
-      segmentLogger.warn("Segment upload failed  with response {}", segmentCommitUploadResponse.toJsonString());
-      return SegmentCompletionProtocol.RESP_FAILED;
-    }
+    SegmentCommitter segmentCommitter;
 
-    params = new SegmentCompletionProtocol.Request.Params();
-    params.withInstanceId(_instanceId).withOffset(_currentOffset).withSegmentName(_segmentNameStr)
-        .withSegmentLocation(segmentCommitUploadResponse.getSegmentLocation()).withNumRows(_numRowsConsumed)
-        .withBuildTimeMillis(_segmentBuildDescriptor.getBuildTimeMillis())
-        .withSegmentSizeBytes(_segmentBuildDescriptor.getSegmentSizeBytes())
-        .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis());
-    if (_isOffHeap) {
-      params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
-    }
-    SegmentCompletionProtocol.Response commitEndResponse;
-    if (_indexLoadingConfig.isEnableSplitCommitEndWithMetadata()) {
-      commitEndResponse =
-          _protocolHandler.segmentCommitEndWithMetadata(params, _segmentBuildDescriptor.getMetadataFiles());
+    if (isSplitCommit) {
+      segmentCommitter = _segmentCommitterFactory.createSplitSegmentCommitter(params, controllerVipUrl);
     } else {
-      commitEndResponse = _protocolHandler.segmentCommitEnd(params);
+      segmentCommitter = _segmentCommitterFactory.createDefaultSegmentCommitter(params);
     }
 
-    if (!commitEndResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
-      segmentLogger.warn("CommitEnd failed  with response {}", commitEndResponse.toJsonString());
-      return SegmentCompletionProtocol.RESP_FAILED;
-    }
-    return commitEndResponse;
-  }
-
-  protected boolean commitSegment(SegmentCompletionProtocol.Response response) {
-    final String segTarFileName = _segmentBuildDescriptor.getSegmentTarFilePath();
-    File segTarFile = new File(segTarFileName);
-    if (!segTarFile.exists()) {
-      throw new RuntimeException("Segment file does not exist:" + segTarFileName);
-    }
-    SegmentCompletionProtocol.Response returnedResponse;
-    if (response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit()) {
-      // Send segmentStart, segmentUpload, & segmentCommitEnd to the controller
-      // if that succeeds, swap in-memory segment with the one built.
-      returnedResponse = doSplitCommit(response);
-    } else {
-      // Send segmentCommit() to the controller
-      // if that succeeds, swap in-memory segment with the one built.
-      returnedResponse = postSegmentCommitMsg();
-    }
-
-    if (!returnedResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
-      return false;
-    }
-
-    _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
-    removeSegmentFile();
-    return true;
-  }
-
-  protected SegmentCompletionProtocol.Response postSegmentCommitMsg() {
-    final File segmentTarFile = new File(_segmentBuildDescriptor.getSegmentTarFilePath());
-    SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-    params.withInstanceId(_instanceId).withOffset(_currentOffset).withSegmentName(_segmentNameStr)
-        .withNumRows(_numRowsConsumed).withInstanceId(_instanceId)
-        .withBuildTimeMillis(_segmentBuildDescriptor.getBuildTimeMillis())
-        .withSegmentSizeBytes(_segmentBuildDescriptor.getSegmentSizeBytes())
-        .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis());
-    if (_isOffHeap) {
-      params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
-    }
-    SegmentCompletionProtocol.Response response = _protocolHandler.segmentCommit(params, segmentTarFile);
-    if (!response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
-      segmentLogger.warn("Commit failed  with response {}", response.toJsonString());
-    }
-    return response;
+    return segmentCommitter.commit(_currentOffset, _numRowsConsumed, _segmentBuildDescriptor);
   }
 
   protected boolean buildSegmentAndReplace() {
@@ -1204,6 +1149,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (_consumeEndTime - now < minConsumeTimeMillis) {
       _consumeEndTime = now + minConsumeTimeMillis;
     }
+
+    _segmentCommitterFactory = new SegmentCommitterFactory(segmentLogger, _indexLoadingConfig, _protocolHandler);
 
     segmentLogger
         .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", _segmentName,

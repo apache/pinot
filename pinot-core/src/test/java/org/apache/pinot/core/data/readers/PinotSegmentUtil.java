@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.readers;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,7 +25,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -80,7 +78,7 @@ public class PinotSegmentUtil {
     return value1Set.containsAll(value2Set);
   }
 
-  static File createSegment(Schema schema, String segmentName, String segmentOutputDir, RecordReader recordReader)
+  public static File createSegment(Schema schema, String segmentName, String segmentOutputDir, RecordReader recordReader)
       throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
     segmentGeneratorConfig.setTableName(segmentName);
