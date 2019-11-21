@@ -42,7 +42,7 @@ public class SplitSegmentCommitter implements SegmentCommitter {
     _segmentLogger = segmentLogger;
     _protocolHandler = protocolHandler;
     _indexLoadingConfig = indexLoadingConfig;
-    _params = params;
+    _params = new SegmentCompletionProtocol.Request.Params(params);
     _controllerVipUrl = controllerVipUrl;
   }
 

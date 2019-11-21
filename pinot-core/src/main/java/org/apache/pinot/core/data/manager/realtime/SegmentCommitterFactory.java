@@ -38,13 +38,7 @@ public class SegmentCommitterFactory {
     _indexLoadingConfig = indexLoadingConfig;
     _protocolHandler = protocolHandler;
   }
-
-  /**
-   * Takes given params and returns params with segment location
-   * @param params
-   * @param controllerVipUrl
-   * @return
-   */
+  
   public SegmentCommitter createSplitSegmentCommitter(SegmentCompletionProtocol.Request.Params params, String controllerVipUrl) {
     return new SplitSegmentCommitter(LOGGER, _protocolHandler, _indexLoadingConfig, params, controllerVipUrl);
   }
