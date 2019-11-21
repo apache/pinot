@@ -229,7 +229,7 @@ public class LoaderTest {
   }
 
   @Test
-  public void testDefaultValueByteColumn()
+  public void testDefaultBytesColumn()
       throws Exception {
     Schema schema = constructV1Segment();
     String newColumnName = "byteMetric";
