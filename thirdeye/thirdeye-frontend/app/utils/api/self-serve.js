@@ -140,7 +140,7 @@ const createNewDataset = '/onboard/create';
  * @param {Number} detectionId
  * @param {Boolean} active
  */
-const setAlertActivationUrl = (detectionId, active) => `/detection/activation/${detectionId}?active=${active}`;
+const setAlertActivationUrl = (detectionId, active) => `/yaml/activation/${detectionId}?active=${active}`;
 
 
 /**

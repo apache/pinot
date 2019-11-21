@@ -328,6 +328,8 @@ public class YamlResource {
 
     LOG.info("Alert created successfully with detection ID " + detectionConfigId + " and subscription ID "
         + detectionAlertConfigId);
+    // refresh the detection config list cache after a new alert is created
+    this.formattedDetectionConfigsCache.refresh();
     return Response.ok().entity(ImmutableMap.of(
         "detectionConfigId", detectionConfigId,
         "detectionAlertConfigId", detectionAlertConfigId)
@@ -387,6 +389,7 @@ public class YamlResource {
     LOG.info("Detection created with id " + detectionConfigId + " using payload " + payload);
     responseMessage.put("message", "Alert was created successfully.");
     responseMessage.put("more-info", "Record saved with id " + detectionConfigId);
+    this.formattedDetectionConfigsCache.refresh();
     return Response.ok().entity(responseMessage).build();
   }
 
@@ -494,6 +497,7 @@ public class YamlResource {
     LOG.info("Detection with id " + id + " updated");
     responseMessage.put("message", "Alert was updated successfully.");
     responseMessage.put("detectionConfigId", String.valueOf(id));
+    this.formattedDetectionConfigsCache.refresh();
     return Response.ok().entity(responseMessage).build();
   }
 
@@ -559,6 +563,7 @@ public class YamlResource {
     LOG.info("Detection Pipeline created/updated with id " + detectionConfigId + " using payload " + payload);
     responseMessage.put("message", "The alert was created/updated successfully.");
     responseMessage.put("more-info", "Record saved/updated with id " + detectionConfigId);
+    this.formattedDetectionConfigsCache.refresh();
     return Response.ok().entity(responseMessage).build();
   }
 
@@ -605,6 +610,7 @@ public class YamlResource {
     LOG.info("Notification group created with id " + detectionAlertConfigId + " using payload " + payload);
     responseMessage.put("message", "The subscription group was created successfully.");
     responseMessage.put("detectionAlertConfigId", String.valueOf(detectionAlertConfigId));
+    this.formattedDetectionConfigsCache.refresh();
     return Response.ok().entity(responseMessage).build();
   }
 
@@ -694,6 +700,7 @@ public class YamlResource {
     LOG.info("Subscription group with id " + id + " updated");
     responseMessage.put("message", "The subscription group was updated successfully.");
     responseMessage.put("detectionAlertConfigId", String.valueOf(id));
+    this.formattedDetectionConfigsCache.refresh();
     return Response.ok().entity(responseMessage).build();
   }
 
@@ -863,6 +870,42 @@ public class YamlResource {
 
     return TimeSeries.empty();
   }
+
+  /**
+   * Toggle active/inactive for given detection
+   *
+   * @param detectionId detection config id (must exist)
+   * @param active value to set for active field in detection config
+   */
+  @PUT
+  @Path("/activation/{id}")
+  @ApiOperation("Make detection active or inactive, given id")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response toggleActivation(
+      @ApiParam("Detection configuration id for the alert") @NotNull @PathParam("id") long detectionId,
+      @ApiParam("Active status you want to set for the alert") @NotNull @QueryParam("active") boolean active) throws Exception {
+    Map<String, String> responseMessage = new HashMap<>();
+    try {
+      DetectionConfigDTO config = this.detectionConfigDAO.findById(detectionId);
+      if (config == null) {
+        throw new IllegalArgumentException(String.format("Cannot find config %d", detectionId));
+      }
+
+      // update state
+      config.setActive(active);
+      this.detectionConfigDAO.update(config);
+      responseMessage.put("message", "Alert activation toggled to " + active + " for detection id " + detectionId);
+    } catch (Exception e) {
+      LOG.error("Error toggling activation on detection id " + detectionId, e);
+      responseMessage.put("message", "Failed to toggle activation: " + e.getMessage());
+      return Response.serverError().entity(responseMessage).build();
+    }
+
+    LOG.info("Alert activation toggled to {} for detection id {}", active , detectionId);
+    this.formattedDetectionConfigsCache.refresh();
+    return Response.ok(responseMessage).build();
+  }
+
 
   /**
    * List all yaml configurations as JSON enhanced with detection config id, isActive and createBy information.

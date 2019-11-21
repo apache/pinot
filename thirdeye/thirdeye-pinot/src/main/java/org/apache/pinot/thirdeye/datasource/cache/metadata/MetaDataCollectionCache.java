@@ -23,6 +23,7 @@ package org.apache.pinot.thirdeye.datasource.cache.metadata;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -44,9 +45,9 @@ import org.slf4j.LoggerFactory;
  */
 public class MetaDataCollectionCache<T> {
   private static final String META_DATA_KEY = "metaData";
-  protected static final Logger LOG = LoggerFactory.getLogger(MetaDataCollectionCache.class);
-  private final LoadingCache<String, T> loadingCache;
 
+  private final LoadingCache<String, T> loadingCache;
+  private final ExecutorService adHocRefreshExecutor;
   /**
    * Create a Metadata collection cache
    * @param cacheLoader the cache loader for the meta data collection
@@ -58,15 +59,15 @@ public class MetaDataCollectionCache<T> {
         .expireAfterWrite(10, TimeUnit.MINUTES)
         .build(CacheLoader.from(cacheLoader::loadMetaData));
 
-    ScheduledExecutorService cacheRefreshExecutor = Executors.newSingleThreadScheduledExecutor();
-    // refresh the cached value every 3 minutes asynchronously. This will also load the data into cache when the
+    ScheduledExecutorService scheduledCacheRefreshExecutor = Executors.newSingleThreadScheduledExecutor();
+    // refresh the cached value periodically. This will also load the data into cache when the
     // application starts.
-    cacheRefreshExecutor.scheduleAtFixedRate(() -> this.loadingCache.refresh(META_DATA_KEY), 0, reloadPeriod,
-        reloadUnit);
+    scheduledCacheRefreshExecutor.scheduleAtFixedRate(this::refresh, 0, reloadPeriod, reloadUnit);
+    adHocRefreshExecutor = Executors.newSingleThreadExecutor();
   }
 
   /**
-   * Create a Metadata collection cache.
+   * Create a Metadata collection cache. By default reloads every 3 minutes
    * @param cacheLoader the cache loader for the meta data collection
    */
   public MetaDataCollectionCache(MetadataCacheLoader<T> cacheLoader) {
@@ -79,5 +80,12 @@ public class MetaDataCollectionCache<T> {
    */
   public T get() {
     return this.loadingCache.getUnchecked(META_DATA_KEY);
+  }
+
+  /**
+   * Refresh the meta data collection cache asynchronously
+   */
+  public void refresh() {
+    adHocRefreshExecutor.submit(() -> this.loadingCache.refresh(META_DATA_KEY));
   }
 }

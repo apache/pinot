@@ -62,7 +62,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
     for (let subscriptionGroup of model.detectionAlertConfig){
       const detectionConfigIds = subscriptionGroup.detectionConfigIds;
       for (let id of detectionConfigIds) {
-        let foundAlert = alerts.find(yamlAlert => yamlAlert.id.toString() === id);
+        let foundAlert = alerts.find(yamlAlert => yamlAlert.id === id);
         if (foundAlert) {
           Object.assign(foundAlert, {
             application: subscriptionGroup.application,

@@ -175,13 +175,7 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
     if (!Objects.isNull(config.getHealth())) {
       return config.getHealth();
     }
-    DateTime end = DateTime.now();
-    return new DetectionHealth.Builder(config.getId(), end.minusDays(30).getMillis(),
-        end.getMillis()).addRegressionStatus(this.evaluationDAO)
-        .addAnomalyCoverageStatus(this.anomalyDAO)
-        .addDetectionTaskStatus(this.taskDAO)
-        .addOverallHealth()
-        .build();
+    return DetectionHealth.unknown();
   }
 
   /**

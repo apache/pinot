@@ -132,12 +132,15 @@ public class MonitorTaskRunner implements TaskRunner {
       // update detection health status
       try {
         DateTime healthStatusWindowEnd = DateTime.now();
-        config.setHealth(new DetectionHealth.Builder(config.getId(), healthStatusWindowEnd.minusDays(30).getMillis(),
+        DetectionHealth health = new DetectionHealth.Builder(config.getId(), healthStatusWindowEnd.minusDays(30).getMillis(),
             healthStatusWindowEnd.getMillis()).addRegressionStatus(DAO_REGISTRY.getEvaluationManager())
             .addAnomalyCoverageStatus(DAO_REGISTRY.getMergedAnomalyResultDAO())
             .addDetectionTaskStatus(DAO_REGISTRY.getTaskDAO())
             .addOverallHealth()
-            .build());
+            .build();
+        // fetch the config again before saving to DB to avoid overriding config that is updated by other threads
+        config = detectionDAO.findById(config.getId());
+        config.setHealth(health);
         detectionDAO.update(config);
         LOG.info("Updated detection health for {}", config.getId());
       } catch (Exception e) {
