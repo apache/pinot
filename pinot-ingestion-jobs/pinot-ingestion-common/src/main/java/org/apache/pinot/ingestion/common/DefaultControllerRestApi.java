@@ -43,13 +43,19 @@ public class DefaultControllerRestApi implements ControllerRestApi {
   private final List<PushLocation> _pushLocations;
   private final String _rawTableName;
   private final FileUploadDownloadClient _fileUploadDownloadClient = new FileUploadDownloadClient();
+  private final int _retry;
 
   private static final String OFFLINE = "OFFLINE";
 
   public DefaultControllerRestApi(List<PushLocation> pushLocations, String rawTableName) {
+    this(pushLocations, rawTableName, 0);
+  }
+
+  public DefaultControllerRestApi(List<PushLocation> pushLocations, String rawTableName, int retry) {
     LOGGER.info("Push locations are: {} for table: {}", pushLocations, rawTableName);
     _pushLocations = pushLocations;
     _rawTableName = rawTableName;
+    _retry = retry;
   }
 
   @Override
@@ -104,14 +110,25 @@ public class DefaultControllerRestApi implements ControllerRestApi {
       String segmentName = fileName.substring(0, fileName.length() - JobConfigConstants.TAR_GZ_FILE_EXT.length());
       for (PushLocation pushLocation : _pushLocations) {
         LOGGER.info("Pushing segment: {} to location: {}", segmentName, pushLocation);
-        try (InputStream inputStream = fileSystem.open(tarFilePath)) {
-          SimpleHttpResponse response = _fileUploadDownloadClient.uploadSegment(
-              FileUploadDownloadClient.getUploadSegmentHttpURI(pushLocation.getHost(), pushLocation.getPort()),
-              segmentName, inputStream, _rawTableName);
-          LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
-        } catch (Exception e) {
-          LOGGER.error("Caught exception while pushing segment: {} to location: {}", segmentName, pushLocation, e);
-          throw new RuntimeException(e);
+        for (int retry = 0; retry <= _retry; retry++) {
+          try (InputStream inputStream = fileSystem.open(tarFilePath)) {
+            SimpleHttpResponse response = _fileUploadDownloadClient.uploadSegment(
+                FileUploadDownloadClient.getUploadSegmentHttpURI(pushLocation.getHost(), pushLocation.getPort()),
+                segmentName, inputStream, _rawTableName);
+            LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
+          } catch (Exception e) {
+            LOGGER.error("Caught exception while pushing segment: {} to location: {}, retry {}/{}", segmentName,
+                pushLocation, retry, _retry, e);
+            if (retry == _retry) {
+              throw new RuntimeException(e);
+            }
+            try {
+              // Exponential back-off, max sleep time is 64 seconds.
+              Thread.sleep(1000 * (int) Math.pow(2, Math.min(retry + 1, 6)));
+            } catch (InterruptedException ex) {
+              // Swallow
+            }
+          }
         }
       }
     }

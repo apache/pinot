@@ -68,4 +68,6 @@ public class JobConfigConstants {
   public static final String DEFAULT_ENABLE_PARALLEL_PUSH = "false";
   public static final String PUSH_JOB_PARALLELISM = "push.job.parallelism";
   public static final String DEFAULT_PUSH_JOB_PARALLELISM = "4";
+  public static final String PUSH_JOB_RETRY = "push.job.retry";
+  public static final String DEFAULT_PUSH_JOB_RETRY = "3";
 }

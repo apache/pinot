@@ -22,6 +22,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.pinot.ingestion.common.ControllerRestApi;
+import org.apache.pinot.ingestion.common.DefaultControllerRestApi;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
 import org.apache.pinot.ingestion.jobs.SegmentTarPushJob;
 import org.apache.spark.SparkContext;
@@ -37,6 +38,7 @@ import java.util.Properties;
 public class SparkSegmentTarPushJob extends SegmentTarPushJob {
   private final boolean _enableParallelPush;
   private int _pushJobParallelism;
+  private int _pushJobRetry;
 
   public SparkSegmentTarPushJob(Properties properties) {
     super(properties);
@@ -44,6 +46,8 @@ public class SparkSegmentTarPushJob extends SegmentTarPushJob {
         Boolean.parseBoolean(properties.getProperty(JobConfigConstants.ENABLE_PARALLEL_PUSH, JobConfigConstants.DEFAULT_ENABLE_PARALLEL_PUSH));
     _pushJobParallelism =
         Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_JOB_PARALLELISM, JobConfigConstants.DEFAULT_PUSH_JOB_PARALLELISM));
+    _pushJobRetry =
+        Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_JOB_RETRY, JobConfigConstants.DEFAULT_PUSH_JOB_RETRY));
   }
 
   @Override
@@ -75,5 +79,9 @@ public class SparkSegmentTarPushJob extends SegmentTarPushJob {
         }
       });
     }
+  }
+
+  protected ControllerRestApi getControllerRestApi() {
+    return new DefaultControllerRestApi(_pushLocations, _rawTableName, _pushJobRetry);
   }
 }
