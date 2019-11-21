@@ -23,8 +23,10 @@ import java.net.URL;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -223,6 +225,22 @@ public class LoaderTest {
     indexSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig, schema);
     Assert.assertEquals(indexSegment.getDataSource("SVString").getDictionary().get(0), "");
     Assert.assertEquals(indexSegment.getDataSource("MVString").getDictionary().get(0), "");
+    indexSegment.destroy();
+  }
+
+  @Test
+  public void testDefaultValueByteColumn()
+      throws Exception {
+    Schema schema = constructV1Segment();
+    String newColumnName = "byteMetric";
+    String defaultValue = "0000ac0000";
+
+    FieldSpec byteMetric = new MetricFieldSpec(newColumnName, FieldSpec.DataType.BYTES, defaultValue);
+    schema.addField(byteMetric);
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig, schema);
+    Assert
+        .assertEquals(BytesUtils.toHexString((byte[]) indexSegment.getDataSource(newColumnName).getDictionary().get(0)),
+            defaultValue);
     indexSegment.destroy();
   }
 

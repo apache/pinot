@@ -30,6 +30,7 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
@@ -179,7 +180,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         boolean isSingleValueInMetadata = columnMetadata.isSingleValue();
         boolean isSingleValueInSchema = fieldSpecInSchema.isSingleValueField();
         String defaultValueInMetadata = columnMetadata.getDefaultNullValueString();
-        String defaultValueInSchema = fieldSpecInSchema.getDefaultNullValue().toString();
+
+        String defaultValueInSchema;
+        if (dataTypeInSchema == FieldSpec.DataType.BYTES) {
+          defaultValueInSchema = BytesUtils.toHexString((byte[]) fieldSpecInSchema.getDefaultNullValue());
+        } else {
+          defaultValueInSchema = fieldSpecInSchema.getDefaultNullValue().toString();
+        }
+
         if (dataTypeInMetadata != dataTypeInSchema || isSingleValueInMetadata != isSingleValueInSchema
             || !defaultValueInSchema.equals(defaultValueInMetadata)) {
           if (fieldTypeInMetadata == FieldSpec.FieldType.DIMENSION) {
@@ -306,6 +314,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         break;
       case BYTES:
         Preconditions.checkState(defaultValue instanceof byte[]);
+        dictionaryElementSize = ((byte[]) defaultValue).length;
         sortedArray = new ByteArray[] {new ByteArray((byte[]) defaultValue)};
         break;
       default:
