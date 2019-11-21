@@ -121,7 +121,7 @@ All values should be strings. For example:
 
     "streamType" : "foo",
     "stream.foo.topic.name" : "SomeTopic",
-    "stream.foo.consumer.type": "lowlevel",
+    "stream.foo.consumer.type": "LowLevel",
     "stream.foo.consumer.factory.class.name": "fully.qualified.pkg.ConsumerFactoryClassName",
     "stream.foo.consumer.prop.auto.offset.reset": "largest",
     "stream.foo.decoder.class.name" : "fully.qualified.pkg.DecoderClassName",
