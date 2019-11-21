@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.readers;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -79,7 +78,6 @@ public class PinotSegmentUtil {
     return value1Set.containsAll(value2Set);
   }
 
-  @VisibleForTesting
   public static File createSegment(Schema schema, String segmentName, String segmentOutputDir, RecordReader recordReader)
       throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
