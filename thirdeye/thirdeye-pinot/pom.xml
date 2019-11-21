@@ -252,6 +252,12 @@
       <artifactId>parsii</artifactId>
     </dependency>
 
+    <dependency>
+      <groupId>com.couchbase.client</groupId>
+      <artifactId>java-client</artifactId>
+      <version>2.7.9</version>
+    </dependency>
+
     <!-- demo dependencies -->
     <dependency>
       <groupId>com.h2database</groupId>

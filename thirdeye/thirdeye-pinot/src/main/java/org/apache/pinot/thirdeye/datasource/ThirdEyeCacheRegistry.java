@@ -36,6 +36,13 @@ import java.net.URL;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.thirdeye.detection.cache.CacheConfig;
+import org.apache.pinot.thirdeye.detection.cache.CacheConfigLoader;
+import org.apache.pinot.thirdeye.detection.cache.CacheDataSource;
+import org.apache.pinot.thirdeye.detection.cache.CentralizedCacheConfig;
+import org.apache.pinot.thirdeye.detection.cache.CouchbaseCacheDAO;
+import org.apache.pinot.thirdeye.detection.cache.DefaultTimeSeriesCache;
+import org.apache.pinot.thirdeye.detection.cache.TimeSeriesCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,6 +55,7 @@ public class ThirdEyeCacheRegistry {
 
   // TODO: Rename QueryCache to a name like DataSourceCache.
   private QueryCache queryCache;
+  private TimeSeriesCache timeSeriesCache = null;
 
   // Meta-data caches
   private LoadingCache<String, DatasetConfigDTO> datasetConfigCache;
@@ -68,6 +76,7 @@ public class ThirdEyeCacheRegistry {
   public static void initializeCaches(ThirdEyeConfiguration thirdeyeConfig) throws Exception {
     initDataSources(thirdeyeConfig);
     initMetaDataCaches();
+    initCentralizedCache(thirdeyeConfig);
   }
 
   /**
@@ -90,6 +99,43 @@ public class ThirdEyeCacheRegistry {
     }
   }
 
+  public static void initCentralizedCache(ThirdEyeConfiguration thirdeyeConfig) {
+    try {
+      URL cacheConfigUrl = thirdeyeConfig.getCacheConfigAsUrl();
+      CacheConfig cacheConfig = CacheConfigLoader.fromCacheConfigUrl(cacheConfigUrl);
+      if (cacheConfig == null) {
+        LOGGER.error("Could not get cache config from path {} - using default settings", cacheConfigUrl);
+
+        CentralizedCacheConfig cfg = new CentralizedCacheConfig();
+        cfg.setMaxParallelInserts(1);
+
+        CacheConfig.getInstance().setUseCentralizedCache(false);
+        CacheConfig.getInstance().setUseInMemoryCache(true);
+        CacheConfig.getInstance().setCentralizedCacheSettings(cfg);
+      } else {
+        CacheDataSource dataSource = CacheConfig.getInstance().getCentralizedCacheSettings().getDataSourceConfig();
+
+        cacheConfig.setHost(dataSource.getHost());
+        cacheConfig.setAuthUsername(dataSource.getAuthUsername());
+        cacheConfig.setAuthPassword(dataSource.getAuthPassword());
+        cacheConfig.setBucketName(dataSource.getBucketName());
+      }
+
+      if (INSTANCE.getTimeSeriesCache() == null) {
+        // TODO: add generic cache DAO
+        TimeSeriesCache timeSeriesCache = new DefaultTimeSeriesCache(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
+            ThirdEyeCacheRegistry.getInstance().getQueryCache(),
+            new CouchbaseCacheDAO(),
+            Executors.newFixedThreadPool(CacheConfig.getInstance().getCentralizedCacheSettings().getMaxParallelInserts()));
+
+        ThirdEyeCacheRegistry.getInstance().registerTimeSeriesCache(timeSeriesCache);
+      }
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while initializing centralized cache", e);
+      System.exit(1);
+    }
+  }
+
   /**
    * Initialize the cache for meta data. This method has to be invoked after data sources are connected.
    */
@@ -97,7 +143,7 @@ public class ThirdEyeCacheRegistry {
     ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
     QueryCache queryCache = cacheRegistry.getQueryCache();
     Preconditions.checkNotNull(queryCache,
-        "Data sources are not initialzed. Please invoke initDataSources() before this method.");
+        "Data sources are not initialized. Please invoke initDataSources() before this method.");
 
     // DatasetConfig cache
     // TODO deprecate. read from database directly
@@ -161,6 +207,10 @@ public class ThirdEyeCacheRegistry {
   public void registerQueryCache(QueryCache queryCache) {
     this.queryCache = queryCache;
   }
+
+  public TimeSeriesCache getTimeSeriesCache() { return timeSeriesCache; }
+
+  public void registerTimeSeriesCache(TimeSeriesCache timeSeriesCache) { this.timeSeriesCache = timeSeriesCache; }
 
   public LoadingCache<String, DatasetConfigDTO> getDatasetConfigCache() {
     return datasetConfigCache;

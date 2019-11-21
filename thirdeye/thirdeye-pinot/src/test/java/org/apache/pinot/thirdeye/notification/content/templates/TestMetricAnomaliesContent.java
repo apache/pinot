@@ -96,7 +96,7 @@ public class TestMetricAnomaliesContent {
     detectionPipelineLoader = new DetectionPipelineLoader();
 
     TimeSeriesLoader timeseriesLoader =
-        new DefaultTimeSeriesLoader(daoRegistry.getMetricConfigDAO(), datasetDAO, null);
+        new DefaultTimeSeriesLoader(daoRegistry.getMetricConfigDAO(), datasetDAO, null, null);
     AggregationLoader aggregationLoader =
         new DefaultAggregationLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(),
             ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
