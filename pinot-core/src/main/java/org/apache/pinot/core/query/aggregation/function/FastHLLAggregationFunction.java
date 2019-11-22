@@ -147,6 +147,11 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
   }
 
   @Override
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.LONG;
+  }
+
+  @Override
   public Long extractFinalResult(HyperLogLog intermediateResult) {
     return intermediateResult.cardinality();
   }

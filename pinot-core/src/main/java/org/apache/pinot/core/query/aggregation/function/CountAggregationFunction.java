@@ -136,6 +136,11 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   }
 
   @Override
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.LONG;
+  }
+
+  @Override
   public Long extractFinalResult(Long intermediateResult) {
     return intermediateResult;
   }

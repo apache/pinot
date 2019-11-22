@@ -132,6 +132,11 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
   }
 
   @Override
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.DOUBLE;
+  }
+
+  @Override
   public Double extractFinalResult(DoubleArrayList intermediateResult) {
     int size = intermediateResult.size();
     if (size == 0) {

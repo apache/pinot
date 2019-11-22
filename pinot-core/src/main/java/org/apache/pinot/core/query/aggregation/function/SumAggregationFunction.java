@@ -113,6 +113,11 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
   }
 
   @Override
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.DOUBLE;
+  }
+
+  @Override
   public Double extractFinalResult(Double intermediateResult) {
     return intermediateResult;
   }
