@@ -262,7 +262,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
   /**
    * Test random SQL queries from the query file.
-   * TODO: fix this teat by adding the SQL query file
+   * TODO: fix this test by adding the SQL query file
    */
   public void testSqlQueriesFromQueryFile()
       throws Exception {
