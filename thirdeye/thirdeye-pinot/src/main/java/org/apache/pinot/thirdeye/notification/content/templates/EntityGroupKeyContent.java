@@ -196,8 +196,8 @@ public class EntityGroupKeyContent extends BaseNotificationContent {
       for (MergedAnomalyResultDTO childAnomaly : anomaly.getChildren()) {
         // Since an anomaly can have two parents (due to merge across entity reports), we do not want them
         // to be displayed twice in the notification report.
-        if (!visitedAnomaliesSet.contains(anomaly.getId())) {
-          visitedAnomaliesSet.add(anomaly.getId());
+        if (!visitedAnomaliesSet.contains(childAnomaly.getId())) {
+          visitedAnomaliesSet.add(childAnomaly.getId());
           updateEntityToAnomalyDetailsMap(childAnomaly, detectionConfig);
         }
       }
