@@ -22,8 +22,6 @@ import com.yammer.metrics.core.MetricsRegistry;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.LongAccumulator;
-
-import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -36,8 +34,6 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.query.scheduler.QuerySchedulerFactory;
 import org.apache.pinot.server.conf.ServerConf;
-import org.apache.pinot.transport.netty.NettyServer;
-import org.apache.pinot.transport.netty.NettyTCPServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +68,8 @@ public class ServerBuilder {
     MetricsHelper.initializeMetrics(_serverConf.getMetricsConfig());
     MetricsRegistry metricsRegistry = new MetricsRegistry();
     MetricsHelper.registerMetricsRegistry(metricsRegistry);
-    _serverMetrics = new ServerMetrics(_serverConf.getMetricsPrefix(), metricsRegistry, !_serverConf.emitTableLevelMetrics());
+    _serverMetrics =
+        new ServerMetrics(_serverConf.getMetricsPrefix(), metricsRegistry, !_serverConf.emitTableLevelMetrics());
     _serverMetrics.initializeGlobalMeters();
   }
 
@@ -116,12 +113,5 @@ public class ServerBuilder {
   public QueryScheduler buildQueryScheduler(QueryExecutor queryExecutor, LongAccumulator latestQueryTime) {
     return QuerySchedulerFactory
         .create(_serverConf.getSchedulerConfig(), queryExecutor, _serverMetrics, latestQueryTime);
-  }
-
-  public NettyServer buildNettyServer(NettyServer.RequestHandlerFactory requestHandlerFactory)
-      throws ConfigurationException {
-    int nettyPort = _serverConf.getNettyConfig().getPort();
-    LOGGER.info("Building netty TCP server with port: {}", nettyPort);
-    return new NettyTCPServer(nettyPort, requestHandlerFactory, null);
   }
 }

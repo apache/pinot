@@ -48,7 +48,6 @@
     <module>pinot-ingestion-jobs</module>
     <module>pinot-tools</module>
     <module>pinot-perf</module>
-    <module>pinot-transport</module>
     <module>pinot-integration-tests</module>
     <module>pinot-distribution</module>
     <module>pinot-minion</module>
@@ -291,11 +290,6 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-orc</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-transport</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

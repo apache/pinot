@@ -11,7 +11,6 @@ bin/
 out/
 .DS_Store
 test-output
-pinot-transport/test-output/
 pinot-broker/test-output/
 pinot-core/test-output/
 *.log

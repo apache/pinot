@@ -45,7 +45,6 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.BrokerServerBuilder;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
-import org.apache.pinot.broker.requesthandler.ConnectionPoolBrokerRequestHandler;
 import org.apache.pinot.broker.routing.HelixExternalViewBasedRouting;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TagNameUtils;
@@ -83,7 +82,6 @@ public class HelixBrokerStarter {
   // Cluster change handlers
   private HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
   private HelixExternalViewBasedQueryQuotaManager _helixExternalViewBasedQueryQuotaManager;
-  private LiveInstanceChangeHandler _liveInstanceChangeHandler;
   private ClusterChangeMediator _clusterChangeMediator;
 
   private BrokerServerBuilder _brokerServerBuilder;
@@ -176,11 +174,6 @@ public class HelixBrokerStarter {
     _brokerServerBuilder = new BrokerServerBuilder(_brokerConf, _helixExternalViewBasedRouting,
         _helixExternalViewBasedRouting.getTimeBoundaryService(), _helixExternalViewBasedQueryQuotaManager);
     BrokerRequestHandler brokerRequestHandler = _brokerServerBuilder.getBrokerRequestHandler();
-    if (brokerRequestHandler instanceof ConnectionPoolBrokerRequestHandler) {
-      _liveInstanceChangeHandler = new LiveInstanceChangeHandler();
-      _liveInstanceChangeHandler.init(_spectatorHelixManager);
-      _liveInstanceChangeHandler.init(((ConnectionPoolBrokerRequestHandler) brokerRequestHandler).getConnPool());
-    }
     BrokerMetrics brokerMetrics = _brokerServerBuilder.getBrokerMetrics();
     _helixExternalViewBasedRouting.setBrokerMetrics(brokerMetrics);
     _helixExternalViewBasedQueryQuotaManager.setBrokerMetrics(brokerMetrics);
@@ -199,9 +192,6 @@ public class HelixBrokerStarter {
     _instanceConfigChangeHandlers.add(_helixExternalViewBasedRouting);
     for (ClusterChangeHandler liveInstanceChangeHandler : _liveInstanceChangeHandlers) {
       liveInstanceChangeHandler.init(_spectatorHelixManager);
-    }
-    if (_liveInstanceChangeHandler != null) {
-      _liveInstanceChangeHandlers.add(_liveInstanceChangeHandler);
     }
     Map<ChangeType, List<ClusterChangeHandler>> clusterChangeHandlersMap = new HashMap<>();
     clusterChangeHandlersMap.put(ChangeType.EXTERNAL_VIEW, _externalViewChangeHandlers);
