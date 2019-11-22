@@ -143,13 +143,6 @@ public class HadoopSegmentBuildPushOfflineClusterIntegrationTest extends BaseClu
 
   @Test
   @Override
-  public void testSqlQueriesFromQueryFile()
-      throws Exception {
-    super.testQueriesFromQueryFile();
-  }
-
-  @Test
-  @Override
   public void testGeneratedQueriesWithMultiValues()
       throws Exception {
     super.testGeneratedQueriesWithMultiValues();

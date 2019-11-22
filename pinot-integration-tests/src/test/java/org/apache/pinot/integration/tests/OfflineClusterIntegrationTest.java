@@ -809,11 +809,4 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     sql = "SELECT DISTINCT Carrier, DestAirportID, DestCityName FROM mytable";
     testQuery(pql, Collections.singletonList(sql));
   }
-
-  @Test
-  @Override
-  public void testSqlQueriesFromQueryFile()
-      throws Exception {
-    super.testQueriesFromQueryFile();
-  }
 }
