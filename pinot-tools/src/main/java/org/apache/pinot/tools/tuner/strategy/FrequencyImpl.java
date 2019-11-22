@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.tools.tuner.strategy;
 
-import io.vavr.Tuple2;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,6 +28,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.math.fraction.BigFraction;
 import org.apache.pinot.tools.tuner.meta.manager.MetaManager;
 import org.apache.pinot.tools.tuner.query.src.stats.wrapper.AbstractQueryStats;
@@ -77,7 +77,6 @@ public class FrequencyImpl implements TuningStrategy {
     public Builder() {
     }
 
-    @Nonnull
     public FrequencyImpl build() {
       return new FrequencyImpl(this);
     }
@@ -86,8 +85,7 @@ public class FrequencyImpl implements TuningStrategy {
      * set the tables to work on, other tables will be filtered out
      * @param val set of table names without type
      */
-    @Nonnull
-    public Builder setTableNamesWithoutType(@Nonnull Set<String> val) {
+    public Builder setTableNamesWithoutType(Set<String> val) {
       _tableNamesWithoutType = val;
       return this;
     }
@@ -96,7 +94,6 @@ public class FrequencyImpl implements TuningStrategy {
      * set the threshold for _numEntriesScannedInFilter, the queries with _numEntriesScannedInFilter below this will be filtered out
      * @param val threshold for _numEntriesScannedInFilter, default to 0
      */
-    @Nonnull
     public Builder setNumEntriesScannedThreshold(long val) {
       _numEntriesScannedThreshold = val;
       return this;
@@ -107,7 +104,6 @@ public class FrequencyImpl implements TuningStrategy {
      * setting a high value will force the system to ignore low card columns
      * @param val cardinality threshold, default to 1
      */
-    @Nonnull
     public Builder setCardinalityThreshold(long val) {
       _cardinalityThreshold = val;
       return this;
@@ -117,7 +113,6 @@ public class FrequencyImpl implements TuningStrategy {
      * set the minimum number of records scanned to give a recommendation
      * @param val minimum number of records scanned to give a recommendation, default to 0
      */
-    @Nonnull
     public Builder setNumQueriesThreshold(long val) {
       _numQueriesThreshold = val;
       return this;
@@ -128,12 +123,13 @@ public class FrequencyImpl implements TuningStrategy {
   public boolean filter(AbstractQueryStats queryStats) {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     long numEntriesScannedInFilter = Long.parseLong(indexSuggestQueryStatsImpl.getNumEntriesScannedInFilter());
-    return (_skipTableCheck || _tableNamesWithoutType.contains(
-        indexSuggestQueryStatsImpl.getTableNameWithoutType())) && (numEntriesScannedInFilter > _numEntriesScannedThreshold);
+    return (_skipTableCheck || _tableNamesWithoutType.contains(indexSuggestQueryStatsImpl.getTableNameWithoutType()))
+        && (numEntriesScannedInFilter > _numEntriesScannedThreshold);
   }
 
   @Override
-  public void accumulate(AbstractQueryStats queryStats, MetaManager metaManager, Map<String, Map<String, AbstractAccumulator>> accumulatorOut) {
+  public void accumulate(AbstractQueryStats queryStats, MetaManager metaManager,
+      Map<String, Map<String, AbstractAccumulator>> accumulatorOut) {
 
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     String tableNameWithoutType = indexSuggestQueryStatsImpl.getTableNameWithoutType();
@@ -154,12 +150,12 @@ public class FrequencyImpl implements TuningStrategy {
       }
     }
 
-    counted.stream()
-        .filter(colName -> metaManager.getColumnSelectivity(tableNameWithoutType, colName).compareTo(new BigFraction(_cardinalityThreshold)) > 0)
-        .forEach(colName -> {
-          ((FrequencyAccumulator) AbstractAccumulator.putAccumulatorToMapIfAbsent(accumulatorOut, tableNameWithoutType,
-              colName, new FrequencyAccumulator())).incrementFrequency();
-        });
+    counted.stream().filter(colName -> metaManager.getColumnSelectivity(tableNameWithoutType, colName)
+        .compareTo(new BigFraction(_cardinalityThreshold)) > 0).forEach(colName -> {
+      ((FrequencyAccumulator) AbstractAccumulator
+          .putAccumulatorToMapIfAbsent(accumulatorOut, tableNameWithoutType, colName, new FrequencyAccumulator()))
+          .incrementFrequency();
+    });
   }
 
   @Override
@@ -187,12 +183,12 @@ public class FrequencyImpl implements TuningStrategy {
     }
 
     reportOut += MessageFormat.format("\nTotal lines accumulated: {0}\n\n", totalCount);
-    List<Tuple2<String, Long>> sortedPure = new ArrayList<>();
-    columnStats.forEach(
-        (colName, score) -> sortedPure.add(new Tuple2<>(colName, ((FrequencyAccumulator) score).getFrequency())));
-    sortedPure.sort((p1, p2) -> (p2._2().compareTo(p1._2())));
-    for (Tuple2<String, Long> tuple2 : sortedPure) {
-      reportOut += "Dimension: " + tuple2._1() + "  " + tuple2._2().toString() + "\n";
+    List<Pair<String, Long>> sortedPure = new ArrayList<>();
+    columnStats
+        .forEach((colName, score) -> sortedPure.add(Pair.of(colName, ((FrequencyAccumulator) score).getFrequency())));
+    sortedPure.sort((p1, p2) -> (p2.getRight().compareTo(p1.getRight())));
+    for (Pair<String, Long> tuple2 : sortedPure) {
+      reportOut += "Dimension: " + tuple2.getLeft() + "  " + tuple2.getRight().toString() + "\n";
     }
     LOGGER.info(reportOut);
   }

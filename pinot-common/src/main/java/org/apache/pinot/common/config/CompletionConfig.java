@@ -19,6 +19,7 @@
 package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import org.apache.pinot.common.utils.EqualityUtils;
 
 
@@ -29,8 +30,7 @@ import org.apache.pinot.common.utils.EqualityUtils;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class CompletionConfig {
 
-  @ConfigKey(value = "completionMode")
-  @ConfigDoc(value = "Mode to use when completing segment. DEFAULT for default strategy (build segment if segment is equivalent to the committed segment, else download). DOWNLOAD for always download the segment, never build.", mandatory = false)
+  @JsonPropertyDescription("Mode to use when completing segment. DEFAULT for default strategy (build segment if segment is equivalent to the committed segment, else download). DOWNLOAD for always download the segment, never build.")
   private String _completionMode;
 
   public String getCompletionMode() {

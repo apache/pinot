@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
-import org.apache.pinot.common.config.ConfigKey;
 import org.apache.pinot.common.segment.StarTreeMetadata;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.JsonUtils;
@@ -40,24 +39,18 @@ public class StarTreeIndexSpec {
   public static final int DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD = 10000;
 
   /** The upper bound on the number of leaf records to be scanned for any query */
-  @ConfigKey("maxLeafRecords")
   private int _maxLeafRecords = DEFAULT_MAX_LEAF_RECORDS;
 
   /** Dimension split order (if null or absent, descending w.r.t. dimension cardinality) */
-  @ConfigKey("dimensionsSplitOrder")
   private List<String> _dimensionsSplitOrder;
 
   /** Dimensions for which to exclude star nodes at split. */
-  @ConfigKey("skipStarNodeCreationForDimensions")
   private Set<String> _skipStarNodeCreationForDimensions;
 
-  @ConfigKey("skipMaterializationForDimensions")
   private Set<String> _skipMaterializationForDimensions;
 
-  @ConfigKey("skipMaterializationCardinalityThreshold")
   private int _skipMaterializationCardinalityThreshold = DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD;
 
-  @ConfigKey("excludeSkipMaterializationDimensionsForStarTreeIndex")
   private boolean _excludeSkipMaterializationDimensionsForStarTreeIndex;
 
   public int getMaxLeafRecords() {

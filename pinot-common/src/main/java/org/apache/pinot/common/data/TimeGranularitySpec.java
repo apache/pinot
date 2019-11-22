@@ -22,8 +22,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
-import org.apache.pinot.common.config.ConfigKey;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.JsonUtils;
@@ -53,19 +51,10 @@ public class TimeGranularitySpec {
   private static final String DEFAULT_TIME_FORMAT = TimeFormat.EPOCH.toString();
   private static final String COLON_SEPARATOR = ":";
 
-  @ConfigKey("name")
   private String _name;
-
-  @ConfigKey("dataType")
   private DataType _dataType;
-
-  @ConfigKey("timeType")
   private TimeUnit _timeType;
-
-  @ConfigKey("timeUnitSize")
   private int _timeUnitSize = DEFAULT_TIME_UNIT_SIZE;
-
-  @ConfigKey("timeFormat")
   private String _timeFormat = DEFAULT_TIME_FORMAT;
 
   /*
@@ -80,7 +69,7 @@ public class TimeGranularitySpec {
   public TimeGranularitySpec() {
   }
 
-  public TimeGranularitySpec(@Nonnull DataType dataType, @Nonnull TimeUnit timeType, @Nonnull String name) {
+  public TimeGranularitySpec(DataType dataType, TimeUnit timeType, String name) {
     Preconditions.checkNotNull(timeType);
     Preconditions.checkNotNull(name);
 
@@ -89,8 +78,7 @@ public class TimeGranularitySpec {
     _name = name;
   }
 
-  public TimeGranularitySpec(@Nonnull DataType dataType, @Nonnull TimeUnit timeType, @Nonnull String timeFormat,
-      @Nonnull String name) {
+  public TimeGranularitySpec(DataType dataType, TimeUnit timeType, String timeFormat, String name) {
     Preconditions.checkNotNull(timeType);
     Preconditions.checkNotNull(name);
     Preconditions.checkNotNull(timeFormat);
@@ -103,8 +91,7 @@ public class TimeGranularitySpec {
     _timeFormat = timeFormat;
   }
 
-  public TimeGranularitySpec(@Nonnull DataType dataType, int timeUnitSize, @Nonnull TimeUnit timeType,
-      @Nonnull String name) {
+  public TimeGranularitySpec(DataType dataType, int timeUnitSize, TimeUnit timeType, String name) {
     Preconditions.checkNotNull(timeType);
     Preconditions.checkNotNull(name);
 
@@ -114,8 +101,7 @@ public class TimeGranularitySpec {
     _name = name;
   }
 
-  public TimeGranularitySpec(@Nonnull DataType dataType, int timeUnitSize, @Nonnull TimeUnit timeType,
-      @Nonnull String timeFormat, @Nonnull String name) {
+  public TimeGranularitySpec(DataType dataType, int timeUnitSize, TimeUnit timeType, String timeFormat, String name) {
     Preconditions.checkNotNull(timeType);
     Preconditions.checkNotNull(name);
     Preconditions.checkNotNull(timeFormat);
@@ -129,33 +115,30 @@ public class TimeGranularitySpec {
     _timeFormat = timeFormat;
   }
 
-  @Nonnull
   public String getName() {
     return _name;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setName(@Nonnull String name) {
+  public void setName(String name) {
     _name = name;
   }
 
-  @Nonnull
   public DataType getDataType() {
     return _dataType;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setDataType(@Nonnull DataType dataType) {
+  public void setDataType(DataType dataType) {
     _dataType = dataType.getStoredType();
   }
 
-  @Nonnull
   public TimeUnit getTimeType() {
     return _timeType;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setTimeType(@Nonnull TimeUnit timeType) {
+  public void setTimeType(TimeUnit timeType) {
     _timeType = timeType;
   }
 
@@ -177,13 +160,12 @@ public class TimeGranularitySpec {
     _timeUnitSize = timeUnitSize;
   }
 
-  @Nonnull
   public String getTimeFormat() {
     return _timeFormat;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setTimeFormat(@Nonnull String timeFormat) {
+  public void setTimeFormat(String timeFormat) {
     _timeFormat = timeFormat;
   }
 

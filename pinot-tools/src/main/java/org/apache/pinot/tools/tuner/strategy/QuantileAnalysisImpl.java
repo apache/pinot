@@ -20,7 +20,6 @@ package org.apache.pinot.tools.tuner.strategy;
 
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -89,12 +88,13 @@ public class QuantileAnalysisImpl implements TuningStrategy {
   @Override
   public boolean filter(AbstractQueryStats queryStats) {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
-    return (_tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType.contains(
-        indexSuggestQueryStatsImpl.getTableNameWithoutType()));
+    return (_tableNamesWithoutType == null || _tableNamesWithoutType.isEmpty() || _tableNamesWithoutType
+        .contains(indexSuggestQueryStatsImpl.getTableNameWithoutType()));
   }
 
   @Override
-  public void accumulate(AbstractQueryStats queryStats, MetaManager metaManager, Map<String, Map<String, AbstractAccumulator>> accumulatorOut) {
+  public void accumulate(AbstractQueryStats queryStats, MetaManager metaManager,
+      Map<String, Map<String, AbstractAccumulator>> accumulatorOut) {
 
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
     String tableNameWithoutType = indexSuggestQueryStatsImpl.getTableNameWithoutType();
@@ -107,9 +107,10 @@ public class QuantileAnalysisImpl implements TuningStrategy {
     AbstractAccumulator.putAccumulatorToMapIfAbsent(accumulatorOut, tableNameWithoutType, NUM_QUERIES_COUNT,
         new QuantileAnalysisAccumulator()).increaseCount();
 
-    ((QuantileAnalysisAccumulator) AbstractAccumulator.putAccumulatorToMapIfAbsent(accumulatorOut, tableNameWithoutType,
-        QUANTILE_REPORT_KEY, new QuantileAnalysisAccumulator())).merge(Long.parseLong(time),
-        Long.parseLong(numEntriesScannedInFilter), Long.parseLong(numEntriesScannedPostFilter), 0, _lenBin);
+    ((QuantileAnalysisAccumulator) AbstractAccumulator
+        .putAccumulatorToMapIfAbsent(accumulatorOut, tableNameWithoutType, QUANTILE_REPORT_KEY,
+            new QuantileAnalysisAccumulator())).merge(Long.parseLong(time), Long.parseLong(numEntriesScannedInFilter),
+        Long.parseLong(numEntriesScannedPostFilter), 0, _lenBin);
   }
 
   @Override
@@ -182,19 +183,27 @@ public class QuantileAnalysisImpl implements TuningStrategy {
     numEntriesScannedInFilterPercentile[9] = percentile.evaluate(95);
 
     reportOut += "numEntriesScannedInFilter:\n";
-    reportOut += MessageFormat.format(
-        "10%:{0} | 20%:{1} | 30%:{2} | 40%:{3} | 50%:{4} | 60%:{5} | 70%:{6} | 80%:{7} | 90%:{8} | 95%:{9}\n", String.format("%.0f", numEntriesScannedInFilterPercentile[0]),
-        String.format("%.0f", numEntriesScannedInFilterPercentile[1]), String.format("%.0f", numEntriesScannedInFilterPercentile[2]),
-        String.format("%.0f", numEntriesScannedInFilterPercentile[3]), String.format("%.0f", numEntriesScannedInFilterPercentile[4]),
-        String.format("%.0f", numEntriesScannedInFilterPercentile[5]), String.format("%.0f", numEntriesScannedInFilterPercentile[6]),
-        String.format("%.0f", numEntriesScannedInFilterPercentile[7]), String.format("%.0f", numEntriesScannedInFilterPercentile[8]),
-        String.format("%.0f", numEntriesScannedInFilterPercentile[9]));
+    reportOut += MessageFormat
+        .format("10%:{0} | 20%:{1} | 30%:{2} | 40%:{3} | 50%:{4} | 60%:{5} | 70%:{6} | 80%:{7} | 90%:{8} | 95%:{9}\n",
+            String.format("%.0f", numEntriesScannedInFilterPercentile[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[1]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[2]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[3]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[4]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[5]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[6]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[7]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[8]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[9]));
 
     reportOut += "\nLatency (ms):\n";
-    reportOut += MessageFormat.format(
-        "10%:{0} | 20%:{1} | 30%:{2} | 40%:{3} | 50%:{4} | 60%:{5} | 70%:{6} | 80%:{7} | 90%:{8} | 95%:{9}\n", String.format("%.0f", timePercentile[0]), String.format("%.0f", timePercentile[1]),
-        String.format("%.0f", timePercentile[2]), String.format("%.0f", timePercentile[3]), String.format("%.0f", timePercentile[4]), String.format("%.0f", timePercentile[5]),
-        String.format("%.0f", timePercentile[6]), String.format("%.0f", timePercentile[7]), String.format("%.0f", timePercentile[8]), String.format("%.0f", timePercentile[9]));
+    reportOut += MessageFormat
+        .format("10%:{0} | 20%:{1} | 30%:{2} | 40%:{3} | 50%:{4} | 60%:{5} | 70%:{6} | 80%:{7} | 90%:{8} | 95%:{9}\n",
+            String.format("%.0f", timePercentile[0]), String.format("%.0f", timePercentile[1]),
+            String.format("%.0f", timePercentile[2]), String.format("%.0f", timePercentile[3]),
+            String.format("%.0f", timePercentile[4]), String.format("%.0f", timePercentile[5]),
+            String.format("%.0f", timePercentile[6]), String.format("%.0f", timePercentile[7]),
+            String.format("%.0f", timePercentile[8]), String.format("%.0f", timePercentile[9]));
 
     OLSMultipleLinearRegression regression = new OLSMultipleLinearRegression();
     regression.setNoIntercept(true);
@@ -204,9 +213,9 @@ public class QuantileAnalysisImpl implements TuningStrategy {
     AtomicInteger iter = new AtomicInteger(0);
 
     olsMergerObj.getMinBin().forEach((key, val) -> {
-      time[iter.get()] = val._2();
-      x_arr[iter.get()][0] = key._1() * _lenBin + _lenBin / 2;
-      x_arr[iter.get()][1] = key._2() * _lenBin + _lenBin / 2;
+      time[iter.get()] = val.getRight();
+      x_arr[iter.get()][0] = key.getLeft() * _lenBin + _lenBin / 2;
+      x_arr[iter.get()][1] = key.getRight() * _lenBin + _lenBin / 2;
       iter.incrementAndGet();
     });
 
@@ -221,9 +230,12 @@ public class QuantileAnalysisImpl implements TuningStrategy {
             String.format("%.0f", numEntriesScannedInFilterPercentile[0] * params[0]),
             String.format("%.0f", numEntriesScannedInFilterPercentile[1] * params[0]),
             String.format("%.0f", numEntriesScannedInFilterPercentile[2] * params[0]),
-            String.format("%.0f", numEntriesScannedInFilterPercentile[3] * params[0]), String.format("%.0f", numEntriesScannedInFilterPercentile[4] * params[0]),
-            String.format("%.0f", numEntriesScannedInFilterPercentile[5] * params[0]), String.format("%.0f", numEntriesScannedInFilterPercentile[6] * params[0]),
-            String.format("%.0f", numEntriesScannedInFilterPercentile[7] * params[0]), String.format("%.0f", numEntriesScannedInFilterPercentile[8] * params[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[3] * params[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[4] * params[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[5] * params[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[6] * params[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[7] * params[0]),
+            String.format("%.0f", numEntriesScannedInFilterPercentile[8] * params[0]),
             String.format("%.0f", numEntriesScannedInFilterPercentile[9] * params[0]));
         reportOut += MessageFormat.format("\nR-square: {0}\n", rSquared);
         reportOut += String.format("Params: %s %s\n", Double.toString(params[0]), Double.toString(params[1]));
@@ -299,7 +311,8 @@ public class QuantileAnalysisImpl implements TuningStrategy {
       if (predicateListContext.getChildCount() == 1) {
         LOGGER.debug("Parsing parenthesis group");
         return parsePredicate((PQL2Parser.PredicateContext) predicateListContext.getChild(0));
-      } else if (predicateListContext.getChild(1).getText().toUpperCase().equals(AND) || predicateListContext.getChild(1).getText().toUpperCase().equals(OR)) {
+      } else if (predicateListContext.getChild(1).getText().toUpperCase().equals(AND) || predicateListContext
+          .getChild(1).getText().toUpperCase().equals(OR)) {
         LOGGER.debug("Parsing AND/OR list {}", predicateListContext.getText());
         int childResults = 0;
         for (int i = 0; i < predicateListContext.getChildCount(); i += 2) {
@@ -320,7 +333,8 @@ public class QuantileAnalysisImpl implements TuningStrategy {
     int parsePredicate(PQL2Parser.PredicateContext predicateContext) {
       LOGGER.debug("Parsing predicate: {}", predicateContext.getText());
       if (predicateContext instanceof PQL2Parser.PredicateParenthesisGroupContext) {
-        PQL2Parser.PredicateParenthesisGroupContext predicateParenthesisGroupContext = (PQL2Parser.PredicateParenthesisGroupContext) predicateContext;
+        PQL2Parser.PredicateParenthesisGroupContext predicateParenthesisGroupContext =
+            (PQL2Parser.PredicateParenthesisGroupContext) predicateContext;
         return parsePredicateList(predicateParenthesisGroupContext.predicateList());
       } else if (predicateContext instanceof PQL2Parser.InPredicateContext) {
         LOGGER.debug("Entering IN clause!");
@@ -333,9 +347,9 @@ public class QuantileAnalysisImpl implements TuningStrategy {
         String colName =
             ((PQL2Parser.ComparisonPredicateContext) predicateContext).comparisonClause().expression(0).getText();
         LOGGER.debug("Entering COMP clause!");
-        String comparisonOp = ((PQL2Parser.ComparisonPredicateContext) predicateContext).comparisonClause()
-            .comparisonOperator()
-            .getText();
+        String comparisonOp =
+            ((PQL2Parser.ComparisonPredicateContext) predicateContext).comparisonClause().comparisonOperator()
+                .getText();
         LOGGER.debug("COMP operator {}", comparisonOp);
         if (comparisonOp.equals("=") || comparisonOp.equals("!=") || comparisonOp.equals("<>")) {
           if (_metaManager.hasInvertedIndex(_tableNameWithoutType, colName)) {

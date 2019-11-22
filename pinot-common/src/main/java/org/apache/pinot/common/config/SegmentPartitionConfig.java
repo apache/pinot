@@ -18,33 +18,27 @@
  */
 package org.apache.pinot.common.config;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.JsonUtils;
 
 
-@SuppressWarnings("unused") // Suppress incorrect warning, as methods are used for json ser/de.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentPartitionConfig {
   public static final int INVALID_NUM_PARTITIONS = -1;
 
-  @ConfigKey("columnPartitionMap")
-  @UseChildKeyHandler(ColumnPartitionMapChildKeyHandler.class)
   private final Map<String, ColumnPartitionConfig> _columnPartitionMap;
 
-  public SegmentPartitionConfig() {
-    _columnPartitionMap = null;
-  }
-
+  @JsonCreator
   public SegmentPartitionConfig(
-      @Nonnull @JsonProperty("columnPartitionMap") Map<String, ColumnPartitionConfig> columnPartitionMap) {
+      @JsonProperty("columnPartitionMap") Map<String, ColumnPartitionConfig> columnPartitionMap) {
     Preconditions.checkNotNull(columnPartitionMap);
     _columnPartitionMap = columnPartitionMap;
   }
@@ -60,7 +54,7 @@ public class SegmentPartitionConfig {
    * @return Partition function for the column.
    */
   @Nullable
-  public String getFunctionName(@Nonnull String column) {
+  public String getFunctionName(String column) {
     ColumnPartitionConfig columnPartitionConfig = _columnPartitionMap.get(column);
     return (columnPartitionConfig != null) ? columnPartitionConfig.getFunctionName() : null;
   }

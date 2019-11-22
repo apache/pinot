@@ -166,9 +166,7 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
    */
   private void setupOfflineTable(String table)
       throws Exception {
-    _realtimeTableConfig = null;
     addOfflineTable(table, null, null, TENANT_NAME, TENANT_NAME, null, SegmentVersion.v1, null, null, null, null, null);
-    completeTableConfiguration();
   }
 
   /**
@@ -178,7 +176,6 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
     setTableName(tableName);
-    _realtimeTableConfig = null;
 
     File schemaFile = getSchemaFile();
     Schema schema = Schema.fromFile(schemaFile);
@@ -193,7 +190,6 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
 
     addOfflineTable(tableName, timeColumnName, timeType, TENANT_NAME, TENANT_NAME, null, SegmentVersion.v1, null, null,
         null, null, null);
-    completeTableConfiguration();
 
     ExecutorService executor = Executors.newCachedThreadPool();
     ClusterIntegrationTestUtils
@@ -209,7 +205,6 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
    */
   private void setupRealtimeTable(String table, String topic, File avroFile)
       throws Exception {
-    _offlineTableConfig = null;
     File schemaFile = getSchemaFile();
     Schema schema = Schema.fromFile(schemaFile);
     String schemaName = schema.getSchemaName();
@@ -225,7 +220,6 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
         getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName, TENANT_NAME, TENANT_NAME,
         getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getBloomFilterIndexColumns(), getRawIndexColumns(),
         getTaskConfig(), getStreamConsumerFactoryClassName());
-    completeTableConfiguration();
   }
 
   @Override
@@ -342,7 +336,7 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
       Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.IDEALSTATE_ZNODE_SIZE),
           idealState.toString().length());
       Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.SEGMENT_COUNT),
-          (long) (idealState.getPartitionSet().size()));
+          idealState.getPartitionSet().size());
     }
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS),
         numReplicas);
@@ -559,11 +553,6 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
   }
 
   // TODO: tests for other ControllerPeriodicTasks (RetentionManagert , RealtimeSegmentValidationManager)
-
-  @Override
-  protected boolean isUsingNewConfigFormat() {
-    return true;
-  }
 
   @Override
   protected boolean useLlc() {

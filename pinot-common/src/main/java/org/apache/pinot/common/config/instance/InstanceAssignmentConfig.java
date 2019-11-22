@@ -20,27 +20,19 @@ package org.apache.pinot.common.config.instance;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.pinot.common.config.ConfigDoc;
-import org.apache.pinot.common.config.ConfigKey;
-import org.apache.pinot.common.config.NestedConfig;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class InstanceAssignmentConfig {
 
-  @ConfigKey("tagPoolConfig")
-  @ConfigDoc(value = "Configuration for the instance tag and pool of the instance assignment", mandatory = true)
-  @NestedConfig
+  @JsonPropertyDescription("Configuration for the instance tag and pool of the instance assignment (mandatory)")
   private InstanceTagPoolConfig _tagPoolConfig;
 
-  @ConfigKey("constraintConfig")
-  @ConfigDoc("Configuration for the instance constraints of the instance assignment, which filters out unqualified instances and sorts instances for picking priority")
-  @NestedConfig
+  @JsonPropertyDescription("Configuration for the instance constraints of the instance assignment, which filters out unqualified instances and sorts instances for picking priority")
   private InstanceConstraintConfig _constraintConfig;
 
-  @ConfigKey("replicaGroupPartitionConfig")
-  @ConfigDoc(value = "Configuration for the instance replica-group and partition of the instance assignment", mandatory = true)
-  @NestedConfig
+  @JsonPropertyDescription("Configuration for the instance replica-group and partition of the instance assignment (mandatory)")
   private InstanceReplicaGroupPartitionConfig _replicaGroupPartitionConfig;
 
   @JsonProperty

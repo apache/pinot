@@ -23,8 +23,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
-import org.apache.pinot.common.config.ConfigKey;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.JsonUtils;
 
@@ -32,10 +30,7 @@ import org.apache.pinot.common.utils.JsonUtils;
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class TimeFieldSpec extends FieldSpec {
-  @ConfigKey("incoming")
   private TimeGranularitySpec _incomingGranularitySpec;
-
-  @ConfigKey("outgoing")
   private TimeGranularitySpec _outgoingGranularitySpec;
 
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
@@ -43,51 +38,48 @@ public final class TimeFieldSpec extends FieldSpec {
     super();
   }
 
-  public TimeFieldSpec(@Nonnull String incomingName, @Nonnull DataType incomingDataType,
-      @Nonnull TimeUnit incomingTimeUnit) {
+  public TimeFieldSpec(String incomingName, DataType incomingDataType, TimeUnit incomingTimeUnit) {
     super(incomingName, incomingDataType, true);
     _incomingGranularitySpec = new TimeGranularitySpec(incomingDataType, incomingTimeUnit, incomingName);
   }
 
-  public TimeFieldSpec(@Nonnull String incomingName, @Nonnull DataType incomingDataType,
-      @Nonnull TimeUnit incomingTimeUnit, @Nonnull Object defaultNullValue) {
+  public TimeFieldSpec(String incomingName, DataType incomingDataType, TimeUnit incomingTimeUnit,
+      Object defaultNullValue) {
     super(incomingName, incomingDataType, true, defaultNullValue);
     _incomingGranularitySpec = new TimeGranularitySpec(incomingDataType, incomingTimeUnit, incomingName);
   }
 
-  public TimeFieldSpec(@Nonnull String incomingName, @Nonnull DataType incomingDataType,
-      @Nonnull TimeUnit incomingTimeUnit, @Nonnull String outgoingName, @Nonnull DataType outgoingDataType,
-      @Nonnull TimeUnit outgoingTimeUnit) {
+  public TimeFieldSpec(String incomingName, DataType incomingDataType, TimeUnit incomingTimeUnit, String outgoingName,
+      DataType outgoingDataType, TimeUnit outgoingTimeUnit) {
     super(outgoingName, outgoingDataType, true);
     _incomingGranularitySpec = new TimeGranularitySpec(incomingDataType, incomingTimeUnit, incomingName);
     _outgoingGranularitySpec = new TimeGranularitySpec(outgoingDataType, outgoingTimeUnit, outgoingName);
   }
 
-  public TimeFieldSpec(@Nonnull String incomingName, @Nonnull DataType incomingDataType,
-      @Nonnull TimeUnit incomingTimeUnit, @Nonnull String outgoingName, @Nonnull DataType outgoingDataType,
-      @Nonnull TimeUnit outgoingTimeUnit, @Nonnull Object defaultNullValue) {
+  public TimeFieldSpec(String incomingName, DataType incomingDataType, TimeUnit incomingTimeUnit, String outgoingName,
+      DataType outgoingDataType, TimeUnit outgoingTimeUnit, Object defaultNullValue) {
     super(outgoingName, outgoingDataType, true, defaultNullValue);
     _incomingGranularitySpec = new TimeGranularitySpec(incomingDataType, incomingTimeUnit, incomingName);
     _outgoingGranularitySpec = new TimeGranularitySpec(outgoingDataType, outgoingTimeUnit, outgoingName);
   }
 
-  public TimeFieldSpec(@Nonnull String incomingName, @Nonnull DataType incomingDataType, int incomingTimeUnitSize,
-      @Nonnull TimeUnit incomingTimeUnit) {
+  public TimeFieldSpec(String incomingName, DataType incomingDataType, int incomingTimeUnitSize,
+      TimeUnit incomingTimeUnit) {
     super(incomingName, incomingDataType, true);
     _incomingGranularitySpec =
         new TimeGranularitySpec(incomingDataType, incomingTimeUnitSize, incomingTimeUnit, incomingName);
   }
 
-  public TimeFieldSpec(@Nonnull String incomingName, @Nonnull DataType incomingDataType, int incomingTimeUnitSize,
-      @Nonnull TimeUnit incomingTimeUnit, @Nonnull Object defaultNullValue) {
+  public TimeFieldSpec(String incomingName, DataType incomingDataType, int incomingTimeUnitSize,
+      TimeUnit incomingTimeUnit, Object defaultNullValue) {
     super(incomingName, incomingDataType, true, defaultNullValue);
     _incomingGranularitySpec =
         new TimeGranularitySpec(incomingDataType, incomingTimeUnitSize, incomingTimeUnit, incomingName);
   }
 
-  public TimeFieldSpec(@Nonnull String incomingName, @Nonnull DataType incomingDataType, int incomingTimeUnitSize,
-      @Nonnull TimeUnit incomingTimeUnit, @Nonnull String outgoingName, @Nonnull DataType outgoingDataType,
-      int outgoingTimeUnitSize, @Nonnull TimeUnit outgoingTimeUnit) {
+  public TimeFieldSpec(String incomingName, DataType incomingDataType, int incomingTimeUnitSize,
+      TimeUnit incomingTimeUnit, String outgoingName, DataType outgoingDataType, int outgoingTimeUnitSize,
+      TimeUnit outgoingTimeUnit) {
     super(outgoingName, outgoingDataType, true);
     _incomingGranularitySpec =
         new TimeGranularitySpec(incomingDataType, incomingTimeUnitSize, incomingTimeUnit, incomingName);
@@ -95,9 +87,9 @@ public final class TimeFieldSpec extends FieldSpec {
         new TimeGranularitySpec(outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit, outgoingName);
   }
 
-  public TimeFieldSpec(@Nonnull String incomingName, @Nonnull DataType incomingDataType, int incomingTimeUnitSize,
-      @Nonnull TimeUnit incomingTimeUnit, @Nonnull String outgoingName, @Nonnull DataType outgoingDataType,
-      int outgoingTimeUnitSize, @Nonnull TimeUnit outgoingTimeUnit, @Nonnull Object defaultNullValue) {
+  public TimeFieldSpec(String incomingName, DataType incomingDataType, int incomingTimeUnitSize,
+      TimeUnit incomingTimeUnit, String outgoingName, DataType outgoingDataType, int outgoingTimeUnitSize,
+      TimeUnit outgoingTimeUnit, Object defaultNullValue) {
     super(outgoingName, outgoingDataType, true, defaultNullValue);
     _incomingGranularitySpec =
         new TimeGranularitySpec(incomingDataType, incomingTimeUnitSize, incomingTimeUnit, incomingName);
@@ -105,32 +97,31 @@ public final class TimeFieldSpec extends FieldSpec {
         new TimeGranularitySpec(outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit, outgoingName);
   }
 
-  public TimeFieldSpec(@Nonnull TimeGranularitySpec incomingGranularitySpec) {
+  public TimeFieldSpec(TimeGranularitySpec incomingGranularitySpec) {
     super(incomingGranularitySpec.getName(), incomingGranularitySpec.getDataType(), true);
     _incomingGranularitySpec = incomingGranularitySpec;
   }
 
-  public TimeFieldSpec(@Nonnull TimeGranularitySpec incomingGranularitySpec, @Nonnull Object defaultNullValue) {
+  public TimeFieldSpec(TimeGranularitySpec incomingGranularitySpec, Object defaultNullValue) {
     super(incomingGranularitySpec.getName(), incomingGranularitySpec.getDataType(), true, defaultNullValue);
     _incomingGranularitySpec = incomingGranularitySpec;
   }
 
-  public TimeFieldSpec(@Nonnull TimeGranularitySpec incomingGranularitySpec,
-      @Nonnull TimeGranularitySpec outgoingGranularitySpec) {
+  public TimeFieldSpec(TimeGranularitySpec incomingGranularitySpec, TimeGranularitySpec outgoingGranularitySpec) {
     super(outgoingGranularitySpec.getName(), outgoingGranularitySpec.getDataType(), true);
     _incomingGranularitySpec = incomingGranularitySpec;
     _outgoingGranularitySpec = outgoingGranularitySpec;
   }
 
-  public TimeFieldSpec(@Nonnull TimeGranularitySpec incomingGranularitySpec,
-      @Nonnull TimeGranularitySpec outgoingGranularitySpec, @Nonnull Object defaultNullValue) {
+  public TimeFieldSpec(TimeGranularitySpec incomingGranularitySpec, TimeGranularitySpec outgoingGranularitySpec,
+      Object defaultNullValue) {
     super(outgoingGranularitySpec.getName(), outgoingGranularitySpec.getDataType(), true, defaultNullValue);
     _incomingGranularitySpec = incomingGranularitySpec;
     _outgoingGranularitySpec = outgoingGranularitySpec;
   }
 
   @JsonIgnore
-  @Nonnull
+
   @Override
   public FieldType getFieldType() {
     return FieldType.TIME;
@@ -138,13 +129,13 @@ public final class TimeFieldSpec extends FieldSpec {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   @Override
-  public void setName(@Nonnull String name) {
+  public void setName(String name) {
     // Ignore setName for TimeFieldSpec because we pick the name from TimeGranularitySpec.
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   @Override
-  public void setDataType(@Nonnull DataType dataType) {
+  public void setDataType(DataType dataType) {
     // Ignore setDataType for TimeFieldSpec because we pick the data type from TimeGranularitySpec.
   }
 
@@ -155,13 +146,11 @@ public final class TimeFieldSpec extends FieldSpec {
   }
 
   @JsonIgnore
-  @Nonnull
   public String getIncomingTimeColumnName() {
     return _incomingGranularitySpec.getName();
   }
 
   @JsonIgnore
-  @Nonnull
   public String getOutgoingTimeColumnName() {
     return getName();
   }
@@ -169,18 +158,16 @@ public final class TimeFieldSpec extends FieldSpec {
   // For third-eye backward compatible.
   @Deprecated
   @JsonIgnore
-  @Nonnull
   public String getOutGoingTimeColumnName() {
     return getName();
   }
 
-  @Nonnull
   public TimeGranularitySpec getIncomingGranularitySpec() {
     return _incomingGranularitySpec;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setIncomingGranularitySpec(@Nonnull TimeGranularitySpec incomingGranularitySpec) {
+  public void setIncomingGranularitySpec(TimeGranularitySpec incomingGranularitySpec) {
     _incomingGranularitySpec = incomingGranularitySpec;
     if (_outgoingGranularitySpec == null) {
       super.setName(incomingGranularitySpec.getName());
@@ -188,7 +175,6 @@ public final class TimeFieldSpec extends FieldSpec {
     }
   }
 
-  @Nonnull
   public TimeGranularitySpec getOutgoingGranularitySpec() {
     if (_outgoingGranularitySpec == null) {
       return _incomingGranularitySpec;
@@ -198,13 +184,12 @@ public final class TimeFieldSpec extends FieldSpec {
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setOutgoingGranularitySpec(@Nonnull TimeGranularitySpec outgoingGranularitySpec) {
+  public void setOutgoingGranularitySpec(TimeGranularitySpec outgoingGranularitySpec) {
     _outgoingGranularitySpec = outgoingGranularitySpec;
     super.setName(outgoingGranularitySpec.getName());
     super.setDataType(outgoingGranularitySpec.getDataType());
   }
 
-  @Nonnull
   @Override
   public ObjectNode toJsonObject() {
     ObjectNode jsonObject = JsonUtils.newObjectNode();

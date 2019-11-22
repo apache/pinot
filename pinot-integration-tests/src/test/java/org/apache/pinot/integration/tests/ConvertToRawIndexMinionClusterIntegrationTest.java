@@ -199,9 +199,4 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
 
     super.tearDown();
   }
-
-  @Override
-  protected boolean isUsingNewConfigFormat() {
-    return false;
-  }
 }

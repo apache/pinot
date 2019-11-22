@@ -28,13 +28,8 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
-import org.apache.pinot.common.config.ConfigKey;
+import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.JsonUtils;
-
-import static org.apache.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static org.apache.pinot.common.utils.EqualityUtils.isEqual;
-import static org.apache.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
-import static org.apache.pinot.common.utils.EqualityUtils.isSameReference;
 
 
 /**
@@ -45,18 +40,11 @@ import static org.apache.pinot.common.utils.EqualityUtils.isSameReference;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class HllConfig {
-  @ConfigKey("hllLog2m")
-  private int hllLog2m = HllConstants.DEFAULT_LOG2M;
+  private int _hllLog2m = HllConstants.DEFAULT_LOG2M;
+  private String _hllDeriveColumnSuffix = HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX;
+  private Set<String> _columnsToDeriveHllFields = new HashSet<>();
 
-  @ConfigKey("hllFieldSize")
-  private int hllFieldSize = HllSizeUtils.getHllFieldSizeFromLog2m(HllConstants.DEFAULT_LOG2M);
-
-  @ConfigKey("hllDeriveColumnSuffix")
-  private String hllDeriveColumnSuffix = HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX;
-
-  private Set<String> columnsToDeriveHllFields = new HashSet<>();
-
-  private transient Map<String, String> derivedHllFieldToOriginMap;
+  private transient Map<String, String> _derivedHllFieldToOriginMap;
 
   /**
    * HllConfig with default hll log2m. No Hll derived field is generated.
@@ -71,7 +59,7 @@ public class HllConfig {
    *                 accuracy = 1.04/sqrt(2^log2m)
    */
   public HllConfig(int hllLog2m) {
-    this.hllLog2m = hllLog2m;
+    this._hllLog2m = hllLog2m;
   }
 
   /**
@@ -85,35 +73,33 @@ public class HllConfig {
   public HllConfig(int hllLog2m, Set<String> columnsToDeriveHllFields, String hllDeriveColumnSuffix) {
     Preconditions.checkNotNull(columnsToDeriveHllFields, "ColumnsToDeriveHllFields should not be null.");
     Preconditions.checkNotNull(hllDeriveColumnSuffix, "HLL Derived Field Suffix should not be null.");
-    this.hllLog2m = hllLog2m;
-    this.hllFieldSize = HllSizeUtils.getHllFieldSizeFromLog2m(hllLog2m);
-    this.hllDeriveColumnSuffix = hllDeriveColumnSuffix;
-    this.columnsToDeriveHllFields = columnsToDeriveHllFields;
+    _hllLog2m = hllLog2m;
+    _hllDeriveColumnSuffix = hllDeriveColumnSuffix;
+    _columnsToDeriveHllFields = columnsToDeriveHllFields;
   }
 
   public int getHllLog2m() {
-    return hllLog2m;
+    return _hllLog2m;
   }
 
   public void setHllLog2m(int hllLog2m) {
-    this.hllLog2m = hllLog2m;
-    this.hllFieldSize = HllSizeUtils.getHllFieldSizeFromLog2m(hllLog2m);
+    _hllLog2m = hllLog2m;
   }
 
   public String getHllDeriveColumnSuffix() {
-    return hllDeriveColumnSuffix;
+    return _hllDeriveColumnSuffix;
   }
 
   public void setHllDeriveColumnSuffix(String hllDeriveColumnSuffix) {
-    this.hllDeriveColumnSuffix = hllDeriveColumnSuffix;
+    _hllDeriveColumnSuffix = hllDeriveColumnSuffix;
   }
 
   public Set<String> getColumnsToDeriveHllFields() {
-    return columnsToDeriveHllFields;
+    return _columnsToDeriveHllFields;
   }
 
   public void setColumnsToDeriveHllFields(Set<String> columnsToDeriveHllFields) {
-    this.columnsToDeriveHllFields = columnsToDeriveHllFields;
+    _columnsToDeriveHllFields = columnsToDeriveHllFields;
   }
 
   /**
@@ -122,23 +108,23 @@ public class HllConfig {
    */
   @JsonIgnore
   public boolean isEnableHllIndex() {
-    return columnsToDeriveHllFields.size() > 0;
+    return _columnsToDeriveHllFields.size() > 0;
   }
 
   @JsonIgnore
   public int getHllFieldSize() {
-    return hllFieldSize;
+    return HllSizeUtils.getHllFieldSizeFromLog2m(_hllLog2m);
   }
 
   @JsonIgnore
   public Map<String, String> getDerivedHllFieldToOriginMap() {
-    if (derivedHllFieldToOriginMap == null) {
-      derivedHllFieldToOriginMap = new HashMap<>();
-      for (String columnName : columnsToDeriveHllFields) {
-        derivedHllFieldToOriginMap.put(columnName + hllDeriveColumnSuffix, columnName);
+    if (_derivedHllFieldToOriginMap == null) {
+      _derivedHllFieldToOriginMap = new HashMap<>();
+      for (String columnName : _columnsToDeriveHllFields) {
+        _derivedHllFieldToOriginMap.put(columnName + _hllDeriveColumnSuffix, columnName);
       }
     }
-    return derivedHllFieldToOriginMap;
+    return _derivedHllFieldToOriginMap;
   }
 
   @Override
@@ -157,30 +143,26 @@ public class HllConfig {
   }
 
   @Override
-  public boolean equals(Object o) {
-    if (isSameReference(this, o)) {
+  public boolean equals(Object obj) {
+    if (EqualityUtils.isSameReference(this, obj)) {
       return true;
     }
 
-    if (isNullOrNotSameClass(this, o)) {
+    if (EqualityUtils.isNullOrNotSameClass(this, obj)) {
       return false;
     }
 
-    HllConfig hllConfig = (HllConfig) o;
-
-    return isEqual(hllLog2m, hllConfig.hllLog2m) && isEqual(hllFieldSize, hllConfig.hllFieldSize) && isEqual(
-        hllDeriveColumnSuffix, hllConfig.hllDeriveColumnSuffix) && isEqual(columnsToDeriveHllFields,
-        hllConfig.columnsToDeriveHllFields) && isEqual(derivedHllFieldToOriginMap,
-        hllConfig.derivedHllFieldToOriginMap);
+    HllConfig that = (HllConfig) obj;
+    return EqualityUtils.isEqual(_hllLog2m, that._hllLog2m) && EqualityUtils
+        .isEqual(_hllDeriveColumnSuffix, that._hllDeriveColumnSuffix) && EqualityUtils
+        .isEqual(_columnsToDeriveHllFields, that._columnsToDeriveHllFields);
   }
 
   @Override
   public int hashCode() {
-    int result = hashCodeOf(hllLog2m);
-    result = hashCodeOf(result, hllFieldSize);
-    result = hashCodeOf(result, hllDeriveColumnSuffix);
-    result = hashCodeOf(result, columnsToDeriveHllFields);
-    result = hashCodeOf(result, derivedHllFieldToOriginMap);
+    int result = EqualityUtils.hashCodeOf(_hllLog2m);
+    result = EqualityUtils.hashCodeOf(result, _hllDeriveColumnSuffix);
+    result = EqualityUtils.hashCodeOf(result, _columnsToDeriveHllFields);
     return result;
   }
 }

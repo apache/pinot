@@ -32,8 +32,6 @@ public class TableCustomConfig {
 
   public static final String MESSAGE_BASED_REFRESH_KEY = "messageBasedRefresh";
 
-  @ConfigKey("customConfigs")
-  @UseChildKeyHandler(SimpleMapChildKeyHandler.class)
   private Map<String, String> _customConfigs;
 
   public Map<String, String> getCustomConfigs() {

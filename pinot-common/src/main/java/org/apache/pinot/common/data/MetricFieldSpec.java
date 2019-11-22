@@ -22,8 +22,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import javax.annotation.Nonnull;
-import org.apache.pinot.common.config.ConfigKey;
 import org.apache.pinot.common.utils.EqualityUtils;
 
 
@@ -42,7 +40,6 @@ public final class MetricFieldSpec extends FieldSpec {
   // These two fields are for derived metric fields.
   private int _fieldSize = UNDEFINED_METRIC_SIZE;
 
-  @ConfigKey("derivedMetricType")
   private DerivedMetricType _derivedMetricType = null;
 
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
@@ -50,27 +47,26 @@ public final class MetricFieldSpec extends FieldSpec {
     super();
   }
 
-  public MetricFieldSpec(@Nonnull String name, @Nonnull DataType dataType) {
+  public MetricFieldSpec(String name, DataType dataType) {
     super(name, dataType, true);
     _fieldSize = _dataType.size();
   }
 
-  public MetricFieldSpec(@Nonnull String name, @Nonnull DataType dataType, @Nonnull Object defaultNullValue) {
+  public MetricFieldSpec(String name, DataType dataType, Object defaultNullValue) {
     super(name, dataType, true, defaultNullValue);
     _fieldSize = _dataType.size();
   }
 
   // For derived metric fields.
-  public MetricFieldSpec(@Nonnull String name, @Nonnull DataType dataType, int fieldSize,
-      @Nonnull DerivedMetricType derivedMetricType) {
+  public MetricFieldSpec(String name, DataType dataType, int fieldSize, DerivedMetricType derivedMetricType) {
     super(name, dataType, true);
     setFieldSize(fieldSize);
     _derivedMetricType = derivedMetricType;
   }
 
   // For derived metric fields.
-  public MetricFieldSpec(@Nonnull String name, @Nonnull DataType dataType, int fieldSize,
-      @Nonnull DerivedMetricType derivedMetricType, @Nonnull Object defaultNullValue) {
+  public MetricFieldSpec(String name, DataType dataType, int fieldSize, DerivedMetricType derivedMetricType,
+      Object defaultNullValue) {
     super(name, dataType, true, defaultNullValue);
     setFieldSize(fieldSize);
     _derivedMetricType = derivedMetricType;
@@ -100,7 +96,7 @@ public final class MetricFieldSpec extends FieldSpec {
   }
 
   @JsonIgnore
-  @Nonnull
+
   @Override
   public FieldType getFieldType() {
     return FieldType.METRIC;
@@ -108,7 +104,7 @@ public final class MetricFieldSpec extends FieldSpec {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   @Override
-  public void setDataType(@Nonnull DataType dataType) {
+  public void setDataType(DataType dataType) {
     super.setDataType(dataType);
     if (_dataType != DataType.STRING && _dataType != DataType.BYTES) {
       _fieldSize = _dataType.size();
@@ -139,7 +135,6 @@ public final class MetricFieldSpec extends FieldSpec {
     HLL
   }
 
-  @Nonnull
   @Override
   public ObjectNode toJsonObject() {
     ObjectNode jsonObject = super.toJsonObject();
@@ -174,11 +169,5 @@ public final class MetricFieldSpec extends FieldSpec {
     int result = EqualityUtils.hashCodeOf(super.hashCode(), _fieldSize);
     result = EqualityUtils.hashCodeOf(result, _derivedMetricType);
     return result;
-  }
-
-  @Override
-  public void postInject() {
-    super.postInject();
-    _fieldSize = _dataType.size();
   }
 }

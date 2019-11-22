@@ -23,8 +23,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import javax.annotation.Nullable;
 import org.apache.avro.Schema.Type;
-import org.apache.pinot.common.config.ConfigKey;
-import org.apache.pinot.common.config.ConfigNodeLifecycleAware;
 import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.JsonUtils;
@@ -42,7 +40,7 @@ import org.apache.pinot.common.utils.JsonUtils;
  * <p>- <code>VirtualColumnProvider</code>: the virtual column provider to use for this field.
  */
 @SuppressWarnings("unused")
-public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLifecycleAware {
+public abstract class FieldSpec implements Comparable<FieldSpec> {
   private static final int DEFAULT_MAX_LENGTH = 512;
 
   // TODO: revisit to see if we allow 0-length byte array
@@ -62,28 +60,19 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
   public static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
   public static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BYTES = NULL_BYTE_ARRAY_VALUE;
 
-  @ConfigKey("name")
   protected String _name;
-
-  @ConfigKey("dataType")
   protected DataType _dataType;
-
-  @ConfigKey("singleValue")
   protected boolean _isSingleValueField = true;
 
   // NOTE: for STRING column, this is the max number of characters; for BYTES column, this is the max number of bytes
-  @ConfigKey("maxLength")
   private int _maxLength = DEFAULT_MAX_LENGTH;
 
   protected Object _defaultNullValue;
-
-  @ConfigKey("defaultNullValue")
   private transient String _stringDefaultNullValue;
 
   // Transform function to generate this column, can be based on other columns
   protected String _transformFunction;
 
-  @ConfigKey("virtualColumnProvider")
   protected String _virtualColumnProvider;
 
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
@@ -344,17 +333,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     result = EqualityUtils.hashCodeOf(result, getStringValue(_defaultNullValue));
     result = EqualityUtils.hashCodeOf(result, _maxLength);
     return result;
-  }
-
-  @Override
-  public void preInject() {
-    // Nothing to do
-  }
-
-  @Override
-  public void postInject() {
-    // Compute the actual default null value from its string representation
-    _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
   }
 
   /**

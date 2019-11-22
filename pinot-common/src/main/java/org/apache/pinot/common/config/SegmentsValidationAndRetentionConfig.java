@@ -33,46 +33,20 @@ import org.slf4j.LoggerFactory;
 public class SegmentsValidationAndRetentionConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentsValidationAndRetentionConfig.class);
 
-  @ConfigKey(value = "retention")
-  @UseDsl(dsl = DurationDsl.class, value = "unit")
   private String retentionTimeUnit;
-
-  @ConfigKey(value = "retention")
-  @UseDsl(dsl = DurationDsl.class, value = "unitCount")
   private String retentionTimeValue;
-
-  @ConfigKey(value = "segmentPushFrequency")
   private String segmentPushFrequency; // DO NOT REMOVE, this is used in internal segment generation management
-
-  @ConfigKey(value = "segmentPushType")
   private String segmentPushType;
-
-  @ConfigKey(value = "replication")
   private String replication; // For high-level consumers, the number of replicas should be same as num server instances
-
-  @ConfigKey(value = "schemaName")
   private String schemaName;
-
-  @ConfigKey(value = "timeColumnName")
   private String timeColumnName;
-
-  @ConfigKey(value = "timeType")
   private TimeUnit _timeType;
-
-  @ConfigKey(value = "segmentAssignmentStrategy")
   private String segmentAssignmentStrategy;
-
-  @NestedConfig
   private ReplicaGroupStrategyConfig replicaGroupStrategyConfig;
-
-  @NestedConfig
   private CompletionConfig _completionConfig;
-
-  @NestedConfig
   private HllConfig hllConfig;
 
   // Number of replicas per partition of low-level consumers. This config is used for realtime tables only.
-  @ConfigKey(value = "replicasPerPartition")
   private String replicasPerPartition;
 
   public String getSegmentAssignmentStrategy() {

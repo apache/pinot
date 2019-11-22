@@ -18,26 +18,17 @@
  */
 package org.apache.pinot.common.config;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.utils.EqualityUtils;
 
 
-@SuppressWarnings("unused") // Suppress incorrect warnings as methods used for ser/de.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ColumnPartitionConfig {
-  public static final String PARTITION_VALUE_DELIMITER = ",";
-
-  @ConfigKey("functionName")
-  private String _functionName;
-
-  @ConfigKey("numPartitions")
+  private final String _functionName;
   private int _numPartitions;
-
-  public ColumnPartitionConfig() {
-  }
 
   /**
    * Constructor for the class.
@@ -45,7 +36,8 @@ public class ColumnPartitionConfig {
    * @param functionName Name of the partition function.
    * @param numPartitions Number of partitions for this column.
    */
-  public ColumnPartitionConfig(@Nonnull @JsonProperty("functionName") String functionName,
+  @JsonCreator
+  public ColumnPartitionConfig(@JsonProperty("functionName") String functionName,
       @JsonProperty("numPartitions") int numPartitions) {
     _functionName = functionName;
 

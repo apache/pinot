@@ -20,16 +20,14 @@ package org.apache.pinot.common.config.instance;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.List;
-import org.apache.pinot.common.config.ConfigDoc;
-import org.apache.pinot.common.config.ConfigKey;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class InstanceConstraintConfig {
 
-  @ConfigKey("constraints")
-  @ConfigDoc(value = "Name of the instance constraints to be applied", mandatory = true)
+  @JsonPropertyDescription("Name of the instance constraints to be applied (mandatory)")
   private List<String> _constraints;
 
   @JsonProperty

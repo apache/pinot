@@ -25,10 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -173,11 +170,6 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     pqlQuery = "SELECT MINMAXRANGE(" + column + ") FROM " + getTableName();
     sqlQuery = "SELECT MAX(" + column + ")-MIN(" + column + ") FROM " + getTableName();
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
-  }
-
-  @Override
-  protected boolean isUsingNewConfigFormat() {
-    return true;
   }
 
   @Test

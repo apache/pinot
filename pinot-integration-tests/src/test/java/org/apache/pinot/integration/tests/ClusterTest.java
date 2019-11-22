@@ -31,7 +31,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericData;
@@ -93,9 +92,8 @@ public abstract class ClusterTest extends ControllerTest {
   private List<HelixServerStarter> _serverStarters = new ArrayList<>();
   private List<MinionStarter> _minionStarters = new ArrayList<>();
 
-  protected Schema _schema;
-  protected TableConfig _offlineTableConfig;
-  protected TableConfig _realtimeTableConfig;
+  // TODO: clean this up
+  private TableConfig _realtimeTableConfig;
 
   protected void startBroker()
       throws Exception {
@@ -255,14 +253,10 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void addSchema(File schemaFile, String schemaName)
       throws Exception {
-    if (!isUsingNewConfigFormat()) {
-      try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-        fileUploadDownloadClient
-            .addSchema(FileUploadDownloadClient.getUploadSchemaHttpURI(LOCAL_HOST, _controllerPort), schemaName,
-                schemaFile);
-      }
-    } else {
-      _schema = Schema.fromFile(schemaFile);
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      fileUploadDownloadClient
+          .addSchema(FileUploadDownloadClient.getUploadSchemaHttpURI(LOCAL_HOST, _controllerPort), schemaName,
+              schemaFile);
     }
   }
 
@@ -271,7 +265,7 @@ public abstract class ClusterTest extends ControllerTest {
    *
    * @param segmentDir Segment directory
    */
-  protected void uploadSegments(@Nonnull String tableName, @Nonnull File segmentDir)
+  protected void uploadSegments(String tableName, File segmentDir)
       throws Exception {
     String[] segmentNames = segmentDir.list();
     Assert.assertNotNull(segmentNames);
@@ -318,12 +312,7 @@ public abstract class ClusterTest extends ControllerTest {
     TableConfig tableConfig =
         getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
             invertedIndexColumns, bloomFilterColumns, taskConfig, segmentPartitionConfig, sortedColumn, "daily");
-
-    if (!isUsingNewConfigFormat()) {
-      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
-    } else {
-      _offlineTableConfig = tableConfig;
-    }
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
   }
 
   protected void updateOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
@@ -334,12 +323,7 @@ public abstract class ClusterTest extends ControllerTest {
     TableConfig tableConfig =
         getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
             invertedIndexColumns, bloomFilterColumns, taskConfig, segmentPartitionConfig, sortedColumn, "daily");
-
-    if (!isUsingNewConfigFormat()) {
-      sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJsonConfigString());
-    } else {
-      _offlineTableConfig = tableConfig;
-    }
+    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJsonConfigString());
   }
 
   private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,
@@ -347,21 +331,17 @@ public abstract class ClusterTest extends ControllerTest {
       List<String> invertedIndexColumns, List<String> bloomFilterColumns, TableTaskConfig taskConfig,
       SegmentPartitionConfig segmentPartitionConfig, String sortedColumn, String segmentPushFrequency) {
     return new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName).setTimeColumnName(timeColumnName)
-        .setTimeType(timeType).setSegmentPushFrequency(segmentPushFrequency).setNumReplicas(1).setBrokerTenant(brokerTenant).setServerTenant(serverTenant)
-        .setLoadMode(loadMode).setSegmentVersion(segmentVersion.toString())
-        .setInvertedIndexColumns(invertedIndexColumns).setBloomFilterColumns(bloomFilterColumns)
-        .setTaskConfig(taskConfig).setSegmentPartitionConfig(segmentPartitionConfig).setSortedColumn(sortedColumn)
-        .build();
+        .setTimeType(timeType).setSegmentPushFrequency(segmentPushFrequency).setNumReplicas(1)
+        .setBrokerTenant(brokerTenant).setServerTenant(serverTenant).setLoadMode(loadMode)
+        .setSegmentVersion(segmentVersion.toString()).setInvertedIndexColumns(invertedIndexColumns)
+        .setBloomFilterColumns(bloomFilterColumns).setTaskConfig(taskConfig)
+        .setSegmentPartitionConfig(segmentPartitionConfig).setSortedColumn(sortedColumn).build();
   }
 
   protected void dropOfflineTable(String tableName)
       throws Exception {
     sendDeleteRequest(
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
-  }
-
-  protected boolean isUsingNewConfigFormat() {
-    return false;
   }
 
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
@@ -464,9 +444,7 @@ public abstract class ClusterTest extends ControllerTest {
     // save the realtime table config
     _realtimeTableConfig = tableConfig;
 
-    if (!isUsingNewConfigFormat()) {
-      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
-    }
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
   }
 
   protected void updateRealtimeTableConfig(String tablename, List<String> invertedIndexCols,

@@ -25,16 +25,9 @@ import java.util.List;
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class StarTreeIndexConfig {
-  @ConfigKey("dimensionsSplitOrder")
   private List<String> _dimensionsSplitOrder;
-
-  @ConfigKey("skipStarNodeCreationForDimensions")
   private List<String> _skipStarNodeCreationForDimensions;
-
-  @ConfigKey("functionColumnPairs")
   private List<String> _functionColumnPairs;
-
-  @ConfigKey("maxLeafRecords")
   private int _maxLeafRecords;
 
   public List<String> getDimensionsSplitOrder() {

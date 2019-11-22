@@ -20,35 +20,28 @@ package org.apache.pinot.common.config.instance;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.pinot.common.config.ConfigDoc;
-import org.apache.pinot.common.config.ConfigKey;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class InstanceReplicaGroupPartitionConfig {
 
-  @ConfigKey("replicaGroupBased")
-  @ConfigDoc("Whether to use replica-group based selection, false by default")
+  @JsonPropertyDescription("Whether to use replica-group based selection, false by default")
   private boolean _replicaGroupBased;
 
-  @ConfigKey("numServers")
-  @ConfigDoc("Number of instances to select for non-replica-group based selection, select all instances if not specified")
+  @JsonPropertyDescription("Number of instances to select for non-replica-group based selection, select all instances if not specified")
   private int _numInstances;
 
-  @ConfigKey("numReplicaGroups")
-  @ConfigDoc("Number of replica-groups for replica-group based selection")
+  @JsonPropertyDescription("Number of replica-groups for replica-group based selection")
   private int _numReplicaGroups;
 
-  @ConfigKey("numServersPerReplicaGroup")
-  @ConfigDoc("Number of instances per replica-group for replica-group based selection, select as many instances as possible if not specified")
+  @JsonPropertyDescription("Number of instances per replica-group for replica-group based selection, select as many instances as possible if not specified")
   private int _numInstancesPerReplicaGroup;
 
-  @ConfigKey("numPartitions")
-  @ConfigDoc("Number of partitions for replica-group based selection, do not partition the replica-group (1 partition) if not specified")
+  @JsonPropertyDescription("Number of partitions for replica-group based selection, do not partition the replica-group (1 partition) if not specified")
   private int _numPartitions;
 
-  @ConfigKey("numServersPerPartition")
-  @ConfigDoc("Number of instances per partition (within a replica-group) for replica-group based selection, select all instances if not specified")
+  @JsonPropertyDescription("Number of instances per partition (within a replica-group) for replica-group based selection, select all instances if not specified")
   private int _numInstancesPerPartition;
 
   @JsonProperty

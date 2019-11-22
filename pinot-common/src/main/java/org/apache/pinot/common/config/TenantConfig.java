@@ -19,6 +19,7 @@
 package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.lang.reflect.Field;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.slf4j.Logger;
@@ -29,40 +30,37 @@ import org.slf4j.LoggerFactory;
 public class TenantConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(TenantConfig.class);
 
-  @ConfigKey("brokerTagPrefix")
-  @ConfigDoc("Broker tag prefix used by this table")
-  private String broker;
+  @JsonPropertyDescription("Broker tag prefix used by this table")
+  private String _broker;
 
-  @ConfigKey("serverTagPrefix")
-  @ConfigDoc("Server tag prefix used by this table")
-  private String server;
+  @JsonPropertyDescription("Server tag prefix used by this table")
+  private String _server;
 
-  @ConfigKey("tagOverrideConfig")
-  @ConfigDoc("Overrides for tags")
-  private TagOverrideConfig tagOverrideConfig;
+  @JsonPropertyDescription("Overrides for tags")
+  private TagOverrideConfig _tagOverrideConfig;
 
   public String getBroker() {
-    return broker;
+    return _broker;
   }
 
   public void setBroker(String broker) {
-    this.broker = broker;
+    _broker = broker;
   }
 
   public String getServer() {
-    return server;
+    return _server;
   }
 
   public void setServer(String server) {
-    this.server = server;
+    _server = server;
   }
 
   public TagOverrideConfig getTagOverrideConfig() {
-    return tagOverrideConfig;
+    return _tagOverrideConfig;
   }
 
   public void setTagOverrideConfig(TagOverrideConfig tagOverrideConfig) {
-    this.tagOverrideConfig = tagOverrideConfig;
+    _tagOverrideConfig = tagOverrideConfig;
   }
 
   @Override
@@ -109,13 +107,13 @@ public class TenantConfig {
 
     TenantConfig that = (TenantConfig) o;
 
-    return EqualityUtils.isEqual(broker, that.broker) && EqualityUtils.isEqual(server, that.server);
+    return EqualityUtils.isEqual(_broker, that._broker) && EqualityUtils.isEqual(_server, that._server);
   }
 
   @Override
   public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(broker);
-    result = EqualityUtils.hashCodeOf(result, server);
+    int result = EqualityUtils.hashCodeOf(_broker);
+    result = EqualityUtils.hashCodeOf(result, _server);
     return result;
   }
 }

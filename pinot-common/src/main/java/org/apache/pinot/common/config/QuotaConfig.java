@@ -20,6 +20,7 @@ package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationRuntimeException;
 import org.apache.pinot.common.utils.DataSize;
@@ -35,9 +36,9 @@ import org.slf4j.LoggerFactory;
 public class QuotaConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(QuotaConfig.class);
 
-  @ConfigKey("storage")
-  @ConfigDoc(value = "Storage allocated for this table", exampleValue = "10 GiB")
+  @JsonPropertyDescription("Storage allocated for this table, e.g. \"10G\"")
   private String _storage;
+
   private String _maxQueriesPerSecond;
 
   @Nullable
