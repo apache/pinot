@@ -104,14 +104,8 @@ public class ThirdEyeCacheRegistry {
       URL cacheConfigUrl = thirdeyeConfig.getCacheConfigAsUrl();
       CacheConfig cacheConfig = CacheConfigLoader.fromCacheConfigUrl(cacheConfigUrl);
       if (cacheConfig == null) {
-        LOGGER.error("Could not get cache config from path {} - using default settings", cacheConfigUrl);
-
-        CentralizedCacheConfig cfg = new CentralizedCacheConfig();
-        cfg.setMaxParallelInserts(1);
-
-        CacheConfig.getInstance().setUseCentralizedCache(false);
-        CacheConfig.getInstance().setUseInMemoryCache(true);
-        CacheConfig.getInstance().setCentralizedCacheSettings(cfg);
+        LOGGER.error("Could not get cache config from path {} - reverting to default settings", cacheConfigUrl);
+        setupDefaultTimeSeriesCacheSettings();
       } else {
         CacheDataSource dataSource = CacheConfig.getInstance().getCentralizedCacheSettings().getDataSourceConfig();
 
@@ -131,9 +125,18 @@ public class ThirdEyeCacheRegistry {
         ThirdEyeCacheRegistry.getInstance().registerTimeSeriesCache(timeSeriesCache);
       }
     } catch (Exception e) {
-      LOGGER.error("Caught exception while initializing centralized cache", e);
-      System.exit(1);
+      LOGGER.error("Caught exception while initializing centralized cache - reverting to default settings", e);
+      setupDefaultTimeSeriesCacheSettings();
     }
+  }
+
+  private static void setupDefaultTimeSeriesCacheSettings() {
+    CentralizedCacheConfig cfg = new CentralizedCacheConfig();
+    cfg.setMaxParallelInserts(1);
+
+    CacheConfig.getInstance().setUseCentralizedCache(false);
+    CacheConfig.getInstance().setUseInMemoryCache(true);
+    CacheConfig.getInstance().setCentralizedCacheSettings(cfg);
   }
 
   /**

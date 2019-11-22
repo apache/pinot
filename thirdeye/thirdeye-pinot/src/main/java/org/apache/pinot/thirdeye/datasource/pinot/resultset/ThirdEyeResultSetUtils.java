@@ -35,6 +35,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
 import org.apache.pinot.thirdeye.datasource.TimeRangeUtils;
+import org.apache.pinot.thirdeye.detection.cache.CacheConfig;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -152,7 +153,7 @@ public class ThirdEyeResultSetUtils {
           String[] rowValues = dataMap.get(compositeGroupKey);
           if (rowValues == null) {
             // add one to include the timestamp, if applicable
-            if (timestamp != null) {
+            if (timestamp != null && CacheConfig.getInstance().useCentralizedCache()) {
               rowValues = new String[numCols + 1];
             } else {
               rowValues = new String[numCols];
@@ -179,7 +180,7 @@ public class ThirdEyeResultSetUtils {
                   sourceName
               ));
 
-          if (timestamp != null) {
+          if (timestamp != null && CacheConfig.getInstance().useCentralizedCache()) {
             rowValues[rowValues.length - 1] = timestamp;
           }
         }
