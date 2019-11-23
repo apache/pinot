@@ -110,7 +110,6 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   /**
    * Returns the {@link ColumnDataType} of the final result.
    * <p>This column data type is used for constructing the result table</p>
-   * @return
    */
   ColumnDataType getFinalResultColumnType();
 
