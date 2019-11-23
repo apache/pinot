@@ -108,6 +108,12 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   ColumnDataType getIntermediateResultColumnType();
 
   /**
+   * Returns the {@link ColumnDataType} of the final result.
+   * <p>This column data type is used for constructing the result table</p>
+   */
+  ColumnDataType getFinalResultColumnType();
+
+  /**
    * Extracts the final result used in the broker response from the given intermediate result.
    * TODO: Support serializing/deserializing null values in DataTable and use null as the empty intermediate result
    */

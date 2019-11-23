@@ -179,6 +179,11 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   }
 
   @Override
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.DOUBLE;
+  }
+
+  @Override
   public Double extractFinalResult(AvgPair intermediateResult) {
     long count = intermediateResult.getCount();
     if (count == 0L) {

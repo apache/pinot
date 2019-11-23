@@ -306,6 +306,11 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   }
 
   @Override
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.LONG;
+  }
+
+  @Override
   public Long extractFinalResult(HyperLogLog intermediateResult) {
     return intermediateResult.cardinality();
   }

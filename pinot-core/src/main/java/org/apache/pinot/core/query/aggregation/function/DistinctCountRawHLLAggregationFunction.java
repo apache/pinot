@@ -106,6 +106,11 @@ public class DistinctCountRawHLLAggregationFunction implements AggregationFuncti
   }
 
   @Override
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.STRING;
+  }
+
+  @Override
   public SerializedHLL extractFinalResult(HyperLogLog intermediateResult) {
     return SerializedHLL.of(intermediateResult);
   }
