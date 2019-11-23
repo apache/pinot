@@ -19,6 +19,9 @@
 
 package org.apache.pinot.thirdeye.detection.cache;
 
+import java.util.Map;
+
+
 /**
  * Config for a single centralized cache data source.
  * For example, this class could be for Couchbase, or Redis, or Cassandra, etc.
@@ -26,23 +29,25 @@ package org.apache.pinot.thirdeye.detection.cache;
 public class CacheDataSource {
 
   /**
-   * authentication stuff.
+   * class name, e.g. org.apache.pinot.thirdeye.detection.cache.CouchbaseCacheDAO
    */
-  private String host;
-  private String authUsername;
-  private String authPassword;
-  private String bucketName;
+  private String className;
+
+  /**
+   * settings/config for the specific data source. generic since different
+   * data stores may have different authentication methods.
+   */
+  private Map<String, Object> config;
 
   // left blank
   public CacheDataSource() {}
 
-  public String getHost() { return host; }
-  public String getAuthUsername() { return authUsername; }
-  public String getAuthPassword() { return authPassword; }
-  public String getBucketName() { return bucketName; }
+  public String getClassName() { return className; }
+  public Map<String, Object> getConfig() { return config; }
 
-  public void setHost(String host) { this.host = host; }
-  public void setAuthUsername(String authUsername) { this.authUsername = authUsername; }
-  public void setAuthPassword(String authPassword) { this.authPassword = authPassword; }
-  public void setBucketName(String bucketName) { this.bucketName = bucketName; }
+  public Object getField(String fieldName) { return config.get(fieldName); }
+  public String getFieldAsString(String fieldName) { return String.valueOf(config.get(fieldName)); }
+
+  public void setClassName(String className) { this.className = className; }
+  public void setConfig(Map<String, Object> config) { this.config = config; }
 }

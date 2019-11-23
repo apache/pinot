@@ -57,10 +57,10 @@ public class DefaultTimeSeriesCache implements TimeSeriesCache {
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
   private final QueryCache queryCache;
-  private CouchbaseCacheDAO cacheDAO;
+  private CacheDAO cacheDAO;
   private final ExecutorService executor;
 
-  public DefaultTimeSeriesCache(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, QueryCache queryCache, CouchbaseCacheDAO cacheDAO, ExecutorService executorService) {
+  public DefaultTimeSeriesCache(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, QueryCache queryCache, CacheDAO cacheDAO, ExecutorService executorService) {
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
     this.queryCache = queryCache;

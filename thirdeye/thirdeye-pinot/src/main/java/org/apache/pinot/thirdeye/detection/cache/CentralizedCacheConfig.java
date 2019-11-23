@@ -60,7 +60,7 @@ public class CentralizedCacheConfig {
    * shorthand to get the config for the single data source specified in the config file
    * @return CacheDataSource with auth info
    */
-  public CacheDataSource getDataSourceConfig() { return cacheDataSources.get(cacheDataStoreName);  }
+  public CacheDataSource getDataSourceConfig() { return cacheDataSources.get(cacheDataStoreName); }
 
   public void setTTL(int ttl) { this.ttl = ttl; }
   public void setMaxParallelInserts(int maxParallelInserts) { this.maxParallelInserts = maxParallelInserts; }

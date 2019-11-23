@@ -38,6 +38,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.detection.cache.CacheConfig;
 import org.apache.pinot.thirdeye.detection.cache.CacheConfigLoader;
+import org.apache.pinot.thirdeye.detection.cache.CacheDAO;
 import org.apache.pinot.thirdeye.detection.cache.CacheDataSource;
 import org.apache.pinot.thirdeye.detection.cache.CentralizedCacheConfig;
 import org.apache.pinot.thirdeye.detection.cache.CouchbaseCacheDAO;
@@ -106,20 +107,17 @@ public class ThirdEyeCacheRegistry {
       if (cacheConfig == null) {
         LOGGER.error("Could not get cache config from path {} - reverting to default settings", cacheConfigUrl);
         setupDefaultTimeSeriesCacheSettings();
-      } else {
-        CacheDataSource dataSource = CacheConfig.getInstance().getCentralizedCacheSettings().getDataSourceConfig();
+      }
 
-        cacheConfig.setHost(dataSource.getHost());
-        cacheConfig.setAuthUsername(dataSource.getAuthUsername());
-        cacheConfig.setAuthPassword(dataSource.getAuthPassword());
-        cacheConfig.setBucketName(dataSource.getBucketName());
+      CacheDAO cacheDAO = null;
+      if (cacheConfig.useCentralizedCache()) {
+        cacheDAO = CacheConfigLoader.loadCacheDAO(cacheConfig);
       }
 
       if (INSTANCE.getTimeSeriesCache() == null) {
-        // TODO: add generic cache DAO
         TimeSeriesCache timeSeriesCache = new DefaultTimeSeriesCache(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
             ThirdEyeCacheRegistry.getInstance().getQueryCache(),
-            new CouchbaseCacheDAO(),
+            cacheDAO,
             Executors.newFixedThreadPool(CacheConfig.getInstance().getCentralizedCacheSettings().getMaxParallelInserts()));
 
         ThirdEyeCacheRegistry.getInstance().registerTimeSeriesCache(timeSeriesCache);
@@ -130,6 +128,9 @@ public class ThirdEyeCacheRegistry {
     }
   }
 
+  /**
+   * Use "default" cache settings, meaning
+   */
   private static void setupDefaultTimeSeriesCacheSettings() {
     CentralizedCacheConfig cfg = new CentralizedCacheConfig();
     cfg.setMaxParallelInserts(1);
