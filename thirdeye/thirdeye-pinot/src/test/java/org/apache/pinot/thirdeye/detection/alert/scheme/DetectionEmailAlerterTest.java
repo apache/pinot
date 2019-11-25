@@ -34,6 +34,7 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
+import org.apache.pinot.thirdeye.detection.alert.filter.SubscriptionUtils;
 import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -134,8 +135,10 @@ public class DetectionEmailAlerterTest {
   @Test
   public void testSendEmailSuccessful() throws Exception {
     Map<DetectionAlertFilterNotification, Set<MergedAnomalyResultDTO>> result = new HashMap<>();
+    DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(
+        ConfigUtils.getMap(this.alertConfigDTO.getAlertSchemes()));
     result.put(
-        new DetectionAlertFilterNotification(ConfigUtils.getMap(this.alertConfigDTO.getAlertSchemes())),
+        new DetectionAlertFilterNotification(subsConfig),
         new HashSet<>(this.anomalyDAO.findAll()));
     DetectionAlertFilterResult notificationResults = new DetectionAlertFilterResult(result);
 

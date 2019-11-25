@@ -21,6 +21,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 
 import static org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter.*;
@@ -47,8 +49,9 @@ public class AlertFilterUtils {
     return makeEmailNotifications(recipients, PROP_CC_VALUE, PROP_BCC_VALUE);
   }
 
-  static DetectionAlertFilterNotification makeEmailNotifications(Set<String> toRecipients, Set<String> ccRecipients, Set<String> bccRecipients) {
-    Map<String, Object> alertProps = new HashMap<>();
+  static DetectionAlertFilterNotification makeEmailNotifications(DetectionAlertConfigDTO config,
+      Set<String> toRecipients, Set<String> ccRecipients, Set<String> bccRecipients) {
+    Map<String, Map<String, Object>> alertProps = new HashMap<>();
 
     Map<String, Set<String>> recipients = new HashMap<>();
     recipients.put(PROP_TO, new HashSet<>(toRecipients));
@@ -59,6 +62,16 @@ public class AlertFilterUtils {
     emailRecipients.put(PROP_RECIPIENTS, recipients);
 
     alertProps.put(PROP_EMAIL_SCHEME, emailRecipients);
-    return new DetectionAlertFilterNotification(alertProps);
+
+    DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(alertProps);
+    subsConfig.setProperties(config.getProperties());
+    subsConfig.setVectorClocks(config.getVectorClocks());
+    subsConfig.setReferenceLinks(config.getReferenceLinks());
+
+    return new DetectionAlertFilterNotification(subsConfig);
+  }
+
+  static DetectionAlertFilterNotification makeEmailNotifications(Set<String> toRecipients, Set<String> ccRecipients, Set<String> bccRecipients) {
+    return makeEmailNotifications(new DetectionAlertConfigDTO(), toRecipients, ccRecipients, bccRecipients);
   }
 }

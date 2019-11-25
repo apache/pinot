@@ -27,13 +27,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import org.apache.pinot.thirdeye.detection.annotation.AlertScheme;
@@ -120,20 +118,20 @@ public class DetectionJiraAlerter extends DetectionAlertScheme {
   }
 
   private JiraEntity buildJiraEntity(DetectionAlertFilterNotification notification, Set<MergedAnomalyResultDTO> anomalies) {
-    Map<String, Object> notificationSchemeProps = notification.getNotificationSchemeProps();
-    if (notificationSchemeProps == null || notificationSchemeProps.get(PROP_JIRA_SCHEME) == null) {
+    DetectionAlertConfigDTO subsetSubsConfig = notification.getSubscriptionConfig();
+    if (subsetSubsConfig.getAlertSchemes().get(PROP_JIRA_SCHEME) == null) {
       throw new IllegalArgumentException("Jira not configured in subscription group " + this.subsConfig.getId());
     }
 
     Properties jiraClientConfig = new Properties();
-    jiraClientConfig.putAll(ConfigUtils.getMap(notificationSchemeProps.get(PROP_JIRA_SCHEME)));
+    jiraClientConfig.putAll(subsetSubsConfig.getAlertSchemes().get(PROP_JIRA_SCHEME));
 
     List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>(anomalies);
     anomalyResultListOfGroup.sort(COMPARATOR_DESC);
 
     BaseNotificationContent content = super.buildNotificationContent(jiraClientConfig);
 
-    return new JiraContentFormatter(this.jiraAdminConfig, jiraClientConfig, content, this.teConfig, subsConfig)
+    return new JiraContentFormatter(this.jiraAdminConfig, jiraClientConfig, content, this.teConfig, subsetSubsConfig)
         .getJiraEntity(notification.getDimensionFilters(), anomalyResultListOfGroup);
   }
 

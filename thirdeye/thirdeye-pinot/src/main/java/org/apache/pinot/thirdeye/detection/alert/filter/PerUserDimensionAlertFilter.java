@@ -106,13 +106,15 @@ public class PerUserDimensionAlertFilter extends StatefulDetectionAlertFilter {
     }
 
     for (Map.Entry<String, List<MergedAnomalyResultDTO>> userAnomalyMapping : perUserAnomalies.entrySet()) {
+      DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(
+          generateNotificationSchemeProps(
+              this.config,
+              this.makeGroupRecipients(userAnomalyMapping.getKey()),
+              this.recipients.get(PROP_CC),
+              this.recipients.get(PROP_BCC)));
+
       result.addMapping(
-          new DetectionAlertFilterNotification(
-              generateNotificationSchemeProps(
-                  this.config,
-                  this.makeGroupRecipients(userAnomalyMapping.getKey()),
-                  this.recipients.get(PROP_CC),
-                  this.recipients.get(PROP_BCC))),
+          new DetectionAlertFilterNotification(subsConfig),
           new HashSet<>(userAnomalyMapping.getValue()));
     }
 

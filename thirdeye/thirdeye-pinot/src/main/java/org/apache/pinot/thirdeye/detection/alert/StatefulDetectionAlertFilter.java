@@ -114,9 +114,9 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
     return filteredRecipients;
   }
 
-  protected Map<String, Object> generateNotificationSchemeProps(DetectionAlertConfigDTO config,
+  protected Map<String, Map<String, Object>> generateNotificationSchemeProps(DetectionAlertConfigDTO config,
       Set<String> to, Set<String> cc, Set<String> bcc) {
-    Map<String, Object> notificationSchemeProps = new HashMap<>();
+    Map<String, Map<String, Object>> notificationSchemeProps = new HashMap<>();
 
     if (config.getAlertSchemes() == null) {
       Map<String, Map<String, Object>> alertSchemes = new HashMap<>();

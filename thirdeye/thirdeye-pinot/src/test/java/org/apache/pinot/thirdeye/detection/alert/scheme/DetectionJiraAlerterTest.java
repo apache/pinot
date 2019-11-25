@@ -35,6 +35,7 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
+import org.apache.pinot.thirdeye.detection.alert.filter.SubscriptionUtils;
 import org.apache.pinot.thirdeye.notification.commons.JiraEntity;
 import org.apache.pinot.thirdeye.notification.commons.ThirdEyeJiraClient;
 import org.apache.pinot.thirdeye.notification.formatter.channels.TestJiraContentFormatter;
@@ -123,10 +124,10 @@ public class DetectionJiraAlerterTest {
 
   @Test
   public void testUpdateJiraSuccessful() throws Exception {
+    DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(
+        ConfigUtils.getMap(this.alertConfigDTO.getAlertSchemes()));
     Map<DetectionAlertFilterNotification, Set<MergedAnomalyResultDTO>> result = new HashMap<>();
-    result.put(
-        new DetectionAlertFilterNotification(ConfigUtils.getMap(this.alertConfigDTO.getAlertSchemes())),
-        new HashSet<>(this.anomalyDAO.findAll()));
+    result.put(new DetectionAlertFilterNotification(subsConfig), new HashSet<>(this.anomalyDAO.findAll()));
     DetectionAlertFilterResult notificationResults = new DetectionAlertFilterResult(result);
 
     final ThirdEyeJiraClient jiraClient = mock(ThirdEyeJiraClient.class);

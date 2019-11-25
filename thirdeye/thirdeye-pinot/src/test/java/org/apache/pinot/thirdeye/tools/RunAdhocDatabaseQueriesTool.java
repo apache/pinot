@@ -462,10 +462,16 @@ public class RunAdhocDatabaseQueriesTool {
   private void disableAllActiveSubsGroups(Collection<Long> excludeIds){
     List<DetectionAlertConfigDTO> subsConfigs = detectionAlertConfigDAO.findAll();
     for (DetectionAlertConfigDTO subsConfig : subsConfigs) {
-      if (subsConfig.isActive() && (CollectionUtils.isEmpty(excludeIds) || !excludeIds
-          .contains(subsConfig.getId()))) {
-        subsConfig.setActive(false);
+      // Activate the whitelisted configs
+      if (excludeIds.contains(subsConfig.getId())) {
+        subsConfig.setActive(true);
         detectionAlertConfigDAO.update(subsConfig);
+      } else {
+        // Disable other configs
+        if (subsConfig.isActive()) {
+          subsConfig.setActive(false);
+          detectionAlertConfigDAO.update(subsConfig);
+        }
       }
     }
   }
@@ -612,7 +618,7 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
-    dq.unsubscribedDetections();
+    dq.disableAllActiveSubsGroups(Collections.singleton(142644400L));
     LOG.info("DONE");
   }
 

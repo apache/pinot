@@ -3,6 +3,7 @@ package org.apache.pinot.thirdeye.detection.alert.suppress;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterNotification;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
@@ -14,6 +15,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.thirdeye.detection.alert.filter.SubscriptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -116,13 +118,14 @@ public class DetectionTimeWindowSuppressorTest {
    */
   @Test
   public void testTimeWindowSuppressorWithThreshold() throws Exception {
-    Map<String, Set<String>> recipients = new HashMap<>();
+    Map<String, Object> recipients = new HashMap<>();
     recipients.put("to", Collections.singleton("test@test"));
 
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
-    Map<String, Object> alertProps = new HashMap<>();
-    alertProps.put("recipients", recipients);
-    result.addMapping(new DetectionAlertFilterNotification(alertProps), anomalies);
+    Map<String, Map<String, Object>> alertProps = new HashMap<>();
+    alertProps.put("emailScheme", recipients);
+    DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(alertProps);
+    result.addMapping(new DetectionAlertFilterNotification(subsConfig), anomalies);
 
     DetectionAlertTimeWindowSuppressor suppressor = new DetectionAlertTimeWindowSuppressor(config);
     DetectionAlertFilterResult resultsAfterSuppress = suppressor.run(result);
@@ -150,13 +153,14 @@ public class DetectionTimeWindowSuppressorTest {
     alertSuppressors.put(TIME_WINDOW_SUPPRESSOR_KEY, params);
     config.setAlertSuppressors(alertSuppressors);
 
-    Map<String, Set<String>> recipients = new HashMap<>();
+    Map<String, Object> recipients = new HashMap<>();
     recipients.put("to", Collections.singleton("test@test"));
 
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
-    Map<String, Object> alertProps = new HashMap<>();
-    alertProps.put("recipients", recipients);
-    result.addMapping(new DetectionAlertFilterNotification(alertProps), anomalies);
+    Map<String, Map<String, Object>> alertProps = new HashMap<>();
+    alertProps.put("emailScheme", recipients);
+    DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(alertProps);
+    result.addMapping(new DetectionAlertFilterNotification(subsConfig), anomalies);
 
     DetectionAlertTimeWindowSuppressor suppressor = new DetectionAlertTimeWindowSuppressor(config);
     DetectionAlertFilterResult resultsAfterSuppress = suppressor.run(result);
