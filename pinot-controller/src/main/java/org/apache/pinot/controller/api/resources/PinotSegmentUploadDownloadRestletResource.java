@@ -192,7 +192,7 @@ public class PinotSegmentUploadDownloadRestletResource {
                   metadataProviderClass);
           break;
         case SEGMENT:
-          getFileFromMultipart(multiPart, tempDecryptedFile);
+          getFileFromMultipart(multiPart, tempEncryptedFile);
           segmentMetadata = getSegmentMetadata(crypterClassName, tempEncryptedFile, tempDecryptedFile, tempSegmentDir,
               metadataProviderClass);
           break;
@@ -303,14 +303,14 @@ public class PinotSegmentUploadDownloadRestletResource {
     return MetadataExtractorFactory.create(metadataProviderClass).extractMetadata(tempDecryptedFile, tempSegmentDir);
   }
 
-  private void completeZkOperations(boolean enableParallelPushProtection, HttpHeaders headers, File tempDecryptedFile,
+  private void completeZkOperations(boolean enableParallelPushProtection, HttpHeaders headers, File tempEncryptedFile,
       FileUploadPathProvider provider, String rawTableName, SegmentMetadata segmentMetadata, String segmentName,
       String zkDownloadURI, boolean moveSegmentToFinalLocation)
       throws Exception {
     URI finalSegmentLocationURI =
         URIUtils.getUri(provider.getBaseDataDirURI().toString(), rawTableName, URIUtils.encode(segmentName));
     ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
-    zkOperator.completeSegmentOperations(rawTableName, segmentMetadata, finalSegmentLocationURI, tempDecryptedFile,
+    zkOperator.completeSegmentOperations(rawTableName, segmentMetadata, finalSegmentLocationURI, tempEncryptedFile,
         enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation);
   }
 
