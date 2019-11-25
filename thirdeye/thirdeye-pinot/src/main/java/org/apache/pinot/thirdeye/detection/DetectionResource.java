@@ -36,11 +36,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import javax.validation.constraints.NotNull;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -70,19 +68,17 @@ import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
-import org.apache.pinot.thirdeye.datasource.cache.metadata.DetectionAlertConfigsCacheLoader;
-import org.apache.pinot.thirdeye.datasource.cache.metadata.MetaDataCollectionCache;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.finetune.GridSearchTuningAlgorithm;
 import org.apache.pinot.thirdeye.detection.finetune.TuningAlgorithm;
-import org.apache.pinot.thirdeye.formatter.DetectionAlertConfigFormatter;
-import org.apache.pinot.thirdeye.formatter.DetectionConfigFormatter;
 import org.apache.pinot.thirdeye.detection.health.DetectionHealth;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detector.function.BaseAnomalyFunction;
+import org.apache.pinot.thirdeye.formatter.DetectionAlertConfigFormatter;
+import org.apache.pinot.thirdeye.formatter.DetectionConfigFormatter;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.AnomalyOffset;
 import org.joda.time.DateTime;
@@ -117,7 +113,6 @@ public class DetectionResource {
   private final DetectionAlertConfigManager detectionAlertConfigDAO;
   private final DetectionConfigFormatter detectionConfigFormatter;
   private final DetectionAlertConfigFormatter subscriptionConfigFormatter;
-  private final MetaDataCollectionCache<List<DetectionAlertConfigDTO>> detectionAlertConfigsCache;
 
   public DetectionResource() {
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
@@ -141,7 +136,6 @@ public class DetectionResource {
     this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, evaluationDAO, timeseriesLoader, aggregationLoader, loader);
     this.detectionConfigFormatter = new DetectionConfigFormatter(metricDAO, datasetDAO);
     this.subscriptionConfigFormatter = new DetectionAlertConfigFormatter();
-    this.detectionAlertConfigsCache = new MetaDataCollectionCache<>(new DetectionAlertConfigsCacheLoader(this.detectionAlertConfigDAO));
   }
 
   @Path("/{id}")
@@ -172,7 +166,7 @@ public class DetectionResource {
   @GET
   @ApiOperation("get a list of detection alert configs for a given detection config id")
   public Response getSubscriptionGroups(@ApiParam("the detection config id") @PathParam("id") long id){
-    List<DetectionAlertConfigDTO> detectionAlertConfigDTOs = this.detectionAlertConfigsCache.get();
+    List<DetectionAlertConfigDTO> detectionAlertConfigDTOs = this.detectionAlertConfigDAO.findAll();
     Set<DetectionAlertConfigDTO> subscriptionGroupAlertDTOs = new HashSet<>();
     for (DetectionAlertConfigDTO alertConfigDTO : detectionAlertConfigDTOs){
       if (alertConfigDTO.getVectorClocks().containsKey(id) || ConfigUtils.getLongs(alertConfigDTO.getProperties().get("detectionConfigIds")).contains(id)){
@@ -187,7 +181,7 @@ public class DetectionResource {
   @GET
   @ApiOperation("get all detection alert configs")
   public Response getAllSubscriptionGroups(){
-    List<DetectionAlertConfigDTO> detectionAlertConfigDTOs = this.detectionAlertConfigsCache.get();
+    List<DetectionAlertConfigDTO> detectionAlertConfigDTOs = this.detectionAlertConfigDAO.findAll();
     return Response.ok(detectionAlertConfigDTOs.stream().map(this.subscriptionConfigFormatter::format).collect(Collectors.toList())).build();
   }
 

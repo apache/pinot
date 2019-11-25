@@ -66,8 +66,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
-import org.apache.pinot.thirdeye.datasource.cache.metadata.ApplicationsCacheLoader;
-import org.apache.pinot.thirdeye.datasource.cache.metadata.MetaDataCollectionCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,7 +87,6 @@ public class EntityManagerResource {
   private final MergedAnomalyResultManager mergedAnomalyResultManager;
   private final DetectionAlertConfigManager detectionAlertConfigManager;
   private final ThirdEyeConfiguration config;
-  private final MetaDataCollectionCache<List<ApplicationDTO>> applicationsCache;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -110,7 +107,6 @@ public class EntityManagerResource {
     this.mergedAnomalyResultManager = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.detectionAlertConfigManager = DAO_REGISTRY.getDetectionAlertConfigManager();
     this.config = configuration;
-    this.applicationsCache = new MetaDataCollectionCache<>(new ApplicationsCacheLoader(applicationManager));
   }
 
   private enum EntityType {
@@ -175,7 +171,7 @@ public class EntityManagerResource {
         return classificationConfigManager.findAll();
 
       case APPLICATION:
-        return applicationsCache.get();
+        return applicationManager.findAll();
 
       case ENTITY_MAPPING:
         return entityToEntityMappingManager.findAll();

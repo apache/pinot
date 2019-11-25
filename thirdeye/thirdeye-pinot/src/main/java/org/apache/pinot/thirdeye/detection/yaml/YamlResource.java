@@ -40,6 +40,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import javax.annotation.security.PermitAll;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.Consumes;
@@ -75,8 +76,6 @@ import org.apache.pinot.thirdeye.datalayer.dto.SessionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
-import org.apache.pinot.thirdeye.datasource.cache.metadata.FormattedDetectionConfigsCacheLoader;
-import org.apache.pinot.thirdeye.datasource.cache.metadata.MetaDataCollectionCache;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
@@ -95,6 +94,7 @@ import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
 import org.apache.pinot.thirdeye.detection.validators.SubscriptionConfigValidator;
 import org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator;
 import org.apache.pinot.thirdeye.detection.yaml.translator.SubscriptionConfigTranslator;
+import org.apache.pinot.thirdeye.formatter.DetectionConfigFormatter;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -143,7 +143,7 @@ public class YamlResource {
   private final Yaml yaml;
   private final ExecutorService executor;
   private final long previewTimeout;
-  private final MetaDataCollectionCache<List<Map<String, Object>>> formattedDetectionConfigsCache;
+  private final DetectionConfigFormatter detectionConfigFormatter;
 
   public YamlResource(DetectionPreviewConfiguration previewConfig) {
     this.detectionConfigDAO = DAORegistry.getInstance().getDetectionConfigManager();
@@ -172,8 +172,7 @@ public class YamlResource {
 
     this.detectionValidator = new DetectionConfigValidator(this.provider);
     this.subscriptionValidator = new SubscriptionConfigValidator();
-    this.formattedDetectionConfigsCache = new MetaDataCollectionCache<>(
-        new FormattedDetectionConfigsCacheLoader(this.detectionConfigDAO, this.metricDAO, this.datasetDAO));
+    this.detectionConfigFormatter = new DetectionConfigFormatter(metricDAO, datasetDAO);
   }
 
   /*
@@ -328,8 +327,6 @@ public class YamlResource {
 
     LOG.info("Alert created successfully with detection ID " + detectionConfigId + " and subscription ID "
         + detectionAlertConfigId);
-    // refresh the detection config list cache after a new alert is created
-    this.formattedDetectionConfigsCache.refresh();
     return Response.ok().entity(ImmutableMap.of(
         "detectionConfigId", detectionConfigId,
         "detectionAlertConfigId", detectionAlertConfigId)
@@ -389,7 +386,6 @@ public class YamlResource {
     LOG.info("Detection created with id " + detectionConfigId + " using payload " + payload);
     responseMessage.put("message", "Alert was created successfully.");
     responseMessage.put("more-info", "Record saved with id " + detectionConfigId);
-    this.formattedDetectionConfigsCache.refresh();
     return Response.ok().entity(responseMessage).build();
   }
 
@@ -497,7 +493,6 @@ public class YamlResource {
     LOG.info("Detection with id " + id + " updated");
     responseMessage.put("message", "Alert was updated successfully.");
     responseMessage.put("detectionConfigId", String.valueOf(id));
-    this.formattedDetectionConfigsCache.refresh();
     return Response.ok().entity(responseMessage).build();
   }
 
@@ -563,7 +558,6 @@ public class YamlResource {
     LOG.info("Detection Pipeline created/updated with id " + detectionConfigId + " using payload " + payload);
     responseMessage.put("message", "The alert was created/updated successfully.");
     responseMessage.put("more-info", "Record saved/updated with id " + detectionConfigId);
-    this.formattedDetectionConfigsCache.refresh();
     return Response.ok().entity(responseMessage).build();
   }
 
@@ -610,7 +604,6 @@ public class YamlResource {
     LOG.info("Notification group created with id " + detectionAlertConfigId + " using payload " + payload);
     responseMessage.put("message", "The subscription group was created successfully.");
     responseMessage.put("detectionAlertConfigId", String.valueOf(detectionAlertConfigId));
-    this.formattedDetectionConfigsCache.refresh();
     return Response.ok().entity(responseMessage).build();
   }
 
@@ -700,7 +693,6 @@ public class YamlResource {
     LOG.info("Subscription group with id " + id + " updated");
     responseMessage.put("message", "The subscription group was updated successfully.");
     responseMessage.put("detectionAlertConfigId", String.valueOf(id));
-    this.formattedDetectionConfigsCache.refresh();
     return Response.ok().entity(responseMessage).build();
   }
 
@@ -902,7 +894,6 @@ public class YamlResource {
     }
 
     LOG.info("Alert activation toggled to {} for detection id {}", active , detectionId);
-    this.formattedDetectionConfigsCache.refresh();
     return Response.ok(responseMessage).build();
   }
 
@@ -915,6 +906,6 @@ public class YamlResource {
   @Path("/list")
   @Produces(MediaType.APPLICATION_JSON)
   public List<Map<String, Object>> listYamls() throws ExecutionException {
-    return formattedDetectionConfigsCache.get();
+    return this.detectionConfigDAO.findAll().parallelStream().map(this.detectionConfigFormatter::format).collect(Collectors.toList());
   }
 }
