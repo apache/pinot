@@ -180,6 +180,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_ENABLE_COMMIT_END_WITH_METADATA =
         "pinot.server.instance.enable.commitend.metadata";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap";
+    public static final String CONFIG_OF_REALTIME_ENABLE_UPLOAD_TO_CONTROLLER = "pinot.server.instance.enable.upload.segment.to.controller";
+    // Configs for the root directory of segment store.
+    public static final String CONFIG_OF_SEGMENT_STORE_ROOT_DIR = "pinot.server.instance.segment.store.root.dir";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION =
         "pinot.server.instance.realtime.alloc.offheap.direct";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.server.storage.factory";

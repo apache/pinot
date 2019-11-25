@@ -24,6 +24,7 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import com.yammer.metrics.core.Meter;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -44,6 +45,8 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.NetUtil;
+import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
@@ -591,7 +594,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                     response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit());
                 if (success) {
                   _state = State.COMMITTED;
-                  // TODO (tingchen) Asynchronously upload the segment file to Pinot FS for backup.
+                  // Asynchronously upload the segment file to Pinot FS for backup.
+                  uploadSegmentToSegmentStore();
                 } else {
                   // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
                   // Change the state to HOLDING before looping around.
@@ -624,6 +628,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       }
       _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
     }
+  }
+
+  // Upload the tar file of the committed segment to the configure segment store.
+  private boolean uploadSegmentToSegmentStore() {
+    final File segmentTarFile = new File(_segmentBuildDescriptor.getSegmentTarFilePath());
+    return _realtimeTableDataManager.uploadRealtimeSegment(segmentTarFile);
   }
 
   /**

@@ -52,4 +52,6 @@ public interface InstanceDataManagerConfig {
   int getMaxParallelSegmentBuilds();
 
   boolean isEnableSegmentUploadToController();
+
+  String getSegmentStoreDir();
 }

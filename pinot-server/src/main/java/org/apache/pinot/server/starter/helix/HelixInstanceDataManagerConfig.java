@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import java.net.URI;
 import java.util.Iterator;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
@@ -95,6 +96,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final String MAX_PARALLEL_REFRESH_THREADS = "max.parallel.refresh.threads";
 
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE};
+  private static final String SEGMENT_STORE_ROOT_DIR = "segment.store.root.dir";
   private Configuration _instanceDataManagerConfiguration = null;
 
   public HelixInstanceDataManagerConfig(Configuration serverConfig)
@@ -197,6 +199,10 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   public boolean isEnableSegmentUploadToController() {
     return _instanceDataManagerConfiguration.getBoolean(ENABLE_SEGMENT_UPLOAD_TO_CONTROLLER, true);
+  }
+
+  public String getSegmentStoreDir() {
+    return _instanceDataManagerConfiguration.getString(SEGMENT_STORE_ROOT_DIR);
   }
 
   @Override

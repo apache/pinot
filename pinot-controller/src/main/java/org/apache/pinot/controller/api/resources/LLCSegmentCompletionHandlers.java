@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.UUID;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -353,6 +354,7 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
       @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
+      @DefaultValue ("true") @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_UPLOAD_TO_CONTROLLER) boolean segmentUpload,
       FormDataMultiPart metadataFiles) {
     if (instanceId == null || segmentName == null || offset == -1 || segmentLocation == null || metadataFiles == null) {
       LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}, segmentLocation={}", offset, segmentName,
@@ -365,7 +367,7 @@ public class LLCSegmentCompletionHandlers {
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset)
         .withSegmentLocation(segmentLocation).withSegmentSizeBytes(segmentSizeBytes)
         .withBuildTimeMillis(buildTimeMillis).withWaitTimeMillis(waitTimeMillis).withNumRows(numRows)
-        .withMemoryUsedBytes(memoryUsedBytes);
+        .withMemoryUsedBytes(memoryUsedBytes).withSegmentUploadToController(segmentUpload);
     LOGGER.info("Processing segmentCommitEndWithMetadata:{}", requestParams.toString());
 
     SegmentMetadataImpl segmentMetadata;

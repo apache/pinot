@@ -152,6 +152,9 @@ public class HelixServerStarter {
 
     updateInstanceConfigIfNeeded(host, port);
 
+    // Init the Pinot FS for uploading and downloading segments.
+    PinotFSFactory.init(serverConf.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY));
+
     // Start restlet server for admin API endpoint
     int adminApiPort = _serverConf.getInt(CONFIG_OF_ADMIN_API_PORT, DEFAULT_ADMIN_API_PORT);
     _adminApiApplication = new AdminApiApplication(_serverInstance);

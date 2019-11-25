@@ -66,6 +66,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _instanceId = instanceId;
     _propertyStore = propertyStore;
     _serverMetrics = serverMetrics;
+    _helixAdmin = admin;
+    _clusterName = clusterName;
 
     _tableNameWithType = tableDataManagerConfig.getTableName();
     _tableDataDir = tableDataManagerConfig.getDataDir();

@@ -123,6 +123,9 @@ public class SegmentCompletionProtocol {
   public static final String PARAM_MEMORY_USED_BYTES = "memoryUsedBytes";
   public static final String PARAM_SEGMENT_SIZE_BYTES = "segmentSizeBytes";
   public static final String PARAM_REASON = "reason";
+  // Controller whether servers upload segments to controller.
+  public static final String PARAM_SEGMENT_UPLOAD_TO_CONTROLLER = "segmentUploadToController";
+
   // Sent by servers to request additional time to build
   public static final String PARAM_EXTRA_TIME_SEC = "extraTimeSec";
   public static final String PARAM_ROW_COUNT = "rowCount"; // Sent by servers to indicate the number of rows read so far
@@ -186,7 +189,8 @@ public class SegmentCompletionProtocol {
           + (_params.getSegmentSizeBytes() <= 0 ? ""
           : ("&" + PARAM_SEGMENT_SIZE_BYTES + "=" + _params.getSegmentSizeBytes())) + (_params.getNumRows() <= 0 ? ""
           : ("&" + PARAM_ROW_COUNT + "=" + _params.getNumRows())) + (_params.getSegmentLocation() == null ? ""
-          : ("&" + PARAM_SEGMENT_LOCATION + "=" + _params.getSegmentLocation()));
+          : ("&" + PARAM_SEGMENT_LOCATION + "=" + _params.getSegmentLocation()))
+          + "&" + PARAM_SEGMENT_UPLOAD_TO_CONTROLLER + "=" + _params.getSegmentUploadToController();
     }
 
     public static class Params {
@@ -201,6 +205,7 @@ public class SegmentCompletionProtocol {
       private String _segmentLocation;
       private long _memoryUsedBytes;
       private long _segmentSizeBytes;
+      private boolean _segmentUploadToController;
 
       public Params() {
         _offset = -1L;
@@ -213,6 +218,7 @@ public class SegmentCompletionProtocol {
         _segmentLocation = null;
         _memoryUsedBytes = MEMORY_USED_BYTES_DEFAULT;
         _segmentSizeBytes = SEGMENT_SIZE_BYTES_DEFAULT;
+        _segmentUploadToController = true;
       }
 
       public Params(Params params) {
@@ -283,6 +289,11 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
+      public Params withSegmentUploadToController(boolean segmentUploadToController) {
+        _segmentUploadToController = segmentUploadToController;
+        return this;
+      }
+
       public String getSegmentName() {
         return _segmentName;
       }
@@ -325,6 +336,10 @@ public class SegmentCompletionProtocol {
 
       public long getSegmentSizeBytes() {
         return _segmentSizeBytes;
+      }
+
+      public boolean getSegmentUploadToController() {
+        return _segmentUploadToController;
       }
 
       public String toString() {

@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -40,7 +42,6 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -61,6 +62,8 @@ import org.apache.pinot.spi.config.IndexingConfig;
 import org.apache.pinot.spi.config.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 
 
 @ThreadSafe
@@ -76,6 +79,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   // The semaphores will stay in the hash map even if the consuming partitions move to a different host.
   // We expect that there will be a small number of semaphores, but that may be ok.
   private final Map<Integer, Semaphore> _partitionIdToSemaphoreMap = new ConcurrentHashMap<>();
+  // TODO(tingchen) unify the _pinotFS and _segmentFetcherFactory under Pinot FS.
+  private PinotFS _pinotFS;
 
   // The old name of the stats file used to be stats.ser which we changed when we moved all packages
   // from com.linkedin to org.apache because of not being able to deserialize the old files using the newer classes
@@ -145,6 +150,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           _logger.error("Cannot delete file {}", file.getAbsolutePath());
         }
       }
+    }
+    try {
+      _pinotFS = PinotFSFactory.create(new URI(_tableDataManagerConfig.getTableSegmentStoreRootDir()).getScheme());
+    } catch (URISyntaxException e) {
+      _logger.error("Failed to init Pinot FS from store store URI {}", _tableDataManagerConfig.getTableSegmentStoreRootDir());
     }
   }
 
@@ -280,22 +290,21 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     final File segmentFolder = new File(_indexDir, segmentName);
     FileUtils.deleteQuietly(segmentFolder);
     try {
-      SegmentFetcherFactory.fetchSegmentToLocal(uri, tempFile);
-      _logger.info("Downloaded file from {} to {}; Length of downloaded file: {}", uri, tempFile, tempFile.length());
       boolean downloadResult = downloadFromURI(uri, tempFile);
       if (!downloadResult) {
          String peerServerUri = getPeerServerURI(segmentName);
          if (peerServerUri == null || !downloadFromURI(peerServerUri, tempFile)) {
-           _logger.warn("Download segment {} failed.", segmentName);
+           _logger.warn("Download segment {} from {} failed.", segmentName, peerServerUri);
            return;
          }
       }
       TarGzCompressionUtils.unTar(tempFile, tempSegmentFolder);
-      _logger.info("Uncompressed file {} into tmp dir {}", tempFile, tempSegmentFolder);
+      _logger.warn("Uncompressed file {} into tmp dir {}", tempFile, tempSegmentFolder);
       FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], segmentFolder);
-      _logger.info("Replacing LLC Segment {}", segmentName);
+      _logger.warn("Replacing LLC Segment {}", segmentName);
       replaceLLSegment(segmentName, indexLoadingConfig);
     } catch (Exception e) {
+      _logger.error("Failed to download segment {}.", e.getMessage());
       throw new RuntimeException(e);
     } finally {
       FileUtils.deleteQuietly(tempFile);
@@ -304,8 +313,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   // Return the address of an ONLINE server hosting a segment.
-  private String getPeerServerURI(String segmentName) {
+  public String getPeerServerURI(String segmentName) {
     ExternalView externalViewForResource = HelixHelper.getExternalViewForResource(_helixAdmin, _clusterName, _tableNameWithType);
+    if (externalViewForResource == null ) {
+      _logger.warn("External View not found for segment {}", segmentName);
+      return null;
+    }
     // Find out the ONLINE server serving the segment.
     for(String segment : externalViewForResource.getPartitionSet()) {
       if (!segmentName.equals(segment)) {
@@ -320,15 +333,18 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
           String namePortStr = instanceId.split(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)[1];
           String hostName = namePortStr.split("_")[0];
+
+          Map<String, String> instanceConfig =
+              HelixHelper.getInstanceConfigsMapFor(instanceId, _clusterName, _helixAdmin);
           int port;
           try {
-            port = Integer.parseInt(namePortStr.split("_")[1]);
+            port = Integer.parseInt(instanceConfig.get(CommonConstants.Helix.Instance.ADMIN_PORT_KEY));
           } catch (Exception e) {
             port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
           }
 
           return StringUtil.join("/", "http://" + hostName + ":" + port,
-              "tables",  _tableNameWithType, "segments", segmentName);
+              "segments", _tableNameWithType, segmentName);
         }
       }
     }
@@ -415,5 +431,20 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
 
     return isValid;
+  }
+
+  public boolean uploadRealtimeSegment(File segmentTarFile) {
+    try {
+      _pinotFS.copyFromLocalFile(segmentTarFile, new URI(StringUtil.join(File.separator,
+          _tableDataManagerConfig.getTableSegmentStoreRootDir(), this._tableNameWithType, segmentTarFile.getName())));
+      return true;
+    } catch (Exception e) {
+      _logger.error("Failed copy segment tar file to segment store {}", segmentTarFile.getName());
+    }
+    return false;
+  }
+
+  public String getTableSegmentStoreRootDir() {
+    return _tableDataManagerConfig.getTableSegmentStoreRootDir();
   }
 }

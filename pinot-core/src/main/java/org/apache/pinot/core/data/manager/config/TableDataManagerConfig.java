@@ -35,6 +35,7 @@ public class TableDataManagerConfig {
   private static final String TABLE_DATA_MANAGER_DATA_DIRECTORY = "directory";
   private static final String TABLE_DATA_MANAGER_CONSUMER_DIRECTORY = "consumerDirectory";
   private static final String TABLE_DATA_MANAGER_NAME = "name";
+  private static final String TABLE_SEGMENT_STORE_ROOT_DIR = "segmentStoreDirectory";
 
   private final Configuration _tableDataManagerConfig;
 
@@ -62,6 +63,10 @@ public class TableDataManagerConfig {
     return _tableDataManagerConfig.getString(TABLE_DATA_MANAGER_NAME);
   }
 
+  public String getTableSegmentStoreRootDir() {
+    return _tableDataManagerConfig.getString(TABLE_DATA_MANAGER_CONSUMER_DIRECTORY);
+  }
+
   public static TableDataManagerConfig getDefaultHelixTableDataManagerConfig(
       @Nonnull InstanceDataManagerConfig instanceDataManagerConfig, @Nonnull String tableNameWithType) {
     Configuration defaultConfig = new PropertiesConfiguration();
@@ -72,6 +77,7 @@ public class TableDataManagerConfig {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     Preconditions.checkNotNull(tableType);
     defaultConfig.addProperty(TABLE_DATA_MANAGER_TYPE, tableType.name());
+    defaultConfig.addProperty(TABLE_SEGMENT_STORE_ROOT_DIR, instanceDataManagerConfig.getSegmentStoreDir());
 
     return new TableDataManagerConfig(defaultConfig);
   }
