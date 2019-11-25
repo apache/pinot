@@ -25,6 +25,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -139,6 +140,17 @@ public class DetectionHealth {
     public Builder addDetectionTaskStatus(TaskManager taskDAO, long limit) {
       this.taskDAO = taskDAO;
       this.taskLimit = limit;
+      return this;
+    }
+
+    /**
+     * Add the detection task health status in the health report built by the builder. Do not return any task details
+     * @param taskDAO the task dao
+     * @return the builder
+     */
+    public Builder addDetectionTaskStatus(TaskManager taskDAO) {
+      this.taskDAO = taskDAO;
+      this.taskLimit = 0;
       return this;
     }
 
@@ -259,5 +271,18 @@ public class DetectionHealth {
       }
       return HealthStatus.GOOD;
     }
+  }
+
+  /**
+   * Create a unknown detection health
+   * @return the unknown detection health
+   */
+  public static DetectionHealth unknown() {
+    DetectionHealth health = new DetectionHealth();
+    health.anomalyCoverageStatus = AnomalyCoverageStatus.fromCoverageRatio(Double.NaN);
+    health.detectionTaskStatus = DetectionTaskStatus.fromTasks(Collections.emptyList());
+    health.regressionStatus = RegressionStatus.fromDetectorMapes(Collections.emptyMap());
+    health.overallHealth = HealthStatus.UNKNOWN;
+    return health;
   }
 }

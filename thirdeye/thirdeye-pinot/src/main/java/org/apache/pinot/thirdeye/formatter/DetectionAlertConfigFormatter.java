@@ -33,6 +33,7 @@ public class DetectionAlertConfigFormatter implements DTOFormatter<DetectionAler
   private static final String ATTR_YAML = "yaml";
   private static final String ATTR_ACTIVE = "active";
   private static final String ATTR_ID = "id";
+  private static final String ATTR_DETECTION_CONFIG_IDS = "detectionConfigIds";
 
   @Override
   public Map<String, Object> format(DetectionAlertConfigDTO config) {
@@ -41,6 +42,7 @@ public class DetectionAlertConfigFormatter implements DTOFormatter<DetectionAler
     output.put(ATTR_YAML, config.getYaml());
     output.put(ATTR_ID, config.getId());
     output.put(ATTR_ACTIVE, config.isActive());
+    output.put(ATTR_DETECTION_CONFIG_IDS, config.getVectorClocks().keySet());
     return output;
   }
 }

@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -32,12 +33,18 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
+import org.apache.pinot.thirdeye.detection.health.DetectionHealth;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
+import org.joda.time.DateTime;
 import org.joda.time.Period;
 import org.joda.time.PeriodType;
 import org.slf4j.Logger;
@@ -68,6 +75,7 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
   static final String ATTR_DIMENSION_EXPLORE = "dimensionExploration";
   static final String ATTR_RULES = "rules";
   static final String ATTR_GRANULARITY = "monitoringGranularity";
+  static final String ATTR_HEALTH = "health";
 
   private static final String PROP_NESTED_METRIC_URNS_KEY = "nestedMetricUrns";
   private static final String PROP_NESTED_PROPERTIES_KEY = "nested";
@@ -87,11 +95,17 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
 
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
+  private final EvaluationManager evaluationDAO;
+  private final MergedAnomalyResultManager anomalyDAO;
+  private final TaskManager taskDAO;
   private final Yaml yaml;
 
   public DetectionConfigFormatter(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) {
     this.datasetDAO = datasetDAO;
     this.metricDAO = metricDAO;
+    this.evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
+    this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
+    this.taskDAO = DAORegistry.getInstance().getTaskDAO();
     this.yaml = new Yaml();
   }
 
@@ -106,6 +120,8 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
     output.put(ATTR_DESCRIPTION, config.getDescription());
     output.put(ATTR_YAML, config.getYaml());
     output.put(ATTR_LAST_TIMESTAMP, config.getLastTimestamp());
+    output.put(ATTR_HEALTH, getDetectionHealth(config));
+
     List<String> metricUrns = extractMetricUrnsFromProperties(config.getProperties());
 
     Map<String, MetricConfigDTO> metricUrnToMetricDTOs = new HashMap<>();
@@ -154,6 +170,14 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
     return metricUrns;
   }
 
+  private DetectionHealth getDetectionHealth(DetectionConfigDTO config) {
+    // Return the stored detection health when it is available in the DetectionConfig.
+    if (!Objects.isNull(config.getHealth())) {
+      return config.getHealth();
+    }
+    return DetectionHealth.unknown();
+  }
+
   /**
    * Get the display names for the datasets. Show the display name if it is available in the dataset. Otherwize, use the dataset name.
    * @param metricUrnToDatasets the map of detection config keyed buy metric urn
@@ -197,7 +221,7 @@ public class DetectionConfigFormatter implements DTOFormatter<DetectionConfigDTO
       }
       return granularities;
     } catch (Exception e) {
-      LOG.warn("Exception thrown when getting granularities for detection config {}, use default granularity", config.getId(), e);
+      // return the default granularity if the dataset is not available. Most likely caused by the dataset is deleted.
       return Collections.singletonList(DEFAULT_SHOW_GRANULARITY);
     }
   }

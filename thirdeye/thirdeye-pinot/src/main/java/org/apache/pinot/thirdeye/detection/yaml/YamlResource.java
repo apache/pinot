@@ -28,14 +28,13 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -868,21 +867,48 @@ public class YamlResource {
   }
 
   /**
-   * List all yaml configurations as JSON enhanced with detection config id, isActive and createBy information.
+   * Toggle active/inactive for given detection
    *
-   * @param id id of a specific detection config yaml to list (optional)
+   * @param detectionId detection config id (must exist)
+   * @param active value to set for active field in detection config
+   */
+  @PUT
+  @Path("/activation/{id}")
+  @ApiOperation("Make detection active or inactive, given id")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response toggleActivation(
+      @ApiParam("Detection configuration id for the alert") @NotNull @PathParam("id") long detectionId,
+      @ApiParam("Active status you want to set for the alert") @NotNull @QueryParam("active") boolean active) throws Exception {
+    Map<String, String> responseMessage = new HashMap<>();
+    try {
+      DetectionConfigDTO config = this.detectionConfigDAO.findById(detectionId);
+      if (config == null) {
+        throw new IllegalArgumentException(String.format("Cannot find config %d", detectionId));
+      }
+
+      // update state
+      config.setActive(active);
+      this.detectionConfigDAO.update(config);
+      responseMessage.put("message", "Alert activation toggled to " + active + " for detection id " + detectionId);
+    } catch (Exception e) {
+      LOG.error("Error toggling activation on detection id " + detectionId, e);
+      responseMessage.put("message", "Failed to toggle activation: " + e.getMessage());
+      return Response.serverError().entity(responseMessage).build();
+    }
+
+    LOG.info("Alert activation toggled to {} for detection id {}", active , detectionId);
+    return Response.ok(responseMessage).build();
+  }
+
+
+  /**
+   * List all yaml configurations as JSON enhanced with detection config id, isActive and createBy information.
    * @return the yaml configuration converted in to JSON, with enhanced information from detection config DTO.
    */
   @GET
   @Path("/list")
   @Produces(MediaType.APPLICATION_JSON)
-  public List<Object> listYamls(@QueryParam("id") Long id){
-    List<DetectionConfigDTO> detectionConfigDTOs;
-    if (id == null) {
-      detectionConfigDTOs = this.detectionConfigDAO.findAll();
-    } else {
-      detectionConfigDTOs = Collections.singletonList(this.detectionConfigDAO.findById(id));
-    }
-    return detectionConfigDTOs.parallelStream().map(this.detectionConfigFormatter::format).collect(Collectors.toList());
+  public List<Map<String, Object>> listYamls() throws ExecutionException {
+    return this.detectionConfigDAO.findAll().parallelStream().map(this.detectionConfigFormatter::format).collect(Collectors.toList());
   }
 }
