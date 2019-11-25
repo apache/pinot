@@ -79,7 +79,7 @@
         <artifactId>maven-assembly-plugin</artifactId>
         <executions>
           <execution>
-            <id>build-pinot-druid-migration</id>
+            <id>build-segment-converter</id>
             <configuration>
               <descriptorRefs>
                 <descriptorRef>jar-with-dependencies</descriptorRef>
@@ -89,7 +89,25 @@
                   <mainClass>org.apache.pinot.druid.tools.DruidToPinotSegmentConverter</mainClass>
                 </manifest>
               </archive>
-              <finalName>pinot-druid-migration</finalName>
+              <finalName>druid-to-pinot-segment-converter</finalName>
+            </configuration>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>build-schema-converter</id>
+            <configuration>
+              <descriptorRefs>
+                <descriptorRef>jar-with-dependencies</descriptorRef>
+              </descriptorRefs>
+              <archive>
+                <manifest>
+                  <mainClass>org.apache.pinot.druid.tools.DruidToPinotSchemaGenerator</mainClass>
+                </manifest>
+              </archive>
+              <finalName>druid-to-pinot-schema-generator</finalName>
             </configuration>
             <phase>package</phase>
             <goals>
@@ -148,6 +166,11 @@
         <groupId>net.jpountz.lz4</groupId>
         <artifactId>lz4</artifactId>
         <version>1.3.0</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-core</artifactId>
+        <version>2.9.8</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

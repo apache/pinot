@@ -20,8 +20,8 @@
 -->
 # Druid to Pinot Segment Converter Tool
 
-This tool takes a local Druid segment and uses it to generate a corresponding Pinot segment with all of the columns specified
-in a given Pinot schema and Pinot table config.
+This tool takes a local Druid segment and uses it to generate a corresponding Pinot segment with all of the columns 
+specified in a given Pinot schema.
 
 ## Build and Usage
 To build the project:
@@ -30,8 +30,32 @@ To build the project:
 mvn clean install -DskipTests
 ```
 
-This will create `pinot-druid-migration-jar-with-dependencies.jar` inside the `target` directory, which can be used 
-as follows:
+
+This will create `druid-to-pinot-schema-generator-jar-with-dependencies.jar` and 
+`druid-to-pinot-segment-converter-jar-with-dependencies.jar` inside the `target` directory.
+
+A Pinot schema is required to run the `segment converter` command, which can either be written and provided by the user or
+generated from the Druid segment with the `schema generator` command.
+
+The `schema generator` command is used as follows*:
+
 ```
-java -jar pinot-druid-migration-jar-with-dependencies.jar <pinot_table_name> <pinot_segment_name> <pinot_schema_path> <druid_segment_path> <output_path>
+java -jar druid-to-pinot-schema-generator-jar-with-dependencies.jar <schema_name> \
+<druid_segment_path> \
+<schema_output_path>
 ```
+
+Keep in mind that a Druid segment is a directory rather than a single file.
+
+The `segment converter` command is used as follows*:
+
+```
+java -jar druid-to-pinot-segment-converter-jar-with-dependencies.jar \
+<pinot_table_name> \
+<pinot_segment_name> \
+<pinot_schema_path> \
+<druid_segment_path> \
+<segment_output_path>
+```
+
+*Backslashes and newlines are used for readability and ease of use.
