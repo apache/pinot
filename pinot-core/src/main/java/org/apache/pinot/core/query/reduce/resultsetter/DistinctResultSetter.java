@@ -40,6 +40,9 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.QueryOptions;
 
 
+/**
+ * Helper class to set results of distinct query into the BrokerResponseNative
+ */
 public class DistinctResultSetter implements ResultSetter {
 
   private final BrokerRequest _brokerRequest;
@@ -50,11 +53,16 @@ public class DistinctResultSetter implements ResultSetter {
     _aggregationFunction = aggregationFunction;
   }
 
+  /**
+   * Sets results of distinct into SelectionResults
+   */
   @Override
   public void setResults(String tableName, DataSchema dataSchema, Map<ServerRoutingInstance, DataTable> dataTableMap,
       BrokerResponseNative brokerResponseNative, BrokerMetrics brokerMetrics) {
 
     if (dataTableMap.isEmpty()) {
+      brokerResponseNative
+          .setSelectionResults(new SelectionResults(Arrays.asList(getDistinctColumns()), new ArrayList<>(0)));
       return;
     }
 
@@ -112,5 +120,9 @@ public class DistinctResultSetter implements ResultSetter {
     // of view and will return one or records in the result table for the column(s) selected and so
     // for that reason, response from broker should be a selection query result.
     brokerResponseNative.setSelectionResults((new SelectionResults(Arrays.asList(columnNames), resultSet)));
+  }
+
+  private String[] getDistinctColumns() {
+    return _brokerRequest.getAggregationsInfo().get(0).getAggregationParams().get("column").split(":");
   }
 }
