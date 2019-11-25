@@ -201,7 +201,7 @@ public class DataAvailabilityTaskScheduler implements Runnable {
   private boolean isAllDatasetUpdated(DetectionConfigDTO detectionConfig, Set<String> datasets,
       Map<String, Long> dataset2RefreshTimeMap) {
     long lastTimestamp = detectionConfig.getLastTimestamp();
-    return datasets.stream().allMatch(d -> dataset2RefreshTimeMap.get(d) >= lastTimestamp);
+    return datasets.stream().allMatch(d -> dataset2RefreshTimeMap.get(d) > lastTimestamp);
   }
 
   private boolean needFallback(DetectionConfigDTO detectionConfig) throws Exception {
