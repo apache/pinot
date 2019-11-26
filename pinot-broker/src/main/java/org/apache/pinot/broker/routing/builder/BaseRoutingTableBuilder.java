@@ -71,9 +71,10 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
     if (routingConfig != null) {
       Map<String, String> routingOption = routingConfig.getRoutingTableBuilderOptions();
-      _enableDynamicComputing = Boolean.parseBoolean(routingOption.get(RoutingConfig.ENABLE_DYNAMIC_COMPUTING_KEY));
-      if (_enableDynamicComputing) {
+      if (routingOption != null && Boolean
+          .parseBoolean(routingOption.get(RoutingConfig.ENABLE_DYNAMIC_COMPUTING_KEY))) {
         LOGGER.info("Dynamic routing table computation is enabled for table {}", _tableName);
+        _enableDynamicComputing = true;
       }
     }
   }

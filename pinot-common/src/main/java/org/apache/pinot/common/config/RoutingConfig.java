@@ -18,55 +18,32 @@
  */
 package org.apache.pinot.common.config;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import java.util.HashMap;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
-import org.apache.pinot.common.utils.EqualityUtils;
+import javax.annotation.Nullable;
 
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class RoutingConfig {
+public class RoutingConfig extends BaseJsonConfig {
   public static final String ENABLE_DYNAMIC_COMPUTING_KEY = "enableDynamicComputing";
 
-  private String _routingTableBuilderName;
-  private Map<String, String> _routingTableBuilderOptions = new HashMap<>();
+  private final String _routingTableBuilderName;
+  private final Map<String, String> _routingTableBuilderOptions;
 
+  @JsonCreator
+  public RoutingConfig(@JsonProperty("routingTableBuilderName") @Nullable String routingTableBuilderName,
+      @JsonProperty("routingTableBuilderOptions") @Nullable Map<String, String> routingTableBuilderOptions) {
+    _routingTableBuilderName = routingTableBuilderName;
+    _routingTableBuilderOptions = routingTableBuilderOptions;
+  }
+
+  @Nullable
   public String getRoutingTableBuilderName() {
     return _routingTableBuilderName;
   }
 
-  public void setRoutingTableBuilderName(String routingTableBuilderName) {
-    _routingTableBuilderName = routingTableBuilderName;
-  }
-
+  @Nullable
   public Map<String, String> getRoutingTableBuilderOptions() {
     return _routingTableBuilderOptions;
-  }
-
-  public void setRoutingTableBuilderOptions(Map<String, String> routingTableBuilderOptions) {
-    _routingTableBuilderOptions = routingTableBuilderOptions;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
-      return true;
-    }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
-      return false;
-    }
-
-    RoutingConfig that = (RoutingConfig) o;
-
-    return EqualityUtils.isEqual(_routingTableBuilderName, that._routingTableBuilderName) && EqualityUtils
-        .isEqual(_routingTableBuilderOptions, that._routingTableBuilderOptions);
-  }
-
-  @Override
-  public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(_routingTableBuilderName);
-    result = EqualityUtils.hashCodeOf(result, _routingTableBuilderOptions);
-    return result;
   }
 }

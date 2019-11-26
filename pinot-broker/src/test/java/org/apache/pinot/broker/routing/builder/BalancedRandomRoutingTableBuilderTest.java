@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.routing.builder;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -28,7 +29,9 @@ import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
+import org.apache.pinot.common.config.RoutingConfig;
 import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -72,7 +75,10 @@ public class BalancedRandomRoutingTableBuilderTest {
     String tableNameWithType = "testTable_OFFLINE";
     BalancedRandomRoutingTableBuilder routingTableBuilder = new BalancedRandomRoutingTableBuilder();
 
-    TableConfig tableConfig = RoutingTableBuilderTestUtil.getDynamicComputingTableConfig(tableNameWithType);
+    TableConfig tableConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName(tableNameWithType)
+        .setRoutingConfig(
+            new RoutingConfig(null, Collections.singletonMap(RoutingConfig.ENABLE_DYNAMIC_COMPUTING_KEY, "true")))
+        .build();
     routingTableBuilder.init(new BaseConfiguration(), tableConfig, null, null);
 
     // Create external view

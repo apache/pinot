@@ -373,13 +373,8 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
     context.setAttribute("relocationTable", relocationTable);
 
     // add tag override for relocation
-    TenantConfig tenantConfig = new TenantConfig();
-    tenantConfig.setServer(TENANT_NAME);
-    tenantConfig.setBroker(TENANT_NAME);
-    TagOverrideConfig tagOverrideConfig = new TagOverrideConfig();
-    tagOverrideConfig.setRealtimeConsuming(TENANT_NAME + "_REALTIME");
-    tagOverrideConfig.setRealtimeCompleted(TENANT_NAME + "_OFFLINE");
-    tenantConfig.setTagOverrideConfig(tagOverrideConfig);
+    TenantConfig tenantConfig = new TenantConfig(TENANT_NAME, TENANT_NAME,
+        new TagOverrideConfig(TENANT_NAME + "_REALTIME", TENANT_NAME + "_OFFLINE"));
     updateRealtimeTableTenant(TableNameBuilder.extractRawTableName(relocationTable), tenantConfig);
   }
 

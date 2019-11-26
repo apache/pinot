@@ -19,52 +19,45 @@
 package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import java.lang.reflect.Field;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.startree.hll.HllConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class SegmentsValidationAndRetentionConfig {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentsValidationAndRetentionConfig.class);
-
-  private String retentionTimeUnit;
-  private String retentionTimeValue;
-  private String segmentPushFrequency; // DO NOT REMOVE, this is used in internal segment generation management
-  private String segmentPushType;
-  private String replication; // For high-level consumers, the number of replicas should be same as num server instances
-  private String schemaName;
-  private String timeColumnName;
+public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
+  private String _retentionTimeUnit;
+  private String _retentionTimeValue;
+  private String _segmentPushFrequency; // DO NOT REMOVE, this is used in internal segment generation management
+  private String _segmentPushType;
+  private String _replication;
+  // For high-level consumers, the number of replicas should be same as num server instances
+  private String _schemaName;
+  private String _timeColumnName;
   private TimeUnit _timeType;
-  private String segmentAssignmentStrategy;
-  private ReplicaGroupStrategyConfig replicaGroupStrategyConfig;
+  private String _segmentAssignmentStrategy;
+  private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
-  private HllConfig hllConfig;
+  private HllConfig _hllConfig;
 
   // Number of replicas per partition of low-level consumers. This config is used for realtime tables only.
-  private String replicasPerPartition;
+  private String _replicasPerPartition;
 
   public String getSegmentAssignmentStrategy() {
-    return segmentAssignmentStrategy;
+    return _segmentAssignmentStrategy;
   }
 
   public void setSegmentAssignmentStrategy(String segmentAssignmentStrategy) {
-    this.segmentAssignmentStrategy = segmentAssignmentStrategy;
+    _segmentAssignmentStrategy = segmentAssignmentStrategy;
   }
 
   // TODO: Use TimeFieldSpec in Schema
   @Deprecated
   public String getTimeColumnName() {
-    return timeColumnName;
+    return _timeColumnName;
   }
 
   public void setTimeColumnName(String timeColumnName) {
-    this.timeColumnName = timeColumnName;
+    _timeColumnName = timeColumnName;
   }
 
   // TODO: Use TimeFieldSpec in Schema
@@ -78,67 +71,69 @@ public class SegmentsValidationAndRetentionConfig {
   }
 
   public String getRetentionTimeUnit() {
-    return retentionTimeUnit;
+    return _retentionTimeUnit;
   }
 
   public void setRetentionTimeUnit(String retentionTimeUnit) {
-    this.retentionTimeUnit = retentionTimeUnit;
+    _retentionTimeUnit = retentionTimeUnit;
   }
 
   public String getRetentionTimeValue() {
-    return retentionTimeValue;
+    return _retentionTimeValue;
   }
 
   public void setRetentionTimeValue(String retentionTimeValue) {
-    this.retentionTimeValue = retentionTimeValue;
+    _retentionTimeValue = retentionTimeValue;
   }
 
   public String getSegmentPushFrequency() {
-    return segmentPushFrequency;
+    return _segmentPushFrequency;
   }
 
   public void setSegmentPushFrequency(String segmentPushFrequency) {
-    this.segmentPushFrequency = segmentPushFrequency;
+    _segmentPushFrequency = segmentPushFrequency;
   }
 
   public String getSegmentPushType() {
-    return segmentPushType;
+    return _segmentPushType;
   }
 
   public void setSegmentPushType(String segmentPushType) {
-    this.segmentPushType = segmentPushType;
+    _segmentPushType = segmentPushType;
   }
 
   public String getReplication() {
-    return replication;
+    return _replication;
   }
 
   public void setReplication(String replication) {
-    this.replication = replication;
+    _replication = replication;
   }
 
+  // Schema name should be the same as raw table name
+  @Deprecated
   public String getSchemaName() {
-    return schemaName;
+    return _schemaName;
   }
 
   public void setSchemaName(String schemaName) {
-    this.schemaName = schemaName;
+    _schemaName = schemaName;
   }
 
   public String getReplicasPerPartition() {
-    return replicasPerPartition;
+    return _replicasPerPartition;
   }
 
   public void setReplicasPerPartition(String replicasPerPartition) {
-    this.replicasPerPartition = replicasPerPartition;
+    _replicasPerPartition = replicasPerPartition;
   }
 
   public ReplicaGroupStrategyConfig getReplicaGroupStrategyConfig() {
-    return replicaGroupStrategyConfig;
+    return _replicaGroupStrategyConfig;
   }
 
   public void setReplicaGroupStrategyConfig(ReplicaGroupStrategyConfig replicaGroupStrategyConfig) {
-    this.replicaGroupStrategyConfig = replicaGroupStrategyConfig;
+    _replicaGroupStrategyConfig = replicaGroupStrategyConfig;
   }
 
   public CompletionConfig getCompletionConfig() {
@@ -150,94 +145,20 @@ public class SegmentsValidationAndRetentionConfig {
   }
 
   public HllConfig getHllConfig() {
-    return hllConfig;
+    return _hllConfig;
   }
 
   public void setHllConfig(HllConfig hllConfig) {
-    this.hllConfig = hllConfig;
+    _hllConfig = hllConfig;
   }
 
   @JsonIgnore
   public int getReplicationNumber() {
-    return Integer.parseInt(replication);
+    return Integer.parseInt(_replication);
   }
 
   @JsonIgnore
   public int getReplicasPerPartitionNumber() {
-    return Integer.parseInt(replicasPerPartition);
-  }
-
-  @Override
-  public String toString() {
-    final StringBuilder result = new StringBuilder();
-    final String newLine = System.getProperty("line.separator");
-
-    result.append(this.getClass().getName());
-    result.append(" Object {");
-    result.append(newLine);
-
-    //determine fields declared in this class only (no fields of superclass)
-    final Field[] fields = this.getClass().getDeclaredFields();
-
-    //print field names paired with their values
-    for (final Field field : fields) {
-      result.append("  ");
-      try {
-        result.append(field.getName());
-        result.append(": ");
-        //requires access to private field:
-        result.append(field.get(this));
-      } catch (final IllegalAccessException ex) {
-        if (LOGGER.isWarnEnabled()) {
-          LOGGER.warn("Caught exception while processing field " + field, ex);
-        }
-      }
-      result.append(newLine);
-    }
-    result.append("}");
-
-    return result.toString();
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
-      return true;
-    }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
-      return false;
-    }
-
-    SegmentsValidationAndRetentionConfig that = (SegmentsValidationAndRetentionConfig) o;
-
-    return EqualityUtils.isEqual(retentionTimeUnit, that.retentionTimeUnit) && EqualityUtils
-        .isEqual(retentionTimeValue, that.retentionTimeValue) && EqualityUtils
-        .isEqual(segmentPushFrequency, that.segmentPushFrequency) && EqualityUtils
-        .isEqual(segmentPushType, that.segmentPushType) && EqualityUtils.isEqual(replication, that.replication)
-        && EqualityUtils.isEqual(schemaName, that.schemaName) && EqualityUtils
-        .isEqual(timeColumnName, that.timeColumnName) && EqualityUtils.isEqual(_timeType, that._timeType)
-        && EqualityUtils.isEqual(segmentAssignmentStrategy, that.segmentAssignmentStrategy) && EqualityUtils
-        .isEqual(replicaGroupStrategyConfig, that.replicaGroupStrategyConfig) && EqualityUtils
-        .isEqual(_completionConfig, that._completionConfig) && EqualityUtils.isEqual(hllConfig, that.hllConfig)
-        && EqualityUtils.isEqual(replicasPerPartition, that.replicasPerPartition);
-  }
-
-  @Override
-  public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(retentionTimeUnit);
-    result = EqualityUtils.hashCodeOf(result, retentionTimeValue);
-    result = EqualityUtils.hashCodeOf(result, segmentPushFrequency);
-    result = EqualityUtils.hashCodeOf(result, segmentPushType);
-    result = EqualityUtils.hashCodeOf(result, replication);
-    result = EqualityUtils.hashCodeOf(result, schemaName);
-    result = EqualityUtils.hashCodeOf(result, timeColumnName);
-    result = EqualityUtils.hashCodeOf(result, _timeType);
-    result = EqualityUtils.hashCodeOf(result, segmentAssignmentStrategy);
-    result = EqualityUtils.hashCodeOf(result, replicaGroupStrategyConfig);
-    result = EqualityUtils.hashCodeOf(result, _completionConfig);
-    result = EqualityUtils.hashCodeOf(result, hllConfig);
-    result = EqualityUtils.hashCodeOf(result, replicasPerPartition);
-    return result;
+    return Integer.parseInt(_replicasPerPartition);
   }
 }

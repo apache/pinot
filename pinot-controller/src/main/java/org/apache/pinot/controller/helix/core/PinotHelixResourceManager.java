@@ -1007,10 +1007,8 @@ public class PinotHelixResourceManager {
   public void addTable(@Nonnull TableConfig tableConfig)
       throws IOException {
     if (isSingleTenantCluster()) {
-      TenantConfig tenantConfig = new TenantConfig();
-      tenantConfig.setBroker(TagNameUtils.DEFAULT_TENANT_NAME);
-      tenantConfig.setServer(TagNameUtils.DEFAULT_TENANT_NAME);
-      tableConfig.setTenantConfig(tenantConfig);
+      tableConfig
+          .setTenantConfig(new TenantConfig(TagNameUtils.DEFAULT_TENANT_NAME, TagNameUtils.DEFAULT_TENANT_NAME, null));
     }
     validateTableTenantConfig(tableConfig);
 

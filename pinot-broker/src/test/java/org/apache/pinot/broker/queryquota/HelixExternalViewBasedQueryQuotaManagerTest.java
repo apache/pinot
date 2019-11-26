@@ -140,8 +140,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
   @Test
   public void testOfflineTableWithNullQuotaButWithRealtimeTableConfigNullQpsConfig()
       throws Exception {
-    QuotaConfig quotaConfig = new QuotaConfig();
-    quotaConfig.setStorage("6G");
+    QuotaConfig quotaConfig = new QuotaConfig("6G", null);
     TableConfig realtimeTableConfig =
         new TableConfig.Builder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
             .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
@@ -162,9 +161,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
   @Test
   public void testOfflineTableWithNullQuotaButWithRealtimeTableConfigNotNullQpsConfig()
       throws Exception {
-    QuotaConfig quotaConfig = new QuotaConfig();
-    quotaConfig.setStorage("6G");
-    quotaConfig.setMaxQueriesPerSecond("100.00");
+    QuotaConfig quotaConfig = new QuotaConfig("6G", "100.00");
     TableConfig realtimeTableConfig =
         new TableConfig.Builder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
             .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
@@ -189,17 +186,11 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     brokerResource.setState(REALTIME_TABLE_NAME, BROKER_INSTANCE_ID, "ONLINE");
     brokerResource.setState(REALTIME_TABLE_NAME, "broker_instance_2", "OFFLINE");
 
-    QuotaConfig quotaConfig = new QuotaConfig();
-    quotaConfig.setStorage("6G");
-    quotaConfig.setMaxQueriesPerSecond("100.00");
+    QuotaConfig quotaConfig = new QuotaConfig("6G", "100.00");
     TableConfig realtimeTableConfig =
         new TableConfig.Builder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
             .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
             .setBrokerTenant("testBroker").setServerTenant("testServer").build();
-
-    QuotaConfig quotaConfig2 = new QuotaConfig();
-    quotaConfig2.setStorage("6G");
-    quotaConfig2.setMaxQueriesPerSecond("100.00");
     TableConfig offlineTableConfig =
         new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
             .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
@@ -255,8 +246,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
   @Test
   public void testRealtimeTableWithNullQuotaButWithOfflineTableConfigNullQpsConfig()
       throws Exception {
-    QuotaConfig quotaConfig = new QuotaConfig();
-    quotaConfig.setStorage("6G");
+    QuotaConfig quotaConfig = new QuotaConfig("6G", null);
     TableConfig offlineTableConfig =
         new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
             .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
@@ -272,9 +262,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
   @Test
   public void testRealtimeTableWithNullQuotaButWithOfflineTableConfigNotNullQpsConfig()
       throws Exception {
-    QuotaConfig quotaConfig = new QuotaConfig();
-    quotaConfig.setStorage("6G");
-    quotaConfig.setMaxQueriesPerSecond("100.00");
+    QuotaConfig quotaConfig = new QuotaConfig("6G", "100.00");
     TableConfig offlineTableConfig =
         new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
             .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
@@ -293,8 +281,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
     // Set invalid qps quota
-    QuotaConfig quotaConfig = new QuotaConfig();
-    quotaConfig.setMaxQueriesPerSecond("InvalidQpsQuota");
+    QuotaConfig quotaConfig = new QuotaConfig(null, "InvalidQpsQuota");
     tableConfig.setQuotaConfig(quotaConfig);
     _queryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
@@ -306,8 +293,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
     // Set invalid negative qps quota
-    QuotaConfig quotaConfig = new QuotaConfig();
-    quotaConfig.setMaxQueriesPerSecond("-1.0");
+    QuotaConfig quotaConfig = new QuotaConfig(null, "-1.0");
     tableConfig.setQuotaConfig(quotaConfig);
     _queryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
@@ -354,8 +340,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
   }
 
   private void setQps(TableConfig tableConfig) {
-    QuotaConfig quotaConfig = new QuotaConfig();
-    quotaConfig.setMaxQueriesPerSecond("100.00");
+    QuotaConfig quotaConfig = new QuotaConfig(null, "100.00");
     tableConfig.setQuotaConfig(quotaConfig);
   }
 

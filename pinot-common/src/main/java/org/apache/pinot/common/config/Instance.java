@@ -20,9 +20,8 @@ package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -30,7 +29,6 @@ import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.InstanceType;
-import org.apache.pinot.common.utils.JsonUtils;
 
 
 /**
@@ -48,8 +46,7 @@ import org.apache.pinot.common.utils.JsonUtils;
  * }
  * </pre>
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class Instance {
+public class Instance extends BaseJsonConfig {
   public static final String POOL_KEY = "pool";
 
   private final String _host;
@@ -62,8 +59,9 @@ public class Instance {
   public Instance(@JsonProperty(value = "host", required = true) String host,
       @JsonProperty(value = "port", required = true) int port,
       @JsonProperty(value = "type", required = true) InstanceType type,
-      @JsonProperty(value = "tags") @Nullable List<String> tags,
-      @JsonProperty(value = "pools") @Nullable Map<String, Integer> pools) {
+      @JsonProperty("tags") @Nullable List<String> tags, @JsonProperty("pools") @Nullable Map<String, Integer> pools) {
+    Preconditions.checkArgument(host != null, "'host' must be configured");
+    Preconditions.checkArgument(type != null, "'type' must be configured");
     _host = host;
     _port = port;
     _type = type;
@@ -86,11 +84,13 @@ public class Instance {
     return _type;
   }
 
+  @Nullable
   @JsonProperty
   public List<String> getTags() {
     return _tags;
   }
 
+  @Nullable
   @JsonProperty
   public Map<String, Integer> getPools() {
     return _pools;
@@ -133,13 +133,5 @@ public class Instance {
       instanceConfig.getRecord().setMapField(POOL_KEY, mapValue);
     }
     return instanceConfig;
-  }
-
-  public String toJsonString() {
-    try {
-      return JsonUtils.objectToString(this);
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
   }
 }

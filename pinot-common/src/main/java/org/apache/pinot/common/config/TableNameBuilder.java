@@ -19,7 +19,6 @@
 package org.apache.pinot.common.config;
 
 import com.google.common.base.Preconditions;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.SegmentName;
@@ -33,7 +32,7 @@ public class TableNameBuilder {
 
   private final String _typeSuffix;
 
-  private TableNameBuilder(@Nonnull TableType tableType) {
+  private TableNameBuilder(TableType tableType) {
     _typeSuffix = TYPE_SUFFIX_SEPARATOR + tableType.toString();
   }
 
@@ -42,8 +41,7 @@ public class TableNameBuilder {
    * @param tableType Table type
    * @return Table name builder for the given table type
    */
-  @Nonnull
-  public static TableNameBuilder forType(@Nonnull TableType tableType) {
+  public static TableNameBuilder forType(TableType tableType) {
     if (tableType == TableType.OFFLINE) {
       return OFFLINE;
     } else {
@@ -57,8 +55,7 @@ public class TableNameBuilder {
    * @param tableName Table name with or without type suffix
    * @return Table name with type suffix
    */
-  @Nonnull
-  public String tableNameWithType(@Nonnull String tableName) {
+  public String tableNameWithType(String tableName) {
     Preconditions.checkArgument(!tableName.contains(SegmentName.SEPARATOR),
         "Table name: %s cannot contain two consecutive underscore characters", tableName);
 
@@ -75,7 +72,7 @@ public class TableNameBuilder {
    * @param tableName Table name with or without type suffix
    * @return Whether the table has type suffix that matches the builder type
    */
-  public boolean tableHasTypeSuffix(@Nonnull String tableName) {
+  public boolean tableHasTypeSuffix(String tableName) {
     return tableName.endsWith(_typeSuffix);
   }
 
@@ -86,7 +83,7 @@ public class TableNameBuilder {
    * @return Table type for the given table name, null if cannot be determined by table name
    */
   @Nullable
-  public static TableType getTableTypeFromTableName(@Nonnull String tableName) {
+  public static TableType getTableTypeFromTableName(String tableName) {
     if (OFFLINE.tableHasTypeSuffix(tableName)) {
       return TableType.OFFLINE;
     }
@@ -102,8 +99,7 @@ public class TableNameBuilder {
    * @param tableName Table name with or without type suffix
    * @return Table name without type suffix
    */
-  @Nonnull
-  public static String extractRawTableName(@Nonnull String tableName) {
+  public static String extractRawTableName(String tableName) {
     if (OFFLINE.tableHasTypeSuffix(tableName)) {
       return tableName.substring(0, tableName.length() - OFFLINE._typeSuffix.length());
     }
@@ -119,21 +115,21 @@ public class TableNameBuilder {
    * @param resourceName Resource name
    * @return Whether the resource name represents a table resource
    */
-  public static boolean isTableResource(@Nonnull String resourceName) {
+  public static boolean isTableResource(String resourceName) {
     return OFFLINE.tableHasTypeSuffix(resourceName) || REALTIME.tableHasTypeSuffix(resourceName);
   }
 
   /**
    * Return whether the given resource name represents an offline table resource.
    */
-  public static boolean isOfflineTableResource(@Nonnull String resourceName) {
+  public static boolean isOfflineTableResource(String resourceName) {
     return OFFLINE.tableHasTypeSuffix(resourceName);
   }
 
   /**
    * Return whether the given resource name represents a realtime table resource.
    */
-  public static boolean isRealtimeTableResource(@Nonnull String resourceName) {
+  public static boolean isRealtimeTableResource(String resourceName) {
     return REALTIME.tableHasTypeSuffix(resourceName);
   }
 }

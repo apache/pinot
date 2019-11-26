@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.common.config;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import org.apache.pinot.common.utils.EqualityUtils;
+import javax.annotation.Nullable;
 
 
 /**
@@ -41,57 +41,27 @@ import org.apache.pinot.common.utils.EqualityUtils;
  * 2) checking if instances with the tag exist
  *
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class TagOverrideConfig {
+public class TagOverrideConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Tag override for realtime consuming segments")
-  private String _realtimeConsuming;
+  private final String _realtimeConsuming;
 
   @JsonPropertyDescription("Tag override for realtime completed segments")
-  private String _realtimeCompleted;
+  private final String _realtimeCompleted;
 
+  public TagOverrideConfig(@JsonProperty("realtimeConsuming") @Nullable String realtimeConsuming,
+      @JsonProperty("realtimeCompleted") @Nullable String realtimeCompleted) {
+    _realtimeConsuming = realtimeConsuming;
+    _realtimeCompleted = realtimeCompleted;
+  }
+
+  @Nullable
   public String getRealtimeConsuming() {
     return _realtimeConsuming;
   }
 
-  public void setRealtimeConsuming(String realtimeConsuming) {
-    _realtimeConsuming = realtimeConsuming;
-  }
-
+  @Nullable
   public String getRealtimeCompleted() {
     return _realtimeCompleted;
-  }
-
-  public void setRealtimeCompleted(String realtimeCompleted) {
-    _realtimeCompleted = realtimeCompleted;
-  }
-
-  @Override
-  public String toString() {
-    return "TagOverrideConfig{" + "realtimeConsuming='" + _realtimeConsuming + '\'' + ", realtimeCompleted="
-        + _realtimeCompleted + '}';
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
-      return true;
-    }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
-      return false;
-    }
-
-    TagOverrideConfig that = (TagOverrideConfig) o;
-
-    return EqualityUtils.isEqual(_realtimeConsuming, that._realtimeConsuming) && EqualityUtils
-        .isEqual(_realtimeCompleted, that._realtimeCompleted);
-  }
-
-  @Override
-  public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(_realtimeConsuming);
-    result = EqualityUtils.hashCodeOf(result, _realtimeCompleted);
-    return result;
   }
 }

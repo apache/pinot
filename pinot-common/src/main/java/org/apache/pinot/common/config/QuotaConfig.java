@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.common.config;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationRuntimeException;
 import org.apache.pinot.common.utils.DataSize;
-import org.apache.pinot.common.utils.EqualityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,31 +32,29 @@ import org.slf4j.LoggerFactory;
 /**
  * Class representing table quota configuration
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class QuotaConfig {
+public class QuotaConfig extends BaseJsonConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(QuotaConfig.class);
 
   @JsonPropertyDescription("Storage allocated for this table, e.g. \"10G\"")
-  private String _storage;
+  private final String _storage;
 
-  private String _maxQueriesPerSecond;
+  private final String _maxQueriesPerSecond;
+
+  @JsonCreator
+  public QuotaConfig(@JsonProperty("storage") @Nullable String storage,
+      @JsonProperty("maxQueriesPerSecond") @Nullable String maxQueriesPerSecond) {
+    _storage = storage;
+    _maxQueriesPerSecond = maxQueriesPerSecond;
+  }
 
   @Nullable
   public String getStorage() {
     return _storage;
   }
 
-  public void setStorage(@Nullable String storage) {
-    _storage = storage;
-  }
-
   @Nullable
   public String getMaxQueriesPerSecond() {
     return _maxQueriesPerSecond;
-  }
-
-  public void setMaxQueriesPerSecond(@Nullable String maxQueriesPerSecond) {
-    _maxQueriesPerSecond = maxQueriesPerSecond;
   }
 
   /**
@@ -100,28 +98,5 @@ public class QuotaConfig {
       }
     }
     return _maxQueriesPerSecond == null || qps > 0;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
-      return true;
-    }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
-      return false;
-    }
-
-    QuotaConfig that = (QuotaConfig) o;
-
-    return EqualityUtils.isEqual(_storage, that._storage) && EqualityUtils
-        .isEqual(_maxQueriesPerSecond, that._maxQueriesPerSecond);
-  }
-
-  @Override
-  public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(_storage);
-    result = EqualityUtils.hashCodeOf(result, _maxQueriesPerSecond);
-    return result;
   }
 }

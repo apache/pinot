@@ -18,25 +18,26 @@
  */
 package org.apache.pinot.common.config.instance;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.google.common.base.Preconditions;
 import java.util.List;
+import org.apache.pinot.common.config.BaseJsonConfig;
 
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class InstanceConstraintConfig {
+public class InstanceConstraintConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Name of the instance constraints to be applied (mandatory)")
-  private List<String> _constraints;
+  private final List<String> _constraints;
 
-  @JsonProperty
-  public List<String> getConstraints() {
-    return _constraints;
+  @JsonCreator
+  public InstanceConstraintConfig(@JsonProperty(value = "constraints", required = true) List<String> constraints) {
+    Preconditions.checkArgument(constraints != null, "'constraints' must be configured");
+    _constraints = constraints;
   }
 
-  @JsonProperty
-  public void setConstraints(List<String> constraints) {
-    _constraints = constraints;
+  public List<String> getConstraints() {
+    return _constraints;
   }
 }

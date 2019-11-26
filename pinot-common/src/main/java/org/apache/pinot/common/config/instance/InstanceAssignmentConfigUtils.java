@@ -78,16 +78,14 @@ public class InstanceAssignmentConfigUtils {
 
     // Generate default instance assignment config if it does not exist
     // Only allow default config for offline table with replica-group segment assignment for backward-compatibility
-    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig();
 
-    InstanceTagPoolConfig tagPoolConfig = new InstanceTagPoolConfig();
-    tagPoolConfig.setTag(TagNameUtils.getOfflineTagForTenant(tableConfig.getTenantConfig().getServer()));
-    instanceAssignmentConfig.setTagPoolConfig(tagPoolConfig);
+    InstanceTagPoolConfig tagPoolConfig =
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(tableConfig.getTenantConfig().getServer()), false,
+            0, null);
 
-    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig = new InstanceReplicaGroupPartitionConfig();
-    replicaGroupPartitionConfig.setReplicaGroupBased(true);
+    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig;
     SegmentsValidationAndRetentionConfig segmentConfig = tableConfig.getValidationConfig();
-    replicaGroupPartitionConfig.setNumReplicaGroups(segmentConfig.getReplicationNumber());
+    int numReplicaGroups = segmentConfig.getReplicationNumber();
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig = segmentConfig.getReplicaGroupStrategyConfig();
     Preconditions.checkState(replicaGroupStrategyConfig != null, "Failed to find the replica-group strategy config");
     String partitionColumn = replicaGroupStrategyConfig.getPartitionColumn();
@@ -95,16 +93,15 @@ public class InstanceAssignmentConfigUtils {
       int numPartitions = tableConfig.getIndexingConfig().getSegmentPartitionConfig().getNumPartitions(partitionColumn);
       Preconditions.checkState(numPartitions > 0, "Number of partitions for column: %s is not properly configured",
           partitionColumn);
-      replicaGroupPartitionConfig.setNumPartitions(numPartitions);
-      replicaGroupPartitionConfig.setNumInstancesPerPartition(replicaGroupStrategyConfig.getNumInstancesPerPartition());
+      replicaGroupPartitionConfig = new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups, 0, numPartitions,
+          replicaGroupStrategyConfig.getNumInstancesPerPartition());
     } else {
       // If partition column is not configured, use replicaGroupStrategyConfig.getNumInstancesPerPartition() as
       // number of instances per replica-group for backward-compatibility
-      replicaGroupPartitionConfig
-          .setNumInstancesPerReplicaGroup(replicaGroupStrategyConfig.getNumInstancesPerPartition());
+      replicaGroupPartitionConfig = new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups,
+          replicaGroupStrategyConfig.getNumInstancesPerPartition(), 0, 0);
     }
-    instanceAssignmentConfig.setReplicaGroupPartitionConfig(replicaGroupPartitionConfig);
 
-    return instanceAssignmentConfig;
+    return new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig);
   }
 }

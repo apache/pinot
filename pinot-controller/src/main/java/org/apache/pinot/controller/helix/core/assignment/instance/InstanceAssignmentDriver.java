@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.instance;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -30,8 +29,6 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.config.instance.InstanceConstraintConfig;
-import org.apache.pinot.common.config.instance.InstanceReplicaGroupPartitionConfig;
-import org.apache.pinot.common.config.instance.InstanceTagPoolConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,9 +58,8 @@ public class InstanceAssignmentDriver {
 
     InstanceAssignmentConfig assignmentConfig =
         InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(_tableConfig, instancePartitionsType);
-    InstanceTagPoolConfig tagPoolConfig = assignmentConfig.getTagPoolConfig();
-    Preconditions.checkState(tagPoolConfig != null, "Instance tag/pool config is missing");
-    InstanceTagPoolSelector tagPoolSelector = new InstanceTagPoolSelector(tagPoolConfig, tableNameWithType);
+    InstanceTagPoolSelector tagPoolSelector =
+        new InstanceTagPoolSelector(assignmentConfig.getTagPoolConfig(), tableNameWithType);
     Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap = tagPoolSelector.selectInstances(instanceConfigs);
 
     InstanceConstraintConfig constraintConfig = assignmentConfig.getConstraintConfig();
@@ -77,10 +73,8 @@ public class InstanceAssignmentDriver {
       poolToInstanceConfigsMap = constraintApplier.applyConstraint(poolToInstanceConfigsMap);
     }
 
-    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig = assignmentConfig.getReplicaGroupPartitionConfig();
-    Preconditions.checkState(replicaGroupPartitionConfig != null, "Instance replica-group/partition config is missing");
     InstanceReplicaGroupPartitionSelector replicaPartitionSelector =
-        new InstanceReplicaGroupPartitionSelector(replicaGroupPartitionConfig, tableNameWithType);
+        new InstanceReplicaGroupPartitionSelector(assignmentConfig.getReplicaGroupPartitionConfig(), tableNameWithType);
     InstancePartitions instancePartitions = new InstancePartitions(
         instancePartitionsType.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableNameWithType)));
     replicaPartitionSelector.selectInstances(poolToInstanceConfigsMap, instancePartitions);

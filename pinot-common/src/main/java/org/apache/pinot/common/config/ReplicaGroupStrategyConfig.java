@@ -18,51 +18,31 @@
  */
 package org.apache.pinot.common.config;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.EqualityUtils;
 
 
 /**
  * Class representing configurations related to segment assignment strategy.
- *
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class ReplicaGroupStrategyConfig {
-  private String _partitionColumn;
-  private int _numInstancesPerPartition;
-  private boolean _mirrorAssignmentAcrossReplicaGroups;
+public class ReplicaGroupStrategyConfig extends BaseJsonConfig {
+  private final String _partitionColumn;
+  private final int _numInstancesPerPartition;
 
-  /**
-   * Returns the number of instances that segments for a partition span.
-   *
-   * @return Number of instances used for a partition.
-   */
-  public int getNumInstancesPerPartition() {
-    return _numInstancesPerPartition;
-  }
-
-  public void setNumInstancesPerPartition(int numInstancesPerPartition) {
+  @JsonCreator
+  public ReplicaGroupStrategyConfig(@JsonProperty("partitionColumn") @Nullable String partitionColumn,
+      @JsonProperty(value = "numInstancesPerPartition", required = true) int numInstancesPerPartition) {
+    Preconditions.checkArgument(numInstancesPerPartition > 0, "'numInstancesPerPartition' must be positive");
+    _partitionColumn = partitionColumn;
     _numInstancesPerPartition = numInstancesPerPartition;
-  }
-
-  /**
-   * Returns the configuration for mirror assignment across replica groups. If this is set to true, each server in
-   * a replica group will be mirrored in other replica groups.
-   *
-   * @return Configuration for mirror assignment across replica groups.
-   */
-  public boolean getMirrorAssignmentAcrossReplicaGroups() {
-    return _mirrorAssignmentAcrossReplicaGroups;
-  }
-
-  public void setMirrorAssignmentAcrossReplicaGroups(boolean mirrorAssignmentAcrossReplicaGroups) {
-    _mirrorAssignmentAcrossReplicaGroups = mirrorAssignmentAcrossReplicaGroups;
   }
 
   /**
    * Returns the name of column used for partitioning. If this is set to null, we use the table level replica groups.
    * Otherwise, we use the partition level replica groups.
+   * TODO: use partition info from SegmentPartitionConfig
    *
    * @return Name of partitioning column.
    */
@@ -71,32 +51,12 @@ public class ReplicaGroupStrategyConfig {
     return _partitionColumn;
   }
 
-  public void setPartitionColumn(String partitionColumn) {
-    _partitionColumn = partitionColumn;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
-      return true;
-    }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
-      return false;
-    }
-
-    ReplicaGroupStrategyConfig that = (ReplicaGroupStrategyConfig) o;
-
-    return EqualityUtils.isEqual(_numInstancesPerPartition, that._numInstancesPerPartition) && EqualityUtils
-        .isEqual(_mirrorAssignmentAcrossReplicaGroups, that._mirrorAssignmentAcrossReplicaGroups) && EqualityUtils
-        .isEqual(_partitionColumn, that._partitionColumn);
-  }
-
-  @Override
-  public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(_partitionColumn);
-    result = EqualityUtils.hashCodeOf(result, _numInstancesPerPartition);
-    result = EqualityUtils.hashCodeOf(result, _mirrorAssignmentAcrossReplicaGroups);
-    return result;
+  /**
+   * Returns the number of instances that segments for a partition span.
+   *
+   * @return Number of instances used for a partition.
+   */
+  public int getNumInstancesPerPartition() {
+    return _numInstancesPerPartition;
   }
 }

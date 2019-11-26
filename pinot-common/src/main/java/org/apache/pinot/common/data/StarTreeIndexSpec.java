@@ -18,23 +18,18 @@
  */
 package org.apache.pinot.common.data;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
+import org.apache.pinot.common.config.BaseJsonConfig;
 import org.apache.pinot.common.segment.StarTreeMetadata;
-import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.JsonUtils;
 
 
-@SuppressWarnings("unused")
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class StarTreeIndexSpec {
+@Deprecated // Replaced with StarTreeIndexConfig for the new star-tree
+public class StarTreeIndexSpec extends BaseJsonConfig {
   public static final int DEFAULT_MAX_LEAF_RECORDS = 100000; // TODO: determine a good number via experiment
   public static final int DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD = 10000;
 
@@ -102,16 +97,6 @@ public class StarTreeIndexSpec {
     _excludeSkipMaterializationDimensionsForStarTreeIndex = excludeSkipMaterializationDimensionsForStarTreeIndex;
   }
 
-  @Override
-  public String toString() {
-    return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
-  }
-
-  public String toJsonString()
-      throws JsonProcessingException {
-    return JsonUtils.objectToString(this);
-  }
-
   /**
    * Builds and returns StarTreeIndexSpec from specified file.
    *
@@ -139,37 +124,5 @@ public class StarTreeIndexSpec {
         .setSkipMaterializationForDimensions(Sets.newHashSet(starTreeMetadata.getSkipMaterializationForDimensions()));
     starTreeIndexSpec.setSkipMaterializationCardinalityThreshold(starTreeMetadata.getSkipMaterializationCardinality());
     return starTreeIndexSpec;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
-      return true;
-    }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
-      return false;
-    }
-
-    StarTreeIndexSpec that = (StarTreeIndexSpec) o;
-
-    return EqualityUtils.isEqual(_maxLeafRecords, that._maxLeafRecords) && EqualityUtils
-        .isEqual(_skipMaterializationCardinalityThreshold, that._skipMaterializationCardinalityThreshold)
-        && EqualityUtils.isEqual(_excludeSkipMaterializationDimensionsForStarTreeIndex,
-        that._excludeSkipMaterializationDimensionsForStarTreeIndex) && EqualityUtils
-        .isEqual(_dimensionsSplitOrder, that._dimensionsSplitOrder) && EqualityUtils
-        .isEqual(_skipStarNodeCreationForDimensions, that._skipStarNodeCreationForDimensions) && EqualityUtils
-        .isEqual(_skipMaterializationForDimensions, that._skipMaterializationForDimensions);
-  }
-
-  @Override
-  public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(_maxLeafRecords);
-    result = EqualityUtils.hashCodeOf(result, _dimensionsSplitOrder);
-    result = EqualityUtils.hashCodeOf(result, _skipStarNodeCreationForDimensions);
-    result = EqualityUtils.hashCodeOf(result, _skipMaterializationForDimensions);
-    result = EqualityUtils.hashCodeOf(result, _skipMaterializationCardinalityThreshold);
-    result = EqualityUtils.hashCodeOf(result, _excludeSkipMaterializationDimensionsForStarTreeIndex);
-    return result;
   }
 }
