@@ -25,8 +25,8 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.config.RealtimeTagConfig;
 import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.utils.StringUtil;
@@ -79,9 +79,8 @@ public class PinotTableIdealStateBuilder {
   public static IdealState buildInitialHighLevelRealtimeIdealStateFor(String realtimeTableName,
       TableConfig realtimeTableConfig, HelixManager helixManager, ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore,
       boolean enableBatchMessageMode) {
-    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(realtimeTableConfig);
-    final List<String> realtimeInstances =
-        HelixHelper.getInstancesWithTag(helixManager, realtimeTagConfig.getConsumingServerTag());
+    List<String> realtimeInstances = HelixHelper.getInstancesWithTag(helixManager,
+        TagNameUtils.extractConsumingServerTag(realtimeTableConfig.getTenantConfig()));
     IdealState idealState = buildEmptyRealtimeIdealStateFor(realtimeTableName, 1, enableBatchMessageMode);
     if (realtimeInstances.size() % Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()) != 0) {
       throw new RuntimeException(

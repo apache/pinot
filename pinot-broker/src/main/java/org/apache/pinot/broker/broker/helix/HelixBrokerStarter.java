@@ -108,9 +108,8 @@ public class HelixBrokerStarter {
     _zkServers = zkServer.replaceAll("\\s+", "");
 
     if (brokerHost == null) {
-      brokerHost =
-        _brokerConf.getBoolean(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil
-            .getHostnameOrAddress() : NetUtil.getHostAddress();
+      brokerHost = _brokerConf.getBoolean(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil
+          .getHostnameOrAddress() : NetUtil.getHostAddress();
     }
     _brokerId = _brokerConf.getString(Helix.Instance.INSTANCE_ID_KEY,
         Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + _brokerConf
@@ -251,7 +250,8 @@ public class HelixBrokerStarter {
    */
   private void registerServiceStatusHandler() {
     List<String> resourcesToMonitor = new ArrayList<>(1);
-    IdealState brokerResourceIdealState = _helixAdmin.getResourceIdealState(_clusterName, Helix.BROKER_RESOURCE_INSTANCE);
+    IdealState brokerResourceIdealState =
+        _helixAdmin.getResourceIdealState(_clusterName, Helix.BROKER_RESOURCE_INSTANCE);
     if (brokerResourceIdealState != null && brokerResourceIdealState.isEnabled()) {
       for (String partitionName : brokerResourceIdealState.getPartitionSet()) {
         if (brokerResourceIdealState.getInstanceSet(partitionName).contains(_brokerId)) {
@@ -265,11 +265,11 @@ public class HelixBrokerStarter {
         Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
 
     LOGGER.info("Registering service status handler");
-    ServiceStatus.setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
-        new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager, _clusterName,
-            _brokerId, resourcesToMonitor, minResourcePercentForStartup),
-        new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager, _clusterName,
-            _brokerId, resourcesToMonitor, minResourcePercentForStartup))));
+    ServiceStatus.setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
+        .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager,
+                _clusterName, _brokerId, resourcesToMonitor, minResourcePercentForStartup),
+            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
+                _clusterName, _brokerId, resourcesToMonitor, minResourcePercentForStartup))));
   }
 
   private void addInstanceTagIfNeeded() {
@@ -278,8 +278,7 @@ public class HelixBrokerStarter {
     List<String> instanceTags = instanceConfig.getTags();
     if (instanceTags == null || instanceTags.isEmpty()) {
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
-        _helixAdmin.addInstanceTag(_clusterName, _brokerId,
-            TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME));
+        _helixAdmin.addInstanceTag(_clusterName, _brokerId, TagNameUtils.getBrokerTagForTenant(null));
       } else {
         _helixAdmin.addInstanceTag(_clusterName, _brokerId, Helix.UNTAGGED_BROKER_INSTANCE);
       }

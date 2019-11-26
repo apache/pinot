@@ -28,10 +28,10 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.config.OfflineTagConfig;
-import org.apache.pinot.common.config.RealtimeTagConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.config.TagNameUtils;
+import org.apache.pinot.common.config.TenantConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 
@@ -98,16 +98,17 @@ public class InstancePartitionsUtils {
    */
   public static InstancePartitions computeDefaultInstancePartitions(HelixManager helixManager, TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
+    TenantConfig tenantConfig = tableConfig.getTenantConfig();
     String serverTag;
     switch (instancePartitionsType) {
       case OFFLINE:
-        serverTag = new OfflineTagConfig(tableConfig).getOfflineServerTag();
+        serverTag = TagNameUtils.extractOfflineServerTag(tenantConfig);
         break;
       case CONSUMING:
-        serverTag = new RealtimeTagConfig(tableConfig).getConsumingServerTag();
+        serverTag = TagNameUtils.extractConsumingServerTag(tenantConfig);
         break;
       case COMPLETED:
-        serverTag = new RealtimeTagConfig(tableConfig).getCompletedServerTag();
+        serverTag = TagNameUtils.extractCompletedServerTag(tenantConfig);
         break;
       default:
         throw new IllegalStateException();

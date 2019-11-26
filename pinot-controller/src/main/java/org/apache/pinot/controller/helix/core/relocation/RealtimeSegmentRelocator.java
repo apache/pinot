@@ -24,9 +24,9 @@ import java.util.concurrent.ExecutorService;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.assignment.InstancePartitionsType;
-import org.apache.pinot.common.config.RealtimeTagConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.time.TimeUtils;
@@ -78,8 +78,8 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask<Void> {
     Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap =
         tableConfig.getInstanceAssignmentConfigMap();
     if ((instanceAssignmentConfigMap != null && instanceAssignmentConfigMap
-        .containsKey(InstancePartitionsType.COMPLETED)) || new RealtimeTagConfig(tableConfig)
-        .isRelocateCompletedSegments()) {
+        .containsKey(InstancePartitionsType.COMPLETED)) || TagNameUtils
+        .isRelocateCompletedSegments(tableConfig.getTenantConfig())) {
       LOGGER.info("Relocating COMPLETED segments for table: {}", tableNameWithType);
 
       // Allow at most one replica unavailable during relocation
