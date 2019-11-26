@@ -21,6 +21,7 @@
 package org.apache.pinot.thirdeye.detection.health;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -76,6 +77,14 @@ public class DetectionTaskStatus {
         .map(TaskBean::getEndTime)
         .findFirst()
         .orElse(-1L);
+  }
+
+  // default constructor for deserialization
+  public DetectionTaskStatus() {
+    this.taskSuccessRate = Double.NaN;
+    this.healthStatus = HealthStatus.UNKNOWN;
+    this.tasks = Collections.emptyList();
+    this.lastTaskExecutionTime = -1L;
   }
 
   public double getTaskSuccessRate() {
