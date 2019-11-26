@@ -116,11 +116,12 @@ public class DefaultControllerRestApi implements ControllerRestApi {
                 FileUploadDownloadClient.getUploadSegmentHttpURI(pushLocation.getHost(), pushLocation.getPort()),
                 segmentName, inputStream, _rawTableName);
             LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
+            break;
           } catch (Exception e) {
             LOGGER.error("Caught exception while pushing segment: {} to location: {}, retry {}/{}", segmentName,
                 pushLocation, retry, _retry, e);
             if (retry == _retry) {
-              throw new RuntimeException(e);
+              throw new RuntimeException(String.format("Failed to push segment %s to %s with %d retries",segmentName, pushLocation, retry), e);
             }
             try {
               // Exponential back-off, max sleep time is 64 seconds.
