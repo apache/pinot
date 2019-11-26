@@ -51,7 +51,7 @@ import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.RE
  */
 public class HadoopPinotFS extends PinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(HadoopPinotFS.class);
-  private org.apache.hadoop.fs.FileSystem _hadoopFS = null;
+  protected org.apache.hadoop.fs.FileSystem _hadoopFS = null;
   private int _retryCount = RETRY_DEFAULT;
   private int _retryWaitMs = RETRY_WAITIME_MS_DEFAULT;
   private org.apache.hadoop.conf.Configuration _hadoopConf;
