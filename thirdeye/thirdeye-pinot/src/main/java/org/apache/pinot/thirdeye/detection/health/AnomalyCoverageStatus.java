@@ -39,6 +39,11 @@ public class AnomalyCoverageStatus {
   private static final double COVERAGE_RATIO_BAD_LOWER_LIMIT = 0.01;
   private static final double COVERAGE_RATIO_MODERATE_LIMIT = 0.5;
 
+  // default constructor for deserialization
+  public AnomalyCoverageStatus() {
+    this.anomalyCoverageRatio = Double.NaN;
+    this.healthStatus = HealthStatus.UNKNOWN;
+  }
 
   public AnomalyCoverageStatus(double anomalyCoverageRatio, HealthStatus healthStatus) {
     this.anomalyCoverageRatio = anomalyCoverageRatio;
