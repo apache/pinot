@@ -33,11 +33,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.query.reduce.resultsetter.ResultSetter;
-import org.apache.pinot.core.query.reduce.resultsetter.ResultSetterFactory;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -181,8 +177,8 @@ public class BrokerReduceService {
       }
     }
 
-    ResultSetter resultSetter = ResultSetterFactory.getResultSetter(brokerRequest);
-    resultSetter.setResults(tableName, cachedDataSchema, dataTableMap, brokerResponseNative, brokerMetrics);
+    ResultReducer resultReducer = ResultReducerFactory.getResultReducer(brokerRequest);
+    resultReducer.reduceAndSetResults(tableName, cachedDataSchema, dataTableMap, brokerResponseNative, brokerMetrics);
     return brokerResponseNative;
   }
 }

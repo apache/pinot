@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce.resultsetter;
+package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -42,25 +42,25 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Helper class to set Selection results into the BrokerResponseNative
+ * Helper class to reduce and set Selection results into the BrokerResponseNative
  */
-public class SelectionResultSetter implements ResultSetter {
+public class SelectionResultReducer implements ResultReducer {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SelectionResultSetter.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SelectionResultReducer.class);
 
   private final Selection _selection;
   private boolean _preserveType;
 
-  SelectionResultSetter(BrokerRequest brokerRequest, QueryOptions queryOptions) {
+  SelectionResultReducer(BrokerRequest brokerRequest, QueryOptions queryOptions) {
     _selection = brokerRequest.getSelections();
     _preserveType = queryOptions.isPreserveType();
   }
 
   /**
-   * Sets selection results into BrokerResponseNative::SelectionResults
+   * Reduces and sets selection results into BrokerResponseNative::SelectionResults
    */
   @Override
-  public void setResults(String tableName, DataSchema dataSchema, Map<ServerRoutingInstance, DataTable> dataTableMap,
+  public void reduceAndSetResults(String tableName, DataSchema dataSchema, Map<ServerRoutingInstance, DataTable> dataTableMap,
       BrokerResponseNative brokerResponseNative, BrokerMetrics brokerMetrics) {
     Collection<DataTable> dataTables = dataTableMap.values();
 

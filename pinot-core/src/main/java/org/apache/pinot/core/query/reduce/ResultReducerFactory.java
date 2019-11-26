@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce.resultsetter;
+package org.apache.pinot.core.query.reduce;
 
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -26,19 +26,19 @@ import org.apache.pinot.core.util.QueryOptions;
 
 
 /**
- * Factory class to construct the right result setter based on the broker request
+ * Factory class to construct the right result reducer based on the broker request
  */
-public final class ResultSetterFactory {
+public final class ResultReducerFactory {
 
   /**
-   * Constructs the right result setter based on the broker request
+   * Constructs the right result reducer based on the broker request
    */
-  public static ResultSetter getResultSetter(BrokerRequest brokerRequest) {
-    ResultSetter resultSetter;
+  public static ResultReducer getResultReducer(BrokerRequest brokerRequest) {
+    ResultReducer resultReducer;
     QueryOptions queryOptions = new QueryOptions(brokerRequest.getQueryOptions());
     if (brokerRequest.getSelections() != null) {
       // Selection query
-      resultSetter = new SelectionResultSetter(brokerRequest, queryOptions);
+      resultReducer = new SelectionResultReducer(brokerRequest, queryOptions);
     } else {
       // Aggregation query
       AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(brokerRequest);
@@ -46,15 +46,15 @@ public final class ResultSetterFactory {
         // Aggregation only query
         if (aggregationFunctions.length == 1 && aggregationFunctions[0].getType() == AggregationFunctionType.DISTINCT) {
           // Distinct query
-          resultSetter = new DistinctResultSetter(brokerRequest, aggregationFunctions[0], queryOptions);
+          resultReducer = new DistinctResultReducer(brokerRequest, aggregationFunctions[0], queryOptions);
         } else {
-          resultSetter = new AggregationResultSetter(brokerRequest, aggregationFunctions, queryOptions);
+          resultReducer = new AggregationResultReducer(brokerRequest, aggregationFunctions, queryOptions);
         }
       } else {
         // Aggregation group-by query
-        resultSetter = new GroupByResultSetter(brokerRequest, aggregationFunctions, queryOptions);
+        resultReducer = new GroupByResultReducer(brokerRequest, aggregationFunctions, queryOptions);
       }
     }
-    return resultSetter;
+    return resultReducer;
   }
 }

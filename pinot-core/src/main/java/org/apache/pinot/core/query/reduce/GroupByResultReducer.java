@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce.resultsetter;
+package org.apache.pinot.core.query.reduce;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -49,16 +49,15 @@ import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
-import org.apache.pinot.core.query.reduce.HavingClauseComparisonTree;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptions;
 
 
 /**
- * Helper class to set group by results into the BrokerResponseNative
+ * Helper class to reduce and set group by results into the BrokerResponseNative
  */
-public class GroupByResultSetter implements ResultSetter {
+public class GroupByResultReducer implements ResultReducer {
 
   private final BrokerRequest _brokerRequest;
   private final AggregationFunction[] _aggregationFunctions;
@@ -66,7 +65,7 @@ public class GroupByResultSetter implements ResultSetter {
   private final boolean _groupByModeSql;
   private final boolean _responseFormatSql;
 
-  GroupByResultSetter(BrokerRequest brokerRequest, AggregationFunction[] aggregationFunctions,
+  GroupByResultReducer(BrokerRequest brokerRequest, AggregationFunction[] aggregationFunctions,
       QueryOptions queryOptions) {
     _brokerRequest = brokerRequest;
     _aggregationFunctions = aggregationFunctions;
@@ -76,11 +75,11 @@ public class GroupByResultSetter implements ResultSetter {
   }
 
   /**
-   * Sets group by results into ResultTable, if responseFormat = sql
+   * Reduces and sets group by results into ResultTable, if responseFormat = sql
    * By default, sets group by results into GroupByResults
    */
   @Override
-  public void setResults(String tableName, DataSchema dataSchema, Map<ServerRoutingInstance, DataTable> dataTableMap,
+  public void reduceAndSetResults(String tableName, DataSchema dataSchema, Map<ServerRoutingInstance, DataTable> dataTableMap,
       BrokerResponseNative brokerResponseNative, BrokerMetrics brokerMetrics) {
     if (dataTableMap.isEmpty() && !_responseFormatSql) {
       return;

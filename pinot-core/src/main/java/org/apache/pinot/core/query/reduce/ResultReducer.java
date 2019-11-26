@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce.resultsetter;
+package org.apache.pinot.core.query.reduce;
 
 import java.util.Map;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -27,19 +27,19 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 
 
 /**
- * Interface for result setters of query results
+ * Interface for result reducers of query results
  */
-public interface ResultSetter {
+public interface ResultReducer {
 
   /**
-   * Sets the results of the query into the BrokerResponseNative
+   * Reduces and sets the results of the query into the BrokerResponseNative
    * @param tableName table name
    * @param dataSchema schema from broker reduce service
    * @param dataTableMap map of servers to data tables
    * @param brokerResponseNative broker response
    * @param brokerMetrics broker metrics
    */
-  void setResults(String tableName, DataSchema dataSchema,
+  void reduceAndSetResults(String tableName, DataSchema dataSchema,
       Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
       BrokerMetrics brokerMetrics);
 }

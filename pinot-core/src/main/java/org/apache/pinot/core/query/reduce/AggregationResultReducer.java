@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce.resultsetter;
+package org.apache.pinot.core.query.reduce;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -24,7 +24,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -37,24 +36,24 @@ import org.apache.pinot.core.util.QueryOptions;
 
 
 /**
- * Helper class to set Aggregation results into the BrokerResponseNative
+ * Helper class to reduce and set Aggregation results into the BrokerResponseNative
  */
-public class AggregationResultSetter implements ResultSetter {
+public class AggregationResultReducer implements ResultReducer {
 
   private final AggregationFunction[] _aggregationFunctions;
   private final boolean _preserveType;
 
-  AggregationResultSetter(BrokerRequest brokerRequest, AggregationFunction[] aggregationFunctions,
+  AggregationResultReducer(BrokerRequest brokerRequest, AggregationFunction[] aggregationFunctions,
       QueryOptions queryOptions) {
     _aggregationFunctions = aggregationFunctions;
     _preserveType = queryOptions.isPreserveType();
   }
 
   /**
-   * Sets aggregations results into BrokerResponseNative::AggregationResults
+   * Reduces and sets aggregations results into BrokerResponseNative::AggregationResults
    */
   @Override
-  public void setResults(String tableName, DataSchema dataSchema, Map<ServerRoutingInstance, DataTable> dataTableMap,
+  public void reduceAndSetResults(String tableName, DataSchema dataSchema, Map<ServerRoutingInstance, DataTable> dataTableMap,
       BrokerResponseNative brokerResponseNative, BrokerMetrics brokerMetrics) {
     if (dataTableMap.isEmpty()) {
       return;

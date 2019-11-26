@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce.resultsetter;
+package org.apache.pinot.core.query.reduce;
 
 import com.google.common.base.Preconditions;
 import java.io.Serializable;
@@ -42,24 +42,24 @@ import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 
 
 /**
- * Helper class to set results of distinct query into the BrokerResponseNative
+ * Helper class to reduce and set results of distinct query into the BrokerResponseNative
  */
-public class DistinctResultSetter implements ResultSetter {
+public class DistinctResultReducer implements ResultReducer {
 
   private final BrokerRequest _brokerRequest;
   private final AggregationFunction _aggregationFunction;
 
-  DistinctResultSetter(BrokerRequest brokerRequest, AggregationFunction aggregationFunction,
+  DistinctResultReducer(BrokerRequest brokerRequest, AggregationFunction aggregationFunction,
       QueryOptions queryOptions) {
     _brokerRequest = brokerRequest;
     _aggregationFunction = aggregationFunction;
   }
 
   /**
-   * Sets results of distinct into SelectionResults
+   * Reduces and sets results of distinct into SelectionResults
    */
   @Override
-  public void setResults(String tableName, DataSchema dataSchema, Map<ServerRoutingInstance, DataTable> dataTableMap,
+  public void reduceAndSetResults(String tableName, DataSchema dataSchema, Map<ServerRoutingInstance, DataTable> dataTableMap,
       BrokerResponseNative brokerResponseNative, BrokerMetrics brokerMetrics) {
 
     if (dataTableMap.isEmpty()) {
