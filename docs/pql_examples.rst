@@ -269,6 +269,19 @@ Supported transform functions
    The ``VALUEIN`` transform function is especially useful when the same multi-valued column is both filtering column and grouping column.
    *e.g.* ``VALUEIN(mvColumn, 3, 5, 15)``
 
+``LOWER``
+  Takes a single string argument and converts it to lower case.
+
+.. code-block:: sql
+
+  SELECT foo FROM myTable WHERE lower(bar) = 'lower_case'
+
+``UPPER``
+  Takes a single string argument and converts it to upper case.
+
+.. code-block:: sql
+
+  SELECT foo FROM myTable WHERE upper(bar) = 'UPPER_CASE'
 
 Differences with SQL
 --------------------

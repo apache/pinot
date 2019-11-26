@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
@@ -54,6 +55,8 @@ public abstract class BaseTransformFunctionTest {
   private static final String SEGMENT_NAME = "testSegment";
   private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME;
   private static final Random RANDOM = new Random();
+  private static final int MAX_STRING_LENGTH = 200;
+  private static final int MIN_STRING_LENGTH = 1;
 
   protected static final int NUM_ROWS = 1000;
   protected static final int MAX_NUM_MULTI_VALUES = 5;
@@ -63,6 +66,7 @@ public abstract class BaseTransformFunctionTest {
   protected static final String FLOAT_SV_COLUMN = "floatSV";
   protected static final String DOUBLE_SV_COLUMN = "doubleSV";
   protected static final String STRING_SV_COLUMN = "stringSV";
+  protected static final String STRING_ALPHA_NUMERIC_SV_COLUMN = "stringAlphaNumericSV";
   protected static final String INT_MV_COLUMN = "intMV";
   protected static final String TIME_COLUMN = "time";
 
@@ -71,6 +75,7 @@ public abstract class BaseTransformFunctionTest {
   protected final float[] _floatSVValues = new float[NUM_ROWS];
   protected final double[] _doubleSVValues = new double[NUM_ROWS];
   protected final String[] _stringSVValues = new String[NUM_ROWS];
+  protected final String[] _stringAlphaNumericSVValues = new String[NUM_ROWS];
   protected final int[][] _intMVValues = new int[NUM_ROWS][];
   protected final long[] _timeValues = new long[NUM_ROWS];
 
@@ -89,7 +94,7 @@ public abstract class BaseTransformFunctionTest {
       _floatSVValues[i] = _intSVValues[i] * RANDOM.nextFloat();
       _doubleSVValues[i] = _intSVValues[i] * RANDOM.nextDouble();
       _stringSVValues[i] = Double.toString(_intSVValues[i] * RANDOM.nextDouble());
-
+      _stringAlphaNumericSVValues[i] = RandomStringUtils.randomAlphabetic(RANDOM.nextInt(MAX_STRING_LENGTH - MIN_STRING_LENGTH) + MIN_STRING_LENGTH);
       int numValues = 1 + RANDOM.nextInt(MAX_NUM_MULTI_VALUES);
       _intMVValues[i] = new int[numValues];
       for (int j = 0; j < numValues; j++) {
@@ -108,6 +113,7 @@ public abstract class BaseTransformFunctionTest {
       map.put(FLOAT_SV_COLUMN, _floatSVValues[i]);
       map.put(DOUBLE_SV_COLUMN, _doubleSVValues[i]);
       map.put(STRING_SV_COLUMN, _stringSVValues[i]);
+      map.put(STRING_ALPHA_NUMERIC_SV_COLUMN, _stringAlphaNumericSVValues[i]);
       map.put(INT_MV_COLUMN, ArrayUtils.toObject(_intMVValues[i]));
       map.put(TIME_COLUMN, _timeValues[i]);
       GenericRow row = new GenericRow();
@@ -121,6 +127,7 @@ public abstract class BaseTransformFunctionTest {
     schema.addField(new DimensionFieldSpec(FLOAT_SV_COLUMN, FieldSpec.DataType.FLOAT, true));
     schema.addField(new DimensionFieldSpec(DOUBLE_SV_COLUMN, FieldSpec.DataType.DOUBLE, true));
     schema.addField(new DimensionFieldSpec(STRING_SV_COLUMN, FieldSpec.DataType.STRING, true));
+    schema.addField(new DimensionFieldSpec(STRING_ALPHA_NUMERIC_SV_COLUMN, FieldSpec.DataType.STRING, true));
     schema.addField(new DimensionFieldSpec(INT_MV_COLUMN, FieldSpec.DataType.INT, false));
     schema.addField(new TimeFieldSpec(TIME_COLUMN, FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS));
 
@@ -154,6 +161,13 @@ public abstract class BaseTransformFunctionTest {
       Assert.assertEquals(floatValues[i], (float) expectedValues[i]);
       Assert.assertEquals(doubleValues[i], expectedValues[i]);
       Assert.assertEquals(stringValues[i], Double.toString(expectedValues[i]));
+    }
+  }
+
+  protected void testStringAlphaNumericTransformFunction(TransformFunction transformFunction, String[] expectedValues) {
+    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(stringValues[i], expectedValues[i]);
     }
   }
 

@@ -31,6 +31,8 @@ import org.apache.pinot.core.operator.transform.function.SingleParamMathTransfor
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.FloorTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.LnTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.SqrtTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamStringTransformFunction.LowerTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamStringTransformFunction.UpperTransformFunction;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 
 
@@ -61,6 +63,8 @@ public class TransformFunctionFactory {
           put(DateTruncTransformFunction.FUNCTION_NAME.toLowerCase(), DateTruncTransformFunction.class);
           put(ValueInTransformFunction.FUNCTION_NAME.toLowerCase(), ValueInTransformFunction.class);
           put(MapValueTransformFunction.FUNCTION_NAME.toLowerCase(), MapValueTransformFunction.class);
+          put(LowerTransformFunction.FUNCTION_NAME.toLowerCase(), LowerTransformFunction.class);
+          put(UpperTransformFunction.FUNCTION_NAME.toLowerCase(), UpperTransformFunction.class);
         }
       };
 
