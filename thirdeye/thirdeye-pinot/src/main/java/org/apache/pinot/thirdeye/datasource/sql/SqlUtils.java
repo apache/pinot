@@ -99,22 +99,23 @@ public class SqlUtils {
    * @param dimensions list of dimensions
    * @throws SQLException SQL exception if SQL failed
    */
-  public static void createTable(DataSource ds, String tableName,
+  public static void createTableOverride(DataSource ds, String tableName,
       String timeColumn, List<String> metrics, List<String> dimensions) throws SQLException {
     StringBuilder sb = new StringBuilder();
-    sb.append("create table if not exists ");
-    sb.append(tableName);
-    sb.append(" (");
+    sb.append("drop table if exists ").append(tableName).append(";");
+    sb.append("create table ").append(tableName).append(" (");
 
     for (String metric: metrics) {
-      sb.append(metric).append(" decimal(20,3), ");
+      sb.append(metric).append(" decimal(50,3), ");
     }
     for (String dimension: dimensions) {
-      sb.append(dimension).append(" varchar(25), ");
+      sb.append(dimension).append(" varchar(50), ");
     }
-    sb.append(timeColumn).append(" varchar(25) ) ENGINE=InnoDB;");
+    sb.append(timeColumn).append(" varchar(50) ) ENGINE=InnoDB;");
 
     String sql = sb.toString();
+
+    LOG.info("Creating H2 table: " + sql);
 
     try (Connection connection = ds.getConnection();
         Statement statement = connection.createStatement()){

@@ -3,6 +3,21 @@
 dataSourceConfigs:
   - className: org.apache.pinot.thirdeye.datasource.mock.MockThirdEyeDataSource
     properties:
+      H2:
+        db: jdbc:h2:./config/h2db
+        user: sa
+        password: sa
+        datasets:
+          - tableName: "H2.H2.total_pageviews"
+            timeColumn: "timestamp"
+            granularity: "1DAYS"
+            timeFormat: "yyyy-MM-dd"
+            dimensions: [country, device]
+            timezone: "UTC"
+            metrics:
+              pageviews: "SUM"
+            dataFile: "pageviews.csv"
+
       populateMetaData: true
       lookback: 90
       datasets:
