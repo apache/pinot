@@ -31,15 +31,8 @@ public class TenantTest {
   @Test
   public void testDeserializeFromJson()
       throws IOException {
-    Tenant tenant = new Tenant();
-    tenant.setTenantRole(TenantRole.SERVER);
-    tenant.setTenantName("newTenant");
-    tenant.setNumberOfInstances(10);
-    tenant.setOfflineInstances(5);
-    tenant.setRealtimeInstances(5);
-
+    Tenant tenant = new Tenant(TenantRole.SERVER, "newTenant", 10, 5, 5);
     tenant = JsonUtils.stringToObject(JsonUtils.objectToString(tenant), Tenant.class);
-
     assertEquals(tenant.getTenantRole(), TenantRole.SERVER);
     assertEquals(tenant.getTenantName(), "newTenant");
     assertEquals(tenant.getNumberOfInstances(), 10);

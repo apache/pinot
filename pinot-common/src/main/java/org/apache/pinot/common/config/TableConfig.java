@@ -34,12 +34,11 @@ import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
-import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.JsonUtils;
 
 
 @SuppressWarnings({"Duplicates", "unused"})
-public class TableConfig {
+public class TableConfig extends BaseJsonConfig {
   public static final String TABLE_NAME_KEY = "tableName";
   public static final String TABLE_TYPE_KEY = "tableType";
   public static final String VALIDATION_CONFIG_KEY = "segmentsConfig";
@@ -76,8 +75,8 @@ public class TableConfig {
    */
   public TableConfig() {
     // TODO: currently these 2 fields are annotated as non-null. Revisit to see whether that's necessary
-    _tenantConfig = new TenantConfig();
-    _customConfig = new TableCustomConfig();
+    _tenantConfig = new TenantConfig(null, null, null);
+    _customConfig = new TableCustomConfig(null);
   }
 
   private TableConfig(String tableName, TableType tableType, SegmentsValidationAndRetentionConfig validationConfig,
@@ -213,6 +212,11 @@ public class TableConfig {
     }
 
     return jsonConfig;
+  }
+
+  @Override
+  public JsonNode toJsonNode() {
+    return toJsonConfig();
   }
 
   public String toJsonConfigString() {
@@ -410,46 +414,6 @@ public class TableConfig {
   public void setInstanceAssignmentConfigMap(
       Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
     _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
-  }
-
-  @Override
-  public String toString() {
-    try {
-      return JsonUtils.objectToPrettyString(toJsonConfig());
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (this == obj) {
-      return true;
-    }
-    if (obj instanceof TableConfig) {
-      TableConfig that = (TableConfig) obj;
-      return EqualityUtils.isEqual(_tableName, that._tableName) && EqualityUtils.isEqual(_tableType, that._tableType)
-          && EqualityUtils.isEqual(_validationConfig, that._validationConfig) && EqualityUtils
-          .isEqual(_tenantConfig, that._tenantConfig) && EqualityUtils.isEqual(_indexingConfig, that._indexingConfig)
-          && EqualityUtils.isEqual(_customConfig, that._customConfig) && EqualityUtils
-          .isEqual(_quotaConfig, that._quotaConfig) && EqualityUtils.isEqual(_taskConfig, that._taskConfig)
-          && EqualityUtils.isEqual(_routingConfig, that._routingConfig);
-    }
-    return false;
-  }
-
-  @Override
-  public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(_tableName);
-    result = EqualityUtils.hashCodeOf(result, _tableType);
-    result = EqualityUtils.hashCodeOf(result, _validationConfig);
-    result = EqualityUtils.hashCodeOf(result, _tenantConfig);
-    result = EqualityUtils.hashCodeOf(result, _indexingConfig);
-    result = EqualityUtils.hashCodeOf(result, _customConfig);
-    result = EqualityUtils.hashCodeOf(result, _quotaConfig);
-    result = EqualityUtils.hashCodeOf(result, _taskConfig);
-    result = EqualityUtils.hashCodeOf(result, _routingConfig);
-    return result;
   }
 
   public static class Builder {
@@ -670,10 +634,7 @@ public class TableConfig {
       }
 
       // Tenant config
-      TenantConfig tenantConfig = new TenantConfig();
-      tenantConfig.setBroker(_brokerTenant);
-      tenantConfig.setServer(_serverTenant);
-      tenantConfig.setTagOverrideConfig(_tagOverrideConfig);
+      TenantConfig tenantConfig = new TenantConfig(_brokerTenant, _serverTenant, _tagOverrideConfig);
 
       // Indexing config
       IndexingConfig indexingConfig = new IndexingConfig();
@@ -690,8 +651,7 @@ public class TableConfig {
       indexingConfig.setSegmentPartitionConfig(_segmentPartitionConfig);
 
       if (_customConfig == null) {
-        _customConfig = new TableCustomConfig();
-        _customConfig.setCustomConfigs(new HashMap<>());
+        _customConfig = new TableCustomConfig(null);
       }
 
       return new TableConfig(_tableName, _tableType, validationConfig, tenantConfig, indexingConfig, _customConfig,

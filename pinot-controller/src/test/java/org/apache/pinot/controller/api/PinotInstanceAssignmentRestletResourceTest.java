@@ -68,11 +68,9 @@ public class PinotInstanceAssignmentRestletResourceTest extends ControllerTest {
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, false);
 
     // Create broker and server tenant
-    Tenant brokerTenant = new Tenant.TenantBuilder(TENANT_NAME).setRole(TenantRole.BROKER).setTotalInstances(1).build();
+    Tenant brokerTenant = new Tenant(TenantRole.BROKER, TENANT_NAME, 1, 0, 0);
     _helixResourceManager.createBrokerTenant(brokerTenant);
-    Tenant serverTenant =
-        new Tenant.TenantBuilder(TENANT_NAME).setRole(TenantRole.SERVER).setOfflineInstances(1).setRealtimeInstances(1)
-            .build();
+    Tenant serverTenant = new Tenant(TenantRole.SERVER, TENANT_NAME, 2, 1, 1);
     _helixResourceManager.createServerTenant(serverTenant);
   }
 
@@ -110,11 +108,9 @@ public class PinotInstanceAssignmentRestletResourceTest extends ControllerTest {
     }
 
     // Add OFFLINE instance assignment config to the offline table config
-    InstanceAssignmentConfig offlineInstanceAssignmentConfig = new InstanceAssignmentConfig();
-    InstanceTagPoolConfig offlineInstanceTagPoolConfig = new InstanceTagPoolConfig();
-    offlineInstanceTagPoolConfig.setTag(TagNameUtils.getOfflineTagForTenant(TENANT_NAME));
-    offlineInstanceAssignmentConfig.setTagPoolConfig(offlineInstanceTagPoolConfig);
-    offlineInstanceAssignmentConfig.setReplicaGroupPartitionConfig(new InstanceReplicaGroupPartitionConfig());
+    InstanceAssignmentConfig offlineInstanceAssignmentConfig = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0));
     offlineTableConfig.setInstanceAssignmentConfigMap(
         Collections.singletonMap(InstancePartitionsType.OFFLINE, offlineInstanceAssignmentConfig));
     _helixResourceManager.setExistingTableConfig(offlineTableConfig);
@@ -130,11 +126,9 @@ public class PinotInstanceAssignmentRestletResourceTest extends ControllerTest {
     String offlineInstanceId = offlineInstancePartitions.getInstances(0, 0).get(0);
 
     // Add CONSUMING instance assignment config to the real-time table config
-    InstanceAssignmentConfig consumingInstanceAssignmentConfig = new InstanceAssignmentConfig();
-    InstanceTagPoolConfig realtimeInstanceTagPoolConfig = new InstanceTagPoolConfig();
-    realtimeInstanceTagPoolConfig.setTag(TagNameUtils.getRealtimeTagForTenant(TENANT_NAME));
-    consumingInstanceAssignmentConfig.setTagPoolConfig(realtimeInstanceTagPoolConfig);
-    consumingInstanceAssignmentConfig.setReplicaGroupPartitionConfig(new InstanceReplicaGroupPartitionConfig());
+    InstanceAssignmentConfig consumingInstanceAssignmentConfig = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getRealtimeTagForTenant(TENANT_NAME), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0));
     realtimeTableConfig.setInstanceAssignmentConfigMap(
         Collections.singletonMap(InstancePartitionsType.CONSUMING, consumingInstanceAssignmentConfig));
     _helixResourceManager.setExistingTableConfig(realtimeTableConfig);

@@ -18,50 +18,48 @@
  */
 package org.apache.pinot.common.config.instance;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.config.BaseJsonConfig;
 
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class InstanceAssignmentConfig {
+public class InstanceAssignmentConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Configuration for the instance tag and pool of the instance assignment (mandatory)")
-  private InstanceTagPoolConfig _tagPoolConfig;
+  private final InstanceTagPoolConfig _tagPoolConfig;
 
   @JsonPropertyDescription("Configuration for the instance constraints of the instance assignment, which filters out unqualified instances and sorts instances for picking priority")
-  private InstanceConstraintConfig _constraintConfig;
+  private final InstanceConstraintConfig _constraintConfig;
 
   @JsonPropertyDescription("Configuration for the instance replica-group and partition of the instance assignment (mandatory)")
-  private InstanceReplicaGroupPartitionConfig _replicaGroupPartitionConfig;
+  private final InstanceReplicaGroupPartitionConfig _replicaGroupPartitionConfig;
 
-  @JsonProperty
+  @JsonCreator
+  public InstanceAssignmentConfig(
+      @JsonProperty(value = "tagPoolConfig", required = true) InstanceTagPoolConfig tagPoolConfig,
+      @JsonProperty("constraintConfig") @Nullable InstanceConstraintConfig constraintConfig,
+      @JsonProperty(value = "replicaGroupPartitionConfig", required = true) InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig) {
+    Preconditions.checkArgument(tagPoolConfig != null, "'tagPoolConfig' must be configured");
+    Preconditions
+        .checkArgument(replicaGroupPartitionConfig != null, "'replicaGroupPartitionConfig' must be configured");
+    _tagPoolConfig = tagPoolConfig;
+    _constraintConfig = constraintConfig;
+    _replicaGroupPartitionConfig = replicaGroupPartitionConfig;
+  }
+
   public InstanceTagPoolConfig getTagPoolConfig() {
     return _tagPoolConfig;
   }
 
-  @JsonProperty
-  public void setTagPoolConfig(InstanceTagPoolConfig tagPoolConfig) {
-    _tagPoolConfig = tagPoolConfig;
-  }
-
-  @JsonProperty
+  @Nullable
   public InstanceConstraintConfig getConstraintConfig() {
     return _constraintConfig;
   }
 
-  @JsonProperty
-  public void setConstraintConfig(InstanceConstraintConfig constraintConfig) {
-    _constraintConfig = constraintConfig;
-  }
-
-  @JsonProperty
   public InstanceReplicaGroupPartitionConfig getReplicaGroupPartitionConfig() {
     return _replicaGroupPartitionConfig;
-  }
-
-  @JsonProperty
-  public void setReplicaGroupPartitionConfig(InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig) {
-    _replicaGroupPartitionConfig = replicaGroupPartitionConfig;
   }
 }

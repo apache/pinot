@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -66,7 +65,6 @@ import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.TenantRole;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.ControllerConf;
@@ -409,11 +407,8 @@ public abstract class ControllerTest {
     Assert.assertEquals(postMethod.getStatusCode(), 200);
   }
 
-  protected String getBrokerTenantRequestPayload(String tenantName, int numBrokers)
-      throws JsonProcessingException {
-    Tenant tenant =
-        new Tenant.TenantBuilder(tenantName).setRole(TenantRole.BROKER).setTotalInstances(numBrokers).build();
-    return JsonUtils.objectToString(tenant);
+  protected String getBrokerTenantRequestPayload(String tenantName, int numBrokers) {
+    return new Tenant(TenantRole.BROKER, tenantName, numBrokers, 0, 0).toJsonString();
   }
 
   protected void createBrokerTenant(String tenantName, int numBrokers)
@@ -428,12 +423,9 @@ public abstract class ControllerTest {
         getBrokerTenantRequestPayload(tenantName, numBrokers));
   }
 
-  protected String getServerTenantRequestPayload(String tenantName, int numOfflineServers, int numRealtimeServers)
-      throws JsonProcessingException {
-    Tenant tenant = new Tenant.TenantBuilder(tenantName).setRole(TenantRole.SERVER)
-        .setTotalInstances(numOfflineServers + numRealtimeServers).setOfflineInstances(numOfflineServers)
-        .setRealtimeInstances(numRealtimeServers).build();
-    return JsonUtils.objectToString(tenant);
+  protected String getServerTenantRequestPayload(String tenantName, int numOfflineServers, int numRealtimeServers) {
+    return new Tenant(TenantRole.SERVER, tenantName, numOfflineServers + numRealtimeServers, numOfflineServers,
+        numRealtimeServers).toJsonString();
   }
 
   protected void createServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)

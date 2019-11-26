@@ -18,102 +18,43 @@
  */
 package org.apache.pinot.common.config;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import java.lang.reflect.Field;
-import org.apache.pinot.common.utils.EqualityUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import javax.annotation.Nullable;
 
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class TenantConfig {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TenantConfig.class);
+public class TenantConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Broker tag prefix used by this table")
-  private String _broker;
+  private final String _broker;
 
   @JsonPropertyDescription("Server tag prefix used by this table")
-  private String _server;
+  private final String _server;
 
   @JsonPropertyDescription("Overrides for tags")
-  private TagOverrideConfig _tagOverrideConfig;
+  private final TagOverrideConfig _tagOverrideConfig;
 
+  @JsonCreator
+  public TenantConfig(@JsonProperty("broker") @Nullable String broker, @JsonProperty("server") @Nullable String server,
+      @JsonProperty("tagOverrideConfig") @Nullable TagOverrideConfig tagOverrideConfig) {
+    _broker = broker;
+    _server = server;
+    _tagOverrideConfig = tagOverrideConfig;
+  }
+
+  @Nullable
   public String getBroker() {
     return _broker;
   }
 
-  public void setBroker(String broker) {
-    _broker = broker;
-  }
-
+  @Nullable
   public String getServer() {
     return _server;
   }
 
-  public void setServer(String server) {
-    _server = server;
-  }
-
+  @Nullable
   public TagOverrideConfig getTagOverrideConfig() {
     return _tagOverrideConfig;
-  }
-
-  public void setTagOverrideConfig(TagOverrideConfig tagOverrideConfig) {
-    _tagOverrideConfig = tagOverrideConfig;
-  }
-
-  @Override
-  public String toString() {
-    final StringBuilder result = new StringBuilder();
-    final String newLine = System.getProperty("line.separator");
-
-    result.append(this.getClass().getName());
-    result.append(" Object {");
-    result.append(newLine);
-
-    //determine fields declared in this class only (no fields of superclass)
-    final Field[] fields = this.getClass().getDeclaredFields();
-
-    //print field names paired with their values
-    for (final Field field : fields) {
-      result.append("  ");
-      try {
-        result.append(field.getName());
-        result.append(": ");
-        //requires access to private field:
-        result.append(field.get(this));
-      } catch (final IllegalAccessException ex) {
-        if (LOGGER.isWarnEnabled()) {
-          LOGGER.warn("Caught exception while processing field " + field, ex);
-        }
-      }
-      result.append(newLine);
-    }
-    result.append("}");
-
-    return result.toString();
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
-      return true;
-    }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
-      return false;
-    }
-
-    TenantConfig that = (TenantConfig) o;
-
-    return EqualityUtils.isEqual(_broker, that._broker) && EqualityUtils.isEqual(_server, that._server);
-  }
-
-  @Override
-  public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(_broker);
-    result = EqualityUtils.hashCodeOf(result, _server);
-    return result;
   }
 }

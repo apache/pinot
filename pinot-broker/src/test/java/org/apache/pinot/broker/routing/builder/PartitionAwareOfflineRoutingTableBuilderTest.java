@@ -374,13 +374,10 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
   private TableConfig buildOfflineTableConfig()
       throws Exception {
     // Create the replica group aware assignment strategy config
-    ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig();
-    replicaGroupStrategyConfig.setNumInstancesPerPartition(NUM_PARTITION);
-    replicaGroupStrategyConfig.setMirrorAssignmentAcrossReplicaGroups(true);
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig(null, NUM_PARTITION);
 
     // Create the routing config
-    RoutingConfig routingConfig = new RoutingConfig();
-    routingConfig.setRoutingTableBuilderName("PartitionAwareOffline");
+    RoutingConfig routingConfig = new RoutingConfig("PartitionAwareOffline", null);
 
     // Create table config
     TableConfig tableConfig =

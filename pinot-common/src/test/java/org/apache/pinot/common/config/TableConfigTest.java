@@ -150,8 +150,7 @@ public class TableConfigTest {
     }
     {
       // With quota config
-      QuotaConfig quotaConfig = new QuotaConfig();
-      quotaConfig.setStorage("30G");
+      QuotaConfig quotaConfig = new QuotaConfig("30G", "100.00");
       TableConfig tableConfig = tableConfigBuilder.setQuotaConfig(quotaConfig).build();
 
       assertEquals(tableConfig.getTableName(), "myTable_OFFLINE");
@@ -159,13 +158,6 @@ public class TableConfigTest {
       assertEquals(tableConfig.getIndexingConfig().getLoadMode(), "HEAP");
       assertNotNull(tableConfig.getQuotaConfig());
       assertEquals(tableConfig.getQuotaConfig().getStorage(), "30G");
-      assertNull(tableConfig.getQuotaConfig().getMaxQueriesPerSecond());
-
-      // With qps quota
-      quotaConfig.setMaxQueriesPerSecond("100.00");
-      tableConfig = tableConfigBuilder.setQuotaConfig(quotaConfig).build();
-      assertNotNull(tableConfig.getQuotaConfig());
-      assertNotNull(tableConfig.getQuotaConfig().getMaxQueriesPerSecond());
       assertEquals(tableConfig.getQuotaConfig().getMaxQueriesPerSecond(), "100.00");
 
       // Serialize then de-serialize
@@ -207,8 +199,7 @@ public class TableConfigTest {
       assertEquals(tableConfigToCompare.getTenantConfig().getBroker(), tableConfig.getTenantConfig().getBroker());
       assertNull(tableConfig.getTenantConfig().getTagOverrideConfig());
 
-      TagOverrideConfig tagOverrideConfig = new TagOverrideConfig();
-      tagOverrideConfig.setRealtimeConsuming("aRTConsumingTag_REALTIME");
+      TagOverrideConfig tagOverrideConfig = new TagOverrideConfig("aRTConsumingTag_REALTIME", null);
       tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
 
       assertEquals(tableConfig.getTableName(), "myTable_OFFLINE");
@@ -242,10 +233,7 @@ public class TableConfigTest {
     }
     {
       // With SegmentAssignmentStrategyConfig
-      ReplicaGroupStrategyConfig replicaGroupConfig = new ReplicaGroupStrategyConfig();
-      replicaGroupConfig.setNumInstancesPerPartition(5);
-      replicaGroupConfig.setMirrorAssignmentAcrossReplicaGroups(true);
-      replicaGroupConfig.setPartitionColumn("memberId");
+      ReplicaGroupStrategyConfig replicaGroupConfig = new ReplicaGroupStrategyConfig("memberId", 5);
 
       TableConfig tableConfig =
           tableConfigBuilder.setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy").build();
@@ -260,8 +248,7 @@ public class TableConfigTest {
     }
     {
       // With completion config
-      CompletionConfig completionConfig = new CompletionConfig();
-      completionConfig.setCompletionMode("DEFAULT");
+      CompletionConfig completionConfig = new CompletionConfig("DEFAULT");
 
       TableConfig tableConfig = tableConfigBuilder.build();
       tableConfig.getValidationConfig().setCompletionConfig(completionConfig);
@@ -323,24 +310,10 @@ public class TableConfigTest {
     }
     {
       // With instance assignment config
-      InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig();
-
-      InstanceTagPoolConfig tagPoolConfig = new InstanceTagPoolConfig();
-      tagPoolConfig.setTag("tenant_OFFLINE");
-      tagPoolConfig.setPoolBased(true);
-      tagPoolConfig.setNumPools(3);
-      instanceAssignmentConfig.setTagPoolConfig(tagPoolConfig);
-
-      InstanceConstraintConfig constraintConfig = new InstanceConstraintConfig();
-      constraintConfig.setConstraints(Arrays.asList("constraint1", "constraint2"));
-      instanceAssignmentConfig.setConstraintConfig(constraintConfig);
-
-      InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig = new InstanceReplicaGroupPartitionConfig();
-      replicaGroupPartitionConfig.setReplicaGroupBased(true);
-      replicaGroupPartitionConfig.setNumReplicaGroups(3);
-      replicaGroupPartitionConfig.setNumInstancesPerReplicaGroup(5);
-      instanceAssignmentConfig.setReplicaGroupPartitionConfig(replicaGroupPartitionConfig);
-
+      InstanceAssignmentConfig instanceAssignmentConfig =
+          new InstanceAssignmentConfig(new InstanceTagPoolConfig("tenant_OFFLINE", true, 3, null),
+              new InstanceConstraintConfig(Arrays.asList("constraint1", "constraint2")),
+              new InstanceReplicaGroupPartitionConfig(true, 0, 3, 5, 0, 0));
       TableConfig tableConfig = tableConfigBuilder.setInstanceAssignmentConfigMap(
           Collections.singletonMap(InstancePartitionsType.OFFLINE, instanceAssignmentConfig)).build();
 
@@ -360,7 +333,6 @@ public class TableConfigTest {
     // Check that the configurations are correct.
     ReplicaGroupStrategyConfig strategyConfig =
         tableConfigToCompare.getValidationConfig().getReplicaGroupStrategyConfig();
-    assertTrue(strategyConfig.getMirrorAssignmentAcrossReplicaGroups());
     assertEquals(strategyConfig.getNumInstancesPerPartition(), 5);
     assertEquals(strategyConfig.getPartitionColumn(), "memberId");
   }

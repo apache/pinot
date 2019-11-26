@@ -43,26 +43,22 @@ public class TagOverrideConfigTest {
     inputs.add(new Object[]{tableConfig, "aServerTenant", "aServerTenant_REALTIME", "aServerTenant_REALTIME"});
 
     // empty tag override
-    TagOverrideConfig tagOverrideConfig = new TagOverrideConfig();
+    TagOverrideConfig tagOverrideConfig = new TagOverrideConfig(null, null);
     tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
     inputs.add(new Object[]{tableConfig, "aServerTenant", "aServerTenant_REALTIME", "aServerTenant_REALTIME"});
 
     // defined realtime consuming override
-    tagOverrideConfig = new TagOverrideConfig();
-    tagOverrideConfig.setRealtimeConsuming("overriddenTag_REALTIME");
+    tagOverrideConfig = new TagOverrideConfig("overriddenTag_REALTIME", null);
     tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
     inputs.add(new Object[]{tableConfig, "aServerTenant", "overriddenTag_REALTIME", "aServerTenant_REALTIME"});
 
     // defined realtime completed override
-    tagOverrideConfig = new TagOverrideConfig();
-    tagOverrideConfig.setRealtimeCompleted("overriddenTag_OFFLINE");
+    tagOverrideConfig = new TagOverrideConfig(null, "overriddenTag_OFFLINE");
     tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
     inputs.add(new Object[]{tableConfig, "aServerTenant", "aServerTenant_REALTIME", "overriddenTag_OFFLINE"});
 
     // defined both overrides
-    tagOverrideConfig = new TagOverrideConfig();
-    tagOverrideConfig.setRealtimeConsuming("overriddenTag_REALTIME");
-    tagOverrideConfig.setRealtimeCompleted("overriddenTag_OFFLINE");
+    tagOverrideConfig = new TagOverrideConfig("overriddenTag_REALTIME", "overriddenTag_OFFLINE");
     tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
     inputs.add(new Object[]{tableConfig, "aServerTenant", "overriddenTag_REALTIME", "overriddenTag_OFFLINE"});
 
@@ -92,13 +88,11 @@ public class TagOverrideConfigTest {
     tableConfig = tableConfigBuilder.setTagOverrideConfig(null).build();
     inputs.add(new Object[]{tableConfig, "aServerTenant", "aServerTenant_OFFLINE"});
 
-    TagOverrideConfig tagOverrideConfig = new TagOverrideConfig();
+    TagOverrideConfig tagOverrideConfig = new TagOverrideConfig(null, null);
     tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
     inputs.add(new Object[]{tableConfig, "aServerTenant", "aServerTenant_OFFLINE"});
 
-    tagOverrideConfig = new TagOverrideConfig();
-    tagOverrideConfig.setRealtimeConsuming("overriddenTag_REALTIME");
-    tagOverrideConfig.setRealtimeCompleted("overriddenTag_OFFLINE");
+    tagOverrideConfig = new TagOverrideConfig("overriddenTag_REALTIME", "overriddenTag_OFFLINE");
     tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
     inputs.add(new Object[]{tableConfig, "aServerTenant", "aServerTenant_OFFLINE"});
 

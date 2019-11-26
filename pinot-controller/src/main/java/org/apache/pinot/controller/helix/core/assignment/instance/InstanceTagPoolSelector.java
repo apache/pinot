@@ -55,7 +55,6 @@ public class InstanceTagPoolSelector {
 
     // Filter out the instances with the correct tag
     String tag = _tagPoolConfig.getTag();
-    Preconditions.checkState(tag != null, "Tag must be configured");
     List<InstanceConfig> candidateInstanceConfigs = new ArrayList<>();
     for (InstanceConfig instanceConfig : instanceConfigs) {
       if (instanceConfig.getTags().contains(tag)) {

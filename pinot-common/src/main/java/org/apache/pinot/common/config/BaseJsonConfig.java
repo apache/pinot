@@ -18,24 +18,43 @@
  */
 package org.apache.pinot.common.config;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.Map;
-import javax.annotation.Nullable;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.JsonNode;
+import org.apache.pinot.common.utils.JsonUtils;
 
 
-public class TableCustomConfig extends BaseJsonConfig {
-  public static final String MESSAGE_BASED_REFRESH_KEY = "messageBasedRefresh";
+/**
+ * Base implementation for the JSON based configurations.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+public abstract class BaseJsonConfig {
 
-  private final Map<String, String> _customConfigs;
-
-  @JsonCreator
-  public TableCustomConfig(@JsonProperty("customConfigs") @Nullable Map<String, String> customConfigs) {
-    _customConfigs = customConfigs;
+  public JsonNode toJsonNode() {
+    return JsonUtils.objectToJsonNode(this);
   }
 
-  @Nullable
-  public Map<String, String> getCustomConfigs() {
-    return _customConfigs;
+  public String toJsonString() {
+    return toJsonNode().toString();
+  }
+
+  @Override
+  public int hashCode() {
+    return toJsonNode().hashCode();
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if (obj instanceof BaseJsonConfig) {
+      return toJsonNode().equals(((BaseJsonConfig) obj).toJsonNode());
+    }
+    return false;
+  }
+
+  @Override
+  public String toString() {
+    return toJsonString();
   }
 }

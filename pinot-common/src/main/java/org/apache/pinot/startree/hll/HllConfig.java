@@ -19,16 +19,13 @@
 package org.apache.pinot.startree.hll;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
-import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.config.BaseJsonConfig;
 import org.apache.pinot.common.utils.JsonUtils;
 
 
@@ -38,8 +35,8 @@ import org.apache.pinot.common.utils.JsonUtils;
  * If columnsToDeriveHllFields are specified and not empty,
  * segment builder will generate corresponding hll derived fields on the fly.
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class HllConfig {
+@Deprecated // Not required for the new star-tree
+public class HllConfig extends BaseJsonConfig {
   private int _hllLog2m = HllConstants.DEFAULT_LOG2M;
   private String _hllDeriveColumnSuffix = HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX;
   private Set<String> _columnsToDeriveHllFields = new HashSet<>();
@@ -59,7 +56,7 @@ public class HllConfig {
    *                 accuracy = 1.04/sqrt(2^log2m)
    */
   public HllConfig(int hllLog2m) {
-    this._hllLog2m = hllLog2m;
+    _hllLog2m = hllLog2m;
   }
 
   /**
@@ -127,42 +124,8 @@ public class HllConfig {
     return _derivedHllFieldToOriginMap;
   }
 
-  @Override
-  public String toString() {
-    return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
-  }
-
-  public String toJsonString()
-      throws Exception {
-    return JsonUtils.objectToPrettyString(this);
-  }
-
   public static HllConfig fromJsonString(String jsonString)
       throws IOException {
     return JsonUtils.stringToObject(jsonString, HllConfig.class);
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (EqualityUtils.isSameReference(this, obj)) {
-      return true;
-    }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, obj)) {
-      return false;
-    }
-
-    HllConfig that = (HllConfig) obj;
-    return EqualityUtils.isEqual(_hllLog2m, that._hllLog2m) && EqualityUtils
-        .isEqual(_hllDeriveColumnSuffix, that._hllDeriveColumnSuffix) && EqualityUtils
-        .isEqual(_columnsToDeriveHllFields, that._columnsToDeriveHllFields);
-  }
-
-  @Override
-  public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(_hllLog2m);
-    result = EqualityUtils.hashCodeOf(result, _hllDeriveColumnSuffix);
-    result = EqualityUtils.hashCodeOf(result, _columnsToDeriveHllFields);
-    return result;
   }
 }

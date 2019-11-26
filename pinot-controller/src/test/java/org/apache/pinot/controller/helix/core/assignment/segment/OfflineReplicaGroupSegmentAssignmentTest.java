@@ -128,8 +128,9 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     HelixManager helixManagerWithPartitions = mock(HelixManager.class);
     when(helixManagerWithPartitions.getHelixPropertyStore()).thenReturn(propertyStoreWithPartitions);
 
-    ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig();
-    replicaGroupStrategyConfig.setPartitionColumn(PARTITION_COLUMN);
+    int numInstancesPerPartition = numInstancesPerReplicaGroup / NUM_REPLICAS;
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
+        new ReplicaGroupStrategyConfig(PARTITION_COLUMN, numInstancesPerPartition);
     TableConfig tableConfigWithPartitions =
         new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITH_PARTITION)
             .setNumReplicas(NUM_REPLICAS)
@@ -151,7 +152,6 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     // }
     InstancePartitions instancePartitionsWithPartition =
         new InstancePartitions(INSTANCE_PARTITIONS_NAME_WITH_PARTITION);
-    int numInstancesPerPartition = numInstancesPerReplicaGroup / NUM_REPLICAS;
     instanceIdToAdd = 0;
     for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
       for (int partitionId = 0; partitionId < NUM_PARTITIONS; partitionId++) {

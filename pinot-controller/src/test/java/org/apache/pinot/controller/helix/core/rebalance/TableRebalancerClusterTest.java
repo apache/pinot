@@ -181,16 +181,12 @@ public class TableRebalancerClusterTest extends ControllerTest {
         newSegmentAssignment));
 
     // Update the table config to use replica-group based assignment
-    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig();
-    InstanceTagPoolConfig tagPoolConfig = new InstanceTagPoolConfig();
-    tagPoolConfig.setTag(TagNameUtils.getOfflineTagForTenant(null));
-    instanceAssignmentConfig.setTagPoolConfig(tagPoolConfig);
-    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig = new InstanceReplicaGroupPartitionConfig();
-    replicaGroupPartitionConfig.setReplicaGroupBased(true);
-    replicaGroupPartitionConfig.setNumReplicaGroups(NUM_REPLICAS);
-    instanceAssignmentConfig.setReplicaGroupPartitionConfig(replicaGroupPartitionConfig);
-    tableConfig.setInstanceAssignmentConfigMap(
-        Collections.singletonMap(InstancePartitionsType.OFFLINE, instanceAssignmentConfig));
+    InstanceTagPoolConfig tagPoolConfig =
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(null), false, 0, null);
+    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+        new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS, 0, 0, 0);
+    tableConfig.setInstanceAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.OFFLINE,
+        new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig)));
     _helixResourceManager.updateTableConfig(tableConfig);
 
     // No need to reassign instances because instances should be automatically assigned when updating the table config

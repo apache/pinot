@@ -46,6 +46,7 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.config.TagOverrideConfig;
 import org.apache.pinot.common.config.Tenant;
+import org.apache.pinot.common.config.TenantConfig;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -93,9 +94,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_INSTANCES, false, BASE_SERVER_ADMIN_PORT);
 
     // Create server tenant on all Servers
-    Tenant serverTenant =
-        new Tenant.TenantBuilder(SERVER_TENANT_NAME).setRole(TenantRole.SERVER).setOfflineInstances(NUM_INSTANCES)
-            .build();
+    Tenant serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, NUM_INSTANCES, NUM_INSTANCES, 0);
     _helixResourceManager.createServerTenant(serverTenant);
 
     // Enable lead controller resource
@@ -190,8 +189,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   public void testRebuildBrokerResourceFromHelixTags()
       throws Exception {
     // Create broker tenant on 3 Brokers
-    Tenant brokerTenant =
-        new Tenant.TenantBuilder(BROKER_TENANT_NAME).setRole(TenantRole.BROKER).setTotalInstances(3).build();
+    Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 3, 0, 0);
     PinotResourceManagerResponse response = _helixResourceManager.createBrokerTenant(brokerTenant);
     Assert.assertTrue(response.isSuccessful());
 
@@ -217,7 +215,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     Assert.assertEquals(idealState.getInstanceStateMap(OFFLINE_TABLE_NAME).size(), 0);
 
     // Create broker tenant on 5 Brokers
-    brokerTenant.setNumberOfInstances(5);
+    brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 5, 0, 0);
     response = _helixResourceManager.createBrokerTenant(brokerTenant);
     Assert.assertTrue(response.isSuccessful());
 
@@ -270,8 +268,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   @Test
   void testRetrieveTenantNames() {
     // Create broker tenant on 1 Broker
-    Tenant brokerTenant =
-        new Tenant.TenantBuilder(BROKER_TENANT_NAME).setRole(TenantRole.BROKER).setTotalInstances(1).build();
+    Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 1, 0, 0);
     PinotResourceManagerResponse response = _helixResourceManager.createBrokerTenant(brokerTenant);
     Assert.assertTrue(response.isSuccessful());
 
@@ -311,8 +308,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   @Test
   public void testValidateTenantConfig() {
     // Create broker tenant on 3 Brokers
-    Tenant brokerTenant =
-        new Tenant.TenantBuilder(BROKER_TENANT_NAME).setRole(TenantRole.BROKER).setTotalInstances(3).build();
+    Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 3, 0, 0);
     _helixResourceManager.createBrokerTenant(brokerTenant);
 
     String rawTableName = "testTable";
@@ -327,7 +323,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     }
 
     // Empty server tag (DefaultTenant_OFFLINE)
-    offlineTableConfig.getTenantConfig().setBroker(BROKER_TENANT_NAME);
+    offlineTableConfig.setTenantConfig(new TenantConfig(BROKER_TENANT_NAME, null, null));
     try {
       _helixResourceManager.validateTableTenantConfig(offlineTableConfig);
       Assert.fail("Expected InvalidTableConfigException");
@@ -336,7 +332,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     }
 
     // Valid tenant config without tagOverrideConfig
-    offlineTableConfig.getTenantConfig().setServer(SERVER_TENANT_NAME);
+    offlineTableConfig.setTenantConfig(new TenantConfig(BROKER_TENANT_NAME, SERVER_TENANT_NAME, null));
     _helixResourceManager.validateTableTenantConfig(offlineTableConfig);
 
     TableConfig realtimeTableConfig =
@@ -352,10 +348,9 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     }
 
     // Incorrect CONSUMING server tag (serverTenant_BROKER)
-    TagOverrideConfig tagOverrideConfig = new TagOverrideConfig();
-    tagOverrideConfig.setRealtimeConsuming(TagNameUtils.getBrokerTagForTenant(SERVER_TENANT_NAME));
-    tagOverrideConfig.setRealtimeCompleted(TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME));
-    realtimeTableConfig.getTenantConfig().setTagOverrideConfig(tagOverrideConfig);
+    TagOverrideConfig tagOverrideConfig = new TagOverrideConfig(TagNameUtils.getBrokerTagForTenant(SERVER_TENANT_NAME),
+        TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME));
+    realtimeTableConfig.setTenantConfig(new TenantConfig(BROKER_TENANT_NAME, SERVER_TENANT_NAME, tagOverrideConfig));
     try {
       _helixResourceManager.validateTableTenantConfig(realtimeTableConfig);
       Assert.fail("Expected InvalidTableConfigException");
@@ -364,7 +359,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     }
 
     // Empty CONSUMING server tag (serverTenant_REALTIME)
-    tagOverrideConfig.setRealtimeConsuming(TagNameUtils.getRealtimeTagForTenant(SERVER_TENANT_NAME));
+    tagOverrideConfig = new TagOverrideConfig(TagNameUtils.getRealtimeTagForTenant(SERVER_TENANT_NAME), null);
+    realtimeTableConfig.setTenantConfig(new TenantConfig(BROKER_TENANT_NAME, SERVER_TENANT_NAME, tagOverrideConfig));
     try {
       _helixResourceManager.validateTableTenantConfig(realtimeTableConfig);
       Assert.fail("Expected InvalidTableConfigException");
@@ -373,8 +369,9 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     }
 
     // Incorrect COMPLETED server tag (serverTenant_BROKER)
-    tagOverrideConfig.setRealtimeConsuming(TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME));
-    tagOverrideConfig.setRealtimeCompleted(TagNameUtils.getBrokerTagForTenant(SERVER_TENANT_NAME));
+    tagOverrideConfig = new TagOverrideConfig(TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME),
+        TagNameUtils.getBrokerTagForTenant(SERVER_TENANT_NAME));
+    realtimeTableConfig.setTenantConfig(new TenantConfig(BROKER_TENANT_NAME, SERVER_TENANT_NAME, tagOverrideConfig));
     try {
       _helixResourceManager.validateTableTenantConfig(realtimeTableConfig);
       Assert.fail("Expected InvalidTableConfigException");
@@ -383,7 +380,9 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     }
 
     // Empty COMPLETED server tag (serverTenant_REALTIME)
-    tagOverrideConfig.setRealtimeCompleted(TagNameUtils.getRealtimeTagForTenant(SERVER_TENANT_NAME));
+    tagOverrideConfig = new TagOverrideConfig(TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME),
+        TagNameUtils.getRealtimeTagForTenant(SERVER_TENANT_NAME));
+    realtimeTableConfig.setTenantConfig(new TenantConfig(BROKER_TENANT_NAME, SERVER_TENANT_NAME, tagOverrideConfig));
     try {
       _helixResourceManager.validateTableTenantConfig(realtimeTableConfig);
       Assert.fail("Expected InvalidTableConfigException");
@@ -392,7 +391,9 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     }
 
     // Valid tenant config with tagOverrideConfig
-    tagOverrideConfig.setRealtimeCompleted(TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME));
+    tagOverrideConfig = new TagOverrideConfig(TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME),
+        TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME));
+    realtimeTableConfig.setTenantConfig(new TenantConfig(BROKER_TENANT_NAME, SERVER_TENANT_NAME, tagOverrideConfig));
     _helixResourceManager.validateTableTenantConfig(realtimeTableConfig);
 
     untagBrokers();

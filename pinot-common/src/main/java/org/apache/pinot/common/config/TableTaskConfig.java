@@ -18,53 +18,32 @@
  */
 package org.apache.pinot.common.config;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import java.util.Map;
-import org.apache.pinot.common.utils.EqualityUtils;
 
 
-@SuppressWarnings("unused")
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class TableTaskConfig {
-  private Map<String, Map<String, String>> _taskTypeConfigsMap;
+public class TableTaskConfig extends BaseJsonConfig {
+  private final Map<String, Map<String, String>> _taskTypeConfigsMap;
 
-  public void setTaskTypeConfigsMap(Map<String, Map<String, String>> taskTypeConfigsMap) {
+  @JsonCreator
+  public TableTaskConfig(
+      @JsonProperty(value = "taskTypeConfigsMap", required = true) Map<String, Map<String, String>> taskTypeConfigsMap) {
+    Preconditions.checkArgument(taskTypeConfigsMap != null, "'taskTypeConfigsMap' must be configured");
     _taskTypeConfigsMap = taskTypeConfigsMap;
   }
 
+  @JsonProperty
   public Map<String, Map<String, String>> getTaskTypeConfigsMap() {
     return _taskTypeConfigsMap;
   }
 
-  @JsonIgnore
   public boolean isTaskTypeEnabled(String taskType) {
     return _taskTypeConfigsMap.containsKey(taskType);
   }
 
-  @JsonIgnore
   public Map<String, String> getConfigsForTaskType(String taskType) {
     return _taskTypeConfigsMap.get(taskType);
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
-      return true;
-    }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
-      return false;
-    }
-
-    TableTaskConfig that = (TableTaskConfig) o;
-
-    return EqualityUtils.isEqual(_taskTypeConfigsMap, that._taskTypeConfigsMap);
-  }
-
-  @Override
-  public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(_taskTypeConfigsMap);
-    return result;
   }
 }
