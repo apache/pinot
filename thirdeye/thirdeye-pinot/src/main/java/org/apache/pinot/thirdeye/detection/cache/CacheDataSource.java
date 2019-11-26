@@ -47,6 +47,7 @@ public class CacheDataSource {
 
   public Object getField(String fieldName) { return config.get(fieldName); }
   public String getFieldAsString(String fieldName) { return String.valueOf(config.get(fieldName)); }
+  public Boolean getFieldAsBoolean(String fieldName) { return Boolean.parseBoolean(this.getFieldAsString(fieldName)); }
 
   public void setClassName(String className) { this.className = className; }
   public void setConfig(Map<String, Object> config) { this.config = config; }

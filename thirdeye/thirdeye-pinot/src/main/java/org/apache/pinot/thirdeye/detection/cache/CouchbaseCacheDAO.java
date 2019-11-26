@@ -49,6 +49,7 @@ public class CouchbaseCacheDAO implements CacheDAO {
   private static final String BUCKET_NAME = "bucketName";
   private static final String AUTH_USERNAME = "authUsername";
   private static final String AUTH_PASSWORD = "authPassword";
+  private static final String ENABLE_DNS_SRV = "enableDnsSrv";
   private static final String KEY_STORE_FILE_PATH = "keyStoreFilePath";
   private static final String KEY_STORE_PASSWORD = "keyStorePassword";
   private static final String TRUST_STORE_FILE_PATH = "trustStoreFilePath";
@@ -70,11 +71,12 @@ public class CouchbaseCacheDAO implements CacheDAO {
     List<String> hosts = (List)config.getField(HOSTS);
 
     Cluster cluster;
-    if (Boolean.parseBoolean(config.getFieldAsString(USE_CERT_BASED_AUTH))) {
+    if (config.getFieldAsBoolean(USE_CERT_BASED_AUTH)) {
       CouchbaseEnvironment env = DefaultCouchbaseEnvironment
           .builder()
           .sslEnabled(true)
           .certAuthEnabled(true)
+          .dnsSrvEnabled(config.getFieldAsBoolean(ENABLE_DNS_SRV))
           .sslKeystoreFile(config.getFieldAsString(KEY_STORE_FILE_PATH))
           .sslKeystorePassword(config.getFieldAsString(KEY_STORE_PASSWORD))
           .sslTruststoreFile(config.getFieldAsString(TRUST_STORE_FILE_PATH))
