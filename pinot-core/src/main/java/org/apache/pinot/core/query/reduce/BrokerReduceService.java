@@ -177,8 +177,8 @@ public class BrokerReduceService {
       }
     }
 
-    ResultReducer resultReducer = ResultReducerFactory.getResultReducer(brokerRequest);
-    resultReducer.reduceAndSetResults(tableName, cachedDataSchema, dataTableMap, brokerResponseNative, brokerMetrics);
+    DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(brokerRequest);
+    dataTableReducer.reduceAndSetResults(tableName, cachedDataSchema, dataTableMap, brokerResponseNative, brokerMetrics);
     return brokerResponseNative;
   }
 }

@@ -55,9 +55,9 @@ import org.apache.pinot.core.util.QueryOptions;
 
 
 /**
- * Helper class to reduce and set group by results into the BrokerResponseNative
+ * Helper class to reduce data tables and set group by results into the BrokerResponseNative
  */
-public class GroupByResultReducer implements ResultReducer {
+public class GroupByDataTableReducer implements DataTableReducer {
 
   private final BrokerRequest _brokerRequest;
   private final AggregationFunction[] _aggregationFunctions;
@@ -65,7 +65,7 @@ public class GroupByResultReducer implements ResultReducer {
   private final boolean _groupByModeSql;
   private final boolean _responseFormatSql;
 
-  GroupByResultReducer(BrokerRequest brokerRequest, AggregationFunction[] aggregationFunctions,
+  GroupByDataTableReducer(BrokerRequest brokerRequest, AggregationFunction[] aggregationFunctions,
       QueryOptions queryOptions) {
     _brokerRequest = brokerRequest;
     _aggregationFunctions = aggregationFunctions;

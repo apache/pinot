@@ -27,12 +27,12 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 
 
 /**
- * Interface for result reducers of query results
+ * Interface for data tables reducers of query results
  */
-public interface ResultReducer {
+public interface DataTableReducer {
 
   /**
-   * Reduces and sets the results of the query into the BrokerResponseNative
+   * Reduces data tables and sets the results of the query into the BrokerResponseNative
    * @param tableName table name
    * @param dataSchema schema from broker reduce service
    * @param dataTableMap map of servers to data tables

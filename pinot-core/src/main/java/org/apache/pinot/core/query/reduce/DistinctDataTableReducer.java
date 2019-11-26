@@ -42,14 +42,14 @@ import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 
 
 /**
- * Helper class to reduce and set results of distinct query into the BrokerResponseNative
+ * Helper class to reduce data tables and set results of distinct query into the BrokerResponseNative
  */
-public class DistinctResultReducer implements ResultReducer {
+public class DistinctDataTableReducer implements DataTableReducer {
 
   private final BrokerRequest _brokerRequest;
   private final AggregationFunction _aggregationFunction;
 
-  DistinctResultReducer(BrokerRequest brokerRequest, AggregationFunction aggregationFunction,
+  DistinctDataTableReducer(BrokerRequest brokerRequest, AggregationFunction aggregationFunction,
       QueryOptions queryOptions) {
     _brokerRequest = brokerRequest;
     _aggregationFunction = aggregationFunction;

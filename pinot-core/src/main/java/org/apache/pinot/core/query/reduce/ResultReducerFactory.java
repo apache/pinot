@@ -33,12 +33,12 @@ public final class ResultReducerFactory {
   /**
    * Constructs the right result reducer based on the broker request
    */
-  public static ResultReducer getResultReducer(BrokerRequest brokerRequest) {
-    ResultReducer resultReducer;
+  public static DataTableReducer getResultReducer(BrokerRequest brokerRequest) {
+    DataTableReducer dataTableReducer;
     QueryOptions queryOptions = new QueryOptions(brokerRequest.getQueryOptions());
     if (brokerRequest.getSelections() != null) {
       // Selection query
-      resultReducer = new SelectionResultReducer(brokerRequest, queryOptions);
+      dataTableReducer = new SelectionDataTableReducer(brokerRequest, queryOptions);
     } else {
       // Aggregation query
       AggregationFunction[] aggregationFunctions = AggregationFunctionUtils.getAggregationFunctions(brokerRequest);
@@ -46,15 +46,15 @@ public final class ResultReducerFactory {
         // Aggregation only query
         if (aggregationFunctions.length == 1 && aggregationFunctions[0].getType() == AggregationFunctionType.DISTINCT) {
           // Distinct query
-          resultReducer = new DistinctResultReducer(brokerRequest, aggregationFunctions[0], queryOptions);
+          dataTableReducer = new DistinctDataTableReducer(brokerRequest, aggregationFunctions[0], queryOptions);
         } else {
-          resultReducer = new AggregationResultReducer(brokerRequest, aggregationFunctions, queryOptions);
+          dataTableReducer = new AggregationDataTableReducer(brokerRequest, aggregationFunctions, queryOptions);
         }
       } else {
         // Aggregation group-by query
-        resultReducer = new GroupByResultReducer(brokerRequest, aggregationFunctions, queryOptions);
+        dataTableReducer = new GroupByDataTableReducer(brokerRequest, aggregationFunctions, queryOptions);
       }
     }
-    return resultReducer;
+    return dataTableReducer;
   }
 }

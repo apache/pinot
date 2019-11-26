@@ -38,19 +38,19 @@ import org.apache.pinot.core.util.QueryOptions;
 /**
  * Helper class to reduce and set Aggregation results into the BrokerResponseNative
  */
-public class AggregationResultReducer implements ResultReducer {
+public class AggregationDataTableReducer implements DataTableReducer {
 
   private final AggregationFunction[] _aggregationFunctions;
   private final boolean _preserveType;
 
-  AggregationResultReducer(BrokerRequest brokerRequest, AggregationFunction[] aggregationFunctions,
+  AggregationDataTableReducer(BrokerRequest brokerRequest, AggregationFunction[] aggregationFunctions,
       QueryOptions queryOptions) {
     _aggregationFunctions = aggregationFunctions;
     _preserveType = queryOptions.isPreserveType();
   }
 
   /**
-   * Reduces and sets aggregations results into BrokerResponseNative::AggregationResults
+   * Reduces data tables and sets aggregations results into BrokerResponseNative::AggregationResults
    */
   @Override
   public void reduceAndSetResults(String tableName, DataSchema dataSchema, Map<ServerRoutingInstance, DataTable> dataTableMap,

@@ -44,20 +44,20 @@ import org.slf4j.LoggerFactory;
 /**
  * Helper class to reduce and set Selection results into the BrokerResponseNative
  */
-public class SelectionResultReducer implements ResultReducer {
+public class SelectionDataTableReducer implements DataTableReducer {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SelectionResultReducer.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SelectionDataTableReducer.class);
 
   private final Selection _selection;
   private boolean _preserveType;
 
-  SelectionResultReducer(BrokerRequest brokerRequest, QueryOptions queryOptions) {
+  SelectionDataTableReducer(BrokerRequest brokerRequest, QueryOptions queryOptions) {
     _selection = brokerRequest.getSelections();
     _preserveType = queryOptions.isPreserveType();
   }
 
   /**
-   * Reduces and sets selection results into BrokerResponseNative::SelectionResults
+   * Reduces data tables and sets selection results into BrokerResponseNative::SelectionResults
    */
   @Override
   public void reduceAndSetResults(String tableName, DataSchema dataSchema, Map<ServerRoutingInstance, DataTable> dataTableMap,
