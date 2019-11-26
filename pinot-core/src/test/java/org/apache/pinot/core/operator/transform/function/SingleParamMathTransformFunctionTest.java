@@ -20,9 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.*;
-import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.testng.Assert;
-import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
