@@ -38,6 +38,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 
 
 /**
@@ -48,7 +49,8 @@ public class DistinctResultSetter implements ResultSetter {
   private final BrokerRequest _brokerRequest;
   private final AggregationFunction _aggregationFunction;
 
-  DistinctResultSetter(BrokerRequest brokerRequest, AggregationFunction aggregationFunction, QueryOptions queryOptions) {
+  DistinctResultSetter(BrokerRequest brokerRequest, AggregationFunction aggregationFunction,
+      QueryOptions queryOptions) {
     _brokerRequest = brokerRequest;
     _aggregationFunction = aggregationFunction;
   }
@@ -123,6 +125,8 @@ public class DistinctResultSetter implements ResultSetter {
   }
 
   private String[] getDistinctColumns() {
-    return _brokerRequest.getAggregationsInfo().get(0).getAggregationParams().get("column").split(":");
+    return _brokerRequest.getAggregationsInfo().get(0).getAggregationParams()
+        .get(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO)
+        .split(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR);
   }
 }
