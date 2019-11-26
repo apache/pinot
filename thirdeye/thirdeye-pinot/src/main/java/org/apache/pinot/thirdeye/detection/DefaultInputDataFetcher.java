@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.detection;
 
 import com.google.common.collect.Multimap;
+import java.util.HashSet;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -57,7 +58,13 @@ public class DefaultInputDataFetcher implements InputDataFetcher {
   public InputData fetchData(InputDataSpec inputDataSpec) {
     Map<MetricSlice, DataFrame> timeseries = provider.fetchTimeseries(inputDataSpec.getTimeseriesSlices());
     Map<MetricSlice, DataFrame> aggregates = provider.fetchAggregates(inputDataSpec.getAggregateSlices(), Collections.<String>emptyList());
-    Multimap<AnomalySlice, MergedAnomalyResultDTO> existingAnomalies = provider.fetchAnomalies(inputDataSpec.getAnomalySlices(), configId);
+
+    Collection<AnomalySlice> slicesWithConfigId = new HashSet<>();
+    for (AnomalySlice slice : inputDataSpec.getAnomalySlices()) {
+      slicesWithConfigId.add(slice.withDetectionId(configId));
+    }
+    Multimap<AnomalySlice, MergedAnomalyResultDTO> existingAnomalies = provider.fetchAnomalies(slicesWithConfigId);
+
     Multimap<EventSlice, EventDTO> events = provider.fetchEvents(inputDataSpec.getEventSlices());
     Map<Long, MetricConfigDTO> metrics = provider.fetchMetrics(inputDataSpec.getMetricIds());
     Map<String, DatasetConfigDTO> datasets = provider.fetchDatasets(inputDataSpec.getDatasetNames());

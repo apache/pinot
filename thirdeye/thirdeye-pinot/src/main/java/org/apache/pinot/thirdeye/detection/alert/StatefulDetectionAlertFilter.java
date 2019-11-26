@@ -60,12 +60,15 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
   protected final Set<MergedAnomalyResultDTO> filter(Map<Long, Long> vectorClocks, final long minId) {
     // retrieve all candidate anomalies
     Set<MergedAnomalyResultDTO> allAnomalies = new HashSet<>();
-    for (Long functionId : vectorClocks.keySet()) {
-      long startTime = vectorClocks.get(functionId);
+    for (Long detectionId : vectorClocks.keySet()) {
+      long startTime = vectorClocks.get(detectionId);
 
-      AnomalySlice slice = new AnomalySlice().withStart(startTime).withEnd(this.endTime);
+      AnomalySlice slice = new AnomalySlice()
+          .withDetectionId(detectionId)
+          .withStart(startTime)
+          .withEnd(this.endTime);
       Collection<MergedAnomalyResultDTO> candidates;
-      candidates = this.provider.fetchAnomalies(Collections.singletonList(slice), functionId).get(slice);
+      candidates = this.provider.fetchAnomalies(Collections.singletonList(slice)).get(slice);
 
       Collection<MergedAnomalyResultDTO> anomalies =
           Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {

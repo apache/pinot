@@ -385,11 +385,11 @@ public class DetectionResource {
         throw new IllegalArgumentException(String.format("Cannot find config %d", configId));
       }
 
-      AnomalySlice slice = new AnomalySlice().withStart(start).withEnd(end);
+      AnomalySlice slice = new AnomalySlice().withDetectionId(configId).withStart(start).withEnd(end);
       if (deleteExistingAnomaly) {
         // clear existing anomalies
         Collection<MergedAnomalyResultDTO> existing =
-            this.provider.fetchAnomalies(Collections.singleton(slice), configId).get(slice);
+            this.provider.fetchAnomalies(Collections.singleton(slice)).get(slice);
 
         List<Long> existingIds = new ArrayList<>();
         for (MergedAnomalyResultDTO anomaly : existing) {
@@ -416,7 +416,8 @@ public class DetectionResource {
         }
       }
 
-      replayResult = this.provider.fetchAnomalies(Collections.singleton(slice), configId).get(slice);
+      slice = slice.withDetectionId(configId);
+      replayResult = this.provider.fetchAnomalies(Collections.singleton(slice)).get(slice);
 
     } catch (Exception e) {
       LOG.error("Error running replay on detection id " + configId, e);
@@ -453,9 +454,9 @@ public class DetectionResource {
       }
 
       if (deleteExistingAnomaly) {
-        AnomalySlice slice = new AnomalySlice().withStart(start).withEnd(end);
+        AnomalySlice slice = new AnomalySlice().withDetectionId(detectionId).withStart(start).withEnd(end);
         Collection<MergedAnomalyResultDTO> existing =
-            this.provider.fetchAnomalies(Collections.singleton(slice), detectionId).get(slice);
+            this.provider.fetchAnomalies(Collections.singleton(slice)).get(slice);
 
         List<Long> existingIds = new ArrayList<>();
         for (MergedAnomalyResultDTO anomaly : existing) {

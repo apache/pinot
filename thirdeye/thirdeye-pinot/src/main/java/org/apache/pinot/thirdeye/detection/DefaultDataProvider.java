@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -224,7 +225,7 @@ public class DefaultDataProvider implements DataProvider {
   }
 
   @Override
-  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, long configId) {
+  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices) {
     Multimap<AnomalySlice, MergedAnomalyResultDTO> output = ArrayListMultimap.create();
     for (AnomalySlice slice : slices) {
       List<Predicate> predicates = new ArrayList<>();
@@ -234,8 +235,8 @@ public class DefaultDataProvider implements DataProvider {
       if (slice.getStart() >= 0) {
         predicates.add(Predicate.GT("endTime", slice.getStart()));
       }
-      if (configId >= 0) {
-        predicates.add(Predicate.EQ(PROP_DETECTION_CONFIG_ID, configId));
+      if (slice.getDetectionId() >= 0) {
+        predicates.add(Predicate.EQ(PROP_DETECTION_CONFIG_ID, slice.getDetectionId()));
       }
 
       if (predicates.isEmpty()) throw new IllegalArgumentException("Must provide at least one of start, end, or " + PROP_DETECTION_CONFIG_ID);
@@ -244,10 +245,10 @@ public class DefaultDataProvider implements DataProvider {
       anomalies.removeIf(anomaly -> !slice.match(anomaly));
 
       anomalies.removeIf(anomaly ->
-          (configId >= 0) && (anomaly.getDetectionConfigId() == null || anomaly.getDetectionConfigId() != configId)
+          (slice.getDetectionId() >= 0) && (anomaly.getDetectionConfigId() == null || anomaly.getDetectionConfigId() != slice.getDetectionId())
       );
 
-      LOG.info("Fetched {} anomalies between (startTime = {}, endTime = {}) with config Id = {}", anomalies.size(), slice.getStart(), slice.getEnd(), configId);
+      LOG.info("Fetched {} anomalies between (startTime = {}, endTime = {}) with config Id = {}", anomalies.size(), slice.getStart(), slice.getEnd(), slice.getDetectionId());
       output.putAll(slice, anomalies);
     }
     return output;

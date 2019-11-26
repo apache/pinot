@@ -255,14 +255,14 @@ public class DataProviderTest {
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testAnomalyInvalid() {
-    this.provider.fetchAnomalies(Collections.singleton(new AnomalySlice()), -1);
+    this.provider.fetchAnomalies(Collections.singleton(new AnomalySlice()));
   }
 
   @Test
   public void testAnomalySingle() {
     AnomalySlice slice = makeAnomalySlice(1209000000L, -1, Collections.<String>emptyList());
 
-    Collection<MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(Collections.singleton(slice), -1).get(slice);
+    Collection<MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(Collections.singleton(slice)).get(slice);
 
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertTrue(anomalies.contains(makeAnomaly(this.anomalyIds.get(2), detectionIds.get(1), 604800000L, 1209600000L, Collections.<String>emptyList())));
@@ -272,7 +272,7 @@ public class DataProviderTest {
   public void testAnomalyDimension() {
     AnomalySlice slice = makeAnomalySlice(0, -1, Arrays.asList("a=1", "c=3"));
 
-    Collection<MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(Collections.singleton(slice), -1).get(slice);
+    Collection<MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(Collections.singleton(slice)).get(slice);
 
     Assert.assertEquals(anomalies.size(), 3);
     Assert.assertTrue(anomalies.contains(makeAnomaly(this.anomalyIds.get(0), detectionIds.get(0), 4000000L, 8000000L, Arrays.asList("a=1", "c=3", "b=2"))));
@@ -346,7 +346,7 @@ public class DataProviderTest {
       String[] parts = fs.split("=");
       filters.put(parts[0], parts[1]);
     }
-    return new AnomalySlice().withStart(start).withEnd(end).withFilters(filters).withDetectionCompNames(null);
+    return new AnomalySlice().withStart(start).withEnd(end).withFilters(filters);
   }
 
   private static MetricConfigDTO makeMetric(Long id, String metric, String dataset) {

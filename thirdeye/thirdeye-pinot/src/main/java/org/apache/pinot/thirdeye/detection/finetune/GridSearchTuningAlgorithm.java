@@ -105,7 +105,8 @@ public class GridSearchTuningAlgorithm implements TuningAlgorithm {
    */
   @Override
   public void fit(AnomalySlice slice, long configId) throws Exception {
-    Collection<MergedAnomalyResultDTO> testAnomalies = this.provider.fetchAnomalies(Collections.singletonList(slice), configId).get(slice);
+    slice = slice.withDetectionId(configId);
+    Collection<MergedAnomalyResultDTO> testAnomalies = this.provider.fetchAnomalies(Collections.singletonList(slice)).get(slice);
     fit(slice, new HashMap<String, Number>(), testAnomalies);
   }
 
