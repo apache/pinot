@@ -24,11 +24,11 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 
 /**
@@ -62,9 +62,7 @@ public class JSONRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(String inputPath, Schema schema, RecordReaderConfig recordReaderConfig)
-      throws Exception {
-
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig) {
   }
 
   @Override

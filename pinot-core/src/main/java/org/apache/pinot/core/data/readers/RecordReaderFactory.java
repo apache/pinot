@@ -52,7 +52,7 @@ public class RecordReaderFactory {
             .warn("Using class: {} to read segment, ignoring configured file format: {}", recordReaderPath, fileFormat);
       }
       RecordReader recordReader = (RecordReader) Class.forName(recordReaderPath).newInstance();
-      recordReader.init(dataFile.getAbsolutePath(), schema, segmentGeneratorConfig.getReaderConfig());
+      recordReader.init(dataFile, schema, segmentGeneratorConfig.getReaderConfig());
       return recordReader;
     }
 

@@ -28,7 +28,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.pinot.core.data.readers.RecordReaderTest;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -82,7 +81,7 @@ public class ParquetRecordReaderTest extends RecordReaderTest {
   public void testParquetRecordReader()
       throws Exception {
     try (ParquetRecordReader recordReader = new ParquetRecordReader()) {
-      recordReader.init(DATA_FILE.getAbsolutePath(), SCHEMA, null);
+      recordReader.init(DATA_FILE, SCHEMA, null);
       checkValue(recordReader);
       recordReader.rewind();
       checkValue(recordReader);

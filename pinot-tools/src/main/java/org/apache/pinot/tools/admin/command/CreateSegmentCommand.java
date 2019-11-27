@@ -410,12 +410,12 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
               switch (config.getFormat()) {
                 case PARQUET:
                   RecordReader parquetRecordReader = new ParquetRecordReader();
-                  parquetRecordReader.init(localFile, Schema.fromFile(new File(_schemaFile)), null);
+                  parquetRecordReader.init(new File(localFile), Schema.fromFile(new File(_schemaFile)), null);
                   driver.init(config, parquetRecordReader);
                   break;
                 case ORC:
                   RecordReader orcRecordReader = new ORCRecordReader();
-                  orcRecordReader.init(localFile, Schema.fromFile(new File(_schemaFile)), null);
+                  orcRecordReader.init(new File(localFile), Schema.fromFile(new File(_schemaFile)), null);
                   driver.init(config, orcRecordReader);
                   break;
                 default:
@@ -449,7 +449,8 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   }
 
   private boolean verifySegment(File indexDir) {
-    File localTempDir = new File(FileUtils.getTempDirectory(), org.apache.pinot.common.utils.FileUtils.getRandomFileName());
+    File localTempDir =
+        new File(FileUtils.getTempDirectory(), org.apache.pinot.common.utils.FileUtils.getRandomFileName());
     try {
       try {
         localTempDir.getParentFile().mkdirs();

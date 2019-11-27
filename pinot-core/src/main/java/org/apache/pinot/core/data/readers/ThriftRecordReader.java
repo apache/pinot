@@ -24,10 +24,10 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TFieldIdEnum;
 import org.apache.thrift.protocol.TBinaryProtocol;
@@ -66,12 +66,6 @@ public class ThriftRecordReader implements RecordReader {
     init();
   }
 
-  @Override
-  public void init(String inputPath, Schema schema, RecordReaderConfig recordReaderConfig)
-      throws Exception {
-
-  }
-
   private void init()
       throws IOException {
     _inputStream = RecordReaderUtils.getBufferedInputStream(_dataFile);
@@ -90,6 +84,10 @@ public class ThriftRecordReader implements RecordReader {
     int nextByte = _inputStream.read();
     _inputStream.reset();
     return nextByte != -1;
+  }
+
+  @Override
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig) {
   }
 
   @Override
