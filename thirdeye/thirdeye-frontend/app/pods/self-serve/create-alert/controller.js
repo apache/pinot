@@ -1107,14 +1107,10 @@ export default Controller.extend({
       fetch(url, postProps).then((res) => {
         res.json().then((result) => {
           if(result){
-            if (result.detectionMsg) {
-              set(this, 'detectionMsg', result.detectionMsg);
-            }
-            if (result.subscriptionMsg) {
-              set(this, 'subscriptionMsg', result.subscriptionMsg);
-            }
             if (result.detectionAlertConfigId && result.detectionConfigId) {
               notifications.success('Created alert successfully.', 'Created', toastOptions);
+            } else {
+              notifications.error(result.message, 'Error', toastOptions);
             }
           }
         });
