@@ -80,8 +80,7 @@ public class InstanceAssignmentConfigUtils {
     // Only allow default config for offline table with replica-group segment assignment for backward-compatibility
 
     InstanceTagPoolConfig tagPoolConfig =
-        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(tableConfig.getTenantConfig().getServer()), false,
-            0, null);
+        new InstanceTagPoolConfig(TagNameUtils.extractOfflineServerTag(tableConfig.getTenantConfig()), false, 0, null);
 
     InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig;
     SegmentsValidationAndRetentionConfig segmentConfig = tableConfig.getValidationConfig();

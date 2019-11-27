@@ -20,90 +20,46 @@ package org.apache.pinot.common.config;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class TagOverrideConfigTest {
 
-  @DataProvider(name = "realtimeTagConfigTestDataProvider")
-  public Object[][] realtimeTagConfigTestDataProvider() {
-    TableConfig.Builder tableConfigBuilder = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE);
-    tableConfigBuilder.setTableName("testRealtimeTable").setTimeColumnName("timeColumn").setTimeType("DAYS")
-        .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5").setServerTenant("aServerTenant");
-
+  @DataProvider(name = "tagOverrideConfigTestDataProvider")
+  public Object[][] tagOverrideConfigTestDataProvider() {
     List<Object[]> inputs = new ArrayList<>();
 
-    TableConfig tableConfig = tableConfigBuilder.build();
-    inputs.add(new Object[]{tableConfig, "aServerTenant", "aServerTenant_REALTIME", "aServerTenant_REALTIME"});
-
-    tableConfig = tableConfigBuilder.setTagOverrideConfig(null).build();
-    inputs.add(new Object[]{tableConfig, "aServerTenant", "aServerTenant_REALTIME", "aServerTenant_REALTIME"});
+    TenantConfig tenantConfig = new TenantConfig(null, "aServerTenant", null);
+    inputs.add(new Object[]{tenantConfig, "aServerTenant_OFFLINE", "aServerTenant_REALTIME", "aServerTenant_REALTIME"});
 
     // empty tag override
-    TagOverrideConfig tagOverrideConfig = new TagOverrideConfig(null, null);
-    tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
-    inputs.add(new Object[]{tableConfig, "aServerTenant", "aServerTenant_REALTIME", "aServerTenant_REALTIME"});
+    tenantConfig = new TenantConfig(null, "aServerTenant", new TagOverrideConfig(null, null));
+    inputs.add(new Object[]{tenantConfig, "aServerTenant_OFFLINE", "aServerTenant_REALTIME", "aServerTenant_REALTIME"});
 
     // defined realtime consuming override
-    tagOverrideConfig = new TagOverrideConfig("overriddenTag_REALTIME", null);
-    tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
-    inputs.add(new Object[]{tableConfig, "aServerTenant", "overriddenTag_REALTIME", "aServerTenant_REALTIME"});
+    tenantConfig = new TenantConfig(null, "aServerTenant", new TagOverrideConfig("overriddenTag_REALTIME", null));
+    inputs.add(new Object[]{tenantConfig, "aServerTenant_OFFLINE", "overriddenTag_REALTIME", "aServerTenant_REALTIME"});
 
     // defined realtime completed override
-    tagOverrideConfig = new TagOverrideConfig(null, "overriddenTag_OFFLINE");
-    tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
-    inputs.add(new Object[]{tableConfig, "aServerTenant", "aServerTenant_REALTIME", "overriddenTag_OFFLINE"});
+    tenantConfig = new TenantConfig(null, "aServerTenant", new TagOverrideConfig(null, "overriddenTag_OFFLINE"));
+    inputs.add(new Object[]{tenantConfig, "aServerTenant_OFFLINE", "aServerTenant_REALTIME", "overriddenTag_OFFLINE"});
 
     // defined both overrides
-    tagOverrideConfig = new TagOverrideConfig("overriddenTag_REALTIME", "overriddenTag_OFFLINE");
-    tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
-    inputs.add(new Object[]{tableConfig, "aServerTenant", "overriddenTag_REALTIME", "overriddenTag_OFFLINE"});
+    tenantConfig = new TenantConfig(null, "aServerTenant",
+        new TagOverrideConfig("overriddenTag_REALTIME", "overriddenTag_OFFLINE"));
+    inputs.add(new Object[]{tenantConfig, "aServerTenant_OFFLINE", "overriddenTag_REALTIME", "overriddenTag_OFFLINE"});
 
     return inputs.toArray(new Object[inputs.size()][]);
   }
 
-  @Test(dataProvider = "realtimeTagConfigTestDataProvider")
-  public void testRealtimeTagConfig(TableConfig tableConfig, String expectedServerTenant,
-      String expectedRealtimeConsumingTag, String expectedRealtimeCompletedTag) {
-    RealtimeTagConfig tagConfig = new RealtimeTagConfig(tableConfig);
-    Assert.assertEquals(tagConfig.getServerTenantName(), expectedServerTenant);
-    Assert.assertEquals(tagConfig.getConsumingServerTag(), expectedRealtimeConsumingTag);
-    Assert.assertEquals(tagConfig.getCompletedServerTag(), expectedRealtimeCompletedTag);
-  }
-
-  @DataProvider(name = "offlineTagConfigTestDataProvider")
-  public Object[][] offlineTagConfigTestDataProvider() {
-    TableConfig.Builder tableConfigBuilder = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE);
-    tableConfigBuilder.setTableName("testOfflineTable").setTimeColumnName("timeColumn").setTimeType("DAYS")
-        .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5").setServerTenant("aServerTenant");
-
-    List<Object[]> inputs = new ArrayList<>();
-
-    TableConfig tableConfig = tableConfigBuilder.build();
-    inputs.add(new Object[]{tableConfig, "aServerTenant", "aServerTenant_OFFLINE"});
-
-    tableConfig = tableConfigBuilder.setTagOverrideConfig(null).build();
-    inputs.add(new Object[]{tableConfig, "aServerTenant", "aServerTenant_OFFLINE"});
-
-    TagOverrideConfig tagOverrideConfig = new TagOverrideConfig(null, null);
-    tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
-    inputs.add(new Object[]{tableConfig, "aServerTenant", "aServerTenant_OFFLINE"});
-
-    tagOverrideConfig = new TagOverrideConfig("overriddenTag_REALTIME", "overriddenTag_OFFLINE");
-    tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
-    inputs.add(new Object[]{tableConfig, "aServerTenant", "aServerTenant_OFFLINE"});
-
-    return inputs.toArray(new Object[inputs.size()][]);
-  }
-
-  @Test(dataProvider = "offlineTagConfigTestDataProvider")
-  public void testOfflineTagConfig(TableConfig tableConfig, String expectedServerTenant,
-      String expectedOfflineServerTag) {
-    OfflineTagConfig tagConfig = new OfflineTagConfig(tableConfig);
-    Assert.assertEquals(tagConfig.getServerTenantName(), expectedServerTenant);
-    Assert.assertEquals(tagConfig.getOfflineServerTag(), expectedOfflineServerTag);
+  @Test(dataProvider = "tagOverrideConfigTestDataProvider")
+  public void testTagOverrideConfig(TenantConfig tenantConfig, String expectedOfflineServerTag,
+      String expectedConsumingServerTag, String expectedCompletedServerTag) {
+    assertEquals(TagNameUtils.extractOfflineServerTag(tenantConfig), expectedOfflineServerTag);
+    assertEquals(TagNameUtils.extractConsumingServerTag(tenantConfig), expectedConsumingServerTag);
+    assertEquals(TagNameUtils.extractCompletedServerTag(tenantConfig), expectedCompletedServerTag);
   }
 }

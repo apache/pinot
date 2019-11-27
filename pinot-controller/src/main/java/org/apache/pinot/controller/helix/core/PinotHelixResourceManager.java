@@ -66,8 +66,6 @@ import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.Instance;
-import org.apache.pinot.common.config.OfflineTagConfig;
-import org.apache.pinot.common.config.RealtimeTagConfig;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableCustomConfig;
@@ -641,7 +639,7 @@ public class PinotHelixResourceManager {
     for (String tableNameWithType : tableIdealState.getPartitionSet()) {
       TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
       Preconditions.checkNotNull(tableConfig);
-      String brokerTag = TagNameUtils.getBrokerTagForTenant(tableConfig.getTenantConfig().getBroker());
+      String brokerTag = TagNameUtils.extractBrokerTag(tableConfig.getTenantConfig());
       if (brokerTag.equals(brokerTenantTag)) {
         tableIdealState.setPartitionState(tableNameWithType, instanceName, BrokerOnlineOfflineStateModel.ONLINE);
       }
@@ -805,7 +803,7 @@ public class PinotHelixResourceManager {
     for (InstanceConfig instanceConfig : instanceConfigs) {
       for (String tag : instanceConfig.getTags()) {
         if (TagNameUtils.isBrokerTag(tag)) {
-          tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
+          tenantSet.add(TagNameUtils.getTenantFromTag(tag));
         }
       }
     }
@@ -818,7 +816,7 @@ public class PinotHelixResourceManager {
     for (InstanceConfig instanceConfig : instanceConfigs) {
       for (String tag : instanceConfig.getTags()) {
         if (TagNameUtils.isServerTag(tag)) {
-          tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
+          tenantSet.add(TagNameUtils.getTenantFromTag(tag));
         }
       }
     }
@@ -1084,8 +1082,8 @@ public class PinotHelixResourceManager {
         throw new InvalidTableConfigException("Unsupported table type: " + tableType);
     }
 
-    String brokerTenantName = TagNameUtils.getBrokerTagForTenant(tableConfig.getTenantConfig().getBroker());
-    handleBrokerResource(tableNameWithType, HelixHelper.getInstancesWithTag(_helixZkManager, brokerTenantName));
+    String brokerTag = TagNameUtils.extractBrokerTag(tableConfig.getTenantConfig());
+    handleBrokerResource(tableNameWithType, HelixHelper.getInstancesWithTag(_helixZkManager, brokerTag));
   }
 
   /**
@@ -1098,18 +1096,17 @@ public class PinotHelixResourceManager {
 
     // Check if tenant exists before creating the table
     Set<String> tagsToCheck = new TreeSet<>();
-    tagsToCheck.add(TagNameUtils.getBrokerTagForTenant(tenantConfig.getBroker()));
+    tagsToCheck.add(TagNameUtils.extractBrokerTag(tenantConfig));
     if (tableConfig.getTableType() == TableType.OFFLINE) {
-      tagsToCheck.add(new OfflineTagConfig(tableConfig).getOfflineServerTag());
+      tagsToCheck.add(TagNameUtils.extractOfflineServerTag(tenantConfig));
     } else {
-      RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig);
-      String consumingServerTag = realtimeTagConfig.getConsumingServerTag();
+      String consumingServerTag = TagNameUtils.extractConsumingServerTag(tenantConfig);
       if (!TagNameUtils.isServerTag(consumingServerTag)) {
         throw new InvalidTableConfigException(
             "Invalid CONSUMING server tag: " + consumingServerTag + " for table: " + tableNameWithType);
       }
       tagsToCheck.add(consumingServerTag);
-      String completedServerTag = realtimeTagConfig.getCompletedServerTag();
+      String completedServerTag = TagNameUtils.extractCompletedServerTag(tenantConfig);
       if (!TagNameUtils.isServerTag(completedServerTag)) {
         throw new InvalidTableConfigException(
             "Invalid COMPLETED server tag: " + completedServerTag + " for table: " + tableNameWithType);
@@ -1980,22 +1977,27 @@ public class PinotHelixResourceManager {
 
   public List<String> getServerInstancesForTable(String tableName, TableType tableType) {
     TableConfig tableConfig = getTableConfig(tableName, tableType);
+    Preconditions.checkNotNull(tableConfig);
+    TenantConfig tenantConfig = tableConfig.getTenantConfig();
     Set<String> serverInstances = new HashSet<>();
-    if (TableType.OFFLINE.equals(tableType)) {
-      OfflineTagConfig tagConfig = new OfflineTagConfig(tableConfig);
-      serverInstances.addAll(HelixHelper.getInstancesWithTag(_helixZkManager, tagConfig.getOfflineServerTag()));
+    List<InstanceConfig> instanceConfigs = HelixHelper.getInstanceConfigs(_helixZkManager);
+    if (tableType == TableType.OFFLINE) {
+      serverInstances
+          .addAll(HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.extractOfflineServerTag(tenantConfig)));
     } else if (TableType.REALTIME.equals(tableType)) {
-      RealtimeTagConfig tagConfig = new RealtimeTagConfig(tableConfig);
-      serverInstances.addAll(HelixHelper.getInstancesWithTag(_helixZkManager, tagConfig.getConsumingServerTag()));
-      serverInstances.addAll(HelixHelper.getInstancesWithTag(_helixZkManager, tagConfig.getCompletedServerTag()));
+      serverInstances.addAll(
+          HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.extractConsumingServerTag(tenantConfig)));
+      serverInstances.addAll(
+          HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.extractCompletedServerTag(tenantConfig)));
     }
     return Lists.newArrayList(serverInstances);
   }
 
   public List<String> getBrokerInstancesForTable(String tableName, TableType tableType) {
     TableConfig tableConfig = getTableConfig(tableName, tableType);
-    String brokerTenantName = TagNameUtils.getBrokerTagForTenant(tableConfig.getTenantConfig().getBroker());
-    return HelixHelper.getInstancesWithTag(_helixZkManager, brokerTenantName);
+    Preconditions.checkNotNull(tableConfig);
+    return HelixHelper
+        .getInstancesWithTag(_helixZkManager, TagNameUtils.extractBrokerTag(tableConfig.getTenantConfig()));
   }
 
   public PinotResourceManagerResponse enableInstance(String instanceName) {
