@@ -26,6 +26,7 @@ import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.MultiplePinotSegmentRecordReader;
 import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.data.readers.RecordReaderConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 
@@ -54,7 +55,8 @@ public class MapperRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+  public void init(String inputPath, Schema schema, RecordReaderConfig recordReaderConfig)
+      throws Exception {
 
   }
 

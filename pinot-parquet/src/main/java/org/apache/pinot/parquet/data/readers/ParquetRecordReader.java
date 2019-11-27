@@ -27,6 +27,7 @@ import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.data.readers.RecordReaderConfig;
 import org.apache.pinot.core.data.readers.RecordReaderUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.util.AvroUtils;
@@ -43,10 +44,10 @@ public class ParquetRecordReader implements RecordReader {
   private GenericRecord _nextRecord;
 
   @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig)
+  public void init(String inputPath, Schema schema, RecordReaderConfig recordReaderConfig)
       throws IOException {
-    _dataFilePath = new Path(segmentGeneratorConfig.getInputFilePath());
-    _schema = segmentGeneratorConfig.getSchema();
+    _dataFilePath = new Path(inputPath);
+    _schema = schema;
     AvroUtils.validateSchema(_schema, ParquetUtils.getParquetSchema(_dataFilePath));
 
     _fieldSpecs = RecordReaderUtils.extractFieldSpecs(_schema);

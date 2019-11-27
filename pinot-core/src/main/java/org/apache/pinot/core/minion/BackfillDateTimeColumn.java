@@ -33,6 +33,7 @@ import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.FileFormat;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.data.readers.RecordReaderConfig;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.RecordReaderSegmentCreationDataSource;
@@ -137,7 +138,8 @@ public class BackfillDateTimeColumn {
     }
 
     @Override
-    public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+    public void init(String inputPath, Schema schema, RecordReaderConfig recordReaderConfig)
+        throws Exception {
 
     }
 

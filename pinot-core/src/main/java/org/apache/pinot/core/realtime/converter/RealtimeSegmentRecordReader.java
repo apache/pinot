@@ -21,6 +21,7 @@ package org.apache.pinot.core.realtime.converter;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.data.readers.RecordReaderConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 
@@ -51,7 +52,8 @@ public class RealtimeSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+  public void init(String inputPath, Schema schema, RecordReaderConfig recordReaderConfig)
+      throws Exception {
 
   }
 

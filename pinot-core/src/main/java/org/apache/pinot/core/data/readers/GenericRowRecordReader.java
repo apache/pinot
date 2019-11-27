@@ -41,7 +41,8 @@ public class GenericRowRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+  public void init(String inputPath, Schema schema, RecordReaderConfig recordReaderConfig)
+      throws Exception {
 
   }
 

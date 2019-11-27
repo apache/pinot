@@ -53,11 +53,6 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
     this(indexDirs, null, null);
   }
 
-  @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
-
-  }
-
   /**
    * Read records using the passed in schema and in the order of sorted column from multiple pinot segments.
    * <p>Passed in schema must be a subset of the segment schema.
@@ -104,6 +99,12 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
         }
       }
     }
+  }
+
+  @Override
+  public void init(String inputPath, Schema schema, RecordReaderConfig recordReaderConfig)
+      throws Exception {
+
   }
 
   /**

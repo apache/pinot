@@ -114,15 +114,12 @@ public class ORCRecordReaderTest {
       throws IOException {
     ORCRecordReader orcRecordReader = new ORCRecordReader();
 
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig();
-    segmentGeneratorConfig.setInputFilePath(ORC_FILE.getAbsolutePath());
     Schema schema = new Schema();
     FieldSpec xFieldSpec = new DimensionFieldSpec("x", FieldSpec.DataType.LONG, true);
     schema.addField(xFieldSpec);
     FieldSpec yFieldSpec = new DimensionFieldSpec("y", FieldSpec.DataType.BYTES, true);
     schema.addField(yFieldSpec);
-    segmentGeneratorConfig.setSchema(schema);
-    orcRecordReader.init(segmentGeneratorConfig);
+    orcRecordReader.init(ORC_FILE.getAbsolutePath(), schema, null);
 
     List<GenericRow> genericRows = new ArrayList<>();
     while (orcRecordReader.hasNext()) {
@@ -140,16 +137,12 @@ public class ORCRecordReaderTest {
   @Test
   public void testReadMVData() throws IOException{
     ORCRecordReader orcRecordReader = new ORCRecordReader();
-
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig();
-    segmentGeneratorConfig.setInputFilePath(MULTIVALUE_ORC_FILE.getAbsolutePath());
     Schema schema = new Schema();
     FieldSpec emailsFieldSpec = new DimensionFieldSpec("emails", FieldSpec.DataType.STRING, false);
     schema.addField(emailsFieldSpec);
     FieldSpec xFieldSpec = new DimensionFieldSpec("x", FieldSpec.DataType.INT, true);
     schema.addField(xFieldSpec);
-    segmentGeneratorConfig.setSchema(schema);
-    orcRecordReader.init(segmentGeneratorConfig);
+    orcRecordReader.init(MULTIVALUE_ORC_FILE.getAbsolutePath(), schema, null);
 
     List<GenericRow> genericRows = new ArrayList<>();
     while (orcRecordReader.hasNext()) {

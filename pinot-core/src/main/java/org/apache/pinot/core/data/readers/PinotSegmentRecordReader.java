@@ -60,11 +60,6 @@ public class PinotSegmentRecordReader implements RecordReader {
     this(indexDir, null, null);
   }
 
-  @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
-
-  }
-
   /**
    * Read records using the segment schema with the given schema and sort order
    * <p>Passed in schema must be a subset of the segment schema.
@@ -108,6 +103,12 @@ public class PinotSegmentRecordReader implements RecordReader {
       _immutableSegment.destroy();
       throw e;
     }
+  }
+
+  @Override
+  public void init(String inputPath, Schema schema, RecordReaderConfig recordReaderConfig)
+      throws Exception {
+
   }
 
   /**

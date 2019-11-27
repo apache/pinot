@@ -81,12 +81,8 @@ public class ParquetRecordReaderTest extends RecordReaderTest {
   @Test
   public void testParquetRecordReader()
       throws Exception {
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig();
-    segmentGeneratorConfig.setInputFilePath(DATA_FILE.getAbsolutePath());
-    segmentGeneratorConfig.setSchema(SCHEMA);
-
     try (ParquetRecordReader recordReader = new ParquetRecordReader()) {
-      recordReader.init(segmentGeneratorConfig);
+      recordReader.init(DATA_FILE.getAbsolutePath(), SCHEMA, null);
       checkValue(recordReader);
       recordReader.rewind();
       checkValue(recordReader);

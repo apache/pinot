@@ -66,6 +66,12 @@ public class ThriftRecordReader implements RecordReader {
     init();
   }
 
+  @Override
+  public void init(String inputPath, Schema schema, RecordReaderConfig recordReaderConfig)
+      throws Exception {
+
+  }
+
   private void init()
       throws IOException {
     _inputStream = RecordReaderUtils.getBufferedInputStream(_dataFile);
@@ -76,11 +82,6 @@ public class ThriftRecordReader implements RecordReader {
       _inputStream.close();
       throw e;
     }
-  }
-
-  @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
-
   }
 
   private boolean hasMoreToRead()

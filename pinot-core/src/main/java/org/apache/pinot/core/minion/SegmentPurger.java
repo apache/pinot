@@ -32,6 +32,7 @@ import org.apache.pinot.common.segment.StarTreeMetadata;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.data.readers.RecordReaderConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
@@ -170,7 +171,9 @@ public class SegmentPurger {
     }
 
     @Override
-    public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+    public void init(String inputPath, Schema schema, RecordReaderConfig recordReaderConfig)
+        throws Exception {
+
     }
 
     @Override

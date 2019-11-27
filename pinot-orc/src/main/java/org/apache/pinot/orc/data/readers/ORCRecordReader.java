@@ -45,6 +45,7 @@ import org.apache.orc.mapred.OrcMapredRecordReader;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.data.readers.RecordReaderConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,9 +84,9 @@ public class ORCRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig)
+  public void init(String inputPath, Schema schema, RecordReaderConfig recordReaderConfig)
       throws IOException {
-    init(segmentGeneratorConfig.getInputFilePath(), segmentGeneratorConfig.getSchema());
+    init(inputPath, schema);
   }
 
   @Override
