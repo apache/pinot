@@ -72,7 +72,7 @@ public class TableNameBuilder {
    * @param tableName Table name with or without type suffix
    * @return Whether the table has type suffix that matches the builder type
    */
-  public boolean tableHasTypeSuffix(String tableName) {
+  private boolean tableHasTypeSuffix(String tableName) {
     return tableName.endsWith(_typeSuffix);
   }
 

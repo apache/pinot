@@ -18,15 +18,12 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
-import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.config.PinotTaskConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -45,8 +42,8 @@ public class ClusterInfoProvider {
   private final PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
   private final ControllerConf _controllerConf;
 
-  public ClusterInfoProvider(@Nonnull PinotHelixResourceManager pinotHelixResourceManager,
-      @Nonnull PinotHelixTaskResourceManager pinotHelixTaskResourceManager, @Nonnull ControllerConf controllerConf) {
+  public ClusterInfoProvider(PinotHelixResourceManager pinotHelixResourceManager,
+      PinotHelixTaskResourceManager pinotHelixTaskResourceManager, ControllerConf controllerConf) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _pinotHelixTaskResourceManager = pinotHelixTaskResourceManager;
     _controllerConf = controllerConf;
@@ -59,7 +56,7 @@ public class ClusterInfoProvider {
    * @return Table config
    */
   @Nullable
-  public TableConfig getTableConfig(@Nonnull String tableNameWithType) {
+  public TableConfig getTableConfig(String tableNameWithType) {
     return _pinotHelixResourceManager.getTableConfig(tableNameWithType);
   }
 
@@ -70,34 +67,30 @@ public class ClusterInfoProvider {
    * @return Table schema
    */
   @Nullable
-  public Schema getTableSchema(@Nonnull String tableName) {
+  public Schema getTableSchema(String tableName) {
     return _pinotHelixResourceManager.getTableSchema(tableName);
   }
 
   /**
    * Get all segments' metadata for the given OFFLINE table name.
    *
-   * @param offlineTableName Offline table name
+   * @param tableName Table name with or without OFFLINE type suffix
    * @return List of segments' metadata
    */
-  @Nonnull
-  public List<OfflineSegmentZKMetadata> getOfflineSegmentsMetadata(@Nonnull String offlineTableName) {
-    Preconditions.checkArgument(TableNameBuilder.OFFLINE.tableHasTypeSuffix(offlineTableName));
+  public List<OfflineSegmentZKMetadata> getOfflineSegmentsMetadata(String tableName) {
     return ZKMetadataProvider
-        .getOfflineSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(), offlineTableName);
+        .getOfflineSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(), tableName);
   }
 
   /**
    * Get all segments' metadata for the given REALTIME table name.
    *
-   * @param realtimeTableName Realtime table name
+   * @param tableName Table name with or without REALTIME type suffix
    * @return List of segments' metadata
    */
-  @Nonnull
-  public List<RealtimeSegmentZKMetadata> getRealtimeSegmentsMetadata(@Nonnull String realtimeTableName) {
-    Preconditions.checkArgument(TableNameBuilder.REALTIME.tableHasTypeSuffix(realtimeTableName));
+  public List<RealtimeSegmentZKMetadata> getRealtimeSegmentsMetadata(String tableName) {
     return ZKMetadataProvider
-        .getRealtimeSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(), realtimeTableName);
+        .getRealtimeSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(), tableName);
   }
 
   /**
@@ -106,8 +99,7 @@ public class ClusterInfoProvider {
    * @param taskType Task type
    * @return Map from task name to task state
    */
-  @Nonnull
-  public Map<String, TaskState> getTaskStates(@Nonnull String taskType) {
+  public Map<String, TaskState> getTaskStates(String taskType) {
     return _pinotHelixTaskResourceManager.getTaskStates(taskType);
   }
 
@@ -117,8 +109,7 @@ public class ClusterInfoProvider {
    * @param taskName Task name
    * @return List of child task configs
    */
-  @Nonnull
-  public List<PinotTaskConfig> getTaskConfigs(@Nonnull String taskName) {
+  public List<PinotTaskConfig> getTaskConfigs(String taskName) {
     return _pinotHelixTaskResourceManager.getTaskConfigs(taskName);
   }
 
@@ -127,7 +118,6 @@ public class ClusterInfoProvider {
    *
    * @return VIP URL
    */
-  @Nonnull
   public String getVipUrl() {
     return _controllerConf.generateVipUrl();
   }
