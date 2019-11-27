@@ -38,7 +38,7 @@ public class MinMVAggregationFunction extends MinAggregationFunction {
 
   @Override
   public String getResultColumnName(String column) {
-    return AggregationFunctionType.MINMV.getName() + "(" + column + ")";
+    return AggregationFunctionType.MINMV.getName().toLowerCase() + "(" + column + ")";
   }
 
   @Override

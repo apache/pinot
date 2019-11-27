@@ -44,7 +44,7 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
 
   @Override
   public String getResultColumnName(String column) {
-    return AggregationFunctionType.MINMAXRANGE.getName() + "(" + column + ")";
+    return AggregationFunctionType.MINMAXRANGE.getName().toLowerCase() + "(" + column + ")";
   }
 
   @Override

@@ -50,7 +50,7 @@ public class DistinctCountRawHLLAggregationFunction implements AggregationFuncti
 
   @Override
   public String getResultColumnName(String column) {
-    return AggregationFunctionType.DISTINCTCOUNTRAWHLL.getName() + "(" + column + ")";
+    return AggregationFunctionType.DISTINCTCOUNTRAWHLL.getName().toLowerCase() + "(" + column + ")";
   }
 
   @Override

@@ -46,7 +46,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
 
   @Override
   public String getResultColumnName(String column) {
-    return AggregationFunctionType.DISTINCTCOUNTHLL.getName() + "(" + column + ")";
+    return AggregationFunctionType.DISTINCTCOUNTHLL.getName().toLowerCase() + "(" + column + ")";
   }
 
   @Override

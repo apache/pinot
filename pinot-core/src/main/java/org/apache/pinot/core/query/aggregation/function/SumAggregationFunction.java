@@ -42,7 +42,7 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
 
   @Override
   public String getResultColumnName(String column) {
-    return AggregationFunctionType.SUM.getName() + "(" + column + ")";
+    return AggregationFunctionType.SUM.getName().toLowerCase() + "(" + column + ")";
   }
 
   @Override

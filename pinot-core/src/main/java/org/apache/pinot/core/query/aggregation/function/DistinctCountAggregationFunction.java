@@ -43,7 +43,7 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
 
   @Override
   public String getResultColumnName(String column) {
-    return AggregationFunctionType.DISTINCTCOUNT.getName() + "(" + column + ")";
+    return AggregationFunctionType.DISTINCTCOUNT.getName().toLowerCase() + "(" + column + ")";
   }
 
   @Override

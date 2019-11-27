@@ -40,7 +40,7 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
 
   @Override
   public String getResultColumnName(String column) {
-    return AggregationFunctionType.DISTINCTCOUNTHLLMV.getName() + "(" + column + ")";
+    return AggregationFunctionType.DISTINCTCOUNTHLLMV.getName().toLowerCase() + "(" + column + ")";
   }
 
   @Override

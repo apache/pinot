@@ -43,7 +43,7 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
 
   @Override
   public String getResultColumnName(String column) {
-    return AggregationFunctionType.COUNT.getName() + "(*)";
+    return AggregationFunctionType.COUNT.getName().toLowerCase() + "(*)";
   }
 
   @Override

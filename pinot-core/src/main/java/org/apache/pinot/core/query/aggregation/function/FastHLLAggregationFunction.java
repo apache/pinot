@@ -45,7 +45,7 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
 
   @Override
   public String getResultColumnName(String column) {
-    return AggregationFunctionType.FASTHLL.getName() + "(" + column + ")";
+    return AggregationFunctionType.FASTHLL.getName().toLowerCase() + "(" + column + ")";
   }
 
   public void setLog2m(int log2m) {

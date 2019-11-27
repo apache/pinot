@@ -162,7 +162,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
     // order by one of the group by columns DESC
-    query = "SELECT SUM(column1) FROM testTable GROUP BY column11 ORDER BY column11 DESC";
+    query = "SELECT sum(column1) FROM testTable GROUP BY column11 ORDER BY column11 DESC";
     results = Lists.newArrayList(results);
     Collections.reverse(results);
     dataSchema = new DataSchema(new String[]{"column11", "sum(column1)"},
@@ -172,7 +172,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
     // order by one of the group by columns, TOP less than default
-    query = "SELECT SUM(column1) FROM testTable GROUP BY column11 ORDER BY column11 TOP 3";
+    query = "SELECT Sum(column1) FROM testTable GROUP BY column11 ORDER BY column11 TOP 3";
     results = Lists.newArrayList(results);
     Collections.reverse(results);
     results = results.subList(0, 3);
@@ -272,7 +272,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
     // multiple aggregations
-    query = "SELECT SUM(column1), MIN(column6) FROM testTable GROUP BY column11 ORDER BY column11";
+    query = "SELECT sum(column1), MIN(column6) FROM testTable GROUP BY column11 ORDER BY column11";
     results = Lists
         .newArrayList(new Object[]{"", 5935285005452.0, 2.96467636E8}, new Object[]{"P", 88832999206836.0, 1689277.0},
             new Object[]{"gFuH", 63202785888.0, 2.96467636E8}, new Object[]{"o", 18105331533948.0, 2.96467636E8},
@@ -295,7 +295,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
     // order by an aggregation DESC, and group by column
-    query = "SELECT MIN(column6) FROM testTable GROUP BY column12 ORDER BY min(column6) DESC, column12";
+    query = "SELECT MIN(column6) FROM testTable GROUP BY column12 ORDER BY Min(column6) DESC, column12";
     results = Lists.newArrayList(new Object[]{"XcBNHe", 329467557.0}, new Object[]{"fykKFqiw", 296467636.0},
         new Object[]{"gFuH", 296467636.0}, new Object[]{"HEuxNvH", 6043515.0},
         new Object[]{"MaztCmmxxgguBUxPti", 6043515.0}, new Object[]{"dJWwFk", 6043515.0},
@@ -365,19 +365,19 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
         new Object[]{"MaztCmmxxgguBUxPti", 5}, new Object[]{"TTltMtFiRqUjvOG", 3}, new Object[]{"XcBNHe", 2},
         new Object[]{"dJWwFk", 4}, new Object[]{"fykKFqiw", 3}, new Object[]{"gFuH", 3},
         new Object[]{"oZgnrlDEtjjVpUoFLol", 4});
-    dataSchema = new DataSchema(new String[]{"column12", "distinctCount(column11)"},
+    dataSchema = new DataSchema(new String[]{"column12", "distinctcount(column11)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
     numEntriesScannedPostFilter = 240000;
     data.add(
         new Object[]{query, results, numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalDocs, dataSchema});
 
     query =
-        "SELECT DISTINCTCOUNT(column11) FROM testTable GROUP BY column12 ORDER BY distinctCount(column11), column12 DESC";
+        "SELECT DISTINCTCOUNT(column11) FROM testTable GROUP BY column12 ORDER BY DistinctCount(column11), column12 DESC";
     results = Lists.newArrayList(new Object[]{"XcBNHe", 2}, new Object[]{"gFuH", 3}, new Object[]{"fykKFqiw", 3},
         new Object[]{"TTltMtFiRqUjvOG", 3}, new Object[]{"oZgnrlDEtjjVpUoFLol", 4}, new Object[]{"dJWwFk", 4},
         new Object[]{"MaztCmmxxgguBUxPti", 5}, new Object[]{"KrNxpdycSiwoRohEiTIlLqDHnx", 5},
         new Object[]{"HEuxNvH", 5});
-    dataSchema = new DataSchema(new String[]{"column12", "distinctCount(column11)"},
+    dataSchema = new DataSchema(new String[]{"column12", "distinctcount(column11)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
     numEntriesScannedPostFilter = 240000;
     data.add(
