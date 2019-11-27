@@ -104,7 +104,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
 
     // Scan all segment ZK metadata and purge segments if necessary
-    if (TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableNameWithType)) {
+    if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
       manageRetentionForOfflineTable(tableNameWithType, retentionStrategy);
     } else {
       manageRetentionForRealtimeTable(tableNameWithType, retentionStrategy);

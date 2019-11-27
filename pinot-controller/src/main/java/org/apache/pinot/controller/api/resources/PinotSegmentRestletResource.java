@@ -251,7 +251,7 @@ public class PinotSegmentRestletResource {
   @Nullable
   private Map<String, String> getSegmentMetadataInternal(String tableNameWithType, String segmentName) {
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
-    if (TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableNameWithType)) {
+    if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
       OfflineSegmentZKMetadata offlineSegmentZKMetadata =
           ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableNameWithType, segmentName);
       return offlineSegmentZKMetadata != null ? offlineSegmentZKMetadata.toMap() : null;

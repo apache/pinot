@@ -63,7 +63,7 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask<Void> {
   @Override
   protected void processTable(String tableNameWithType) {
     // Only relocate segments for LLC real-time table
-    if (!TableNameBuilder.REALTIME.tableHasTypeSuffix(tableNameWithType)) {
+    if (!TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
       return;
     }
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);

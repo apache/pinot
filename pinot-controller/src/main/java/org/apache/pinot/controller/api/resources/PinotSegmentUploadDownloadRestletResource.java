@@ -91,7 +91,6 @@ public class PinotSegmentUploadDownloadRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentUploadDownloadRestletResource.class);
   private static final String TMP_DIR_PREFIX = "tmp-";
   private static final String ENCRYPTED_SUFFIX = "_encrypted";
-  private static final String URL_ENCODING_SCHEME = "UTF-8";
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -121,7 +120,8 @@ public class PinotSegmentUploadDownloadRestletResource {
   public Response downloadSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @Context HttpHeaders httpHeaders) throws Exception {
+      @Context HttpHeaders httpHeaders)
+      throws Exception {
     // Validate data access
     boolean hasDataAccess;
     try {
