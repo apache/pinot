@@ -20,6 +20,7 @@ package org.apache.pinot.core.transport;
 
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.MoreExecutors;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
@@ -83,6 +84,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
         .stopAndRecord();
 
+    // NOTE: executor must be provided as addCallback(future, callback) is removed from newer guava version
     Futures.addCallback(_queryScheduler.submit(queryRequest), new FutureCallback<byte[]>() {
       @Override
       public void onSuccess(@Nullable byte[] responseBytes) {
@@ -113,7 +115,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
         LOGGER.error("Caught exception while processing instance request", t);
         _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
       }
-    });
+    }, MoreExecutors.directExecutor());
   }
 
   @Override
