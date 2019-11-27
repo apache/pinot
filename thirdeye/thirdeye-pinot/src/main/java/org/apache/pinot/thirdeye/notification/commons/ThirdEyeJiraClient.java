@@ -169,7 +169,9 @@ public class ThirdEyeJiraClient {
     LOG.info("Updating Jira {} with [assignee={}, labels={}]. Previous state [assignee={}, labels={}]", issue.getKey(),
         jiraEntity.getAssignee(), jiraEntity.getLabels(), prevAssignee, issue.getLabels());
     restClient.getIssueClient().updateIssue(issue.getKey(), issueInput).claim();
-    restClient.getIssueClient().addAttachments(issue.getAttachmentsUri(), jiraEntity.getSnapshot()).claim();
+    if (jiraEntity.getSnapshot() != null && jiraEntity.getSnapshot().exists()) {
+      restClient.getIssueClient().addAttachments(issue.getAttachmentsUri(), jiraEntity.getSnapshot()).claim();
+    }
   }
 
   Iterable<CimProject> getProjectMetadata(JiraEntity jiraEntity) {
