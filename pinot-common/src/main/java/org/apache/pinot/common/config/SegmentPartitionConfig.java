@@ -25,7 +25,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class SegmentPartitionConfig extends BaseJsonConfig {

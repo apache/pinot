@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Set;
 import org.apache.pinot.common.config.BaseJsonConfig;
 import org.apache.pinot.common.segment.StarTreeMetadata;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 @Deprecated // Replaced with StarTreeIndexConfig for the new star-tree
