@@ -80,8 +80,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
 
     // extract column names and data types for aggregations
     for (AggregationFunctionContext functionContext : functionContexts) {
-      columnNames[index] = functionContext.getAggregationFunction().getType().toString().toLowerCase() + "("
-          + functionContext.getColumn() + ")";
+      columnNames[index] = functionContext.getResultColumnName();
       columnDataTypes[index] = functionContext.getAggregationFunction().getIntermediateResultColumnType();
       index++;
     }

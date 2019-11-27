@@ -39,6 +39,11 @@ public class DistinctCountMVAggregationFunction extends DistinctCountAggregation
   }
 
   @Override
+  public String getResultColumnName(String column) {
+    return AggregationFunctionType.DISTINCTCOUNTMV.getName() + "(" + column + ")";
+  }
+
+  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }

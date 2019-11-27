@@ -57,15 +57,18 @@ public class TableResizer {
     int numAggregations = aggregationInfos.size();
     int numKeyColumns = numColumns - numAggregations;
 
+    int aggIdx = 0;
     Map<String, Integer> columnIndexMap = new HashMap<>();
+    Map<String, AggregationFunction> aggregationColumnToFunction = new HashMap<>();
     for (int i = 0; i < numColumns; i++) {
-      columnIndexMap.put(dataSchema.getColumnName(i), i);
-    }
-
-    Map<String, AggregationInfo> aggregationColumnToInfo = new HashMap<>();
-    for (AggregationInfo aggregationInfo : aggregationInfos) {
-      String aggregationColumn = AggregationFunctionUtils.getAggregationColumnName(aggregationInfo);
-      aggregationColumnToInfo.put(aggregationColumn, aggregationInfo);
+      String columnName = dataSchema.getColumnName(i).toLowerCase();
+      columnIndexMap.put(columnName, i);
+      if (i >= numKeyColumns) {
+        AggregationFunction aggregationFunction =
+            AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfos.get(aggIdx)).getAggregationFunction();
+        aggregationColumnToFunction.put(columnName, aggregationFunction);
+        aggIdx++;
+      }
     }
 
     _numOrderBy = orderBy.size();
@@ -75,16 +78,14 @@ public class TableResizer {
     if (numKeyColumns < numColumns) {
       for (int orderByIdx = 0; orderByIdx < _numOrderBy; orderByIdx++) {
         SelectionSort selectionSort = orderBy.get(orderByIdx);
-        String column = selectionSort.getColumn();
+        String column = selectionSort.getColumn().toLowerCase();
 
         if (columnIndexMap.containsKey(column)) {
           int index = columnIndexMap.get(column);
           if (index < numKeyColumns) {
             _orderByValueExtractors[orderByIdx] = new KeyColumnExtractor(index);
           } else {
-            AggregationInfo aggregationInfo = aggregationColumnToInfo.get(column);
-            AggregationFunction aggregationFunction =
-                AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction();
+            AggregationFunction aggregationFunction = aggregationColumnToFunction.get(column);
             _orderByValueExtractors[orderByIdx] = new AggregationColumnExtractor(index, aggregationFunction);
           }
         } else {
@@ -114,7 +115,7 @@ public class TableResizer {
       boolean[] orderByAsc = new boolean[_numOrderBy];
       for (int i = 0; i < _numOrderBy; i++) {
         SelectionSort selectionSort = orderBy.get(i);
-        String column = selectionSort.getColumn();
+        String column = selectionSort.getColumn().toLowerCase();
         int orderByColIndex = columnIndexMap.get(column);
         orderByIndexes[i] = orderByColIndex;
         if (selectionSort.isIsAsc()) {

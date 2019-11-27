@@ -44,6 +44,11 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   String getColumnName(String column);
 
   /**
+   * Returns the column name to be used in the data schema of results. e.g. 'MINMAXRANGEMV( foo)' -> 'minMaxRangeMV(foo)', 'PERCENTILE75(bar)' -> 'percentile75(bar)'
+   */
+  String getResultColumnName(String column);
+
+  /**
    * Accepts an aggregation function visitor to visit.
    */
   void accept(AggregationFunctionVisitorBase visitor);

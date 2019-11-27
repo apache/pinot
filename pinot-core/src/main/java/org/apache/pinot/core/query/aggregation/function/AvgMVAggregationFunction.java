@@ -37,6 +37,11 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
   }
 
   @Override
+  public String getResultColumnName(String column) {
+    return AggregationFunctionType.AVGMV.getName() + "(" + column + ")";
+  }
+
+  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }

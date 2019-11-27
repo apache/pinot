@@ -41,6 +41,11 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
   }
 
   @Override
+  public String getResultColumnName(String column) {
+    return AggregationFunctionType.MIN.getName() + "(" + column + ")";
+  }
+
+  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }

@@ -72,6 +72,11 @@ public class DistinctAggregationFunction implements AggregationFunction<Distinct
   }
 
   @Override
+  public String getResultColumnName(String column) {
+    return AggregationFunctionType.DISTINCT.getName() + "(" + column + ")";
+  }
+
+  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }

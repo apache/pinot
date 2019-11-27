@@ -41,6 +41,11 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
   }
 
   @Override
+  public String getResultColumnName(String column) {
+    return AggregationFunctionType.MAX.getName() + "(" + column + ")";
+  }
+
+  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }

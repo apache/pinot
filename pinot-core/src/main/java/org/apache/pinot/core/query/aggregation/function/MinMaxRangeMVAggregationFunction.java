@@ -37,6 +37,11 @@ public class MinMaxRangeMVAggregationFunction extends MinMaxRangeAggregationFunc
   }
 
   @Override
+  public String getResultColumnName(String column) {
+    return AggregationFunctionType.MINMAXRANGEMV.getName() + "(" + column + ")";
+  }
+
+  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }

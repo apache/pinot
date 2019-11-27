@@ -50,6 +50,11 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
   }
 
   @Override
+  public String getResultColumnName(String column) {
+    return AggregationFunctionType.PERCENTILEEST.getName() + _percentile + "(" + column + ")";
+  }
+
+  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }

@@ -53,6 +53,11 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   }
 
   @Override
+  public String getResultColumnName(String column) {
+    return AggregationFunctionType.PERCENTILETDIGEST.getName() + _percentile + "(" + column + ")";
+  }
+
+  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }

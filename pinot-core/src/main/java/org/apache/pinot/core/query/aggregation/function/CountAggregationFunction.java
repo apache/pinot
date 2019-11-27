@@ -42,6 +42,11 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   }
 
   @Override
+  public String getResultColumnName(String column) {
+    return AggregationFunctionType.COUNT.getName() + "(*)";
+  }
+
+  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }

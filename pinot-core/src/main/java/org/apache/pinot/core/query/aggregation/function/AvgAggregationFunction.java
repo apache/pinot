@@ -44,6 +44,11 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   }
 
   @Override
+  public String getResultColumnName(String column) {
+    return AggregationFunctionType.AVG.getName() + "(" + column + ")";
+  }
+
+  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }

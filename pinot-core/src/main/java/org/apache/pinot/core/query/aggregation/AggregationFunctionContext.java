@@ -54,4 +54,12 @@ public class AggregationFunctionContext {
   public String getAggregationColumnName() {
     return _aggregationFunction.getColumnName(_column);
   }
+
+  /**
+   * Returns the aggregation column name for the result table.
+   * <p>E.g. AVGMV(foo) -> avgMV(foo)
+   */
+  public String getResultColumnName() {
+    return _aggregationFunction.getResultColumnName(_column);
+  }
 }

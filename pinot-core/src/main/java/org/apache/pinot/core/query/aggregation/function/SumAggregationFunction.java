@@ -41,6 +41,11 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
   }
 
   @Override
+  public String getResultColumnName(String column) {
+    return AggregationFunctionType.SUM.getName() + "(" + column + ")";
+  }
+
+  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
