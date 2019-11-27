@@ -28,11 +28,11 @@ import java.util.List;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.ingestion.utils.PushLocation;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

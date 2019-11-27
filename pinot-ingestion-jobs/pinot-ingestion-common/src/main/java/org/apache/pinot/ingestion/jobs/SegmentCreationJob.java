@@ -29,10 +29,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.ingestion.common.ControllerRestApi;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
 import org.apache.pinot.ingestion.utils.PushLocation;
+import org.apache.pinot.spi.data.Schema;
 
 
 public abstract class SegmentCreationJob extends BaseSegmentJob {

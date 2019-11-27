@@ -83,7 +83,6 @@ public class HadoopSegmentPreprocessingJob extends SegmentPreprocessingJob {
   private int _numOutputFiles;
   private TableConfig _tableConfig;
   private org.apache.pinot.spi.data.Schema _pinotTableSchema;
-  protected FileSystem _fileSystem;
 
   public HadoopSegmentPreprocessingJob(final Properties properties) {
     super(properties);

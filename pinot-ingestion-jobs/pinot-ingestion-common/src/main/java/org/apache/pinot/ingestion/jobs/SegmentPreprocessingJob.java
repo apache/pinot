@@ -94,14 +94,14 @@ public abstract class SegmentPreprocessingJob extends BaseSegmentJob {
   }
 
   @Override
-  protected org.apache.pinot.common.data.Schema getSchema()
+  protected org.apache.pinot.spi.data.Schema getSchema()
       throws IOException {
     try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
       if (controllerRestApi != null) {
         return controllerRestApi.getSchema();
       } else {
         try (InputStream inputStream = FileSystem.get(_schemaFile.toUri(), getConf()).open(_schemaFile)) {
-          return org.apache.pinot.common.data.Schema.fromInputSteam(inputStream);
+          return org.apache.pinot.spi.data.Schema.fromInputSteam(inputStream);
         }
       }
     }
