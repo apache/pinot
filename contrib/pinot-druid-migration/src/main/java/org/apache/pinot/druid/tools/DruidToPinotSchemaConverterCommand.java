@@ -18,13 +18,28 @@
  */
 package org.apache.pinot.druid.tools;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.druid.data.input.impl.DimensionsSpec;
+import org.apache.druid.data.input.impl.JSONParseSpec;
+import org.apache.druid.data.input.impl.ParseSpec;
+import org.apache.druid.data.input.impl.TimestampSpec;
+import org.apache.druid.indexing.common.task.batch.parallel.ParallelIndexIngestionSpec;
 import org.apache.druid.jackson.DefaultObjectMapper;
+import org.apache.druid.java.util.common.parsers.JSONPathFieldSpec;
+import org.apache.druid.java.util.common.parsers.JSONPathParser;
+import org.apache.druid.java.util.common.parsers.JSONPathSpec;
+import org.apache.druid.java.util.common.parsers.Parser;
 import org.apache.druid.query.DruidProcessingConfig;
 import org.apache.druid.segment.IndexIO;
 import org.apache.druid.segment.QueryableIndex;
@@ -34,14 +49,18 @@ import org.apache.druid.segment.column.ColumnConfig;
 import org.apache.druid.segment.column.ColumnHolder;
 import org.apache.druid.segment.column.ValueType;
 import org.apache.druid.segment.data.Indexed;
+import org.apache.hadoop.hdfs.web.JsonUtil;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.JsonUtils;
+
 
 /**
  * The DruidToPinotSchemaConverter is a tool that takes a Druid segment and creates a Pinot schema with the
  * segment's information.
  */
-public class DruidToPinotSchemaGenerator {
+public class DruidToPinotSchemaConverterCommand {
   // TODO: Change implementation to use the Command framework like the CreateSegmentCommand
   // TODO: Allow configuration for time stuff etc.
   // TODO: add "columnsToInclude" like in DumpSegment
@@ -113,6 +132,19 @@ public class DruidToPinotSchemaGenerator {
     return schemaBuilder.build();
   }
 
+  public static Schema ingestionSpecToPinotSchema(String ingestionSpecPath)
+      throws IOException {
+    Schema.SchemaBuilder schemaBuilder = new Schema.SchemaBuilder();
+    File ingestionSpecFile = new File(ingestionSpecPath);
+
+    JsonNode specJsonNode = JsonUtils.fileToJsonNode(ingestionSpecFile);
+    JsonNode dataSchema = specJsonNode.get("dataSchema");
+    JsonNode ioConfig = specJsonNode.get("ioConfig");
+    JsonNode tuningConfig = specJsonNode.get("tuningConfig");
+
+    return schemaBuilder.build();
+  }
+
   public static void writeSchemaToFile(Schema schema, String outputDirectory)
       throws IOException {
     File outputFile = new File(outputDirectory + "/" + schema.getSchemaName() + ".json");
@@ -144,12 +176,16 @@ public class DruidToPinotSchemaGenerator {
 
   public static void main(String[] args)
       throws IOException {
+    args = new String[]{"1", "2", "3"}; // PLACEHOLDER TODO: PLS DELETE THIS
     if (args.length != 3) {
       System.out.println("Usage:");
       System.out.println("java -jar druid-to-pinot-schema-generator-jar-with-dependencies.jar <schema_name> <druid_segment_path> <output_directory>");
     } else {
-      Schema schema = createSchema(args[0], args[1]);
-      writeSchemaToFile(schema, args[2]);
+      String pathToIngestionSpec = "/Users/dadapon/Desktop/test/all-types-test/all-types-data/all-types-ingestion-spec.json";
+
+      //Schema schema = createSchema(args[0], args[1]);
+      Schema schema = ingestionSpecToPinotSchema(pathToIngestionSpec);
+      //writeSchemaToFile(schema, args[2]);
     }
   }
 }

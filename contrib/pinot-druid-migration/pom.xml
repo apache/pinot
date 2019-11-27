@@ -34,22 +34,37 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
-      <version>0.2.0-SNAPSHOT</version>
+      <version>0.2.0</version>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>
-      <version>0.2.0-SNAPSHOT</version>
+      <version>0.2.0</version>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-tools</artifactId>
-      <version>0.2.0-SNAPSHOT</version>
+      <version>0.2.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-hadoop</artifactId>
+      <version>0.2.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-integration-tests</artifactId>
+      <version>0.2.0</version>
     </dependency>
     <dependency>
       <groupId>org.apache.druid</groupId>
       <artifactId>druid-processing</artifactId>
       <version>0.16.0-incubating</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.druid</groupId>
+      <artifactId>druid-indexing-service</artifactId>
+      <version>0.17.0-incubating-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.testng</groupId>
@@ -77,37 +92,20 @@
       </plugin>
       <plugin>
         <artifactId>maven-assembly-plugin</artifactId>
+        <version>3.1.0</version>
         <executions>
           <execution>
-            <id>build-segment-converter</id>
+            <id>build-pinot-druid-migration-tool</id>
             <configuration>
               <descriptorRefs>
                 <descriptorRef>jar-with-dependencies</descriptorRef>
               </descriptorRefs>
               <archive>
                 <manifest>
-                  <mainClass>org.apache.pinot.druid.tools.DruidToPinotSegmentConverter</mainClass>
+                  <mainClass>org.apache.pinot.druid.tools.DruidToPinotMigrationTool</mainClass>
                 </manifest>
               </archive>
-              <finalName>druid-to-pinot-segment-converter</finalName>
-            </configuration>
-            <phase>package</phase>
-            <goals>
-              <goal>single</goal>
-            </goals>
-          </execution>
-          <execution>
-            <id>build-schema-converter</id>
-            <configuration>
-              <descriptorRefs>
-                <descriptorRef>jar-with-dependencies</descriptorRef>
-              </descriptorRefs>
-              <archive>
-                <manifest>
-                  <mainClass>org.apache.pinot.druid.tools.DruidToPinotSchemaGenerator</mainClass>
-                </manifest>
-              </archive>
-              <finalName>druid-to-pinot-schema-generator</finalName>
+              <finalName>druid-to-pinot-migration-tool</finalName>
             </configuration>
             <phase>package</phase>
             <goals>
