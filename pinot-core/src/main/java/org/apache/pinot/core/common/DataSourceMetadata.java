@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.common;
 
-import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public interface DataSourceMetadata {

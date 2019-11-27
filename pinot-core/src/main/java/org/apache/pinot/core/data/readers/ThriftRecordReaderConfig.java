@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.readers;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
 public class ThriftRecordReaderConfig implements RecordReaderConfig {

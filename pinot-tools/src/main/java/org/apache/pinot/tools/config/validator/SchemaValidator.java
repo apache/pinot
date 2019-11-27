@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.tools.config.validator;
 
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 
 
 public class SchemaValidator {

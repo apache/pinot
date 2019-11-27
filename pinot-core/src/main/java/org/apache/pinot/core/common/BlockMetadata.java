@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.common;
 
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 

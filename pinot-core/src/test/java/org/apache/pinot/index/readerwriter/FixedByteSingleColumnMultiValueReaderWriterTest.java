@@ -21,7 +21,7 @@ package org.apache.pinot.index.readerwriter;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;

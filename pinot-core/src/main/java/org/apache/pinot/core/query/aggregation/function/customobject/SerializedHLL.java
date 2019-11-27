@@ -20,7 +20,7 @@ package org.apache.pinot.core.query.aggregation.function.customobject;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import javax.annotation.Nonnull;
-import org.apache.pinot.common.utils.BytesUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.core.startree.hll.HllUtil;
 
 

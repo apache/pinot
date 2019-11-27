@@ -16,16 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.data;
+package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import javax.annotation.Nullable;
-import org.apache.avro.Schema.Type;
-import org.apache.pinot.common.utils.BytesUtils;
-import org.apache.pinot.common.utils.EqualityUtils;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -275,38 +273,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
     }
   }
 
-  public ObjectNode toAvroSchemaJsonObject() {
-    ObjectNode jsonSchema = JsonUtils.newObjectNode();
-    jsonSchema.put("name", _name);
-    switch (_dataType) {
-      case INT:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "int"));
-        return jsonSchema;
-      case LONG:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "long"));
-        return jsonSchema;
-      case FLOAT:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "float"));
-        return jsonSchema;
-      case DOUBLE:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "double"));
-        return jsonSchema;
-      case STRING:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "string"));
-        return jsonSchema;
-      default:
-        throw new UnsupportedOperationException();
-    }
-  }
-
-  private static ArrayNode convertStringsToJsonArray(String... strings) {
-    ArrayNode jsonArray = JsonUtils.newArrayNode();
-    for (String string : strings) {
-      jsonArray.add(string);
-    }
-    return jsonArray;
-  }
-
   @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
   @Override
   public boolean equals(Object o) {
@@ -358,30 +324,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
      */
     public DataType getStoredType() {
       return this == BOOLEAN ? STRING : this;
-    }
-
-    /**
-     * Returns the data type stored in Pinot that is associated with the given Avro type.
-     */
-    public static DataType valueOf(Type avroType) {
-      switch (avroType) {
-        case INT:
-          return INT;
-        case LONG:
-          return LONG;
-        case FLOAT:
-          return FLOAT;
-        case DOUBLE:
-          return DOUBLE;
-        case BOOLEAN:
-        case STRING:
-        case ENUM:
-          return STRING;
-        case BYTES:
-          return BYTES;
-        default:
-          throw new UnsupportedOperationException("Unsupported Avro type: " + avroType);
-      }
     }
 
     /**

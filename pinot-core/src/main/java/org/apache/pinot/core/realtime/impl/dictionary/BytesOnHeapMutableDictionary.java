@@ -22,8 +22,8 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.ints.IntSets;
 import java.util.Arrays;
-import org.apache.pinot.common.utils.BytesUtils;
-import org.apache.pinot.common.utils.primitive.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.core.common.predicate.RangePredicate;
 
 

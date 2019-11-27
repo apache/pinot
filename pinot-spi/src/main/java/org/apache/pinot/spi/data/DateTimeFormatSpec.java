@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.data;
+package org.apache.pinot.spi.data;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.data.DateTimeFieldSpec.TimeFormat;
-import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
+import org.apache.pinot.spi.utils.EqualityUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 

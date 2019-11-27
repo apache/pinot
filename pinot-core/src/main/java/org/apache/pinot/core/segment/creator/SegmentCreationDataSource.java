@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.segment.creator;
 
-import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReader;
 
 
 /**

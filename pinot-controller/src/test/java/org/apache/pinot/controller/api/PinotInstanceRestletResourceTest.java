@@ -29,7 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.config.Instance;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Helix.InstanceType;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;

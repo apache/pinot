@@ -35,11 +35,11 @@ import java.util.List;
 import java.util.zip.GZIPInputStream;
 import javax.annotation.Nullable;
 import org.apache.avro.generic.GenericData;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.FieldSpec.DataType;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.data.TimeFieldSpec;
-import org.apache.pinot.common.utils.BytesUtils;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 public class RecordReaderUtils {

@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.segment.creator;
 
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 public interface SegmentPreIndexStatsCollector extends SegmentPreIndexStatsContainer {

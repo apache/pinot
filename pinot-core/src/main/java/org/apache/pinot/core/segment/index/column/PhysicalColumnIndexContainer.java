@@ -19,7 +19,7 @@
 package org.apache.pinot.core.segment.index.column;
 
 import java.io.IOException;
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;

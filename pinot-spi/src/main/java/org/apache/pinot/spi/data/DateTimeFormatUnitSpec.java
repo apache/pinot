@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.data;
+package org.apache.pinot.spi.data;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.EnumUtils;
-import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.EqualityUtils;
 import org.joda.time.DurationFieldType;
 import org.joda.time.chrono.ISOChronology;
 

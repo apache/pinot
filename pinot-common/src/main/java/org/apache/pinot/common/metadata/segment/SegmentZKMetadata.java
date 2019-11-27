@@ -28,16 +28,16 @@ import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static org.apache.pinot.common.utils.EqualityUtils.isEqual;
-import static org.apache.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
-import static org.apache.pinot.common.utils.EqualityUtils.isSameReference;
+import static org.apache.pinot.spi.utils.EqualityUtils.hashCodeOf;
+import static org.apache.pinot.spi.utils.EqualityUtils.isEqual;
+import static org.apache.pinot.spi.utils.EqualityUtils.isNullOrNotSameClass;
+import static org.apache.pinot.spi.utils.EqualityUtils.isSameReference;
 
 
 public abstract class SegmentZKMetadata implements ZKMetadata {

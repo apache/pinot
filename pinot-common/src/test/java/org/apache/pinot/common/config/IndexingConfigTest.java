@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;

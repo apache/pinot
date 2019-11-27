@@ -34,12 +34,13 @@ import org.apache.avro.SchemaBuilder;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.pinot.common.data.DimensionFieldSpec;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.MetricFieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.data.TimeFieldSpec;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.common.utils.AvroSchemaUtil;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.RecordReaderUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -262,9 +263,9 @@ public class AvroUtils {
       org.apache.avro.Schema fieldSchema = extractSupportedSchema(field.schema());
       org.apache.avro.Schema.Type fieldType = fieldSchema.getType();
       if (fieldType == org.apache.avro.Schema.Type.ARRAY) {
-        return FieldSpec.DataType.valueOf(extractSupportedSchema(fieldSchema.getElementType()).getType());
+        return AvroSchemaUtil.valueOf(extractSupportedSchema(fieldSchema.getElementType()).getType());
       } else {
-        return FieldSpec.DataType.valueOf(fieldType);
+        return AvroSchemaUtil.valueOf(fieldType);
       }
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while extracting data type from field: " + field.name(), e);

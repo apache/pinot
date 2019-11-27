@@ -24,7 +24,7 @@ import java.util.Set;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 

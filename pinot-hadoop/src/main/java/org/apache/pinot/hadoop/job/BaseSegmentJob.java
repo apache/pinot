@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.hadoop.utils.PushLocation;
+import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,7 +81,7 @@ public abstract class BaseSegmentJob extends Configured {
    * of mandating that a schema is pushed to the controller.
    */
   @Nullable
-  protected org.apache.pinot.common.data.Schema getSchema() throws IOException {
+  protected Schema getSchema() throws IOException {
     return null;
   }
 

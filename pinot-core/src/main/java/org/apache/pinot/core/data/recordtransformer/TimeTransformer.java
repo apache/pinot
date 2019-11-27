@@ -19,12 +19,12 @@
 package org.apache.pinot.core.data.recordtransformer;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.data.TimeFieldSpec;
-import org.apache.pinot.common.data.TimeGranularitySpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.common.utils.time.TimeConverter;
 import org.apache.pinot.common.utils.time.TimeUtils;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**

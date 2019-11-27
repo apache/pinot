@@ -19,7 +19,7 @@
 package org.apache.pinot.core.segment.index.loader.defaultcolumn;
 
 import java.io.File;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

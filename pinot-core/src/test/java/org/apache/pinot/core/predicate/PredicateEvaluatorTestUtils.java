@@ -20,7 +20,6 @@ package org.apache.pinot.core.predicate;
 
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
-import org.apache.pinot.common.utils.BytesUtils;
 
 
 public class PredicateEvaluatorTestUtils {

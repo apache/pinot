@@ -21,6 +21,7 @@ package org.apache.pinot.common.data;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;

@@ -19,9 +19,9 @@
 package org.apache.pinot.core.indexsegment.generator;
 
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.data.TimeGranularitySpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;

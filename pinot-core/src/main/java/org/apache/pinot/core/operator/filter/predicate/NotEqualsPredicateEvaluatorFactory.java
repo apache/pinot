@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.utils.BytesUtils;
-import org.apache.pinot.common.utils.primitive.ByteArray;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.NEqPredicate;
 import org.apache.pinot.core.segment.index.readers.Dictionary;

@@ -19,7 +19,7 @@
 package org.apache.pinot.core.data.recordtransformer;
 
 import javax.annotation.Nullable;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**

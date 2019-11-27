@@ -21,7 +21,7 @@ package org.apache.pinot.tools.data.generator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

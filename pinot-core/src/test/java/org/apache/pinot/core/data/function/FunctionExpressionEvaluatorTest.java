@@ -19,7 +19,7 @@
 package org.apache.pinot.core.data.function;
 
 import java.lang.reflect.Method;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.joda.time.DateTime;
 import org.joda.time.Days;
 import org.joda.time.MutableDateTime;

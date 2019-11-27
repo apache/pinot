@@ -23,7 +23,7 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.ints.IntSets;
 import java.io.IOException;
 import java.util.Arrays;
-import org.apache.pinot.common.utils.BytesUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.common.predicate.RangePredicate;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;

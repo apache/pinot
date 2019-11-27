@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils;
+package org.apache.pinot.spi.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -34,7 +34,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class JsonUtils {
@@ -160,7 +161,7 @@ public class JsonUtils {
     }
   }
 
-  private static Object extractSingleValue(JsonNode jsonValue, FieldSpec.DataType dataType) {
+  private static Object extractSingleValue(JsonNode jsonValue, DataType dataType) {
     Preconditions.checkArgument(jsonValue.isValueNode());
     switch (dataType) {
       case INT:

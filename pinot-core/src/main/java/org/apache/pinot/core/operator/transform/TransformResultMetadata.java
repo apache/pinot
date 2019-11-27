@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform;
 
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**

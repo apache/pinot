@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby.utils;
 
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.data;
+package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -35,10 +35,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.data.FieldSpec.DataType;
-import org.apache.pinot.common.data.FieldSpec.FieldType;
-import org.apache.pinot.common.utils.EqualityUtils;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.FieldType;
+import org.apache.pinot.spi.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,9 +46,9 @@ import org.slf4j.LoggerFactory;
 /**
  * The <code>Schema</code> class is defined for each table to describe the details of the table's fields (columns).
  * <p>Four field types are supported: DIMENSION, METRIC, TIME, DATE_TIME.
- * ({@link org.apache.pinot.common.data.DimensionFieldSpec}, {@link org.apache.pinot.common.data.MetricFieldSpec},
- * {@link org.apache.pinot.common.data.TimeFieldSpec}, {@link org.apache.pinot.common.data.DateTimeFieldSpec})
- * <p>For each field, a {@link org.apache.pinot.common.data.FieldSpec} is defined to provide the details of the field.
+ * ({@link DimensionFieldSpec}, {@link MetricFieldSpec},
+ * {@link TimeFieldSpec}, {@link DateTimeFieldSpec})
+ * <p>For each field, a {@link FieldSpec} is defined to provide the details of the field.
  * <p>There could be multiple DIMENSION or METRIC or DATE_TIME fields, but at most 1 TIME field.
  * <p>In pinot, we store data using 5 <code>DataType</code>s: INT, LONG, FLOAT, DOUBLE, STRING. All other
  * <code>DataType</code>s will be converted to one of them.
