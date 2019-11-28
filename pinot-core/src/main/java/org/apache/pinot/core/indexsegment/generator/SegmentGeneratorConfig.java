@@ -84,7 +84,7 @@ public class SegmentGeneratorConfig {
   private String _dataDir = null;
   private String _inputFilePath = null;
   private FileFormat _format = FileFormat.AVRO;
-  private String _recordReaderPath = null;
+  private String _recordReaderPath = null; //TODO: this should be renamed to recordReaderClass or even better removed
   private String _outDir = null;
   private boolean _overwrite = false;
   private String _tableName = null;

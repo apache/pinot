@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.parquet.data.readers;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.ParquetReader;
@@ -27,8 +29,8 @@ import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.data.readers.RecordReaderConfig;
 import org.apache.pinot.core.data.readers.RecordReaderUtils;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.util.AvroUtils;
 
 
@@ -43,10 +45,10 @@ public class ParquetRecordReader implements RecordReader {
   private GenericRecord _nextRecord;
 
   @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig)
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
-    _dataFilePath = new Path(segmentGeneratorConfig.getInputFilePath());
-    _schema = segmentGeneratorConfig.getSchema();
+    _dataFilePath = new Path(dataFile.getAbsolutePath());
+    _schema = schema;
     AvroUtils.validateSchema(_schema, ParquetUtils.getParquetSchema(_dataFilePath));
 
     _fieldSpecs = RecordReaderUtils.extractFieldSpecs(_schema);

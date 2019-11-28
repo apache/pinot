@@ -33,7 +33,6 @@ import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.sort.PinotSegmentSorter;
 import org.apache.pinot.core.data.readers.sort.SegmentSorter;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
@@ -58,11 +57,6 @@ public class PinotSegmentRecordReader implements RecordReader {
   public PinotSegmentRecordReader(@Nonnull File indexDir)
       throws Exception {
     this(indexDir, null, null);
-  }
-
-  @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
-
   }
 
   /**
@@ -118,6 +112,10 @@ public class PinotSegmentRecordReader implements RecordReader {
       SegmentSorter sorter = new PinotSegmentSorter(_numDocs, schema, _columnReaderMap);
       _docIdsInSortedColumnOrder = sorter.getSortedDocIds(sortOrder);
     }
+  }
+
+  @Override
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig) {
   }
 
   @Override

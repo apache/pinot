@@ -29,7 +29,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 
 /**
@@ -51,11 +50,6 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
   public MultiplePinotSegmentRecordReader(@Nonnull List<File> indexDirs)
       throws Exception {
     this(indexDirs, null, null);
-  }
-
-  @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
-
   }
 
   /**
@@ -111,6 +105,10 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
    */
   private boolean isSortedSegment() {
     return _sortOrder != null && !_sortOrder.isEmpty();
+  }
+
+  @Override
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig) {
   }
 
   @Override

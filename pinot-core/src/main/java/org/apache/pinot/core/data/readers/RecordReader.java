@@ -19,10 +19,11 @@
 package org.apache.pinot.core.data.readers;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 
 /**
@@ -34,9 +35,14 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 public interface RecordReader extends Closeable {
 
   /**
-   * Initializes the record reader when needed
+   * Initializes the record reader with data file, schema and (optional) record reader config.
+   *
+   * @param dataFile Data file
+   * @param schema Pinot Schema associated with the table
+   * @param recordReaderConfig Config for the reader specific to the format. e.g. delimiter for csv format etc
+   * @throws IOException If an I/O error occurs
    */
-  void init(SegmentGeneratorConfig segmentGeneratorConfig)
+  void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException;
 
   /**

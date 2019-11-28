@@ -21,7 +21,7 @@ package org.apache.pinot.core.minion;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
-import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.data.DateTimeFieldSpec;
 import org.apache.pinot.common.data.DateTimeFormatSpec;
 import org.apache.pinot.common.data.Schema;
@@ -33,6 +33,7 @@ import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.FileFormat;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.data.readers.RecordReaderConfig;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.RecordReaderSegmentCreationDataSource;
@@ -62,9 +63,8 @@ public class BackfillDateTimeColumn {
   private final TimeFieldSpec _srcTimeFieldSpec;
   private final DateTimeFieldSpec _destDateTimeFieldSpec;
 
-  public BackfillDateTimeColumn(@Nonnull String rawTableName, @Nonnull File originalIndexDir, @Nonnull File backfilledIndexDir,
-      @Nonnull TimeFieldSpec srcTimeSpec, @Nonnull DateTimeFieldSpec destDateTimeSpec)
-      throws Exception {
+  public BackfillDateTimeColumn(String rawTableName, File originalIndexDir, File backfilledIndexDir,
+      TimeFieldSpec srcTimeSpec, DateTimeFieldSpec destDateTimeSpec) {
     _rawTableName = rawTableName;
     _originalIndexDir = originalIndexDir;
     _backfilledIndexDir = backfilledIndexDir;
@@ -137,8 +137,7 @@ public class BackfillDateTimeColumn {
     }
 
     @Override
-    public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
-
+    public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig) {
     }
 
     @Override

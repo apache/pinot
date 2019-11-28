@@ -34,6 +34,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.JsonUtils;
@@ -409,12 +410,12 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
               switch (config.getFormat()) {
                 case PARQUET:
                   RecordReader parquetRecordReader = new ParquetRecordReader();
-                  parquetRecordReader.init(config);
+                  parquetRecordReader.init(new File(localFile), Schema.fromFile(new File(_schemaFile)), null);
                   driver.init(config, parquetRecordReader);
                   break;
                 case ORC:
                   RecordReader orcRecordReader = new ORCRecordReader();
-                  orcRecordReader.init(config);
+                  orcRecordReader.init(new File(localFile), Schema.fromFile(new File(_schemaFile)), null);
                   driver.init(config, orcRecordReader);
                   break;
                 default:
@@ -448,7 +449,8 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   }
 
   private boolean verifySegment(File indexDir) {
-    File localTempDir = new File(FileUtils.getTempDirectory(), org.apache.pinot.common.utils.FileUtils.getRandomFileName());
+    File localTempDir =
+        new File(FileUtils.getTempDirectory(), org.apache.pinot.common.utils.FileUtils.getRandomFileName());
     try {
       try {
         localTempDir.getParentFile().mkdirs();

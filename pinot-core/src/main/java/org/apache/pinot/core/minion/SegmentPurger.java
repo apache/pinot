@@ -23,7 +23,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
@@ -32,6 +31,7 @@ import org.apache.pinot.common.segment.StarTreeMetadata;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.data.readers.RecordReaderConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
@@ -57,8 +57,8 @@ public class SegmentPurger {
   private int _numRecordsPurged;
   private int _numRecordsModified;
 
-  public SegmentPurger(@Nonnull String rawTableName, @Nonnull File originalIndexDir, @Nonnull File workingDir,
-      @Nullable RecordPurger recordPurger, @Nullable RecordModifier recordModifier) {
+  public SegmentPurger(String rawTableName, File originalIndexDir, File workingDir, @Nullable RecordPurger recordPurger,
+      @Nullable RecordModifier recordModifier) {
     Preconditions.checkArgument(recordPurger != null || recordModifier != null,
         "At least one of record purger and modifier should be non-null");
     _rawTableName = rawTableName;
@@ -170,7 +170,7 @@ public class SegmentPurger {
     }
 
     @Override
-    public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+    public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig) {
     }
 
     @Override
@@ -260,7 +260,7 @@ public class SegmentPurger {
     /**
      * Get the {@link RecordPurger} for the given table.
      */
-    RecordPurger getRecordPurger(@Nonnull String rawTableName);
+    RecordPurger getRecordPurger(String rawTableName);
   }
 
   /**
@@ -282,7 +282,7 @@ public class SegmentPurger {
     /**
      * Get the {@link RecordModifier} for the given table.
      */
-    RecordModifier getRecordModifier(@Nonnull String rawTableName);
+    RecordModifier getRecordModifier(String rawTableName);
   }
 
   /**
