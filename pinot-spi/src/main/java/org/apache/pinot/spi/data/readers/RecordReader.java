@@ -16,21 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.readers;
+package org.apache.pinot.spi.data.readers;
 
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.Schema;
 
 
 /**
  * The <code>RecordReader</code> interface is used to read records from various file formats into {@link GenericRow}s.
  * Pinot segments will be generated from {@link GenericRow}s.
- * <p>NOTE: for time column, record reader should be able to read both incoming and outgoing time (see
- * {@link RecordReaderUtils#extractFieldSpecs(Schema)} for details).
+ * <p>NOTE: for time column, record reader should be able to read both incoming and outgoing time
  */
 public interface RecordReader extends Closeable {
 

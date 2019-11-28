@@ -44,10 +44,10 @@ import org.apache.orc.Reader;
 import org.apache.orc.TypeDescription;
 import org.apache.orc.mapred.OrcList;
 import org.apache.orc.mapred.OrcMapredRecordReader;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.data.readers.RecordReader;
-import org.apache.pinot.core.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -197,7 +197,7 @@ public class ORCRecordReader implements RecordReader {
   }
 
   @Override
-  public org.apache.pinot.common.data.Schema getSchema() {
+  public Schema getSchema() {
     return _pinotSchema;
   }
 

@@ -21,7 +21,7 @@ package org.apache.pinot.queries;
 import java.io.Serializable;
 import java.util.function.Function;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.utils.BytesUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.startree.hll.HllUtil;
 import org.testng.annotations.Test;

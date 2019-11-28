@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.PinotTableRebalancer;

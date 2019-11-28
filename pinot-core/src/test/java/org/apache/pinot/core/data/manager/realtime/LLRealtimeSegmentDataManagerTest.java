@@ -27,7 +27,7 @@ import java.lang.reflect.Method;
 import java.util.LinkedList;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;

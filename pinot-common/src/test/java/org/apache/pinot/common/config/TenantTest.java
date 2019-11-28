@@ -19,7 +19,7 @@
 package org.apache.pinot.common.config;
 
 import java.io.IOException;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.TenantRole;
 import org.testng.annotations.Test;
 

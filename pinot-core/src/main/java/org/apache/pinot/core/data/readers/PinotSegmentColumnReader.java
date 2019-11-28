@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.data.readers;
 
-import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.ReaderContext;

@@ -40,7 +40,8 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
-import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.common.utils.AvroSchemaUtil;
 
 
 public class AvroQueryGenerator {
@@ -390,9 +391,9 @@ public class AvroQueryGenerator {
         }
         elementSchema = extractSchemaFromUnionIfNeeded(elementSchema);
       }
-      return DataType.valueOf(elementSchema.getType());
+      return AvroSchemaUtil.valueOf(elementSchema.getType());
     } else {
-      return DataType.valueOf(type);
+      return AvroSchemaUtil.valueOf(type);
     }
   }
 

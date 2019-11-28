@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data;
+package org.apache.pinot.spi.data.readers;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -27,17 +27,14 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.EqualityUtils;
-import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.core.data.readers.RecordReader;
-import org.apache.pinot.core.data.recordtransformer.NullValueTransformer;
-import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
+import org.apache.pinot.spi.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
  * The generic row is the value holder returned from {@link RecordReader#next()} and
- * {@link RecordReader#next(GenericRow)}, and can be modified with {@link RecordTransformer}. The generic row returned
- * from the {@link NullValueTransformer} should have {@code defaultNullValue} filled to the fields with {@code null}
+ * {RecordReader#next(GenericRow)}, and can be modified with {RecordTransformer}. The generic row returned
+ * from the {NullValueTransformer} should have {@code defaultNullValue} filled to the fields with {@code null}
  * value, so that for fields with {@code null} value, {@link #getValue(String)} will return the {@code defaultNullValue}
  * and {@link #isNullValue(String)} will return {@code true}.
  */

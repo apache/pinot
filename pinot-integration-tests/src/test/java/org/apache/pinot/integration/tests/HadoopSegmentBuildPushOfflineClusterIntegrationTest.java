@@ -40,7 +40,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.v2.MiniMRYarnCluster;
 import org.apache.pinot.common.config.ColumnPartitionConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;

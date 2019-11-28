@@ -20,8 +20,8 @@ package org.apache.pinot.hadoop.io;
 
 import java.io.IOException;
 import java.util.Collection;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**

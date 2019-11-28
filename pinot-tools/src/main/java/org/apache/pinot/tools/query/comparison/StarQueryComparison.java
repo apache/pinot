@@ -20,7 +20,7 @@ package org.apache.pinot.tools.query.comparison;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

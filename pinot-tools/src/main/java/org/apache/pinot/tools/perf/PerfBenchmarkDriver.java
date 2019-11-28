@@ -49,7 +49,7 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.Tenant;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.TenantRole;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;

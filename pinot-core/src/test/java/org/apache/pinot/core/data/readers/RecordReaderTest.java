@@ -18,10 +18,11 @@
  */
 package org.apache.pinot.core.data.readers;
 
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
+import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.Assert;
 
 

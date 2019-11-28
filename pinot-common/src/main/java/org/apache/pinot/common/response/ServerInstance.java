@@ -22,7 +22,7 @@ import com.google.common.net.InternetDomainName;
 import java.net.InetAddress;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.EqualityUtils;
 
 
 /**

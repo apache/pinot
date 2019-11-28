@@ -23,8 +23,8 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -40,8 +40,8 @@ public class AvroRecordToPinotRowGeneratorTest {
     GenericData.Record avroRecord = new GenericData.Record(avroSchema);
     avroRecord.put("incomingTime", 12345L);
 
-    org.apache.pinot.common.data.Schema pinotSchema =
-        new org.apache.pinot.common.data.Schema.SchemaBuilder().setSchemaName("testSchema")
+    org.apache.pinot.spi.data.Schema pinotSchema =
+        new org.apache.pinot.spi.data.Schema.SchemaBuilder().setSchemaName("testSchema")
             .addTime("incomingTime", TimeUnit.MILLISECONDS, FieldSpec.DataType.LONG, "outgoingTime", TimeUnit.DAYS,
                 FieldSpec.DataType.INT).build();
 

@@ -27,7 +27,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.scan.query.GroupByOperator;
 import org.apache.pinot.tools.scan.query.QueryResponse;
 import org.apache.pinot.tools.scan.query.ScanBasedQueryProcessor;

@@ -19,7 +19,7 @@
 package org.apache.pinot.core.common;
 
 import java.io.Serializable;
-import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class RowBasedBlockValueFetcher {

@@ -16,11 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils.primitive;
+package org.apache.pinot.spi.utils;
 
 import java.util.Arrays;
 import javax.annotation.Nonnull;
-import org.apache.pinot.common.utils.BytesUtils;
 
 
 /**

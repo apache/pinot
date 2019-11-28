@@ -19,7 +19,7 @@
 package org.apache.pinot.common.utils;
 
 import java.util.Arrays;
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

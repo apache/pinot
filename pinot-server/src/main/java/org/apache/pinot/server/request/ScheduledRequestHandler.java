@@ -25,7 +25,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.request.InstanceRequest;
-import org.apache.pinot.common.utils.BytesUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.serde.SerDe;

@@ -21,7 +21,7 @@ package org.apache.pinot.core.realtime.converter.stats;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.pinot.common.config.ColumnPartitionConfig;
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockMultiValIterator;

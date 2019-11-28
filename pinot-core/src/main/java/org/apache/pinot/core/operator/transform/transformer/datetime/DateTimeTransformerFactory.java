@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.operator.transform.transformer.datetime;
 
-import org.apache.pinot.common.data.DateTimeFieldSpec.TimeFormat;
-import org.apache.pinot.common.data.DateTimeFormatSpec;
-import org.apache.pinot.common.data.DateTimeGranularitySpec;
+import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 
 
 public class DateTimeTransformerFactory {

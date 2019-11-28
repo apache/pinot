@@ -42,7 +42,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.hadoop.job.mappers.SegmentCreationMapper;
 import org.apache.pinot.hadoop.utils.JobPreparationHelper;

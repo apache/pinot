@@ -39,7 +39,7 @@ import org.apache.pinot.common.config.CompletionConfig;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.metadata.RowMetadata;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -53,7 +53,7 @@ import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Completion
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;

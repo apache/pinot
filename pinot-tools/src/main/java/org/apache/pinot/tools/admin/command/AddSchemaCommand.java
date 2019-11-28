@@ -20,7 +20,7 @@ package org.apache.pinot.tools.admin.command;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.tools.Command;

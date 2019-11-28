@@ -34,7 +34,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 @SuppressWarnings({"Duplicates", "unused"})

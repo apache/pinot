@@ -19,7 +19,7 @@
 package org.apache.pinot.core.realtime.stream;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.common.utils.time.TimeUtils;
 
 

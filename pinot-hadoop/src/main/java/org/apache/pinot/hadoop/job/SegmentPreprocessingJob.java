@@ -91,7 +91,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
   protected final Path _schemaFile;
 
   private TableConfig _tableConfig;
-  private org.apache.pinot.common.data.Schema _pinotTableSchema;
+  private org.apache.pinot.spi.data.Schema _pinotTableSchema;
   protected FileSystem _fileSystem;
 
   public SegmentPreprocessingJob(final Properties properties) {
@@ -363,14 +363,14 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
   }
 
   @Override
-  protected org.apache.pinot.common.data.Schema getSchema()
+  protected org.apache.pinot.spi.data.Schema getSchema()
       throws IOException {
     try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
       if (controllerRestApi != null) {
         return controllerRestApi.getSchema();
       } else {
         try (InputStream inputStream = FileSystem.get(_schemaFile.toUri(), getConf()).open(_schemaFile)) {
-          return org.apache.pinot.common.data.Schema.fromInputSteam(inputStream);
+          return org.apache.pinot.spi.data.Schema.fromInputSteam(inputStream);
         }
       }
     }

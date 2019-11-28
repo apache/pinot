@@ -21,9 +21,9 @@ package org.apache.pinot.core.data.readers;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.testng.annotations.Test;
 

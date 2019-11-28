@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockSingleValIterator;
 import org.apache.pinot.core.common.BlockValSet;

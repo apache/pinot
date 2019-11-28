@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.util;
 
-import org.apache.pinot.common.utils.BytesUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**

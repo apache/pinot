@@ -24,7 +24,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.core.common.Block;

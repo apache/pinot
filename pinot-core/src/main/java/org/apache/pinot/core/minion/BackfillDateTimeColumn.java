@@ -22,23 +22,23 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.data.DateTimeFieldSpec;
-import org.apache.pinot.common.data.DateTimeFormatSpec;
-import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.common.data.TimeFieldSpec;
-import org.apache.pinot.common.data.TimeGranularitySpec;
 import org.apache.pinot.common.segment.StarTreeMetadata;
-import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.FileFormat;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
-import org.apache.pinot.core.data.readers.RecordReader;
-import org.apache.pinot.core.data.readers.RecordReaderConfig;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -154,7 +154,7 @@ public class BackfillDateTimeColumn {
     /**
      * Reads the next row from the baseRecordReader, and adds a dateTimeFieldSPec column to it
      * {@inheritDoc}
-     * @see org.apache.pinot.core.data.readers.RecordReader#next(org.apache.pinot.core.data.GenericRow)
+     * @see RecordReader#next(GenericRow)
      */
     @Override
     public GenericRow next(GenericRow reuse)

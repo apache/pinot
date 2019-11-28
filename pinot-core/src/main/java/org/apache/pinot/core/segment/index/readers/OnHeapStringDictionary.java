@@ -20,7 +20,7 @@ package org.apache.pinot.core.segment.index.readers;
 
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.Arrays;
-import org.apache.pinot.common.utils.BytesUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 

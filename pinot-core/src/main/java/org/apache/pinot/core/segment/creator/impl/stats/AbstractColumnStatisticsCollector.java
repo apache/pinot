@@ -21,7 +21,7 @@ package org.apache.pinot.core.segment.creator.impl.stats;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.avro.reflect.Nullable;
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import org.apache.pinot.core.segment.creator.StatsCollectorConfig;

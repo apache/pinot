@@ -20,7 +20,7 @@ package org.apache.pinot.core.indexsegment;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
 import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;

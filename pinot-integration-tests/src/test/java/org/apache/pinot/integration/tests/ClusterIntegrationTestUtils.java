@@ -57,7 +57,7 @@ import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -245,7 +245,7 @@ public class ClusterIntegrationTestUtils {
    */
   public static void buildSegmentsFromAvro(List<File> avroFiles, int baseSegmentIndex, File segmentDir, File tarDir,
       String tableName, boolean createStarTreeIndex, @Nullable List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs,
-      @Nullable List<String> rawIndexColumns, @Nullable org.apache.pinot.common.data.Schema pinotSchema,
+      @Nullable List<String> rawIndexColumns, @Nullable org.apache.pinot.spi.data.Schema pinotSchema,
       Executor executor) {
     int numSegments = avroFiles.size();
     for (int i = 0; i < numSegments; i++) {

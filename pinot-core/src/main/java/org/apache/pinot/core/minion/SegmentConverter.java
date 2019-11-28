@@ -26,7 +26,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
-import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.minion.segment.DefaultRecordPartitioner;
 import org.apache.pinot.core.minion.segment.MapperRecordReader;

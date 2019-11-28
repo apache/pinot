@@ -24,7 +24,7 @@ import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 
 

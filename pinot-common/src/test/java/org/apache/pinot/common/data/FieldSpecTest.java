@@ -24,12 +24,19 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.AvroSchemaUtil;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.data.FieldSpec.DataType.*;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.*;
 
 
 /**
@@ -58,14 +65,14 @@ public class FieldSpecTest {
     Assert.assertEquals(FLOAT.size(), Float.BYTES);
     Assert.assertEquals(DOUBLE.size(), Double.BYTES);
 
-    Assert.assertEquals(FieldSpec.DataType.valueOf(Schema.Type.INT), INT);
-    Assert.assertEquals(FieldSpec.DataType.valueOf(Schema.Type.LONG), LONG);
-    Assert.assertEquals(FieldSpec.DataType.valueOf(Schema.Type.FLOAT), FLOAT);
-    Assert.assertEquals(FieldSpec.DataType.valueOf(Schema.Type.DOUBLE), DOUBLE);
-    Assert.assertEquals(FieldSpec.DataType.valueOf(Schema.Type.BOOLEAN), STRING);
-    Assert.assertEquals(FieldSpec.DataType.valueOf(Schema.Type.STRING), STRING);
-    Assert.assertEquals(FieldSpec.DataType.valueOf(Schema.Type.ENUM), STRING);
-    Assert.assertEquals(FieldSpec.DataType.valueOf(Schema.Type.BYTES), BYTES);
+    Assert.assertEquals(AvroSchemaUtil.valueOf(Schema.Type.INT), INT);
+    Assert.assertEquals(AvroSchemaUtil.valueOf(Schema.Type.LONG), LONG);
+    Assert.assertEquals(AvroSchemaUtil.valueOf(Schema.Type.FLOAT), FLOAT);
+    Assert.assertEquals(AvroSchemaUtil.valueOf(Schema.Type.DOUBLE), DOUBLE);
+    Assert.assertEquals(AvroSchemaUtil.valueOf(Schema.Type.BOOLEAN), STRING);
+    Assert.assertEquals(AvroSchemaUtil.valueOf(Schema.Type.STRING), STRING);
+    Assert.assertEquals(AvroSchemaUtil.valueOf(Schema.Type.ENUM), STRING);
+    Assert.assertEquals(AvroSchemaUtil.valueOf(Schema.Type.BYTES), BYTES);
   }
 
   /**

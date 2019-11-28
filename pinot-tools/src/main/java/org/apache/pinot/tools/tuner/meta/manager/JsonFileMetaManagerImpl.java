@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.math.fraction.BigFraction;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

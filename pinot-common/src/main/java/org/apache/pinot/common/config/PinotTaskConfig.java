@@ -21,7 +21,7 @@ package org.apache.pinot.common.config;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.helix.task.TaskConfig;
-import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.EqualityUtils;
 
 
 public class PinotTaskConfig {

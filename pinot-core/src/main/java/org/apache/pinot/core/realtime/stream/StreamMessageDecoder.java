@@ -21,8 +21,8 @@ package org.apache.pinot.core.realtime.stream;
 import java.util.Map;
 import org.apache.pinot.annotations.InterfaceAudience;
 import org.apache.pinot.annotations.InterfaceStability;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**

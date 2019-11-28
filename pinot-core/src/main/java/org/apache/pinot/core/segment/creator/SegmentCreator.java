@@ -23,8 +23,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 

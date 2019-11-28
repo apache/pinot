@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.minion.rollup.aggregate;
 
-import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
 
 
 /**

@@ -20,7 +20,7 @@ package org.apache.pinot.common.utils.time;
 
 import com.google.common.base.Preconditions;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.data.TimeGranularitySpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 
 
 /**

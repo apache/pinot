@@ -31,7 +31,7 @@ import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.pinot.common.http.MultiGetRequest;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

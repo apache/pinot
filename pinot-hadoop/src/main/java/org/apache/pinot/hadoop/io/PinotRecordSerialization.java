@@ -20,7 +20,7 @@ package org.apache.pinot.hadoop.io;
 
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 
 
 public interface PinotRecordSerialization<T> {

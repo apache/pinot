@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.startree.v2.store;
 
-import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.common.DataSource;

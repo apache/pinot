@@ -20,7 +20,7 @@ package org.apache.pinot.core.indexsegment.mutable;
 
 import java.util.Set;
 import javax.annotation.Nonnull;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;

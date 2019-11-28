@@ -19,7 +19,7 @@
 package org.apache.pinot.controller.api.events;
 
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 
 
 public class DefaultMetadataEventNotifier implements MetadataEventNotifier {

@@ -23,7 +23,7 @@ import java.util.Set;
 import org.apache.pinot.annotations.InterfaceAudience;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 
 @InterfaceAudience.Private

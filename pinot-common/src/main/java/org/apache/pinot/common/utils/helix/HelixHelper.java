@@ -43,7 +43,6 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.apache.pinot.common.utils.retry.RetryPolicy;
 import org.slf4j.Logger;

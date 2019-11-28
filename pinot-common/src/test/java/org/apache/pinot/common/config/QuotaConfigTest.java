@@ -20,7 +20,7 @@ package org.apache.pinot.common.config;
 
 import java.io.IOException;
 import org.apache.commons.configuration.ConfigurationRuntimeException;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
