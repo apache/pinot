@@ -114,6 +114,46 @@ Pinot Spark keeps same format of job configuration file, such as one below:
    # segment.table.name: Name of the table for which to generate segments
    segment.table.name=flights
 
+   # use.relative.path: Match output segments hierarchy along with input file hierarchy.
+   # E.g. data files layout is:
+   #    /user/pinot/input/data/2019/10/24/part-0.avro
+   #    /user/pinot/input/data/2019/10/24/part-1.avro
+   #    /user/pinot/input/data/2019/10/25/part-0.avro
+   #    /user/pinot/input/data/2019/10/25/part-1.avro
+   # Then output directory layout would be:
+   #    /user/pinot/output/2019/10/24/flights_2019-10-24_2019-10-24_0.tar.gz
+   #    /user/pinot/output/2019/10/24/flights_2019-10-24_2019-10-24_1.tar.gz
+   #    /user/pinot/output/2019/10/25/flights_2019-10-25_2019-10-25_2.tar.gz
+   #    /user/pinot/output/2019/10/25/flights_2019-10-25_2019-10-25_3.tar.gz
+   #
+   # use.relative.path=true
+
+   # look.back.period.in.days: only process files within recent days.
+   # For segment creation job, it creates segments for data files been modified within recent configured days.
+   # For segment push job, it pushes segments created/updated within recent configured days.
+   #
+   # look.back.period.in.days=2
+
+   # local.directory.sequence.id: when enabled, segment sequence id is assigned based on local directory,
+   # not globally.
+   # E.g. data files layout is:
+   #    /user/pinot/input/data/2019/10/24/part-0.avro
+   #    /user/pinot/input/data/2019/10/24/part-1.avro
+   #    /user/pinot/input/data/2019/10/25/part-0.avro
+   #    /user/pinot/input/data/2019/10/25/part-1.avro
+   # Then sequence ids for
+   #    `/user/pinot/input/data/2019/10/24/part-0.avro` is 0,
+   #    `/user/pinot/input/data/2019/10/24/part-1.avro` is 1,
+   #    `/user/pinot/input/data/2019/10/25/part-0.avro` is 0,
+   #    `/user/pinot/input/data/2019/10/25/part-1.avro` is 1.
+   # This is result segment name to be
+   #    /user/pinot/output/2019/10/24/flights_2019-10-24_2019-10-24_0.tar.gz
+   #    /user/pinot/output/2019/10/24/flights_2019-10-24_2019-10-24_1.tar.gz
+   #    /user/pinot/output/2019/10/25/flights_2019-10-25_2019-10-25_0.tar.gz
+   #    /user/pinot/output/2019/10/25/flights_2019-10-25_2019-10-25_1.tar.gz
+   #
+   # local.directory.sequence.id=true
+
    # === Segment tar push job config ===
 
    # push.to.hosts: Comma separated list of controllers host names to which to push
