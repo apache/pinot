@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.readers;
+package org.apache.pinot.spi.data.readers;
 
 import com.google.common.base.Preconditions;
 import java.io.BufferedInputStream;
@@ -34,7 +34,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.zip.GZIPInputStream;
 import javax.annotation.Nullable;
-import org.apache.avro.generic.GenericData;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -112,9 +111,6 @@ public class RecordReaderUtils {
   public static Object convertSingleValue(FieldSpec fieldSpec, @Nullable Object value) {
     if (value == null) {
       return null;
-    }
-    if (value instanceof GenericData.Record) {
-      return convertSingleValue(fieldSpec, ((GenericData.Record) value).get(0));
     }
     DataType dataType = fieldSpec.getDataType();
     if (dataType == FieldSpec.DataType.BYTES) {

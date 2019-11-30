@@ -27,15 +27,23 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.ParquetWriter;
-import org.apache.pinot.core.data.readers.RecordReaderTest;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class ParquetRecordReaderTest extends RecordReaderTest {
+public class ParquetRecordReaderTest {
+  protected static final String[] COLUMNS = {"INT_SV", "INT_MV"};
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "ParquetRecordReaderTest");
   private static final File DATA_FILE = new File(TEMP_DIR, "data.parquet");
+  protected static final org.apache.pinot.spi.data.Schema
+      SCHEMA = new org.apache.pinot.spi.data.Schema.SchemaBuilder().addMetric(COLUMNS[0], FieldSpec.DataType.INT).build();
+  private static final Object[][] RECORDS = {{5, new int[]{10, 15, 20}}, {25, new int[]{30, 35, 40}}, {null, null}};
+  private static final Object[] DEFAULT_VALUES = {0, new int[]{-1}};
 
   @BeforeClass
   public void setUp()
@@ -77,6 +85,24 @@ public class ParquetRecordReaderTest extends RecordReaderTest {
     }
   }
 
+
+  protected static void checkValue(RecordReader recordReader)
+      throws Exception {
+    for (Object[] expectedRecord : RECORDS) {
+      GenericRow actualRecord = recordReader.next();
+      GenericRow transformedRecord = actualRecord;
+
+      int numColumns = COLUMNS.length;
+      for (int i = 0; i < numColumns; i++) {
+        if (expectedRecord[i] != null) {
+          Assert.assertEquals(transformedRecord.getValue(COLUMNS[i]), expectedRecord[i]);
+        } else {
+          Assert.assertEquals(transformedRecord.getValue(COLUMNS[i]), DEFAULT_VALUES[i]);
+        }
+      }
+    }
+    Assert.assertFalse(recordReader.hasNext());
+  }
   @Test
   public void testParquetRecordReader()
       throws Exception {

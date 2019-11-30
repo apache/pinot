@@ -30,8 +30,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-import org.apache.pinot.core.data.readers.RecordReaderUtils;
-import org.apache.pinot.core.util.AvroUtils;
+import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 
 
 /**
@@ -101,4 +100,5 @@ public class ParquetRecordReader implements RecordReader {
       throws IOException {
     _reader.close();
   }
+
 }

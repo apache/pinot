@@ -30,6 +30,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.util.AvroUtils;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 
 
 /**

@@ -29,6 +29,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
