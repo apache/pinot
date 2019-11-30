@@ -24,6 +24,7 @@ import java.lang.reflect.Constructor;
 import java.net.URI;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;

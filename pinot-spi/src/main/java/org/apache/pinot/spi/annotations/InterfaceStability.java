@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.annotations;
+package org.apache.pinot.spi.annotations;
 
 import java.lang.annotation.Documented;
 
@@ -24,14 +24,14 @@ import java.lang.annotation.Documented;
 /**
  * Annotation to inform users of how much to rely on a particular package,
  * class or method not changing over time. Currently the stability can be
- * {@link org.apache.pinot.annotations.InterfaceStability.Stable},
- * {@link org.apache.pinot.annotations.InterfaceStability.Evolving} or
- * {@link org.apache.pinot.annotations.InterfaceStability.Unstable}. <br>
+ * {@link InterfaceStability.Stable},
+ * {@link InterfaceStability.Evolving} or
+ * {@link InterfaceStability.Unstable}. <br>
  *
  * <ul>
- *   <li>All classes that are annotated with {@link org.apache.pinot.annotations.InterfaceAudience.Public} must have
+ *   <li>All classes that are annotated with {@link InterfaceAudience.Public} must have
  *       InterfaceStability annotation. </li>
- *   <li>Classes that are {@link org.apache.pinot.annotations.InterfaceAudience.Private} are to be considered unstable
+ *   <li>Classes that are {@link InterfaceAudience.Private} are to be considered unstable
  *       unless a different InterfaceStability annotation states otherwise.</li>
  *   <li>Pinot contributors should NOT make incompatible changes to classes marked as stable.
  *       Some things to watch out for classes marked as stable:

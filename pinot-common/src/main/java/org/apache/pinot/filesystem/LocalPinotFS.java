@@ -28,6 +28,7 @@ import java.util.Arrays;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.spi.filesystem.PinotFS;
 
 
 /**

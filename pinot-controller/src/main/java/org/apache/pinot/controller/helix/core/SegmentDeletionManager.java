@@ -41,7 +41,7 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
-import org.apache.pinot.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.filesystem.PinotFSFactory;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;

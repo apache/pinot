@@ -75,7 +75,7 @@ import org.apache.pinot.core.crypt.PinotCrypter;
 import org.apache.pinot.core.crypt.PinotCrypterFactory;
 import org.apache.pinot.core.metadata.DefaultMetadataExtractor;
 import org.apache.pinot.core.metadata.MetadataExtractorFactory;
-import org.apache.pinot.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.filesystem.PinotFSFactory;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;

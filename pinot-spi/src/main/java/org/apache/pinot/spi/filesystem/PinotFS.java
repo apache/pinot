@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.filesystem;
+package org.apache.pinot.spi.filesystem;
 
 import java.io.Closeable;
 import java.io.File;
@@ -24,8 +24,8 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Paths;
 import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.annotations.InterfaceAudience;
-import org.apache.pinot.annotations.InterfaceStability;
+import org.apache.pinot.spi.annotations.InterfaceAudience;
+import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

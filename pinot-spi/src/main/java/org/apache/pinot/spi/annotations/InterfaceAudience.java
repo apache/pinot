@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.annotations;
+package org.apache.pinot.spi.annotations;
 
 import java.lang.annotation.Documented;
 
@@ -24,23 +24,23 @@ import java.lang.annotation.Documented;
 /**
  * Annotation to inform users of a package, class or method's intended audience.
  *
- * Currently the audience can be {@link org.apache.pinot.annotations.InterfaceAudience.Public},
- * {@link org.apache.pinot.annotations.InterfaceAudience.LimitedPrivate} or
- * {@link org.apache.pinot.annotations.InterfaceAudience.Private}. <br>
+ * Currently the audience can be {@link InterfaceAudience.Public},
+ * {@link InterfaceAudience.LimitedPrivate} or
+ * {@link InterfaceAudience.Private}. <br>
  *
  * <ul>
  * <li>Public classes that are not marked with this annotation must be
- * considered by default as {@link org.apache.pinot.annotations.InterfaceAudience.Private}.</li>
+ * considered by default as {@link InterfaceAudience.Private}.</li>
  *
  * <li>External application developers depending on Pinot must only use classes that are marked
- * {@link org.apache.pinot.annotations.InterfaceAudience.Public}. Do not depend on classes without an
+ * {@link InterfaceAudience.Public}. Do not depend on classes without an
  * explicit InterfaceAudience.Public annotation as these classes
  * could be removed or change in incompatible ways.</li>
  *
  * <li> Methods may have a different annotation that it is more restrictive
  * compared to the audience classification of the class. Example: A class
- * might be {@link org.apache.pinot.annotations.InterfaceAudience.Public},
- * but a method may be {@link org.apache.pinot.annotations.InterfaceAudience.LimitedPrivate}
+ * might be {@link InterfaceAudience.Public},
+ * but a method may be {@link InterfaceAudience.LimitedPrivate}
  * </li></ul>
  *
  * The annotation is borrowed from a similar Apache Hadoop annotation.
