@@ -68,6 +68,7 @@ public abstract class SegmentCreationJob extends BaseSegmentJob {
     // Optional push location and table parameters. If set, will use the table config and schema from the push hosts.
     String pushHostsString = _properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS);
     String pushPortString = _properties.getProperty(JobConfigConstants.PUSH_TO_PORT);
+
     if (pushHostsString != null && pushPortString != null) {
       _pushLocations =
           PushLocation.getPushLocations(StringUtils.split(pushHostsString, ','), Integer.parseInt(pushPortString));

@@ -22,8 +22,10 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
+import java.util.function.Predicate;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -38,6 +40,7 @@ import org.apache.pinot.ingestion.common.ControllerRestApi;
 import org.apache.pinot.ingestion.common.DefaultControllerRestApi;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
 import org.apache.pinot.ingestion.utils.PushLocation;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +50,7 @@ public abstract class BaseSegmentJob extends Configured implements Serializable 
   protected final Properties _properties;
   protected final List<PushLocation> _pushLocations;
   protected final String _rawTableName;
+  protected final int _lookBackPeriod;
 
   protected BaseSegmentJob(Properties properties) {
     _properties = properties;
@@ -65,6 +69,14 @@ public abstract class BaseSegmentJob extends Configured implements Serializable 
     }
 
     _rawTableName = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME));
+
+    // Optional parameter to allow skip files older than given time period.
+    String lookBackPeriodInDays = _properties.getProperty(JobConfigConstants.LOOK_BACK_PERIOD_IN_DAYS);
+    if (lookBackPeriodInDays != null) {
+      _lookBackPeriod = Integer.parseInt(lookBackPeriodInDays);
+    } else {
+      _lookBackPeriod = -1;
+    }
   }
 
   @Nullable
@@ -83,7 +95,8 @@ public abstract class BaseSegmentJob extends Configured implements Serializable 
    * of mandating that a schema is pushed to the controller.
    */
   @Nullable
-  protected Schema getSchema() throws IOException {
+  protected Schema getSchema()
+      throws IOException {
     return null;
   }
 
@@ -111,6 +124,7 @@ public abstract class BaseSegmentJob extends Configured implements Serializable 
       throws IOException {
     return getDataFilePaths(new Path(pathPattern));
   }
+
   protected List<Path> getDataFilePaths(Path pathPattern)
       throws IOException {
     List<Path> tarFilePaths = new ArrayList<>();
@@ -123,6 +137,25 @@ public abstract class BaseSegmentJob extends Configured implements Serializable 
       getDataFilePathsHelper(fileSystem, fileStatuses, tarFilePaths);
     }
     return tarFilePaths;
+  }
+
+  protected void retainRecentFiles(List<Path> filePaths, int lookBackPeriod) {
+    if (lookBackPeriod > 0) {
+      filePaths.removeIf(path -> {
+        try {
+          FileSystem fs = FileSystem.get(path.toUri(), new Configuration());
+          DateTime mtime = new DateTime(fs.getFileStatus(path).getModificationTime());
+          if (mtime.plusDays(lookBackPeriod).isBeforeNow()) {
+            _logger.info("Skip process older than {} days file: {}, last modification time is {}", lookBackPeriod, path,
+                mtime);
+          }
+          return true;
+        } catch (IOException e) {
+          _logger.error("Failed to evaluate last modification time for path " + path, e);
+        }
+        return false;
+      });
+    }
   }
 
   protected void getDataFilePathsHelper(FileSystem fileSystem, FileStatus[] fileStatuses, List<Path> tarFilePaths)

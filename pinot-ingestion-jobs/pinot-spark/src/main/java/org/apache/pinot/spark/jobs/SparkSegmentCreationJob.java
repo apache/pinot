@@ -74,8 +74,14 @@ public class SparkSegmentCreationJob extends SegmentCreationJob {
 
     // Gather all data files
     List<Path> dataFilePaths = getDataFilePaths(inputPattern);
+    int originalNumDataFiles = dataFilePaths.size();
+    retainRecentFiles(dataFilePaths, _lookBackPeriod);
     int numDataFiles = dataFilePaths.size();
     if (numDataFiles == 0) {
+      if (originalNumDataFiles > 0) {
+        _logger.info("No input files within {} days to be processed.", _lookBackPeriod);
+        return;
+      }
       String errorMessage = "No data file founded with pattern: " + inputPattern;
       _logger.error(errorMessage);
       throw new RuntimeException(errorMessage);
@@ -143,7 +149,7 @@ public class SparkSegmentCreationJob extends SegmentCreationJob {
   }
 
   protected void moveSegmentsToOutputDir(FileSystem outputDirFileSystem, String stagingDir, String outputDir)
-          throws IOException {
+      throws IOException {
     Path segmentTarDir = new Path(new Path(stagingDir, "output"), JobConfigConstants.SEGMENT_TAR_DIR);
     _logger.info("Moving all segment tar files from: {} to: {}", stagingDir, outputDir);
     movePath(outputDirFileSystem, segmentTarDir.toString(), outputDir, true);

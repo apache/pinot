@@ -57,6 +57,7 @@ public class SparkSegmentTarPushJob extends SegmentTarPushJob {
       super.run();
     } else {
       List<Path> segmentPathsToPush = getDataFilePaths(_segmentPattern);
+      retainRecentFiles(segmentPathsToPush, _lookBackPeriod);
       List<String> segmentsToPush = new ArrayList<>();
       segmentPathsToPush.forEach(path -> {
         segmentsToPush.add(path.toString());

@@ -70,4 +70,7 @@ public class JobConfigConstants {
   public static final String DEFAULT_PUSH_JOB_PARALLELISM = "4";
   public static final String PUSH_JOB_RETRY = "push.job.retry";
   public static final String DEFAULT_PUSH_JOB_RETRY = "3";
+
+  // This setting ensures jobs only process files with certain time range
+  public static final String LOOK_BACK_PERIOD_IN_DAYS = "look.back.period.in.days";
 }
