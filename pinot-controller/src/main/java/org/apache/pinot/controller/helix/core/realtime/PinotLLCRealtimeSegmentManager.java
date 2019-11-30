@@ -78,7 +78,7 @@ import org.apache.pinot.core.realtime.stream.PartitionOffsetFetcher;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import org.apache.pinot.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.filesystem.PinotFSFactory;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
