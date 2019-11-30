@@ -73,4 +73,7 @@ public class JobConfigConstants {
 
   // This setting ensures jobs only process files with certain time range
   public static final String LOOK_BACK_PERIOD_IN_DAYS = "look.back.period.in.days";
+
+  // Assign sequence ids to input files based at each local directory level
+  public static final String LOCAL_DIRECTORY_SEQUENCE_ID = "local.directory.sequence.id";
 }

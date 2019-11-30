@@ -22,7 +22,9 @@ import com.google.common.base.Preconditions;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -114,18 +116,39 @@ public class SparkSegmentCreationJob extends SegmentCreationJob {
     JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
     addDepsJarToDistributedCache(sparkContext);
     JavaRDD<String> pathRDD = sparkContext.parallelize(dataFilePathStrs, numDataFiles);
-    pathRDD.zipWithIndex().foreach(tuple2 -> {
-      SparkSegmentCreationFunction sparkSegmentCreationFunction =
-          new SparkSegmentCreationFunction(_properties, new Path(_stagingDir, "output").toString());
-      sparkSegmentCreationFunction.run(tuple2._1, tuple2._2);
-      sparkSegmentCreationFunction.cleanup();
-    });
+    if (_localDirectorySequenceId) {
+      Map<String, List<String>> localDirIndex = new HashMap<>();
+      for (Path dataFilePath : dataFilePaths) {
+        Path parentPath = dataFilePath.getParent();
+        if (!localDirIndex.containsKey(parentPath.toString())) {
+          localDirIndex.put(parentPath.toString(), new ArrayList<>());
+        }
+        localDirIndex.get(parentPath.toString()).add(dataFilePath.toString());
+      }
+      pathRDD.foreach(path -> {
+        SparkSegmentCreationFunction sparkSegmentCreationFunction =
+            new SparkSegmentCreationFunction(_properties, new Path(_stagingDir, "output").toString());
+        sparkSegmentCreationFunction.run(path, getLocalDirIndex(localDirIndex, path));
+        sparkSegmentCreationFunction.cleanup();
+      });
+    } else {
+      pathRDD.zipWithIndex().foreach(tuple2 -> {
+        SparkSegmentCreationFunction sparkSegmentCreationFunction =
+            new SparkSegmentCreationFunction(_properties, new Path(_stagingDir, "output").toString());
+        sparkSegmentCreationFunction.run(tuple2._1, tuple2._2);
+        sparkSegmentCreationFunction.cleanup();
+      });
+    }
 
     moveSegmentsToOutputDir(outputDirFileSystem, _stagingDir, _outputDir);
 
     // Delete the staging directory
     _logger.info("Deleting the staging directory: {}", stagingDir);
     outputDirFileSystem.delete(stagingDir, true);
+  }
+
+  private Long getLocalDirIndex(Map<String, List<String>> localDirIndex, String pathStr) {
+    return new Long(localDirIndex.get(new Path(pathStr).getParent().toString()).indexOf(pathStr));
   }
 
   protected void validateTableConfig(TableConfig tableConfig) {

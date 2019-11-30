@@ -48,6 +48,7 @@ public abstract class SegmentCreationJob extends BaseSegmentJob {
   protected final String _schemaFile;
   protected final String _defaultPermissionsMask;
   protected final List<PushLocation> _pushLocations;
+  protected final boolean _localDirectorySequenceId;
 
   public SegmentCreationJob(Properties properties) {
     super(properties);
@@ -64,6 +65,12 @@ public abstract class SegmentCreationJob extends BaseSegmentJob {
     _depsJarDir = _properties.getProperty(JobConfigConstants.PATH_TO_DEPS_JAR);
     _schemaFile = _properties.getProperty(JobConfigConstants.PATH_TO_SCHEMA);
     _defaultPermissionsMask = _properties.getProperty(JobConfigConstants.DEFAULT_PERMISSIONS_MASK);
+    String localDirectorySequenceId = _properties.getProperty(JobConfigConstants.LOCAL_DIRECTORY_SEQUENCE_ID);
+    if (localDirectorySequenceId != null) {
+      _localDirectorySequenceId = Boolean.parseBoolean(localDirectorySequenceId);
+    } else {
+      _localDirectorySequenceId = false;
+    }
 
     // Optional push location and table parameters. If set, will use the table config and schema from the push hosts.
     String pushHostsString = _properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS);
