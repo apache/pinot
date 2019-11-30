@@ -45,7 +45,7 @@
     <module>pinot-server</module>
     <module>pinot-core</module>
     <module>pinot-controller</module>
-    <module>pinot-hadoop</module>
+    <module>pinot-ingestion-jobs</module>
     <module>pinot-tools</module>
     <module>pinot-perf</module>
     <module>pinot-transport</module>
@@ -256,6 +256,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-hadoop</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-spark</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -1336,6 +1341,10 @@
             <exclude>licenses/**</exclude>
             <exclude>licenses-binary/**</exclude>
 
+            <!-- Exclude build targets -->
+            <exclude>**/target/**</exclude>
+
+
             <!-- js, css files that are exact copies of the third-party works. In this case, the original header has to
             be kept. Please refer to 'Treatment of Third-party works' in https://www.apache.org/legal/src-headers.html
             -->
@@ -1360,6 +1369,9 @@
             <exclude>**/*.yml</exclude>
             <exclude>**/*.yaml</exclude>
             <exclude>**/*.properties</exclude>
+
+            <!-- IDE files -->
+            <exclude>**/*.iml</exclude>
 
             <!-- Top level -->
             <exclude>.codecov*</exclude>

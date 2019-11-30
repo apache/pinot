@@ -87,6 +87,110 @@ You can then use the SegmentTarPush job to push segments via the controller REST
 
    hadoop jar pinot-hadoop-<version>-SNAPSHOT-shaded.jar SegmentTarPush job.properties
 
+
+Creating Pinot segments using Spark
+-----------------------------------------
+
+Similar to Pinot hadoop, you can create Pinot segments in Spark.
+
+Configuring the job
+^^^^^^^^^^^^^^^^^^^
+
+Pinot Spark keeps same format of job configuration file, such as one below:
+
+.. code-block:: none
+
+   # === Index segment creation job config ===
+
+   # path.to.input: Input directory containing Avro files
+   path.to.input=/user/pinot/input/data
+
+   # path.to.output: Output directory containing Pinot segments
+   path.to.output=/user/pinot/output
+
+   # path.to.schema: Schema file for the table, stored locally
+   path.to.schema=flights-schema.json
+
+   # segment.table.name: Name of the table for which to generate segments
+   segment.table.name=flights
+
+   # use.relative.path: Match output segments hierarchy along with input file hierarchy.
+   # E.g. data files layout is:
+   #    /user/pinot/input/data/2019/10/24/part-0.avro
+   #    /user/pinot/input/data/2019/10/24/part-1.avro
+   #    /user/pinot/input/data/2019/10/25/part-0.avro
+   #    /user/pinot/input/data/2019/10/25/part-1.avro
+   # Then output directory layout would be:
+   #    /user/pinot/output/2019/10/24/flights_2019-10-24_2019-10-24_0.tar.gz
+   #    /user/pinot/output/2019/10/24/flights_2019-10-24_2019-10-24_1.tar.gz
+   #    /user/pinot/output/2019/10/25/flights_2019-10-25_2019-10-25_2.tar.gz
+   #    /user/pinot/output/2019/10/25/flights_2019-10-25_2019-10-25_3.tar.gz
+   #
+   # use.relative.path=true
+
+   # look.back.period.in.days: only process files within recent days.
+   # For segment creation job, it creates segments for data files been modified within recent configured days.
+   # For segment push job, it pushes segments created/updated within recent configured days.
+   #
+   # look.back.period.in.days=2
+
+   # local.directory.sequence.id: when enabled, segment sequence id is assigned based on local directory,
+   # not globally.
+   # E.g. data files layout is:
+   #    /user/pinot/input/data/2019/10/24/part-0.avro
+   #    /user/pinot/input/data/2019/10/24/part-1.avro
+   #    /user/pinot/input/data/2019/10/25/part-0.avro
+   #    /user/pinot/input/data/2019/10/25/part-1.avro
+   # Then sequence ids for
+   #    `/user/pinot/input/data/2019/10/24/part-0.avro` is 0,
+   #    `/user/pinot/input/data/2019/10/24/part-1.avro` is 1,
+   #    `/user/pinot/input/data/2019/10/25/part-0.avro` is 0,
+   #    `/user/pinot/input/data/2019/10/25/part-1.avro` is 1.
+   # This is result segment name to be
+   #    /user/pinot/output/2019/10/24/flights_2019-10-24_2019-10-24_0.tar.gz
+   #    /user/pinot/output/2019/10/24/flights_2019-10-24_2019-10-24_1.tar.gz
+   #    /user/pinot/output/2019/10/25/flights_2019-10-25_2019-10-25_0.tar.gz
+   #    /user/pinot/output/2019/10/25/flights_2019-10-25_2019-10-25_1.tar.gz
+   #
+   # local.directory.sequence.id=true
+
+   # === Segment tar push job config ===
+
+   # push.to.hosts: Comma separated list of controllers host names to which to push
+   push.to.hosts=controller_host_0,controller_host_1
+
+   # push.to.port: The port on which the controller runs
+   push.to.port=8888
+
+   # enable.parallel.push: Push Segments in parallel
+   enable.parallel.push=true
+
+   # push.job.parallelism: Push job parallelism, works when `enable.parallel.push=true`
+   push.job.parallelism=4
+
+   # push.job.retry: How many retries for segment push failure before throw exceptions
+   push.job.retry=3
+
+Executing the job
+^^^^^^^^^^^^^^^^^
+
+The Pinot Spark module contains a job that you can incorporate into your
+workflow to generate Pinot segments.
+
+.. code-block:: bash
+
+   mvn clean install -DskipTests -Pbuild-shaded-jar
+   spark-submit --class org.apache.pinot.spark.PinotSparkJobLauncher \
+   pinot-spark-<version>-SNAPSHOT-shaded.jar SegmentCreation job.properties
+
+You can then use the SegmentTarPush job to push segments via the controller REST API.
+
+.. code-block:: bash
+
+   spark-submit --class org.apache.pinot.spark.PinotSparkJobLauncher \
+   pinot-spark-<version>-SNAPSHOT-shaded.jar SegmentTarPush job.properties
+
+
 Creating Pinot segments outside of Hadoop
 -----------------------------------------
 
