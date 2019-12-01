@@ -21,6 +21,7 @@ package org.apache.pinot.filesystem;
 import com.google.common.base.Strings;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -228,6 +229,13 @@ public class HadoopPinotFS extends PinotFS {
       _hadoopFS.setTimes(path, System.currentTimeMillis(), -1);
     }
     return true;
+  }
+
+  @Override
+  public InputStream open(URI uri)
+      throws IOException {
+    Path path = new Path(uri);
+    return _hadoopFS.open(path);
   }
 
   private void authenticate(org.apache.hadoop.conf.Configuration hadoopConf,

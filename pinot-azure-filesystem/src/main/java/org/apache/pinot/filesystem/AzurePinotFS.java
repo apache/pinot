@@ -250,4 +250,10 @@ public class AzurePinotFS extends PinotFS {
     }
     return true;
   }
+
+  @Override
+  public InputStream open(URI uri)
+      throws IOException {
+    return _adlStoreClient.getReadStream(uri.getPath());
+  }
 }
