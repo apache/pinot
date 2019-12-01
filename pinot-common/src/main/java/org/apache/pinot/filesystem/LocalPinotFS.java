@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.filesystem;
 
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -142,6 +145,12 @@ public class LocalPinotFS extends PinotFS {
       return file.createNewFile();
     }
     return file.setLastModified(System.currentTimeMillis());
+  }
+
+  @Override
+  public InputStream open(URI uri)
+      throws IOException {
+    return new BufferedInputStream(new FileInputStream(toFile(uri)));
   }
 
   private static File toFile(URI uri) {

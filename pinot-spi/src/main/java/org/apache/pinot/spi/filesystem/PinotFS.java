@@ -21,6 +21,7 @@ package org.apache.pinot.spi.filesystem;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Paths;
 import org.apache.commons.configuration.Configuration;
@@ -204,6 +205,18 @@ public abstract class PinotFS implements Closeable {
    * @throws IOException if the parent directory doesn't exist
    */
   public abstract boolean touch(URI uri)
+      throws IOException;
+
+  /**
+   * Opens a file in the underlying filesystem and returns an InputStream to read it.
+   * Note that the caller can invoke close on this inputstream.
+   * Some implementations can choose to copy the original file to local temp file and return the inputstream.
+   * In this case, the implementation it should delete the temp file when close is invoked.
+   * @param uri location of the file to open
+   * @return a new InputStream
+   * @throws IOException on any IO error - missing file, not a file etc
+   */
+  public abstract InputStream open(URI uri)
       throws IOException;
 
   /**
