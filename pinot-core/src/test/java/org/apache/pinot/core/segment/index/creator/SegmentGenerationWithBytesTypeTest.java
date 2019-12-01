@@ -32,6 +32,7 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.avro.data.readers.AvroUtils;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -52,7 +53,6 @@ import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggrega
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
-import org.apache.pinot.core.util.AvroUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

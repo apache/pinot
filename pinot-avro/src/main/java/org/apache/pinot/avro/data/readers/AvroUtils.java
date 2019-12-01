@@ -16,10 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.parquet.data.readers;
+package org.apache.pinot.avro.data.readers;
 
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
@@ -46,11 +44,10 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-// Deprecated: this should be deprecated once we have pinot-avro module which provides Avro Related Utils
+
 public class AvroUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(AvroUtils.class);
   public static final String MAP_KEY_COLUMN_SUFFIX = "__KEYS";
@@ -268,9 +265,9 @@ public class AvroUtils {
       org.apache.avro.Schema fieldSchema = extractSupportedSchema(field.schema());
       org.apache.avro.Schema.Type fieldType = fieldSchema.getType();
       if (fieldType == org.apache.avro.Schema.Type.ARRAY) {
-        return valueOf(extractSupportedSchema(fieldSchema.getElementType()).getType());
+        return AvroSchemaUtil.valueOf(extractSupportedSchema(fieldSchema.getElementType()).getType());
       } else {
-        return valueOf(fieldType);
+        return AvroSchemaUtil.valueOf(fieldType);
       }
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while extracting data type from field: " + field.name(), e);
@@ -372,61 +369,5 @@ public class AvroUtils {
       list.add(handleSingleValue(value));
     }
     return list;
-  }
-
-  /**
-   * Returns the data type stored in Pinot that is associated with the given Avro type.
-   */
-  public static FieldSpec.DataType valueOf(org.apache.avro.Schema.Type avroType) {
-    switch (avroType) {
-      case INT:
-        return FieldSpec.DataType.INT;
-      case LONG:
-        return FieldSpec.DataType.LONG;
-      case FLOAT:
-        return FieldSpec.DataType.FLOAT;
-      case DOUBLE:
-        return FieldSpec.DataType.DOUBLE;
-      case BOOLEAN:
-      case STRING:
-      case ENUM:
-        return FieldSpec.DataType.STRING;
-      case BYTES:
-        return FieldSpec.DataType.BYTES;
-      default:
-        throw new UnsupportedOperationException("Unsupported Avro type: " + avroType);
-    }
-  }
-
-  public static ObjectNode toAvroSchemaJsonObject(FieldSpec fieldSpec) {
-    ObjectNode jsonSchema = JsonUtils.newObjectNode();
-    jsonSchema.put("name", fieldSpec.getName());
-    switch (fieldSpec.getDataType()) {
-      case INT:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "int"));
-        return jsonSchema;
-      case LONG:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "long"));
-        return jsonSchema;
-      case FLOAT:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "float"));
-        return jsonSchema;
-      case DOUBLE:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "double"));
-        return jsonSchema;
-      case STRING:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "string"));
-        return jsonSchema;
-      default:
-        throw new UnsupportedOperationException();
-    }
-  }
-
-  private static ArrayNode convertStringsToJsonArray(String... strings) {
-    ArrayNode jsonArray = JsonUtils.newArrayNode();
-    for (String string : strings) {
-      jsonArray.add(string);
-    }
-    return jsonArray;
   }
 }

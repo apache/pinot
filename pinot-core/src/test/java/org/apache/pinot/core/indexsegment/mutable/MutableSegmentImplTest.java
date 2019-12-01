@@ -22,6 +22,8 @@ import java.io.File;
 import java.net.URL;
 import java.util.Collections;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.avro.data.readers.AvroRecordReader;
+import org.apache.pinot.avro.data.readers.AvroUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
@@ -31,7 +33,6 @@ import org.apache.pinot.core.common.BlockSingleValIterator;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.core.data.readers.AvroRecordReader;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
@@ -81,6 +82,7 @@ public class MutableSegmentImplTest {
     _lastIngestionTimeMs = System.currentTimeMillis();
     StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(_lastIngestionTimeMs);
     _startTimeMs = System.currentTimeMillis();
+
     try (RecordReader recordReader = new AvroRecordReader(avroFile, _schema)) {
       GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {

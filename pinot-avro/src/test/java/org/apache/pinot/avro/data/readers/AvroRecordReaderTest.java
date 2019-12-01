@@ -16,17 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.parquet.data.readers;
+package org.apache.pinot.avro.data.readers;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.avro.Schema;
+import org.apache.avro.SchemaBuilder;
+import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.DatumWriter;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.fs.Path;
-import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
@@ -36,9 +39,9 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class ParquetRecordReaderTest {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "ParquetRecordReaderTest");
-  private static final File DATA_FILE = new File(TEMP_DIR, "data.parquet");
+public class AvroRecordReaderTest {
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "AvroRecordReaderTest");
+  private static final File DATA_FILE = new File(TEMP_DIR, "data.avro");
 
   protected static final String[] COLUMNS = {"INT_SV", "INT_MV"};
   protected static final Object[][] RECORDS = {{5, new int[]{10, 15, 20}}, {25, new int[]{30, 35, 40}}};
@@ -52,45 +55,37 @@ public class ParquetRecordReaderTest {
     FileUtils.forceMkdir(TEMP_DIR);
 
     String strSchema =
-        "{\n" + "    \"name\": \"AvroParquetTest\",\n" + "    \"type\": \"record\",\n" + "    \"fields\": [\n"
+        "{\n" + "    \"name\": \"AvroRecordReaderTest\",\n" + "    \"type\": \"record\",\n" + "    \"fields\": [\n"
             + "        {\n" + "            \"name\": \"INT_SV\",\n" + "            \"type\": [ \"int\", \"null\"],\n"
             + "            \"default\": 0 \n" + "        },\n" + "        {\n" + "            \"name\": \"INT_MV\",\n"
             + "            \"type\": [{\n" + "                \"type\": \"array\",\n"
             + "                \"items\": \"int\"\n" + "             }, \"null\"]\n" + "        }\n" + "    ]\n" + "}";
 
     Schema schema = new Schema.Parser().parse(strSchema);
-    List<GenericRecord> records = new ArrayList<>();
-
-    for (Object[] r : RECORDS) {
-      GenericRecord record = new GenericData.Record(schema);
-      if (r[0] != null) {
-        record.put("INT_SV", r[0]);
-      } else {
-        record.put("INT_SV", 0);
-      }
-
-      if (r[1] != null) {
-        record.put("INT_MV", r[1]);
-      } else {
-        record.put("INT_MV", new int[]{-1});
-      }
-
-      records.add(record);
-    }
-
-    try (ParquetWriter<GenericRecord> writer = ParquetUtils
-        .getParquetWriter(new Path(DATA_FILE.getAbsolutePath()), schema)) {
-      for (GenericRecord record : records) {
-        writer.write(record);
+    final DatumWriter<GenericRecord> writer = new GenericDatumWriter<>(schema);
+    try (DataFileWriter<GenericRecord> fileWriter = new DataFileWriter<>(writer)) {
+      fileWriter.create(schema, DATA_FILE);
+      for (Object[] r : RECORDS) {
+        GenericRecord record = new GenericData.Record(schema);
+        if (r[0] != null) {
+          record.put(COLUMNS[0], r[0]);
+        }
+        if (r[1] != null) {
+          List<Integer> l = new ArrayList<>(((int[]) r[1]).length);
+          for (int i : (int[]) r[1]) {
+            l.add(i);
+          }
+          record.put(COLUMNS[1], l);
+        }
+        fileWriter.append(record);
       }
     }
   }
 
   @Test
-  public void testParquetRecordReader()
+  public void testAvroRecordReader()
       throws Exception {
-    try (ParquetRecordReader recordReader = new ParquetRecordReader()) {
-      recordReader.init(DATA_FILE, SCHEMA, null);
+    try (AvroRecordReader recordReader = new AvroRecordReader(DATA_FILE, SCHEMA)) {
       checkValue(recordReader);
       recordReader.rewind();
       checkValue(recordReader);

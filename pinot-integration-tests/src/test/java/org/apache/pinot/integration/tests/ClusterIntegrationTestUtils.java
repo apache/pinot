@@ -50,6 +50,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
+import org.apache.pinot.avro.data.readers.AvroUtils;
 import org.apache.pinot.broker.requesthandler.PinotQueryParserFactory;
 import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
 import org.apache.pinot.client.Request;
@@ -67,7 +68,6 @@ import org.apache.pinot.core.realtime.stream.StreamDataProvider;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
-import org.apache.pinot.core.util.AvroUtils;
 import org.apache.pinot.server.util.SegmentTestUtils;
 import org.testng.Assert;
 

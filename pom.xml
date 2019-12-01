@@ -53,6 +53,7 @@
     <module>pinot-minion</module>
     <module>pinot-hadoop-filesystem</module>
     <module>pinot-azure-filesystem</module>
+    <module>pinot-avro</module>
     <module>pinot-orc</module>
     <module>pinot-parquet</module>
     <module>pinot-connectors</module>
@@ -225,6 +226,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-common</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-avro</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
