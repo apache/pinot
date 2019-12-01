@@ -21,101 +21,46 @@ package org.apache.pinot.parquet.data.readers;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.ParquetWriter;
+import org.apache.pinot.avro.data.readers.AvroUtils;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 
 
-public class ParquetRecordReaderTest {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "ParquetRecordReaderTest");
-  private static final File DATA_FILE = new File(TEMP_DIR, "data.parquet");
+public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
+  private final File _dataFile = new File(_tempDir, "data.parquet");
 
-  protected static final String[] COLUMNS = {"INT_SV", "INT_MV"};
-  protected static final Object[][] RECORDS = {{5, new int[]{10, 15, 20}}, {25, new int[]{30, 35, 40}}};
-  protected static final org.apache.pinot.spi.data.Schema SCHEMA =
-      new org.apache.pinot.spi.data.Schema.SchemaBuilder().addMetric(COLUMNS[0], FieldSpec.DataType.INT)
-          .addMultiValueDimension(COLUMNS[1], FieldSpec.DataType.INT, -1).build();
-
-  @BeforeClass
-  public void setUp()
+  @Override
+  protected RecordReader createRecordReader()
       throws Exception {
-    FileUtils.forceMkdir(TEMP_DIR);
+    ParquetRecordReader recordReader = new ParquetRecordReader();
+    recordReader.init(_dataFile, getPinotSchema(), null);
+    return recordReader;
+  }
 
-    String strSchema =
-        "{\n" + "    \"name\": \"AvroParquetTest\",\n" + "    \"type\": \"record\",\n" + "    \"fields\": [\n"
-            + "        {\n" + "            \"name\": \"INT_SV\",\n" + "            \"type\": [ \"int\", \"null\"],\n"
-            + "            \"default\": 0 \n" + "        },\n" + "        {\n" + "            \"name\": \"INT_MV\",\n"
-            + "            \"type\": [{\n" + "                \"type\": \"array\",\n"
-            + "                \"items\": \"int\"\n" + "             }, \"null\"]\n" + "        }\n" + "    ]\n" + "}";
-
-    Schema schema = new Schema.Parser().parse(strSchema);
+  @Override
+  protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
+      throws Exception {
+    Schema schema = AvroUtils.getAvroSchemaFromPinotSchema(getPinotSchema());
     List<GenericRecord> records = new ArrayList<>();
-
-    for (Object[] r : RECORDS) {
+    for (Map<String, Object> r : recordsToWrite) {
       GenericRecord record = new GenericData.Record(schema);
-      if (r[0] != null) {
-        record.put("INT_SV", r[0]);
-      } else {
-        record.put("INT_SV", 0);
+      for (FieldSpec fieldSpec : getPinotSchema().getAllFieldSpecs()) {
+        record.put(fieldSpec.getName(), r.get(fieldSpec.getName()));
       }
-
-      if (r[1] != null) {
-        record.put("INT_MV", r[1]);
-      } else {
-        record.put("INT_MV", new int[]{-1});
-      }
-
       records.add(record);
     }
-
     try (ParquetWriter<GenericRecord> writer = ParquetUtils
-        .getParquetWriter(new Path(DATA_FILE.getAbsolutePath()), schema)) {
+        .getParquetWriter(new Path(_dataFile.getAbsolutePath()), schema)) {
       for (GenericRecord record : records) {
         writer.write(record);
       }
     }
-  }
-
-  @Test
-  public void testParquetRecordReader()
-      throws Exception {
-    try (ParquetRecordReader recordReader = new ParquetRecordReader()) {
-      recordReader.init(DATA_FILE, SCHEMA, null);
-      checkValue(recordReader);
-      recordReader.rewind();
-      checkValue(recordReader);
-    }
-  }
-
-  @AfterClass
-  public void tearDown()
-      throws Exception {
-    FileUtils.forceDelete(TEMP_DIR);
-  }
-
-  protected static void checkValue(RecordReader recordReader)
-      throws Exception {
-    for (Object[] expectedRecord : RECORDS) {
-      GenericRow actualRecord = recordReader.next();
-      GenericRow transformedRecord = actualRecord;
-
-      int numColumns = COLUMNS.length;
-      for (int i = 0; i < numColumns; i++) {
-        if (expectedRecord[i] != null) {
-          Assert.assertEquals(transformedRecord.getValue(COLUMNS[i]), expectedRecord[i]);
-        }
-      }
-    }
-    Assert.assertFalse(recordReader.hasNext());
   }
 }

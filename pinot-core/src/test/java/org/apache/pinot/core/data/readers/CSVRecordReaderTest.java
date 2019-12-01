@@ -20,56 +20,48 @@ package org.apache.pinot.core.data.readers;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.util.List;
+import java.util.Map;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
+import org.apache.pinot.spi.data.readers.RecordReader;
 
 
-public class CSVRecordReaderTest extends RecordReaderTest {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "CSVRecordReaderTest");
-  private static final File DATA_FILE = new File(TEMP_DIR, "data.csv");
+public class CSVRecordReaderTest extends AbstractRecordReaderTest {
+  private static char CSV_MULTI_VALUE_DELIMITER = '\t';
+  private final File _dataFile = new File(_tempDir, "data.csv");
 
-  @BeforeClass
-  public void setUp()
+  @Override
+  protected RecordReader createRecordReader()
       throws Exception {
-    FileUtils.forceMkdir(TEMP_DIR);
+    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
+    csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
+    return new CSVRecordReader(_dataFile, getPinotSchema(), csvRecordReaderConfig);
+  }
 
-    try (FileWriter fileWriter = new FileWriter(DATA_FILE);
-        CSVPrinter csvPrinter = new CSVPrinter(fileWriter, CSVFormat.DEFAULT.withHeader(COLUMNS))) {
-      for (Object[] record : RECORDS) {
-        csvPrinter.printRecord(record[0],
-            StringUtils.join((int[]) record[1], CSVRecordReaderConfig.DEFAULT_MULTI_VALUE_DELIMITER));
+  @Override
+  protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
+      throws Exception {
+
+    Schema pinotSchema = getPinotSchema();
+    String[] columns = pinotSchema.getColumnNames().toArray(new String[0]);
+    try (FileWriter fileWriter = new FileWriter(_dataFile);
+        CSVPrinter csvPrinter = new CSVPrinter(fileWriter, CSVFormat.DEFAULT.withHeader(columns))) {
+
+      for (Map<String, Object> r : recordsToWrite) {
+        Object[] record = new Object[columns.length];
+        for (int i = 0; i < columns.length; i++) {
+          if (pinotSchema.getFieldSpecFor(columns[i]).isSingleValueField()) {
+            record[i] = r.get(columns[i]);
+          } else {
+            record[i] = StringUtils.join(((List) r.get(columns[i])).toArray(), CSV_MULTI_VALUE_DELIMITER);
+          }
+        }
+        csvPrinter.printRecord(record);
       }
     }
-  }
-
-  @Test
-  public void testCSVRecordReader()
-      throws Exception {
-    try (CSVRecordReader recordReader = new CSVRecordReader(DATA_FILE, SCHEMA, new CSVRecordReaderConfig())) {
-      checkValue(recordReader);
-      recordReader.rewind();
-      checkValue(recordReader);
-    }
-  }
-
-  @Test
-  public void testCSVRecordReaderWithDefaultConfig()
-      throws Exception {
-    try (CSVRecordReader recordReader = new CSVRecordReader(DATA_FILE, SCHEMA, null)) {
-      checkValue(recordReader);
-      recordReader.rewind();
-      checkValue(recordReader);
-    }
-  }
-
-  @AfterClass
-  public void tearDown()
-      throws Exception {
-    FileUtils.forceDelete(TEMP_DIR);
   }
 }

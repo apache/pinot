@@ -21,49 +21,33 @@ package org.apache.pinot.core.data.readers;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.FileWriter;
-import org.apache.commons.io.FileUtils;
+import java.util.List;
+import java.util.Map;
+import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
+import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 
 
-public class JSONRecordReaderTest extends RecordReaderTest {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "JSONRecordReaderTest");
-  private static final File DATA_FILE = new File(TEMP_DIR, "data.json");
+public class JSONRecordReaderTest extends AbstractRecordReaderTest {
+  private final File _dateFile = new File(_tempDir, "data.json");
 
-  @BeforeClass
-  public void setUp()
+  @Override
+  protected RecordReader createRecordReader()
       throws Exception {
-    FileUtils.forceMkdir(TEMP_DIR);
+    return new JSONRecordReader(_dateFile, getPinotSchema());
+  }
 
-    try (FileWriter fileWriter = new FileWriter(DATA_FILE)) {
-      for (Object[] record : RECORDS) {
+  @Override
+  protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
+      throws Exception {
+    try (FileWriter fileWriter = new FileWriter(_dateFile)) {
+      for (Map<String, Object> r : recordsToWrite) {
         ObjectNode jsonRecord = JsonUtils.newObjectNode();
-        if (record[0] != null) {
-          jsonRecord.set(COLUMNS[0], JsonUtils.objectToJsonNode(record[0]));
-        }
-        if (record[1] != null) {
-          jsonRecord.set(COLUMNS[1], JsonUtils.objectToJsonNode(record[1]));
+        for (String key : r.keySet()) {
+          jsonRecord.set(key, JsonUtils.objectToJsonNode(r.get(key)));
         }
         fileWriter.write(jsonRecord.toString());
       }
     }
-  }
-
-  @Test
-  public void testJSONRecordReader()
-      throws Exception {
-    try (JSONRecordReader recordReader = new JSONRecordReader(DATA_FILE, SCHEMA)) {
-      checkValue(recordReader);
-      recordReader.rewind();
-      checkValue(recordReader);
-    }
-  }
-
-  @AfterClass
-  public void tearDown()
-      throws Exception {
-    FileUtils.forceDelete(TEMP_DIR);
   }
 }
