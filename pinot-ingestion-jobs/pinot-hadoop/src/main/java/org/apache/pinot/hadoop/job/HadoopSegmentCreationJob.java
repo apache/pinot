@@ -38,7 +38,6 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.hadoop.job.mappers.SegmentCreationMapper;
 import org.apache.pinot.hadoop.utils.PinotHadoopJobPreparationHelper;
@@ -132,11 +131,15 @@ public class HadoopSegmentCreationJob extends SegmentCreationJob {
       throw new RuntimeException("Job failed: " + job);
     }
 
-    moveSegmentsToOutputDir();
+    encryptSegmentsAndMove();
 
     // Delete the staging directory
     _logger.info("Deleting the staging directory: {}", _stagingDir);
     _outputDirFileSystem.delete(new Path(_stagingDir), true);
+  }
+
+  public void encryptSegmentsAndMove() throws IOException {
+    moveSegmentsToOutputDir(JobConfigConstants.SEGMENT_TAR_DIR);
   }
 
   protected void validateTableConfig(TableConfig tableConfig) {
@@ -171,9 +174,9 @@ public class HadoopSegmentCreationJob extends SegmentCreationJob {
   protected void addAdditionalJobProperties(Job job) {
   }
 
-  protected void moveSegmentsToOutputDir()
+  protected void moveSegmentsToOutputDir(String simpleDirName)
       throws IOException {
-    Path segmentTarDir = new Path(new Path(_stagingDir, "output"), JobConfigConstants.SEGMENT_TAR_DIR);
+    Path segmentTarDir = new Path(new Path(_stagingDir, "output"), simpleDirName);
     movePath(_outputDirFileSystem, segmentTarDir.toString(), _outputDir, true);
   }
 }
