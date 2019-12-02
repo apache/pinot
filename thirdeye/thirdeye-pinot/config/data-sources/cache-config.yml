@@ -26,9 +26,9 @@ centralizedCacheSettings:
         enableDnsSrv: true
         # certificate based authentication is only available in Couchbase enterprise edition. 
         keyStoreFilePath: 'key/store/path/keystore_file' # e.g. '/var/identity.p12'
-        # by default, Java uses this password to enable empty passwords for certificates.
+        # if your keystore has a password, enter it here. by default, Java uses 'work_around_jdk-6879539' to enable empty passwords for certificates.
         keyStorePassword: 'work_around_jdk-6879539'
         trustStoreFilePath: 'trust/store/path/truststore_file' # e.g. '/etc/riddler/cacerts'
-        trustStorePassword: '' 
+        trustStorePassword: ''
     # add your store of choice here
 
