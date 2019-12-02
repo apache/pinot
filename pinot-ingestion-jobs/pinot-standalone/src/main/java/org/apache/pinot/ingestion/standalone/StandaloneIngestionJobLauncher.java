@@ -59,6 +59,20 @@ public class StandaloneIngestionJobLauncher {
         case SegmentCreation:
           new SegmentGenerationJobRunner(spec).run();
           break;
+        case SegmentTarPush:
+          new SegmentTarPushJobRunner(spec).run();
+          break;
+        case SegmentUriPush:
+          new SegmentUriPushJobRunner(spec).run();
+          break;
+        case SegmentCreationAndTarPush:
+          new SegmentGenerationJobRunner(spec).run();
+          new SegmentTarPushJobRunner(spec).run();
+          break;
+        case SegmentCreationAndUriPush:
+          new SegmentGenerationJobRunner(spec).run();
+          new SegmentUriPushJobRunner(spec).run();
+          break;
         default:
           LOGGER.error("Unsupported job type - {}. Support job types: {}", spec.getJobType(),
               Arrays.toString(PinotIngestionJobType.values()));

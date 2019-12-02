@@ -18,13 +18,7 @@
  */
 package org.apache.pinot.ingestion.common;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.Reader;
-import java.io.StringWriter;
 import java.util.List;
-import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.Yaml;
 
 
 public class SegmentGenerationJobSpec {
@@ -50,6 +44,8 @@ public class SegmentGenerationJobSpec {
   SegmentNameGeneratorSpec _segmentNameGeneratorSpec;
 
   PinotClusterSpec[] _pinotClusterSpecs;
+
+  UriPushJobSpec _uriPushJobSpec;
 
   public String getJobType() {
     return jobType;
@@ -139,23 +135,12 @@ public class SegmentGenerationJobSpec {
     _segmentNameGeneratorSpec = segmentNameGeneratorSpec;
   }
 
-  public static void main(String[] args)
-      throws Exception {
-    DumperOptions options = new DumperOptions();
-    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-    options.setPrettyFlow(true);
-    Yaml yaml = new Yaml(options);
+  public UriPushJobSpec getUriPushJobSpec() {
+    return _uriPushJobSpec;
+  }
 
-    Reader reader;
-    reader = new BufferedReader(new FileReader("/Users/kishoreg/Documents/testJobSpec.yaml"));
-    SegmentGenerationJobSpec loadedSpec = yaml.loadAs(reader, SegmentGenerationJobSpec.class);
-    System.out.println("loadedSpec = " + loadedSpec);
-
-    SegmentGenerationJobSpec spec = new SegmentGenerationJobSpec();
-
-    StringWriter sw = new StringWriter();
-    yaml.dump(loadedSpec, sw);
-    System.out.println("dump = " + sw.toString());
+  public void setUriPushJobSpec(UriPushJobSpec uriPushJobSpec) {
+    _uriPushJobSpec = uriPushJobSpec;
   }
 }
 

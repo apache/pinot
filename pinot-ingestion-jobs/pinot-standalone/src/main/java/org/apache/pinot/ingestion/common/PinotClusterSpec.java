@@ -20,13 +20,22 @@ package org.apache.pinot.ingestion.common;
 
 public class PinotClusterSpec {
 
-  String _controllerURI;
+  String _host;
+  int _port;
 
-  public String getControllerURI() {
-    return _controllerURI;
+  public String getHost() {
+    return _host;
   }
 
-  public void setControllerURI(String controllerURI) {
-    _controllerURI = controllerURI;
+  public void setHost(String host) {
+    _host = host;
+  }
+
+  public int getPort() {
+    return _port;
+  }
+
+  public void setPort(int port) {
+    _port = port;
   }
 }
