@@ -41,6 +41,7 @@
     <module>pinot-ingestion-common</module>
     <module>pinot-hadoop</module>
     <module>pinot-spark</module>
+    <module>pinot-standalone</module>
   </modules>
 
   <dependencies>
