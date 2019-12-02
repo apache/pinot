@@ -19,12 +19,11 @@
 
 package org.apache.pinot.thirdeye.anomaly;
 
+import org.apache.pinot.thirdeye.anomaly.detection.trigger.utils.DataAvailabilitySchedulingConfiguration;
 import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConfiguration;
 import org.apache.pinot.thirdeye.anomaly.task.TaskDriverConfiguration;
 import org.apache.pinot.thirdeye.auto.onboard.AutoOnboardConfiguration;
 import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
-import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 
 
@@ -41,6 +40,8 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private boolean worker = false;
   private boolean detectionPipeline = false;
   private boolean detectionAlert = false;
+  private boolean dataAvailabilityEventListener = false;
+  private boolean dataAvailabilityTaskScheduler = false;
 
   private long id;
   private String dashboardHost;
@@ -48,6 +49,8 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private MonitorConfiguration monitorConfiguration = new MonitorConfiguration();
   private AutoOnboardConfiguration autoOnboardConfiguration = new AutoOnboardConfiguration();
   private TaskDriverConfiguration taskDriverConfiguration = new TaskDriverConfiguration();
+  private DataAvailabilitySchedulingConfiguration
+      dataAvailabilitySchedulingConfiguration = new DataAvailabilitySchedulingConfiguration();
   private String failureFromAddress;
   private String failureToAddress;
   private List<String> holidayCountriesWhitelist;
@@ -122,6 +125,22 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public void setMonitor(boolean monitor) {
     this.monitor = monitor;
+  }
+
+  public boolean isDataAvailabilityEventListener() {
+    return dataAvailabilityEventListener;
+  }
+
+  public void setDataAvailabilityEventListener(boolean dataAvailabilityEventListener) {
+    this.dataAvailabilityEventListener = dataAvailabilityEventListener;
+  }
+
+  public boolean isDataAvailabilityTaskScheduler() {
+    return dataAvailabilityTaskScheduler;
+  }
+
+  public void setDataAvailabilityEventScheduler(boolean dataAvailabilityEventScheduler) {
+    this.dataAvailabilityTaskScheduler = dataAvailabilityEventScheduler;
   }
 
   public MonitorConfiguration getMonitorConfiguration() {
@@ -210,5 +229,14 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public void setHolidayCountriesWhitelist(List<String> holidayCountriesWhitelist) {
     this.holidayCountriesWhitelist = holidayCountriesWhitelist;
+  }
+
+  public DataAvailabilitySchedulingConfiguration getDataAvailabilitySchedulingConfiguration() {
+    return dataAvailabilitySchedulingConfiguration;
+  }
+
+  public void setDataAvailabilitySchedulingConfiguration(
+      DataAvailabilitySchedulingConfiguration dataAvailabilitySchedulingConfiguration) {
+    this.dataAvailabilitySchedulingConfiguration = dataAvailabilitySchedulingConfiguration;
   }
 }

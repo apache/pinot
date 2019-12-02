@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.pinot.thirdeye.detection.health.DetectionHealth;
 
 
 /**
@@ -43,6 +44,18 @@ public class DetectionConfigBean extends AbstractBean {
   String yaml;
   Map<String, Object> componentSpecs;
   long lastTuningTimestamp;
+  List<String> owners;
+  boolean isDataAvailabilitySchedule;
+  long taskTriggerFallBackTimeInSec;
+  DetectionHealth health;
+
+  public List<String> getOwners() {
+    return owners;
+  }
+
+  public void setOwners(List<String> owners) {
+    this.owners = owners;
+  }
 
   public Map<String, Object> getComponentSpecs() {
     return componentSpecs;
@@ -116,6 +129,30 @@ public class DetectionConfigBean extends AbstractBean {
     this.active = active;
   }
 
+  public boolean isDataAvailabilitySchedule() {
+    return isDataAvailabilitySchedule;
+  }
+
+  public void setDataAvailabilitySchedule(boolean dataAvailabilitySchedule) {
+    isDataAvailabilitySchedule = dataAvailabilitySchedule;
+  }
+
+  public long getTaskTriggerFallBackTimeInSec() {
+    return taskTriggerFallBackTimeInSec;
+  }
+
+  public void setTaskTriggerFallBackTimeInSec(long taskTriggerFallBackTimeInSec) {
+    this.taskTriggerFallBackTimeInSec = taskTriggerFallBackTimeInSec;
+  }
+
+  public DetectionHealth getHealth() {
+    return health;
+  }
+
+  public void setHealth(DetectionHealth health) {
+    this.health = health;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -127,7 +164,8 @@ public class DetectionConfigBean extends AbstractBean {
     DetectionConfigBean that = (DetectionConfigBean) o;
     return lastTimestamp == that.lastTimestamp && active == that.active && Objects.equals(cron, that.cron)
         && Objects.equals(name, that.name) && Objects.equals(properties, that.properties) && Objects.equals(yaml,
-        that.yaml);
+        that.yaml) && Objects.equals(isDataAvailabilitySchedule, that.isDataAvailabilitySchedule) && Objects
+        .equals(taskTriggerFallBackTimeInSec, that.taskTriggerFallBackTimeInSec);
   }
 
   @Override

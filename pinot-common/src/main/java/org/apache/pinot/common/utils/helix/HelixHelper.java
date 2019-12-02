@@ -43,7 +43,6 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.apache.pinot.common.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
@@ -51,7 +50,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class HelixHelper {
-  public static final int MAX_PARTITION_COUNT_IN_UNCOMPRESSED_IDEAL_STATE = 1000;
+  private static final int NUM_PARTITIONS_THRESHOLD_TO_ENABLE_COMPRESSION = 1000;
+  private static final String ENABLE_COMPRESSIONS_KEY = "enableCompression";
+
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixHelper.class);
   private static final ZNRecordSerializer ZN_RECORD_SERIALIZER = new ZNRecordSerializer();
@@ -101,17 +102,25 @@ public class HelixHelper {
           }
 
           // If there are changes to apply, apply them
-          if (!EqualityUtils.isEqual(idealState, updatedIdealState) && updatedIdealState != null) {
+          if (updatedIdealState != null && !idealState.equals(updatedIdealState)) {
+            ZNRecord updatedZNRecord = updatedIdealState.getRecord();
+
+            // Update number of partitions
+            int numPartitions = updatedZNRecord.getMapFields().size();
+            updatedIdealState.setNumPartitions(numPartitions);
 
             // If the ideal state is large enough, enable compression
-            if (MAX_PARTITION_COUNT_IN_UNCOMPRESSED_IDEAL_STATE < updatedIdealState.getPartitionSet().size()) {
-              updatedIdealState.getRecord().setBooleanField("enableCompression", true);
+            boolean enableCompression = numPartitions > NUM_PARTITIONS_THRESHOLD_TO_ENABLE_COMPRESSION;
+            if (enableCompression) {
+              updatedZNRecord.setBooleanField(ENABLE_COMPRESSIONS_KEY, true);
+            } else {
+              updatedZNRecord.getSimpleFields().remove(ENABLE_COMPRESSIONS_KEY);
             }
 
             // Check version and set ideal state
             try {
               if (dataAccessor.getBaseDataAccessor()
-                  .set(idealStateKey.getPath(), updatedIdealState.getRecord(), idealState.getRecord().getVersion(),
+                  .set(idealStateKey.getPath(), updatedZNRecord, idealState.getRecord().getVersion(),
                       AccessOption.PERSISTENT)) {
                 return true;
               } else {
@@ -122,10 +131,8 @@ public class HelixHelper {
               LOGGER.warn("Version changed while updating ideal state for resource: {}", resourceName);
               return false;
             } catch (Exception e) {
-              boolean idealStateIsCompressed =
-                  updatedIdealState.getRecord().getBooleanField("enableCompression", false);
               LOGGER.warn("Caught exception while updating ideal state for resource: {} (compressed={})", resourceName,
-                  idealStateIsCompressed, e);
+                  enableCompression, e);
               return false;
             }
           } else {
@@ -155,6 +162,11 @@ public class HelixHelper {
     public PermanentUpdaterException(Throwable cause) {
       super(cause);
     }
+  }
+
+  public static void updateIdealState(HelixManager helixManager, String resourceName,
+      Function<IdealState, IdealState> updater) {
+    updateIdealState(helixManager, resourceName, updater, DEFAULT_RETRY_POLICY, false);
   }
 
   public static void updateIdealState(final HelixManager helixManager, final String resourceName,
@@ -386,42 +398,6 @@ public class HelixHelper {
       }
     };
     updateIdealState(helixManager, tableName, updater, DEFAULT_RETRY_POLICY);
-  }
-
-  /**
-   * Add the new specified segment to the idealState of the specified table in the specified cluster.
-   *
-   * @param helixManager The HelixManager object to access the helix cluster.
-   * @param tableNameWithType Name of the table to which the new segment is to be added.
-   * @param segmentName Name of the new segment to be added
-   * @param assignedInstances List of assigned instances
-   */
-  public static void addSegmentToIdealState(HelixManager helixManager, final String tableNameWithType,
-      final String segmentName, final List<String> assignedInstances) {
-
-    Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
-      @Override
-      public IdealState apply(IdealState idealState) {
-        Set<String> partitions = idealState.getPartitionSet();
-        if (partitions.contains(segmentName)) {
-          LOGGER.warn("Segment already exists in the ideal state for segment: {} of table: {}, do not update",
-              segmentName, tableNameWithType);
-        } else {
-          if (assignedInstances.isEmpty()) {
-            LOGGER.warn("No instance assigned for segment: {} of table: {}", segmentName, tableNameWithType);
-          } else {
-            int numPartitions = partitions.size() + 1;
-            for (String instance : assignedInstances) {
-              idealState.setPartitionState(segmentName, instance, ONLINE);
-            }
-            idealState.setNumPartitions(numPartitions);
-          }
-        }
-        return idealState;
-      }
-    };
-
-    updateIdealState(helixManager, tableNameWithType, updater, DEFAULT_RETRY_POLICY);
   }
 
   /**

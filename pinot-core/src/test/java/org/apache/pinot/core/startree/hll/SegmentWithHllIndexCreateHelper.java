@@ -24,9 +24,9 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.data.DimensionFieldSpec;
-import org.apache.pinot.common.data.MetricFieldSpec;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.core.data.readers.FileFormat;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -36,7 +36,6 @@ import org.apache.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
 import org.apache.pinot.startree.hll.HllConfig;
-import org.apache.pinot.startree.hll.HllConstants;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,14 +43,13 @@ import org.slf4j.LoggerFactory;
 
 public class SegmentWithHllIndexCreateHelper {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentWithHllIndexCreateHelper.class);
-  private static final String hllDeriveColumnSuffix = HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX;
 
   private final String tableName;
   private final File INDEX_DIR;
   private final File inputAvro;
   private final String timeColumnName;
   private final TimeUnit timeUnit;
-  private String segmentName = "starTreeSegment";
+  private String segmentName;
   private Schema schema;
 
   public SegmentWithHllIndexCreateHelper(String tableName, URL avroUrl, String timeColumnName, TimeUnit timeUnit,
@@ -134,6 +132,12 @@ public class SegmentWithHllIndexCreateHelper {
     segmentGenConfig.createInvertedIndexForAllColumns();
     segmentGenConfig.setSegmentName(segmentName);
     segmentGenConfig.setSegmentNamePostfix("1");
+    // The segment generation code in SegmentColumnarIndexCreator will throw
+    // exception if start and end time in time column are not in acceptable
+    // range. For this test, we first need to fix the input avro data
+    // to have the time column values in allowed range. Until then, the check
+    // is explicitly disabled
+    segmentGenConfig.setSkipTimeValueCheck(true);
 
     if (enableStarTree) {
       setupStarTreeConfig(segmentGenConfig);

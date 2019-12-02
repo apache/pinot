@@ -23,8 +23,8 @@ import java.io.FileWriter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.core.util.AvroUtils;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
@@ -91,7 +91,8 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
 
     File outputDir = new File(_outputDir);
     if (!outputDir.isDirectory()) {
-      LOGGER.error("ERROR: Output directory: %s does not exist or is not a directory", _outputDir);
+      LOGGER.error("ERROR: Output directory: {} does not exist or is not a directory", _outputDir);
+      return false;
     }
     File outputFile = new File(outputDir, _pinotSchemaName + ".json");
     LOGGER.info("Store Pinot schema to file: {}", outputFile.getAbsolutePath());

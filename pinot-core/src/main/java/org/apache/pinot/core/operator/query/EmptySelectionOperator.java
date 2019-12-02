@@ -18,15 +18,17 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import java.io.Serializable;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 
 
@@ -41,16 +43,28 @@ public class EmptySelectionOperator extends BaseOperator<IntermediateResultsBloc
   private final DataSchema _dataSchema;
   private final ExecutionStatistics _executionStatistics;
 
-  public EmptySelectionOperator(IndexSegment indexSegment, Selection selection) {
-    List<String> selectionColumns =
-        SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), indexSegment);
-    _dataSchema = SelectionOperatorUtils.extractDataSchema(null, selectionColumns, indexSegment);
+  public EmptySelectionOperator(IndexSegment indexSegment, Selection selection, TransformOperator transformOperator) {
+    List<TransformExpressionTree> expressions =
+        SelectionOperatorUtils.extractExpressions(selection.getSelectionColumns(), indexSegment);
+
+    int numExpressions = expressions.size();
+    String[] columnNames = new String[numExpressions];
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
+    for (int i = 0; i < numExpressions; i++) {
+      TransformExpressionTree expression = expressions.get(i);
+      TransformResultMetadata expressionMetadata = transformOperator.getResultMetadata(expression);
+      columnNames[i] = expression.toString();
+      columnDataTypes[i] =
+          DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
+    }
+    _dataSchema = new DataSchema(columnNames, columnDataTypes);
+
     _executionStatistics = new ExecutionStatistics(0L, 0L, 0L, indexSegment.getSegmentMetadata().getTotalRawDocs());
   }
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    return new IntermediateResultsBlock(_dataSchema, Collections.<Serializable[]>emptyList());
+    return new IntermediateResultsBlock(_dataSchema, Collections.emptyList());
   }
 
   @Override

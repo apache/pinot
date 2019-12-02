@@ -18,82 +18,24 @@
  */
 package org.apache.pinot.common.config;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import java.lang.reflect.Field;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
-import org.apache.pinot.common.utils.EqualityUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import javax.annotation.Nullable;
 
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class TableCustomConfig {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TableCustomConfig.class);
-
+public class TableCustomConfig extends BaseJsonConfig {
   public static final String MESSAGE_BASED_REFRESH_KEY = "messageBasedRefresh";
 
-  @ConfigKey("customConfigs")
-  @UseChildKeyHandler(SimpleMapChildKeyHandler.class)
-  private Map<String, String> _customConfigs;
+  private final Map<String, String> _customConfigs;
 
-  public Map<String, String> getCustomConfigs() {
-    return _customConfigs;
-  }
-
-  public void setCustomConfigs(Map<String, String> customConfigs) {
+  @JsonCreator
+  public TableCustomConfig(@JsonProperty("customConfigs") @Nullable Map<String, String> customConfigs) {
     _customConfigs = customConfigs;
   }
 
-  @Override
-  public String toString() {
-    final StringBuilder result = new StringBuilder();
-    final String newLine = System.getProperty("line.separator");
-
-    result.append(this.getClass().getName());
-    result.append(" Object {");
-    result.append(newLine);
-
-    //determine fields declared in this class only (no fields of superclass)
-    final Field[] fields = this.getClass().getDeclaredFields();
-
-    //print field names paired with their values
-    for (final Field field : fields) {
-      result.append("  ");
-      try {
-        result.append(field.getName());
-        result.append(": ");
-        //requires access to private field:
-        result.append(field.get(this));
-      } catch (final IllegalAccessException ex) {
-        if (LOGGER.isWarnEnabled()) {
-          LOGGER.warn("Caught exception while processing field " + field, ex);
-        }
-      }
-      result.append(newLine);
-    }
-    result.append("}");
-
-    return result.toString();
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
-      return true;
-    }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
-      return false;
-    }
-
-    TableCustomConfig that = (TableCustomConfig) o;
-
-    return EqualityUtils.isEqual(_customConfigs, that._customConfigs);
-  }
-
-  @Override
-  public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(_customConfigs);
-    return result;
+  @Nullable
+  public Map<String, String> getCustomConfigs() {
+    return _customConfigs;
   }
 }

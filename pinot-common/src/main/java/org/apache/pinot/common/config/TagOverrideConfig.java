@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.common.config;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import org.apache.pinot.common.utils.EqualityUtils;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import javax.annotation.Nullable;
 
 
 /**
@@ -40,59 +41,27 @@ import org.apache.pinot.common.utils.EqualityUtils;
  * 2) checking if instances with the tag exist
  *
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class TagOverrideConfig {
+public class TagOverrideConfig extends BaseJsonConfig {
 
-  @ConfigKey("realtimeConsuming")
-  @ConfigDoc("Tag override for realtime consuming segments")
-  private String realtimeConsuming;
+  @JsonPropertyDescription("Tag override for realtime consuming segments")
+  private final String _realtimeConsuming;
 
-  @ConfigKey("realtimeCompleted")
-  @ConfigDoc("Tag override for realtime completed segments")
-  private String realtimeCompleted;
+  @JsonPropertyDescription("Tag override for realtime completed segments")
+  private final String _realtimeCompleted;
 
+  public TagOverrideConfig(@JsonProperty("realtimeConsuming") @Nullable String realtimeConsuming,
+      @JsonProperty("realtimeCompleted") @Nullable String realtimeCompleted) {
+    _realtimeConsuming = realtimeConsuming;
+    _realtimeCompleted = realtimeCompleted;
+  }
+
+  @Nullable
   public String getRealtimeConsuming() {
-    return realtimeConsuming;
+    return _realtimeConsuming;
   }
 
-  public void setRealtimeConsuming(String realtimeConsuming) {
-    this.realtimeConsuming = realtimeConsuming;
-  }
-
+  @Nullable
   public String getRealtimeCompleted() {
-    return realtimeCompleted;
-  }
-
-  public void setRealtimeCompleted(String realtimeCompleted) {
-    this.realtimeCompleted = realtimeCompleted;
-  }
-
-  @Override
-  public String toString() {
-    return "TagOverrideConfig{" + "realtimeConsuming='" + realtimeConsuming + '\'' + ", realtimeCompleted="
-        + realtimeCompleted + '}';
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
-      return true;
-    }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
-      return false;
-    }
-
-    TagOverrideConfig that = (TagOverrideConfig) o;
-
-    return EqualityUtils.isEqual(realtimeConsuming, that.realtimeConsuming) && EqualityUtils
-        .isEqual(realtimeCompleted, that.realtimeCompleted);
-  }
-
-  @Override
-  public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(realtimeConsuming);
-    result = EqualityUtils.hashCodeOf(result, realtimeCompleted);
-    return result;
+    return _realtimeCompleted;
   }
 }

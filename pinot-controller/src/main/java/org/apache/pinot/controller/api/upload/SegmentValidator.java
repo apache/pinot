@@ -19,22 +19,16 @@
 package org.apache.pinot.controller.api.upload;
 
 import java.io.File;
-import java.util.Date;
-import java.util.List;
 import java.util.concurrent.Executor;
-import javax.annotation.Nonnull;
 import javax.ws.rs.core.Response;
 import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.ControllerLeadershipManager;
 import org.apache.pinot.controller.api.resources.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
@@ -55,44 +49,28 @@ public class SegmentValidator {
   private final Executor _executor;
   private final HttpConnectionManager _connectionManager;
   private final ControllerMetrics _controllerMetrics;
-  private final ControllerLeadershipManager _controllerLeadershipManager;
+  private final boolean _isLeaderForTable;
 
   public SegmentValidator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf controllerConf,
       Executor executor, HttpConnectionManager connectionManager, ControllerMetrics controllerMetrics,
-      ControllerLeadershipManager controllerLeadershipManager) {
+      boolean isLeaderForTable) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _controllerConf = controllerConf;
     _executor = executor;
     _connectionManager = connectionManager;
     _controllerMetrics = controllerMetrics;
-    _controllerLeadershipManager = controllerLeadershipManager;
+    _isLeaderForTable = isLeaderForTable;
   }
 
-  public SegmentValidatorResponse validateSegment(String rawTableName, SegmentMetadata segmentMetadata,
-      File tempSegmentDir) {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
-    String segmentName = segmentMetadata.getName();
+  public void validateOfflineSegment(String offlineTableName, SegmentMetadata segmentMetadata, File tempSegmentDir) {
     TableConfig offlineTableConfig =
         ZKMetadataProvider.getOfflineTableConfig(_pinotHelixResourceManager.getPropertyStore(), offlineTableName);
-
     if (offlineTableConfig == null) {
       throw new ControllerApplicationException(LOGGER, "Failed to find table config for table: " + offlineTableName,
           Response.Status.NOT_FOUND);
     }
 
-    // Verifies whether there's server assigned to this segment when uploading a new segment.
-    List<String> assignedInstances = null;
-    ZNRecord segmentMetadataZnRecord =
-        _pinotHelixResourceManager.getSegmentMetadataZnRecord(offlineTableName, segmentName);
-    // Checks whether it's a new segment or an existing one.
-    if (segmentMetadataZnRecord == null) {
-      assignedInstances = _pinotHelixResourceManager.getAssignedInstancesForSegment(rawTableName, segmentMetadata);
-      if (assignedInstances.isEmpty()) {
-        throw new ControllerApplicationException(LOGGER, "No assigned Instances for Segment: " + segmentName
-            + ". Please check whether the table config is misconfigured.", Response.Status.INTERNAL_SERVER_ERROR);
-      }
-    }
-
+    String segmentName = segmentMetadata.getName();
     StorageQuotaChecker.QuotaCheckerResponse quotaResponse;
     try {
       quotaResponse = checkStorageQuota(tempSegmentDir, segmentMetadata, offlineTableConfig);
@@ -108,14 +86,15 @@ public class SegmentValidator {
               + quotaResponse.reason, Response.Status.FORBIDDEN);
     }
 
-    // Check time range
-    if (!isSegmentTimeValid(segmentMetadata)) {
-      throw new ControllerApplicationException(LOGGER,
-          "Invalid segment start/end time for segment: " + segmentName + " of table: " + offlineTableName,
-          Response.Status.NOT_ACCEPTABLE);
+    // Check time interval
+    // TODO: Pass in schema and check the existence of time interval when time field exists
+    Interval timeInterval = segmentMetadata.getTimeInterval();
+    if (timeInterval != null && !TimeUtils.isValidTimeInterval(timeInterval)) {
+      throw new ControllerApplicationException(LOGGER, String.format(
+          "Invalid segment start/end time: %s (in millis: %d/%d) for segment: %s of table: %s, must be between: %s",
+          timeInterval, timeInterval.getStartMillis(), timeInterval.getEndMillis(), segmentName, offlineTableName,
+          TimeUtils.VALID_TIME_INTERVAL), Response.Status.NOT_ACCEPTABLE);
     }
-
-    return new SegmentValidatorResponse(offlineTableConfig, segmentMetadataZnRecord, assignedInstances, quotaResponse);
   }
 
   /**
@@ -125,8 +104,8 @@ public class SegmentValidator {
    * @param metadata segment metadata. This should not be null.
    * @param offlineTableConfig offline table configuration. This should not be null.
    */
-  private StorageQuotaChecker.QuotaCheckerResponse checkStorageQuota(@Nonnull File segmentFile,
-      @Nonnull SegmentMetadata metadata, @Nonnull TableConfig offlineTableConfig)
+  private StorageQuotaChecker.QuotaCheckerResponse checkStorageQuota(File segmentFile, SegmentMetadata metadata,
+      TableConfig offlineTableConfig)
       throws InvalidConfigException {
     if (!_controllerConf.getEnableStorageQuotaCheck()) {
       return StorageQuotaChecker.success("Quota check is disabled");
@@ -134,39 +113,8 @@ public class SegmentValidator {
     TableSizeReader tableSizeReader =
         new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _pinotHelixResourceManager);
     StorageQuotaChecker quotaChecker =
-        new StorageQuotaChecker(offlineTableConfig, tableSizeReader, _controllerMetrics, _pinotHelixResourceManager,
-            _controllerLeadershipManager);
+        new StorageQuotaChecker(offlineTableConfig, tableSizeReader, _controllerMetrics, _isLeaderForTable);
     return quotaChecker.isSegmentStorageWithinQuota(segmentFile, metadata.getName(),
         _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
-  }
-
-  /**
-   * Returns true if:
-   * - Segment does not have a start/end time, OR
-   * - The start/end time are in a valid range (Jan 01 1971 - Jan 01, 2071)
-   * @param metadata Segment metadata
-   * @return
-   */
-  private boolean isSegmentTimeValid(SegmentMetadata metadata) {
-    Interval interval = metadata.getTimeInterval();
-    if (interval == null) {
-      return true;
-    }
-
-    long startMillis = interval.getStartMillis();
-    long endMillis = interval.getEndMillis();
-
-    if (!TimeUtils.timeValueInValidRange(startMillis) || !TimeUtils.timeValueInValidRange(endMillis)) {
-      Date minDate = new Date(TimeUtils.getValidMinTimeMillis());
-      Date maxDate = new Date(TimeUtils.getValidMaxTimeMillis());
-
-      LOGGER.error(
-          "Invalid start time '{}ms' or end time '{}ms' for segment {}, must be between '{}' and '{}' (timecolumn {}, timeunit {})",
-          interval.getStartMillis(), interval.getEndMillis(), metadata.getName(), minDate, maxDate,
-          metadata.getTimeColumn(), metadata.getTimeUnit().toString());
-      return false;
-    }
-
-    return true;
   }
 }

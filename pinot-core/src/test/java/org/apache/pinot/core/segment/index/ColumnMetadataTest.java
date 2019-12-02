@@ -23,8 +23,8 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.segment.StarTreeMetadata;
 import org.apache.pinot.core.indexsegment.IndexSegment;
@@ -44,7 +44,7 @@ import org.testng.annotations.Test;
 
 public class ColumnMetadataTest {
   private static final String AVRO_DATA = "data/test_data-mv.avro";
-  private static final File INDEX_DIR = new File(ColumnMetadataTest.class.toString());
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "ColumnMetadataTest");
   private static final String CREATOR_VERSION = "TestHadoopJar.1.1.1";
 
   @BeforeMethod
@@ -67,7 +67,12 @@ public class ColumnMetadataTest {
         .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.HOURS,
             "testTable");
     config.setSegmentNamePostfix("1");
-    config.setTimeColumnName("daysSinceEpoch");
+    // The segment generation code in SegmentColumnarIndexCreator will throw
+    // exception if start and end time in time column are not in acceptable
+    // range. For this test, we first need to fix the input avro data
+    // to have the time column values in allowed range. Until then, the check
+    // is explicitly disabled
+    config.setSkipTimeValueCheck(true);
     return config;
   }
 

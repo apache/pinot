@@ -82,4 +82,9 @@ public class MockDatasetConfigManager extends AbstractMockManager<DatasetConfigD
   public List<DatasetConfigDTO> findActiveRequiresCompletenessCheck() {
     throw new AssertionError("not implemented");
   }
+
+  @Override
+  public void updateLastRefreshTime(String dataset, long lastRefreshTime) {
+    throw new AssertionError("not implemented");
+  }
 }

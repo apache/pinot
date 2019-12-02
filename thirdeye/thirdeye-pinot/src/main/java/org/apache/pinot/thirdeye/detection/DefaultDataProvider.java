@@ -24,13 +24,13 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.Weigher;
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -56,13 +56,12 @@ import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
-import org.apache.pinot.thirdeye.datasource.comparison.Row;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
+import org.apache.pinot.thirdeye.detection.cache.CacheConfig;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EvaluationSlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
-import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,6 +71,7 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 public class DefaultDataProvider implements DataProvider {
   private static final Logger LOG = LoggerFactory.getLogger(DefaultDataProvider.class);
   private static final long TIMEOUT = 60000;
+  private static final String PROP_DETECTION_CONFIG_ID = "detectionConfigId";
 
   private final ExecutorService executor = Executors.newCachedThreadPool();
 
@@ -97,28 +97,30 @@ public class DefaultDataProvider implements DataProvider {
     this.aggregationLoader = aggregationLoader;
     this.loader = loader;
 
-    if (DETECTION_TIME_SERIES_CACHE == null) {
-      // don't use more than one third of memory for detection time series
-      long cacheSize = Runtime.getRuntime().freeMemory() / 3;
-      LOG.info("initializing detection timeseries cache with {} bytes", cacheSize);
-      DETECTION_TIME_SERIES_CACHE = CacheBuilder.newBuilder()
-          .maximumWeight(cacheSize)
-          // Estimate that most detection tasks will complete within 15 minutes
-          .expireAfterWrite(15, TimeUnit.MINUTES)
-          .weigher((Weigher<MetricSlice, DataFrame>) (slice, dataFrame) -> dataFrame.size() * (Long.BYTES + Double.BYTES))
-          .build(new CacheLoader<MetricSlice, DataFrame>() {
-            // load single slice
-            @Override
-            public DataFrame load(MetricSlice slice) {
-              return loadTimeseries(Collections.singleton(slice)).get(slice);
-            }
+    if (CacheConfig.getInstance().useInMemoryCache()) {
+      if (DETECTION_TIME_SERIES_CACHE == null) {
+        // don't use more than one third of memory for detection time series
+        long cacheSize = Runtime.getRuntime().freeMemory() / 3;
+        LOG.info("initializing detection timeseries cache with {} bytes", cacheSize);
+        DETECTION_TIME_SERIES_CACHE = CacheBuilder.newBuilder()
+            .maximumWeight(cacheSize)
+            // Estimate that most detection tasks will complete within 15 minutes
+            .expireAfterWrite(15, TimeUnit.MINUTES)
+            .weigher((Weigher<MetricSlice, DataFrame>) (slice, dataFrame) -> dataFrame.size() * (Long.BYTES + Double.BYTES))
+            .build(new CacheLoader<MetricSlice, DataFrame>() {
+              // load single slice
+              @Override
+              public DataFrame load(MetricSlice slice) {
+                return loadTimeseries(Collections.singleton(slice)).get(slice);
+              }
 
-            // buck loading time series slice in parallel
-            @Override
-            public Map<MetricSlice, DataFrame> loadAll(Iterable<? extends MetricSlice> slices) {
-              return loadTimeseries(Lists.newArrayList(slices));
-            }
-          });
+              // buck loading time series slice in parallel
+              @Override
+              public Map<MetricSlice, DataFrame> loadAll(Iterable<? extends MetricSlice> slices) {
+                return loadTimeseries(Lists.newArrayList(slices));
+              }
+            });
+      }
     }
   }
 
@@ -128,15 +130,20 @@ public class DefaultDataProvider implements DataProvider {
       Map<MetricSlice, DataFrame> output = new HashMap<>();
 
       // if the time series slice is already in cache, return directly
-      for (MetricSlice slice : slices){
-        for (Map.Entry<MetricSlice, DataFrame> entry : DETECTION_TIME_SERIES_CACHE.asMap().entrySet()) {
-          // current slice potentially contained in cache
-          if (entry.getKey().containSlice(slice)){
-            DataFrame df = entry.getValue().filter(entry.getValue().getLongs(COL_TIME).between(slice.getStart(), slice.getEnd())).dropNull(COL_TIME);
-            // double check if it is cache hit
-            if (df.getLongs(COL_TIME).size() > 0) {
-              output.put(slice, df);
-              break;
+      if (CacheConfig.getInstance().useInMemoryCache()) {
+        for (MetricSlice slice : slices) {
+          LOG.info(slice.toString());
+          for (Map.Entry<MetricSlice, DataFrame> entry : DETECTION_TIME_SERIES_CACHE.asMap().entrySet()) {
+            // current slice potentially contained in cache
+            if (entry.getKey().containSlice(slice)) {
+              DataFrame df = entry.getValue()
+                  .filter(entry.getValue().getLongs(COL_TIME).between(slice.getStart(), slice.getEnd()))
+                  .dropNull(COL_TIME);
+              // double check if it is cache hit
+              if (df.getLongs(COL_TIME).size() > 0) {
+                output.put(slice, df);
+                break;
+              }
             }
           }
         }
@@ -144,6 +151,7 @@ public class DefaultDataProvider implements DataProvider {
 
       // if not in cache, fetch from data source
       Map<MetricSlice, Future<DataFrame>> futures = new HashMap<>();
+
       for (final MetricSlice slice : slices) {
         if (!output.containsKey(slice)){
           futures.put(slice, this.executor.submit(() -> DefaultDataProvider.this.timeseriesLoader.load(slice)));
@@ -171,13 +179,18 @@ public class DefaultDataProvider implements DataProvider {
       for (MetricSlice slice: slices) {
         alignedMetricSlicesToOriginalSlice.put(alignSlice(slice), slice);
       }
-      Map<MetricSlice, DataFrame> cacheResult = DETECTION_TIME_SERIES_CACHE.getAll(alignedMetricSlicesToOriginalSlice.keySet());
+      Map<MetricSlice, DataFrame> cacheResult;
+      if (CacheConfig.getInstance().useInMemoryCache()) {
+        cacheResult = DETECTION_TIME_SERIES_CACHE.getAll(alignedMetricSlicesToOriginalSlice.keySet());
+      } else {
+        cacheResult = loadTimeseries(alignedMetricSlicesToOriginalSlice.keySet());
+      }
       Map<MetricSlice, DataFrame> timeseriesResult = new HashMap<>();
-      for (Map.Entry<MetricSlice, DataFrame> entry : cacheResult.entrySet()){
+      for (Map.Entry<MetricSlice, DataFrame> entry : cacheResult.entrySet()) {
         // make a copy of the result so that cache won't be contaminated by client code
         timeseriesResult.put(alignedMetricSlicesToOriginalSlice.get(entry.getKey()), entry.getValue().copy());
       }
-      return  timeseriesResult;
+      return timeseriesResult;
     } catch (Exception e) {
       throw new RuntimeException("fetch time series failed", e);
     }
@@ -211,13 +224,8 @@ public class DefaultDataProvider implements DataProvider {
     }
   }
 
-  private Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices,
-      long configId, boolean isLegacy) {
-    String functionIdKey = "detectionConfigId";
-    if (isLegacy) {
-      functionIdKey = "functionId";
-    }
-
+  @Override
+  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices) {
     Multimap<AnomalySlice, MergedAnomalyResultDTO> output = ArrayListMultimap.create();
     for (AnomalySlice slice : slices) {
       List<Predicate> predicates = new ArrayList<>();
@@ -227,36 +235,23 @@ public class DefaultDataProvider implements DataProvider {
       if (slice.getStart() >= 0) {
         predicates.add(Predicate.GT("endTime", slice.getStart()));
       }
-      if (configId >= 0) {
-        predicates.add(Predicate.EQ(functionIdKey, configId));
+      if (slice.getDetectionId() >= 0) {
+        predicates.add(Predicate.EQ(PROP_DETECTION_CONFIG_ID, slice.getDetectionId()));
       }
 
-      if (predicates.isEmpty()) throw new IllegalArgumentException("Must provide at least one of start, end, or " + functionIdKey);
+      if (predicates.isEmpty()) throw new IllegalArgumentException("Must provide at least one of start, end, or " + PROP_DETECTION_CONFIG_ID);
 
       Collection<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findByPredicate(AND(predicates));
       anomalies.removeIf(anomaly -> !slice.match(anomaly));
 
-      if (isLegacy) {
-        anomalies.removeIf(anomaly ->
-            (configId >= 0) && (anomaly.getFunctionId() == null || anomaly.getFunctionId() != configId)
-        );
-      } else {
-        anomalies.removeIf(anomaly ->
-            (configId >= 0) && (anomaly.getDetectionConfigId() == null || anomaly.getDetectionConfigId() != configId)
-        );
-      }
-      // filter all child anomalies. those are kept in the parent anomaly children set.
-      anomalies = Collections2.filter(anomalies, mergedAnomaly -> mergedAnomaly != null && !mergedAnomaly.isChild());
+      anomalies.removeIf(anomaly ->
+          (slice.getDetectionId() >= 0) && (anomaly.getDetectionConfigId() == null || anomaly.getDetectionConfigId() != slice.getDetectionId())
+      );
 
-      //LOG.info("Fetched {} anomalies between (startTime = {}, endTime = {}) with confid Id = {}", anomalies.size(), slice.getStart(), slice.getEnd(), configId);
+      LOG.info("Fetched {} anomalies between (startTime = {}, endTime = {}) with config Id = {}", anomalies.size(), slice.getStart(), slice.getEnd(), slice.getDetectionId());
       output.putAll(slice, anomalies);
     }
     return output;
-  }
-
-  @Override
-  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, long configId) {
-    return fetchAnomalies(slices, configId, false);
   }
 
   @Override
@@ -373,11 +368,19 @@ public class DefaultDataProvider implements DataProvider {
     }
 
     // align to time buckets and request time zone
-    long timeGranularity = granularity.toMillis();
+    // if granularity is more than 1 day, align to the daily boundary
+    // this alignment is required by the Pinot datasource, otherwise, it may return wrong results
+    long timeGranularity = Math.min(granularity.toMillis(), TimeUnit.DAYS.toMillis(1));
     long start = (slice.getStart() / timeGranularity) * timeGranularity;
     long end = ((slice.getEnd() + timeGranularity - 1) / timeGranularity) * timeGranularity;
 
     return slice.withStart(start).withEnd(end).withGranularity(granularity);
+  }
+
+  @Override
+  public  List<DatasetConfigDTO> fetchDatasetByDisplayName(String datasetDisplayName) {
+    List<DatasetConfigDTO> dataset = this.datasetDAO.findByPredicate(Predicate.EQ("displayName", datasetDisplayName));
+    return dataset;
   }
 
   public static void cleanCache() {

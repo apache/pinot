@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.core.realtime.converter;
 
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.data.readers.RecordReader;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import java.io.File;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
 /**
@@ -50,13 +52,12 @@ public class RealtimeSegmentRecordReader implements RecordReader {
     _sortedDocIdIterationOrder = realtimeSegment.getSortedDocIdIterationOrderWithSortedColumn(sortedColumn);
   }
 
-  @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
-
-  }
-
   public int[] getSortedDocIdIterationOrder() {
     return _sortedDocIdIterationOrder;
+  }
+
+  @Override
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig) {
   }
 
   @Override

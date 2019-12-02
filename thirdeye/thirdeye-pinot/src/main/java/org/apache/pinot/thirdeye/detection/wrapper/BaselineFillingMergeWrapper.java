@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Collections2;
 import java.util.HashMap;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.Series;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
@@ -62,7 +63,6 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
   private static final String PROP_METRIC_URN = "metricUrn";
   private static final String PROP_BASELINE_PROVIDER_COMPONENT_NAME = "baselineProviderComponentName";
   private static final String PROP_DETECTOR = "detector";
-  private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
   private static final String DEFAULT_WOW_BASELINE_PROVIDER_NAME = "DEFAULT_WOW";
 
   private final BaselineProvider baselineValueProvider; // optionally configure a baseline value loader
@@ -70,7 +70,7 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
   private final String baselineProviderComponentName;
   private String detectorComponentName;
   private String metricUrn;
-  private final Map<Long, MergedAnomalyResultDTO> existingAnomalies; // from id to anomalies
+  protected final Map<Long, MergedAnomalyResultDTO> existingAnomalies; // from id to anomalies
 
   public BaselineFillingMergeWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
   {
@@ -127,20 +127,19 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
   protected List<MergedAnomalyResultDTO> merge(Collection<MergedAnomalyResultDTO> anomalies) {
     List<MergedAnomalyResultDTO> mergedAnomalies = super.merge(anomalies);
 
-    // skip current & baseline filling if the anomaly is not merged
-    this.fillCurrentAndBaselineValue(mergedAnomalies.stream()
-        .filter(mergedAnomaly -> !isExistingAnomaly(this.existingAnomalies, mergedAnomaly)).collect(Collectors.toList()));
+    // Refill current and baseline values for qualified parent anomalies
+    // Ignore filling baselines for exiting parent anomalies and grouped anomalies
+    Collection<MergedAnomalyResultDTO> parentAnomalies = Collections2.filter(mergedAnomalies,
+        mergedAnomaly -> mergedAnomaly != null && !isExistingAnomaly(this.existingAnomalies, mergedAnomaly)
+            && !StringUtils.isBlank(mergedAnomaly.getMetricUrn()));
+    this.fillCurrentAndBaselineValue(new ArrayList<>(parentAnomalies));
 
     return mergedAnomalies;
   }
 
   @Override
   protected List<MergedAnomalyResultDTO> retrieveAnomaliesFromDatabase(List<MergedAnomalyResultDTO> generated) {
-    AnomalySlice effectiveSlice = this.slice
-        .withStart(this.getStartTime(generated) - this.maxGap - 1)
-        .withEnd(this.getEndTime(generated) + this.maxGap + 1);
-
-    Collection<MergedAnomalyResultDTO> retrieved = this.provider.fetchAnomalies(Collections.singleton(effectiveSlice), this.config.getId()).get(effectiveSlice);
+    List<MergedAnomalyResultDTO> retrieved = super.retrieveAnomaliesFromDatabase(generated);
 
     Collection<MergedAnomalyResultDTO> anomalies =
         Collections2.filter(retrieved,

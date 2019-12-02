@@ -35,14 +35,14 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.transport.AsyncQueryResponse;
 import org.apache.pinot.core.transport.QueryRouter;
-import org.apache.pinot.core.transport.Server;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerResponse;
+import org.apache.pinot.core.transport.ServerRoutingInstance;
 
 
 /**
@@ -71,8 +71,8 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
 
   @Override
   protected BrokerResponse processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<String, List<String>> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<String, List<String>> realtimeRoutingTable,
+      @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
+      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
       long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
       throws Exception {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
@@ -82,26 +82,20 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     AsyncQueryResponse asyncQueryResponse = _queryRouter
         .submitQuery(requestId, rawTableName, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
             realtimeRoutingTable, timeoutMs);
-    Map<Server, ServerResponse> response = asyncQueryResponse.getResponse();
+    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getResponse();
     _brokerMetrics
         .addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER, System.nanoTime() - scatterGatherStartTimeNs);
     // TODO Use scatterGatherStats as serverStats
     serverStats.setServerStats(asyncQueryResponse.getStats());
 
-    // TODO: do not convert Server to ServerInstance
     int numServersQueried = response.size();
     long totalResponseSize = 0;
-    Map<ServerInstance, DataTable> dataTableMap = new HashMap<>(numServersQueried);
-    for (Map.Entry<Server, ServerResponse> entry : response.entrySet()) {
+    Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>(HashUtil.getHashMapCapacity(numServersQueried));
+    for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : response.entrySet()) {
       ServerResponse serverResponse = entry.getValue();
       DataTable dataTable = serverResponse.getDataTable();
       if (dataTable != null) {
-        Server server = entry.getKey();
-        if (server.getTableType() == TableType.OFFLINE) {
-          dataTableMap.put(new ServerInstance(server.getHostName(), server.getPort(), 0), dataTable);
-        } else {
-          dataTableMap.put(new ServerInstance(server.getHostName(), server.getPort(), 1), dataTable);
-        }
+        dataTableMap.put(entry.getKey(), dataTable);
         totalResponseSize += serverResponse.getResponseSize();
       }
     }

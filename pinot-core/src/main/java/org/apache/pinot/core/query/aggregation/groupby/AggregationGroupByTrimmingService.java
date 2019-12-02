@@ -36,13 +36,13 @@ import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.function.MinAggregationFunction;
+import org.apache.pinot.core.util.GroupByUtils;
 
 
 /**
  * The <code>AggregationGroupByTrimmingService</code> class provides trimming service for aggregation group-by queries.
  */
 public class AggregationGroupByTrimmingService {
-  public static final String GROUP_KEY_DELIMITER = "\t";
 
   private final AggregationFunction[] _aggregationFunctions;
   private final int _groupByTopN;
@@ -56,7 +56,7 @@ public class AggregationGroupByTrimmingService {
     _groupByTopN = groupByTopN;
 
     // To keep the precision, _trimSize is the larger of (_groupByTopN * 5) or 5000
-    _trimSize = Math.max(_groupByTopN * 5, 5000);
+    _trimSize = GroupByUtils.getTableCapacity(_groupByTopN);
 
     // To trigger the trimming, number of groups should be larger than _trimThreshold which is (_trimSize * 4)
     _trimThreshold = _trimSize * 4;
@@ -229,7 +229,7 @@ public class AggregationGroupByTrimmingService {
       GroupKeyResultPair groupKeyResultPair;
       while ((groupKeyResultPair = _heap.poll()) != null) {
         // Set limit to -1 to prevent removing trailing empty strings
-        String[] groupKeys = groupKeyResultPair._groupKey.split(GROUP_KEY_DELIMITER, -1);
+        String[] groupKeys = groupKeyResultPair._groupKey.split(GroupKeyGenerator.DELIMITER, -1);
 
         GroupByResult groupByResult = new GroupByResult();
         groupByResult.setGroup(Arrays.asList(groupKeys));

@@ -21,7 +21,7 @@ package org.apache.pinot.tools.admin.command;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.tools.Command;
@@ -120,7 +120,10 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
         .sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableCreate(), node.toString());
 
     LOGGER.info(res);
-    return true;
+    if (res.contains("succesfully added")) {
+      return true;
+    }
+    return false;
   }
 
   @Override

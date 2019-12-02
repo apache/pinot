@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.detection;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+import java.util.HashSet;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.Grouping;
 import org.apache.pinot.thirdeye.dataframe.Series;
@@ -129,18 +130,18 @@ public class MockDataProvider implements DataProvider {
     return result;
   }
 
-  private Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices,
-      long configId, boolean isLegacy) {
+  private Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, boolean isLegacy) {
     Multimap<AnomalySlice, MergedAnomalyResultDTO> result = ArrayListMultimap.create();
     for (AnomalySlice slice : slices) {
       for (MergedAnomalyResultDTO anomaly : this.anomalies) {
         if (slice.match(anomaly)) {
           if (isLegacy) {
-            if (configId >= 0 && (anomaly.getFunctionId() == null || anomaly.getFunctionId() != configId)) {
+            if (slice.getDetectionId() >= 0 && (anomaly.getFunctionId() == null || anomaly.getFunctionId() != slice.getDetectionId())) {
               continue;
             }
           } else {
-            if (configId >= 0 && (anomaly.getDetectionConfigId() == null || anomaly.getDetectionConfigId() != configId)) {
+            if (slice.getDetectionId() >= 0 && (anomaly.getDetectionConfigId() == null
+                || anomaly.getDetectionConfigId() != slice.getDetectionId())) {
               continue;
             }
           }
@@ -152,9 +153,8 @@ public class MockDataProvider implements DataProvider {
   }
 
   @Override
-  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices,
-      long configId) {
-    return fetchAnomalies(slices, configId, false);
+  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices) {
+    return fetchAnomalies(slices, false);
   }
 
   @Override

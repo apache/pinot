@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.core.operator.blocks;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
@@ -28,6 +30,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockDocIdSet;
@@ -36,6 +39,8 @@ import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableImplV2;
+import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -45,7 +50,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
  * The <code>IntermediateResultsBlock</code> class is the holder of the server side inter-segment results.
  */
 public class IntermediateResultsBlock implements Block {
-  private DataSchema _selectionDataSchema;
+  private DataSchema _dataSchema;
   private Collection<Serializable[]> _selectionResult;
   private AggregationFunctionContext[] _aggregationFunctionContexts;
   private List<Object> _aggregationResult;
@@ -60,12 +65,14 @@ public class IntermediateResultsBlock implements Block {
   private long _numSegmentsMatched;
   private boolean _numGroupsLimitReached;
 
+  private Table _table;
+
   /**
    * Constructor for selection result.
    */
-  public IntermediateResultsBlock(@Nonnull DataSchema selectionDataSchema,
+  public IntermediateResultsBlock(@Nonnull DataSchema dataSchema,
       @Nonnull Collection<Serializable[]> selectionResult) {
-    _selectionDataSchema = selectionDataSchema;
+    _dataSchema = dataSchema;
     _selectionResult = selectionResult;
   }
 
@@ -95,6 +102,22 @@ public class IntermediateResultsBlock implements Block {
   }
 
   /**
+   * Constructor for aggregation group-by order-by result with {@link AggregationGroupByResult}.
+   */
+  public IntermediateResultsBlock(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
+      @Nullable AggregationGroupByResult aggregationGroupByResults, DataSchema dataSchema) {
+    _aggregationFunctionContexts = aggregationFunctionContexts;
+    _aggregationGroupByResult = aggregationGroupByResults;
+    _dataSchema = dataSchema;
+  }
+
+
+  public IntermediateResultsBlock(@Nonnull Table table) {
+    _table = table;
+    _dataSchema = table.getDataSchema();
+  }
+
+  /**
    * Constructor for exception block.
    */
   public IntermediateResultsBlock(@Nonnull ProcessingException processingException, @Nonnull Exception e) {
@@ -110,12 +133,12 @@ public class IntermediateResultsBlock implements Block {
   }
 
   @Nullable
-  public DataSchema getSelectionDataSchema() {
-    return _selectionDataSchema;
+  public DataSchema getDataSchema() {
+    return _dataSchema;
   }
 
-  public void setSelectionDataSchema(@Nullable DataSchema dataSchema) {
-    _selectionDataSchema = dataSchema;
+  public void setDataSchema(@Nullable DataSchema dataSchema) {
+    _dataSchema = dataSchema;
   }
 
   @Nullable
@@ -205,6 +228,12 @@ public class IntermediateResultsBlock implements Block {
   @Nonnull
   public DataTable getDataTable()
       throws Exception {
+
+    if (_table != null) {
+      return getResultDataTable();
+    }
+
+    // TODO: remove all these ifs once every operator starts using {@link Table}
     if (_selectionResult != null) {
       return getSelectionResultDataTable();
     }
@@ -225,10 +254,61 @@ public class IntermediateResultsBlock implements Block {
   }
 
   @Nonnull
+  private DataTable getResultDataTable() throws IOException {
+
+    DataTableBuilder dataTableBuilder = new DataTableBuilder(_dataSchema);
+
+    Iterator<Record> iterator = _table.iterator();
+    while (iterator.hasNext()) {
+      Record record = iterator.next();
+      dataTableBuilder.startRow();
+      int columnIndex = 0;
+      for (Object value : record.getValues()) {
+        ColumnDataType columnDataType = _dataSchema.getColumnDataType(columnIndex);
+        setDataTableColumn(columnDataType, dataTableBuilder, columnIndex, value);
+        columnIndex++;
+      }
+      dataTableBuilder.finishRow();
+    }
+    DataTable dataTable = dataTableBuilder.build();
+    return attachMetadataToDataTable(dataTable);
+  }
+
+  private void setDataTableColumn(ColumnDataType columnDataType, DataTableBuilder dataTableBuilder, int columnIndex,
+      Object value)
+      throws IOException {
+    switch (columnDataType) {
+
+      case INT:
+        dataTableBuilder.setColumn(columnIndex, ((Number) value).intValue());
+        break;
+      case LONG:
+        dataTableBuilder.setColumn(columnIndex, ((Number) value).longValue());
+        break;
+      case FLOAT:
+        dataTableBuilder.setColumn(columnIndex, ((Number) value).floatValue());
+        break;
+      case DOUBLE:
+        dataTableBuilder.setColumn(columnIndex, ((Number) value).doubleValue());
+        break;
+      case STRING:
+        dataTableBuilder.setColumn(columnIndex, (String) value);
+        break;
+      case BYTES:
+        // FIXME: support BYTES in DataTable instead of converting to string
+        dataTableBuilder.setColumn(columnIndex, value.toString()); // ByteArray::toString
+        break;
+      default:
+        dataTableBuilder.setColumn(columnIndex, value);
+        break;
+    }
+  }
+
+  @Nonnull
   private DataTable getSelectionResultDataTable()
       throws Exception {
     return attachMetadataToDataTable(
-        SelectionOperatorUtils.getDataTableFromRows(_selectionResult, _selectionDataSchema));
+        SelectionOperatorUtils.getDataTableFromRows(_selectionResult, _dataSchema));
   }
 
   @Nonnull
@@ -237,7 +317,7 @@ public class IntermediateResultsBlock implements Block {
     // Extract each aggregation column name and type from aggregation function context.
     int numAggregationFunctions = _aggregationFunctionContexts.length;
     String[] columnNames = new String[numAggregationFunctions];
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numAggregationFunctions];
+    ColumnDataType[] columnDataTypes = new ColumnDataType[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationFunctionContext aggregationFunctionContext = _aggregationFunctionContexts[i];
       columnNames[i] = aggregationFunctionContext.getAggregationColumnName();
@@ -273,8 +353,8 @@ public class IntermediateResultsBlock implements Block {
   private DataTable getAggregationGroupByResultDataTable()
       throws Exception {
     String[] columnNames = new String[]{"functionName", "GroupByResultMap"};
-    DataSchema.ColumnDataType[] columnDataTypes =
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.OBJECT};
+    ColumnDataType[] columnDataTypes =
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.OBJECT};
 
     // Build the data table.
     DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnDataTypes));

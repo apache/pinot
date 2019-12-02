@@ -18,54 +18,47 @@
  */
 package org.apache.pinot.common.config;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import java.util.List;
+import javax.annotation.Nullable;
 
 
-@SuppressWarnings("unused")
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class StarTreeIndexConfig {
-  @ConfigKey("dimensionsSplitOrder")
-  private List<String> _dimensionsSplitOrder;
+public class StarTreeIndexConfig extends BaseJsonConfig {
+  private final List<String> _dimensionsSplitOrder;
+  private final List<String> _skipStarNodeCreationForDimensions;
+  private final List<String> _functionColumnPairs;
+  private final int _maxLeafRecords;
 
-  @ConfigKey("skipStarNodeCreationForDimensions")
-  private List<String> _skipStarNodeCreationForDimensions;
-
-  @ConfigKey("functionColumnPairs")
-  private List<String> _functionColumnPairs;
-
-  @ConfigKey("maxLeafRecords")
-  private int _maxLeafRecords;
+  @JsonCreator
+  public StarTreeIndexConfig(
+      @JsonProperty(value = "dimensionsSplitOrder", required = true) List<String> dimensionsSplitOrder,
+      @JsonProperty("skipStarNodeCreationForDimensions") @Nullable List<String> skipStarNodeCreationForDimensions,
+      @JsonProperty(value = "functionColumnPairs", required = true) List<String> functionColumnPairs,
+      @JsonProperty("maxLeafRecords") int maxLeafRecords) {
+    Preconditions.checkArgument(dimensionsSplitOrder != null, "'dimensionsSplitOrder' must be configured");
+    Preconditions.checkArgument(functionColumnPairs != null, "'functionColumnPairs' must be configured");
+    _dimensionsSplitOrder = dimensionsSplitOrder;
+    _skipStarNodeCreationForDimensions = skipStarNodeCreationForDimensions;
+    _functionColumnPairs = functionColumnPairs;
+    _maxLeafRecords = maxLeafRecords;
+  }
 
   public List<String> getDimensionsSplitOrder() {
     return _dimensionsSplitOrder;
   }
 
-  public void setDimensionsSplitOrder(List<String> dimensionsSplitOrder) {
-    _dimensionsSplitOrder = dimensionsSplitOrder;
-  }
-
+  @Nullable
   public List<String> getSkipStarNodeCreationForDimensions() {
     return _skipStarNodeCreationForDimensions;
-  }
-
-  public void setSkipStarNodeCreationForDimensions(List<String> skipStarNodeCreationForDimensions) {
-    _skipStarNodeCreationForDimensions = skipStarNodeCreationForDimensions;
   }
 
   public List<String> getFunctionColumnPairs() {
     return _functionColumnPairs;
   }
 
-  public void setFunctionColumnPairs(List<String> functionColumnPairs) {
-    _functionColumnPairs = functionColumnPairs;
-  }
-
   public int getMaxLeafRecords() {
     return _maxLeafRecords;
-  }
-
-  public void setMaxLeafRecords(int maxLeafRecords) {
-    _maxLeafRecords = maxLeafRecords;
   }
 }

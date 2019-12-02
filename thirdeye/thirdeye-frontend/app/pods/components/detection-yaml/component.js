@@ -1,6 +1,6 @@
 /**
  * Component to render the detection configuration yaml editor.
- * @module components/detection-editor
+ * @module components/detection-yaml
  * @property {Number} alertId - alertId needed in edit mode, to submit changes to alert config
  * @property {boolean} isEditMode - to activate the edit mode
  * @property {String} detectionYaml - the detection yaml
@@ -16,10 +16,10 @@
  */
 
 import Component from '@ember/component';
-import {computed, set, get, getProperties, setProperties} from '@ember/object';
-import {checkStatus} from 'thirdeye-frontend/utils/utils';
-import {yamlAlertProps, toastOptions} from 'thirdeye-frontend/utils/constants';
-import yamljs from 'yamljs';
+import { set, get, getProperties, setProperties } from '@ember/object';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import { toastOptions } from 'thirdeye-frontend/utils/constants';
+import { defaultDetectionYaml, redundantParse } from 'thirdeye-frontend/utils/yaml-tools';
 import RSVP from "rsvp";
 import fetch from 'fetch';
 import {
@@ -29,31 +29,22 @@ import {inject as service} from '@ember/service';
 import config from 'thirdeye-frontend/config/environment';
 
 export default Component.extend({
-  classNames: ['yaml-editor'],
+  classNames: ['detection-yaml'],
   notifications: service('toast'),
   /**
-   * Properties we expect to receive for the yaml-editor
+   * Properties we expect to receive for detection-yaml
    */
   currentMetric: null,
   isYamlParseable: true,
   alertTitle: 'Define detection configuration',
   isEditMode: false,
   disableYamlSave: true,
-  detectionMsg: '',                   //General alert failures
   detectionYaml: null,                // The YAML for the anomaly detection
-  currentYamlAlertOriginal: yamlAlertProps,
+  currentYamlAlertOriginal: defaultDetectionYaml,
   alertId: null, // only needed in edit mode
   setDetectionYaml: null, // bubble up detectionYaml changes to parent
 
 
-
-  isDetectionMsg: computed(
-    'detectionMsg',
-    function() {
-      const detectionMsg = get(this, 'detectionMsg');
-      return detectionMsg !== '';
-    }
-  ),
 
   init() {
     this._super(...arguments);
@@ -207,10 +198,9 @@ export default Component.extend({
       } = getProperties(this, 'detectionYaml', 'noResultsArray');
       let yamlAsObject = {};
       try {
-        yamlAsObject = yamljs.parse(detectionYaml);
+        yamlAsObject = redundantParse(detectionYaml);
         set(this, 'isYamlParseable', true);
-      }
-      catch(err){
+      } catch (error) {
         set(this, 'isYamlParseable', false);
         return noResultsArray;
       }

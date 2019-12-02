@@ -20,7 +20,6 @@ package org.apache.pinot.common.utils;
 
 import java.io.IOException;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.response.ProcessingException;
 
 
@@ -35,7 +34,7 @@ public interface DataTable {
   String NUM_SEGMENTS_QUERIED = "numSegmentsQueried";
   String NUM_SEGMENTS_PROCESSED = "numSegmentsProcessed";
   String NUM_SEGMENTS_MATCHED = "numSegmentsMatched";
-  String NUM_CONSUMING_SEGMENTS_QUERIED = "numConsumingSegmentsQueried";
+  String NUM_CONSUMING_SEGMENTS_PROCESSED = "numConsumingSegmentsProcessed";
   String MIN_CONSUMING_FRESHNESS_TIME_MS = "minConsumingFreshnessTimeMs";
   String TOTAL_DOCS_METADATA_KEY = "totalDocs";
   String NUM_GROUPS_LIMIT_REACHED_KEY = "numGroupsLimitReached";
@@ -43,13 +42,11 @@ public interface DataTable {
   String TRACE_INFO_METADATA_KEY = "traceInfo";
   String REQUEST_ID_METADATA_KEY = "requestId";
 
-  void addException(@Nonnull ProcessingException processingException);
+  void addException(ProcessingException processingException);
 
-  @Nonnull
   byte[] toBytes()
       throws IOException;
 
-  @Nonnull
   Map<String, String> getMetadata();
 
   DataSchema getDataSchema();
@@ -64,24 +61,17 @@ public interface DataTable {
 
   double getDouble(int rowId, int colId);
 
-  @Nonnull
   String getString(int rowId, int colId);
 
-  @Nonnull
   <T> T getObject(int rowId, int colId);
 
-  @Nonnull
   int[] getIntArray(int rowId, int colId);
 
-  @Nonnull
   long[] getLongArray(int rowId, int colId);
 
-  @Nonnull
   float[] getFloatArray(int rowId, int colId);
 
-  @Nonnull
   double[] getDoubleArray(int rowId, int colId);
 
-  @Nonnull
   String[] getStringArray(int rowId, int colId);
 }

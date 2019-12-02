@@ -22,10 +22,10 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.data.DateTimeFieldSpec;
-import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.core.minion.BackfillDateTimeColumn;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.backfill.BackfillSegmentUtils;
@@ -208,7 +208,7 @@ public class BackfillDateTimeColumnCommand extends AbstractBaseAdminCommand impl
 
       // upload segment
       LOGGER.info("Uploading segment {} to host: {} port: {}", segmentName, _controllerHost, _controllerPort);
-      backfillSegmentUtils.uploadSegment(segmentName, new File(outputDir, segmentName), outputDir);
+      backfillSegmentUtils.uploadSegment(_tableName, segmentName, new File(outputDir, segmentName), outputDir);
     }
 
     // verify that all segments exist

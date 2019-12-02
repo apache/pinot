@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockSingleValIterator;
 import org.apache.pinot.core.common.BlockValSet;
@@ -34,13 +34,13 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private int _startDocId;
   private int _endDocId;
   private PredicateEvaluator _evaluator;
-  private String _datasourceName;
+  private String _operatorName;
   private int _numEntriesScanned = 0;
   private final ValueMatcher _valueMatcher;
 
-  public SVScanDocIdIterator(String datasourceName, BlockValSet blockValSet, BlockMetadata blockMetadata,
+  public SVScanDocIdIterator(String operatorName, BlockValSet blockValSet, BlockMetadata blockMetadata,
       PredicateEvaluator evaluator) {
-    _datasourceName = datasourceName;
+    _operatorName = operatorName;
     _evaluator = evaluator;
     _valueIterator = (BlockSingleValIterator) blockValSet.iterator();
 
@@ -134,7 +134,7 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   @Override
   public String toString() {
-    return SVScanDocIdIterator.class.getSimpleName() + "[" + _datasourceName + "]";
+    return SVScanDocIdIterator.class.getSimpleName() + "[" + _operatorName + "]";
   }
 
   @Override
@@ -185,6 +185,9 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
       case STRING:
         return new StringMatcher();
+
+      case BYTES:
+        return new BytesMatcher();
 
       default:
         throw new UnsupportedOperationException("Index without dictionary not supported for data type: " + dataType);
@@ -238,6 +241,14 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     @Override
     public boolean doesCurrentEntryMatch(BlockSingleValIterator valueIterator) {
       return _evaluator.applySV(valueIterator.nextStringVal());
+    }
+  }
+
+  private static class BytesMatcher extends ValueMatcher {
+
+    @Override
+    public boolean doesCurrentEntryMatch(BlockSingleValIterator valueIterator) {
+      return _evaluator.applySV(valueIterator.nextBytesVal());
     }
   }
 }

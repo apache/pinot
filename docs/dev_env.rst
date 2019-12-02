@@ -36,7 +36,7 @@ Getting the Source Code
 -----------------------
 Create a fork
 ^^^^^^^^^^^^^
-To limit the number of branches created on the Apache Pinot repository, we recommend that you create a fork by clicking on the fork button `here <https://github.com/apache/incubator-pinot>`_.
+To limit the number of branches created on the Apache Pinot repository, we recommend that you create a fork by clicking on the fork button `in this page <https://github.com/apache/incubator-pinot>`_.
 Read more about `fork workflow here <https://www.atlassian.com/git/tutorials/comparing-workflows/forking-workflow>`_
 
 Clone the repository locally

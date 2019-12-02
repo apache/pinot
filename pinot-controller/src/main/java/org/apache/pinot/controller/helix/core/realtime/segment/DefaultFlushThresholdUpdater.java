@@ -19,13 +19,9 @@
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import org.apache.pinot.common.partition.PartitionAssignment;
-import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.core.realtime.stream.PartitionLevelStreamConfig;
 
 
 /**
@@ -33,43 +29,18 @@ import org.apache.pinot.common.utils.LLCSegmentName;
  * by dividing the flush threshold of the table by the max number of partitions consuming on an instance
  */
 public class DefaultFlushThresholdUpdater implements FlushThresholdUpdater {
-
-  private int _tableFlushSize;
+  private final int _tableFlushSize;
 
   DefaultFlushThresholdUpdater(int tableFlushSize) {
     _tableFlushSize = tableFlushSize;
   }
 
   @Override
-  public void updateFlushThreshold(@Nonnull LLCRealtimeSegmentZKMetadata newSegmentZKMetadata,
-      LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata, CommittingSegmentDescriptor committingSegmentDescriptor,
-      @Nonnull PartitionAssignment partitionAssignment) {
-
-    // Gather list of instances for this partition
-    String partitionId = new LLCSegmentName(newSegmentZKMetadata.getSegmentName()).getPartitionRange();
-    List<String> instancesListForPartition = partitionAssignment.getInstancesListForPartition(partitionId);
-    Map<String, Integer> partitionCountForInstance = new HashMap<>(instancesListForPartition.size());
-    instancesListForPartition.forEach(instance -> partitionCountForInstance.put(instance, 0));
-
-    // Find partition count for each instance
-    int maxPartitionCountPerInstance = 1;
-    for (Map.Entry<String, List<String>> partitionAndInstanceList : partitionAssignment.getPartitionToInstances()
-        .entrySet()) {
-      List<String> instances = partitionAndInstanceList.getValue();
-      for (String instance : instances) {
-        if (partitionCountForInstance.containsKey(instance)) {
-          int partitionCount = partitionCountForInstance.get(instance) + 1;
-          partitionCountForInstance.put(instance, partitionCount);
-          if (maxPartitionCountPerInstance < partitionCount) {
-            maxPartitionCountPerInstance = partitionCount;
-          }
-        }
-      }
-    }
-
-    // Configure the segment size flush limit based on the maximum number of partitions allocated to a replica
-    int segmentFlushSize = (int) (((float) _tableFlushSize) / maxPartitionCountPerInstance);
-    newSegmentZKMetadata.setSizeThresholdToFlushSegment(segmentFlushSize);
+  public void updateFlushThreshold(PartitionLevelStreamConfig streamConfig,
+      LLCRealtimeSegmentZKMetadata newSegmentZKMetadata, CommittingSegmentDescriptor committingSegmentDescriptor,
+      @Nullable LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata, int maxNumPartitionsPerInstance) {
+    // Configure the segment size flush limit based on the maximum number of partitions allocated to an instance
+    newSegmentZKMetadata.setSizeThresholdToFlushSegment(_tableFlushSize / maxNumPartitionsPerInstance);
   }
 
   @VisibleForTesting

@@ -18,121 +18,57 @@
  */
 package org.apache.pinot.common.config;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import org.apache.pinot.common.utils.EqualityUtils;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import org.apache.pinot.common.utils.TenantRole;
 
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class Tenant {
-  private TenantRole _tenantRole;
-  private String _tenantName;
-  private int _numberOfInstances = 0;
-  private int _offlineInstances = 0;
-  private int _realtimeInstances = 0;
+public class Tenant extends BaseJsonConfig {
+  private final TenantRole _tenantRole;
+  private final String _tenantName;
+  private final int _numberOfInstances;
+  // For SERVER tenant
+  private final int _offlineInstances;
+  private final int _realtimeInstances;
+
+  @JsonCreator
+  public Tenant(@JsonProperty(value = "tenantRole", required = true) TenantRole tenantRole,
+      @JsonProperty(value = "tenantName", required = true) String tenantName,
+      @JsonProperty("numberOfInstances") int numberOfInstances, @JsonProperty("offlineInstances") int offlineInstances,
+      @JsonProperty("realtimeInstances") int realtimeInstances) {
+    Preconditions.checkArgument(tenantRole != null, "'tenantRole' must be configured");
+    Preconditions.checkArgument(tenantName != null, "'tenantName' must be configured");
+    _tenantRole = tenantRole;
+    _tenantName = tenantName;
+    _numberOfInstances = numberOfInstances;
+    _offlineInstances = offlineInstances;
+    _realtimeInstances = realtimeInstances;
+  }
 
   public TenantRole getTenantRole() {
     return _tenantRole;
-  }
-
-  public void setTenantRole(TenantRole tenantRole) {
-    _tenantRole = tenantRole;
   }
 
   public String getTenantName() {
     return _tenantName;
   }
 
-  public void setTenantName(String tenantName) {
-    _tenantName = tenantName;
-  }
-
   public int getNumberOfInstances() {
     return _numberOfInstances;
-  }
-
-  public void setNumberOfInstances(int numberOfInstances) {
-    _numberOfInstances = numberOfInstances;
   }
 
   public int getOfflineInstances() {
     return _offlineInstances;
   }
 
-  public void setOfflineInstances(int offlineInstances) {
-    _offlineInstances = offlineInstances;
-  }
-
   public int getRealtimeInstances() {
     return _realtimeInstances;
-  }
-
-  public void setRealtimeInstances(int realtimeInstances) {
-    _realtimeInstances = realtimeInstances;
   }
 
   @JsonIgnore
   public boolean isCoLocated() {
     return _realtimeInstances + _offlineInstances > _numberOfInstances;
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (this == obj) {
-      return true;
-    }
-    if (obj instanceof Tenant) {
-      Tenant that = (Tenant) obj;
-      return EqualityUtils.isEqual(_numberOfInstances, that._numberOfInstances) && EqualityUtils
-          .isEqual(_offlineInstances, that._offlineInstances) && EqualityUtils
-          .isEqual(_realtimeInstances, that._realtimeInstances) && EqualityUtils.isEqual(_tenantRole, that._tenantRole)
-          && EqualityUtils.isEqual(_tenantName, that._tenantName);
-    }
-    return false;
-  }
-
-  @Override
-  public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(_tenantRole);
-    result = EqualityUtils.hashCodeOf(result, _tenantName);
-    result = EqualityUtils.hashCodeOf(result, _numberOfInstances);
-    result = EqualityUtils.hashCodeOf(result, _offlineInstances);
-    result = EqualityUtils.hashCodeOf(result, _realtimeInstances);
-    return result;
-  }
-
-  public static class TenantBuilder {
-    Tenant tenant;
-
-    public TenantBuilder(String name) {
-      tenant = new Tenant();
-      tenant.setTenantName(name);
-    }
-
-    public TenantBuilder setRole(TenantRole role) {
-      tenant.setTenantRole(role);
-      return this;
-    }
-
-    public TenantBuilder setTotalInstances(int totalInstances) {
-      tenant.setNumberOfInstances(totalInstances);
-      return this;
-    }
-
-    public TenantBuilder setOfflineInstances(int totalInstances) {
-      tenant.setOfflineInstances(totalInstances);
-      return this;
-    }
-
-    public TenantBuilder setRealtimeInstances(int totalInstances) {
-      tenant.setRealtimeInstances(totalInstances);
-      return this;
-    }
-
-    public Tenant build() {
-      tenant.isCoLocated();
-      return tenant;
-    }
   }
 }

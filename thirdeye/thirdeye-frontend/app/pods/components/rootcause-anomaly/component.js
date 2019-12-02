@@ -68,7 +68,7 @@ export default Component.extend({
   options: Object.keys(ANOMALY_OPTIONS_MAPPING),
 
   /**
-   * Can be set by isWarning if data inconsistent
+   * Can be set by didReceiveAttrs if data inconsistent
    * @type {boolean}
    */
   warningValue: false,
@@ -149,6 +149,12 @@ export default Component.extend({
    * @type {string}
    */
   functionName: reads('anomaly.attributes.function.firstObject'),
+
+  /**
+   * Anomaly detection (alert) id
+   * @type {string}
+   */
+  detectionConfigId: reads('anomaly.attributes.detectionConfigId.firstObject'),
 
   /**
    * Anomaly metric name from anomaly attributes
@@ -355,34 +361,6 @@ export default Component.extend({
   }),
 
   /**
-   * Checks if value at anomaly detection time and present differ by 1% or more
-   * @type {Boolean}
-   */
-  isWarning: computed('anomalyInfo', 'isRangeChanged', 'metricGranularity',
-    function () {
-      // Don't show warning when granularity is 1 or 5 minutes, regardless of discrepancy
-      const metricGranularity = get(this, 'metricGranularity');
-      if (metricGranularity !== '1_DAYS') {
-        return false;
-      }
-      if(!get(this, 'isRangeChanged')) {
-        const oldCurrent = parseFloat(get(this, 'current'));
-        let newCurrent = this._getAggregate('current');
-        const aggregateMultiplier = parseFloat(get(this, 'aggregateMultiplier'));
-        if (newCurrent && oldCurrent && aggregateMultiplier){
-          newCurrent = newCurrent * aggregateMultiplier;
-          const diffCurrent = Math.abs((newCurrent-oldCurrent)/newCurrent);
-          if (diffCurrent > 0.01) {
-            set(this, 'warningValue', true);
-          } else {
-            set(this, 'warningValue', false);
-          }
-        }
-      }
-      return get(this, 'warningValue');
-    }),
-
-  /**
    * grabs value of new current only when warningValue is toggled
    * @type {string}
    */
@@ -407,6 +385,27 @@ export default Component.extend({
       return value / (aggregateMultiplier || 1.0);
     }
     return aggregates[toOffsetUrn(metricUrn, offset)];
+  },
+
+  didReceiveAttrs() {
+    this._super(...arguments);
+
+    // Don't show warning when granularity is 1 or 5 minutes, regardless of discrepancy
+    const metricGranularity = get(this, 'metricGranularity');
+    if (metricGranularity === '1_DAYS' && !get(this, 'isRangeChanged')) {
+      const oldCurrent = parseFloat(get(this, 'current'));
+      let newCurrent = this._getAggregate('current');
+      const aggregateMultiplier = parseFloat(get(this, 'aggregateMultiplier'));
+      if (newCurrent && oldCurrent && aggregateMultiplier){
+        newCurrent = newCurrent * aggregateMultiplier;
+        const diffCurrent = Math.abs((newCurrent-oldCurrent)/newCurrent);
+        if (diffCurrent > 0.01) {
+          set(this, 'warningValue', true);
+        } else {
+          set(this, 'warningValue', false);
+        }
+      }
+    }
   },
 
   actions: {

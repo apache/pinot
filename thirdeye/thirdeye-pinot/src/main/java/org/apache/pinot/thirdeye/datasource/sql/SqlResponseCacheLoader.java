@@ -31,7 +31,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.dashboard.Utils;
@@ -56,23 +55,28 @@ import static org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeDataF
  */
 public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResultSetGroup> {
   private static final Logger LOG = LoggerFactory.getLogger(SqlResponseCacheLoader.class);
-  private static final int INIT_CONNECTIONS = 20;
-  private static int MAX_CONNECTIONS = 50;
+
   private static final String PRESTO = "Presto";
   private static final String MYSQL = "MySQL";
-  private static final String DATASETS = "datasets";
-  private static final String H2 = "H2";
-  private static final String USER = "user";
-  private static final String DB = "db";
-  private static final String PASSWORD = "password";
-  private static final DateTime MIN_DATETIME = DateTime.parse("1970-01-01");
-  private static final int ABANDONED_TIMEOUT = 60000;
+  private static final String VERTICA = "Vertica";
+
+  public static final int INIT_CONNECTIONS = 20;
+  public static int MAX_CONNECTIONS = 50;
+  public static final String DATASETS = "datasets";
+  public static final String H2 = "H2";
+  public static final String USER = "user";
+  public static final String DB = "db";
+  public static final String PASSWORD = "password";
+  public static final String DRIVER = "driver";
+  public static final int ABANDONED_TIMEOUT = 60000;
 
   private Map<String, DataSource> prestoDBNameToDataSourceMap = new HashMap<>();
   private Map<String, DataSource> mysqlDBNameToDataSourceMap = new HashMap<>();
+  private Map<String, DataSource> verticaDBNameToDataSourceMap = new HashMap<>();
 
   private static Map<String, String> prestoDBNameToURLMap = new HashMap<>();
   private static Map<String, String> mysqlDBNameToURLMap = new HashMap<>();
+  private static Map<String, String> verticaDBNameToURLMap = new HashMap<>();
 
   private static String h2Url;
   DataSource h2DataSource;
@@ -91,8 +95,6 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
           DataSource dataSource = new DataSource();
           dataSource.setInitialSize(INIT_CONNECTIONS);
           dataSource.setMaxActive(MAX_CONNECTIONS);
-          System.out.println(prestoUser);
-          System.out.println(prestoPassword);
           dataSource.setUsername(prestoUser);
           dataSource.setPassword(prestoPassword);
           dataSource.setUrl(entry.getValue());
@@ -133,6 +135,34 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
       }
     }
 
+    // Init Vertica datasources
+    if (properties.containsKey(VERTICA)) {
+      List<Map<String, Object>> verticaMapList = ConfigUtils.getList(properties.get(VERTICA));
+      for (Map<String, Object> objMap: verticaMapList) {
+        Map<String, String> dbNameToURLMap = (Map)objMap.get(DB);
+        String verticaUser = (String)objMap.get(USER);
+        String verticaPassword = getPassword(objMap);
+        String verticaDriver = (String)objMap.get(DRIVER);
+
+        for (Map.Entry<String, String> entry: dbNameToURLMap.entrySet()) {
+          DataSource dataSource = new DataSource();
+          dataSource.setInitialSize(INIT_CONNECTIONS);
+          dataSource.setMaxActive(MAX_CONNECTIONS);
+          dataSource.setUsername(verticaUser);
+          dataSource.setPassword(verticaPassword);
+          dataSource.setDriverClassName(verticaDriver);
+          dataSource.setUrl(entry.getValue());
+
+          // Timeout before an abandoned(in use) connection can be removed.
+          dataSource.setRemoveAbandonedTimeout(ABANDONED_TIMEOUT);
+          dataSource.setRemoveAbandoned(true);
+
+          verticaDBNameToDataSourceMap.put(entry.getKey(), dataSource);
+          verticaDBNameToURLMap.putAll(dbNameToURLMap);
+        }
+      }
+    }
+
     // Init H2 datasource
     if (properties.containsKey(H2)) {
       h2DataSource = new DataSource();
@@ -159,15 +189,13 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
             SqlDataset dataset = mapper.convertValue(obj, SqlDataset.class);
 
             String[] tableNameSplit = dataset.getTableName().split("\\.");
-            String tableName = tableNameSplit[tableNameSplit.length-1];
+            String tableName = tableNameSplit[tableNameSplit.length - 1];
 
             List<String> metrics = new ArrayList<>(dataset.getMetrics().keySet());
 
-            SqlUtils.createTable(h2DataSource, tableName, dataset.getTimeColumn(), metrics, dataset.getDimensions());
+            SqlUtils.createTableOverride(h2DataSource, tableName, dataset.getTimeColumn(), metrics, dataset.getDimensions());
             SqlUtils.onBoardSqlDataset(dataset);
 
-            List<H2Row> h2Rows = new ArrayList<>();
-            DateTime maxDateTime = MIN_DATETIME;
             DateTimeFormatter fmt = DateTimeFormat.forPattern(dataset.getTimeFormat()).withZone(DateTimeZone.forID(dataset.getTimezone()));
 
             if (dataset.getDataFile().length() > 0) {
@@ -178,20 +206,9 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
                 String columnNames = scanner.nextLine();
                 while (scanner.hasNextLine()) {
                   String line = scanner.nextLine();
-                  String[] items = line.split(",");
-                  DateTime dateTime = DateTime.parse(items[0], fmt);
-                  if (dateTime.isAfter(maxDateTime)) {
-                    maxDateTime = dateTime;
-                  }
-                  h2Rows.add(new H2Row(dateTime, items[1]));
-                }
-                // Calculate the day difference between today and the last day of data point
-                int days = (int) ((DateTime.now().getMillis() - maxDateTime.getMillis()) / TimeUnit.DAYS.toMillis(1));
-                for (H2Row h2Row: h2Rows) {
-                  String[] items = new String[2];
-                  items[0] = fmt.print(h2Row.getDateTime().plusDays(days));
-                  items[1] = h2Row.getVal();
-                  SqlUtils.insertCSVRow(h2DataSource, tableName, columnNames, items);
+                  String[] columnValues = line.split(",");
+                  columnValues[0] = fmt.print(DateTime.parse(columnValues[0], fmt));
+                  SqlUtils.insertCSVRow(h2DataSource, tableName, columnNames, columnValues);
                 }
               }
             }
@@ -293,6 +310,8 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
       dataSource = prestoDBNameToDataSourceMap.get(SQLQuery.getDbName());
     } else if (sourceName.equals(MYSQL)) {
       dataSource = mysqlDBNameToDataSourceMap.get(SQLQuery.getDbName());
+    } else if (sourceName.equals(VERTICA)) {
+      dataSource = verticaDBNameToDataSourceMap.get(SQLQuery.getDbName());
     } else {
       dataSource = h2DataSource;
     }
@@ -323,6 +342,7 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
     Map<String, Map<String,String>> dbNameToURLMap = new LinkedHashMap<>();
     dbNameToURLMap.put(PRESTO, prestoDBNameToURLMap);
     dbNameToURLMap.put(MYSQL, mysqlDBNameToURLMap);
+    dbNameToURLMap.put(VERTICA, verticaDBNameToURLMap);
 
     Map<String, String> h2ToURLMap = new HashMap<>();
     h2ToURLMap.put(H2, h2Url);
@@ -348,27 +368,10 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
       return prestoDBNameToDataSourceMap.get(dbName);
     } else if (sourceName.equals(MYSQL)) {
       return mysqlDBNameToDataSourceMap.get(dbName);
+    } else if (sourceName.equals(VERTICA)) {
+      return verticaDBNameToDataSourceMap.get(dbName);
     } else {
       return h2DataSource;
-    }
-  }
-
-  // Container class for one row in H2 CSV
-  final static class H2Row {
-    DateTime dateTime;
-    String val;
-
-    H2Row(DateTime dateTime, String val) {
-      this.dateTime = dateTime;
-      this.val = val;
-    }
-
-    public DateTime getDateTime() {
-      return dateTime;
-    }
-
-    public String getVal() {
-      return val;
     }
   }
 }

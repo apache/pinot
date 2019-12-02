@@ -25,6 +25,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -143,7 +144,19 @@ public class DetectionHealth {
     }
 
     /**
-     * Add the global health status in the report built by the builder, consider regression health, coverage ratio and task health
+     * Add the detection task health status in the health report built by the builder. Do not return any task details
+     * @param taskDAO the task dao
+     * @return the builder
+     */
+    public Builder addDetectionTaskStatus(TaskManager taskDAO) {
+      this.taskDAO = taskDAO;
+      this.taskLimit = 0;
+      return this;
+    }
+
+    /**
+     * Add the global health status in the report built by the builder, consider both regression health, coverage ratio and task health.
+     * The overall health can be generated only if regression health, coverage ratio and task health are available.
      * @return the builder
      */
     public Builder addOverallHealth() {
@@ -200,7 +213,7 @@ public class DetectionHealth {
       List<Interval> intervals = new ArrayList<>();
       if (!anomalies.isEmpty()) {
         anomalies.sort(Comparator.comparingLong(MergedAnomalyResultBean::getStartTime));
-        long start = anomalies.stream().findFirst().get().getStartTime();
+        long start = Math.max(anomalies.stream().findFirst().get().getStartTime(), this.startTime);
         long end = anomalies.stream().findFirst().get().getEndTime();
         for (MergedAnomalyResultDTO anomaly : anomalies) {
           if (anomaly.getStartTime() <= end) {
@@ -211,7 +224,7 @@ public class DetectionHealth {
             end = anomaly.getEndTime();
           }
         }
-        intervals.add(new Interval(start, end));
+        intervals.add(new Interval(start, Math.min(end, this.endTime)));
       }
 
       // compute coverage
@@ -228,7 +241,8 @@ public class DetectionHealth {
               Predicate.LT(COL_NAME_START_TIME, endTime), Predicate.GT(COL_NAME_END_TIME, startTime),
               Predicate.EQ(COL_NAME_TASK_TYPE, TaskConstants.TaskType.DETECTION.toString()),
               Predicate.IN(COL_NAME_TASK_STATUS, new String[]{TaskConstants.TaskStatus.COMPLETED.toString(),
-                  TaskConstants.TaskStatus.FAILED.toString(), TaskConstants.TaskStatus.TIMEOUT.toString()})));
+                  TaskConstants.TaskStatus.FAILED.toString(), TaskConstants.TaskStatus.TIMEOUT.toString(),
+                  TaskConstants.TaskStatus.WAITING.toString()})));
       tasks.sort(Comparator.comparingLong(TaskBean::getStartTime).reversed());
       // limit the task size
       tasks = tasks.stream().limit(this.taskLimit).collect(Collectors.toList());
@@ -257,5 +271,18 @@ public class DetectionHealth {
       }
       return HealthStatus.GOOD;
     }
+  }
+
+  /**
+   * Create a unknown detection health
+   * @return the unknown detection health
+   */
+  public static DetectionHealth unknown() {
+    DetectionHealth health = new DetectionHealth();
+    health.anomalyCoverageStatus = AnomalyCoverageStatus.fromCoverageRatio(Double.NaN);
+    health.detectionTaskStatus = DetectionTaskStatus.fromTasks(Collections.emptyList());
+    health.regressionStatus = RegressionStatus.fromDetectorMapes(Collections.emptyMap());
+    health.overallHealth = HealthStatus.UNKNOWN;
+    return health;
   }
 }

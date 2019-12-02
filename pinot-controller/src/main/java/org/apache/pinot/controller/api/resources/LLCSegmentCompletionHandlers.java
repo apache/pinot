@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -40,21 +41,20 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
-
-import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import org.apache.pinot.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.filesystem.PinotFSFactory;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
@@ -155,8 +155,7 @@ public class LLCSegmentCompletionHandlers {
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset).withReason(stopReason);
     LOGGER.info("Processing segmentStoppedConsuming:{}", requestParams.toString());
 
-    SegmentCompletionProtocol.Response response =
-        _segmentCompletionManager.segmentStoppedConsuming(requestParams);
+    SegmentCompletionProtocol.Response response = _segmentCompletionManager.segmentStoppedConsuming(requestParams);
     final String responseStr = response.toJsonString();
     LOGGER.info("Response to segmentStoppedConsuming for segment:{} is:{}", segmentName, responseStr);
     return responseStr;
@@ -185,8 +184,7 @@ public class LLCSegmentCompletionHandlers {
 
     LOGGER.info("Processing segmentCommitStart:{}", requestParams.toString());
 
-    SegmentCompletionProtocol.Response response =
-        _segmentCompletionManager.segmentCommitStart(requestParams);
+    SegmentCompletionProtocol.Response response = _segmentCompletionManager.segmentCommitStart(requestParams);
     final String responseStr = response.toJsonString();
     LOGGER.info("Response to segmentCommitStart for segment:{} is:{}", segmentName, responseStr);
     return responseStr;
@@ -283,9 +281,9 @@ public class LLCSegmentCompletionHandlers {
             try {
               FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
               final String rawTableName = new LLCSegmentName(segmentName).getTableName();
-              URI segmentFileURI = ControllerConf.getUriFromPath(
-                  StringUtil.join("/", provider.getBaseDataDirURI().toString(), rawTableName, segmentName));
-              PinotFS pinotFS = PinotFSFactory.create(provider.getBaseDataDirURI().getScheme());
+              URI segmentFileURI =
+                  URIUtils.getUri(provider.getBaseDataDirURI().toString(), rawTableName, URIUtils.encode(segmentName));
+              PinotFS pinotFS = PinotFSFactory.create(segmentFileURI.getScheme());
               // Multiple threads can reach this point at the same time, if the following scenario happens
               // The server that was asked to commit did so very slowly (due to network speeds). Meanwhile the FSM in
               // SegmentCompletionManager timed out, and allowed another server to commit, which did so very quickly (somehow
@@ -428,8 +426,8 @@ public class LLCSegmentCompletionHandlers {
     try {
       Preconditions.checkState(tempMetadataDir.mkdirs(), "Failed to create directory: %s", tempMetadataDirStr);
       // Extract metadata.properties from the metadataFiles.
-      if (!extractMetadataFromInputField(metadataFiles, tempMetadataDirStr,
-          V1Constants.MetadataKeys.METADATA_FILE_NAME, segmentNameStr)) {
+      if (!extractMetadataFromInputField(metadataFiles, tempMetadataDirStr, V1Constants.MetadataKeys.METADATA_FILE_NAME,
+          segmentNameStr)) {
         return null;
       }
       // Extract creation.meta from the metadataFiles.
@@ -486,7 +484,7 @@ public class LLCSegmentCompletionHandlers {
     File tempSegmentDataDir = new File(tempSegmentDataDirStr);
     File segDstFile = new File(StringUtil.join("/", tempSegmentDataDirStr, segmentNameStr));
     // Use PinotFS to copy the segment file to local fs for metadata extraction.
-    PinotFS pinotFS = PinotFSFactory.create(ControllerConf.getUriFromPath(_controllerConf.getDataDir()).getScheme());
+    PinotFS pinotFS = PinotFSFactory.create(URIUtils.getUri(_controllerConf.getDataDir()).getScheme());
     try {
       Preconditions.checkState(tempSegmentDataDir.mkdirs(), "Failed to create directory: %s", tempSegmentDataDir);
       pinotFS.copyToLocalFile(segmentLocation, segDstFile);
@@ -539,7 +537,7 @@ public class LLCSegmentCompletionHandlers {
   private File uploadFileToLocalTmpFile(FormDataMultiPart multiPart, String instanceId, String segmentName) {
     try {
       Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
-      if (!PinotSegmentUploadRestletResource.validateMultiPart(map, segmentName)) {
+      if (!PinotSegmentUploadDownloadRestletResource.validateMultiPart(map, segmentName)) {
         return null;
       }
       String name = map.keySet().iterator().next();
@@ -575,8 +573,7 @@ public class LLCSegmentCompletionHandlers {
     // See PinotLLCRealtimeSegmentManager.commitSegmentFile().
     // TODO: move tmp file logic into SegmentCompletionUtils.
     String uniqueSegmentFileName = SegmentCompletionUtils.generateSegmentFileName(segmentName);
-    URI segmentFileURI = ControllerConf.getUriFromPath(
-        StringUtil.join("/", provider.getBaseDataDirURI().toString(), rawTableName, uniqueSegmentFileName));
+    URI segmentFileURI = URIUtils.getUri(provider.getBaseDataDirURI().toString(), rawTableName, uniqueSegmentFileName);
     PinotFS pinotFS = PinotFSFactory.create(provider.getBaseDataDirURI().getScheme());
     pinotFS.copyFromLocalFile(localTmpFile, segmentFileURI);
     return segmentFileURI;

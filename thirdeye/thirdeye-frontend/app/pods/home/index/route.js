@@ -52,6 +52,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
     const { appName, startDate, endDate, duration, feedbackType, subGroup } = params;//check params
     const applications = await this.get('anomaliesApiService').queryApplications();// Get all applicatons available
     const subscriptionGroups = await this.get('anomaliesApiService').querySubscriptionGroups(); // Get all subscription groups available
+    const getAnomaliesTask = this.get('_getAnomalyMapping');
 
     return hash({
       appName,
@@ -61,18 +62,28 @@ export default Route.extend(AuthenticatedRouteMixin, {
       applications,
       subscriptionGroups,
       feedbackType,
-      subGroup
+      subGroup,
+      getAnomaliesTask
     });
   },
 
   afterModel(model) {
     // Overrides with params if exists
-    const appName = model.appName || null;//model.applications.get('firstObject.application');
-    const startDate = Number(model.startDate) || this.get('startDate');//TODO: we can use ember transform here
-    const endDate = Number(model.endDate) || this.get('endDate');
-    const duration = model.duration || this.get('duration');
+    let appName = model.appName || null;//model.applications.get('firstObject.application');
+    let startDate = Number(model.startDate) || this.get('startDate');//TODO: we can use ember transform here
+    let endDate = Number(model.endDate) || this.get('endDate');
+    let duration = model.duration || this.get('duration');
     const feedbackType = model.feedbackType || this.get('feedbackType');
     const subGroup = model.subGroup || null;
+
+    // if there are no selections made, set to tier0-tier1 application by default
+    if (!appName && !subGroup) {
+      appName = 'tier0-tier1';
+      startDate = moment().startOf('day').subtract(1, 'week').utc().valueOf();
+      endDate = moment().startOf('day').utc().valueOf();
+      duration = '1w';
+    }
+
     // Update props
     this.setProperties({
       appName,
@@ -166,6 +177,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
    */
   setupController(controller, model) {
     this._super(...arguments);
+    const anomaliesBySelected = model.subGroup ? 'Subscription Group' : 'Application';
     controller.setProperties({
       columns,
       appNameSelected: model.applications.findBy('application', this.get('appName')),
@@ -173,7 +185,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
       anomaliesCount: this.get('anomalies.content') ? this.get('anomalies.content').length : 0,
       subGroupSelected: model.subscriptionGroups.findBy('name', this.get('subGroup')),
       subGroup: this.get('subGroup'),
-      subscriptionGroups: model.subscriptionGroups
+      subscriptionGroups: model.subscriptionGroups,
+      anomaliesBySelected
     });
   },
 
@@ -187,6 +200,19 @@ export default Route.extend(AuthenticatedRouteMixin, {
       if (transition.intent.name && transition.intent.name !== 'logout') {
         this.set('session.store.fromUrl', {lastIntentTransition: transition});
       }
+    },
+
+    error() {
+      return true;
+    },
+
+    /**
+    * Refresh route's model.
+    * @method refreshModel
+    * @return {undefined}
+    */
+    refreshModel() {
+      this.refresh();
     }
   }
 });

@@ -19,14 +19,13 @@
 package org.apache.pinot.core.data.function;
 
 import java.lang.reflect.Method;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.joda.time.DateTime;
 import org.joda.time.Days;
 import org.joda.time.MutableDateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import scala.collection.mutable.StringBuilder;
 
 
 public class FunctionExpressionEvaluatorTest {

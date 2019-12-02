@@ -34,7 +34,7 @@ public class HllFieldSizeTest {
   @Test
   public void testHllFieldSerializedSize()
       throws Exception {
-    for (int i = 5; i < 10; i++) {
+    for (int i = 5; i < 16; i++) {
       HyperLogLog hll = new HyperLogLog(i);
       Assert.assertEquals(HllSizeUtils.getHllFieldSizeFromLog2m(i), hll.getBytes().length);
       LOGGER.info("Estimated: " + hll.cardinality());

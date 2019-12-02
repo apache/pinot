@@ -28,9 +28,12 @@ import org.apache.pinot.common.response.BrokerResponse;
  * post-processing at a finer level than metrics.
  */
 public class RequestStatistics {
+
+  private static final String DEFAULT_TABLE_NAME = "NotYetParsed";
+
   private int _errorCode = 0;
   private String _pql;
-  private String _tableName = "NotYetParsed";
+  private String _tableName = DEFAULT_TABLE_NAME;
   private long _processingTimeMillis = -1;
 
   private long _totalDocs;
@@ -188,5 +191,9 @@ public class RequestStatistics {
 
   public int getNumExceptions() {
     return _numExceptions;
+  }
+
+  public boolean hasValidTableName() {
+    return ! DEFAULT_TABLE_NAME.equals(_tableName);
   }
 }

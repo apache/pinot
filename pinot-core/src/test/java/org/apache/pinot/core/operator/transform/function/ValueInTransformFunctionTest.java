@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.transform.function;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
-import java.util.Arrays;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
@@ -54,13 +53,11 @@ public class ValueInTransformFunctionTest extends BaseTransformFunctionTest {
         }
       }
       int[] expectedValues = expectedList.toIntArray();
-      // NOTE: need to sort the expected array because we sort the dictionary Ids for multi-valued entries
-      Arrays.sort(expectedValues);
 
       int numValues = expectedValues.length;
       for (int j = 0; j < numValues; j++) {
         int expected = expectedValues[j];
-        Assert.assertEquals(dictIds[i][j], dictionary.indexOf(expected));
+        Assert.assertEquals(dictIds[i][j], dictionary.indexOf(Integer.toString(expected)));
         Assert.assertEquals(intValues[i][j], expected);
         Assert.assertEquals(longValues[i][j], (long) expected);
         Assert.assertEquals(floatValues[i][j], (float) expected);

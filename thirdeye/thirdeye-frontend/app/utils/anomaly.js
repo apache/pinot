@@ -4,9 +4,10 @@ import _ from 'lodash';
 import {
   checkStatus,
   postProps,
-  postYamlProps,
-  getProps
+  getProps,
+  putProps
 } from 'thirdeye-frontend/utils/utils';
+import { postYamlProps } from 'thirdeye-frontend/utils/yaml-tools';
 import fetch from 'fetch';
 import {
   anomalyApiUrls,
@@ -14,8 +15,10 @@ import {
   getAnomaliesByAlertIdUrl,
   getAnomalyFiltersByTimeRangeUrl,
   getAnomalyFiltersByAnomalyIdUrl,
-  getBoundsAndAnomaliesUrl
+  getBoundsUrl,
+  getAiAvailabilityUrl
 } from 'thirdeye-frontend/utils/api/anomaly';
+import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
 
 /**
  * Response type options for anomalies.
@@ -50,8 +53,16 @@ export const anomalyResponseObjNew = [
     value: 'NONE',
     status: 'Not Resolved'
   },
+  { name: 'Not reviewed yet',
+    value: 'NO_FEEDBACK',
+    status: 'Not Resolved'
+  },
   { name: 'Yes - unexpected',
     value: 'ANOMALY',
+    status: 'Confirmed Anomaly'
+  },
+  { name: 'Yes - unexpected',
+    value: 'FALSE_NEGATIVE',
     status: 'Confirmed Anomaly'
   },
   { name: 'Expected temporary change',
@@ -112,16 +123,29 @@ export function getYamlPreviewAnomalies(yamlString, startTime, endTime, alertId)
 }
 
 /**
- * Get bounds and anomalies for a given detection
+ * Get bounds for a given detection (note the anomalies in this response are not end-user anomalies)
  * @method getBoundsAndAnomalies
  * @param {String} detectionId - the id of the detection
  * @param {Number} startTime - start time of analysis range
  * @param {Number} endTime - end time of analysis range
  * @return {Ember.RSVP.Promise}
  */
-export function getBoundsAndAnomalies(detectionId, startTime, endTime) {
-  const url = getBoundsAndAnomaliesUrl(detectionId, startTime, endTime);
+export function getBounds(detectionId, startTime, endTime) {
+  const url = getBoundsUrl(detectionId, startTime, endTime);
   return fetch(url, getProps()).then((res) => checkStatus(res));
+}
+
+/**
+ * Get table data for AI Availability
+ * @method getAiAvailability
+ * @param {Number} detectionConfigId - the config id for the table data's alert
+ * @param {Number} startDate - start time of analysis range
+ * @param {Number} endDate - end time of analysis range
+ * @return {Ember.RSVP.Promise}
+ */
+export function getAiAvailability(detectionConfigId, startDate, endDate) {
+  const url = getAiAvailabilityUrl(startDate, endDate);
+  return fetch(url).then(checkStatus);
 }
 
 /**
@@ -160,6 +184,18 @@ export function getAnomalyFiltersByTimeRange(startTime, endTime) {
 export function getAnomalyFiltersByAnomalyId(startTime, endTime, anomalyIds) {
   const url = getAnomalyFiltersByAnomalyIdUrl(startTime, endTime, anomalyIds);
   return fetch(url).then(checkStatus);
+}
+
+/**
+ * Put alert active status change into backend
+ * @method putAlertActiveStatus
+ * @param {Number} detectionConfigId - id of alert's detection configuration
+ * @param {Boolean} active - what to set active flag to
+ * @return {Ember.RSVP.Promise}
+ */
+export function putAlertActiveStatus(detectionConfigId, active) {
+  const url = selfServeApiCommon.setAlertActivationUrl(detectionConfigId, active);
+  return fetch(url, putProps()).then(checkStatus);
 }
 
 /**
@@ -216,6 +252,8 @@ export default {
   getFormattedDuration,
   verifyAnomalyFeedback,
   pluralizeTime,
+  putAlertActiveStatus,
   getYamlPreviewAnomalies,
-  getAnomaliesByAlertId
+  getAnomaliesByAlertId,
+  getBounds
 };

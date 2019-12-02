@@ -23,7 +23,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.LoadingCache;
 import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.pinot.thirdeye.anomaly.alert.util.AlertFilterHelper;
-import org.apache.pinot.thirdeye.anomaly.onboard.utils.FunctionCreationUtils;
 import org.apache.pinot.thirdeye.anomaly.views.AnomalyTimelinesView;
 import org.apache.pinot.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
@@ -31,9 +30,7 @@ import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeries;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
-import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
-import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.AnomaliesResource;
 import org.apache.pinot.thirdeye.dashboard.views.TimeBucket;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
@@ -41,11 +38,9 @@ import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import org.apache.pinot.thirdeye.datalayer.bao.AutotuneConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
@@ -54,7 +49,6 @@ import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import org.apache.pinot.thirdeye.detector.email.filter.BaseAlertFilter;
 import org.apache.pinot.thirdeye.detector.email.filter.DummyAlertFilter;
 import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
-import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.apache.pinot.thirdeye.util.TimeSeriesUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -88,12 +82,9 @@ import org.joda.time.Interval;
 import org.joda.time.Period;
 import org.joda.time.Weeks;
 import org.joda.time.format.ISODateTimeFormat;
-import org.quartz.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import scala.Tuple2;
-
-import static org.apache.pinot.thirdeye.anomaly.detection.lib.AutotuneMethodType.*;
 
 
 @Path(value = "/dashboard")
@@ -104,22 +95,17 @@ public class AnomalyResource {
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyResource.class);
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private static final String DEFAULT_CRON = "0 0 0 * * ?";
   private static final String UTF8 = "UTF-8";
-  private static final String DEFAULT_FUNCTION_TYPE = "WEEK_OVER_WEEK_RULE";
 
   private AnomalyFunctionManager anomalyFunctionDAO;
   private MergedAnomalyResultManager anomalyMergedResultDAO;
   private AlertConfigManager emailConfigurationDAO;
-  private MetricConfigManager metricConfigDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
   private AutotuneConfigManager autotuneConfigDAO;
   private DatasetConfigManager datasetConfigDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
   private AlertFilterFactory alertFilterFactory;
-  private AlertFilterAutotuneFactory alertFilterAutotuneFactory;
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
-  private LoadingCache<String, String> dimensionFiltersCache;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -128,15 +114,12 @@ public class AnomalyResource {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.emailConfigurationDAO = DAO_REGISTRY.getAlertConfigDAO();
-    this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.autotuneConfigDAO = DAO_REGISTRY.getAutotuneConfigDAO();
     this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
     this.anomalyFunctionFactory = anomalyFunctionFactory;
     this.alertFilterFactory = alertFilterFactory;
-    this.alertFilterAutotuneFactory = alertFilterAutotuneFactory;
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getDatasetMaxDataTimeCache();
-    this.dimensionFiltersCache = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache();
   }
 
   /************** CRUD for anomalies of a collection ********************************************************/
@@ -258,203 +241,6 @@ public class AnomalyResource {
       }
     }
     return anomalyFunctions;
-  }
-
-  /**
-   * Endpoint to be used for creating new anomaly function
-   * @param dataset name of dataset for the new anomaly function
-   * @param functionName name of the new anomaly function. Should follow convention "productName_metricName_dimensionName_other"
-   * @param metric name of metric on Thirdeye of the new anomaly function
-   * @param metric_function was using as a consolidation function, now by default use "SUM"
-   * @param type type of anomaly function. Minutely metrics use SIGN_TEST_VANILLA,
-   *             Hourly metrics use REGRESSION_GAUSSIAN_SCAN, Daily metrics use SPLINE_REGRESSION
-   * @param windowSize Detection window size
-   * @param windowUnit Detection window unit
-   * @param windowDelay Detection window delay (wait for data completeness)
-   * @param windowDelayUnit Detection window delay unit
-   * @param cron cron of detection
-   * @param exploreDimensions explore dimensions in JSON
-   * @param filters filters on dimensions
-   * @param userInputDataGranularity user input metric granularity, if null uses dataset granularity
-   * @param properties properties for anomaly function
-   * @param isActive whether set the new anomaly function to be active or not
-   * @return new anomaly function Id if successfully create new anomaly function
-   * @throws Exception
-   */
-  @POST
-  @Path("/anomaly-function")
-  @ApiOperation("Endpoint to be used for creating new anomaly function")
-  public Response createAnomalyFunction(@NotNull @QueryParam("dataset") String dataset,
-      @NotNull @QueryParam("functionName") String functionName, @NotNull @QueryParam("metric") String metric,
-      @NotNull @QueryParam("metricFunction") String metric_function, @QueryParam("type") String type,
-      @NotNull @QueryParam("windowSize") String windowSize, @NotNull @QueryParam("windowUnit") String windowUnit,
-      @QueryParam("windowDelay") @DefaultValue("0") String windowDelay, @QueryParam("cron") String cron,
-      @QueryParam("windowDelayUnit") String windowDelayUnit, @QueryParam("exploreDimension") String exploreDimensions,
-      @QueryParam("filters") String filters, @QueryParam("dataGranularity") String userInputDataGranularity,
-      @NotNull @QueryParam("properties") String properties, @QueryParam("isActive") boolean isActive) throws Exception {
-    if (StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionName) || StringUtils.isEmpty(metric)
-        || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || properties == null) {
-      throw new IllegalArgumentException(String.format("Received nulll or emtpy String for one of the mandatory params: "
-          + "dataset: %s, metric: %s, functionName %s, windowSize: %s, windowUnit: %s, and properties: %s", dataset,
-          metric, functionName, windowSize, windowUnit, properties));
-    }
-
-    TimeGranularity dataGranularity;
-    DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
-    if (datasetConfig == null) {
-      throw new IllegalArgumentException(String.format("No entry with dataset name %s exists", dataset));
-    }
-    if (userInputDataGranularity == null) {
-      TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
-      dataGranularity = timespec.getDataGranularity();
-    } else {
-      dataGranularity = TimeGranularity.fromString(userInputDataGranularity);
-    }
-
-    AnomalyFunctionDTO anomalyFunctionSpec = new AnomalyFunctionDTO();
-    anomalyFunctionSpec.setActive(isActive);
-    anomalyFunctionSpec.setMetricFunction(MetricAggFunction.valueOf(metric_function));
-    anomalyFunctionSpec.setCollection(dataset);
-    anomalyFunctionSpec.setFunctionName(functionName);
-    anomalyFunctionSpec.setTopicMetric(metric);
-    anomalyFunctionSpec.setMetrics(Arrays.asList(metric));
-    if (StringUtils.isEmpty(type)) {
-      type = DEFAULT_FUNCTION_TYPE;
-    }
-    anomalyFunctionSpec.setType(type);
-    anomalyFunctionSpec.setWindowSize(Integer.valueOf(windowSize));
-    anomalyFunctionSpec.setWindowUnit(TimeUnit.valueOf(windowUnit));
-
-    // Setting window delay time / unit
-    TimeUnit dataGranularityUnit = dataGranularity.getUnit();
-
-    // default windowDelay = 0, can be adjusted to cope with expected delay for given dataset/metric
-    int windowDelayTime = Integer.valueOf(windowDelay);
-    TimeUnit windowDelayTimeUnit;
-    switch (dataGranularityUnit) {
-      case MINUTES:
-        windowDelayTimeUnit = TimeUnit.MINUTES;
-        break;
-      case DAYS:
-        windowDelayTimeUnit = TimeUnit.DAYS;
-        break;
-      case HOURS:
-      default:
-        windowDelayTimeUnit = TimeUnit.HOURS;
-    }
-    if (StringUtils.isNotBlank(windowDelayUnit)) {
-      windowDelayTimeUnit = TimeUnit.valueOf(windowDelayUnit.toUpperCase());
-    }
-    anomalyFunctionSpec.setWindowDelayUnit(windowDelayTimeUnit);
-    anomalyFunctionSpec.setWindowDelay(windowDelayTime);
-
-    // setup detection frequency if it's minutely function
-    // the default frequency in AnomalyDetectionFunctionBean is 1 hour
-    // when detection job is scheduled, the frequency may also be modified by data granularity
-    // this frequency is a override to allow longer time period (lower frequency) and reduce system load
-    if (dataGranularity.getUnit().equals(TimeUnit.MINUTES)) {
-      TimeGranularity frequency = new TimeGranularity(15, TimeUnit.MINUTES);
-      anomalyFunctionSpec.setFrequency(frequency);
-    }
-
-    // bucket size and unit are defaulted to the collection granularity
-    anomalyFunctionSpec.setBucketSize(dataGranularity.getSize());
-    anomalyFunctionSpec.setBucketUnit(dataGranularity.getUnit());
-
-    if (StringUtils.isNotEmpty(exploreDimensions)) {
-      anomalyFunctionSpec.setExploreDimensions(FunctionCreationUtils.getDimensions(datasetConfig, exploreDimensions));
-    }
-    if (!StringUtils.isBlank(filters)) {
-      filters = URLDecoder.decode(filters, UTF8);
-      String filterString = ThirdEyeUtils.getSortedFiltersFromJson(filters);
-      anomalyFunctionSpec.setFilters(filterString);
-    }
-    anomalyFunctionSpec.setProperties(properties);
-
-    if (StringUtils.isEmpty(cron)) {
-      cron = DEFAULT_CRON;
-    } else {
-      // validate cron
-      if (!CronExpression.isValidExpression(cron)) {
-        throw new IllegalArgumentException("Invalid cron expression for cron : " + cron);
-      }
-    }
-    anomalyFunctionSpec.setCron(cron);
-
-    Long id = anomalyFunctionDAO.save(anomalyFunctionSpec);
-
-    return Response.ok(id).build();
-  }
-
-  /**
-   * Apply an autotune configuration to an existing function
-   * @param id
-   * The id of an autotune configuration
-   * @param isCloneFunction
-   * Should we clone the function or simply apply the autotune configuration to the existing function
-   * @return
-   * an activated anomaly detection function
-   */
-  @POST
-  @Path("/anomaly-function/apply/{autotuneConfigId}")
-  @ApiOperation("Apply an autotune configuration to an existing function")
-  public Response applyAutotuneConfig(@PathParam("autotuneConfigId") @NotNull long id,
-      @QueryParam("cloneFunction") @DefaultValue("false") boolean isCloneFunction,
-      @QueryParam("cloneAnomalies") Boolean isCloneAnomalies) {
-    Map<String, String> responseMessage = new HashMap<>();
-    AutotuneConfigDTO autotuneConfigDTO = autotuneConfigDAO.findById(id);
-    if (autotuneConfigDTO == null) {
-      responseMessage.put("message", "Cannot find the autotune configuration entry " + id + ".");
-      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
-    }
-    if (autotuneConfigDTO.getConfiguration() == null || autotuneConfigDTO.getConfiguration().isEmpty()) {
-      responseMessage.put("message",
-          "Autotune configuration is null or empty. The original function is optimal. Nothing to change");
-      return Response.ok(responseMessage).build();
-    }
-
-    if (isCloneAnomalies == null) { // if isCloneAnomalies is not given, assign a default value
-      isCloneAnomalies = containsLabeledAnomalies(autotuneConfigDTO.getFunctionId());
-    }
-
-    AnomalyFunctionDTO originalFunction = anomalyFunctionDAO.findById(autotuneConfigDTO.getFunctionId());
-    AnomalyFunctionDTO targetFunction = originalFunction;
-
-    // clone anomaly function and its anomaly results if requested
-    if (isCloneFunction) {
-      OnboardResource onboardResource = new OnboardResource(anomalyFunctionDAO, mergedAnomalyResultDAO);
-      long cloneId;
-      String tag = "clone";
-      try {
-        cloneId = onboardResource.cloneAnomalyFunctionById(originalFunction.getId(), "clone", isCloneAnomalies);
-      } catch (Exception e) {
-        responseMessage.put("message",
-            "Unable to clone function " + originalFunction.getId() + " with clone tag \"clone\"");
-        LOG.warn("Unable to clone function {} with clone tag \"{}\"", originalFunction.getId(), "clone");
-        return Response.status(Response.Status.CONFLICT).entity(responseMessage).build();
-      }
-      targetFunction = anomalyFunctionDAO.findById(cloneId);
-    }
-
-    // Verify if to update alert filter or function configuraions
-    // if auto tune method is EXHAUSTIVE, which belongs to function auto tune, need to update function configurations
-    // if auto tune method is ALERT_FILTER_LOGISITC_AUTO_TUNE or INITIATE_ALERT_FILTER_LOGISTIC_AUTO_TUNE, alert filter is to be updated
-    if (autotuneConfigDTO.getAutotuneMethod() != EXHAUSTIVE) {
-      targetFunction.setAlertFilter(autotuneConfigDTO.getConfiguration());
-    } else {
-      // Update function configuration
-      targetFunction.updateProperties(autotuneConfigDTO.getConfiguration());
-    }
-    targetFunction.setActive(true);
-    anomalyFunctionDAO.update(targetFunction);
-
-    // Deactivate original function
-    if (isCloneFunction) {
-      originalFunction.setActive(false);
-      anomalyFunctionDAO.update(originalFunction);
-    }
-
-    return Response.ok(targetFunction).build();
   }
 
   /**

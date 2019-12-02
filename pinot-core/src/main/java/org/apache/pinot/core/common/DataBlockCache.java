@@ -23,8 +23,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 
 

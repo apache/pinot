@@ -25,7 +25,7 @@ import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
+import org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import org.apache.pinot.thirdeye.anomaly.classification.ClassificationTaskRunner;
@@ -74,7 +74,7 @@ import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+import static org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration.SMTP_CONFIG_KEY;
 
 
 public class AnomalyReportGenerator {
@@ -83,7 +83,7 @@ public class AnomalyReportGenerator {
 
   private static final AnomalyReportGenerator INSTANCE = new AnomalyReportGenerator();
   private static final String DATE_PATTERN = "MMM dd, HH:mm";
-  private static final String MULTIPLE_ANOMALIES_EMAIL_TEMPLATE = "holiday-anomaly-report.ftl";
+  private static final String MULTIPLE_ANOMALIES_EMAIL_TEMPLATE = "metric-anomalies-template.ftl";
 
   private static final long EVENT_TIME_TOLERANCE = TimeUnit.DAYS.toMillis(2);
 
@@ -314,7 +314,7 @@ public class AnomalyReportGenerator {
       if (anomalyReports.size() == 1) {
         AnomalyReportDTO singleAnomaly = anomalyReports.get(0);
         try {
-          imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), configuration);
+          imgPath = AlertScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), configuration);
           if (StringUtils.isNotBlank(imgPath)) {
             cid = email.embed(new File(imgPath));
           }

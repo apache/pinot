@@ -22,10 +22,9 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
@@ -56,7 +55,7 @@ public class ImmutableSegmentLoader {
   /**
    * For tests only.
    */
-  public static ImmutableSegment load(@Nonnull File indexDir, @Nonnull ReadMode readMode)
+  public static ImmutableSegment load(File indexDir, ReadMode readMode)
       throws Exception {
     IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig();
     defaultIndexLoadingConfig.setReadMode(readMode);
@@ -64,22 +63,14 @@ public class ImmutableSegmentLoader {
   }
 
   /**
-   * For segments from REALTIME table.
-   * <p>
-   * NOTE: Currently REALTIME data manager does not have mechanism to download a new segment copy from controller and
-   * reload the segment when encountering exception during segment load (HLC maintains segment on server side only),
-   * so REALTIME table should always use this method without passing schema.
+   * For tests only.
    */
-  public static ImmutableSegment load(@Nonnull File indexDir, @Nonnull IndexLoadingConfig indexLoadingConfig)
+  public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     return load(indexDir, indexLoadingConfig, null);
   }
 
-  /**
-   * For segments from OFFLINE table.
-   */
-  public static ImmutableSegment load(@Nonnull File indexDir, @Nonnull IndexLoadingConfig indexLoadingConfig,
-      @Nullable Schema schema)
+  public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
       throws Exception {
     Preconditions
         .checkArgument(indexDir.isDirectory(), "Index directory: {} does not exist or is not a directory", indexDir);
@@ -130,9 +121,9 @@ public class ImmutableSegmentLoader {
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSchema(schema);
 
     // Instantiate virtual columns
-    for (String columnName : schema.getColumnNames()) {
-      if (schema.isVirtualColumn(columnName)) {
-        FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (fieldSpec.isVirtualColumn()) {
+        String columnName = fieldSpec.getName();
         VirtualColumnProvider provider =
             VirtualColumnProviderFactory.buildProvider(fieldSpec.getVirtualColumnProvider());
         VirtualColumnContext context = new VirtualColumnContext(NetUtil.getHostnameOrAddress(), segmentName, columnName,

@@ -28,6 +28,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -102,19 +103,28 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
    */
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    int numOperators = _operators.size();
-    CountDownLatch operatorLatch = new CountDownLatch(numOperators);
     ConcurrentHashMap<String, Object[]> resultsMap = new ConcurrentHashMap<>();
     AtomicInteger numGroups = new AtomicInteger();
     ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
 
     AggregationFunctionContext[] aggregationFunctionContexts =
-        AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest.getAggregationsInfo(), null);
+        AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest, null);
     int numAggregationFunctions = aggregationFunctionContexts.length;
     AggregationFunction[] aggregationFunctions = new AggregationFunction[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       aggregationFunctions[i] = aggregationFunctionContexts[i].getAggregationFunction();
     }
+
+    // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
+    // futures (try to interrupt the execution if it already started).
+    // Besides the CountDownLatch, we also use a Phaser to ensure all the Futures are done (not scheduled, finished or
+    // interrupted) before the main thread returns. We need to ensure no execution left before the main thread returning
+    // because the main thread holds the reference to the segments, and if the segments are deleted/refreshed, the
+    // segments can be released after the main thread returns, which would lead to undefined behavior (even JVM crash)
+    // when executing queries against them.
+    int numOperators = _operators.size();
+    CountDownLatch operatorLatch = new CountDownLatch(numOperators);
+    Phaser phaser = new Phaser(1);
 
     Future[] futures = new Future[numOperators];
     for (int i = 0; i < numOperators; i++) {
@@ -123,9 +133,15 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
         @SuppressWarnings("unchecked")
         @Override
         public void runJob() {
-          AggregationGroupByResult aggregationGroupByResult;
-
           try {
+            // Register the thread to the phaser.
+            // If the phaser is terminated (returning negative value) when trying to register the thread, that means the
+            // query execution has timed out, and the main thread has deregistered itself and returned the result.
+            // Directly return as no execution result will be taken.
+            if (phaser.register() < 0) {
+              return;
+            }
+
             IntermediateResultsBlock intermediateResultsBlock =
                 (IntermediateResultsBlock) _operators.get(index).nextBlock();
 
@@ -136,7 +152,7 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
             }
 
             // Merge aggregation group-by result.
-            aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
+            AggregationGroupByResult aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
             if (aggregationGroupByResult != null) {
               // Iterate over the group-by keys, for each key, update the group-by result in the resultsMap.
               Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
@@ -164,9 +180,10 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
             LOGGER.error("Exception processing CombineGroupBy for index {}, operator {}", index,
                 _operators.get(index).getClass().getName(), e);
             mergedProcessingExceptions.add(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+          } finally {
+            operatorLatch.countDown();
+            phaser.arriveAndDeregister();
           }
-
-          operatorLatch.countDown();
         }
       });
     }
@@ -224,6 +241,8 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
           future.cancel(true);
         }
       }
+      // Deregister the main thread and wait for all threads done
+      phaser.awaitAdvance(phaser.arriveAndDeregister());
     }
   }
 

@@ -18,34 +18,33 @@
  */
 package org.apache.pinot.core.data.recordtransformer;
 
-import java.util.HashMap;
-import java.util.Map;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
+import java.util.Arrays;
+import java.util.Collections;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.*;
 
 
 public class RecordTransformerTest {
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
       // For data type conversion
-      .addSingleValueDimension("svInt", FieldSpec.DataType.INT)
-      .addSingleValueDimension("svLong", FieldSpec.DataType.LONG)
-      .addSingleValueDimension("svFloat", FieldSpec.DataType.FLOAT)
-      .addSingleValueDimension("svDouble", FieldSpec.DataType.DOUBLE)
-      .addSingleValueDimension("svBytes", FieldSpec.DataType.BYTES)
-      .addMultiValueDimension("mvInt", FieldSpec.DataType.INT).addMultiValueDimension("mvLong", FieldSpec.DataType.LONG)
-      .addMultiValueDimension("mvFloat", FieldSpec.DataType.FLOAT)
-      .addMultiValueDimension("mvDouble", FieldSpec.DataType.DOUBLE)
+      .addSingleValueDimension("svInt", DataType.INT).addSingleValueDimension("svLong", DataType.LONG)
+      .addSingleValueDimension("svFloat", DataType.FLOAT).addSingleValueDimension("svDouble", DataType.DOUBLE)
+      .addSingleValueDimension("svBytes", DataType.BYTES).addMultiValueDimension("mvInt", DataType.INT)
+      .addMultiValueDimension("mvLong", DataType.LONG).addMultiValueDimension("mvFloat", DataType.FLOAT)
+      .addMultiValueDimension("mvDouble", DataType.DOUBLE)
       // For sanitation
-      .addSingleValueDimension("svStringWithNullCharacters", FieldSpec.DataType.STRING)
-      .addSingleValueDimension("svStringWithLengthLimit", FieldSpec.DataType.STRING).build();
+      .addSingleValueDimension("svStringWithNullCharacters", DataType.STRING)
+      .addSingleValueDimension("svStringWithLengthLimit", DataType.STRING).build();
 
   static {
     SCHEMA.getFieldSpecFor("svStringWithLengthLimit").setMaxLength(2);
+    SCHEMA.addField(new DimensionFieldSpec("$virtual", DataType.STRING, true, Object.class));
   }
 
   // Transform multiple times should return the same result
@@ -53,19 +52,17 @@ public class RecordTransformerTest {
 
   private static GenericRow getRecord() {
     GenericRow record = new GenericRow();
-    Map<String, Object> fields = new HashMap<>();
-    fields.put("svInt", (byte) 123);
-    fields.put("svLong", (char) 123);
-    fields.put("svFloat", (short) 123);
-    fields.put("svDouble", "123");
-    fields.put("svBytes", new byte[]{123, 123});
-    fields.put("mvInt", new Object[]{123L});
-    fields.put("mvLong", new Object[]{123f});
-    fields.put("mvFloat", new Object[]{123d});
-    fields.put("mvDouble", new Object[]{123});
-    fields.put("svStringWithNullCharacters", "1\0002\0003");
-    fields.put("svStringWithLengthLimit", "123");
-    record.init(fields);
+    record.putValue("svInt", (byte) 123);
+    record.putValue("svLong", (char) 123);
+    record.putValue("svFloat", Arrays.asList((short) 123, 456));
+    record.putValue("svDouble", new String[]{"123", "456"});
+    record.putValue("svBytes", "7b7b"/*new byte[]{123, 123}*/);
+    record.putValue("mvInt", new Object[]{123L});
+    record.putValue("mvLong", Collections.singletonList(123f));
+    record.putValue("mvFloat", new Double[]{123d});
+    record.putValue("mvDouble", Collections.singletonList(123));
+    record.putValue("svStringWithNullCharacters", "1\0002\0003");
+    record.putValue("svStringWithLengthLimit", "123");
     return record;
   }
 
@@ -87,6 +84,100 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvDouble"), new Object[]{123d});
       assertEquals(record.getValue("svStringWithNullCharacters"), "1\0002\0003");
       assertEquals(record.getValue("svStringWithLengthLimit"), "123");
+      assertNull(record.getValue("$virtual"));
+      assertTrue(record.getNullValueFields().isEmpty());
+    }
+  }
+
+  @Test
+  public void testSanitationTransformer() {
+    RecordTransformer transformer = new SanitizationTransformer(SCHEMA);
+    GenericRow record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue("svStringWithNullCharacters"), "1");
+      assertEquals(record.getValue("svStringWithLengthLimit"), "12");
+      assertNull(record.getValue("$virtual"));
+      assertTrue(record.getNullValueFields().isEmpty());
+    }
+  }
+
+  @Test
+  public void testNullValueTransformer() {
+    RecordTransformer transformer = new NullValueTransformer(SCHEMA);
+    GenericRow record = new GenericRow();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      validateNullValueTransformerResult(record);
+    }
+
+    record.clear();
+    record.putValue("svInt", Collections.emptyList());
+    record.putValue("svLong", new String[0]);
+    record.putValue("svFloat", null);
+    record.putValue("mvInt", Collections.emptyList());
+    record.putValue("mvLong", new Object[0]);
+    record.putValue("mvFloat", null);
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      validateNullValueTransformerResult(record);
+    }
+  }
+
+  private void validateNullValueTransformerResult(GenericRow record) {
+    assertEquals(record.getValue("svInt"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
+    assertEquals(record.getValue("svLong"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
+    assertEquals(record.getValue("svFloat"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
+    assertEquals(record.getValue("svDouble"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
+    assertEquals(record.getValue("svBytes"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES);
+    assertEquals(record.getValue("mvInt"), new Object[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT});
+    assertEquals(record.getValue("mvLong"), new Object[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG});
+    assertEquals(record.getValue("mvFloat"), new Object[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT});
+    assertEquals(record.getValue("mvDouble"), new Object[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE});
+    assertEquals(record.getValue("svStringWithNullCharacters"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
+    assertEquals(record.getValue("svStringWithLengthLimit"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
+    assertNull(record.getValue("$virtual"));
+    validateNullValueFields(record);
+  }
+
+  private void validateNullValueFields(GenericRow record) {
+    assertTrue(record.isNullValue("svInt"));
+    assertTrue(record.isNullValue("svLong"));
+    assertTrue(record.isNullValue("svFloat"));
+    assertTrue(record.isNullValue("svDouble"));
+    assertTrue(record.isNullValue("svBytes"));
+    assertTrue(record.isNullValue("mvInt"));
+    assertTrue(record.isNullValue("mvLong"));
+    assertTrue(record.isNullValue("mvDouble"));
+    assertTrue(record.isNullValue("svStringWithNullCharacters"));
+    assertTrue(record.isNullValue("svStringWithLengthLimit"));
+    assertFalse(record.isNullValue("$virtual"));
+    assertEquals(record.getNullValueFields(), SCHEMA.getPhysicalColumnNames());
+  }
+
+  @Test
+  public void testDefaultTransformer() {
+    RecordTransformer transformer = CompositeTransformer.getDefaultTransformer(SCHEMA);
+    GenericRow record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue("svInt"), 123);
+      assertEquals(record.getValue("svLong"), 123L);
+      assertEquals(record.getValue("svFloat"), 123f);
+      assertEquals(record.getValue("svDouble"), 123d);
+      assertEquals(record.getValue("svBytes"), new byte[]{123, 123});
+      assertEquals(record.getValue("mvInt"), new Object[]{123});
+      assertEquals(record.getValue("mvLong"), new Object[]{123L});
+      assertEquals(record.getValue("mvFloat"), new Object[]{123f});
+      assertEquals(record.getValue("mvDouble"), new Object[]{123d});
+      assertEquals(record.getValue("svStringWithNullCharacters"), "1");
+      assertEquals(record.getValue("svStringWithLengthLimit"), "12");
+      assertNull(record.getValue("$virtual"));
+      assertTrue(record.getNullValueFields().isEmpty());
     }
 
     // Test empty record
@@ -104,46 +195,16 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvFloat"), new Object[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT});
       assertEquals(record.getValue("mvDouble"), new Object[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE});
       assertEquals(record.getValue("svStringWithNullCharacters"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
-      assertEquals(record.getValue("svStringWithLengthLimit"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING);
-    }
-  }
-
-  @Test
-  public void testSanitationTransformer() {
-    RecordTransformer transformer = new SanitationTransformer(SCHEMA);
-    GenericRow record = getRecord();
-    for (int i = 0; i < NUM_ROUNDS; i++) {
-      record = transformer.transform(record);
-      assertNotNull(record);
-      assertEquals(record.getValue("svStringWithNullCharacters"), "1");
-      assertEquals(record.getValue("svStringWithLengthLimit"), "12");
-    }
-  }
-
-  @Test
-  public void testDefaultTransformer() {
-    RecordTransformer transformer = CompoundTransformer.getDefaultTransformer(SCHEMA);
-    GenericRow record = getRecord();
-    for (int i = 0; i < NUM_ROUNDS; i++) {
-      record = transformer.transform(record);
-      assertNotNull(record);
-      assertEquals(record.getValue("svInt"), 123);
-      assertEquals(record.getValue("svLong"), 123L);
-      assertEquals(record.getValue("svFloat"), 123f);
-      assertEquals(record.getValue("svDouble"), 123d);
-      assertEquals(record.getValue("svBytes"), new byte[]{123, 123});
-      assertEquals(record.getValue("mvInt"), new Object[]{123});
-      assertEquals(record.getValue("mvLong"), new Object[]{123L});
-      assertEquals(record.getValue("mvFloat"), new Object[]{123f});
-      assertEquals(record.getValue("mvDouble"), new Object[]{123d});
-      assertEquals(record.getValue("svStringWithNullCharacters"), "1");
-      assertEquals(record.getValue("svStringWithLengthLimit"), "12");
+      assertEquals(record.getValue("svStringWithLengthLimit"),
+          FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING.substring(0, 2));
+      assertNull(record.getValue("$virtual"));
+      validateNullValueFields(record);
     }
   }
 
   @Test
   public void testPassThroughTransformer() {
-    RecordTransformer transformer = CompoundTransformer.getPassThroughTransformer();
+    RecordTransformer transformer = CompositeTransformer.getPassThroughTransformer();
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
       record = transformer.transform(record);

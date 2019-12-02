@@ -37,13 +37,11 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import kafka.javaapi.producer.Producer;
-import kafka.producer.KeyedMessage;
-import kafka.producer.ProducerConfig;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericData;
@@ -52,11 +50,20 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
+import org.apache.pinot.broker.requesthandler.PinotQueryParserFactory;
+import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
+import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
+import org.apache.pinot.core.realtime.stream.StreamDataProducer;
+import org.apache.pinot.core.realtime.stream.StreamDataProvider;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
@@ -238,7 +245,7 @@ public class ClusterIntegrationTestUtils {
    */
   public static void buildSegmentsFromAvro(List<File> avroFiles, int baseSegmentIndex, File segmentDir, File tarDir,
       String tableName, boolean createStarTreeIndex, @Nullable List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs,
-      @Nullable List<String> rawIndexColumns, @Nullable org.apache.pinot.common.data.Schema pinotSchema,
+      @Nullable List<String> rawIndexColumns, @Nullable org.apache.pinot.spi.data.Schema pinotSchema,
       Executor executor) {
     int numSegments = avroFiles.size();
     for (int i = 0; i < numSegments; i++) {
@@ -251,7 +258,7 @@ public class ClusterIntegrationTestUtils {
               SegmentTestUtils.getSegmentGeneratorConfig(avroFile, outputDir, TimeUnit.DAYS, tableName, pinotSchema);
 
           // Test segment with space and special character in the file name
-          segmentGeneratorConfig.setSegmentNamePostfix(String.valueOf(segmentIndex) + " %");
+          segmentGeneratorConfig.setSegmentNamePostfix(segmentIndex + " %");
 
           // Cannot build star-tree V1 and V2 at same time
           if (starTreeV2BuilderConfigs != null) {
@@ -322,16 +329,14 @@ public class ClusterIntegrationTestUtils {
     properties.put("request.required.acks", "1");
     properties.put("partitioner.class", "kafka.producer.ByteArrayPartitioner");
 
-    ProducerConfig producerConfig = new ProducerConfig(properties);
-    Producer<byte[], byte[]> producer = new Producer<>(producerConfig);
+    StreamDataProducer producer =
+        StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
 
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
       for (File avroFile : avroFiles) {
         try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
           BinaryEncoder binaryEncoder = new EncoderFactory().directBinaryEncoder(outputStream, null);
           GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(reader.getSchema());
-
-          List<KeyedMessage<byte[], byte[]>> messagesToWrite = new ArrayList<>(maxNumKafkaMessagesPerBatch);
           for (GenericRecord genericRecord : reader) {
             outputStream.reset();
             if (header != null && 0 < header.length) {
@@ -343,19 +348,8 @@ public class ClusterIntegrationTestUtils {
             byte[] keyBytes = (partitionColumn == null) ? Longs.toByteArray(System.currentTimeMillis())
                 : (genericRecord.get(partitionColumn)).toString().getBytes();
             byte[] bytes = outputStream.toByteArray();
-            KeyedMessage<byte[], byte[]> data = new KeyedMessage<>(kafkaTopic, keyBytes, bytes);
-
-            messagesToWrite.add(data);
-
-            // Send a batch of messages
-            if (messagesToWrite.size() == maxNumKafkaMessagesPerBatch) {
-              producer.send(messagesToWrite);
-              messagesToWrite.clear();
-            }
+            producer.produce(kafkaTopic, keyBytes, bytes);
           }
-
-          // Send last batch of messages
-          producer.send(messagesToWrite);
         }
       }
     }
@@ -384,16 +378,13 @@ public class ClusterIntegrationTestUtils {
     properties.put("request.required.acks", "1");
     properties.put("partitioner.class", "kafka.producer.ByteArrayPartitioner");
 
-    ProducerConfig producerConfig = new ProducerConfig(properties);
-    Producer<byte[], byte[]> producer = new Producer<>(producerConfig);
-
+    StreamDataProducer producer =
+        StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
         BinaryEncoder binaryEncoder = new EncoderFactory().directBinaryEncoder(outputStream, null);
         Schema avroSchema = reader.getSchema();
         GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(avroSchema);
-
-        List<KeyedMessage<byte[], byte[]>> messagesToWrite = new ArrayList<>(maxNumKafkaMessagesPerBatch);
         GenericRecord genericRecord = new GenericData.Record(avroSchema);
 
         while (numKafkaMessagesToPush > 0) {
@@ -409,21 +400,10 @@ public class ClusterIntegrationTestUtils {
           byte[] keyBytes = (partitionColumn == null) ? Longs.toByteArray(System.currentTimeMillis())
               : (genericRecord.get(partitionColumn)).toString().getBytes();
           byte[] bytes = outputStream.toByteArray();
-          KeyedMessage<byte[], byte[]> data = new KeyedMessage<>(kafkaTopic, keyBytes, bytes);
 
-          messagesToWrite.add(data);
-
-          // Send a batch of messages
-          if (messagesToWrite.size() == maxNumKafkaMessagesPerBatch) {
-            producer.send(messagesToWrite);
-            messagesToWrite.clear();
-          }
-
+          producer.produce(kafkaTopic, keyBytes, bytes);
           numKafkaMessagesToPush--;
         }
-
-        // Send last batch of messages
-        producer.send(messagesToWrite);
       }
     }
   }
@@ -496,20 +476,23 @@ public class ClusterIntegrationTestUtils {
    *   <li>Do not examine the order of result records.</li>
    * </ul>
    *
-   * @param pqlQuery Pinot PQL query
+   * @param pinotQuery Pinot query
+   * @param queryFormat Pinot query format
    * @param brokerUrl Pinot broker URL
    * @param pinotConnection Pinot connection
    * @param sqlQueries H2 SQL queries
    * @param h2Connection H2 connection
    * @throws Exception
    */
-  public static void testQuery(@Nonnull String pqlQuery, @Nonnull String brokerUrl,
+  public static void testQuery(@Nonnull String pinotQuery, @Nonnull String queryFormat, @Nonnull String brokerUrl,
       @Nonnull org.apache.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
       @Nullable Connection h2Connection)
       throws Exception {
     // Use broker response for metadata check, connection response for value check
-    JsonNode pinotResponse = ClusterTest.postQuery(pqlQuery, brokerUrl);
-    ResultSetGroup pinotResultSetGroup = pinotConnection.execute(pqlQuery);
+    PinotQueryRequest pinotBrokerQueryRequest = new PinotQueryRequest(queryFormat, pinotQuery);
+    JsonNode pinotResponse = ClusterTest.postQuery(pinotBrokerQueryRequest, brokerUrl);
+    Request pinotClientRequest = new Request(queryFormat, pinotQuery);
+    ResultSetGroup pinotResultSetGroup = pinotConnection.execute(pinotClientRequest);
 
     // Skip comparison if SQL queries are not specified
     if (sqlQueries == null) {
@@ -530,7 +513,7 @@ public class ClusterIntegrationTestUtils {
         String failureMessage =
             "Number of aggregation results: " + numAggregationResults + " does not match number of SQL queries: "
                 + numSqlQueries;
-        failure(pqlQuery, sqlQueries, failureMessage);
+        failure(pinotQuery, sqlQueries, failureMessage);
       }
 
       // Get aggregation type
@@ -551,7 +534,7 @@ public class ClusterIntegrationTestUtils {
             if (pinotNumRecordsSelected != 0) {
               String failureMessage =
                   "No record selected in H2 but " + pinotNumRecordsSelected + " records selected in Pinot";
-              failure(pqlQuery, sqlQueries, failureMessage);
+              failure(pinotQuery, sqlQueries, failureMessage);
             }
 
             // Skip further comparison
@@ -565,7 +548,7 @@ public class ClusterIntegrationTestUtils {
           if (!DoubleMath.fuzzyEquals(actualValue, expectedValue, 1.0)) {
             String failureMessage =
                 "Value: " + aggregationIndex + " does not match, expected: " + h2Value + ", got: " + pinotValue;
-            failure(pqlQuery, sqlQueries, failureMessage);
+            failure(pinotQuery, sqlQueries, failureMessage);
           }
         }
 
@@ -609,18 +592,18 @@ public class ClusterIntegrationTestUtils {
           if (h2NumGroups == 0) {
             if (pinotNumGroups != 0) {
               String failureMessage = "No group returned in H2 but " + pinotNumGroups + " groups returned in Pinot";
-              failure(pqlQuery, sqlQueries, failureMessage);
+              failure(pinotQuery, sqlQueries, failureMessage);
             }
 
             // If the query has a HAVING clause and both H2 and Pinot have no groups, that is expected, so we don't need
             // to compare the number of docs scanned
-            if (pqlQuery.contains("HAVING")) {
+            if (pinotQuery.contains("HAVING")) {
               return;
             }
 
             if (pinotNumRecordsSelected != 0) {
               String failureMessage = "No group returned in Pinot but " + pinotNumRecordsSelected + " records selected";
-              failure(pqlQuery, sqlQueries, failureMessage);
+              failure(pinotQuery, sqlQueries, failureMessage);
             }
 
             // Skip further comparison
@@ -644,7 +627,7 @@ public class ClusterIntegrationTestUtils {
               String h2Value = expectedValues.get(groupKey);
               if (h2Value == null) {
                 String failureMessage = "Group returned in Pinot but not in H2: " + groupKey;
-                failure(pqlQuery, sqlQueries, failureMessage);
+                failure(pinotQuery, sqlQueries, failureMessage);
                 return;
               }
               double expectedValue = Double.parseDouble(h2Value);
@@ -654,7 +637,7 @@ public class ClusterIntegrationTestUtils {
                 String failureMessage =
                     "Value: " + aggregationIndex + " does not match, expected: " + h2Value + ", got: " + pinotValue
                         + ", for group: " + groupKey;
-                failure(pqlQuery, sqlQueries, failureMessage);
+                failure(pinotQuery, sqlQueries, failureMessage);
               }
             }
           }
@@ -665,7 +648,7 @@ public class ClusterIntegrationTestUtils {
 
       // Neither aggregation-only or group-by results
       String failureMessage = "Inside aggregation results, no aggregation-only or group-by results found";
-      failure(pqlQuery, sqlQueries, failureMessage);
+      failure(pinotQuery, sqlQueries, failureMessage);
     }
 
     // Selection results
@@ -675,7 +658,28 @@ public class ClusterIntegrationTestUtils {
       ResultSet h2ResultSet = h2statement.getResultSet();
       ResultSetMetaData h2MetaData = h2ResultSet.getMetaData();
 
+      // pinotResponse will have "selectionResults" in case of DISTINCT query too
+      // so here we need to check if selection is null or not
+      List<SelectionSort> sortSequence;
+      BrokerRequest brokerRequest =
+          PinotQueryParserFactory.get(CommonConstants.Broker.Request.PQL).compileToBrokerRequest(pinotQuery);
+      if (brokerRequest.isSetSelections()) {
+        sortSequence = brokerRequest.getSelections().getSelectionSortSequence();
+      } else {
+        sortSequence = new ArrayList<>();
+      }
+
+      Set<String> orderByColumns;
+      if (sortSequence == null) {
+        orderByColumns = Collections.emptySet();
+      } else {
+        orderByColumns = new TreeSet<>();
+        for (SelectionSort selectionSort : sortSequence) {
+          orderByColumns.add(selectionSort.getColumn());
+        }
+      }
       Set<String> expectedValues = new HashSet<>();
+      List<String> expectedOrderByValues = new ArrayList<>();
       Map<String, String> reusableExpectedValueMap = new HashMap<>();
       Map<String, List<String>> reusableMultiValuesMap = new HashMap<>();
       List<String> reusableColumnOrder = new ArrayList<>();
@@ -726,11 +730,15 @@ public class ClusterIntegrationTestUtils {
 
         // Build expected value String
         StringBuilder expectedValue = new StringBuilder();
+        StringBuilder expectedOrderByValue = new StringBuilder();
         for (String column : reusableColumnOrder) {
           expectedValue.append(column).append(':').append(reusableExpectedValueMap.get(column)).append(' ');
+          if (orderByColumns.contains(column)) {
+            expectedOrderByValue.append(column).append(':').append(reusableExpectedValueMap.get(column)).append(' ');
+          }
         }
-
         expectedValues.add(expectedValue.toString());
+        expectedOrderByValues.add(expectedOrderByValue.toString());
       }
 
       org.apache.pinot.client.ResultSet pinotSelectionResultSet = pinotResultSetGroup.getResultSet(0);
@@ -740,14 +748,14 @@ public class ClusterIntegrationTestUtils {
       if (h2NumRows == 0) {
         if (pinotNumRows != 0) {
           String failureMessage = "No record selected in H2 but number of records selected in Pinot: " + pinotNumRows;
-          failure(pqlQuery, sqlQueries, failureMessage);
+          failure(pinotQuery, sqlQueries, failureMessage);
           return;
         }
 
         if (pinotNumRecordsSelected != 0) {
           String failureMessage =
               "No selection result returned in Pinot but number of records selected: " + pinotNumRecordsSelected;
-          failure(pqlQuery, sqlQueries, failureMessage);
+          failure(pinotQuery, sqlQueries, failureMessage);
           return;
         }
 
@@ -763,6 +771,7 @@ public class ClusterIntegrationTestUtils {
         for (int rowIndex = 0; rowIndex < pinotNumRows; rowIndex++) {
           // Build actual value String.
           StringBuilder actualValueBuilder = new StringBuilder();
+          StringBuilder actualOrderByValueBuilder = new StringBuilder();
           for (int columnIndex = 0; columnIndex < numColumns; columnIndex++) {
             // Convert column name to all uppercase to make it compatible with H2
             String columnName = pinotSelectionResultSet.getColumnName(columnIndex).toUpperCase();
@@ -783,25 +792,41 @@ public class ClusterIntegrationTestUtils {
               }
               Collections.sort(multiValue);
               actualValueBuilder.append(columnName).append(':').append(multiValue.toString()).append(' ');
+              if (orderByColumns.contains(columnName)) {
+                actualOrderByValueBuilder.append(columnName).append(':').append(columnResult).append(' ');
+              }
             } else {
               // Single-value column
               actualValueBuilder.append(columnName).append(':').append(columnResult).append(' ');
+              if (orderByColumns.contains(columnName)) {
+                actualOrderByValueBuilder.append(columnName).append(':').append(columnResult).append(' ');
+              }
             }
           }
           String actualValue = actualValueBuilder.toString();
-
+          String actualOrderByValue = actualOrderByValueBuilder.toString();
           // Check actual value in expected values set
           if (!expectedValues.contains(actualValue)) {
             String failureMessage = "Selection result returned in Pinot but not in H2: " + actualValue;
-            failure(pqlQuery, sqlQueries, failureMessage);
+            failure(pinotQuery, sqlQueries, failureMessage);
             return;
+          }
+          if (!orderByColumns.isEmpty()) {
+            // Check actual group value is the same as expected group value in the same order.
+            if (!expectedOrderByValues.get(rowIndex).equals(actualOrderByValue)) {
+              String failureMessage = String.format(
+                  "Selection Order by result at row index: %d in Pinot: [ %s ] is different than result in H2: [ %s ].",
+                  rowIndex, actualOrderByValue, expectedOrderByValues.get(rowIndex));
+              failure(pinotQuery, sqlQueries, failureMessage);
+              return;
+            }
           }
         }
       }
     } else {
       // Neither aggregation or selection results
-      String failureMessage = "No aggregation or selection results found for query: " + pqlQuery;
-      failure(pqlQuery, sqlQueries, failureMessage);
+      String failureMessage = "No aggregation or selection results found for query: " + pinotQuery;
+      failure(pinotQuery, sqlQueries, failureMessage);
     }
   }
 

@@ -3,8 +3,8 @@
  * @module components/subscription-yaml
  * @property {number} subscriptionGroupId - the subscription group id in edit mode
  * @property {boolean} isEditMode - to activate the edit mode
- * @property {Object} subscriptionGroupNames - the list of subscription groups
- * @property {Object} subscriptionYaml - the subscription group yaml
+ * @property {Array} subscriptionGroupNames - the list of subscription groups
+ * @property {String} subscriptionYaml - the subscription group yaml
  * @property {function} updateSubscriptionYaml - bubble up the subscription group yaml to parent
  * @example
    {{subscription-yaml
@@ -21,16 +21,16 @@
  */
 
 import Component from '@ember/component';
-import {computed, get, set} from '@ember/object';
-import {yamlAlertSettings} from 'thirdeye-frontend/utils/constants';
-import {inject as service} from '@ember/service';
+import { get, set } from '@ember/object';
+import { defaultSubscriptionYaml } from 'thirdeye-frontend/utils/yaml-tools';
+import { inject as service } from '@ember/service';
 import config from 'thirdeye-frontend/config/environment';
 
 export default Component.extend({
-  classNames: ['yaml-editor'],
+  classNames: ['subscription-yaml'],
   notifications: service('toast'),
   /**
-   * Properties we expect to receive for the yaml-editor
+   * Properties we expect to receive for the subscription-yaml
    */
   currentMetric: null,
   isYamlParseable: true,
@@ -40,21 +40,13 @@ export default Component.extend({
   disableSubGroupSave: true,
   subscriptionMsg: '',                //General subscription failures
   subscriptionYaml:  null,            // The YAML for the subscription group
-  currentYamlSettingsOriginal: yamlAlertSettings,
+  currentYamlSettingsOriginal: defaultSubscriptionYaml,
   showAnomalyModal: false,
   showNotificationModal: false,
   setSubscriptionYaml: null, // function passed in from parent
   createGroup: null,
 
 
-
-  isSubscriptionMsg: computed(
-    'subscriptionMsg',
-    function() {
-      const subscriptionMsg = get(this, 'subscriptionMsg');
-      return subscriptionMsg !== '';
-    }
-  ),
 
   init() {
     this._super(...arguments);

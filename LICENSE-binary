@@ -205,6 +205,7 @@ This project bundles some components that are also licensed under the Apache
 License Version 2.0:
 
 com.101tec:zkclient:0.7
+com.amazonaws:aws-java-sdk:1.7.4
 com.clearspring.analytics:stream:2.7.0
 com.fasterxml.jackson.core:jackson-annotations:2.9.8
 com.fasterxml.jackson.core:jackson-core:2.9.8
@@ -218,6 +219,7 @@ com.google.code.gson:gson:2.2.4
 com.google.guava:guava:20.0
 com.google.inject.extensions:guice-servlet:3.0
 com.google.inject:guice:3.0
+com.jamesmurty.utils:java-xmlbuilder:0.4
 com.lmax:disruptor:3.3.4
 commons-beanutils:commons-beanutils:1.8.3
 commons-beanutils:commons-beanutils-core:1.8.0
@@ -246,13 +248,21 @@ io.swagger:swagger-jersey2-jaxrs:1.5.16
 io.swagger:swagger-models:1.5.16
 io.vavr:vavr:0.9.2
 io.vavr:vavr-match:0.9.2
-it.unimi.dsi:fastutil:6.5.16
+it.unimi.dsi:fastutil:8.2.3
 javax.inject:javax.inject:1
+javax.servlet.jsp:jsp-api:2.1
+javax.servlet:servlet-api:2.5
 javax.validation:validation-api:2.0.1.Final
 joda-time:joda-time:2.0
 me.lemire.integercompression:JavaFastPFOR:0.0.13
+net.java.dev.jets3t:jets3t:0.9.0
 net.jpountz.lz4:lz4:1.2.0
 org.apache.avro:avro:1.7.6
+org.apache.avro:avro-ipc:1.7.4
+org.apache.avro:avro-mapred:1.7.4
+org.apache.calcite.avatica:avatica-core:1.13.0
+org.apache.calcite:calcite-core:1.19.0
+org.apache.calcite:calcite-linq4j:1.19.0
 org.apache.commons:commons-compress:1.9
 org.apache.commons:commons-csv:1.0
 org.apache.commons:commons-lang3:3.5
@@ -261,16 +271,18 @@ org.apache.commons:commons-math3:3.2
 org.apache.commons:commons-math3:3.2
 org.apache.curator:curator-client:2.7.1
 org.apache.curator:curator-framework:2.7.1
+org.apache.curator:curator-recipes:2.7.1
 org.apache.directory.api:api-asn1-api:1.0.0-M20
 org.apache.directory.api:api-util:1.0.0-M20
 org.apache.directory.server:apacheds-i18n:2.0.0-M15
 org.apache.directory.server:apacheds-kerberos-codec:2.0.0-M15
 org.apache.hadoop:hadoop-annotations:2.2.0
 org.apache.hadoop:hadoop-auth:2.7.0
+org.apache.hadoop:hadoop-aws:2.7.0
 org.apache.hadoop:hadoop-common:2.7.0
 org.apache.hadoop:hadoop-hdfs:2.2.0
 org.apache.hadoop:hadoop-mapreduce-client-core:2.2.0
-org.apache.helix:helix-core:0.8.2
+org.apache.helix:helix-core:0.8.4
 org.apache.hive:hive-storage-api:2.6.0
 org.apache.htrace:htrace-core:3.1.0-incubating
 org.apache.httpcomponents:httpclient:4.5.3
@@ -285,12 +297,23 @@ org.apache.logging.log4j:log4j-slf4j-impl:2.11.2
 org.apache.orc:orc-core:1.5.2
 org.apache.orc:orc-mapreduce:1.5.2
 org.apache.orc:orc-shims:1.5.2
-org.apache.thrift:libthrift:0.9.1
+org.apache.parquet:parquet-avro:1.8.0
+org.apache.parquet:parquet-column:1.8.0
+org.apache.parquet:parquet-common:1.8.0
+org.apache.parquet:parquet-encoding:1.8.0
+org.apache.parquet:parquet-format:2.3.0-incubating
+org.apache.parquet:parquet-hadoop:1.8.0
+org.apache.parquet:parquet-jackson:1.8.0
+org.apache.thrift:libthrift:0.12.0
+org.apache.velocity:velocity:1.7
 org.apache.yetus:audience-annotations:0.5.0
 org.apache.zookeeper:zookeeper:3.4.11
 org.codehaus.jackson:jackson-core-asl:1.9.13
 org.codehaus.jackson:jackson-mapper-asl:1.9.13
 org.javassist:javassist:3.19.0-GA
+org.mortbay.jetty:jetty:6.1.26
+org.mortbay.jetty:jetty-util:6.1.26
+org.mortbay.jetty:servlet-api:2.5-20081211
 org.objenesis:objenesis:2.1
 org.roaringbitmap:RoaringBitmap:0.8.0
 org.roaringbitmap:shims:0.8.0
@@ -315,8 +338,7 @@ MIT License
 args4j:args4j:2.32
 com.microsoft.azure:azure-data-lake-store-sdk:2.1.5
 net.sf.jopt-simple:jopt-simple:4.6
-org.slf4j:slf4j-api:1.7.7
-org.slf4j:slf4j-log4j12:1.7.7
+org.slf4j:slf4j-api:1.7.25
 
 pinot-controller/src/main/resources/*/js/lib/codemirror/*
 pinot-controller/src/main/resources/*/js/lib/foundation/*

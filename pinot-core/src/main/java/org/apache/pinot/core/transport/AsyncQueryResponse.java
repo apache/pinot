@@ -35,18 +35,18 @@ import org.apache.pinot.common.utils.DataTable;
 public class AsyncQueryResponse {
   private final QueryRouter _queryRouter;
   private final long _requestId;
-  private final ConcurrentHashMap<Server, ServerResponse> _responseMap;
+  private final ConcurrentHashMap<ServerRoutingInstance, ServerResponse> _responseMap;
   private final CountDownLatch _countDownLatch;
   private final long _maxEndTimeMs;
 
-  public AsyncQueryResponse(QueryRouter queryRouter, long requestId, Set<Server> serversQueried, long startTimeMs,
-      long timeoutMs) {
+  public AsyncQueryResponse(QueryRouter queryRouter, long requestId, Set<ServerRoutingInstance> serversQueried,
+      long startTimeMs, long timeoutMs) {
     _queryRouter = queryRouter;
     _requestId = requestId;
     int numServersQueried = serversQueried.size();
     _responseMap = new ConcurrentHashMap<>(numServersQueried);
-    for (Server server : serversQueried) {
-      _responseMap.put(server, new ServerResponse(startTimeMs));
+    for (ServerRoutingInstance serverRoutingInstance : serversQueried) {
+      _responseMap.put(serverRoutingInstance, new ServerResponse(startTimeMs));
     }
     _countDownLatch = new CountDownLatch(numServersQueried);
     _maxEndTimeMs = startTimeMs + timeoutMs;
@@ -55,7 +55,7 @@ public class AsyncQueryResponse {
   /**
    * Waits until the query is done and returns a map from the server to the response.
    */
-  public Map<Server, ServerResponse> getResponse()
+  public Map<ServerRoutingInstance, ServerResponse> getResponse()
       throws InterruptedException {
     try {
       _countDownLatch.await(_maxEndTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
@@ -72,18 +72,19 @@ public class AsyncQueryResponse {
   public String getStats() {
     StringBuilder stringBuilder =
         new StringBuilder("(Server=SubmitDelayMs,ResponseDelayMs,ResponseSize,DeserializationTimeMs)");
-    for (Map.Entry<Server, ServerResponse> entry : _responseMap.entrySet()) {
+    for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : _responseMap.entrySet()) {
       stringBuilder.append(';').append(entry.getKey().getShortName()).append('=').append(entry.getValue().toString());
     }
     return stringBuilder.toString();
   }
 
-  void markRequestSubmitted(Server server) {
-    _responseMap.get(server).markRequestSubmitted();
+  void markRequestSubmitted(ServerRoutingInstance serverRoutingInstance) {
+    _responseMap.get(serverRoutingInstance).markRequestSubmitted();
   }
 
-  void receiveDataTable(Server server, DataTable dataTable, long responseSize, long deserializationTimeMs) {
-    _responseMap.get(server).receiveDataTable(dataTable, responseSize, deserializationTimeMs);
+  void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
+      int deserializationTimeMs) {
+    _responseMap.get(serverRoutingInstance).receiveDataTable(dataTable, responseSize, deserializationTimeMs);
     _countDownLatch.countDown();
   }
 
@@ -98,8 +99,8 @@ public class AsyncQueryResponse {
    * NOTE: the server might not be hit by the query. Only fail the query if the query was sent to the server and the
    * server hasn't responded yet.
    */
-  void markServerDown(Server server) {
-    ServerResponse serverResponse = _responseMap.get(server);
+  void markServerDown(ServerRoutingInstance serverRoutingInstance) {
+    ServerResponse serverResponse = _responseMap.get(serverRoutingInstance);
     if (serverResponse != null && serverResponse.getDataTable() == null) {
       markQueryFailed();
     }

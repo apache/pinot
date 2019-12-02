@@ -17,7 +17,9 @@
 package org.apache.pinot.thirdeye.util;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -173,4 +175,22 @@ public class ThirdEyeUtilsTest {
     Assert.assertFalse(errorMessage.contains("e3"));
   }
 
+  @Test
+  public void testMergeAnomalyProperties() {
+    Map<String, String> parentProperties = new HashMap<>();
+    parentProperties.put("p1", "value1");
+    parentProperties.put("p2", "value2");
+    parentProperties.put("detectorComponentName", "rule1");
+
+    Map<String, String> childProperties = new HashMap<>();
+    childProperties.put("p1", "value3");
+    childProperties.put("c1", "value4");
+    childProperties.put("detectorComponentName", "rule2");
+
+    ThirdEyeUtils.mergeAnomalyProperties(parentProperties, childProperties);
+    Assert.assertEquals(parentProperties.get("p1"), "value1");
+    Assert.assertEquals(parentProperties.get("p2"), "value2");
+    Assert.assertEquals(parentProperties.get("c1"), "value4");
+    Assert.assertEquals(parentProperties.get("detectorComponentName"), "rule1,rule2");
+  }
 }

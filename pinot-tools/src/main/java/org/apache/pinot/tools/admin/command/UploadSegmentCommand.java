@@ -50,6 +50,10 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
   @Option(name = "-segmentDir", required = true, metaVar = "<string>", usage = "Path to segment directory.")
   private String _segmentDir = null;
 
+  // TODO: make this as a required field once we deprecate the table name from segment metadata
+  @Option(name = "-tableName", required = false, metaVar = "<string>", usage = "Table name to upload.")
+  private String _tableName = null;
+
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
@@ -127,7 +131,7 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
         }
 
         LOGGER.info("Uploading segment {}", tgzFile.getName());
-        fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, tgzFile.getName(), tgzFile);
+        fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, tgzFile.getName(), tgzFile, _tableName);
       }
     } finally {
       // Delete the temporary working directory.

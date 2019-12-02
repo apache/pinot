@@ -25,9 +25,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.FieldSpec.DataType;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.segment.ReadMode;
@@ -94,6 +94,12 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
+    // The segment generation code in SegmentColumnarIndexCreator will throw
+    // exception if start and end time in time column are not in acceptable
+    // range. For this test, we first need to fix the input avro data
+    // to have the time column values in allowed range. Until then, the check
+    // is explicitly disabled
+    segmentGeneratorConfig.setSkipTimeValueCheck(true);
     segmentGeneratorConfig
         .setInvertedIndexCreationColumns(Arrays.asList("column6", "column7", "column11", "column17", "column18"));
 
@@ -121,6 +127,12 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME_STARTREE);
     segmentGeneratorConfig.setOutDir(INDEX_DIR_STARTREE.getAbsolutePath());
     segmentGeneratorConfig.enableStarTreeIndex(new StarTreeIndexSpec());
+    // The segment generation code in SegmentColumnarIndexCreator will throw
+    // exception if start and end time in time column are not in acceptable
+    // range. For this test, we first need to fix the input avro data
+    // to have the time column values in allowed range. Until then, the check
+    // is explicitly disabled
+    segmentGeneratorConfig.setSkipTimeValueCheck(true);
 
     // Build the index segment.
     driver = new SegmentIndexCreationDriverImpl();
@@ -202,8 +214,9 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
       boolean expectedIsFitForDictionary) {
     BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
 
-    boolean isFitForMetadataBasedPlan = PLAN_MAKER.isFitForMetadataBasedPlan(brokerRequest, indexSegment);
-    boolean isFitForDictionaryBasedPlan = PLAN_MAKER.isFitForDictionaryBasedPlan(brokerRequest, indexSegment);
+    boolean isFitForMetadataBasedPlan = InstancePlanMakerImplV2.isFitForMetadataBasedPlan(brokerRequest, indexSegment);
+    boolean isFitForDictionaryBasedPlan =
+        InstancePlanMakerImplV2.isFitForDictionaryBasedPlan(brokerRequest, indexSegment);
     Assert.assertEquals(isFitForMetadataBasedPlan, expectedIsFitForMetadata);
     Assert.assertEquals(isFitForDictionaryBasedPlan, expectedIsFitForDictionary);
   }

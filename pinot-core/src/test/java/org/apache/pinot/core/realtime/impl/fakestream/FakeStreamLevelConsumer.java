@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.realtime.impl.fakestream;
 
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.realtime.stream.StreamLevelConsumer;
 
 

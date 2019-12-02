@@ -17,6 +17,7 @@
 package org.apache.pinot.thirdeye.tools;
 
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
+import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import org.apache.pinot.thirdeye.datalayer.bao.ApplicationManager;
@@ -81,6 +82,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /**
  * Run adhoc queries to db
@@ -443,13 +445,27 @@ public class RunAdhocDatabaseQueriesTool {
     disableAllActiveFunction(null);
   }
 
-  private void disableAllActiveFunction(Collection<Long> exception){
+  private void disableAllActiveFunction(Collection<Long> excludeIds){
     List<AnomalyFunctionDTO> functionSpecs = anomalyFunctionDAO.findAllActiveFunctions();
     for (AnomalyFunctionDTO functionSpec : functionSpecs) {
-      if (functionSpec.getIsActive() && (CollectionUtils.isEmpty(exception) || !exception
+      if (functionSpec.getIsActive() && (CollectionUtils.isEmpty(excludeIds) || !excludeIds
           .contains(functionSpec.getId()))) {
         functionSpec.setActive(false);
         anomalyFunctionDAO.update(functionSpec);
+      }
+    }
+  }
+
+  /**
+   * Disable all subscription groups except groups with id in excludeIds
+   */
+  private void disableAllActiveSubsGroups(Collection<Long> excludeIds){
+    List<DetectionAlertConfigDTO> subsConfigs = detectionAlertConfigDAO.findAll();
+    for (DetectionAlertConfigDTO subsConfig : subsConfigs) {
+      if (subsConfig.isActive() && (CollectionUtils.isEmpty(excludeIds) || !excludeIds
+          .contains(subsConfig.getId()))) {
+        subsConfig.setActive(false);
+        detectionAlertConfigDAO.update(subsConfig);
       }
     }
   }
@@ -573,6 +589,18 @@ public class RunAdhocDatabaseQueriesTool {
       }
 
       detectionAlertConfigDAO.delete(alert);
+    }
+  }
+
+  /**
+   * Replayed anomalies are flagged accordingly and such anomalies are excluded from the email report.
+   * This method removes the replay flag to test an email report from replayed results.
+   */
+  private void removeReplayFlagFromAnomalies(long detectionConfigId) {
+    List<MergedAnomalyResultDTO> anomalies = mergedResultDAO.findByDetectionConfigAndIdGreaterThan(detectionConfigId,0l);
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      anomaly.setAnomalyResultSource(AnomalyResultSource.DEFAULT_ANOMALY_DETECTION);
+      mergedResultDAO.save(anomaly);
     }
   }
 

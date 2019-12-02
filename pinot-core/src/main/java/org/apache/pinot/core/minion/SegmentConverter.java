@@ -22,12 +22,11 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
-import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.minion.segment.DefaultRecordPartitioner;
 import org.apache.pinot.core.minion.segment.MapperRecordReader;
@@ -69,11 +68,12 @@ public class SegmentConverter {
   private RecordAggregator _recordAggregator;
   private List<String> _groupByColumns;
   private IndexingConfig _indexingConfig;
+  private boolean _skipTimeValueCheck;
 
-  public SegmentConverter(@Nonnull List<File> inputIndexDirs, @Nonnull File workingDir, @Nonnull String tableName,
-      @Nonnull String segmentName, int totalNumPartition, @Nonnull RecordTransformer recordTransformer,
-      @Nullable RecordPartitioner recordPartitioner, @Nullable RecordAggregator recordAggregator,
-      @Nullable List<String> groupByColumns, @Nullable IndexingConfig indexingConfig) {
+  public SegmentConverter(List<File> inputIndexDirs, File workingDir, String tableName, String segmentName,
+      int totalNumPartition, RecordTransformer recordTransformer, @Nullable RecordPartitioner recordPartitioner,
+      @Nullable RecordAggregator recordAggregator, @Nullable List<String> groupByColumns,
+      @Nullable IndexingConfig indexingConfig, boolean skipTimeValueCheck) {
     _inputIndexDirs = inputIndexDirs;
     _workingDir = workingDir;
     _recordTransformer = recordTransformer;
@@ -86,6 +86,7 @@ public class SegmentConverter {
     _recordAggregator = recordAggregator;
     _groupByColumns = groupByColumns;
     _indexingConfig = indexingConfig;
+    _skipTimeValueCheck = skipTimeValueCheck;
   }
 
   public List<File> convertSegment()
@@ -148,6 +149,7 @@ public class SegmentConverter {
     segmentGeneratorConfig.setOutDir(outputPath);
     segmentGeneratorConfig.setTableName(tableName);
     segmentGeneratorConfig.setSegmentName(segmentName);
+    segmentGeneratorConfig.setSkipTimeValueCheck(_skipTimeValueCheck);
     if (indexingConfig != null) {
       segmentGeneratorConfig.setInvertedIndexCreationColumns(indexingConfig.getInvertedIndexColumns());
       if (indexingConfig.getStarTreeIndexSpec() != null) {
@@ -173,6 +175,7 @@ public class SegmentConverter {
     private RecordAggregator _recordAggregator;
     private List<String> _groupByColumns;
     private IndexingConfig _indexingConfig;
+    private boolean _skipTimeValueCheck;
 
     public Builder setInputIndexDirs(List<File> inputIndexDirs) {
       _inputIndexDirs = inputIndexDirs;
@@ -224,18 +227,24 @@ public class SegmentConverter {
       return this;
     }
 
+    public Builder setSkipTimeValueCheck(boolean skipTimeValueCheck) {
+      _skipTimeValueCheck = skipTimeValueCheck;
+      return this;
+    }
+
     public SegmentConverter build() {
       // Check that the group-by columns and record aggregator are configured together
       if (_groupByColumns != null && _groupByColumns.size() > 0) {
         Preconditions
-            .checkNotNull(_groupByColumns, "If group-by columns are given, the record aggregator is required.");
+            .checkNotNull(_recordAggregator, "If group-by columns are given, the record aggregator is required.");
       } else {
         Preconditions.checkArgument(_recordAggregator == null,
             "If group-by columns are not given, the record aggregator has to be null.");
       }
 
       return new SegmentConverter(_inputIndexDirs, _workingDir, _tableName, _segmentName, _totalNumPartition,
-          _recordTransformer, _recordPartitioner, _recordAggregator, _groupByColumns, _indexingConfig);
+          _recordTransformer, _recordPartitioner, _recordAggregator, _groupByColumns, _indexingConfig,
+          _skipTimeValueCheck);
     }
   }
 }

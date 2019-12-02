@@ -24,7 +24,6 @@ import com.google.common.cache.CacheBuilder;
 import io.dropwizard.auth.AuthValueFactoryProvider;
 import io.dropwizard.auth.Authenticator;
 import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobScheduler;
-import org.apache.pinot.thirdeye.anomaly.onboard.DetectionOnboardResource;
 import org.apache.pinot.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import org.apache.pinot.thirdeye.api.application.ApplicationResource;
 import org.apache.pinot.thirdeye.auth.ThirdEyeCredentials;
@@ -38,6 +37,7 @@ import org.apache.pinot.thirdeye.common.ThirdEyeSwaggerBundle;
 import org.apache.pinot.thirdeye.dashboard.configs.AuthConfiguration;
 import org.apache.pinot.thirdeye.dashboard.configs.ResourceConfiguration;
 import org.apache.pinot.thirdeye.dashboard.resources.AdminResource;
+import org.apache.pinot.thirdeye.dashboard.resources.AnomalyFlattenResource;
 import org.apache.pinot.thirdeye.dashboard.resources.AnomalyResource;
 import org.apache.pinot.thirdeye.dashboard.resources.AutoOnboardResource;
 import org.apache.pinot.thirdeye.dashboard.resources.CacheResource;
@@ -50,7 +50,6 @@ import org.apache.pinot.thirdeye.dashboard.resources.EntityManagerResource;
 import org.apache.pinot.thirdeye.dashboard.resources.EntityMappingResource;
 import org.apache.pinot.thirdeye.dashboard.resources.MetricConfigResource;
 import org.apache.pinot.thirdeye.dashboard.resources.OnboardDatasetMetricResource;
-import org.apache.pinot.thirdeye.dashboard.resources.OnboardResource;
 import org.apache.pinot.thirdeye.dashboard.resources.SummaryResource;
 import org.apache.pinot.thirdeye.dashboard.resources.ThirdEyeResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.AnomaliesResource;
@@ -174,29 +173,28 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new ThirdEyeResource());
     env.jersey().register(new DataResource(anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory));
-    env.jersey().register(new OnboardResource(config));
     env.jersey().register(new EntityMappingResource());
     env.jersey().register(new OnboardDatasetMetricResource());
     env.jersey().register(new AutoOnboardResource(config));
     env.jersey().register(new ConfigResource(DAO_REGISTRY.getConfigDAO()));
     env.jersey().register(new CustomizedEventResource(DAO_REGISTRY.getEventDAO()));
     env.jersey().register(new TimeSeriesResource());
+    env.jersey().register(new AnomalyFlattenResource(DAO_REGISTRY.getMergedAnomalyResultDAO(),
+        DAO_REGISTRY.getDatasetConfigDAO(), DAO_REGISTRY.getMetricConfigDAO()));
     env.jersey().register(new UserDashboardResource(
         DAO_REGISTRY.getMergedAnomalyResultDAO(), DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
         DAO_REGISTRY.getDetectionConfigManager(), DAO_REGISTRY.getDetectionAlertConfigManager()));
     env.jersey().register(new ApplicationResource(
         DAO_REGISTRY.getApplicationDAO(), DAO_REGISTRY.getMergedAnomalyResultDAO(),
         DAO_REGISTRY.getDetectionConfigManager(), DAO_REGISTRY.getDetectionAlertConfigManager()));
-    env.jersey().register(new DetectionOnboardResource(
-        DAO_REGISTRY.getTaskDAO(), DAO_REGISTRY.getAnomalyFunctionDAO()));
     env.jersey().register(new DetectionResource());
     env.jersey().register(new DetectionAlertResource(DAO_REGISTRY.getDetectionAlertConfigManager()));
-    env.jersey().register(new YamlResource());
+    env.jersey().register(new YamlResource(config.getDetectionPreviewConfig()));
     env.jersey().register(new SqlDataSourceResource());
 
     TimeSeriesLoader timeSeriesLoader = new DefaultTimeSeriesLoader(
         DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
-        ThirdEyeCacheRegistry.getInstance().getQueryCache());
+        ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getTimeSeriesCache());
     AggregationLoader aggregationLoader = new DefaultAggregationLoader(
         DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
         ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());

@@ -35,8 +35,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.segment.SegmentMetadata;
@@ -152,22 +151,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void notifySegmentAdded(@Nonnull String tableNameWithType, @Nonnull String segmentName) {
-    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
-    if (tableDataManager != null) {
-      tableDataManager.notifySegmentAdded(segmentName);
-    }
-  }
-
-  @Override
-  public void notifySegmentDeleted(@Nonnull String tableNameWithType, @Nonnull String segmentName) {
-    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
-    if (tableDataManager != null) {
-      tableDataManager.notifySegmentDeleted(segmentName);
-    }
-  }
-
-  @Override
   public void reloadSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName)
       throws Exception {
     LOGGER.info("Reloading single segment: {} in table: {}", segmentName, tableNameWithType);
@@ -193,11 +176,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkNotNull(tableConfig);
 
-    Schema schema = null;
-    // For OFFLINE table, try to get schema for default columns
-    if (TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableNameWithType)) {
-      schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
-    }
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
 
     for (SegmentMetadata segmentMetadata : getAllSegmentsMetadata(tableNameWithType)) {
       reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema);

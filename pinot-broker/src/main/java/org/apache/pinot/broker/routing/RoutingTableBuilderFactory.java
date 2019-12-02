@@ -117,13 +117,7 @@ public class RoutingTableBuilderFactory {
 
         // Check that replica group strategy config is correctly set
         boolean hasReplicaGroupStrategyConfig = (validationConfig.getReplicaGroupStrategyConfig() != null);
-
-        // Check that the table push type is not 'refresh'.
-        boolean isNotRefreshPush =
-            (validationConfig.getSegmentPushType() != null) && !validationConfig.getSegmentPushType()
-                .equalsIgnoreCase("REFRESH");
-
-        if (isSegmentAssignmentStrategyCorrect && hasReplicaGroupStrategyConfig && isNotRefreshPush) {
+        if (isSegmentAssignmentStrategyCorrect && hasReplicaGroupStrategyConfig) {
           builder = new PartitionAwareOfflineRoutingTableBuilder();
         } else {
           builder = new DefaultOfflineRoutingTableBuilder();
@@ -131,7 +125,8 @@ public class RoutingTableBuilderFactory {
         break;
       case PartitionAwareRealtime:
         // Check that the table uses LL consumer.
-        StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+        StreamConfig streamConfig = new StreamConfig(tableConfig.getTableName(),
+            tableConfig.getIndexingConfig().getStreamConfigs());
 
         if (streamConfig.getConsumerTypes().size() == 1 && streamConfig.hasLowLevelConsumerType()) {
           builder = new PartitionAwareRealtimeRoutingTableBuilder();

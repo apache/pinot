@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.docvalsets;
 
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.common.BaseBlockValSet;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -39,6 +40,16 @@ public class TransformBlockValSet extends BaseBlockValSet {
   public TransformBlockValSet(ProjectionBlock projectionBlock, TransformFunction transformFunction) {
     _projectionBlock = projectionBlock;
     _transformFunction = transformFunction;
+  }
+
+  @Override
+  public FieldSpec.DataType getValueType() {
+    return _transformFunction.getResultMetadata().getDataType();
+  }
+
+  @Override
+  public boolean isSingleValue() {
+    return _transformFunction.getResultMetadata().isSingleValue();
   }
 
   @Override
@@ -69,6 +80,11 @@ public class TransformBlockValSet extends BaseBlockValSet {
   @Override
   public String[] getStringValuesSV() {
     return _transformFunction.transformToStringValuesSV(_projectionBlock);
+  }
+
+  @Override
+  public byte[][] getBytesValuesSV() {
+    return _transformFunction.transformToBytesValuesSV(_projectionBlock);
   }
 
   @Override

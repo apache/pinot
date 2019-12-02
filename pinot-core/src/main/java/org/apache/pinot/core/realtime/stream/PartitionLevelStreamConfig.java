@@ -18,68 +18,67 @@
  */
 package org.apache.pinot.core.realtime.stream;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
+import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.time.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * A {@link StreamConfig} for a partition level stream
+ * A {@link StreamConfig} for LLC partition level stream, which overrides some properties for low-level consumer.
  * This can be removed once we remove HLC implementation from the code
  */
 public class PartitionLevelStreamConfig extends StreamConfig {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionLevelStreamConfig.class);
 
-  final private int _flushThresholdRows;
-  final private long _flushThresholdTimeMillis;
+  public PartitionLevelStreamConfig(TableConfig tableConfig) {
+    super(tableConfig);
+  }
 
-  /**
-   * Initializes a partition level stream config using the map of stream configs from the table config
-   * This overrides some properties for low level consumer
-   * @param streamConfigMap
-   */
-  public PartitionLevelStreamConfig(Map<String, String> streamConfigMap) {
-    super(streamConfigMap);
+  public PartitionLevelStreamConfig(String tableNameWithType, Map<String, String> streamConfigMap) {
+    super(tableNameWithType, streamConfigMap);
+  }
 
-    int flushThresholdRows = super.getFlushThresholdRows();
+  @Override
+  protected int extractFlushThresholdRows(Map<String, String> streamConfigMap) {
     String flushThresholdRowsKey =
         StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS + StreamConfigProperties.LLC_SUFFIX;
-    String flushThresholdRowsValue = streamConfigMap.get(flushThresholdRowsKey);
-    if (flushThresholdRowsValue != null) {
+    String flushThresholdRowsStr = streamConfigMap.get(flushThresholdRowsKey);
+    if (flushThresholdRowsStr != null) {
       try {
-        flushThresholdRows = Integer.parseInt(flushThresholdRowsValue);
+        int flushThresholdRows = Integer.parseInt(flushThresholdRowsStr);
+        // Flush threshold rows 0 means using segment size based flush threshold
+        Preconditions.checkState(flushThresholdRows >= 0);
+        return flushThresholdRows;
       } catch (Exception e) {
-        LOGGER.warn("Caught exception when parsing low level flush threshold rows {}:{}, defaulting to base value {}",
-            flushThresholdRowsKey, flushThresholdRowsValue, flushThresholdRows, e);
+        int defaultValue = super.extractFlushThresholdRows(streamConfigMap);
+        LOGGER.warn("Invalid config {}: {}, defaulting to: {}", flushThresholdRowsKey, flushThresholdRowsStr,
+            defaultValue);
+        return defaultValue;
       }
+    } else {
+      return super.extractFlushThresholdRows(streamConfigMap);
     }
-    _flushThresholdRows = flushThresholdRows;
+  }
 
-    long flushThresholdTime = super.getFlushThresholdTimeMillis();
+  @Override
+  protected long extractFlushThresholdTimeMillis(Map<String, String> streamConfigMap) {
     String flushThresholdTimeKey =
         StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + StreamConfigProperties.LLC_SUFFIX;
-    String flushThresholdTimeValue = streamConfigMap.get(flushThresholdTimeKey);
-    if (flushThresholdTimeValue != null) {
+    String flushThresholdTimeStr = streamConfigMap.get(flushThresholdTimeKey);
+    if (flushThresholdTimeStr != null) {
       try {
-        flushThresholdTime = TimeUtils.convertPeriodToMillis(flushThresholdTimeValue);
+        return TimeUtils.convertPeriodToMillis(flushThresholdTimeStr);
       } catch (Exception e) {
-        LOGGER.warn(
-            "Caught exception when converting low level flush threshold period to millis {}:{}, defaulting to base value {}",
-            flushThresholdTimeKey, flushThresholdTimeValue, flushThresholdTime, e);
+        long defaultValue = super.extractFlushThresholdTimeMillis(streamConfigMap);
+        LOGGER.warn("Invalid config {}: {}, defaulting to: {}", flushThresholdTimeKey, flushThresholdTimeStr,
+            defaultValue);
+        return defaultValue;
       }
+    } else {
+      return super.extractFlushThresholdTimeMillis(streamConfigMap);
     }
-    _flushThresholdTimeMillis = flushThresholdTime;
-  }
-
-  @Override
-  public long getFlushThresholdTimeMillis() {
-    return _flushThresholdTimeMillis;
-  }
-
-  @Override
-  public int getFlushThresholdRows() {
-    return _flushThresholdRows;
   }
 }

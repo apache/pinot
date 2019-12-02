@@ -2,19 +2,32 @@
   <div class="te-search-results__title-group">
     <div class="te-search-results__title">
       <span title={{alertData.detectionName}}>{{alertData.detectionName}}</span>
-      <div class="te-search-results__tag {{if (eq displayMode "list") "te-search-results__tag--list"}} {{if alertData.isActive "te-search-results__tag--active"}}">
-        {{#if isLoadError}}
-          Error
-        {{else}}
-          {{if alertData.isActive "Active" "Inactive"}}
-        {{/if}}
-      </div>
       {{#if (eq displayMode "list")}}
         {{#link-to "manage.explore" alertData.id}}
           <div class="te-search-results__title-name" title={{alertData.detectionName}}>{{alertData.detectionName}}</div>
         {{/link-to}}
       {{/if}}
       <h4 class="te-alert-page__subtitle">{{alertData.description}}</h4>
+      {{#if isLoadError}}
+        <div class="te-search-results__tag {{if (eq displayMode "list") "te-search-results__tag--list"}} {{if alertData.isActive "te-search-results__tag--active"}}">
+          Error
+        </div>
+      {{else}}
+        <div class="te-search-results__tag {{if (eq displayMode "list") "te-search-results__tag--list"}} {{if alertData.isActive "te-search-results__tag--active"}}">
+          {{if alertData.isActive "Active" "Inactive"}}
+        </div>
+        {{#x-toggle
+          value=alertData.isActive
+          classNames="te-toggle te-toggle--form te-toggle--left report-toggle activation-toggle"
+          theme="ios"
+          id="active-toggle"
+          showLabels=false
+          name="activeToggle"
+          onToggle=(action "toggleAlertActivation")
+          as |toggle|}}
+          {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
+        {{/x-toggle}}
+      {{/if}}
     </div>
   </div>
   {{yield}}

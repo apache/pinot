@@ -20,8 +20,8 @@ package org.apache.pinot.common.segment;
 
 import java.io.File;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.data.MetricFieldSpec;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 
@@ -102,6 +102,8 @@ public interface SegmentMetadata {
   String getBitmapInvertedIndexFileName(String column);
 
   String getBloomFilterFileName(String column);
+
+  String getNullValueVectorFileName(String column);
 
   String getCreatorName();
 

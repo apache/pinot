@@ -20,8 +20,9 @@ package org.apache.pinot.core.data.readers;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.data.readers.RecordReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +53,7 @@ public class RecordReaderFactory {
             .warn("Using class: {} to read segment, ignoring configured file format: {}", recordReaderPath, fileFormat);
       }
       RecordReader recordReader = (RecordReader) Class.forName(recordReaderPath).newInstance();
-      recordReader.init(segmentGeneratorConfig);
+      recordReader.init(dataFile, schema, segmentGeneratorConfig.getReaderConfig());
       return recordReader;
     }
 

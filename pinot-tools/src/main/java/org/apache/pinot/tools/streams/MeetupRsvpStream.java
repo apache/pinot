@@ -23,52 +23,50 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 import javax.websocket.ClientEndpointConfig;
 import javax.websocket.Endpoint;
 import javax.websocket.EndpointConfig;
 import javax.websocket.MessageHandler;
 import javax.websocket.Session;
-import kafka.javaapi.producer.Producer;
-import kafka.producer.KeyedMessage;
-import kafka.producer.ProducerConfig;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
+import org.apache.pinot.core.realtime.stream.StreamDataProducer;
+import org.apache.pinot.core.realtime.stream.StreamDataProvider;
+import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
 import org.glassfish.tyrus.client.ClientManager;
 
 
 public class MeetupRsvpStream {
+
   private Schema schema;
-  private Producer<String, byte[]> producer;
+  private StreamDataProducer producer;
   private boolean keepPublishing = true;
   private ClientManager client;
 
   public MeetupRsvpStream(File schemaFile)
-      throws IOException, URISyntaxException {
+      throws Exception {
     schema = Schema.fromFile(schemaFile);
-
     Properties properties = new Properties();
     properties.put("metadata.broker.list", KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
-
-    ProducerConfig producerConfig = new ProducerConfig(properties);
-    producer = new Producer<String, byte[]>(producerConfig);
+    producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
   }
 
   public void stopPublishing() {
     keepPublishing = false;
+    producer.close();
     client.shutdown();
   }
 
   public void run() {
     try {
-
       final ClientEndpointConfig cec = ClientEndpointConfig.Builder.create().build();
-      final KafkaJSONMessageDecoder decoder = new KafkaJSONMessageDecoder();
+      final StreamMessageDecoder decoder =
+          (StreamMessageDecoder) Class.forName(KafkaStarterUtils.KAFKA_JSON_MESSAGE_DECODER_CLASS_NAME).newInstance();
       decoder.init(null, schema, null);
       client = ClientManager.createClient();
       client.connectToServer(new Endpoint() {
@@ -108,9 +106,7 @@ public class MeetupRsvpStream {
                   extracted.put("rsvp_count", 1);
 
                   if (keepPublishing) {
-                    KeyedMessage<String, byte[]> data =
-                        new KeyedMessage<String, byte[]>("meetupRSVPEvents", extracted.toString().getBytes("UTF-8"));
-                    producer.send(data);
+                    producer.produce("meetupRSVPEvents", extracted.toString().getBytes(StandardCharsets.UTF_8));
                   }
                 } catch (Exception e) {
                   //LOGGER.error("error processing raw event ", e);

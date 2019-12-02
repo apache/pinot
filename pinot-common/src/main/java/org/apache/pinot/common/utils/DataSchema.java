@@ -24,18 +24,18 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
-import javax.annotation.Nonnull;
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.EqualityUtils;
 
 
 /**
  * The <code>DataSchema</code> class describes the schema of {@link DataTable}.
  */
 public class DataSchema {
-  private String[] _columnNames;
-  private ColumnDataType[] _columnDataTypes;
+  private final String[] _columnNames;
+  private final ColumnDataType[] _columnDataTypes;
 
-  public DataSchema(@Nonnull String[] columnNames, @Nonnull ColumnDataType[] columnDataTypes) {
+  public DataSchema(String[] columnNames, ColumnDataType[] columnDataTypes) {
     _columnNames = columnNames;
     _columnDataTypes = columnDataTypes;
   }
@@ -44,14 +44,20 @@ public class DataSchema {
     return _columnNames.length;
   }
 
-  @Nonnull
   public String getColumnName(int index) {
     return _columnNames[index];
   }
 
-  @Nonnull
+  public String[] getColumnNames() {
+    return _columnNames;
+  }
+
   public ColumnDataType getColumnDataType(int index) {
     return _columnDataTypes[index];
+  }
+
+  public ColumnDataType[] getColumnDataTypes() {
+    return _columnDataTypes;
   }
 
   /**
@@ -65,7 +71,7 @@ public class DataSchema {
    * @param anotherDataSchema Data schema to compare with
    * @return Whether the two data schemas are type compatible
    */
-  public boolean isTypeCompatibleWith(@Nonnull DataSchema anotherDataSchema) {
+  public boolean isTypeCompatibleWith(DataSchema anotherDataSchema) {
     if (!Arrays.equals(_columnNames, anotherDataSchema._columnNames)) {
       return false;
     }
@@ -87,7 +93,7 @@ public class DataSchema {
    *
    * @param anotherDataSchema Data schema to cover
    */
-  public void upgradeToCover(@Nonnull DataSchema anotherDataSchema) {
+  public void upgradeToCover(DataSchema anotherDataSchema) {
     int numColumns = _columnDataTypes.length;
     for (int i = 0; i < numColumns; i++) {
       ColumnDataType thisColumnDataType = _columnDataTypes[i];
@@ -110,7 +116,6 @@ public class DataSchema {
     }
   }
 
-  @Nonnull
   public byte[] toBytes()
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
@@ -138,8 +143,7 @@ public class DataSchema {
     return byteArrayOutputStream.toByteArray();
   }
 
-  @Nonnull
-  public static DataSchema fromBytes(@Nonnull byte[] buffer)
+  public static DataSchema fromBytes(byte[] buffer)
       throws IOException {
     ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer);
     DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream);

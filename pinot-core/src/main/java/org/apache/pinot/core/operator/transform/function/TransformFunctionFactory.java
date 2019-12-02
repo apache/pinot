@@ -23,10 +23,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.*;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.AbsTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.CeilTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.ExpTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.FloorTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.LnTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.SqrtTransformFunction;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 
 
@@ -45,17 +49,18 @@ public class TransformFunctionFactory {
           put(SubtractionTransformFunction.FUNCTION_NAME.toLowerCase(), SubtractionTransformFunction.class);
           put(MultiplicationTransformFunction.FUNCTION_NAME.toLowerCase(), MultiplicationTransformFunction.class);
           put(DivisionTransformFunction.FUNCTION_NAME.toLowerCase(), DivisionTransformFunction.class);
-          put(TimeConversionTransformFunction.FUNCTION_NAME.toLowerCase(), TimeConversionTransformFunction.class);
-          put(DateTimeConversionTransformFunction.FUNCTION_NAME.toLowerCase(),
-              DateTimeConversionTransformFunction.class);
-          put(ValueInTransformFunction.FUNCTION_NAME.toLowerCase(), ValueInTransformFunction.class);
-
           put(AbsTransformFunction.FUNCTION_NAME.toLowerCase(), AbsTransformFunction.class);
           put(CeilTransformFunction.FUNCTION_NAME.toLowerCase(), CeilTransformFunction.class);
           put(ExpTransformFunction.FUNCTION_NAME.toLowerCase(), ExpTransformFunction.class);
           put(FloorTransformFunction.FUNCTION_NAME.toLowerCase(), FloorTransformFunction.class);
           put(LnTransformFunction.FUNCTION_NAME.toLowerCase(), LnTransformFunction.class);
           put(SqrtTransformFunction.FUNCTION_NAME.toLowerCase(), SqrtTransformFunction.class);
+          put(TimeConversionTransformFunction.FUNCTION_NAME.toLowerCase(), TimeConversionTransformFunction.class);
+          put(DateTimeConversionTransformFunction.FUNCTION_NAME.toLowerCase(),
+              DateTimeConversionTransformFunction.class);
+          put(DateTruncTransformFunction.FUNCTION_NAME.toLowerCase(), DateTruncTransformFunction.class);
+          put(ValueInTransformFunction.FUNCTION_NAME.toLowerCase(), ValueInTransformFunction.class);
+          put(MapValueTransformFunction.FUNCTION_NAME.toLowerCase(), MapValueTransformFunction.class);
         }
       };
 
@@ -65,7 +70,7 @@ public class TransformFunctionFactory {
    *
    * @param transformFunctionClasses Set of transform function classes
    */
-  public static void init(@Nonnull Set<Class<TransformFunction>> transformFunctionClasses) {
+  public static void init(Set<Class<TransformFunction>> transformFunctionClasses) {
     for (Class<TransformFunction> transformFunctionClass : transformFunctionClasses) {
       TransformFunction transformFunction;
       try {
@@ -90,8 +95,7 @@ public class TransformFunctionFactory {
    * @param dataSourceMap Map from column name to column data source
    * @return Transform function
    */
-  public static TransformFunction get(@Nonnull TransformExpressionTree expression,
-      @Nonnull Map<String, DataSource> dataSourceMap) {
+  public static TransformFunction get(TransformExpressionTree expression, Map<String, DataSource> dataSourceMap) {
     TransformFunction transformFunction;
     switch (expression.getExpressionType()) {
       case FUNCTION:

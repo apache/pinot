@@ -7,15 +7,16 @@
  * @property {Boolean} isLoadError - was there an error loading the data
  * @property {String} displayMode  - is the use case part of a list or standalone? 'list' || 'single'
  * @example
-    {{#self-serve-alert-details
+    {{#self-serve-alert-yaml-details
       alertData=alertData
       isLoadError=false
       displayMode="list"
+      toggleActivation=(action "toggleActivation")
     }}
       ...additional case-specific header content
-    {{/self-serve-alert-details}}
- * @exports self-serve-alert-details
- * @author smcclung
+    {{/self-serve-alert-yaml-details}}
+ * @exports self-serve-alert-yaml-details
+ * @authors lohuynh and hjackson
  */
 
 import Component from '@ember/component';
@@ -24,6 +25,7 @@ import { setProperties, get } from '@ember/object';
 export default Component.extend({
   valueClassSuffix: '',
   modeSubClass: 'list',
+  toggleActivation: null, // passed from parent - do not set
 
   init() {
     this._super(...arguments);
@@ -33,6 +35,15 @@ export default Component.extend({
         valueClassSuffix: '-solo',
         modeSubClass: 'solo'
       });
+    }
+  },
+
+  actions: {
+    /**
+     * send action to parent
+     */
+    toggleAlertActivation() {
+      this.get('toggleActivation')();
     }
   }
 });

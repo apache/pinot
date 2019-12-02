@@ -45,6 +45,8 @@ public class SelectAstNode extends BaseAstNode {
   private boolean _hasTopClause = false;
   private boolean _hasLimitClause = false;
 
+  public static final int DEFAULT_RECORD_LIMIT = 10;
+
   public SelectAstNode() {
   }
 
@@ -126,7 +128,7 @@ public class SelectAstNode extends BaseAstNode {
         selections.setSize(_recordLimit);
       } else {
         // Pinot quirk: default to LIMIT 10
-        selections.setSize(10);
+        selections.setSize(DEFAULT_RECORD_LIMIT);
       }
       if (_offset != -1) {
         selections.setOffset(_offset);
@@ -140,8 +142,27 @@ public class SelectAstNode extends BaseAstNode {
         groupBy.setTopN(_topN);
       } else {
         // Pinot quirk: default to top 10
-        groupBy.setTopN(10);
+        groupBy.setTopN(DEFAULT_RECORD_LIMIT);
       }
+    }
+
+    // set the limit in broker request so that it can be used by
+    // other queries too (that don't go down the selection path in execution engine)
+    // e.g SELECT DISTINCT(col1, col2) FROM foo LIMIT 1000
+    //
+    // the current implementation restricted the use of LIMIT clause only to standard
+    // select queries like SELECT C1, C2 FROM foo LIMIT 100 and thus the LIMIT info
+    // was stored in BrokerRequest.getSelections().setSize().
+    //
+    // However, now LIMIT is also applicable to DISTINCT. But since DISTINCT follows
+    // the aggregation execution code path, we need to store the LIMIT info in a common
+    // place that can be leveraged by all the queries regardless of whether they are
+    // a selection query or aggregation query. Thus the limit is stored in broker
+    // to easily access it anywhere in the physical planning or execution code.
+    if (_recordLimit != -1) {
+      brokerRequest.setLimit(_recordLimit);
+    } else {
+      brokerRequest.setLimit(DEFAULT_RECORD_LIMIT);
     }
 
     // Pinot quirk: if there is both a selection and an aggregation, remove the selection
@@ -174,5 +195,21 @@ public class SelectAstNode extends BaseAstNode {
         pinotQuery.setLimit(10);
       }
     }
+  }
+
+  public boolean isHasTopClause() {
+    return _hasTopClause;
+  }
+
+  public int getTopN() {
+    return _topN;
+  }
+
+  public boolean isHasLimitClause() {
+    return _hasLimitClause;
+  }
+
+  public int getRecordLimit() {
+    return _recordLimit;
   }
 }

@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.controller.helix.core.realtime;
 
+import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.TableConfig;
@@ -39,19 +41,19 @@ public class TableConfigCache {
   private static final long DEFAULT_CACHE_TIMEOUT_IN_MINUTE = 60;
 
   private final LoadingCache<String, TableConfig> _tableConfigCache;
-  private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   public TableConfigCache(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _tableConfigCache = CacheBuilder.newBuilder().maximumSize(DEFAULT_CACHE_SIZE)
         .expireAfterWrite(DEFAULT_CACHE_TIMEOUT_IN_MINUTE, TimeUnit.MINUTES)
         .build(new CacheLoader<String, TableConfig>() {
           @Override
-          public TableConfig load(String tableNameWithType)
-              throws Exception {
-            return ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+          public TableConfig load(@Nonnull String tableNameWithType) {
+            TableConfig tableConfig = ZKMetadataProvider.getTableConfig(propertyStore, tableNameWithType);
+            Preconditions
+                .checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
+            return tableConfig;
           }
         });
-    _propertyStore = propertyStore;
   }
 
   public TableConfig getTableConfig(String tableNameWithType)

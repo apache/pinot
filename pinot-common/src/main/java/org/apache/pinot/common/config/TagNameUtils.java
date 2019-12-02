@@ -18,91 +18,143 @@
  */
 package org.apache.pinot.common.config;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.ServerType;
 import org.apache.pinot.common.utils.TenantRole;
 
 
+/**
+ * The <code>TagNameUtils</code> class handles the conversion between tenant and tag. For single-tenant cluster, use
+ * {@link #DEFAULT_TENANT_NAME} ("DefaultTenant") as the tenant name.
+ * <p>Example:
+ * <ul>
+ *   <li>Tenant name: myTenant</li>
+ *   <li>Broker tag name: myTenant_BROKER</li>
+ *   <li>Offline server tag name: myTenant_OFFLINE</li>
+ *   <li>Realtime server tag name: myTenant_REALTIME</li>
+ * </ul>
+ * Tag name can be overridden by {@link TagOverrideConfig} from {@link TenantConfig}.
+ */
 public class TagNameUtils {
+  private TagNameUtils() {
+  }
+
   public final static String DEFAULT_TENANT_NAME = "DefaultTenant";
+  private final static String BROKER_TAG_SUFFIX = "_" + TenantRole.BROKER;
+  private final static String OFFLINE_SERVER_TAG_SUFFIX = "_" + ServerType.OFFLINE;
+  private final static String REALTIME_SERVER_TAG_SUFFIX = "_" + ServerType.REALTIME;
 
-  private static String buildRealtimeTagFromTenantName(String tenantName) {
-    return tenantName + "_" + ServerType.REALTIME.toString();
+  /**
+   * Returns whether the given tag is a broker tag.
+   */
+  public static boolean isBrokerTag(String tagName) {
+    return tagName.endsWith(BROKER_TAG_SUFFIX);
   }
 
-  private static String buildOfflineTagFromTenantName(String tenantName) {
-    return tenantName + "_" + ServerType.OFFLINE.toString();
-  }
-
-  private static String buildBrokerTenantTagFromTenantName(String tenantName) {
-    return tenantName + "_" + TenantRole.BROKER.toString();
-  }
-
+  /**
+   * Returns whether the given tag is a server tag (OFFLINE or REALTIME).
+   */
   public static boolean isServerTag(String tagName) {
     return isOfflineServerTag(tagName) || isRealtimeServerTag(tagName);
   }
 
+  /**
+   * Returns whether the given tag is an OFFLINE server tag.
+   */
   public static boolean isOfflineServerTag(String tagName) {
-    return tagName.endsWith(ServerType.OFFLINE.toString());
+    return tagName.endsWith(OFFLINE_SERVER_TAG_SUFFIX);
   }
 
+  /**
+   * Returns whether the given tag is an REALTIME server tag.
+   */
   public static boolean isRealtimeServerTag(String tagName) {
-    return tagName.endsWith(ServerType.REALTIME.toString());
+    return tagName.endsWith(REALTIME_SERVER_TAG_SUFFIX);
   }
 
-  public static boolean isBrokerTag(String tagName) {
-    return tagName.endsWith(TenantRole.BROKER.toString());
+  /**
+   * Returns the tenant name for the given tag. The given tag should be valid (with proper tag suffix).
+   */
+  public static String getTenantFromTag(String tagName) {
+    return tagName.substring(0, tagName.lastIndexOf('_'));
   }
 
-  public static String getTagFromTenantAndServerType(String tenantName, ServerType type) {
-    if (type == ServerType.OFFLINE) {
-      return getOfflineTagForTenant(tenantName);
-    }
-    return getRealtimeTagForTenant(tenantName);
+  /**
+   * Returns the Broker tag name for the given tenant.
+   */
+  public static String getBrokerTagForTenant(@Nullable String tenantName) {
+    return getTagForTenant(tenantName, BROKER_TAG_SUFFIX);
   }
 
-  public static String getRealtimeTagForTenant(String tenantName) {
+  /**
+   * Returns the OFFLINE server tag name for the given tenant.
+   */
+  public static String getOfflineTagForTenant(@Nullable String tenantName) {
+    return getTagForTenant(tenantName, OFFLINE_SERVER_TAG_SUFFIX);
+  }
+
+  /**
+   * Returns the REALTIME server tag name for the given tenant.
+   */
+  public static String getRealtimeTagForTenant(@Nullable String tenantName) {
+    return getTagForTenant(tenantName, REALTIME_SERVER_TAG_SUFFIX);
+  }
+
+  private static String getTagForTenant(@Nullable String tenantName, String tagSuffix) {
     if (tenantName == null) {
-      return TagNameUtils.getRealtimeTagForTenant(DEFAULT_TENANT_NAME);
-    }
-    if (tenantName.endsWith(ServerType.REALTIME.toString())) {
-      return tenantName;
+      return DEFAULT_TENANT_NAME + tagSuffix;
     } else {
-      return TagNameUtils.buildRealtimeTagFromTenantName(tenantName);
+      return tenantName + tagSuffix;
     }
   }
 
-  public static String getOfflineTagForTenant(String tenantName) {
-    if (tenantName == null) {
-      return TagNameUtils.getOfflineTagForTenant(DEFAULT_TENANT_NAME);
-    }
-    if (tenantName.endsWith(ServerType.OFFLINE.toString())) {
-      return tenantName;
+  /**
+   * Extracts the broker tag name from the given tenant config.
+   */
+  public static String extractBrokerTag(TenantConfig tenantConfig) {
+    return getBrokerTagForTenant(tenantConfig.getBroker());
+  }
+
+  /**
+   * Extracts the OFFLINE server tag name from the given tenant config.
+   */
+  public static String extractOfflineServerTag(TenantConfig tenantConfig) {
+    return getOfflineTagForTenant(tenantConfig.getServer());
+  }
+
+  /**
+   * Extracts the REALTIME consuming server tag name from the given tenant config.
+   */
+  public static String extractConsumingServerTag(TenantConfig tenantConfig) {
+    TagOverrideConfig tagOverrideConfig = tenantConfig.getTagOverrideConfig();
+    if (tagOverrideConfig == null || tagOverrideConfig.getRealtimeConsuming() == null) {
+      return getRealtimeTagForTenant(tenantConfig.getServer());
     } else {
-      return TagNameUtils.buildOfflineTagFromTenantName(tenantName);
+      return tagOverrideConfig.getRealtimeConsuming();
     }
   }
 
-  public static String getBrokerTagForTenant(String tenantName) {
-    if (tenantName == null) {
-      return TagNameUtils.getBrokerTagForTenant(DEFAULT_TENANT_NAME);
-    }
-    if (tenantName.endsWith(TenantRole.BROKER.toString())) {
-      return tenantName;
+  /**
+   * Extracts the REALTIME completed server tag name from the given tenant config.
+   */
+  public static String extractCompletedServerTag(TenantConfig tenantConfig) {
+    TagOverrideConfig tagOverrideConfig = tenantConfig.getTagOverrideConfig();
+    if (tagOverrideConfig == null || tagOverrideConfig.getRealtimeCompleted() == null) {
+      return getRealtimeTagForTenant(tenantConfig.getServer());
     } else {
-      return TagNameUtils.buildBrokerTenantTagFromTenantName(tenantName);
+      return tagOverrideConfig.getRealtimeCompleted();
     }
   }
 
-  public static String getTenantNameFromTag(String tag) {
-    if (tag.endsWith(ServerType.REALTIME.toString())) {
-      return tag.substring(0, tag.length() - (ServerType.REALTIME.toString().length() + 1));
+  /**
+   * Returns whether the completed segments need to be relocated (completed server tag is different from consuming
+   * server tag).
+   */
+  public static boolean isRelocateCompletedSegments(TenantConfig tenantConfig) {
+    if (tenantConfig.getTagOverrideConfig() == null) {
+      return false;
+    } else {
+      return !extractConsumingServerTag(tenantConfig).equals(extractCompletedServerTag(tenantConfig));
     }
-    if (tag.endsWith(ServerType.OFFLINE.toString())) {
-      return tag.substring(0, tag.length() - (ServerType.OFFLINE.toString().length() + 1));
-    }
-    if (tag.endsWith(TenantRole.BROKER.toString())) {
-      return tag.substring(0, tag.length() - (TenantRole.BROKER.toString().length() + 1));
-    }
-    return tag;
   }
 }

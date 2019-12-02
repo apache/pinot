@@ -20,10 +20,12 @@ package org.apache.pinot.filesystem;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.URI;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -138,6 +140,12 @@ public class PinotFSFactoryTest {
     public boolean touch(URI uri)
         throws IOException {
       return true;
+    }
+
+    @Override
+    public InputStream open(URI uri)
+        throws IOException {
+      return null;
     }
   }
 }

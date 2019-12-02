@@ -32,6 +32,9 @@ import org.testng.annotations.Test;
  *
  */
 public class ResultSetGroupTest {
+  private DummyJsonTransport _dummyJsonTransport = new DummyJsonTransport();
+  private PinotClientTransportFactory _previousTransportFactory = null;
+
   @Test
   public void testDeserializeSelectionResultSet() {
     // Deserialize selection result
@@ -117,8 +120,16 @@ public class ResultSetGroupTest {
     return connection.execute("dummy");
   }
 
-  private DummyJsonTransport _dummyJsonTransport = new DummyJsonTransport();
-  private PinotClientTransportFactory _previousTransportFactory = null;
+  @BeforeClass
+  public void overridePinotClientTransport() {
+    _previousTransportFactory = ConnectionFactory._transportFactory;
+    ConnectionFactory._transportFactory = new DummyJsonTransportFactory();
+  }
+
+  @AfterClass
+  public void resetPinotClientTransport() {
+    ConnectionFactory._transportFactory = _previousTransportFactory;
+  }
 
   class DummyJsonTransport implements PinotClientTransport {
     public String _resource;
@@ -147,6 +158,18 @@ public class ResultSetGroupTest {
         throws PinotClientException {
       return null;
     }
+
+    @Override
+    public BrokerResponse executeQuery(String brokerAddress, Request request)
+        throws PinotClientException {
+      return executeQuery(brokerAddress, request.getQuery());
+    }
+
+    @Override
+    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
+        throws PinotClientException {
+      return null;
+    }
   }
 
   class DummyJsonTransportFactory implements PinotClientTransportFactory {
@@ -154,16 +177,5 @@ public class ResultSetGroupTest {
     public PinotClientTransport buildTransport() {
       return _dummyJsonTransport;
     }
-  }
-
-  @BeforeClass
-  public void overridePinotClientTransport() {
-    _previousTransportFactory = ConnectionFactory._transportFactory;
-    ConnectionFactory._transportFactory = new DummyJsonTransportFactory();
-  }
-
-  @AfterClass
-  public void resetPinotClientTransport() {
-    ConnectionFactory._transportFactory = _previousTransportFactory;
   }
 }

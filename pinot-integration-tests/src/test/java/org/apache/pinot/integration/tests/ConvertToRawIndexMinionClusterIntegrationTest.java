@@ -35,6 +35,7 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.common.MinionConstants.ConvertToRawIndexTask;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -62,13 +63,10 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
 
   @Override
   protected TableTaskConfig getTaskConfig() {
-    TableTaskConfig taskConfig = new TableTaskConfig();
     Map<String, String> convertToRawIndexTaskConfigs = new HashMap<>();
     convertToRawIndexTaskConfigs.put(MinionConstants.TABLE_MAX_NUM_TASKS_KEY, "5");
-    convertToRawIndexTaskConfigs.put(MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY, COLUMNS_TO_CONVERT);
-    taskConfig.setTaskTypeConfigsMap(
-        Collections.singletonMap(MinionConstants.ConvertToRawIndexTask.TASK_TYPE, convertToRawIndexTaskConfigs));
-    return taskConfig;
+    convertToRawIndexTaskConfigs.put(ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY, COLUMNS_TO_CONVERT);
+    return new TableTaskConfig(Collections.singletonMap(ConvertToRawIndexTask.TASK_TYPE, convertToRawIndexTaskConfigs));
   }
 
   @BeforeClass
@@ -106,21 +104,20 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
     }
 
     // Should create the task queues and generate a ConvertToRawIndexTask task with 5 child tasks
-    Assert.assertTrue(_taskManager.scheduleTasks().containsKey(MinionConstants.ConvertToRawIndexTask.TASK_TYPE));
+    Assert.assertTrue(_taskManager.scheduleTasks().containsKey(ConvertToRawIndexTask.TASK_TYPE));
     Assert.assertTrue(_helixTaskResourceManager.getTaskQueues()
-        .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.ConvertToRawIndexTask.TASK_TYPE)));
+        .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(ConvertToRawIndexTask.TASK_TYPE)));
 
     // Should generate one more ConvertToRawIndexTask task with 3 child tasks
-    Assert.assertTrue(_taskManager.scheduleTasks().containsKey(MinionConstants.ConvertToRawIndexTask.TASK_TYPE));
+    Assert.assertTrue(_taskManager.scheduleTasks().containsKey(ConvertToRawIndexTask.TASK_TYPE));
 
     // Should not generate more tasks
-    Assert.assertFalse(_taskManager.scheduleTasks().containsKey(MinionConstants.ConvertToRawIndexTask.TASK_TYPE));
+    Assert.assertFalse(_taskManager.scheduleTasks().containsKey(ConvertToRawIndexTask.TASK_TYPE));
 
     // Wait at most 600 seconds for all tasks COMPLETED and new segments refreshed
     TestUtils.waitForCondition(input -> {
       // Check task state
-      for (TaskState taskState : _helixTaskResourceManager
-          .getTaskStates(MinionConstants.ConvertToRawIndexTask.TASK_TYPE).values()) {
+      for (TaskState taskState : _helixTaskResourceManager.getTaskStates(ConvertToRawIndexTask.TASK_TYPE).values()) {
         if (taskState != TaskState.COMPLETED) {
           return false;
         }
@@ -131,7 +128,7 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
           .getOfflineSegmentMetadata(offlineTableName)) {
         Map<String, String> customMap = offlineSegmentZKMetadata.getCustomMap();
         if (customMap == null || customMap.size() != 1 || !customMap
-            .containsKey(MinionConstants.ConvertToRawIndexTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX)) {
+            .containsKey(ConvertToRawIndexTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX)) {
           return false;
         }
       }
@@ -198,10 +195,5 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
     stopMinion();
 
     super.tearDown();
-  }
-
-  @Override
-  protected boolean isUsingNewConfigFormat() {
-    return false;
   }
 }

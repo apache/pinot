@@ -14,7 +14,7 @@ import {
 import { inject as service } from '@ember/service';
 import { isPresent, isEmpty } from '@ember/utils';
 import Controller from '@ember/controller';
-import yamljs from 'yamljs';
+import { redundantParse } from 'thirdeye-frontend/utils/yaml-tools';
 import { reads } from '@ember/object/computed';
 import { toastOptions } from 'thirdeye-frontend/utils/constants';
 import { setUpTimeRangeOptions, powerSort } from 'thirdeye-frontend/utils/manage-alert-utils';
@@ -69,7 +69,7 @@ export default Controller.extend({
   /**
    * Filter settings
    */
-  anomalyFilters: [],
+  anomalyFilters: {},
   resetFiltersLocal: null,
   alertFoundByName: null,
 
@@ -233,23 +233,18 @@ export default Controller.extend({
       };
       let filterStr = 'All Anomalies';
       if (isPresent(anomalyFilters)) {
-        if (anomalyFilters.primary) {
-          filterStr = anomalyFilters.primary;
-          set(this, 'primaryFilterVal', filterStr);
-        } else {
-          let filterArr = [get(this, 'primaryFilterVal')];
-          Object.keys(anomalyFilters).forEach((filterKey) => {
-            const value = anomalyFilters[filterKey];
-            const isStatusAll = filterKey === 'status' && Array.isArray(value) && value.length > 1;
-            // Only display valid search filters
-            if (filterKey !== 'triggerType' && value !== null && value.length && !isStatusAll) {
-              let concatVal = filterKey === 'status' && !value.length ? 'Active' : value.join(', ');
-              let abbrevKey = filterAbbrevMap[filterKey] || filterKey;
-              filterArr.push(`${abbrevKey}: ${concatVal}`);
-            }
-          });
-          filterStr = filterArr.join(' | ');
-        }
+        let filterArr = [get(this, 'primaryFilterVal')];
+        Object.keys(anomalyFilters).forEach((filterKey) => {
+          const value = anomalyFilters[filterKey];
+          const isStatusAll = filterKey === 'status' && Array.isArray(value) && value.length > 1;
+          // Only display valid search filters
+          if (filterKey !== 'triggerType' && value !== null && value.length && !isStatusAll) {
+            let concatVal = filterKey === 'status' && !value.length ? 'Active' : value.join(', ');
+            let abbrevKey = filterAbbrevMap[filterKey] || filterKey;
+            filterArr.push(`${abbrevKey}: ${concatVal}`);
+          }
+        });
+        filterStr = filterArr.join(' | ');
       }
       return filterStr;
     }
@@ -398,8 +393,9 @@ export default Controller.extend({
       let additionalAlertNames = [];
       // for each group, grab yaml, extract alert names for adding to filterObj
       selectedSubGroupObjects.forEach(group => {
+        let yamlAsObject;
         try {
-          const yamlAsObject = yamljs.parse(group.get('yaml'));
+          yamlAsObject = redundantParse(group.get('yaml'));
           if (Array.isArray(yamlAsObject.subscribedDetections)) {
             additionalAlertNames = [ ...additionalAlertNames, ...yamlAsObject.subscribedDetections];
           }

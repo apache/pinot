@@ -23,7 +23,10 @@
 <head>
 
 <script src="https://code.jquery.com/jquery-1.11.1.min.js"></script>
-<script src="https://cdn.datatables.net/1.10.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
+<script src="https://cdn.datatables.net/1.10.19/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/1.5.6/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/1.5.6/js/buttons.html5.min.js"></script>
 <script src="js/lib/handlebars.js"></script>
 <script src="js/lib/underscore.js"></script>
 <script src="js/lib/foundation/foundation.js"></script>
@@ -35,7 +38,8 @@
 <script src="js/lib/underscore-min.js"></script>
 <script src="js/lib/beautify.js"></script>
 
-<link href="https://cdn.datatables.net/1.10.7/css/jquery.dataTables.css" type="text/css" rel="stylesheet">
+<link href="https://cdn.datatables.net/1.10.19/css/jquery.dataTables.min.css" type="text/css" rel="stylesheet">
+<link href="https://cdn.datatables.net/buttons/1.5.6/css/buttons.dataTables.min.css" type="text/css" rel="stylesheet">
 <link href='http://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css'>
 
 <link href="css/lib/normalize.css" type="text/css" rel="stylesheet">
@@ -72,9 +76,17 @@
         <div class="separator"></div>
 
         <div class="row">
-          <div class="small-8 columns">&nbsp;</div>
-          <div class="small-2 columns"><input type=checkbox id="trace-enabled">&nbsp;&nbsp;Enable Tracing</input></div>
-          <div class="small-2 columns"><a href="#" id="execute-query" class="button round success small">Run Query</a></div>
+          <div class="small-2 columns" title="Enables tracing">
+            <input type=checkbox id="trace-enabled">&nbsp;&nbsp;Tracing</input>
+          </div>
+          <div class="small-3 columns" title="Sets groupByMode=sql in queryOptions (default pql)">
+            <input type=checkbox id="group-by-mode-sql">&nbsp;&nbsp;Group By Mode : SQL</input>
+          </div>
+          <div class="small-4 columns" title="Sets responseFormat=sql in queryOptions (default pql)">
+            <input type=checkbox id="response-format-sql">&nbsp;&nbsp;Query Response Format : SQL</input>
+          </div>
+          <div class="small-2 columns"><a href="#" id="execute-query" class="button round success small">Run Query</a>
+          </div>
         </div>
 
         <div class="separator"></div>

@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.core.operator.transform;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -50,8 +49,7 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
    * @param projectionOperator Projection operator
    * @param expressions Set of expressions to evaluate
    */
-  public TransformOperator(@Nonnull ProjectionOperator projectionOperator,
-      @Nonnull Set<TransformExpressionTree> expressions) {
+  public TransformOperator(ProjectionOperator projectionOperator, Collection<TransformExpressionTree> expressions) {
     _projectionOperator = projectionOperator;
     _dataSourceMap = projectionOperator.getDataSourceMap();
     for (TransformExpressionTree expression : expressions) {
@@ -75,18 +73,17 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
    * @param expression Expression
    * @return Transform result metadata
    */
-  public TransformResultMetadata getResultMetadata(@Nonnull TransformExpressionTree expression) {
+  public TransformResultMetadata getResultMetadata(TransformExpressionTree expression) {
     return _transformFunctionMap.get(expression).getResultMetadata();
   }
 
   /**
-   * Returns the dictionary associated with the given expression.
-   * <p>Should be called only if {@link #getResultMetadata(TransformExpressionTree)} indicates that the transform result
-   * has dictionary.
+   * Returns the dictionary associated with the given expression if the transform result is dictionary-encoded, or
+   * {@code null} if not.
    *
    * @return Dictionary
    */
-  public Dictionary getDictionary(@Nonnull TransformExpressionTree expression) {
+  public Dictionary getDictionary(TransformExpressionTree expression) {
     return _transformFunctionMap.get(expression).getDictionary();
   }
 

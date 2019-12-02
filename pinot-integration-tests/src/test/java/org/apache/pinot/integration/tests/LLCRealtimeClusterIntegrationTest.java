@@ -19,56 +19,53 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Function;
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import org.apache.avro.reflect.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
-import org.apache.pinot.common.config.IndexingConfig;
-import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableCustomConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.TenantConfig;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 /**
  * Integration test that extends RealtimeClusterIntegrationTest but uses low-level Kafka consumer.
+ * TODO: Add separate module-level tests and remove the randomness of this test
  */
 public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
-
-  public static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
-  public static final long RANDOM_SEED = System.currentTimeMillis();
-  public static final Random RANDOM = new Random(RANDOM_SEED);
-
-  public final boolean _isDirectAlloc = RANDOM.nextBoolean();
-  public final boolean _isConsumerDirConfigured = RANDOM.nextBoolean();
-  private final long _startTime = System.currentTimeMillis();
-
+  private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
   private static final String TEST_UPDATED_INVERTED_INDEX_QUERY =
       "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime = 305";
-  private static final List<String> UPDATED_INVERTED_INDEX_COLUMNS =
-      Arrays.asList("FlightNum", "Origin", "Quarter", "DivActualElapsedTime");
+  private static final List<String> UPDATED_INVERTED_INDEX_COLUMNS = Collections.singletonList("DivActualElapsedTime");
+  private static final long RANDOM_SEED = System.currentTimeMillis();
+  private static final Random RANDOM = new Random(RANDOM_SEED);
+
+  private final boolean _isDirectAlloc = RANDOM.nextBoolean();
+  private final boolean _isConsumerDirConfigured = RANDOM.nextBoolean();
+  private final boolean _enableLeadControllerResource = RANDOM.nextBoolean();
+  private final long _startTime = System.currentTimeMillis();
 
   @BeforeClass
   @Override
   public void setUp()
       throws Exception {
-    // TODO Avoid printing to stdout. Instead, we need to add the seed to every assert in this (and super-classes)
-    System.out.println("========== Using random seed value " + RANDOM_SEED);
+    System.out.println(String.format(
+        "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableLeadControllerResource: %s",
+        RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableLeadControllerResource));
+
     // Remove the consumer directory
     File consumerDirectory = new File(CONSUMER_DIRECTORY);
     if (consumerDirectory.exists()) {
@@ -82,7 +79,9 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   public void startController() {
     ControllerConf controllerConfig = getDefaultControllerConfiguration();
     controllerConfig.setHLCTablesAllowed(false);
+    controllerConfig.setSplitCommit(true);
     startController(controllerConfig);
+    enableResourceConfigForLeadControllerResource(_enableLeadControllerResource);
   }
 
   @Override
@@ -103,24 +102,24 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
     if (_isConsumerDirConfigured) {
       configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, CONSUMER_DIRECTORY);
     }
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_SPLIT_COMMIT, true);
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_COMMIT_END_WITH_METADATA, true);
   }
 
   @Test
   public void testConsumerDirectoryExists() {
     File consumerDirectory = new File(CONSUMER_DIRECTORY, "mytable_REALTIME");
-    Assert.assertEquals(consumerDirectory.exists(), _isConsumerDirConfigured,
+    assertEquals(consumerDirectory.exists(), _isConsumerDirConfigured,
         "The off heap consumer directory does not exist");
   }
 
   @Test
-  public void testSegmentFlushSize()
-      throws Exception {
-
+  public void testSegmentFlushSize() {
     String zkSegmentsPath = "/SEGMENTS/" + TableNameBuilder.REALTIME.tableNameWithType(getTableName());
     List<String> segmentNames = _propertyStore.getChildNames(zkSegmentsPath, 0);
     for (String segmentName : segmentNames) {
       ZNRecord znRecord = _propertyStore.get(zkSegmentsPath + "/" + segmentName, null, 0);
-      Assert.assertEquals(znRecord.getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE),
+      assertEquals(znRecord.getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE),
           Integer.toString(getRealtimeSegmentFlushSize() / getNumKafkaPartitions()),
           "Segment: " + segmentName + " does not have the expected flush size");
     }
@@ -129,58 +128,35 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   @Test
   public void testInvertedIndexTriggering()
       throws Exception {
-
-    final long numTotalDocs = getCountStarResult();
+    long numTotalDocs = getCountStarResult();
 
     JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
-    Assert.assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-    // TODO: investigate why assert for a specific value fails intermittently
-    Assert.assertNotSame(queryResponse.get("numEntriesScannedInFilter").asLong(), 0);
+    assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+    assertTrue(queryResponse.get("numEntriesScannedInFilter").asLong() > 0L);
 
     updateRealtimeTableConfig(getTableName(), UPDATED_INVERTED_INDEX_COLUMNS, null);
-
     sendPostRequest(_controllerRequestURLBuilder.forTableReload(getTableName(), "realtime"), null);
 
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Override
-      public Boolean apply(@javax.annotation.Nullable Void aVoid) {
-        try {
-          JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
-          // Total docs should not change during reload
-          Assert.assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-          Assert.assertEquals(queryResponse.get("numConsumingSegmentsQueried").asLong(), 2);
-          Assert.assertTrue(queryResponse.get("minConsumingFreshnessTimeMs").asLong() > _startTime);
-          Assert.assertTrue(queryResponse.get("minConsumingFreshnessTimeMs").asLong() < System.currentTimeMillis());
-          return queryResponse.get("numEntriesScannedInFilter").asLong() == 0;
-        } catch (Exception e) {
-          throw new RuntimeException(e);
-        }
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse1 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+        // Total docs should not change during reload
+        assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
+        assertEquals(queryResponse1.get("numConsumingSegmentsQueried").asLong(), 2);
+        assertTrue(queryResponse1.get("minConsumingFreshnessTimeMs").asLong() > _startTime);
+        assertTrue(queryResponse1.get("minConsumingFreshnessTimeMs").asLong() < System.currentTimeMillis());
+        return queryResponse1.get("numEntriesScannedInFilter").asLong() == 0;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate inverted index");
   }
 
-  @Test
-  public void testAddHLCTableShouldFail() {
-    TableConfig tableConfig = new TableConfig();
-    IndexingConfig indexingConfig = new IndexingConfig();
-    Map<String, String> streamConfigs = new HashMap<>();
-    streamConfigs.put("stream.kafka.consumer.type", "HIGHLEVEL");
-    indexingConfig.setStreamConfigs(streamConfigs);
-    tableConfig.setIndexingConfig(indexingConfig);
-    tableConfig.setTableName("testTable");
-    tableConfig.setTableType(CommonConstants.Helix.TableType.REALTIME);
-    SegmentsValidationAndRetentionConfig validationAndRetentionConfig = new SegmentsValidationAndRetentionConfig();
-    tableConfig.setValidationConfig(validationAndRetentionConfig);
-    TenantConfig tenantConfig = new TenantConfig();
-    tableConfig.setTenantConfig(tenantConfig);
-    TableCustomConfig tableCustomConfig = new TableCustomConfig();
-    tableConfig.setCustomConfig(tableCustomConfig);
-    try {
-      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
-      Assert.fail();
-    } catch (IOException e) {
-      // Expected
-    }
+  @Test(expectedExceptions = IOException.class)
+  public void testAddHLCTableShouldFail()
+      throws IOException {
+    TableConfig tableConfig = new TableConfig.Builder(TableType.REALTIME).setTableName("testTable")
+        .setStreamConfigs(Collections.singletonMap("stream.kafka.consumer.type", "HIGHLEVEL")).build();
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
   }
 }
-

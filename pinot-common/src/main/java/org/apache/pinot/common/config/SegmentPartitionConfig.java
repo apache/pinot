@@ -18,35 +18,31 @@
  */
 package org.apache.pinot.common.config;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.EqualityUtils;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
-@SuppressWarnings("unused") // Suppress incorrect warning, as methods are used for json ser/de.
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class SegmentPartitionConfig {
+public class SegmentPartitionConfig extends BaseJsonConfig {
   public static final int INVALID_NUM_PARTITIONS = -1;
 
-  @ConfigKey("columnPartitionMap")
-  @UseChildKeyHandler(ColumnPartitionMapChildKeyHandler.class)
   private final Map<String, ColumnPartitionConfig> _columnPartitionMap;
 
-  public SegmentPartitionConfig() {
-    _columnPartitionMap = null;
+  @JsonCreator
+  public SegmentPartitionConfig(
+      @JsonProperty(value = "columnPartitionMap", required = true) Map<String, ColumnPartitionConfig> columnPartitionMap) {
+    Preconditions.checkArgument(columnPartitionMap != null, "'columnPartitionMap' must be configured");
+    _columnPartitionMap = columnPartitionMap;
   }
 
-  public SegmentPartitionConfig(
-      @Nonnull @JsonProperty("columnPartitionMap") Map<String, ColumnPartitionConfig> columnPartitionMap) {
-    Preconditions.checkNotNull(columnPartitionMap);
-    _columnPartitionMap = columnPartitionMap;
+  public static SegmentPartitionConfig fromJsonString(String jsonString)
+      throws IOException {
+    return JsonUtils.stringToObject(jsonString, SegmentPartitionConfig.class);
   }
 
   public Map<String, ColumnPartitionConfig> getColumnPartitionMap() {
@@ -60,20 +56,9 @@ public class SegmentPartitionConfig {
    * @return Partition function for the column.
    */
   @Nullable
-  public String getFunctionName(@Nonnull String column) {
+  public String getFunctionName(String column) {
     ColumnPartitionConfig columnPartitionConfig = _columnPartitionMap.get(column);
     return (columnPartitionConfig != null) ? columnPartitionConfig.getFunctionName() : null;
-  }
-
-  /**
-   * Set the number of partitions for the specified column.
-   *
-   * @param column Column for which to set the number of partitions.
-   * @param numPartitions Number of partitions to set.
-   */
-  @JsonIgnore
-  public void setNumPartitions(String column, int numPartitions) {
-    ColumnPartitionConfig columnPartitionConfig = _columnPartitionMap.get(column);
   }
 
   /**
@@ -89,29 +74,6 @@ public class SegmentPartitionConfig {
   }
 
   /**
-   * Given a JSON string, de-serialize and return an instance of {@link SegmentPartitionConfig}
-   *
-   * @param jsonString Input JSON string
-   * @return Instance of {@link SegmentPartitionConfig} built from the input string.
-   * @throws IOException
-   */
-  public static SegmentPartitionConfig fromJsonString(String jsonString)
-      throws IOException {
-    return JsonUtils.stringToObject(jsonString, SegmentPartitionConfig.class);
-  }
-
-  /**
-   * Returns the JSON equivalent of the object.
-   *
-   * @return JSON string equivalent of the object.
-   * @throws IOException
-   */
-  public String toJsonString()
-      throws IOException {
-    return JsonUtils.objectToString(this);
-  }
-
-  /**
    * Returns the number of partitions for the specified column.
    * Returns {@link #INVALID_NUM_PARTITIONS} if it does not exist for the column.
    *
@@ -121,26 +83,5 @@ public class SegmentPartitionConfig {
   public int getNumPartitions(String column) {
     ColumnPartitionConfig config = _columnPartitionMap.get(column);
     return (config != null) ? config.getNumPartitions() : INVALID_NUM_PARTITIONS;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
-      return true;
-    }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
-      return false;
-    }
-
-    SegmentPartitionConfig that = (SegmentPartitionConfig) o;
-
-    return EqualityUtils.isEqual(_columnPartitionMap, that._columnPartitionMap);
-  }
-
-  @Override
-  public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(_columnPartitionMap);
-    return result;
   }
 }

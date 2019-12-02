@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import org.apache.commons.lang3.mutable.MutableInt;
+
 public abstract class BaseRawValueBasedPredicateEvaluator extends BasePredicateEvaluator {
 
   @Override
@@ -65,20 +67,24 @@ public abstract class BaseRawValueBasedPredicateEvaluator extends BasePredicateE
    */
   @SuppressWarnings("Duplicates")
   @Override
-  public boolean applyMV(int[] values, int length) {
+  public boolean applyMV(int[] values, int length, MutableInt numEntriesScanned) {
     if (isExclusive()) {
       for (int i = 0; i < length; i++) {
         if (!applySV(values[i])) {
+          numEntriesScanned.add(i + 1);
           return false;
         }
       }
+      numEntriesScanned.add(length);
       return true;
     } else {
       for (int i = 0; i < length; i++) {
         if (applySV(values[i])) {
+          numEntriesScanned.add(i + 1);
           return true;
         }
       }
+      numEntriesScanned.add(length);
       return false;
     }
   }
@@ -182,4 +188,30 @@ public abstract class BaseRawValueBasedPredicateEvaluator extends BasePredicateE
       return false;
     }
   }
+
+  @Override
+  public boolean applySV(byte[] value) {
+    throw new UnsupportedOperationException();
+  }
+
+  @SuppressWarnings("Duplicates")
+  @Override
+  public boolean applyMV(byte[][] values, int length) {
+    if (isExclusive()) {
+      for (int i = 0; i < length; i++) {
+        if (!applySV(values[i])) {
+          return false;
+        }
+      }
+      return true;
+    } else {
+      for (int i = 0; i < length; i++) {
+        if (applySV(values[i])) {
+          return true;
+        }
+      }
+      return false;
+    }
+  }
+
 }

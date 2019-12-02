@@ -19,20 +19,33 @@
 package org.apache.pinot.tools.admin.command;
 
 import java.io.File;
-import java.io.FilenameFilter;
 import java.io.IOException;
+import java.net.URI;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.orc.data.readers.ORCRecordReader;
+import org.apache.pinot.parquet.data.readers.ParquetRecordReader;
 import org.apache.pinot.startree.hll.HllConfig;
 import org.apache.pinot.startree.hll.HllConstants;
 import org.apache.pinot.tools.Command;
@@ -54,7 +67,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   @Option(name = "-dataDir", metaVar = "<string>", usage = "Directory containing the data.")
   private String _dataDir;
 
-  @Option(name = "-format", metaVar = "<AVRO/CSV/JSON>", usage = "Input data format.")
+  @Option(name = "-format", metaVar = "<AVRO/CSV/JSON/THRIFT/PARQUET/ORC>", usage = "Input data format.")
   private FileFormat _format;
 
   @Option(name = "-outDir", metaVar = "<string>", usage = "Name of output directory.")
@@ -95,6 +108,12 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
 
   @Option(name = "-numThreads", metaVar = "<int>", usage = "Parallelism while generating segments, default is 1.")
   private int _numThreads = 1;
+
+  @Option(name = "-postCreationVerification", usage = "Verify segment data file after segment creation. Please ensure you have enough local disk to hold data for verification")
+  private boolean _postCreationVerification = false;
+
+  @Option(name = "-retry", metaVar = "<int>", usage = "Number of retries if encountered any segment creation failure, default is 0.")
+  private int _retry = 0;
 
   @SuppressWarnings("FieldCanBeLocal")
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
@@ -157,6 +176,16 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
 
   public CreateSegmentCommand setStarTreeIndexSpecFile(String starTreeIndexSpecFile) {
     _starTreeIndexSpecFile = starTreeIndexSpecFile;
+    return this;
+  }
+
+  public CreateSegmentCommand setRetry(int retry) {
+    _retry = retry;
+    return this;
+  }
+
+  public CreateSegmentCommand setPostCreationVerification(boolean postCreationVerification) {
+    _postCreationVerification = postCreationVerification;
     return this;
   }
 
@@ -283,24 +312,22 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     }
 
     // Filter out all input files.
-    File dir = new File(_dataDir);
-    if (!dir.exists() || !dir.isDirectory()) {
+    final Path dataDirPath = new Path(_dataDir);
+    FileSystem fileSystem = FileSystem.get(URI.create(_dataDir), new Configuration());
+
+    if (!fileSystem.exists(dataDirPath) || !fileSystem.isDirectory(dataDirPath)) {
       throw new RuntimeException("Data directory " + _dataDir + " not found.");
     }
 
-    File[] files = dir.listFiles(new FilenameFilter() {
-      @Override
-      public boolean accept(File dir, String name) {
-        return name.toLowerCase().endsWith(_format.toString().toLowerCase());
-      }
-    });
+    // Gather all data files
+    List<Path> dataFilePaths = getDataFilePaths(dataDirPath);
 
-    if ((files == null) || (files.length == 0)) {
+    if ((dataFilePaths == null) || (dataFilePaths.size() == 0)) {
       throw new RuntimeException(
           "Data directory " + _dataDir + " does not contain " + _format.toString().toUpperCase() + " files.");
     }
 
-    LOGGER.info("Accepted files: {}", Arrays.toString(files));
+    LOGGER.info("Accepted files: {}", Arrays.toString(dataFilePaths.toArray()));
 
     // Make sure output directory does not already exist, or can be overwritten.
     File outDir = new File(_outDir);
@@ -362,23 +389,55 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
 
     ExecutorService executor = Executors.newFixedThreadPool(_numThreads);
     int cnt = 0;
-    for (final File file : files) {
+    for (final Path dataFilePath : dataFilePaths) {
       final int segCnt = cnt;
 
       executor.execute(new Runnable() {
         @Override
         public void run() {
-          try {
-            SegmentGeneratorConfig config = new SegmentGeneratorConfig(segmentGeneratorConfig);
-            config.setInputFilePath(file.getAbsolutePath());
-            config.setSegmentName(_segmentName + "_" + segCnt);
-            config.loadConfigFiles();
+          for (int curr = 0; curr <= _retry; curr++) {
+            try {
+              SegmentGeneratorConfig config = new SegmentGeneratorConfig(segmentGeneratorConfig);
 
-            final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-            driver.init(config);
-            driver.build();
-          } catch (Exception e) {
-            throw new RuntimeException(e);
+              String localFile = dataFilePath.getName();
+              Path localFilePath = new Path(localFile);
+              dataDirPath.getFileSystem(new Configuration()).copyToLocalFile(dataFilePath, localFilePath);
+              config.setInputFilePath(localFile);
+              config.setSegmentName(_segmentName + "_" + segCnt);
+              config.loadConfigFiles();
+
+              final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+              switch (config.getFormat()) {
+                case PARQUET:
+                  RecordReader parquetRecordReader = new ParquetRecordReader();
+                  parquetRecordReader.init(new File(localFile), Schema.fromFile(new File(_schemaFile)), null);
+                  driver.init(config, parquetRecordReader);
+                  break;
+                case ORC:
+                  RecordReader orcRecordReader = new ORCRecordReader();
+                  orcRecordReader.init(new File(localFile), Schema.fromFile(new File(_schemaFile)), null);
+                  driver.init(config, orcRecordReader);
+                  break;
+                default:
+                  driver.init(config);
+              }
+              driver.build();
+              if (_postCreationVerification) {
+                if (!verifySegment(new File(config.getOutDir(), driver.getSegmentName()))) {
+                  throw new RuntimeException("Pinot segment is corrupted, please try to recreate it.");
+                } else {
+                  LOGGER.info("Post segment creation verification is succeed for segment {}.", driver.getSegmentName());
+                }
+              }
+              break;
+            } catch (Exception e) {
+              LOGGER.error("Got exception during segment creation.", e);
+              if (curr == _retry) {
+                throw new RuntimeException(e);
+              } else {
+                LOGGER.error("Failed to create Pinot segment, retry: {}/{}", curr + 1, _retry);
+              }
+            }
           }
         }
       });
@@ -387,5 +446,74 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
 
     executor.shutdown();
     return executor.awaitTermination(1, TimeUnit.HOURS);
+  }
+
+  private boolean verifySegment(File indexDir) {
+    File localTempDir =
+        new File(FileUtils.getTempDirectory(), org.apache.pinot.common.utils.FileUtils.getRandomFileName());
+    try {
+      try {
+        localTempDir.getParentFile().mkdirs();
+        FileSystem.get(URI.create(indexDir.toString()), new Configuration())
+            .copyToLocalFile(new Path(indexDir.toString()), new Path(localTempDir.toString()));
+      } catch (IOException e) {
+        LOGGER.error("Failed to copy segment {} to local directory {} for verification.", indexDir, localTempDir, e);
+        return false;
+      }
+      try {
+        ImmutableSegment segment = ImmutableSegmentLoader.load(localTempDir, ReadMode.mmap);
+        LOGGER.info("Successfully loaded Pinot segment {} (size: {} Bytes) from {}.", segment.getSegmentName(),
+            segment.getSegmentSizeBytes(), localTempDir);
+        segment.destroy();
+      } catch (Exception e) {
+        LOGGER.error("Failed to load segment from {}.", localTempDir, e);
+        return false;
+      }
+      return true;
+    } finally {
+      FileUtils.deleteQuietly(localTempDir);
+    }
+  }
+
+  protected List<Path> getDataFilePaths(Path pathPattern)
+      throws IOException {
+    List<Path> tarFilePaths = new ArrayList<>();
+    FileSystem fileSystem = FileSystem.get(pathPattern.toUri(), new Configuration());
+    getDataFilePathsHelper(fileSystem, fileSystem.globStatus(pathPattern), tarFilePaths);
+    return tarFilePaths;
+  }
+
+  protected void getDataFilePathsHelper(FileSystem fileSystem, FileStatus[] fileStatuses, List<Path> tarFilePaths)
+      throws IOException {
+    for (FileStatus fileStatus : fileStatuses) {
+      Path path = fileStatus.getPath();
+      if (fileStatus.isDirectory()) {
+        getDataFilePathsHelper(fileSystem, fileSystem.listStatus(path), tarFilePaths);
+      } else {
+        if (isDataFile(path.getName())) {
+          tarFilePaths.add(path);
+        }
+      }
+    }
+  }
+
+  protected boolean isDataFile(String fileName) {
+    switch (_format) {
+      case AVRO:
+      case GZIPPED_AVRO:
+        return fileName.endsWith(".avro");
+      case CSV:
+        return fileName.endsWith(".csv");
+      case JSON:
+        return fileName.endsWith(".json");
+      case THRIFT:
+        return fileName.endsWith(".thrift");
+      case PARQUET:
+        return fileName.endsWith(".parquet");
+      case ORC:
+        return fileName.endsWith(".orc");
+      default:
+        throw new IllegalStateException("Unsupported file format for segment creation: " + _format);
+    }
   }
 }

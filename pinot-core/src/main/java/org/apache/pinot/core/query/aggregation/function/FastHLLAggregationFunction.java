@@ -19,8 +19,8 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import javax.annotation.Nonnull;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
@@ -33,15 +33,13 @@ import org.apache.pinot.startree.hll.HllConstants;
 public class FastHLLAggregationFunction implements AggregationFunction<HyperLogLog, Long> {
   private int _log2m = HllConstants.DEFAULT_LOG2M;
 
-  @Nonnull
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.FASTHLL;
   }
 
-  @Nonnull
   @Override
-  public String getColumnName(@Nonnull String column) {
+  public String getColumnName(String column) {
     return AggregationFunctionType.FASTHLL.getName() + "_" + column;
   }
 
@@ -50,25 +48,22 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
   }
 
   @Override
-  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+  public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
 
-  @Nonnull
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
     return new ObjectAggregationResultHolder();
   }
 
-  @Nonnull
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
     return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
   }
 
   @Override
-  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull BlockValSet... blockValSets) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
     String[] valueArray = blockValSets[0].getStringValuesSV();
     HyperLogLog hyperLogLog = getHyperLogLog(aggregationResultHolder);
     try {
@@ -81,8 +76,8 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
   }
 
   @Override
-  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     String[] valueArray = blockValSets[0].getStringValuesSV();
     try {
       for (int i = 0; i < length; i++) {
@@ -95,8 +90,8 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
   }
 
   @Override
-  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     String[] valueArray = blockValSets[0].getStringValuesSV();
     try {
       for (int i = 0; i < length; i++) {
@@ -111,9 +106,8 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
     }
   }
 
-  @Nonnull
   @Override
-  public HyperLogLog extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+  public HyperLogLog extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
     if (hyperLogLog == null) {
       return new HyperLogLog(_log2m);
@@ -122,9 +116,8 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
     }
   }
 
-  @Nonnull
   @Override
-  public HyperLogLog extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+  public HyperLogLog extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
     if (hyperLogLog == null) {
       return new HyperLogLog(_log2m);
@@ -133,9 +126,8 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
     }
   }
 
-  @Nonnull
   @Override
-  public HyperLogLog merge(@Nonnull HyperLogLog intermediateResult1, @Nonnull HyperLogLog intermediateResult2) {
+  public HyperLogLog merge(HyperLogLog intermediateResult1, HyperLogLog intermediateResult2) {
     try {
       intermediateResult1.addAll(intermediateResult2);
     } catch (Exception e) {
@@ -149,15 +141,18 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
     return false;
   }
 
-  @Nonnull
   @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.OBJECT;
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.OBJECT;
   }
 
-  @Nonnull
   @Override
-  public Long extractFinalResult(@Nonnull HyperLogLog intermediateResult) {
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.LONG;
+  }
+
+  @Override
+  public Long extractFinalResult(HyperLogLog intermediateResult) {
     return intermediateResult.cardinality();
   }
 
@@ -167,7 +162,7 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
    * @param aggregationResultHolder Result holder
    * @return HyperLogLog from the result holder
    */
-  private HyperLogLog getHyperLogLog(@Nonnull AggregationResultHolder aggregationResultHolder) {
+  private HyperLogLog getHyperLogLog(AggregationResultHolder aggregationResultHolder) {
     HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
     if (hyperLogLog == null) {
       hyperLogLog = new HyperLogLog(_log2m);
@@ -183,7 +178,7 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
    * @param groupKey Group key for which to return the HyperLogLog
    * @return HyperLogLog for the group key
    */
-  private HyperLogLog getHyperLogLog(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+  private HyperLogLog getHyperLogLog(GroupByResultHolder groupByResultHolder, int groupKey) {
     HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
     if (hyperLogLog == null) {
       hyperLogLog = new HyperLogLog(_log2m);

@@ -169,11 +169,12 @@ public class LegacyMergeWrapper extends DetectionPipeline {
 
     // retrieve anomalies
     AnomalySlice effectiveSlice = this.slice
+        .withDetectionId(this.config.getId())
         .withStart(this.getStartTime(generated) - this.maxGap)
         .withEnd(this.getEndTime(generated) + this.maxGap);
 
     List<MergedAnomalyResultDTO> retrieved = new ArrayList<>();
-    retrieved.addAll(this.provider.fetchAnomalies(Collections.singleton(effectiveSlice), config.getId()).get(effectiveSlice));
+    retrieved.addAll(this.provider.fetchAnomalies(Collections.singleton(effectiveSlice)).get(effectiveSlice));
 
     return new DetectionPipelineResult(this.merge(generated, retrieved));
   }

@@ -22,12 +22,12 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
-import org.apache.pinot.core.data.readers.RecordReader;
-import org.apache.pinot.core.data.readers.RecordReaderUtils;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
 /**
@@ -52,8 +52,7 @@ public class ReducerRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
-
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig) {
   }
 
   @Override
@@ -101,7 +100,7 @@ public class ReducerRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse) {
     Preconditions.checkState(!_nextRowReturned);
-    RecordReaderUtils.copyRow(_nextRow, reuse);
+    reuse.init(_nextRow);
     _nextRowReturned = true;
     return reuse;
   }

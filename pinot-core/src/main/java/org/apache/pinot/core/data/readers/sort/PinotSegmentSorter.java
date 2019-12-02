@@ -19,13 +19,11 @@
 package org.apache.pinot.core.data.readers.sort;
 
 import it.unimi.dsi.fastutil.Arrays;
-import it.unimi.dsi.fastutil.Swapper;
-import it.unimi.dsi.fastutil.ints.IntComparator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.core.data.readers.PinotSegmentColumnReader;
 
 
@@ -84,54 +82,39 @@ public class PinotSegmentSorter implements SegmentSorter {
       sortedDocIds[i] = i;
     }
 
-    IntComparator comparator = new IntComparator() {
-      @Override
-      public int compare(int i1, int i2) {
-        int docId1 = sortedDocIds[i1];
-        int docId2 = sortedDocIds[i2];
+    Arrays.quickSort(0, _numDocs, (i1, i2) -> {
+      int docId1 = sortedDocIds[i1];
+      int docId2 = sortedDocIds[i2];
 
-        int compare = 0;
-        for (int index : _sortOrder) {
-          String dimensionName = _dimensionNames.get(index);
-          FieldSpec fieldSpec = _schema.getFieldSpecFor(dimensionName);
-          PinotSegmentColumnReader columnReader = _columnReaderMap.get(dimensionName);
+      int compare = 0;
+      for (int sortIndex : _sortOrder) {
+        String dimensionName = _dimensionNames.get(sortIndex);
+        FieldSpec fieldSpec = _schema.getFieldSpecFor(dimensionName);
+        PinotSegmentColumnReader columnReader = _columnReaderMap.get(dimensionName);
 
-          // Multi value column or no dictionary column is not supported
-          boolean isMultiValueColumn = !fieldSpec.isSingleValueField();
-          boolean isNoDictionaryColumn = !columnReader.hasDictionary();
-          if (isMultiValueColumn || isNoDictionaryColumn) {
-            throw new IllegalStateException(
-                "Multi value column or no dictionary column is not supported. ( column name: " + dimensionName
-                    + ", multi value column: " + isMultiValueColumn + ", no dictionary column: " + isNoDictionaryColumn
-                    + " )");
-          }
-
-          // Compute the order
-          compare = columnReader.getDictionaryId(docId1) - columnReader.getDictionaryId(docId2);
-
-          if (compare != 0) {
-            return compare;
-          }
+        // Multi value column or no dictionary column is not supported
+        boolean isMultiValueColumn = !fieldSpec.isSingleValueField();
+        boolean isNoDictionaryColumn = !columnReader.hasDictionary();
+        if (isMultiValueColumn || isNoDictionaryColumn) {
+          throw new IllegalStateException(
+              "Multi value column or no dictionary column is not supported. ( column name: " + dimensionName
+                  + ", multi value column: " + isMultiValueColumn + ", no dictionary column: " + isNoDictionaryColumn
+                  + " )");
         }
-        return compare;
-      }
 
-      @Override
-      public int compare(Integer o1, Integer o2) {
-        throw new UnsupportedOperationException();
-      }
-    };
+        // Compute the order
+        compare = columnReader.getDictionaryId(docId1) - columnReader.getDictionaryId(docId2);
 
-    Swapper swapper = new Swapper() {
-      @Override
-      public void swap(int i, int j) {
-        int temp = sortedDocIds[i];
-        sortedDocIds[i] = sortedDocIds[j];
-        sortedDocIds[j] = temp;
+        if (compare != 0) {
+          return compare;
+        }
       }
-    };
-
-    Arrays.quickSort(0, _numDocs, comparator, swapper);
+      return compare;
+    }, (i, j) -> {
+      int temp = sortedDocIds[i];
+      sortedDocIds[i] = sortedDocIds[j];
+      sortedDocIds[j] = temp;
+    });
 
     return sortedDocIds;
   }

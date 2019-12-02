@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.controller.helix.core.periodictask;
 
+import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.periodictask.BasePeriodicTask;
 import org.slf4j.Logger;
@@ -40,12 +42,15 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerPeriodicTask.class);
 
   protected final PinotHelixResourceManager _pinotHelixResourceManager;
+  protected final LeadControllerManager _leadControllerManager;
   protected final ControllerMetrics _controllerMetrics;
 
   public ControllerPeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds,
-      PinotHelixResourceManager pinotHelixResourceManager, ControllerMetrics controllerMetrics) {
+      PinotHelixResourceManager pinotHelixResourceManager, LeadControllerManager leadControllerManager,
+      ControllerMetrics controllerMetrics) {
     super(taskName, runFrequencyInSeconds, initialDelayInSeconds);
     _pinotHelixResourceManager = pinotHelixResourceManager;
+    _leadControllerManager = leadControllerManager;
     _controllerMetrics = controllerMetrics;
   }
 
@@ -53,7 +58,14 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   protected final void runTask() {
     _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN, 1L);
     try {
-      processTables(_pinotHelixResourceManager.getAllTables());
+      // Process the tables that are managed by this controller
+      List<String> tablesToProcess = new ArrayList<>();
+      for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
+        if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
+          tablesToProcess.add(tableNameWithType);
+        }
+      }
+      processTables(tablesToProcess);
     } catch (Exception e) {
       LOGGER.error("Caught exception while running task: {}", _taskName, e);
       _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR, 1L);

@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.operator.docvalsets;
 
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.core.common.BaseBlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.operator.ProjectionOperator;
@@ -32,7 +32,8 @@ import org.apache.pinot.core.operator.ProjectionOperator;
 public class ProjectionBlockValSet extends BaseBlockValSet {
   private final DataBlockCache _dataBlockCache;
   private final String _column;
-  private final FieldSpec.DataType _dataType;
+  private final DataType _dataType;
+  private final boolean _singleValue;
 
   /**
    * Constructor for the class.
@@ -42,10 +43,26 @@ public class ProjectionBlockValSet extends BaseBlockValSet {
    * @param dataBlockCache data block cache
    * @param column Projection column.
    */
-  public ProjectionBlockValSet(DataBlockCache dataBlockCache, String column, FieldSpec.DataType dataType) {
+  public ProjectionBlockValSet(DataBlockCache dataBlockCache, String column, DataType dataType, boolean singleValue) {
     _dataBlockCache = dataBlockCache;
     _column = column;
     _dataType = dataType;
+    _singleValue = singleValue;
+  }
+
+  @Override
+  public DataType getValueType() {
+    return _dataType;
+  }
+
+  @Override
+  public boolean isSingleValue() {
+    return _singleValue;
+  }
+
+  @Override
+  public int[] getDictionaryIdsSV() {
+    return _dataBlockCache.getDictIdsForSVColumn(_column);
   }
 
   @Override
@@ -54,18 +71,8 @@ public class ProjectionBlockValSet extends BaseBlockValSet {
   }
 
   @Override
-  public int[][] getIntValuesMV() {
-    return _dataBlockCache.getIntValuesForMVColumn(_column);
-  }
-
-  @Override
   public long[] getLongValuesSV() {
     return _dataBlockCache.getLongValuesForSVColumn(_column);
-  }
-
-  @Override
-  public long[][] getLongValuesMV() {
-    return _dataBlockCache.getLongValuesForMVColumn(_column);
   }
 
   @Override
@@ -74,30 +81,8 @@ public class ProjectionBlockValSet extends BaseBlockValSet {
   }
 
   @Override
-  public float[][] getFloatValuesMV() {
-    return _dataBlockCache.getFloatValuesForMVColumn(_column);
-  }
-
-  /**
-   * Returns an array of single values for the given doc Ids.
-   * Caller chooses T based on data type.
-   *
-   * @return Array of single-values from dataBlockCache.
-   */
-  @Override
   public double[] getDoubleValuesSV() {
     return _dataBlockCache.getDoubleValuesForSVColumn(_column);
-  }
-
-  /**
-   * Returns an array of multi-values for the given doc Ids.
-   * Caller chooses T based on data type.
-   *
-   * @return Array of multi-values from dataBlockCache.
-   */
-  @Override
-  public double[][] getDoubleValuesMV() {
-    return _dataBlockCache.getDoubleValuesForMVColumn(_column);
   }
 
   @Override
@@ -111,23 +96,33 @@ public class ProjectionBlockValSet extends BaseBlockValSet {
   }
 
   @Override
-  public String[][] getStringValuesMV() {
-    return _dataBlockCache.getStringValuesForMVColumn(_column);
-  }
-
-  @Override
-  public FieldSpec.DataType getValueType() {
-    return _dataType;
-  }
-
-  @Override
-  public int[] getDictionaryIdsSV() {
-    return _dataBlockCache.getDictIdsForSVColumn(_column);
-  }
-
-  @Override
   public int[][] getDictionaryIdsMV() {
     return _dataBlockCache.getDictIdsForMVColumn(_column);
+  }
+
+  @Override
+  public int[][] getIntValuesMV() {
+    return _dataBlockCache.getIntValuesForMVColumn(_column);
+  }
+
+  @Override
+  public long[][] getLongValuesMV() {
+    return _dataBlockCache.getLongValuesForMVColumn(_column);
+  }
+
+  @Override
+  public float[][] getFloatValuesMV() {
+    return _dataBlockCache.getFloatValuesForMVColumn(_column);
+  }
+
+  @Override
+  public double[][] getDoubleValuesMV() {
+    return _dataBlockCache.getDoubleValuesForMVColumn(_column);
+  }
+
+  @Override
+  public String[][] getStringValuesMV() {
+    return _dataBlockCache.getStringValuesForMVColumn(_column);
   }
 
   @Override

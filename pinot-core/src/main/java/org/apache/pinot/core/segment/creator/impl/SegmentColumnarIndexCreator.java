@@ -19,6 +19,7 @@
 package org.apache.pinot.core.segment.creator.impl;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterables;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
@@ -29,12 +30,15 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.pinot.common.data.DateTimeFieldSpec;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.FieldSpec.FieldType;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.FieldType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.common.utils.FileUtils;
+import org.apache.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
@@ -54,7 +58,10 @@ import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForward
 import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.startree.hll.HllConfig;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Interval;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
@@ -77,6 +84,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
   private Map<String, ForwardIndexCreator> _forwardIndexCreatorMap = new HashMap<>();
   private Map<String, InvertedIndexCreator> _invertedIndexCreatorMap = new HashMap<>();
+  private Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new HashMap<>();
   private String segmentName;
   private Schema schema;
   private File _indexDir;
@@ -84,6 +92,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private int totalRawDocs;
   private int totalAggDocs;
   private int docIdCounter;
+  private boolean _nullHandlingEnabled;
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
@@ -114,13 +123,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     // Initialize creators for dictionary, forward index and inverted index
     for (FieldSpec fieldSpec : fieldSpecs) {
-      String columnName = fieldSpec.getName();
-
       // Ignore virtual columns
-      if (schema.isVirtualColumn(columnName)) {
+      if (fieldSpec.isVirtualColumn()) {
         continue;
       }
 
+      String columnName = fieldSpec.getName();
       ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(columnName);
       Preconditions.checkNotNull(indexCreationInfo, "Missing index creation info for column: %s", columnName);
 
@@ -129,7 +137,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
         // Initialize dictionary creator
         SegmentDictionaryCreator dictionaryCreator =
-            new SegmentDictionaryCreator(indexCreationInfo.getSortedUniqueElementsArray(), fieldSpec, _indexDir);
+            new SegmentDictionaryCreator(indexCreationInfo.getSortedUniqueElementsArray(), fieldSpec, _indexDir,
+                indexCreationInfo.isUseVarLengthDictionary());
         _dictionaryCreatorMap.put(columnName, dictionaryCreator);
 
         // Create dictionary
@@ -184,6 +193,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         _forwardIndexCreatorMap.put(columnName,
             getRawIndexCreatorForColumn(_indexDir, compressionType, columnName, fieldSpec.getDataType(), totalDocs,
                 indexCreationInfo.getLengthOfLongestEntry()));
+      }
+
+      _nullHandlingEnabled = config.isNullHandlingEnabled();
+
+      if (_nullHandlingEnabled) {
+        // Initialize Null value vector map
+        _nullValueVectorCreatorMap.put(columnName, new NullValueVectorCreator(_indexDir, columnName));
       }
     }
   }
@@ -275,6 +291,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           _invertedIndexCreatorMap.get(columnName).add(dictIds, dictIds.length);
         }
       }
+
+      if (_nullHandlingEnabled) {
+        // If row has null value for given column name, add to null value vector
+        if (row.isNullValue(columnName)) {
+          _nullValueVectorCreatorMap.get(columnName).setNull(docIdCounter);
+        }
+      }
     }
     docIdCounter++;
   }
@@ -289,6 +312,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       throws ConfigurationException, IOException {
     for (InvertedIndexCreator invertedIndexCreator : _invertedIndexCreatorMap.values()) {
       invertedIndexCreator.seal();
+    }
+    for (NullValueVectorCreator nullValueVectorCreator : _nullValueVectorCreatorMap.values()) {
+      nullValueVectorCreator.seal();
     }
     writeMetadata();
   }
@@ -306,7 +332,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(METRICS, config.getMetrics());
     properties.setProperty(DATETIME_COLUMNS, config.getDateTimeColumnNames());
     properties.setProperty(TIME_COLUMN_NAME, config.getTimeColumnName());
-    properties.setProperty(TIME_INTERVAL, "not_there");
     properties.setProperty(SEGMENT_TOTAL_RAW_DOCS, String.valueOf(totalRawDocs));
     properties.setProperty(SEGMENT_TOTAL_AGGREGATE_DOCS, String.valueOf(totalAggDocs));
     properties.setProperty(SEGMENT_TOTAL_DOCS, String.valueOf(totalDocs));
@@ -335,27 +360,44 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     String timeColumn = config.getTimeColumnName();
     ColumnIndexCreationInfo timeColumnIndexCreationInfo = indexCreationInfoMap.get(timeColumn);
     if (timeColumnIndexCreationInfo != null) {
+      long startTime;
+      long endTime;
+      TimeUnit timeUnit;
+
       // Use start/end time in config if defined
       if (config.getStartTime() != null) {
-        properties.setProperty(SEGMENT_START_TIME, config.getStartTime());
-        properties.setProperty(SEGMENT_END_TIME, Preconditions.checkNotNull(config.getEndTime()));
-        properties.setProperty(TIME_UNIT, Preconditions.checkNotNull(config.getSegmentTimeUnit()));
+        startTime = Long.parseLong(config.getStartTime());
+        endTime = Long.parseLong(config.getEndTime());
+        timeUnit = Preconditions.checkNotNull(config.getSegmentTimeUnit());
       } else {
-        Object minTime = Preconditions.checkNotNull(timeColumnIndexCreationInfo.getMin());
-        Object maxTime = Preconditions.checkNotNull(timeColumnIndexCreationInfo.getMax());
+        String startTimeStr = timeColumnIndexCreationInfo.getMin().toString();
+        String endTimeStr = timeColumnIndexCreationInfo.getMax().toString();
 
         if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
-          // For simple date format, convert time value into millis since epoch
+          // For TimeColumnType.SIMPLE_DATE_FORMAT, convert time value into millis since epoch
           DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(config.getSimpleDateFormat());
-          properties.setProperty(SEGMENT_START_TIME, dateTimeFormatter.parseMillis(minTime.toString()));
-          properties.setProperty(SEGMENT_END_TIME, dateTimeFormatter.parseMillis(maxTime.toString()));
-          properties.setProperty(TIME_UNIT, TimeUnit.MILLISECONDS);
+          startTime = dateTimeFormatter.parseMillis(startTimeStr);
+          endTime = dateTimeFormatter.parseMillis(endTimeStr);
+          timeUnit = TimeUnit.MILLISECONDS;
         } else {
-          properties.setProperty(SEGMENT_START_TIME, minTime);
-          properties.setProperty(SEGMENT_END_TIME, maxTime);
-          properties.setProperty(TIME_UNIT, Preconditions.checkNotNull(config.getSegmentTimeUnit()));
+          // by default, time column type is TimeColumnType.EPOCH
+          startTime = Long.parseLong(startTimeStr);
+          endTime = Long.parseLong(endTimeStr);
+          timeUnit = Preconditions.checkNotNull(config.getSegmentTimeUnit());
         }
       }
+
+      if (!config.isSkipTimeValueCheck()) {
+        Interval timeInterval = new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime), DateTimeZone.UTC);
+        Preconditions.checkState(TimeUtils.isValidTimeInterval(timeInterval),
+            "Invalid segment start/end time: %s (in millis: %s/%s) for time column: %s, must be between: %s",
+            timeInterval, timeInterval.getStartMillis(), timeInterval.getEndMillis(), timeColumn,
+            TimeUtils.VALID_TIME_INTERVAL);
+      }
+
+      properties.setProperty(SEGMENT_START_TIME, startTime);
+      properties.setProperty(SEGMENT_END_TIME, endTime);
+      properties.setProperty(TIME_UNIT, timeUnit);
     }
 
     for (Map.Entry<String, String> entry : config.getCustomProperties().entrySet()) {
@@ -444,11 +486,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     Object defaultNullValue = columnIndexCreationInfo.getDefaultNullValue();
-    if (defaultNullValue == null) {
-      defaultNullValue = fieldSpec.getDefaultNullValue();
+    if (defaultNullValue instanceof byte[]) {
+      String defaultNullValueString = BytesUtils.toHexString((byte[]) defaultNullValue);
+      properties
+          .setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValueString);
+    } else {
+      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DEFAULT_NULL_VALUE),
+          String.valueOf(defaultNullValue));
     }
-    properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DEFAULT_NULL_VALUE),
-        String.valueOf(defaultNullValue));
   }
 
   public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column, String minValue,
@@ -531,14 +576,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @Override
   public void close()
       throws IOException {
-    for (SegmentDictionaryCreator dictionaryCreator : _dictionaryCreatorMap.values()) {
-      dictionaryCreator.close();
-    }
-    for (ForwardIndexCreator forwardIndexCreator : _forwardIndexCreatorMap.values()) {
-      forwardIndexCreator.close();
-    }
-    for (InvertedIndexCreator invertedIndexCreator : _invertedIndexCreatorMap.values()) {
-      invertedIndexCreator.close();
-    }
+    FileUtils.close(Iterables
+        .concat(_dictionaryCreatorMap.values(), _forwardIndexCreatorMap.values(), _invertedIndexCreatorMap.values(), _nullValueVectorCreatorMap
+            .values()));
   }
 }

@@ -28,9 +28,10 @@ import java.util.Map;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.common.utils.AvroSchemaUtil;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class AvroWriter implements Closeable {
@@ -53,7 +54,7 @@ public class AvroWriter implements Closeable {
 
     ArrayNode fields = JsonUtils.newArrayNode();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      JsonNode jsonObject = fieldSpec.toAvroSchemaJsonObject();
+      JsonNode jsonObject = AvroSchemaUtil.toAvroSchemaJsonObject(fieldSpec);
       fields.add(jsonObject);
     }
     avroSchema.set("fields", fields);

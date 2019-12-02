@@ -126,7 +126,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
       try {
         return FileUtils.sizeOfDirectory(segmentDirectory.toPath().toFile());
       } catch (IllegalArgumentException e) {
-        LOGGER.error("Failed to read disk size for direcotry: ", segmentDirectory.getAbsolutePath());
+        LOGGER.error("Failed to read disk size for directory: ", segmentDirectory.getAbsolutePath());
         return -1;
       }
     } else {
@@ -241,6 +241,9 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
         break;
       case BLOOM_FILTER:
         buffer = columnIndexDirectory.getBloomFilterBufferFor(column);
+        break;
+      case NULLVALUE_VECTOR:
+        buffer = columnIndexDirectory.getNullValueVectorBufferFor(column);
         break;
       default:
         throw new RuntimeException("Unknown index type: " + type.name());
@@ -423,6 +426,8 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
           return columnIndexDirectory.newInvertedIndexBuffer(key.name, sizeBytes);
         case BLOOM_FILTER:
           return columnIndexDirectory.newBloomFilterBuffer(key.name, sizeBytes);
+        case NULLVALUE_VECTOR:
+          return columnIndexDirectory.newNullValueVectorBuffer(key.name, sizeBytes);
         default:
           throw new RuntimeException("Unknown index type: " + indexType.name() + " for directory: " + segmentDirectory);
       }

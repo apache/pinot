@@ -24,6 +24,7 @@ import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -52,6 +53,13 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 public class DetectionUtils {
   private static final String PROP_BASELINE_PROVIDER_COMPONENT_NAME = "baselineProviderComponentName";
+
+  private static final Comparator<MergedAnomalyResultDTO> COMPARATOR = new Comparator<MergedAnomalyResultDTO>() {
+    @Override
+    public int compare(MergedAnomalyResultDTO o1, MergedAnomalyResultDTO o2) {
+      return Long.compare(o1.getStartTime(), o2.getStartTime());
+    }
+  };
 
   // TODO anomaly should support multimap
   public static DimensionMap toFilterMap(Multimap<String, String> filters) {
@@ -102,12 +110,6 @@ public class DetectionUtils {
    * @return list of anomalies
    */
   public static List<MergedAnomalyResultDTO> makeAnomalies(MetricSlice slice, DataFrame df, String seriesName, long endTime, Period monitoringGranularityPeriod, DatasetConfigDTO dataset) {
-    if (df.isEmpty()) {
-      return Collections.emptyList();
-    }
-
-    df = df.filter(df.getLongs(COL_TIME).between(slice.getStart(), slice.getEnd())).dropNull(COL_TIME);
-
     if (df.isEmpty()) {
       return Collections.emptyList();
     }
@@ -171,6 +173,46 @@ public class DetectionUtils {
     anomaly.setEndTime(slice.getEnd());
 
     return anomaly;
+  }
+
+  public static void setEntityChildMapping(MergedAnomalyResultDTO parent, MergedAnomalyResultDTO child1) {
+    if (child1 != null) {
+      parent.getChildren().add(child1);
+      child1.setChild(true);
+    }
+
+    parent.setChild(false);
+  }
+
+  public static MergedAnomalyResultDTO makeEntityAnomaly() {
+    MergedAnomalyResultDTO entityAnomaly = new MergedAnomalyResultDTO();
+    // TODO: define anomaly type
+    //entityAnomaly.setType();
+    entityAnomaly.setChild(false);
+
+    return entityAnomaly;
+  }
+
+  public static MergedAnomalyResultDTO makeParentEntityAnomaly(MergedAnomalyResultDTO childAnomaly) {
+    MergedAnomalyResultDTO newEntityAnomaly = makeEntityAnomaly();
+    newEntityAnomaly.setStartTime(childAnomaly.getStartTime());
+    newEntityAnomaly.setEndTime(childAnomaly.getEndTime());
+    setEntityChildMapping(newEntityAnomaly, childAnomaly);
+    return newEntityAnomaly;
+  }
+
+  public static List<MergedAnomalyResultDTO> mergeAndSortAnomalies(List<MergedAnomalyResultDTO> anomalyListA, List<MergedAnomalyResultDTO> anomalyListB) {
+    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
+    if (anomalyListA != null) {
+      anomalies.addAll(anomalyListA);
+    }
+    if (anomalyListB != null) {
+      anomalies.addAll(anomalyListB);
+    }
+
+    // Sort by increasing order of anomaly start time
+    Collections.sort(anomalies, COMPARATOR);
+    return anomalies;
   }
 
   /**

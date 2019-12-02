@@ -41,6 +41,7 @@ import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -104,7 +105,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
 
       // Check the query that requires to scan all segment.
       String countStarQuery = "select count(*) from myTable";
-      Map<String, List<String>> routingTable =
+      Map<ServerInstance, List<String>> routingTable =
           routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery), null);
 
       // Check that all segments are covered exactly for once.
@@ -181,7 +182,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
 
     // Check the query that requires to scan all segment.
     String countStarQuery = "select count(*) from myTable";
-    Map<String, List<String>> routingTable =
+    Map<ServerInstance, List<String>> routingTable =
         routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery), null);
 
     // Check that all segments are covered exactly for once.
@@ -254,10 +255,10 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
     // Compute routing table
     routingTableBuilder.computeOnExternalViewChange(REALTIME_TABLE_NAME, newExternalView, instanceConfigs);
 
-    Set<String> servers = new HashSet<>();
+    Set<ServerInstance> servers = new HashSet<>();
     for (int i = 0; i < 100; i++) {
       String countStarQuery = "select count(*) from " + REALTIME_TABLE_NAME;
-      Map<String, List<String>> routingTable =
+      Map<ServerInstance, List<String>> routingTable =
           routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery), null);
       Assert.assertEquals(routingTable.keySet().size(), 1);
       servers.addAll(routingTable.keySet());
@@ -345,8 +346,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
     SegmentPartitionConfig partitionConfig = new SegmentPartitionConfig(metadataMap);
 
     // Create the routing config
-    RoutingConfig routingConfig = new RoutingConfig();
-    routingConfig.setRoutingTableBuilderName("PartitionAwareOffline");
+    RoutingConfig routingConfig = new RoutingConfig("PartitionAwareOffline", null);
 
     // Create table config
     TableConfig tableConfig =

@@ -43,12 +43,12 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringEscapeUtils;
-import org.apache.pinot.common.data.MetricFieldSpec;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.segment.StarTreeMetadata;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -57,6 +57,7 @@ import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.core.startree.v2.StarTreeV2Constants;
 import org.apache.pinot.core.startree.v2.StarTreeV2Metadata;
 import org.apache.pinot.startree.hll.HllConstants;
+import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
@@ -190,7 +191,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         String endTimeString = segmentMetadataPropertiesConfiguration.getString(SEGMENT_END_TIME);
         _segmentStartTime = Long.parseLong(startTimeString);
         _segmentEndTime = Long.parseLong(endTimeString);
-        _timeInterval = new Interval(_timeUnit.toMillis(_segmentStartTime), _timeUnit.toMillis(_segmentEndTime));
+        _timeInterval =
+            new Interval(_timeUnit.toMillis(_segmentStartTime), _timeUnit.toMillis(_segmentEndTime), DateTimeZone.UTC);
       } catch (Exception e) {
         LOGGER.warn("Caught exception while setting time interval and granularity", e);
         _timeInterval = null;
@@ -529,6 +531,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public String getBloomFilterFileName(String column) {
     return column + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION;
+  }
+
+  @Override
+  public String getNullValueVectorFileName(String column) {
+    return column + V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION;
   }
 
   @Nullable

@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.operator.docvalsets;
 
-import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.core.common.BaseBlockValSet;
 import org.apache.pinot.core.common.BlockValIterator;
 import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
@@ -44,5 +44,10 @@ public final class MultiValueSet extends BaseBlockValSet {
   @Override
   public DataType getValueType() {
     return _dataType;
+  }
+
+  @Override
+  public boolean isSingleValue() {
+    return false;
   }
 }

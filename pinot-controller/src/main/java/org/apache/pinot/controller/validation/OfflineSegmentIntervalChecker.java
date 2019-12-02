@@ -29,7 +29,9 @@ import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.util.SegmentIntervalUtils;
@@ -50,9 +52,11 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
   private final ValidationMetrics _validationMetrics;
 
   public OfflineSegmentIntervalChecker(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
-      ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics) {
+      LeadControllerManager leadControllerManager, ValidationMetrics validationMetrics,
+      ControllerMetrics controllerMetrics) {
     super("OfflineSegmentIntervalChecker", config.getOfflineSegmentIntervalCheckerFrequencyInSeconds(),
-        config.getOfflineSegmentIntervalCheckerInitialDelayInSeconds(), pinotHelixResourceManager, controllerMetrics);
+        config.getOfflineSegmentIntervalCheckerInitialDelayInSeconds(), pinotHelixResourceManager,
+        leadControllerManager, controllerMetrics);
     _validationMetrics = validationMetrics;
   }
 
@@ -85,15 +89,15 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
       int numSegmentsWithInvalidIntervals = 0;
       for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadataList) {
         Interval timeInterval = offlineSegmentZKMetadata.getTimeInterval();
-        if (SegmentIntervalUtils.isValidInterval(timeInterval)) {
+        if (timeInterval != null && TimeUtils.isValidTimeInterval(timeInterval)) {
           segmentIntervals.add(timeInterval);
         } else {
-          numSegmentsWithInvalidIntervals ++;
+          numSegmentsWithInvalidIntervals++;
         }
       }
       if (numSegmentsWithInvalidIntervals > 0) {
-        LOGGER.warn("Table: {} has {} segments with invalid interval", offlineTableName,
-            numSegmentsWithInvalidIntervals);
+        LOGGER
+            .warn("Table: {} has {} segments with invalid interval", offlineTableName, numSegmentsWithInvalidIntervals);
       }
       Duration frequency = SegmentIntervalUtils.convertToDuration(validationConfig.getSegmentPushFrequency());
       numMissingSegments = computeNumMissingSegments(segmentIntervals, frequency);

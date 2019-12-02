@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.pql.parsers;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
@@ -39,10 +38,11 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.apache.commons.lang.math.NumberUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.parsers.AbstractCompiler;
+import org.apache.pinot.parsers.utils.BrokerRequestComparisonUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.BaseAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.BetweenPredicateAstNode;
@@ -70,6 +70,8 @@ public class Pql2Compiler implements AbstractCompiler {
       Boolean.valueOf(System.getProperty("pinot.query.converter.validate", "false"));
   public static boolean FAIL_ON_CONVERSION_ERROR =
       Boolean.valueOf(System.getProperty("pinot.query.converter.fail_on_error", "false"));
+  public static String ENABLE_DISTINCT_KEY = "pinot.distinct.enabled";
+  public static boolean ENABLE_DISTINCT = Boolean.valueOf(System.getProperty(ENABLE_DISTINCT_KEY, "true"));
 
   private static class ErrorListener extends BaseErrorListener {
 
@@ -124,7 +126,7 @@ public class Pql2Compiler implements AbstractCompiler {
           if (VALIDATE_CONVERTER) {
             PinotQuery2BrokerRequestConverter converter = new PinotQuery2BrokerRequestConverter();
             BrokerRequest tempBrokerRequest = converter.convert(pinotQuery);
-            boolean result = compare(brokerRequest, tempBrokerRequest);
+            boolean result = BrokerRequestComparisonUtils.validate(brokerRequest, tempBrokerRequest);
             if (!result) {
               LOGGER.error("Pinot query to broker request conversion failed. PQL:{}", expression);
               if (FAIL_ON_CONVERSION_ERROR) {
@@ -150,64 +152,6 @@ public class Pql2Compiler implements AbstractCompiler {
     }
   }
 
-  private boolean compare(BrokerRequest br1, BrokerRequest br2)
-      throws Exception {
-    //Having not yet supported
-    if (br1.getHavingFilterQuery() != null) {
-      return true;
-    }
-    boolean result = br1.equals(br2);
-    if (!result) {
-      StringBuilder sb = new StringBuilder();
-
-      if (br1.getFilterQuery() != null) {
-        if (!br1.getFilterQuery().equals(br2.getFilterQuery())) {
-          sb.append("br1.getFilterQuery() = ").append(br1.getFilterQuery()).append("\n")
-              .append("br2.getFilterQuery() = ").append(br2.getFilterQuery());
-          LOGGER.error("Filter did not match after conversion.{}", sb);
-          return false;
-        }
-
-        if (!br1.getFilterSubQueryMap().equals(br2.getFilterSubQueryMap())) {
-          sb.append("br1.getFilterSubQueryMap() = ").append(br1.getFilterSubQueryMap()).append("\n")
-              .append("br2.getFilterSubQueryMap() = ").append(br2.getFilterSubQueryMap());
-          LOGGER.error("FilterSubQueryMap did not match after conversion. {}", sb);
-          return false;
-        }
-      }
-      if (br1.getSelections() != null) {
-        if (!br1.getSelections().equals(br2.getSelections())) {
-          sb.append("br1.getSelections() = ").append(br1.getSelections()).append("\n").append("br2.getSelections() = ")
-              .append(br2.getSelections());
-          LOGGER.error("Selection did not match after conversion:{}", sb);
-          return false;
-        }
-      }
-      if (br1.getGroupBy() != null) {
-        if (!br1.getGroupBy().equals(br2.getGroupBy())) {
-          sb.append("br1.getGroupBy() = ").append(br1.getGroupBy()).append("\n").append("br2.getGroupBy() = ")
-              .append(br2.getGroupBy());
-          LOGGER.error("Group By did not match conversion:{}", sb);
-          return false;
-        }
-      }
-      if (br1.getAggregationsInfo() != null) {
-        List<AggregationInfo> aggregationsInfo = br1.getAggregationsInfo();
-        for (int i = 0; i < aggregationsInfo.size(); i++) {
-          AggregationInfo agg1 = br1.getAggregationsInfo().get(i);
-          AggregationInfo agg2 = br2.getAggregationsInfo().get(i);
-          if (!agg1.equals(agg2)) {
-            sb.append("br1.agg1 = ").append(agg1).append("\n").append("br2.agg2() = ").append(agg2);
-            LOGGER.error("AggregationInfo did not match after conversion: {}", sb);
-            return false;
-          }
-        }
-      }
-    }
-    return result;
-  }
-
-  @Override
   public TransformExpressionTree compileToExpressionTree(String expression) {
     CharStream charStream = new ANTLRInputStream(expression);
     PQL2Lexer lexer = new PQL2Lexer(charStream);
@@ -322,5 +266,28 @@ public class Pql2Compiler implements AbstractCompiler {
       }
     }
     return functionCalls;
+  }
+
+  public static AstNode buildAst(String expression) {
+    CharStream charStream = new ANTLRInputStream(expression);
+    PQL2Lexer lexer = new PQL2Lexer(charStream);
+    lexer.setTokenFactory(new CommonTokenFactory(true));
+    lexer.removeErrorListeners();
+    lexer.addErrorListener(ERROR_LISTENER);
+    TokenStream tokenStream = new UnbufferedTokenStream<CommonToken>(lexer);
+    PQL2Parser parser = new PQL2Parser(tokenStream);
+    parser.setErrorHandler(new BailErrorStrategy());
+    parser.removeErrorListeners();
+    parser.addErrorListener(ERROR_LISTENER);
+
+    // Parse
+    ParseTree parseTree = parser.root();
+
+    ParseTreeWalker walker = new ParseTreeWalker();
+    Pql2AstListener listener = new Pql2AstListener(expression);
+    walker.walk(listener, parseTree);
+
+    AstNode rootNode = listener.getRootNode();
+    return rootNode;
   }
 }

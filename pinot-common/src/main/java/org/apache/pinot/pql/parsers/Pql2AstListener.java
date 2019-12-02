@@ -310,13 +310,13 @@ public class Pql2AstListener extends PQL2BaseListener {
     String literalWithoutQuotes = text.substring(1, textLength - 1);
     if (text.charAt(0) == '\'') {
       if (literalWithoutQuotes.contains("''")) {
-        literalWithoutQuotes = literalWithoutQuotes.replaceAll("''", "'");
+        literalWithoutQuotes = literalWithoutQuotes.replace("''", "'");
       }
 
       pushNode(new StringLiteralAstNode(literalWithoutQuotes));
     } else if (text.charAt(0) == '"') {
       if (literalWithoutQuotes.contains("\"\"")) {
-        literalWithoutQuotes = literalWithoutQuotes.replaceAll("\"\"", "\"");
+        literalWithoutQuotes = literalWithoutQuotes.replace("\"\"", "\"");
       }
 
       pushNode(new StringLiteralAstNode(literalWithoutQuotes));
@@ -379,7 +379,7 @@ public class Pql2AstListener extends PQL2BaseListener {
   @Override
   public void enterOrderByExpression(@NotNull PQL2Parser.OrderByExpressionContext ctx) {
     if (ctx.getChildCount() == 1) {
-      pushNode(new OrderByExpressionAstNode(ctx.getChild(0).getText(), "asc"));
+      pushNode(new OrderByExpressionAstNode(ctx.getChild(0).getText(), OrderByAstNode.ASCENDING_ORDER));
     } else {
       pushNode(new OrderByExpressionAstNode(ctx.getChild(0).getText(), ctx.getChild(1).getText()));
     }

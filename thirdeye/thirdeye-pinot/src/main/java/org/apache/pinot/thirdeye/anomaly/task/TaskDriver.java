@@ -20,10 +20,12 @@
 package org.apache.pinot.thirdeye.anomaly.task;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
 import org.apache.pinot.thirdeye.anomaly.utils.AnomalyUtils;
 import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
-import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 
 import java.util.ArrayList;
@@ -48,6 +50,8 @@ import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
+import org.slf4j.MDC;
+
 
 public class TaskDriver {
 
@@ -56,6 +60,7 @@ public class TaskDriver {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private ExecutorService taskExecutorService;
+  private ExecutorService taskWatcherExecutorService;
 
   private final TaskManager taskDAO;
   private TaskContext taskContext;
@@ -74,6 +79,9 @@ public class TaskDriver {
     taskExecutorService = Executors.newFixedThreadPool(
             driverConfiguration.getMaxParallelTasks(),
             new ThreadFactoryBuilder().setNameFormat("task-executor-%d").build());
+    taskWatcherExecutorService = Executors.newFixedThreadPool(
+            driverConfiguration.getMaxParallelTasks(),
+            new ThreadFactoryBuilder().setNameFormat("task-watcher-%d").setDaemon(true).build());
     taskContext = new TaskContext();
     taskContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
     taskContext.setThirdEyeAnomalyConfiguration(thirdEyeAnomalyConfiguration);
@@ -84,9 +92,19 @@ public class TaskDriver {
   }
 
   public void start() throws Exception {
+    // Mark all assigned tasks with RUNNING as FAILED
+    List<TaskDTO> leftoverTasks = DAO_REGISTRY.getTaskDAO().findByStatusAndWorkerId(workerId, TaskStatus.RUNNING);
+    if (!leftoverTasks.isEmpty()) {
+      LOG.info("Found {} RUNNING tasks with worker id {} at start", leftoverTasks.size(), workerId);
+      for (TaskDTO task : leftoverTasks) {
+        LOG.info("Update task {} from RUNNING to FAILED", task.getId());
+        DAO_REGISTRY.getTaskDAO().updateStatusAndTaskEndTime(task.getId(), TaskStatus.RUNNING, TaskStatus.FAILED,
+            System.currentTimeMillis(), "FAILED status updated by the worker at start");
+      }
+    }
     for (int i = 0; i < driverConfiguration.getMaxParallelTasks(); i++) {
-      Callable callable = new Callable() {
-        @Override public Object call() throws Exception {
+      Runnable runnable = new Runnable() {
+        @Override public void run() {
           while (!shutdown) {
             LOG.info("Finding next task to execute");
 
@@ -98,21 +116,33 @@ public class TaskDriver {
               ThirdeyeMetricsUtil.taskCounter.inc();
 
               try {
-                LOG.info("Executing task: {} {}", anomalyTaskSpec.getJobName(),
-                    anomalyTaskSpec.getTaskInfo());
+                MDC.put("job.name", anomalyTaskSpec.getJobName());
+                LOG.info("Executing task {} {}", anomalyTaskSpec.getId(), anomalyTaskSpec.getTaskInfo());
 
                 // execute the selected task
                 TaskType taskType = anomalyTaskSpec.getTaskType();
                 TaskRunner taskRunner = TaskRunnerFactory.getTaskRunnerFromTaskType(taskType);
                 TaskInfo taskInfo = TaskInfoFactory.getTaskInfoFromTaskType(taskType, anomalyTaskSpec.getTaskInfo());
-
-                updateTaskStartTime(anomalyTaskSpec.getId());
-                List<TaskResult> taskResults = taskRunner.execute(taskInfo, taskContext);
-                LOG.info("DONE Executing task: {}", anomalyTaskSpec.getId());
+                Future<List<TaskResult>> future = taskExecutorService.submit(new Callable<List<TaskResult>>() {
+                  @Override
+                  public List<TaskResult> call() throws Exception {
+                    return taskRunner.execute(taskInfo, taskContext);
+                  }
+                });
+                try {
+                  List<TaskResult> taskResults = future.get(driverConfiguration.getMaxTaskRunTimeMillis(), TimeUnit.MILLISECONDS);
+                } catch (TimeoutException e) {
+                  LOG.error("Timeout on executing task", e);
+                  future.cancel(true);
+                  LOG.info("Executor thread gets cancelled successfully: {}", future.isCancelled());
+                  updateStatusAndTaskEndTime(anomalyTaskSpec.getId(),
+                      TaskStatus.RUNNING, TaskStatus.TIMEOUT, e.getMessage());
+                  continue;
+                }
+                LOG.info("DONE Executing task {}", anomalyTaskSpec.getId());
                 // update status to COMPLETED
                 updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.COMPLETED, "");
                 ThirdeyeMetricsUtil.taskSuccessCounter.inc();
-
               } catch (Exception e) {
                 ThirdeyeMetricsUtil.taskExceptionCounter.inc();
                 LOG.error("Exception in electing and executing task", e);
@@ -128,15 +158,15 @@ public class TaskDriver {
               } finally {
                 long elapsedTime = System.nanoTime() - tStart;
                 LOG.info("Task {} took {} nano seconds", anomalyTaskSpec.getId(), elapsedTime);
+                MDC.clear();
                 ThirdeyeMetricsUtil.taskDurationCounter.inc(elapsedTime);
               }
             }
           }
           LOG.info("Thread safely quiting");
-          return 0;
         }
       };
-      taskExecutorService.submit(callable);
+      taskWatcherExecutorService.submit(runnable);
       LOG.info("Starting task driver");
     }
   }
@@ -144,6 +174,7 @@ public class TaskDriver {
   public void shutdown() {
     shutdown = true;
     AnomalyUtils.safelyShutdownExecutionService(taskExecutorService, this.getClass());
+    AnomalyUtils.safelyShutdownExecutionService(taskWatcherExecutorService, this.getClass());
   }
 
   /**
@@ -179,9 +210,8 @@ public class TaskDriver {
 
           boolean success = false;
           try {
-            success = taskDAO
-                .updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(), allowedOldTaskStatus,
-                    TaskStatus.RUNNING, anomalyTaskSpec.getVersion());
+            success = taskDAO.updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(),
+                    allowedOldTaskStatus, anomalyTaskSpec.getVersion());
             LOG.info("Trying to acquire task id [{}], success status: [{}] with version [{}]",
                 anomalyTaskSpec.getId(), success, anomalyTaskSpec.getVersion());
           } catch (Exception e) {
@@ -215,17 +245,6 @@ public class TaskDriver {
       }
     }
     return null;
-  }
-
-  private void updateTaskStartTime(long taskId) {
-    LOG.info("Starting updateTaskStartTime for task id {}", taskId);
-    try {
-      long startTime = System.currentTimeMillis();
-      taskDAO.updateTaskStartTime(taskId, startTime);
-      LOG.info("Updated task start time {}", startTime);
-    } catch (Exception e) {
-      LOG.error("Exception in updating task start time", e);
-    }
   }
 
   private void updateStatusAndTaskEndTime(long taskId, TaskStatus oldStatus, TaskStatus newStatus, String message) {

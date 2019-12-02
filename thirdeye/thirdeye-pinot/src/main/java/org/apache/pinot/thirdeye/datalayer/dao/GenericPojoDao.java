@@ -378,7 +378,8 @@ public class GenericPojoDao {
     genericJsonEntity.setJsonVal(jsonVal);
     genericJsonEntity.setId(pojo.getId());
     genericJsonEntity.setVersion(pojo.getVersion());
-    dumpTable(connection, GenericJsonEntity.class);
+    PojoInfo pojoInfo = pojoInfoMap.get(pojo.getClass());
+    dumpTable(connection, pojoInfo.indexEntityClass);
     Set<String> fieldsToUpdate = Sets.newHashSet("jsonVal", "updateTime", "version");
     int affectedRows;
     try (PreparedStatement baseTableInsertStmt =
@@ -389,7 +390,6 @@ public class GenericPojoDao {
     //update indexes
     if (affectedRows == 1) {
       ThirdeyeMetricsUtil.dbWriteByteCounter.inc(jsonVal.length());
-      PojoInfo pojoInfo = pojoInfoMap.get(pojo.getClass());
       if (pojoInfo.indexEntityClass != null) {
         AbstractIndexEntity abstractIndexEntity = pojoInfo.indexEntityClass.newInstance();
         MODEL_MAPPER.map(pojo, abstractIndexEntity);

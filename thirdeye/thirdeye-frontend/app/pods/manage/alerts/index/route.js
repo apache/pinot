@@ -3,7 +3,8 @@ import Route from '@ember/routing/route';
 import fetch from 'fetch';
 import { get, getWithDefault } from '@ember/object';
 import { inject as service } from '@ember/service';
-import { checkStatus, formatYamlFilter } from 'thirdeye-frontend/utils/utils';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import { formatYamlFilter} from 'thirdeye-frontend/utils/yaml-tools';
 import { powerSort } from 'thirdeye-frontend/utils/manage-alert-utils';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 
@@ -13,7 +14,9 @@ const filterToPropertyMap = {
   subscription: 'group',
   owner: 'createdBy',
   type: 'type',
-  metric: 'metric'
+  metric: 'metric',
+  dataset: 'collection',
+  granularity: 'granularity'
 };
 
 export default Route.extend(AuthenticatedRouteMixin, {
@@ -25,7 +28,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
   model() {
     return hash({
       applications: fetch('/thirdeye/entity/APPLICATION').then(checkStatus),
-      detectionAlertConfig: fetch('/thirdeye/entity/DETECTION_ALERT_CONFIG').then(checkStatus),
+      detectionAlertConfig: fetch('/detection/subscription-groups').then(checkStatus),
       polishedDetectionYaml: fetch('/yaml/list').then(checkStatus)
     });
   },
@@ -45,8 +48,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
         dimensions = dimensions.substring(0, dimensions.length-2);
       }
       Object.assign(yamlAlert, {
-        functionName: yamlAlert.detectionName,
-        collection: yamlAlert.dataset,
+        functionName: yamlAlert.name,
+        collection: yamlAlert.datasetNames.toString(),
+        granularity: yamlAlert.monitoringGranularity.toString(),
         type: this._detectionType(yamlAlert),
         exploreDimensions: dimensions,
         filters: formatYamlFilter(yamlAlert.filters),
@@ -56,9 +60,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
 
     // Iterate through detection alerter to enhance all yaml alert with extra properties (group name, application)
     for (let subscriptionGroup of model.detectionAlertConfig){
-      const detectionConfigIds = Object.keys(subscriptionGroup.vectorClocks);
+      const detectionConfigIds = subscriptionGroup.detectionConfigIds;
       for (let id of detectionConfigIds) {
-        let foundAlert = alerts.find(yamlAlert => yamlAlert.id.toString() === id);
+        let foundAlert = alerts.find(yamlAlert => yamlAlert.id === id);
         if (foundAlert) {
           Object.assign(foundAlert, {
             application: subscriptionGroup.application,
@@ -131,6 +135,18 @@ export default Route.extend(AuthenticatedRouteMixin, {
       {
         name: 'metric',
         title: 'Metrics',
+        type: 'select',
+        filterKeys: []
+      },
+      {
+        name: 'dataset',
+        title: 'Datasets',
+        type: 'select',
+        filterKeys: []
+      },
+      {
+        name: 'granularity',
+        title: 'Time Granularities',
         type: 'select',
         filterKeys: []
       }
@@ -224,6 +240,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
         this.set('session.store.fromUrl', {lastIntentTransition: transition});
       }
     },
+
     error() {
       // The `error` hook is also provided the failed
       // `transition`, which can be stored and later

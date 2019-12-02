@@ -36,7 +36,15 @@ public class HashUtil {
    * @return the optimal min value
    */
   public static int getMinHashSetSize(int expected) {
-    return Math.min(MIN_FASTUTIL_HASHSET_SIZE, expected);
+    return Math.max(MIN_FASTUTIL_HASHSET_SIZE, expected);
+  }
+
+  /**
+   * Returns a capacity that is sufficient to keep the map from being resized as long as it grows no larger than
+   * expectedSize and the load factor is >= its default (0.75).
+   */
+  public static int getHashMapCapacity(int expectedSize) {
+    return (int) ((float) expectedSize / 0.75f + 1f);
   }
 
   public static long compute(IntBuffer buff) {
@@ -95,14 +103,60 @@ public class HashUtil {
       case 2:
         h ^= (long) (data[(length & ~7) + 1] & 0xff) << 8;
       case 1:
-        h ^= (long) (data[length & ~7] & 0xff);
+        h ^= data[length & ~7] & 0xff;
         h *= m;
     }
-    ;
 
     h ^= h >>> r;
     h *= m;
     h ^= h >>> r;
+    return h;
+  }
+
+  /**
+   * Generates 32 bit murmur2 hash from byte array
+   * @param data byte array to hash
+   * @return 32 bit hash of the given array
+   */
+  public static int murmur2(final byte[] data) {
+    int length = data.length;
+    int seed = 0x9747b28c;
+    // 'm' and 'r' are mixing constants generated offline.
+    // They're not really 'magic', they just happen to work well.
+    final int m = 0x5bd1e995;
+    final int r = 24;
+
+    // Initialize the hash to a random value
+    int h = seed ^ length;
+    int length4 = length / 4;
+
+    for (int i = 0; i < length4; i++) {
+      final int i4 = i * 4;
+      int k =
+          (data[i4 + 0] & 0xff) + ((data[i4 + 1] & 0xff) << 8) + ((data[i4 + 2] & 0xff) << 16) + ((data[i4 + 3] & 0xff)
+              << 24);
+      k *= m;
+      k ^= k >>> r;
+      k *= m;
+      h *= m;
+      h ^= k;
+    }
+
+    // Handle the last few bytes of the input array
+    switch (length % 4) {
+      case 3:
+        h ^= (data[(length & ~3) + 2] & 0xff) << 16;
+      case 2:
+        h ^= (data[(length & ~3) + 1] & 0xff) << 8;
+      case 1:
+        h ^= data[length & ~3] & 0xff;
+        h *= m;
+    }
+
+    h ^= h >>> 13;
+    h *= m;
+    h ^= h >>> 15;
+
     return h;
   }
 }

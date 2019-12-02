@@ -21,13 +21,11 @@ package org.apache.pinot.server.request;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
-import java.net.InetSocketAddress;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.serde.SerDe;
@@ -51,20 +49,14 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
   }
 
   @Override
-  public ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request) {
+  public ListenableFuture<byte[]> processRequest(byte[] request) {
     long queryArrivalTimeMs = System.currentTimeMillis();
     serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES, 1);
 
-    LOGGER.debug("Processing request : {}", request);
-
-    byte[] byteArray = new byte[request.readableBytes()];
-    request.readBytes(byteArray);
     SerDe serDe = new SerDe(new TCompactProtocol.Factory());
-    final InstanceRequest instanceRequest = new InstanceRequest();
-
-    if (!serDe.deserialize(instanceRequest, byteArray)) {
-      LOGGER.error("Failed to deserialize query request from broker ip: {}",
-          ((InetSocketAddress) channelHandlerContext.channel().remoteAddress()).getAddress().getHostAddress());
+    InstanceRequest instanceRequest = new InstanceRequest();
+    if (!serDe.deserialize(instanceRequest, request)) {
+      LOGGER.error("Failed to deserialize query request: {}", BytesUtils.toHexString(request));
       serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
       return Futures.immediateFuture(null);
     }

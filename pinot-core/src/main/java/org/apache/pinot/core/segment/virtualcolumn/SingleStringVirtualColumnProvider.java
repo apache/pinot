@@ -19,24 +19,23 @@
 package org.apache.pinot.core.segment.virtualcolumn;
 
 import java.io.IOException;
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
-import org.apache.pinot.core.io.util.DictionaryDelegatingValueReader;
-import org.apache.pinot.core.io.util.ValueReader;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
-import org.apache.pinot.core.segment.index.readers.StringDictionary;
 
 
 /**
  * Virtual column provider for a virtual column that contains a single string.
  */
 public abstract class SingleStringVirtualColumnProvider extends BaseVirtualColumnProvider {
+
   protected abstract String getValue(VirtualColumnContext context);
 
   @Override
@@ -46,11 +45,7 @@ public abstract class SingleStringVirtualColumnProvider extends BaseVirtualColum
 
   @Override
   public Dictionary buildDictionary(VirtualColumnContext context) {
-    DictionaryDelegatingValueReader valueReader = new DictionaryDelegatingValueReader();
-    SingleStringDictionary stringDictionary =
-        new SingleStringDictionary(valueReader, context.getTotalDocCount(), context);
-    valueReader.setDictionary(stringDictionary);
-    return stringDictionary;
+    return new SingleStringDictionary(getValue(context));
   }
 
   @Override
@@ -106,69 +101,54 @@ public abstract class SingleStringVirtualColumnProvider extends BaseVirtualColum
     }
   }
 
-  private class SingleStringDictionary extends StringDictionary {
-    private int _length;
-    private VirtualColumnContext _context;
+  private class SingleStringDictionary extends BaseImmutableDictionary {
+    final String _value;
 
-    public SingleStringDictionary(ValueReader valueReader, int length, VirtualColumnContext context) {
-      super(valueReader, length);
-
-      _length = length;
-      _context = context;
+    public SingleStringDictionary(String value) {
+      super(1);
+      _value = value;
     }
 
     @Override
-    public int getIntValue(int dictId) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public long getLongValue(int dictId) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public float getFloatValue(int dictId) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public double getDoubleValue(int dictId) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public int length() {
-      return _length;
-    }
-
-    @Override
-    public boolean isSorted() {
-      return true;
-    }
-
-    @Override
-    public int indexOf(Object rawValue) {
-      if (rawValue.equals(getValue(_context))) {
-        return 0;
-      } else {
+    public int insertionIndexOf(String stringValue) {
+      int compareResult = _value.compareTo(stringValue);
+      if (compareResult > 0) {
         return -1;
+      } else if (compareResult < 0) {
+        return -2;
+      } else {
+        return 0;
       }
     }
 
     @Override
     public String get(int dictId) {
-      return getValue(_context);
+      return _value;
+    }
+
+    @Override
+    public int getIntValue(int dictId) {
+      return Integer.parseInt(_value);
+    }
+
+    @Override
+    public long getLongValue(int dictId) {
+      return Long.parseLong(_value);
+    }
+
+    @Override
+    public float getFloatValue(int dictId) {
+      return Float.parseFloat(_value);
+    }
+
+    @Override
+    public double getDoubleValue(int dictId) {
+      return Double.parseDouble(_value);
     }
 
     @Override
     public String getStringValue(int dictId) {
-      return getValue(_context);
-    }
-
-    @Override
-    public void close()
-        throws IOException {
+      return _value;
     }
   }
 }

@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.detection.yaml.translator;
 
 import com.google.common.base.CaseFormat;
+import com.google.common.base.Preconditions;
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
@@ -37,9 +38,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.detection.validators.SubscriptionConfigValidator;
-import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.Yaml;
-
 
 /**
  * The translator converts the alert yaml config into a detection alert config
@@ -53,6 +51,7 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
   public static final String PROP_ACTIVE = "active";
   public static final String PROP_APPLICATION = "application";
   public static final String PROP_FROM = "fromAddress";
+  public static final String PROP_OWNERS = "owners";
   public static final String PROP_EMAIL_SUBJECT_TYPE = "emailSubjectStyle";
   public static final String PROP_ALERT_SCHEMES = "alertSchemes";
   public static final String PROP_DETECTION_NAMES = "subscribedDetections";
@@ -91,6 +90,10 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
 
   private Map<String, Object> buildAlerterProperties(Map<String, Object> alertYamlConfigs) {
     Map<String, Object> properties = new HashMap<>();
+
+    // Default subscription type is "DEFAULT_ALERTER_PIPELINE"
+    alertYamlConfigs.putIfAbsent(PROP_TYPE, "DEFAULT_ALERTER_PIPELINE");
+
     for (Map.Entry<String, Object> entry : alertYamlConfigs.entrySet()) {
       if (entry.getKey().equals(PROP_TYPE)) {
         properties.put(PROP_CLASS_NAME, DETECTION_ALERT_REGISTRY.lookupAlertFilters(MapUtils.getString(alertYamlConfigs, PROP_TYPE)));
@@ -137,13 +140,13 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
   private Map<String,Map<String,Object>>  buildAlertSchemes(Map<String,Object> yamlAlertConfig) {
     List<Map<String, Object>> alertSchemes = ConfigUtils.getList(yamlAlertConfig.get(PROP_ALERT_SCHEMES));
     Map<String, Map<String, Object>> alertSchemesHolder = new HashMap<>();
-    Map<String, Object> alertSchemesParsed = new HashMap<>();
     if (!alertSchemes.isEmpty()) {
       for (Map<String, Object> alertScheme : alertSchemes) {
-        if (alertScheme.get(PROP_TYPE) != null) {
-          alertSchemesParsed.put(PROP_CLASS_NAME,
+        Map<String, Object> alertSchemesParsed = new HashMap<>();
+
+        Preconditions.checkNotNull(alertScheme.get(PROP_TYPE));
+        alertSchemesParsed.put(PROP_CLASS_NAME,
               DETECTION_ALERT_REGISTRY.lookupAlertSchemes(alertScheme.get(PROP_TYPE).toString()));
-        }
 
         if (alertScheme.get(PROP_PARAM) != null) {
           for (Map.Entry<String, Object> params : ((Map<String, Object>) alertScheme.get(PROP_PARAM)).entrySet()) {
@@ -168,6 +171,7 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
     alertConfigDTO.setName(MapUtils.getString(yamlConfigMap, PROP_SUBS_GROUP_NAME));
     alertConfigDTO.setApplication(MapUtils.getString(yamlConfigMap, PROP_APPLICATION));
     alertConfigDTO.setFrom(MapUtils.getString(yamlConfigMap, PROP_FROM));
+    alertConfigDTO.setOwners(filterOwners(ConfigUtils.getList(yamlConfigMap.get(PROP_OWNERS))));
 
     alertConfigDTO.setCronExpression(MapUtils.getString(yamlConfigMap, PROP_CRON, CRON_SCHEDULE_DEFAULT));
     alertConfigDTO.setActive(MapUtils.getBooleanValue(yamlConfigMap, PROP_ACTIVE, true));

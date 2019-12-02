@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.detection.alert;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
+import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -35,8 +36,15 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.MapUtils;
 
+import static org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter.*;
+
 
 public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter {
+
+  public static final String PROP_TO = "to";
+  public static final String PROP_CC = "cc";
+  public static final String PROP_BCC = "bcc";
+  public static final String PROP_RECIPIENTS = "recipients";
 
   public StatefulDetectionAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) {
     super(provider, config, endTime);
@@ -52,12 +60,15 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
   protected final Set<MergedAnomalyResultDTO> filter(Map<Long, Long> vectorClocks, final long minId) {
     // retrieve all candidate anomalies
     Set<MergedAnomalyResultDTO> allAnomalies = new HashSet<>();
-    for (Long functionId : vectorClocks.keySet()) {
-      long startTime = vectorClocks.get(functionId);
+    for (Long detectionId : vectorClocks.keySet()) {
+      long startTime = vectorClocks.get(detectionId);
 
-      AnomalySlice slice = new AnomalySlice().withStart(startTime).withEnd(this.endTime);
+      AnomalySlice slice = new AnomalySlice()
+          .withDetectionId(detectionId)
+          .withStart(startTime)
+          .withEnd(this.endTime);
       Collection<MergedAnomalyResultDTO> candidates;
-      candidates = this.provider.fetchAnomalies(Collections.singletonList(slice), functionId).get(slice);
+      candidates = this.provider.fetchAnomalies(Collections.singletonList(slice)).get(slice);
 
       Collection<MergedAnomalyResultDTO> anomalies =
           Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {
@@ -91,5 +102,40 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
       return this.config.getHighWaterMark();
     }
     return 0;
+  }
+
+  protected Set<String> cleanupRecipients(Set<String> recipient) {
+    Set<String> filteredRecipients = new HashSet<>();
+    if (recipient != null) {
+      filteredRecipients.addAll(recipient);
+      filteredRecipients = filteredRecipients.stream().map(String::trim).collect(Collectors.toSet());
+      filteredRecipients.removeIf(rec -> rec == null || "".equals(rec));
+    }
+    return filteredRecipients;
+  }
+
+  protected Map<String, Object> generateNotificationSchemeProps(DetectionAlertConfigDTO config,
+      Set<String> to, Set<String> cc, Set<String> bcc) {
+    Map<String, Object> notificationSchemeProps = new HashMap<>();
+
+    if (config.getAlertSchemes() == null) {
+      Map<String, Map<String, Object>> alertSchemes = new HashMap<>();
+      alertSchemes.put(PROP_EMAIL_SCHEME, new HashMap<>());
+      config.setAlertSchemes(alertSchemes);
+    }
+
+    for (Map.Entry<String, Map<String, Object>> schemeProps : config.getAlertSchemes().entrySet()) {
+      notificationSchemeProps.put(schemeProps.getKey(), new HashMap<>(schemeProps.getValue()));
+    }
+
+    if (notificationSchemeProps.get(PROP_EMAIL_SCHEME) != null) {
+      Map<String, Set<String>> recipients = new HashMap<>();
+      recipients.put(PROP_TO, cleanupRecipients(to));
+      recipients.put(PROP_CC, cleanupRecipients(cc));
+      recipients.put(PROP_BCC, cleanupRecipients(bcc));
+      ((Map<String, Object>) notificationSchemeProps.get(PROP_EMAIL_SCHEME)).put(PROP_RECIPIENTS, recipients);
+    }
+
+    return notificationSchemeProps;
   }
 }

@@ -22,8 +22,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
-import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 
 

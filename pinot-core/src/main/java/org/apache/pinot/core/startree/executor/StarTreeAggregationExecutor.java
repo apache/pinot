@@ -18,13 +18,12 @@
  */
 package org.apache.pinot.core.startree.executor;
 
-import javax.annotation.Nonnull;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 
@@ -39,12 +38,12 @@ import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
  */
 public class StarTreeAggregationExecutor extends DefaultAggregationExecutor {
 
-  public StarTreeAggregationExecutor(@Nonnull AggregationFunctionContext[] functionContexts) {
+  public StarTreeAggregationExecutor(AggregationFunctionContext[] functionContexts) {
     super(StarTreeUtils.createStarTreeFunctionContexts(functionContexts));
   }
 
   @Override
-  public void aggregate(@Nonnull TransformBlock transformBlock) {
+  public void aggregate(TransformBlock transformBlock) {
     int length = transformBlock.getNumDocs();
     for (int i = 0; i < _numFunctions; i++) {
       AggregationFunction function = _functions[i];

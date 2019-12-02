@@ -46,10 +46,7 @@ public abstract class SegmentName {
   }
 
   protected boolean isValidComponentName(String string) {
-    if (string.contains("__")) {
-      return false;
-    }
-    return true;
+    return !string.contains(SEPARATOR);
   }
 
   public abstract String getTableName();
@@ -75,28 +72,26 @@ public abstract class SegmentName {
   }
 
   public static boolean isHighLevelConsumerSegmentName(String segmentName) {
-    if (segmentName.endsWith(SEPARATOR) || segmentName.startsWith(SEPARATOR)) {
-      return false;
-    }
-
-    String[] parts = segmentName.split(SEPARATOR);
-    if (parts.length != 3 && parts.length != 5) {
-      return false;
-    }
-
-    return true;
+    int numSeparators = getNumSeparators(segmentName);
+    return numSeparators == 2 || numSeparators == 4;
   }
 
   public static boolean isLowLevelConsumerSegmentName(String segmentName) {
-    if (segmentName.endsWith(SEPARATOR) || segmentName.startsWith(SEPARATOR)) {
-      return false;
-    }
+    return getNumSeparators(segmentName) == 3;
+  }
 
-    String[] parts = segmentName.split(SEPARATOR);
-    if (parts.length != 4) {
-      return false;
-    }
+  public static boolean isRealtimeSegmentName(String segmentName) {
+    int numSeparators = getNumSeparators(segmentName);
+    return numSeparators >= 2 && numSeparators <= 4;
+  }
 
-    return true;
+  private static int getNumSeparators(String segmentName) {
+    int numSeparators = 0;
+    int index = 0;
+    while ((index = segmentName.indexOf(SEPARATOR, index)) != -1) {
+      numSeparators++;
+      index += 2; // SEPARATOR.length()
+    }
+    return numSeparators;
   }
 }

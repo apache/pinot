@@ -6,9 +6,9 @@ import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 
 
 public class RandomAlerter extends DetectionAlertScheme {
-  public RandomAlerter(DetectionAlertConfigDTO config, ThirdEyeAnomalyConfiguration thirdeyeConfig,
+  public RandomAlerter(DetectionAlertConfigDTO subsConfig, ThirdEyeAnomalyConfiguration thirdeyeConfig,
       DetectionAlertFilterResult result) {
-    super(config, result);
+    super(subsConfig, result);
   }
 
   @Override

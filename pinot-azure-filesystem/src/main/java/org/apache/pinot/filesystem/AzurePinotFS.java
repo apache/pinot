@@ -42,6 +42,7 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -248,5 +249,11 @@ public class AzurePinotFS extends PinotFS {
       _adlStoreClient.setTimes(uri.getPath(), null, new Date());
     }
     return true;
+  }
+
+  @Override
+  public InputStream open(URI uri)
+      throws IOException {
+    return _adlStoreClient.getReadStream(uri.getPath());
   }
 }

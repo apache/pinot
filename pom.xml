@@ -19,7 +19,8 @@
     under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
@@ -30,20 +31,21 @@
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>0.2.2.5-SNAPSHOT</version>
+  <version>0.3.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
   <url>https://pinot.apache.org/</url>
 
   <modules>
+    <module>pinot-spi</module>
     <module>pinot-broker</module>
     <module>pinot-common</module>
     <module>pinot-api</module>
     <module>pinot-server</module>
     <module>pinot-core</module>
     <module>pinot-controller</module>
-    <module>pinot-hadoop</module>
+    <module>pinot-ingestion-jobs</module>
     <module>pinot-tools</module>
     <module>pinot-perf</module>
     <module>pinot-transport</module>
@@ -94,20 +96,12 @@
   </mailingLists>
 
   <scm>
-    <developerConnection>scm:git:gitolite@code.uber.internal:data/pinot</developerConnection>
-    <tag>pinot-0.1.076-SNAPSHOT</tag>
+    <developerConnection>scm:git:git@github.com:apache/incubator-pinot.git</developerConnection>
+    <tag>HEAD</tag>
   </scm>
-  <distributionManagement>
-    <repository>
-      <id>central</id>
-      <url>http://artifactory.uber.internal:4587/artifactory/libs-release-local/</url>
-    </repository>
-    <snapshotRepository>
-      <id>snapshots</id>
-      <url>http://artifactory.uber.internal:4587/artifactory/libs-snapshot-local/</url>
-    </snapshotRepository>
-  </distributionManagement>
-  <inceptionYear>2014-2018</inceptionYear>
+
+  <!-- Apache project inception year for generating correct NOTICE file for jar bundle. -->
+  <inceptionYear>2018</inceptionYear>
 
   <properties>
     <pinot.root>${basedir}</pinot.root>
@@ -126,7 +120,7 @@
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
     <avro.version>1.7.6</avro.version>
     <parquet.version>1.8.0</parquet.version>
-    <helix.version>0.9.0</helix.version>
+    <helix.version>0.8.4</helix.version>
     <zkclient.version>0.7</zkclient.version>
     <jackson.version>2.9.8</jackson.version>
     <async-http-client.version>1.9.21</async-http-client.version>
@@ -134,6 +128,7 @@
     <swagger.version>1.5.16</swagger.version>
     <hadoop.version>2.7.0</hadoop.version>
     <antlr.version>4.6</antlr.version>
+    <calcite.version>1.19.0</calcite.version>
     <!-- commons-configuration, hadoop-common, hadoop-client use commons-lang -->
     <commons-lang.version>2.6</commons-lang.version>
     <!-- pinot-common, commons-configuration, hadoop-common, hadoop-client use commons-logging-->
@@ -143,9 +138,27 @@
 
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g</argLine>
+
+    <!-- handle kafka imports
+    kafka dependency is still explicitly defined in pinot-integration-tests, pinot-tools and pinot-perf pom files.
+    To change kafka connector dependency, we only need to update this version number config.
+    TODO: figure out a way to inject kafka dependency instead of explicitly setting the kafka module dependency -->
+    <kafka.version>0.9</kafka.version>
   </properties>
 
   <profiles>
+    <profile>
+      <id>kafka-2.0</id>
+      <activation>
+        <property>
+          <name>kafka.version</name>
+          <value>2.0</value>
+        </property>
+      </activation>
+      <properties>
+        <kafka.version>2.0</kafka.version>
+      </properties>
+    </profile>
     <profile>
       <id>travis</id>
       <activation>
@@ -217,6 +230,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-spi</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-api</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -238,6 +256,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-hadoop</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-spark</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -375,7 +398,7 @@
       <dependency>
         <groupId>it.unimi.dsi</groupId>
         <artifactId>fastutil</artifactId>
-        <version>6.5.16</version>
+        <version>8.2.3</version>
       </dependency>
       <dependency>
         <groupId>joda-time</groupId>
@@ -405,7 +428,7 @@
       <dependency>
         <groupId>org.apache.thrift</groupId>
         <artifactId>libthrift</artifactId>
-        <version>0.9.1</version>
+        <version>0.12.0</version>
       </dependency>
       <dependency>
         <groupId>javax.servlet</groupId>
@@ -646,6 +669,11 @@
         </exclusions>
       </dependency>
       <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-aws</artifactId>
+        <version>${hadoop.version}</version>
+      </dependency>
+      <dependency>
         <groupId>org.apache.orc</groupId>
         <artifactId>orc-core</artifactId>
         <version>1.5.2</version>
@@ -674,6 +702,12 @@
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.avro</groupId>
+        <artifactId>avro-mapred</artifactId>
+        <version>1.7.4</version>
+        <classifier>hadoop2</classifier>
       </dependency>
       <dependency>
         <groupId>org.codehaus.jackson</groupId>
@@ -714,6 +748,85 @@
         <groupId>org.antlr</groupId>
         <artifactId>antlr4-runtime</artifactId>
         <version>${antlr.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.calcite</groupId>
+        <artifactId>calcite-core</artifactId>
+        <version>${calcite.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.calcite.avatica</groupId>
+            <artifactId>avatica-metrics</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpcore</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-dbcp2</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.esri.geometry</groupId>
+            <artifactId>esri-geometry-api</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.yahoo.datasketches</groupId>
+            <artifactId>sketches-core</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>net.hydromatic</groupId>
+            <artifactId>aggdesigner-algorithm</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.jayway.jsonpath</groupId>
+            <artifactId>json-path</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>joda-time</groupId>
+            <artifactId>joda-time</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.janino</groupId>
+            <artifactId>janino</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.janino</groupId>
+            <artifactId>commons-compiler</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.google.code.findbugs</groupId>
+            <artifactId>jsr305</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>com.jcabi</groupId>
@@ -840,12 +953,6 @@
         <artifactId>jopt-simple</artifactId>
         <version>4.6</version>
       </dependency>
-      <!-- kafka_2.10 & larray use scala-library -->
-      <dependency>
-        <groupId>org.scala-lang</groupId>
-        <artifactId>scala-library</artifactId>
-        <version>2.10.5</version>
-      </dependency>
       <dependency>
         <groupId>commons-lang</groupId>
         <artifactId>commons-lang</artifactId>
@@ -855,16 +962,6 @@
         <groupId>commons-logging</groupId>
         <artifactId>commons-logging</artifactId>
         <version>${commons-logging.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.typesafe</groupId>
-        <artifactId>config</artifactId>
-        <version>1.3.2</version>
-      </dependency>
-      <dependency>
-        <groupId>io.vavr</groupId>
-        <artifactId>vavr</artifactId>
-        <version>0.9.2</version>
       </dependency>
     </dependencies>
 
@@ -946,6 +1043,9 @@
           <executions>
             <execution>
               <id>attach-sources</id>
+              <goals>
+                <goal>jar</goal>
+              </goals>
             </execution>
           </executions>
         </plugin>
@@ -994,6 +1094,7 @@
             <systemPropertyVariables>
               <zookeeper.forceSync>no</zookeeper.forceSync>
             </systemPropertyVariables>
+            <trimStackTrace>false</trimStackTrace>
             <reportFormat>plain</reportFormat>
           </configuration>
         </plugin>
@@ -1012,7 +1113,7 @@
           </executions>
           <configuration>
             <rules>
-              <dependencyConvergence />
+              <dependencyConvergence/>
             </rules>
           </configuration>
         </plugin>
@@ -1071,6 +1172,8 @@
           <!-- Excludes integration tests when unit tests are run. -->
           <excludes>
             <exclude>**/*IT.java</exclude>
+            <!-- TODO: re-enable the Minion tests when upgrading to Helix 0.9.1 -->
+            <exclude>**/*MinionClusterIntegrationTest.java</exclude>
           </excludes>
           <forkCount>1</forkCount>
           <reuseForks>false</reuseForks>
@@ -1164,6 +1267,8 @@
             <exclude>**/*.conf</exclude>
             <exclude>**/appAssemblerScriptTemplate</exclude>
 
+            <exclude>**/zone-index.properties</exclude>
+
             <!-- Resource directories under test -->
             <exclude>**/src/test/resources/**</exclude>
 
@@ -1197,11 +1302,6 @@
             <exclude>**/normalize*</exclude>
             <exclude>**/handlebars*</exclude>
             <exclude>**/beautify*</exclude>
-
-            <!-- Uber specific stuff -->
-            <exclude>.arcconfig</exclude>
-            <exclude>.jenkins/*</exclude>
-            <exclude>UBER_README.md</exclude>
           </excludes>
           <mapping>
             <thrift>JAVADOC_STYLE</thrift>
@@ -1241,6 +1341,10 @@
             <exclude>licenses/**</exclude>
             <exclude>licenses-binary/**</exclude>
 
+            <!-- Exclude build targets -->
+            <exclude>**/target/**</exclude>
+
+
             <!-- js, css files that are exact copies of the third-party works. In this case, the original header has to
             be kept. Please refer to 'Treatment of Third-party works' in https://www.apache.org/legal/src-headers.html
             -->
@@ -1261,9 +1365,13 @@
             <exclude>**/*.csv</exclude>
             <exclude>**/*.avro</exclude>
             <exclude>**/*.conf</exclude>
+            <exclude>**/*.config</exclude>
             <exclude>**/*.yml</exclude>
             <exclude>**/*.yaml</exclude>
             <exclude>**/*.properties</exclude>
+
+            <!-- IDE files -->
+            <exclude>**/*.iml</exclude>
 
             <!-- Top level -->
             <exclude>.codecov*</exclude>
@@ -1276,11 +1384,6 @@
 
             <!-- Third eye (not part of the distribution) -->
             <exclude>thirdeye/**</exclude>
-
-            <!-- Uber specific stuff -->
-            <exclude>.arcconfig</exclude>
-            <exclude>.jenkins/*</exclude>
-            <exclude>UBER_README.md</exclude>
           </excludes>
         </configuration>
       </plugin>
@@ -1303,8 +1406,10 @@
         <configuration>
           <shadedArtifactAttached>true</shadedArtifactAttached>
           <transformers>
-            <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
-            <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+            <transformer
+                implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+            <transformer
+                implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
               <mainClass>${mainClass}</mainClass>
             </transformer>
           </transformers>

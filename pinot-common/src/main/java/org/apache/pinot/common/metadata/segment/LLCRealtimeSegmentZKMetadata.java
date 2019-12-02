@@ -21,10 +21,10 @@ package org.apache.pinot.common.metadata.segment;
 import java.util.Map;
 import org.apache.helix.ZNRecord;
 
-import static org.apache.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static org.apache.pinot.common.utils.EqualityUtils.isEqual;
-import static org.apache.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
-import static org.apache.pinot.common.utils.EqualityUtils.isSameReference;
+import static org.apache.pinot.spi.utils.EqualityUtils.hashCodeOf;
+import static org.apache.pinot.spi.utils.EqualityUtils.isEqual;
+import static org.apache.pinot.spi.utils.EqualityUtils.isNullOrNotSameClass;
+import static org.apache.pinot.spi.utils.EqualityUtils.isSameReference;
 
 
 public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {

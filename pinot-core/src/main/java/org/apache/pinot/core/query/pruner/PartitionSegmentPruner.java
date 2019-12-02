@@ -87,6 +87,11 @@ public class PartitionSegmentPruner extends AbstractSegmentPruner {
       return pruneNonLeaf(filterQueryTree, columnMetadataMap, bloomFilterMap);
     }
 
+    //skip expressions
+    if(filterQueryTree.getExpression()!= null && !filterQueryTree.getExpression().isColumn()){
+      return false;
+    }
+
     // TODO: Enhance partition based pruning for RANGE operator.
     if (filterQueryTree.getOperator() != FilterOperator.EQUALITY) {
       return false;

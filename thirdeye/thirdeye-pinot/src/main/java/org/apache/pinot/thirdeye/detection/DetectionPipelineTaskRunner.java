@@ -74,7 +74,7 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
 
     TimeSeriesLoader timeseriesLoader =
         new DefaultTimeSeriesLoader(metricDAO, datasetDAO,
-            ThirdEyeCacheRegistry.getInstance().getQueryCache());
+            ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getTimeSeriesCache());
 
     AggregationLoader aggregationLoader =
         new DefaultAggregationLoader(metricDAO, datasetDAO,
@@ -95,7 +95,7 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
    * @param loader pipeline loader
    * @param provider pipeline data provider
    */
-  DetectionPipelineTaskRunner(DetectionConfigManager detectionDAO, MergedAnomalyResultManager anomalyDAO,
+  public DetectionPipelineTaskRunner(DetectionConfigManager detectionDAO, MergedAnomalyResultManager anomalyDAO,
       EvaluationManager evaluationDAO, DetectionPipelineLoader loader, DataProvider provider) {
     this.detectionDAO = detectionDAO;
     this.anomalyDAO = anomalyDAO;
@@ -117,15 +117,16 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
         throw new IllegalArgumentException(String.format("Could not resolve config id %d", info.configId));
       }
 
+      LOG.info("Start detection for config {} between {} and {}", config.getId(), info.start, info.end);
       DetectionPipeline pipeline = this.loader.from(this.provider, config, info.start, info.end);
       DetectionPipelineResult result = pipeline.run();
 
       if (result.getLastTimestamp() < 0) {
+        LOG.info("No detection ran for config {} between {} and {}", config.getId(), info.start, info.end);
         return Collections.emptyList();
       }
 
       config.setLastTimestamp(result.getLastTimestamp());
-      this.detectionDAO.update(config);
 
       for (MergedAnomalyResultDTO mergedAnomalyResultDTO : result.getAnomalies()) {
         this.anomalyDAO.save(mergedAnomalyResultDTO);
@@ -138,18 +139,21 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
         this.evaluationDAO.save(evaluationDTO);
       }
 
-      // run maintenance flow to update model
-      config = maintenanceFlow.maintain(config, Instant.now());
+      try {
+        // run maintenance flow to update model
+        config = maintenanceFlow.maintain(config, Instant.now());
+      } catch (Exception e) {
+        LOG.warn("Re-tune pipeline {} failed", config.getId(), e);
+      }
       this.detectionDAO.update(config);
 
+      ThirdeyeMetricsUtil.detectionTaskSuccessCounter.inc();
+      LOG.info("End detection for config {} between {} and {}. Detected {} anomalies.", config.getId(), info.start,
+          info.end, result.getAnomalies());
       return Collections.emptyList();
-
     } catch(Exception e) {
       ThirdeyeMetricsUtil.detectionTaskExceptionCounter.inc();
       throw e;
-
-    } finally {
-      ThirdeyeMetricsUtil.detectionTaskSuccessCounter.inc();
     }
   }
 }

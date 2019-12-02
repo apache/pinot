@@ -211,6 +211,7 @@ export default Component.extend({
           end: a.endTime,
           metricName: a.metric,
           dataset: a.collection,
+          dimensions: a.dimensions,
           startDateStr: this._formatAnomaly(a),
           durationStr: getFormattedDuration(a.startTime, a.endTime),
           shownCurrent: a.avgCurrentVal === "Infinity" ? 0 : humanizeFloat(a.avgCurrentVal),
@@ -254,12 +255,16 @@ export default Component.extend({
         return RSVP.hash(timeseriesHash);
       })
       .then((res) => {
-        set(this, 'current', res.predicted);
-        set(this, 'predicted', res.predicted);
-        set(this, 'isLoading', false);
+        if (!(this.get('isDestroyed') || this.get('isDestroying'))) {
+          set(this, 'current', res.predicted);
+          set(this, 'predicted', res.predicted);
+          set(this, 'isLoading', false);
+        }
       })
       .catch(() => {
-        set(this, 'isLoading', false);
+        if (!(this.get('isDestroyed') || this.get('isDestroying'))) {
+          set(this, 'isLoading', false);
+        }
       });
   },
 

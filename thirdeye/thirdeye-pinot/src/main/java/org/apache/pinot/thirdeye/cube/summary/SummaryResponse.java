@@ -44,6 +44,9 @@ public class SummaryResponse {
   static final String NOT_ALL = "(ALL)-";
   static final String NOT_AVAILABLE = "-na-";
 
+  @JsonProperty("metricUrn")
+  private String metricUrn;
+
   @JsonProperty("dataset")
   private String dataset;
 
@@ -88,6 +91,14 @@ public class SummaryResponse {
     globalRatio = roundUp(currentTotal / baselineTotal);
   }
 
+  public String getMetricUrn() {
+    return metricUrn;
+  }
+
+  public void setMetricUrn(String metricUrn) {
+    this.metricUrn = metricUrn;
+  }
+
   public String getDataset() {
     return dataset;
   }
@@ -122,6 +133,13 @@ public class SummaryResponse {
 
   public void setDimensionCosts(List<Cube.DimensionCost> dimensionCosts) {
     this.dimensionCosts = dimensionCosts;
+  }
+
+  public static SummaryResponse buildNotAvailableResponse(String metricUrn) {
+    SummaryResponse response = new SummaryResponse(0d, 0d, 0d, 0d);
+    response.setMetricUrn(metricUrn);
+    response.dimensions.add(NOT_AVAILABLE);
+    return response;
   }
 
   public static SummaryResponse buildNotAvailableResponse(String dataset, String metricName) {

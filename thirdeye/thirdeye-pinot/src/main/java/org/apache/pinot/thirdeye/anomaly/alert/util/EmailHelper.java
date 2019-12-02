@@ -23,12 +23,11 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
-import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
-import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
+import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
+import org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import org.apache.pinot.thirdeye.anomaly.utils.EmailUtils;
-import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 import org.apache.pinot.thirdeye.dashboard.Utils;
 import org.apache.pinot.thirdeye.dashboard.views.contributor.ContributorViewHandler;
@@ -42,7 +41,6 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.mail.DefaultAuthenticator;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
@@ -50,7 +48,6 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
 import org.joda.time.Weeks;
-import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,7 +59,7 @@ import org.apache.pinot.thirdeye.datasource.MetricExpression;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
 
-import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+import static org.apache.pinot.thirdeye.notification.commons.SmtpConfiguration.SMTP_CONFIG_KEY;
 
 
 /**
@@ -229,30 +226,6 @@ public abstract class EmailHelper {
       case WoW:
       default:
         return Weeks.ONE.toPeriod();
-    }
-  }
-
-
-  public static void sendFailureEmailForScreenshot(String anomalyId, Throwable t, ThirdEyeConfiguration thirdeyeConfig)
-      throws JobExecutionException {
-    sendFailureEmailForScreenshot(anomalyId, t,
-        SmtpConfiguration.createFromProperties(thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY)),
-        thirdeyeConfig.getFailureFromAddress(),
-        new DetectionAlertFilterRecipients(EmailUtils.getValidEmailAddresses(thirdeyeConfig.getFailureToAddress())));
-  }
-
-  public static void sendFailureEmailForScreenshot(String anomalyId, Throwable t, SmtpConfiguration smtpConfiguration,
-    String failureFromAddress, DetectionAlertFilterRecipients failureToAddress) throws JobExecutionException {
-    HtmlEmail email = new HtmlEmail();
-    String subject = String
-        .format("[ThirdEye Anomaly Detector] FAILED SCREENSHOT FOR ANOMALY ID=%s", anomalyId);
-    String textBody = String
-        .format("Anomaly ID:%s; Exception:%s", anomalyId, ExceptionUtils.getStackTrace(t));
-    try {
-      EmailHelper
-          .sendEmailWithTextBody(email, smtpConfiguration, subject, textBody, failureFromAddress, failureToAddress);
-    } catch (EmailException e) {
-      LOG.error("Exception in sending email for failed screenshot", e);
     }
   }
 

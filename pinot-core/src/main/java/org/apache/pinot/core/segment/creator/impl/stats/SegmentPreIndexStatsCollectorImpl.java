@@ -20,9 +20,9 @@ package org.apache.pinot.core.segment.creator.impl.stats;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import org.apache.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
 import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
@@ -96,15 +96,13 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
   }
 
   @Override
-  public void collectRow(GenericRow row)
-      throws Exception {
+  public void collectRow(GenericRow row) {
     collectRow(row, false);
   }
 
   @Override
-  public void collectRow(GenericRow row, boolean isAggregated)
-      throws Exception {
-    for (Map.Entry<String, Object> columnNameAndValue : row.getEntrySet()) {
+  public void collectRow(GenericRow row, boolean isAggregated) {
+    for (Map.Entry<String, Object> columnNameAndValue : row.getFieldToValueMap().entrySet()) {
       final String columnName = columnNameAndValue.getKey();
       final Object value = columnNameAndValue.getValue();
 

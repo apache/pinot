@@ -82,13 +82,11 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     startServer();
 
     // Add 3 offline tables, where 2 of them have TestTask enabled
-    TableTaskConfig taskConfig = new TableTaskConfig();
-    Map<String, Map<String, String>> taskTypeConfigsMap = new HashMap<>();
-    taskTypeConfigsMap.put(TestTaskGenerator.TASK_TYPE, Collections.emptyMap());
-    taskConfig.setTaskTypeConfigsMap(taskTypeConfigsMap);
-    addOfflineTable(TABLE_NAME_1, null, null, null, null, null, SegmentVersion.v1, null, null, taskConfig);
-    addOfflineTable(TABLE_NAME_2, null, null, null, null, null, SegmentVersion.v1, null, null, taskConfig);
-    addOfflineTable(TABLE_NAME_3, null, null, null, null, null, SegmentVersion.v1, null, null, null);
+    TableTaskConfig taskConfig =
+        new TableTaskConfig(Collections.singletonMap(TestTaskGenerator.TASK_TYPE, Collections.emptyMap()));
+    addOfflineTable(TABLE_NAME_1, null, null, null, null, null, SegmentVersion.v1, null, null, taskConfig, null, null);
+    addOfflineTable(TABLE_NAME_2, null, null, null, null, null, SegmentVersion.v1, null, null, taskConfig, null, null);
+    addOfflineTable(TABLE_NAME_3, null, null, null, null, null, SegmentVersion.v1, null, null, null, null, null);
 
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();

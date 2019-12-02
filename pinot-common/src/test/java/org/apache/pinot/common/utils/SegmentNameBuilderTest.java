@@ -50,10 +50,6 @@ public class SegmentNameBuilderTest {
     assertEquals(SegmentName.getSegmentType(shortV1Name), SegmentName.RealtimeSegmentType.HLC_SHORT);
     assertEquals(SegmentName.getSegmentType(v2Name), SegmentName.RealtimeSegmentType.LLC);
 
-//    assertEquals(isRealtimeV2Name(oldV1Name), false);
-//    assertEquals(isRealtimeV2Name(shortV1Name), false);
-//    assertEquals(isRealtimeV2Name(v2Name), true);
-
     // Check table name
     assertEquals(longNameSegment.getTableName(), "myTable_REALTIME");
     assertEquals(shortNameSegment.getTableName(), "myTable_REALTIME");
@@ -92,11 +88,8 @@ public class SegmentNameBuilderTest {
         SegmentName.RealtimeSegmentType.HLC_SHORT);
 
     // Invalid segment names
-    assertEquals(SegmentName.getSegmentType(shortNameSegment.getSegmentName() + "__"),
+    assertEquals(SegmentName.getSegmentType(longNameSegment.getSegmentName() + "__"),
         SegmentName.RealtimeSegmentType.UNSUPPORTED);
-    assertEquals(SegmentName.getSegmentType("__" + shortNameSegment.getSegmentName()),
-        SegmentName.RealtimeSegmentType.UNSUPPORTED);
-    assertEquals(SegmentName.getSegmentType("__abc__"), SegmentName.RealtimeSegmentType.UNSUPPORTED);
     assertEquals(SegmentName.getSegmentType("a__abc__1__3__4__54__g__gg___h"),
         SegmentName.RealtimeSegmentType.UNSUPPORTED);
   }

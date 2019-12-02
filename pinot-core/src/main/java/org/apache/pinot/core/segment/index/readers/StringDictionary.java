@@ -18,29 +18,19 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
-import org.apache.pinot.core.io.util.ValueReader;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
-public class StringDictionary extends ImmutableDictionaryReader {
+public class StringDictionary extends BaseImmutableDictionary {
 
   public StringDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
     super(dataBuffer, length, numBytesPerValue, paddingByte);
   }
 
-  public StringDictionary(ValueReader valueReader, int length) {
-    super(valueReader, length);
-  }
-
   @Override
-  public int indexOf(Object rawValue) {
-    int index = insertionIndexOf(rawValue);
-    return (index >= 0) ? index : -1;
-  }
-
-  @Override
-  public int insertionIndexOf(Object rawValue) {
-    return binarySearch((String) rawValue);
+  public int insertionIndexOf(String stringValue) {
+    return binarySearch(stringValue);
   }
 
   @Override
@@ -49,16 +39,80 @@ public class StringDictionary extends ImmutableDictionaryReader {
   }
 
   @Override
+  public int getIntValue(int dictId) {
+    return Integer.parseInt(getUnpaddedString(dictId, getBuffer()));
+  }
+
+  @Override
+  public long getLongValue(int dictId) {
+    return Long.parseLong(getUnpaddedString(dictId, getBuffer()));
+  }
+
+  @Override
+  public float getFloatValue(int dictId) {
+    return Float.parseFloat(getUnpaddedString(dictId, getBuffer()));
+  }
+
+  @Override
+  public double getDoubleValue(int dictId) {
+    return Double.parseDouble(getUnpaddedString(dictId, getBuffer()));
+  }
+
+  @Override
   public String getStringValue(int dictId) {
     return getUnpaddedString(dictId, getBuffer());
   }
 
   @Override
-  public void readStringValues(int[] dictIds, int inStartPos, int length, String[] outValues, int outStartPos) {
+  public byte[] getBytesValue(int dictId) {
+    return BytesUtils.toBytes(getUnpaddedString(dictId, getBuffer()));
+  }
+
+  @Override
+  public void readIntValues(int[] dictIds, int length, int[] outValues) {
     byte[] buffer = getBuffer();
-    int inEndPos = inStartPos + length;
-    for (int i = inStartPos; i < inEndPos; i++) {
-      outValues[outStartPos++] = getUnpaddedString(dictIds[i], buffer);
+    for (int i = 0; i < length; i++) {
+      outValues[i] = Integer.parseInt(getUnpaddedString(dictIds[i], buffer));
+    }
+  }
+
+  @Override
+  public void readLongValues(int[] dictIds, int length, long[] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = Long.parseLong(getUnpaddedString(dictIds[i], buffer));
+    }
+  }
+
+  @Override
+  public void readFloatValues(int[] dictIds, int length, float[] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = Float.parseFloat(getUnpaddedString(dictIds[i], buffer));
+    }
+  }
+
+  @Override
+  public void readDoubleValues(int[] dictIds, int length, double[] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = Double.parseDouble(getUnpaddedString(dictIds[i], buffer));
+    }
+  }
+
+  @Override
+  public void readStringValues(int[] dictIds, int length, String[] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getUnpaddedString(dictIds[i], buffer);
+    }
+  }
+
+  @Override
+  public void readBytesValues(int[] dictIds, int length, byte[][] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = BytesUtils.toBytes(getUnpaddedString(dictIds[i], buffer));
     }
   }
 }

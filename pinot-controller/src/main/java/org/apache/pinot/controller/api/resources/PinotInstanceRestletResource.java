@@ -37,8 +37,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.controller.api.pojos.Instance;
+import org.apache.pinot.common.config.Instance;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.slf4j.Logger;
@@ -85,8 +85,7 @@ public class PinotInstanceRestletResource {
   @ApiOperation(value = "Get instance information", produces = MediaType.APPLICATION_JSON)
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Instance not found"), @ApiResponse(code = 500, message = "Internal error")})
   public String getInstance(
-      @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000")
-      @PathParam("instanceName") String instanceName) {
+      @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000") @PathParam("instanceName") String instanceName) {
     InstanceConfig instanceConfig = pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
     if (instanceConfig == null) {
       throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " not found",
@@ -98,6 +97,7 @@ public class PinotInstanceRestletResource {
     response.put("enabled", instanceConfig.getInstanceEnabled());
     response.put("port", instanceConfig.getPort());
     response.set("tags", JsonUtils.objectToJsonNode(instanceConfig.getTags()));
+    response.set("pools", JsonUtils.objectToJsonNode(instanceConfig.getRecord().getMapField(Instance.POOL_KEY)));
     return response.toString();
   }
 
@@ -108,7 +108,7 @@ public class PinotInstanceRestletResource {
   @ApiOperation(value = "Create a new instance", consumes = MediaType.APPLICATION_JSON, notes = "Creates a new instance with given instance config")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 409, message = "Instance already exists"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse addInstance(Instance instance) {
-    LOGGER.info("Instance creation request received for instance " + instance.toInstanceId());
+    LOGGER.info("Instance creation request received for instance: {}", instance.getInstanceId());
     if (!pinotHelixResourceManager.addInstance(instance).isSuccessful()) {
       throw new ControllerApplicationException(LOGGER, "Instance already exists", Response.Status.CONFLICT);
     }
@@ -130,13 +130,17 @@ public class PinotInstanceRestletResource {
     }
 
     if (StateType.ENABLE.name().equalsIgnoreCase(state)) {
-      if (!pinotHelixResourceManager.enableInstance(instanceName).isSuccessful()) {
-        throw new ControllerApplicationException(LOGGER, "Failed to enable instance " + instanceName,
+      PinotResourceManagerResponse response = pinotHelixResourceManager.enableInstance(instanceName);
+      if (!response.isSuccessful()) {
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to enable instance " + instanceName + " - " + response.getMessage(),
             Response.Status.INTERNAL_SERVER_ERROR);
       }
     } else if (StateType.DISABLE.name().equalsIgnoreCase(state)) {
-      if (!pinotHelixResourceManager.disableInstance(instanceName).isSuccessful()) {
-        throw new ControllerApplicationException(LOGGER, "Failed to disable instance " + instanceName,
+      PinotResourceManagerResponse response = pinotHelixResourceManager.disableInstance(instanceName);
+      if (!response.isSuccessful()) {
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to disable instance " + instanceName + " - " + response.getMessage(),
             Response.Status.INTERNAL_SERVER_ERROR);
       }
     } else if (StateType.DROP.name().equalsIgnoreCase(state)) {

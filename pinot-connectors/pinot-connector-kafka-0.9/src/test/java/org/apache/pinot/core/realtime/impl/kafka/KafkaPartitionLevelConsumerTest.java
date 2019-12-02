@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.kafka;
+package org.apache.pinot.core.realtime.impl.kafka;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
@@ -222,6 +222,7 @@ public class KafkaPartitionLevelConsumerTest {
     String streamKafkaBrokerList = "abcd:1234,bcde:2345";
     String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
+    String tableNameWithType = "table_REALTIME";
 
     MockKafkaSimpleConsumerFactory mockKafkaSimpleConsumerFactory =
         new MockKafkaSimpleConsumerFactory(new String[]{"abcd", "bcde"}, new int[]{1234, 2345},
@@ -237,7 +238,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     streamConfigMap.put("stream.kafka.fetcher.size", "10000");
     streamConfigMap.put("stream.kafka.fetcher.minBytes", "20000");
-    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
     KafkaStreamMetadataProvider streamMetadataProvider =
         new KafkaStreamMetadataProvider(clientId, streamConfig, mockKafkaSimpleConsumerFactory);
@@ -259,7 +260,7 @@ public class KafkaPartitionLevelConsumerTest {
     // test user defined values
     streamConfigMap.put("stream.kafka.buffer.size", "100");
     streamConfigMap.put("stream.kafka.socket.timeout", "1000");
-    streamConfig = new StreamConfig(streamConfigMap);
+    streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
     kafkaSimpleStreamConsumer =
         new KafkaPartitionLevelConsumer(clientId, streamConfig, 0, mockKafkaSimpleConsumerFactory);
     kafkaSimpleStreamConsumer.fetchMessages(12345L, 23456L, 10000);
@@ -274,6 +275,7 @@ public class KafkaPartitionLevelConsumerTest {
     String streamKafkaBrokerList = "abcd:1234,bcde:2345";
     String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
+    String tableNameWithType = "table_REALTIME";
 
     MockKafkaSimpleConsumerFactory mockKafkaSimpleConsumerFactory =
         new MockKafkaSimpleConsumerFactory(new String[]{"abcd", "bcde"}, new int[]{1234, 2345},
@@ -287,7 +289,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap
         .put("stream.kafka.consumer.factory.class.name", mockKafkaSimpleConsumerFactory.getClass().getName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
-    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
     KafkaStreamMetadataProvider streamMetadataProvider =
         new KafkaStreamMetadataProvider(clientId, streamConfig, mockKafkaSimpleConsumerFactory);
@@ -302,6 +304,7 @@ public class KafkaPartitionLevelConsumerTest {
     String streamKafkaBrokerList = "abcd:1234,bcde:2345";
     String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
+    String tableNameWithType = "table_REALTIME";
 
     MockKafkaSimpleConsumerFactory mockKafkaSimpleConsumerFactory =
         new MockKafkaSimpleConsumerFactory(new String[]{"abcd", "bcde"}, new int[]{1234, 2345},
@@ -315,7 +318,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap
         .put("stream.kafka.consumer.factory.class.name", mockKafkaSimpleConsumerFactory.getClass().getName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
-    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
     int partition = 0;
     KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer =
@@ -331,6 +334,7 @@ public class KafkaPartitionLevelConsumerTest {
     String streamKafkaBrokerList = "abcd:1234,bcde:2345";
     String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
+    String tableNameWithType = "table_REALTIME";
 
     MockKafkaSimpleConsumerFactory mockKafkaSimpleConsumerFactory =
         new MockKafkaSimpleConsumerFactory(new String[]{"abcd", "bcde"}, new int[]{1234, 2345},
@@ -344,7 +348,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap
         .put("stream.kafka.consumer.factory.class.name", mockKafkaSimpleConsumerFactory.getClass().getName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
-    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
     int partition = 0;
     KafkaStreamMetadataProvider kafkaStreamMetadataProvider =

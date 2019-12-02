@@ -23,23 +23,19 @@ import com.google.common.base.Function;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
-import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.config.CombinedConfig;
-import org.apache.pinot.common.config.Serializer;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 
@@ -60,7 +56,6 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   /**
    * Can be overridden to change default setting
    */
-  @Nonnull
   protected String getQueryFileName() {
     return DEFAULT_QUERY_FILE_NAME;
   }
@@ -142,6 +137,52 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   }
 
   /**
+   * Test hardcoded queries.
+   * <p>NOTE:
+   * <p>For queries with <code>LIMIT</code> or <code>TOP</code>, need to remove limit or add <code>LIMIT 10000</code> to
+   * the H2 SQL query because the comparison only works on exhausted result with at most 10000 rows.
+   * <ul>
+   *   <li>
+   *     Eg. <code>SELECT a FROM table LIMIT 15 -> [SELECT a FROM table LIMIT 10000]</code>
+   *   </li>
+   * </ul>
+   * <p>For queries with multiple aggregation functions, need to split each of them into a separate H2 SQL query.
+   * <ul>
+   *   <li>
+   *     Eg. <code>SELECT SUM(a), MAX(b) FROM table -> [SELECT SUM(a) FROM table, SELECT MAX(b) FROM table]</code>
+   *   </li>
+   * </ul>
+   * <p>For group-by queries, need to add group-by columns to the select clause for H2 SQL query.
+   * <ul>
+   *   <li>
+   *     Eg. <code>SELECT SUM(a) FROM table GROUP BY b -> [SELECT b, SUM(a) FROM table GROUP BY b]</code>
+   *   </li>
+   * </ul>
+   *
+   * @throws Exception
+   */
+  public void testHardcodedSqlQueries()
+      throws Exception {
+    // Here are some sample queries.
+    String query;
+    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16312 AND Carrier = 'DL'";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL'";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch > 16312 AND Carrier = 'DL'";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch >= 16312 AND Carrier = 'DL'";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch < 16312 AND Carrier = 'DL'";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
+    testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT MAX(ArrTime), MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 16312";
+    testSqlQuery(query, Arrays.asList("SELECT MAX(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 15312",
+        "SELECT MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 15312"));
+  }
+
+  /**
    * Test to ensure that broker response contains expected stats
    *
    * @throws Exception
@@ -220,6 +261,43 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   }
 
   /**
+   * Test random SQL queries from the query file.
+   * TODO: fix this test by adding the SQL query file
+   */
+  public void testSqlQueriesFromQueryFile()
+      throws Exception {
+    URL resourceUrl = BaseClusterIntegrationTestSet.class.getClassLoader().getResource(getQueryFileName());
+    Assert.assertNotNull(resourceUrl);
+    File queryFile = new File(resourceUrl.getFile());
+
+    int maxNumQueriesToSkipInQueryFile = getMaxNumQueriesToSkipInQueryFile();
+    try (BufferedReader reader = new BufferedReader(new FileReader(queryFile))) {
+      while (true) {
+        int numQueriesSkipped = RANDOM.nextInt(maxNumQueriesToSkipInQueryFile);
+        for (int i = 0; i < numQueriesSkipped; i++) {
+          reader.readLine();
+        }
+
+        String queryString = reader.readLine();
+        // Reach end of file.
+        if (queryString == null) {
+          return;
+        }
+
+        JsonNode query = JsonUtils.stringToJsonNode(queryString);
+        String sqlQuery = query.get("pql").asText();
+        JsonNode hsqls = query.get("hsqls");
+        List<String> sqlQueries = new ArrayList<>();
+        int length = hsqls.size();
+        for (int i = 0; i < length; i++) {
+          sqlQueries.add(hsqls.get(i).asText());
+        }
+        testSqlQuery(sqlQuery, sqlQueries);
+      }
+    }
+  }
+
+  /**
    * Test queries without multi values generated by query generator.
    *
    * @throws Exception
@@ -276,14 +354,14 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    */
   public void testInstanceShutdown()
       throws Exception {
-    List<String> instances = _helixAdmin.getInstancesInCluster(_clusterName);
+    List<String> instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
     Assert.assertFalse(instances.isEmpty(), "List of instances should not be empty");
 
     // Mark all instances in the cluster as shutting down
     for (String instance : instances) {
-      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_clusterName, instance);
+      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), instance);
       instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, true);
-      _helixAdmin.setInstanceConfig(_clusterName, instance, instanceConfig);
+      _helixAdmin.setInstanceConfig(getHelixClusterName(), instance, instanceConfig);
     }
 
     // Check that the routing table is empty
@@ -291,9 +369,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
     // Mark all instances as not shutting down
     for (String instance : instances) {
-      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_clusterName, instance);
+      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), instance);
       instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
-      _helixAdmin.setInstanceConfig(_clusterName, instance, instanceConfig);
+      _helixAdmin.setInstanceConfig(getHelixClusterName(), instance, instanceConfig);
     }
 
     // Check that the routing table is not empty
@@ -309,24 +387,23 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       checkForInstanceInRoutingTable(true, instanceName);
 
       // Mark the server instance as shutting down
-      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_clusterName, instanceName);
+      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), instanceName);
       instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, true);
-      _helixAdmin.setInstanceConfig(_clusterName, instanceName, instanceConfig);
+      _helixAdmin.setInstanceConfig(getHelixClusterName(), instanceName, instanceConfig);
 
       // Check that it is not in the routing table
       checkForInstanceInRoutingTable(false, instanceName);
 
       // Re-enable the server instance
       instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
-      _helixAdmin.setInstanceConfig(_clusterName, instanceName, instanceConfig);
+      _helixAdmin.setInstanceConfig(getHelixClusterName(), instanceName, instanceConfig);
 
       // Check that it is in the routing table
       checkForInstanceInRoutingTable(true, instanceName);
     }
   }
 
-  private void checkForInstanceInRoutingTable(final boolean shouldExist, @Nonnull final String instanceName)
-      throws Exception {
+  private void checkForInstanceInRoutingTable(final boolean shouldExist, final String instanceName) {
     String errorMessage;
     if (shouldExist) {
       errorMessage = "Routing table does not contain expected instance: " + instanceName;
@@ -405,28 +482,5 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         }
       }
     }, 60_000L, errorMessage);
-  }
-
-  protected void completeTableConfiguration() {
-    if (isUsingNewConfigFormat()) {
-      CombinedConfig combinedConfig = new CombinedConfig(_offlineTableConfig, _realtimeTableConfig, _schema);
-      try {
-        sendPostRequest(_controllerRequestURLBuilder.forNewTableCreate(), Serializer.serializeToString(combinedConfig));
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }
-  }
-
-  protected void updateTableConfiguration() {
-    if (isUsingNewConfigFormat()) {
-      CombinedConfig combinedConfig = new CombinedConfig(_offlineTableConfig, _realtimeTableConfig, _schema);
-      try {
-        sendPutRequest(_controllerRequestURLBuilder.forNewUpdateTableConfig(_offlineTableConfig.getTableName()),
-            Serializer.serializeToString(combinedConfig));
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }
   }
 }

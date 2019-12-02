@@ -19,6 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
@@ -37,10 +38,12 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.util.TestUtils;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -117,12 +120,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Create the table
     addOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1, getInvertedIndexColumns(),
-        getBloomFilterIndexColumns(), getTaskConfig());
-
-    completeTableConfiguration();
+        getBloomFilterIndexColumns(), getTaskConfig(), null, null);
 
     // Upload all segments
-    uploadSegments(_tarDir);
+    uploadSegments(getTableName(), _tarDir);
 
     // Set up service status callbacks
     // NOTE: put this step after creating the table and uploading all segments so that brokers and servers can find the
@@ -134,16 +135,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   private void registerCallbackHandlers() {
-    List<String> instances = _helixAdmin.getInstancesInCluster(_clusterName);
-    instances.removeIf(instance -> (!instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) && !instance.startsWith(
-        CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)));
-    List<String> resourcesInCluster = _helixAdmin.getResourcesInCluster(_clusterName);
-    resourcesInCluster.removeIf(resource -> (!TableNameBuilder.isTableResource(resource)
-        && !CommonConstants.Helix.BROKER_RESOURCE_INSTANCE.equals(resource)));
+    List<String> instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
+    instances.removeIf(instance -> (!instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) && !instance
+        .startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)));
+    List<String> resourcesInCluster = _helixAdmin.getResourcesInCluster(getHelixClusterName());
+    resourcesInCluster.removeIf(
+        resource -> (!TableNameBuilder.isTableResource(resource) && !CommonConstants.Helix.BROKER_RESOURCE_INSTANCE
+            .equals(resource)));
     for (String instance : instances) {
       List<String> resourcesToMonitor = new ArrayList<>();
       for (String resourceName : resourcesInCluster) {
-        IdealState idealState = _helixAdmin.getResourceIdealState(_clusterName, resourceName);
+        IdealState idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), resourceName);
         for (String partitionName : idealState.getPartitionSet()) {
           if (idealState.getInstanceSet(partitionName).contains(instance)) {
             resourcesToMonitor.add(resourceName);
@@ -151,11 +153,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           }
         }
       }
-      _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
-          new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _clusterName, instance,
-              resourcesToMonitor, 100.0),
-          new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _clusterName, instance,
-              resourcesToMonitor, 100.0))));
+      _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
+          .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager,
+                  getHelixClusterName(), instance, resourcesToMonitor, 100.0),
+              new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager,
+                  getHelixClusterName(), instance, resourcesToMonitor, 100.0))));
     }
   }
 
@@ -196,7 +198,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Refresh time is when the segment gets refreshed (existing segment)
     long refreshTime = segmentZKMetadata.getRefreshTime();
 
-    uploadSegments(_tarDir);
+    uploadSegments(getTableName(), _tarDir);
     for (OfflineSegmentZKMetadata segmentZKMetadataAfterUpload : _helixResourceManager
         .getOfflineSegmentMetadata(getTableName())) {
       // Only check one segment
@@ -221,9 +223,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Update table config and trigger reload
     updateOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1,
-        UPDATED_INVERTED_INDEX_COLUMNS, null, getTaskConfig());
-
-    updateTableConfiguration();
+        UPDATED_INVERTED_INDEX_COLUMNS, null, getTaskConfig(), null, null);
 
     sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);
 
@@ -248,9 +248,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Update table config and trigger reload
     updateOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1, null,
-        UPDATED_BLOOM_FILTER_COLUMNS, getTaskConfig());
-
-    updateTableConfiguration();
+        UPDATED_BLOOM_FILTER_COLUMNS, getTaskConfig(), null, null);
 
     sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);
 
@@ -309,8 +307,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     } else {
       sendSchema(SCHEMA_WITH_MISSING_COLUMNS);
     }
-
-    updateTableConfiguration();
 
     // Trigger reload
     sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);
@@ -459,7 +455,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testUDF()
+  public void testGroupByUDF()
       throws Exception {
     String pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY timeConvert(DaysSinceEpoch,'DAYS','SECONDS')";
     JsonNode response = postQuery(pqlQuery);
@@ -530,6 +526,168 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     aggregationResult = response.get("aggregationResults").get(0);
     assertEquals(aggregationResult.get("function").asText(), "min_div(DaysSinceEpoch,'2')");
     assertEquals(aggregationResult.get("value").asDouble(), 16071.0 / 2);
+  }
+
+  @Test
+  public void testAggregationUDF()
+      throws Exception {
+
+    String pqlQuery = "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable";
+    JsonNode response = postQuery(pqlQuery);
+    JsonNode aggregationResult = response.get("aggregationResults").get(0);
+    assertEquals(aggregationResult.get("function").asText(), "max_timeconvert(DaysSinceEpoch,'DAYS','SECONDS')");
+    assertEquals(aggregationResult.get("value").asDouble(), 16435.0 * 24 * 3600);
+
+    pqlQuery = "SELECT MIN(div(DaysSinceEpoch,2)) FROM mytable";
+    response = postQuery(pqlQuery);
+    aggregationResult = response.get("aggregationResults").get(0);
+    assertEquals(aggregationResult.get("function").asText(), "min_div(DaysSinceEpoch,'2')");
+    assertEquals(aggregationResult.get("value").asDouble(), 16071.0 / 2);
+  }
+
+  @Test
+  public void testSelectionUDF()
+      throws Exception {
+    String pqlQuery = "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable";
+    JsonNode response = postQuery(pqlQuery);
+    ArrayNode selectionResults = (ArrayNode) response.get("selectionResults").get("results");
+    Assert.assertNotNull(selectionResults);
+    Assert.assertTrue(selectionResults.size() > 0);
+    for (int i = 0; i < selectionResults.size(); i++) {
+      long daysSinceEpoch = selectionResults.get(i).get(0).asLong();
+      long secondsSinceEpoch = selectionResults.get(i).get(1).asLong();
+      Assert.assertEquals(daysSinceEpoch * 24 * 60 * 60, secondsSinceEpoch);
+    }
+
+    pqlQuery =
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch limit 10000";
+    response = postQuery(pqlQuery);
+    selectionResults = (ArrayNode) response.get("selectionResults").get("results");
+    Assert.assertNotNull(selectionResults);
+    Assert.assertTrue(selectionResults.size() > 0);
+    long prevValue = -1;
+    for (int i = 0; i < selectionResults.size(); i++) {
+      long daysSinceEpoch = selectionResults.get(i).get(0).asLong();
+      long secondsSinceEpoch = selectionResults.get(i).get(1).asLong();
+      Assert.assertEquals(daysSinceEpoch * 24 * 60 * 60, secondsSinceEpoch);
+      Assert.assertTrue(daysSinceEpoch >= prevValue);
+      prevValue = daysSinceEpoch;
+    }
+
+    pqlQuery =
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000";
+    response = postQuery(pqlQuery);
+    selectionResults = (ArrayNode) response.get("selectionResults").get("results");
+    Assert.assertNotNull(selectionResults);
+    Assert.assertTrue(selectionResults.size() > 0);
+    prevValue = Long.MAX_VALUE;
+    for (int i = 0; i < selectionResults.size(); i++) {
+      long daysSinceEpoch = selectionResults.get(i).get(0).asLong();
+      long secondsSinceEpoch = selectionResults.get(i).get(1).asLong();
+      Assert.assertEquals(daysSinceEpoch * 24 * 60 * 60, secondsSinceEpoch);
+      Assert.assertTrue(secondsSinceEpoch <= prevValue);
+      prevValue = secondsSinceEpoch;
+    }
+  }
+
+  @Test
+  public void testFilterUDF()
+      throws Exception {
+    int daysSinceEpoch = 16138;
+    long secondsSinceEpoch = 16138 * 24 * 60 * 60;
+
+    String pqlQuery;
+    pqlQuery = "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch;
+    JsonNode response1 = postQuery(pqlQuery);
+
+    pqlQuery = "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch;
+    JsonNode response2 = postQuery(pqlQuery);
+
+    pqlQuery = "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch
+        + " OR timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch;
+    JsonNode response3 = postQuery(pqlQuery);
+
+    pqlQuery = "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch
+        + " AND timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch;
+    JsonNode response4 = postQuery(pqlQuery);
+
+    pqlQuery =
+        "SELECT count(*) FROM mytable WHERE DIV(timeConvert(DaysSinceEpoch,'DAYS','SECONDS'),1) = " + secondsSinceEpoch;
+    JsonNode response5 = postQuery(pqlQuery);
+
+    double val1 = response1.get("aggregationResults").get(0).get("value").asDouble();
+    double val2 = response2.get("aggregationResults").get(0).get("value").asDouble();
+    double val3 = response3.get("aggregationResults").get(0).get("value").asDouble();
+    double val4 = response4.get("aggregationResults").get(0).get("value").asDouble();
+    double val5 = response5.get("aggregationResults").get(0).get("value").asDouble();
+    Assert.assertEquals(val1, val2);
+    Assert.assertEquals(val1, val3);
+    Assert.assertEquals(val1, val4);
+    Assert.assertEquals(val1, val5);
+  }
+
+  @Test
+  public void testFilterWithInvertedIndexUDF()
+      throws Exception {
+    int daysSinceEpoch = 16138;
+    long secondsSinceEpoch = 16138 * 24 * 60 * 60;
+
+    String[] origins =
+        new String[]{"ATL", "ORD", "DFW", "DEN", "LAX", "IAH", "SFO", "PHX", "LAS", "EWR", "MCO", "BOS", "SLC", "SEA", "MSP", "CLT", "LGA", "DTW", "JFK", "BWI"};
+    String pqlQuery;
+    for (String origin : origins) {
+      pqlQuery =
+          "SELECT count(*) FROM mytable WHERE Origin = \"" + origin + "\" AND DaysSinceEpoch = " + daysSinceEpoch;
+      JsonNode response1 = postQuery(pqlQuery);
+      //System.out.println(response1);
+      pqlQuery = "SELECT count(*) FROM mytable WHERE Origin = \"" + origin
+          + "\" AND timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch;
+      JsonNode response2 = postQuery(pqlQuery);
+      //System.out.println(response2);
+      double val1 = response1.get("aggregationResults").get(0).get("value").asDouble();
+      double val2 = response2.get("aggregationResults").get(0).get("value").asDouble();
+      Assert.assertEquals(val1, val2);
+    }
+  }
+
+  @Test
+  public void testQueryWithRepeatedColumns()
+      throws Exception {
+    //test repeated columns in selection query
+    String query = "SELECT ArrTime, ArrTime FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
+    testQuery(query, Collections.singletonList(query));
+
+    //test repeated columns in selection query with order by
+    query = "SELECT ArrTime, ArrTime FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' order by ArrTime";
+    testQuery(query, Collections.singletonList(query));
+
+    //test repeated columns in agg query
+    query = "SELECT count(*), count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
+    testQuery(query, Arrays.asList("SELECT count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'",
+        "SELECT count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'"));
+
+    //test repeated columns in agg group by query
+    query =
+        "SELECT ArrTime, ArrTime, count(*), count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' group by ArrTime, ArrTime";
+    testQuery(query, Arrays.asList(
+        "SELECT ArrTime, ArrTime, count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' group by ArrTime, ArrTime",
+        "SELECT ArrTime, ArrTime, count(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' group by ArrTime, ArrTime"));
+  }
+
+  @Test
+  public void testQueryWithOrderby()
+      throws Exception {
+    //test repeated columns in selection query
+    String query = "SELECT ArrTime, Carrier, DaysSinceEpoch FROM mytable ORDER BY DaysSinceEpoch DESC";
+    testQuery(query, Collections.singletonList(query));
+
+    //test repeated columns in selection query
+    query = "SELECT ArrTime, DaysSinceEpoch, Carrier FROM mytable ORDER BY Carrier DESC";
+    testQuery(query, Collections.singletonList(query));
+
+    //test repeated columns in selection query
+    query = "SELECT ArrTime, DaysSinceEpoch, Carrier FROM mytable ORDER BY Carrier DESC, ArrTime DESC";
+    testQuery(query, Collections.singletonList(query));
   }
 
   @AfterClass
@@ -616,16 +774,39 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // TODO: Add test to delete broker instance. Currently, stopBroker() does not work correctly.
 
     // Check if '/INSTANCES/<serverName>' has been erased correctly
-    String instancePath = "/" + _clusterName + "/INSTANCES/" + serverName;
+    String instancePath = "/" + getHelixClusterName() + "/INSTANCES/" + serverName;
     assertFalse(_propertyStore.exists(instancePath, 0));
 
     // Check if '/CONFIGS/PARTICIPANT/<serverName>' has been erased correctly
-    String configPath = "/" + _clusterName + "/CONFIGS/PARTICIPANT/" + serverName;
+    String configPath = "/" + getHelixClusterName() + "/CONFIGS/PARTICIPANT/" + serverName;
     assertFalse(_propertyStore.exists(configPath, 0));
   }
 
-  @Override
-  protected boolean isUsingNewConfigFormat() {
-    return true;
+  /**
+   * Test for DISTINCT clause. Run the PQL query against Pinot
+   * execution engine and compare with the output of corresponding
+   * SQL query run against H2
+   * @throws Exception
+   */
+  @Test
+  public void testDistinctQuery()
+      throws Exception {
+    Pql2Compiler.ENABLE_DISTINCT = true;
+    // by default 10 rows will be returned, so use high limit
+    String pql = "SELECT DISTINCT(Carrier) FROM mytable LIMIT 1000000";
+    String sql = "SELECT DISTINCT Carrier FROM mytable";
+    testQuery(pql, Collections.singletonList(sql));
+
+    pql = "SELECT DISTINCT(Carrier, DestAirportID) FROM mytable LIMIT 1000000";
+    sql = "SELECT DISTINCT Carrier, DestAirportID FROM mytable";
+    testQuery(pql, Collections.singletonList(sql));
+
+    pql = "SELECT DISTINCT(Carrier, DestAirportID, DestStateName) FROM mytable LIMIT 1000000";
+    sql = "SELECT DISTINCT Carrier, DestAirportID, DestStateName FROM mytable";
+    testQuery(pql, Collections.singletonList(sql));
+
+    pql = "SELECT DISTINCT(Carrier, DestAirportID, DestCityName) FROM mytable LIMIT 1000000";
+    sql = "SELECT DISTINCT Carrier, DestAirportID, DestCityName FROM mytable";
+    testQuery(pql, Collections.singletonList(sql));
   }
 }

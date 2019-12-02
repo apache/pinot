@@ -37,6 +37,8 @@ import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import org.quartz.CronExpression;
 
+import static org.apache.pinot.thirdeye.detection.ConfigUtils.*;
+
 
 public class DetectionConfigValidator implements ConfigValidator<DetectionConfigDTO> {
 
@@ -45,11 +47,11 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
 
   private static final String PROP_DETECTION = "detection";
   private static final String PROP_FILTER = "filter";
-  private static final String PROP_METRIC = "metric";
+  public static final String PROP_METRIC = "metric";
   private static final String PROP_GROUPER = "grouper";
-  private static final String PROP_DATASET = "dataset";
+  public static final String PROP_DATASET = "dataset";
   private static final String PROP_TYPE = "type";
-  private static final String PROP_RULES = "rules";
+  public static final String PROP_RULES = "rules";
   private static final String PROP_ALERTS = "alerts";
   private static final String PROP_MERGER = "merger";
   private static final String PROP_NAME = "name";
@@ -72,20 +74,15 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
    * Validate the pipeline by loading and initializing components
    */
   private void semanticValidation(DetectionConfigDTO detectionConfig) {
-    try {
-      // backup and swap out id
-      Long id = detectionConfig.getId();
-      detectionConfig.setId(-1L);
+    // backup and swap out id
+    Long id = detectionConfig.getId();
+    detectionConfig.setId(-1L);
 
-      // try to load the detection pipeline and init all the components
-      this.loader.from(provider, detectionConfig, 0, 0);
+    // try to load the detection pipeline and init all the components
+    this.loader.from(provider, detectionConfig, 0, 0);
 
-      // set id back
-      detectionConfig.setId(id);
-    } catch (Exception e){
-      // exception thrown in validate pipeline via reflection
-      throw new IllegalArgumentException("Semantic error: " + e.getCause().getMessage());
-    }
+    // set id back
+    detectionConfig.setId(id);
   }
 
   /**
@@ -160,17 +157,13 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
         "For sub-alert " + alertName + ", please double check the filter config. Adding dimensions filters"
             + " should be in the yaml root level using 'filters' as the key. Anomaly filter should be added in to the"
             + " indentation level of detection yaml it applies to.");
+    // Check if the dataset defined in the config exists
+    DatasetConfigDTO datasetConfig = fetchDatasetConfigDTO(this.provider, dataset);
 
     // Check if the metric defined in the config exists
-    MetricConfigDTO metricConfig = provider.fetchMetric(metric, dataset);
+    MetricConfigDTO metricConfig = provider.fetchMetric(metric, datasetConfig.getDataset());
     Preconditions.checkArgument(metricConfig != null,
-        "Metric doesn't exist in our records. Metric " + metric + " in sub-alert " + alertName);
-
-    // Check if the dataset defined in the config exists
-    DatasetConfigDTO datasetConfig = provider
-        .fetchDatasets(Collections.singletonList(metricConfig.getDataset())).get(metricConfig.getDataset());
-    Preconditions.checkArgument(datasetConfig != null,
-        "Dataset doesn't exist in our records. Dataset " + dataset + " in sub-alert " + alertName);
+        "Metric doesn't exist in our records. Metric " + metric + " Dataset " + dataset + " in sub-alert " + alertName);
 
     // We support only one grouper per metric
     Preconditions.checkArgument(ConfigUtils.getList(detectionYaml.get(PROP_GROUPER)).size() <= 1,

@@ -18,23 +18,32 @@
  */
 package org.apache.pinot.server.realtime;
 
-import org.apache.helix.BaseDataAccessor;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import org.apache.helix.ConfigAccessor;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
-import org.apache.helix.ZNRecord;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.LiveInstance;
+import org.apache.helix.model.ResourceConfig;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.core.query.utils.Pair;
-import org.apache.zookeeper.data.Stat;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 
 public class ControllerLeaderLocatorTest {
+  private final String testTable = "testTable";
 
   /**
    * Tests the invalidate logic for cached controller leader
@@ -44,115 +53,249 @@ public class ControllerLeaderLocatorTest {
   public void testInvalidateCachedControllerLeader() {
     HelixManager helixManager = mock(HelixManager.class);
     HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
-    BaseDataAccessor<ZNRecord> baseDataAccessor = mock(BaseDataAccessor.class);
-    ZNRecord znRecord = mock(ZNRecord.class);
     final String leaderHost = "host";
     final int leaderPort = 12345;
 
+    // Lead controller resource disabled.
+    ConfigAccessor configAccessor = mock(ConfigAccessor.class);
+    ResourceConfig resourceConfig = mock(ResourceConfig.class);
+    when(helixManager.getConfigAccessor()).thenReturn(configAccessor);
+    when(configAccessor.getResourceConfig(any(), anyString())).thenReturn(resourceConfig);
+    when(resourceConfig.getSimpleConfig(anyString())).thenReturn("false");
+
+    // Mocks the helix leader
     when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
-    when(helixDataAccessor.getBaseDataAccessor()).thenReturn(baseDataAccessor);
-    when(znRecord.getId()).thenReturn(leaderHost + "_" + leaderPort);
-    when(baseDataAccessor.get(anyString(), any(), anyInt())).thenReturn(znRecord);
-    when(helixManager.getClusterName()).thenReturn("testCluster");
+    PropertyKey.Builder keyBuilder = mock(PropertyKey.Builder.class);
+    when(helixDataAccessor.keyBuilder()).thenReturn(keyBuilder);
+    PropertyKey controllerLeader = mock(PropertyKey.class);
+    when(keyBuilder.controllerLeader()).thenReturn(controllerLeader);
+    LiveInstance liveInstance = mock(LiveInstance.class);
+    when(helixDataAccessor.getProperty(controllerLeader)).thenReturn(liveInstance);
+    when(liveInstance.getInstanceName()).thenReturn(leaderHost + "_" + leaderPort);
 
     // Create Controller Leader Locator
     FakeControllerLeaderLocator.create(helixManager);
-    ControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
+    FakeControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
 
     // check values at startup
-    Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderInvalid());
-    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), 0);
+    Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderValid());
+    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidationTimeMs(), 0);
 
     // very first invalidate
+    long currentTimeMs = 31_000L;
+    controllerLeaderLocator.setCurrentTimeMs(currentTimeMs);
     controllerLeaderLocator.invalidateCachedControllerLeader();
-    Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderInvalid());
-    long lastCacheInvalidateMillis = controllerLeaderLocator.getLastCacheInvalidateMillis();
+    Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderValid());
+    long lastCacheInvalidateMillis = controllerLeaderLocator.getLastCacheInvalidationTimeMs();
     Assert.assertTrue(lastCacheInvalidateMillis > 0);
+    Assert.assertEquals(lastCacheInvalidateMillis, currentTimeMs);
 
-    // invalidate within {@link ControllerLeaderLocator::getMillisBetweenInvalidate()} millis
+    // invalidate within {@link ControllerLeaderLocator::getMinInvalidateIntervalMs()} millis
     // values should remain unchanged
-    lastCacheInvalidateMillis = System.currentTimeMillis();
-    controllerLeaderLocator.setLastCacheInvalidateMillis(lastCacheInvalidateMillis);
+    currentTimeMs = 32_000L;
+    controllerLeaderLocator.setCurrentTimeMs(currentTimeMs);
     controllerLeaderLocator.invalidateCachedControllerLeader();
-    Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderInvalid());
-    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), lastCacheInvalidateMillis);
+    Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderValid());
+    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidationTimeMs(), lastCacheInvalidateMillis);
 
     // getControllerLeader, which validates the cache
-    controllerLeaderLocator.getControllerLeader();
-    Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderInvalid());
-    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), lastCacheInvalidateMillis);
+    controllerLeaderLocator.getControllerLeader(testTable);
+    Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderValid());
+    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidationTimeMs(), lastCacheInvalidateMillis);
 
-    // invalidate within {@link ControllerLeaderLocator::getMillisBetweenInvalidate()} millis
+    // invalidate within {@link ControllerLeaderLocator::getMinInvalidateIntervalMs()} millis
     // values should remain unchanged
-    lastCacheInvalidateMillis = System.currentTimeMillis();
-    controllerLeaderLocator.setLastCacheInvalidateMillis(lastCacheInvalidateMillis);
+    currentTimeMs = 33_000L;
+    controllerLeaderLocator.setCurrentTimeMs(currentTimeMs);
     controllerLeaderLocator.invalidateCachedControllerLeader();
-    Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderInvalid());
-    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), lastCacheInvalidateMillis);
+    Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderValid());
+    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidationTimeMs(), lastCacheInvalidateMillis);
 
-    // invalidate after {@link ControllerLeaderLocator::getMillisBetweenInvalidate()} millis have elapsed, by setting lastCacheInvalidateMillis to well before the millisBetweenInvalidate
+    // invalidate after {@link ControllerLeaderLocator::getMinInvalidateIntervalMs()} millis have elapsed, by setting lastCacheInvalidateMillis to well before the millisBetweenInvalidate
     // cache should be invalidated and last cache invalidation time should get updated
-    lastCacheInvalidateMillis = System.currentTimeMillis() - 2 * controllerLeaderLocator.getMillisBetweenInvalidate();
-    controllerLeaderLocator.setLastCacheInvalidateMillis(lastCacheInvalidateMillis);
+    controllerLeaderLocator.setCurrentTimeMs(
+        controllerLeaderLocator.getCurrentTimeMs() + 2 * controllerLeaderLocator.getMinInvalidateIntervalMs());
     controllerLeaderLocator.invalidateCachedControllerLeader();
-    Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderInvalid());
-    Assert.assertTrue(controllerLeaderLocator.getLastCacheInvalidateMillis() > lastCacheInvalidateMillis);
+    Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderValid());
+    Assert.assertTrue(controllerLeaderLocator.getLastCacheInvalidationTimeMs() > lastCacheInvalidateMillis);
   }
 
   @Test
   public void testNoControllerLeader() {
     HelixManager helixManager = mock(HelixManager.class);
     HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
-    BaseDataAccessor<ZNRecord> baseDataAccessor = mock(BaseDataAccessor.class);
 
+    // Mock that there is no helix leader.
     when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
-    when(helixDataAccessor.getBaseDataAccessor()).thenReturn(baseDataAccessor);
-    when(baseDataAccessor.get(anyString(), (Stat) any(), anyInt())).thenThrow(new RuntimeException());
+    PropertyKey.Builder keyBuilder = mock(PropertyKey.Builder.class);
+    when(helixDataAccessor.keyBuilder()).thenReturn(keyBuilder);
+    PropertyKey controllerLeader = mock(PropertyKey.class);
+    when(keyBuilder.controllerLeader()).thenReturn(controllerLeader);
+    when(helixDataAccessor.getProperty(controllerLeader)).thenReturn(null);
+
+    // Lead controller resource disabled.
+    ConfigAccessor configAccessor = mock(ConfigAccessor.class);
+    ResourceConfig resourceConfig = mock(ResourceConfig.class);
+    when(helixManager.getConfigAccessor()).thenReturn(configAccessor);
+    when(configAccessor.getResourceConfig(any(), any())).thenReturn(resourceConfig);
+    when(resourceConfig.getSimpleConfig(anyString())).thenReturn("false");
 
     // Create Controller Leader Locator
     FakeControllerLeaderLocator.create(helixManager);
     ControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
 
-    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(), null);
+    Assert.assertNull(controllerLeaderLocator.getControllerLeader(testTable));
   }
 
   @Test
   public void testControllerLeaderExists() {
     HelixManager helixManager = mock(HelixManager.class);
     HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
-    BaseDataAccessor<ZNRecord> baseDataAccessor = mock(BaseDataAccessor.class);
-    ZNRecord znRecord = mock(ZNRecord.class);
+    HelixAdmin helixAdmin = mock(HelixAdmin.class);
     final String leaderHost = "host";
     final int leaderPort = 12345;
 
+    // Lead controller resource disabled.
+    ConfigAccessor configAccessor = mock(ConfigAccessor.class);
+    ResourceConfig resourceConfig = mock(ResourceConfig.class);
+    when(helixManager.getConfigAccessor()).thenReturn(configAccessor);
+    when(configAccessor.getResourceConfig(any(), anyString())).thenReturn(resourceConfig);
+    when(resourceConfig.getSimpleConfig(anyString())).thenReturn("false");
+
+    // Mocks the helix leader
     when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
-    when(helixDataAccessor.getBaseDataAccessor()).thenReturn(baseDataAccessor);
-    when(znRecord.getId()).thenReturn(leaderHost + "_" + leaderPort);
-    when(baseDataAccessor.get(anyString(), (Stat) any(), anyInt())).thenReturn(znRecord);
+    PropertyKey.Builder keyBuilder = mock(PropertyKey.Builder.class);
+    when(helixDataAccessor.keyBuilder()).thenReturn(keyBuilder);
+    PropertyKey controllerLeader = mock(PropertyKey.class);
+    when(keyBuilder.controllerLeader()).thenReturn(controllerLeader);
+    LiveInstance liveInstance = mock(LiveInstance.class);
+    when(helixDataAccessor.getProperty(controllerLeader)).thenReturn(liveInstance);
+    when(liveInstance.getInstanceName()).thenReturn(leaderHost + "_" + leaderPort);
+
     when(helixManager.getClusterName()).thenReturn("myCluster");
+    when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
+    when(helixAdmin.getResourceExternalView(anyString(), anyString())).thenReturn(null);
 
     // Create Controller Leader Locator
     FakeControllerLeaderLocator.create(helixManager);
     ControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
 
     Pair<String, Integer> expectedLeaderLocation = new Pair<>(leaderHost, leaderPort);
-    Assert.assertEquals(controllerLeaderLocator.getControllerLeader().getFirst(), expectedLeaderLocation.getFirst());
-    Assert.assertEquals(controllerLeaderLocator.getControllerLeader().getSecond(), expectedLeaderLocation.getSecond());
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(testTable).getFirst(),
+        expectedLeaderLocation.getFirst());
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(testTable).getSecond(),
+        expectedLeaderLocation.getSecond());
+  }
+
+  @Test
+  public void testWhenLeadControllerResourceEnabled() {
+    HelixManager helixManager = mock(HelixManager.class);
+    HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
+    HelixAdmin helixAdmin = mock(HelixAdmin.class);
+    final String leaderHost = "host";
+    final int leaderPort = 12345;
+
+    when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
+    PropertyKey.Builder keyBuilder = mock(PropertyKey.Builder.class);
+    when(helixDataAccessor.keyBuilder()).thenReturn(keyBuilder);
+    PropertyKey controllerLeader = mock(PropertyKey.class);
+    when(keyBuilder.controllerLeader()).thenReturn(controllerLeader);
+    LiveInstance liveInstance = mock(LiveInstance.class);
+    when(helixDataAccessor.getProperty(controllerLeader)).thenReturn(liveInstance);
+    when(liveInstance.getInstanceName()).thenReturn(leaderHost + "_" + leaderPort);
+
+    when(helixManager.getClusterName()).thenReturn("myCluster");
+    when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
+    when(helixAdmin.getResourceExternalView(anyString(), anyString())).thenReturn(null);
+
+    // Lead controller resource disabled.
+    ConfigAccessor configAccessor = mock(ConfigAccessor.class);
+    ResourceConfig resourceConfig = mock(ResourceConfig.class);
+    when(helixManager.getConfigAccessor()).thenReturn(configAccessor);
+    when(configAccessor.getResourceConfig(any(), anyString())).thenReturn(resourceConfig);
+    when(resourceConfig.getSimpleConfig(anyString())).thenReturn("false");
+
+    // Create Controller Leader Locator
+    FakeControllerLeaderLocator.create(helixManager);
+    ControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
+    Pair<String, Integer> expectedLeaderLocation = new Pair<>(leaderHost, leaderPort);
+
+    // Before enabling lead controller resource config, the helix leader should be used.
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(testTable).getFirst(),
+        expectedLeaderLocation.getFirst());
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(testTable).getSecond(),
+        expectedLeaderLocation.getSecond());
+
+    // Mock the behavior that 40 seconds have passed.
+    ((FakeControllerLeaderLocator) controllerLeaderLocator)
+        .setCurrentTimeMs(controllerLeaderLocator.getCurrentTimeMs() + 40_000L);
+    controllerLeaderLocator.invalidateCachedControllerLeader();
+
+    // After enabling lead controller resource config, the leader in lead controller resource should be used.
+    when(resourceConfig.getSimpleConfig(anyString())).thenReturn("true");
+
+    // External view is null, should return null.
+    Assert.assertNull(controllerLeaderLocator.getControllerLeader(testTable));
+
+    ExternalView externalView = mock(ExternalView.class);
+    when(helixAdmin.getResourceExternalView(anyString(), anyString())).thenReturn(externalView);
+    Set<String> partitionSet = new HashSet<>();
+    when(externalView.getPartitionSet()).thenReturn(partitionSet);
+    Map<String, String> partitionStateMap = new HashMap<>();
+    when(externalView.getStateMap(anyString())).thenReturn(partitionStateMap);
+
+    // External view is empty, should return null.
+    Assert.assertNull(controllerLeaderLocator.getControllerLeader(testTable));
+
+    // Adding one host as master, should return the correct host-port pair.
+    partitionSet.add(LeadControllerUtils.generatePartitionName(LeadControllerUtils.getPartitionIdForTable(testTable)));
+    for (int i = 0; i < CommonConstants.Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
+      partitionSet.add(LeadControllerUtils.generatePartitionName(i));
+    }
+    partitionStateMap.put(LeadControllerUtils.generateParticipantInstanceId(leaderHost, leaderPort), "MASTER");
+
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(testTable).getFirst(),
+        expectedLeaderLocation.getFirst());
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(testTable).getSecond(),
+        expectedLeaderLocation.getSecond());
+
+    // The participant host is in offline state, should return null.
+    partitionStateMap.put(LeadControllerUtils.generateParticipantInstanceId(leaderHost, leaderPort), "OFFLINE");
+
+    // The leader is still valid since the leader is just updated within 30 seconds.
+    Assert.assertNotNull(controllerLeaderLocator.getControllerLeader(testTable));
+
+    // Mock the behavior that 40 seconds have passed.
+    ((FakeControllerLeaderLocator) controllerLeaderLocator)
+        .setCurrentTimeMs(controllerLeaderLocator.getCurrentTimeMs() + 40_000L);
+    controllerLeaderLocator.invalidateCachedControllerLeader();
+
+    // No controller in MASTER state, should return null.
+    Assert.assertNull(controllerLeaderLocator.getControllerLeader(testTable));
   }
 
   static class FakeControllerLeaderLocator extends ControllerLeaderLocator {
-    private static ControllerLeaderLocator _instance = null;
+    private static FakeControllerLeaderLocator _instance = null;
+    private long _currentTimeMs;
 
     FakeControllerLeaderLocator(HelixManager helixManager) {
       super(helixManager);
     }
 
     public static void create(HelixManager helixManager) {
-      _instance = new ControllerLeaderLocator(helixManager);
+      _instance = new FakeControllerLeaderLocator(helixManager);
     }
 
-    public static ControllerLeaderLocator getInstance() {
+    public static FakeControllerLeaderLocator getInstance() {
       return _instance;
+    }
+
+    protected long getCurrentTimeMs() {
+      return _currentTimeMs;
+    }
+
+    void setCurrentTimeMs(long currentTimeMs) {
+      _currentTimeMs = currentTimeMs;
     }
   }
 }

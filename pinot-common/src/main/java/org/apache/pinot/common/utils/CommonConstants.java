@@ -28,30 +28,32 @@ public class CommonConstants {
 
   public static class Helix {
     public static final String IS_SHUTDOWN_IN_PROGRESS = "shutdownInProgress";
+    public static final String QUERIES_DISABLED = "queriesDisabled";
 
     public static final String INSTANCE_CONNECTED_METRIC_NAME = "helix.connected";
 
-    public static final String PREFIX_OF_SERVER_INSTANCE = "Server_";
-    public static final String PREFIX_OF_BROKER_INSTANCE = "Broker_";
     public static final String PREFIX_OF_CONTROLLER_INSTANCE = "Controller_";
-
-    public static final String SERVER_INSTANCE_TYPE = "server";
-    public static final String BROKER_INSTANCE_TYPE = "broker";
-    public static final String CONTROLLER_INSTANCE_TYPE = "controller";
+    public static final String PREFIX_OF_BROKER_INSTANCE = "Broker_";
+    public static final String PREFIX_OF_SERVER_INSTANCE = "Server_";
+    public static final String PREFIX_OF_MINION_INSTANCE = "Minion_";
 
     public static final String BROKER_RESOURCE_INSTANCE = "brokerResource";
     public static final String LEAD_CONTROLLER_RESOURCE_NAME = "leadControllerResource";
+
+    public static final String LEAD_CONTROLLER_RESOURCE_ENABLED_KEY = "RESOURCE_ENABLED";
 
     // More information on why these numbers are set can be found in the following doc:
     // https://cwiki.apache.org/confluence/display/PINOT/Controller+Separation+between+Helix+and+Pinot
     public static final int NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE = 24;
     public static final int LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT = 1;
-    public static final boolean ENABLE_DELAY_REBALANCE = true;
     public static final int MIN_ACTIVE_REPLICAS = 0;
-    public static final long REBALANCE_DELAY_MS = 300_000L; // 5 minutes.
+    public static final int REBALANCE_DELAY_MS = 300_000; // 5 minutes.
 
-    public static final String UNTAGGED_SERVER_INSTANCE = "server_untagged";
+    // Instance tags
+    public static final String CONTROLLER_INSTANCE = "controller";
     public static final String UNTAGGED_BROKER_INSTANCE = "broker_untagged";
+    public static final String UNTAGGED_SERVER_INSTANCE = "server_untagged";
+    public static final String UNTAGGED_MINION_INSTANCE = "minion_untagged";
 
     public static class StateModel {
       public static class SegmentOnlineOfflineStateModel {
@@ -93,6 +95,10 @@ public class CommonConstants {
       public static final String ADMIN_PORT_KEY = "adminPort";
     }
 
+    public enum InstanceType {
+      CONTROLLER, BROKER, SERVER, MINION
+    }
+
     public enum TableType {
       OFFLINE, REALTIME;
 
@@ -103,6 +109,7 @@ public class CommonConstants {
         return ServerType.REALTIME;
       }
     }
+    public static final String SET_INSTANCE_ID_TO_HOSTNAME_KEY = "pinot.set.instance.id.to.hostname";
 
     public static final String KEY_OF_SERVER_NETTY_PORT = "pinot.server.netty.port";
     public static final int DEFAULT_SERVER_NETTY_PORT = 8098;
@@ -124,6 +131,9 @@ public class CommonConstants {
     public static final String ROUTING_TABLE_CONFIG_PREFIX = "pinot.broker.routing.table";
     public static final String ACCESS_CONTROL_CONFIG_PREFIX = "pinot.broker.access.control";
     public static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
+    public static final String CONFIG_OF_METRICS_NAME_PREFIX = "pinot.broker.metrics.prefix";
+    public static final String DEFAULT_METRICS_NAME_PREFIX = "pinot.broker.";
+    public static final boolean DEFAULT_METRICS_GLOBAL_ENABLED = false;
 
     public static final String CONFIG_OF_DELAY_SHUTDOWN_TIME_MS = "pinot.broker.delayShutdownTimeMs";
     public static final long DEFAULT_DELAY_SHUTDOWN_TIME_MS = 10_000L;
@@ -159,11 +169,15 @@ public class CommonConstants {
 
     public static class Request {
       public static final String PQL = "pql";
+      public static final String SQL = "sql";
       public static final String TRACE = "trace";
       public static final String DEBUG_OPTIONS = "debugOptions";
+      public static final String QUERY_OPTIONS = "queryOptions";
 
       public static class QueryOptionKey {
         public static final String PRESERVE_TYPE = "preserveType";
+        public static final String RESPONSE_FORMAT = "responseFormat";
+        public static final String GROUP_BY_MODE = "groupByMode";
       }
     }
   }
@@ -273,6 +287,9 @@ public class CommonConstants {
       public static final int DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = 300_000;
       public static final int DEFAULT_OTHER_REQUESTS_TIMEOUT = 10_000;
     }
+
+    public static final String DEFAULT_METRICS_PREFIX = "pinot.server.";
+    public static final boolean DEFAULT_METRICS_GLOBAL_ENABLED = false;
   }
 
   public static class Controller {
@@ -283,16 +300,20 @@ public class CommonConstants {
     public static final String SEGMENT_NAME_HTTP_HEADER = "Pinot-Segment-Name";
     public static final String TABLE_NAME_HTTP_HEADER = "Pinot-Table-Name";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.controller.crypter";
+
+    public static final String CONFIG_OF_CONTROLLER_METRICS_PREFIX = "controller.metrics.prefix";
+    // FYI this is incorrect as it generate metrics named without a dot after pinot.controller part,
+    // but we keep this default for backward compatibility in case someone relies on this format
+    // see Server or Broker class for correct prefix format you should use
+    public static final String DEFAULT_METRICS_PREFIX = "pinot.controller";
   }
 
   public static class Minion {
-    public static final String INSTANCE_PREFIX = "Minion_";
-    public static final String INSTANCE_TYPE = "minion";
-    public static final String UNTAGGED_INSTANCE = "minion_untagged";
-    public static final String METRICS_PREFIX = "pinot.minion.";
+    public static final String CONFIG_OF_METRICS_PREFIX = "pinot.minion.";
     public static final String METADATA_EVENT_OBSERVER_PREFIX = "metadata.event.notifier";
 
     // Config keys
+    public static final String CONFIG_OF_METRICS_PREFIX_KEY = "metricsPrefix";
     public static final String METRICS_REGISTRY_REGISTRATION_LISTENERS_KEY = "metricsRegistryRegistrationListeners";
 
     // Default settings
@@ -306,18 +327,18 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "crypter";
   }
 
-  public static class Metric {
-    public static class Server {
-      public static final String CURRENT_NUMBER_OF_SEGMENTS = "currentNumberOfSegments";
-      public static final String CURRENT_NUMBER_OF_DOCUMENTS = "currentNumberOfDocuments";
-      public static final String NUMBER_OF_DELETED_SEGMENTS = "numberOfDeletedSegments";
-    }
-  }
-
   public static class Segment {
     public static class Realtime {
       public enum Status {
         IN_PROGRESS, DONE
+      }
+
+      /**
+       * During realtime segment completion, the value of this enum decides how  non-winner servers should replace  the completed segment.
+       */
+      public enum CompletionMode {
+        DEFAULT, // default behavior - if the in memory segment in the non-winner server is equivalent to the committed segment, then build and replace, else download
+        DOWNLOAD // non-winner servers always download the segment, never build it
       }
 
       public static final String STATUS = "segment.realtime.status";
@@ -358,6 +379,11 @@ public class CommonConstants {
 
     public enum SegmentType {
       OFFLINE, REALTIME
+    }
+
+    public static class AssignmentStrategy {
+      public static String BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY = "BalanceNumSegmentAssignmentStrategy";
+      public static String REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "ReplicaGroupSegmentAssignmentStrategy";
     }
 
     @Deprecated

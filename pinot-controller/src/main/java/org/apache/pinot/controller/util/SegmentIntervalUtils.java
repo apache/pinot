@@ -20,9 +20,7 @@ package org.apache.pinot.controller.util;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.common.utils.time.TimeUtils;
 import org.joda.time.Duration;
-import org.joda.time.Interval;
 
 
 /**
@@ -31,15 +29,8 @@ import org.joda.time.Interval;
 public class SegmentIntervalUtils {
 
   /**
-   * Checks if the given segment metadata time interval is valid
-   */
-  public static boolean isValidInterval(Interval timeInterval) {
-    return timeInterval != null && TimeUtils.timeValueInValidRange(timeInterval.getStartMillis()) && TimeUtils
-        .timeValueInValidRange(timeInterval.getEndMillis());
-  }
-
-  /**
    * We only want to check missing segments if the table has at least 2 segments and a time column
+   * TODO: Use TimeFieldSpec in Schema
    */
   public static boolean eligibleForMissingSegmentCheck(int numSegments,
       SegmentsValidationAndRetentionConfig validationConfig) {
@@ -48,6 +39,7 @@ public class SegmentIntervalUtils {
 
   /**
    * We only want to check intervals if the table has a time column
+   * TODO: Use TimeFieldSpec in Schema
    */
   public static boolean eligibleForSegmentIntervalCheck(SegmentsValidationAndRetentionConfig validationConfig) {
     return StringUtils.isNotEmpty(validationConfig.getTimeColumnName());

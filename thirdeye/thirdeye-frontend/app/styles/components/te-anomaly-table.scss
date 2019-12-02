@@ -86,6 +86,8 @@
     margin-left: -37px;
     margin-bottom: 0;
     max-width: 280px;
+    overflow: auto;
+
 
     &--left {
       margin-left: -45px;
@@ -98,8 +100,8 @@
     &--smaller {
       margin-left: -2px;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      overflow: auto;
+      text-overflow: initial;
     }
     &--lighter {
       color: app-shade(black, 6);
@@ -120,6 +122,16 @@
     font-size: 13px;
     font-weight: 600;
     margin-left: 5px;
+
+    &--smaller {
+      overflow: auto;
+      text-overflow: initial;
+    }
+  }
+
+  &__current-baseline {
+    font-size: 16px;
+    font-weight: 600;
   }
 
   &__value-label {

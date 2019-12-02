@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.creator.impl.fwd;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -56,10 +57,11 @@ public class SingleValueSortedForwardIndexCreator implements SingleValueForwardI
   public void close()
       throws IOException {
     int cardinality = _maxDocIds.length;
-    for (int i = 0; i < cardinality; i++) {
-      _writer.setInt(i, 0, _minDocIds[i]);
-      _writer.setInt(i, 1, _maxDocIds[i]);
+    try (Closeable closeable = _writer) {
+      for (int i = 0; i < cardinality; i++) {
+        _writer.setInt(i, 0, _minDocIds[i]);
+        _writer.setInt(i, 1, _maxDocIds[i]);
+      }
     }
-    _writer.close();
   }
 }

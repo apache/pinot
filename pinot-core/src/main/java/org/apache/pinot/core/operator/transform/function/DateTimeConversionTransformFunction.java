@@ -20,8 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nonnull;
-import org.apache.pinot.common.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -94,7 +93,7 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(@Nonnull List<TransformFunction> arguments, @Nonnull Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     // Check that there are exactly 4 arguments
     if (arguments.size() != 4) {
       throw new IllegalArgumentException("Exactly 4 arguments are required for DATE_TIME_CONVERT transform function");
@@ -125,7 +124,7 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public long[] transformToLongValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
     if (_resultMetadata == LONG_SV_NO_DICTIONARY_METADATA) {
       if (_longOutputTimes == null) {
         _longOutputTimes = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
@@ -133,10 +132,12 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
 
       int length = projectionBlock.getNumDocs();
       if (_dateTimeTransformer instanceof EpochToEpochTransformer) {
-        ((EpochToEpochTransformer) _dateTimeTransformer)
+        EpochToEpochTransformer dateTimeTransformer = (EpochToEpochTransformer) _dateTimeTransformer;
+        dateTimeTransformer
             .transform(_mainTransformFunction.transformToLongValuesSV(projectionBlock), _longOutputTimes, length);
       } else {
-        ((SDFToEpochTransformer) _dateTimeTransformer)
+        SDFToEpochTransformer dateTimeTransformer = (SDFToEpochTransformer) _dateTimeTransformer;
+        dateTimeTransformer
             .transform(_mainTransformFunction.transformToStringValuesSV(projectionBlock), _longOutputTimes, length);
       }
       return _longOutputTimes;
@@ -146,7 +147,7 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public String[] transformToStringValuesSV(@Nonnull ProjectionBlock projectionBlock) {
+  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     if (_resultMetadata == STRING_SV_NO_DICTIONARY_METADATA) {
       if (_stringOutputTimes == null) {
         _stringOutputTimes = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
@@ -154,10 +155,12 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
 
       int length = projectionBlock.getNumDocs();
       if (_dateTimeTransformer instanceof EpochToSDFTransformer) {
-        ((EpochToSDFTransformer) _dateTimeTransformer)
+        EpochToSDFTransformer dateTimeTransformer = (EpochToSDFTransformer) _dateTimeTransformer;
+        dateTimeTransformer
             .transform(_mainTransformFunction.transformToLongValuesSV(projectionBlock), _stringOutputTimes, length);
       } else {
-        ((SDFToSDFTransformer) _dateTimeTransformer)
+        SDFToSDFTransformer dateTimeTransformer = (SDFToSDFTransformer) _dateTimeTransformer;
+        dateTimeTransformer
             .transform(_mainTransformFunction.transformToStringValuesSV(projectionBlock), _stringOutputTimes, length);
       }
       return _stringOutputTimes;

@@ -20,18 +20,15 @@ package org.apache.pinot.controller.helix.core;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.config.RealtimeTagConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.retry.RetryPolicies;
@@ -73,28 +70,6 @@ public class PinotTableIdealStateBuilder {
     return idealState;
   }
 
-  /**
-   *
-   * Building an empty idealState for a given table.
-   * Used when creating a new table.
-   *
-   * @param helixAdmin
-   * @param helixClusterName
-   * @return
-   */
-  public static IdealState buildEmptyIdealStateForBrokerResource(HelixAdmin helixAdmin, String helixClusterName,
-      boolean enableBatchMessageMode) {
-    final CustomModeISBuilder customModeIdealStateBuilder =
-        new CustomModeISBuilder(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    customModeIdealStateBuilder.setStateModel(
-        PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.PINOT_BROKER_RESOURCE_ONLINE_OFFLINE_STATE_MODEL)
-        .setMaxPartitionsPerNode(Integer.MAX_VALUE).setNumReplica(Integer.MAX_VALUE)
-        .setNumPartitions(Integer.MAX_VALUE);
-    final IdealState idealState = customModeIdealStateBuilder.build();
-    idealState.setBatchMessageMode(enableBatchMessageMode);
-    return idealState;
-  }
-
   public static IdealState addNewRealtimeSegmentToIdealState(String segmentId, IdealState state, String instanceName) {
     state.setPartitionState(segmentId, instanceName, ONLINE);
     state.setNumPartitions(state.getNumPartitions() + 1);
@@ -104,9 +79,8 @@ public class PinotTableIdealStateBuilder {
   public static IdealState buildInitialHighLevelRealtimeIdealStateFor(String realtimeTableName,
       TableConfig realtimeTableConfig, HelixManager helixManager, ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore,
       boolean enableBatchMessageMode) {
-    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(realtimeTableConfig);
-    final List<String> realtimeInstances =
-        HelixHelper.getInstancesWithTag(helixManager, realtimeTagConfig.getConsumingServerTag());
+    List<String> realtimeInstances = HelixHelper.getInstancesWithTag(helixManager,
+        TagNameUtils.extractConsumingServerTag(realtimeTableConfig.getTenantConfig()));
     IdealState idealState = buildEmptyRealtimeIdealStateFor(realtimeTableName, 1, enableBatchMessageMode);
     if (realtimeInstances.size() % Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()) != 0) {
       throw new RuntimeException(
@@ -137,11 +111,7 @@ public class PinotTableIdealStateBuilder {
     if (idealState == null) {
       idealState = buildEmptyRealtimeIdealStateFor(realtimeTableName, nReplicas, enableBatchMessageMode);
     }
-    try {
-      pinotLLCRealtimeSegmentManager.setupNewTable(realtimeTableConfig, idealState);
-    } catch (InvalidConfigException e) {
-      throw new IllegalStateException("Caught exception when creating table " + realtimeTableName, e);
-    }
+    pinotLLCRealtimeSegmentManager.setUpNewTable(realtimeTableConfig, idealState);
   }
 
   public static int getPartitionCount(StreamConfig streamConfig) {
@@ -200,7 +170,7 @@ public class PinotTableIdealStateBuilder {
 
   private static String getGroupIdFromRealtimeDataTable(String realtimeTableName, Map<String, String> streamConfigMap) {
     String groupId = StringUtil.join("_", realtimeTableName, System.currentTimeMillis() + "");
-    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+    StreamConfig streamConfig = new StreamConfig(realtimeTableName, streamConfigMap);
     String streamConfigGroupId = streamConfig.getGroupId();
     if (streamConfigGroupId != null && !streamConfigGroupId.isEmpty()) {
       groupId = streamConfigGroupId;

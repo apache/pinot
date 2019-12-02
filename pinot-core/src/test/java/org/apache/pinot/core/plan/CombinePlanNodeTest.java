@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import junit.framework.Assert;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -71,6 +73,8 @@ public class CombinePlanNodeTest {
   public void testSlowPlanNode() {
     // Warning: this test is slow (take 10 seconds).
 
+    AtomicBoolean notInterrupted = new AtomicBoolean();
+
     List<PlanNode> planNodes = new ArrayList<>();
     for (int i = 0; i < 20; i++) {
       planNodes.add(new PlanNode() {
@@ -79,8 +83,10 @@ public class CombinePlanNodeTest {
           try {
             Thread.sleep(20000);
           } catch (InterruptedException e) {
-            // Ignored.
+            // Thread should be interrupted
+            throw new RuntimeException(e);
           }
+          notInterrupted.set(true);
           return null;
         }
 
@@ -94,7 +100,8 @@ public class CombinePlanNodeTest {
     try {
       combinePlanNode.run();
     } catch (RuntimeException e) {
-      Assert.assertEquals(e.getCause().toString(), "java.util.concurrent.TimeoutException");
+      Assert.assertTrue(e.getCause() instanceof TimeoutException);
+      Assert.assertFalse(notInterrupted.get());
       return;
     }
     // Fail.

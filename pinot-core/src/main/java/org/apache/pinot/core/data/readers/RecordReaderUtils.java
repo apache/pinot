@@ -29,17 +29,17 @@ import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import javax.annotation.Nullable;
 import org.apache.avro.generic.GenericData;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.FieldSpec.DataType;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.data.TimeFieldSpec;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 public class RecordReaderUtils {
@@ -111,9 +111,7 @@ public class RecordReaderUtils {
    */
   public static Object convertSingleValue(FieldSpec fieldSpec, @Nullable Object value) {
     if (value == null) {
-      // Do not allow default value for time column
-      assert fieldSpec.getFieldType() != FieldSpec.FieldType.TIME;
-      return fieldSpec.getDefaultNullValue();
+      return null;
     }
     if (value instanceof GenericData.Record) {
       return convertSingleValue(fieldSpec, ((GenericData.Record) value).get(0));
@@ -160,14 +158,12 @@ public class RecordReaderUtils {
    */
   public static Object convertSingleValue(FieldSpec fieldSpec, @Nullable String stringValue) {
     if (stringValue == null) {
-      // Do not allow default value for time column
-      assert fieldSpec.getFieldType() != FieldSpec.FieldType.TIME;
-      return fieldSpec.getDefaultNullValue();
+      return null;
     }
     DataType dataType = fieldSpec.getDataType();
     // Treat empty string as null for data types other than STRING
     if (stringValue.isEmpty() && dataType != DataType.STRING) {
-      return fieldSpec.getDefaultNullValue();
+      return null;
     }
     switch (dataType) {
       case INT:
@@ -180,6 +176,8 @@ public class RecordReaderUtils {
         return Double.parseDouble(stringValue);
       case STRING:
         return stringValue;
+      case BYTES:
+        return BytesUtils.toBytes(stringValue);
       default:
         throw new IllegalStateException("Illegal data type: " + dataType);
     }
@@ -190,15 +188,24 @@ public class RecordReaderUtils {
    */
   public static Object convertMultiValue(FieldSpec fieldSpec, @Nullable Collection values) {
     if (values == null || values.isEmpty()) {
-      return new Object[]{fieldSpec.getDefaultNullValue()};
+      return null;
     } else {
       int numValues = values.size();
       Object[] array = new Object[numValues];
       int index = 0;
       for (Object value : values) {
-        array[index++] = convertSingleValue(fieldSpec, value);
+        Object convertedValue = convertSingleValue(fieldSpec, value);
+        if (convertedValue != null) {
+          array[index++] = convertedValue;
+        }
       }
-      return array;
+      if (index == numValues) {
+        return array;
+      } else if (index == 0) {
+        return null;
+      } else {
+        return Arrays.copyOf(array, index);
+      }
     }
   }
 
@@ -207,21 +214,24 @@ public class RecordReaderUtils {
    */
   public static Object convertMultiValue(FieldSpec fieldSpec, @Nullable String[] stringValues) {
     if (stringValues == null || stringValues.length == 0) {
-      return new Object[]{fieldSpec.getDefaultNullValue()};
+      return null;
     } else {
       int numValues = stringValues.length;
       Object[] array = new Object[numValues];
-      for (int i = 0; i < numValues; i++) {
-        array[i] = convertSingleValue(fieldSpec, stringValues[i]);
+      int index = 0;
+      for (String stringValue : stringValues) {
+        Object convertedValue = convertSingleValue(fieldSpec, stringValue);
+        if (convertedValue != null) {
+          array[index++] = convertedValue;
+        }
       }
-      return array;
-    }
-  }
-
-  public static void copyRow(GenericRow source, GenericRow destination) {
-    destination.clear();
-    for (Map.Entry<String, Object> entry : source.getEntrySet()) {
-      destination.putField(entry.getKey(), entry.getValue());
+      if (index == numValues) {
+        return array;
+      } else if (index == 0) {
+        return null;
+      } else {
+        return Arrays.copyOf(array, index);
+      }
     }
   }
 }

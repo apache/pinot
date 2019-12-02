@@ -1,0 +1,20 @@
+
+# please use at most one cache at a time, either the in-memory cache or the centralized cache.
+useInMemoryCache: true
+useCentralizedCache: false
+
+centralizedCacheSettings:
+  # TTL (time-to-live) for documents in seconds
+  ttl: 3600
+  # if inserting data points individually, max number of threads to spawn to parallel insert at a time
+  maxParallelInserts: 10
+  # which store to use
+  cacheDataStoreName: couchbase
+  cacheDataSources:
+    couchbase:
+      # host can just be localhost if you're using this locally.
+      host: your_host
+      authUsername: your_username
+      authPassword: your_password
+      bucketName: your_bucket_name
+    # add your store of choice here

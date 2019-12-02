@@ -20,8 +20,8 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.util.Arrays;
-import javax.annotation.Nonnull;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
@@ -38,38 +38,33 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
     _percentile = percentile;
   }
 
-  @Nonnull
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.PERCENTILE;
   }
 
-  @Nonnull
   @Override
-  public String getColumnName(@Nonnull String column) {
+  public String getColumnName(String column) {
     return AggregationFunctionType.PERCENTILE.getName() + _percentile + "_" + column;
   }
 
   @Override
-  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+  public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
 
-  @Nonnull
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
     return new ObjectAggregationResultHolder();
   }
 
-  @Nonnull
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
     return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
   }
 
   @Override
-  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull BlockValSet... blockValSets) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
     DoubleArrayList valueList = getValueList(aggregationResultHolder);
     double[] valueArray = blockValSets[0].getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
@@ -78,8 +73,8 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
   }
 
   @Override
-  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     double[] valueArray = blockValSets[0].getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
@@ -88,8 +83,8 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
   }
 
   @Override
-  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     double[] valueArray = blockValSets[0].getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
@@ -100,9 +95,8 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
     }
   }
 
-  @Nonnull
   @Override
-  public DoubleArrayList extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+  public DoubleArrayList extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     DoubleArrayList doubleArrayList = aggregationResultHolder.getResult();
     if (doubleArrayList == null) {
       return new DoubleArrayList();
@@ -111,9 +105,8 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
     }
   }
 
-  @Nonnull
   @Override
-  public DoubleArrayList extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+  public DoubleArrayList extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     DoubleArrayList doubleArrayList = groupByResultHolder.getResult(groupKey);
     if (doubleArrayList == null) {
       return new DoubleArrayList();
@@ -122,10 +115,8 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
     }
   }
 
-  @Nonnull
   @Override
-  public DoubleArrayList merge(@Nonnull DoubleArrayList intermediateResult1,
-      @Nonnull DoubleArrayList intermediateResult2) {
+  public DoubleArrayList merge(DoubleArrayList intermediateResult1, DoubleArrayList intermediateResult2) {
     intermediateResult1.addAll(intermediateResult2);
     return intermediateResult1;
   }
@@ -135,15 +126,18 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
     return false;
   }
 
-  @Nonnull
   @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.OBJECT;
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.OBJECT;
   }
 
-  @Nonnull
   @Override
-  public Double extractFinalResult(@Nonnull DoubleArrayList intermediateResult) {
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.DOUBLE;
+  }
+
+  @Override
+  public Double extractFinalResult(DoubleArrayList intermediateResult) {
     int size = intermediateResult.size();
     if (size == 0) {
       return DEFAULT_FINAL_RESULT;
@@ -164,7 +158,7 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
    * @param aggregationResultHolder Result holder
    * @return Value list from the result holder
    */
-  protected static DoubleArrayList getValueList(@Nonnull AggregationResultHolder aggregationResultHolder) {
+  protected static DoubleArrayList getValueList(AggregationResultHolder aggregationResultHolder) {
     DoubleArrayList valueList = aggregationResultHolder.getResult();
     if (valueList == null) {
       valueList = new DoubleArrayList();
@@ -180,7 +174,7 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
    * @param groupKey Group key for which to return the value list
    * @return Value list for the group key
    */
-  protected static DoubleArrayList getValueList(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+  protected static DoubleArrayList getValueList(GroupByResultHolder groupByResultHolder, int groupKey) {
     DoubleArrayList valueList = groupByResultHolder.getResult(groupKey);
     if (valueList == null) {
       valueList = new DoubleArrayList();

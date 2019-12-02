@@ -21,12 +21,10 @@ package org.apache.pinot.core.segment.creator.impl.stats;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.avro.reflect.Nullable;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
 
 
 /**
@@ -70,8 +68,6 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
     } else {
       _partitions = null;
     }
-    addressNull(previousValue, fieldSpec.getDataType());
-    previousValue = null;
   }
 
   public int getMaxNumberOfMultiValues() {
@@ -130,25 +126,6 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
   }
 
   public abstract void seal();
-
-  Object addressNull(Object entry, DataType e) {
-    if (entry == null) {
-      if (e == DataType.STRING) {
-        entry = V1Constants.Str.NULL_STRING;
-      } else if (e == DataType.BOOLEAN) {
-        entry = V1Constants.Str.NULL_BOOLEAN;
-      } else if (e == DataType.DOUBLE) {
-        entry = V1Constants.Numbers.NULL_DOUBLE;
-      } else if (e == DataType.FLOAT) {
-        entry = V1Constants.Numbers.NULL_FLOAT;
-      } else if (e == DataType.LONG) {
-        entry = V1Constants.Numbers.NULL_LONG;
-      } else if (e == DataType.INT) {
-        entry = V1Constants.Numbers.NULL_INT;
-      }
-    }
-    return entry;
-  }
 
   /**
    * Returns the {@link PartitionFunction} for the column.

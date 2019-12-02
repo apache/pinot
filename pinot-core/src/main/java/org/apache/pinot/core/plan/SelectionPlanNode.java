@@ -25,7 +25,7 @@ import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,38 +38,25 @@ public class SelectionPlanNode implements PlanNode {
 
   private final IndexSegment _indexSegment;
   private final Selection _selection;
-  private final ProjectionPlanNode _projectionPlanNode;
+  private final TransformPlanNode _transformPlanNode;
 
   public SelectionPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     _indexSegment = indexSegment;
     _selection = brokerRequest.getSelections();
-
-    if (_selection.getSize() > 0) {
-      int maxDocPerNextCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
-
-      // No ordering required, select minimum number of documents
-      if (!_selection.isSetSelectionSortSequence()) {
-        maxDocPerNextCall = Math.min(_selection.getOffset() + _selection.getSize(), maxDocPerNextCall);
-      }
-
-      DocIdSetPlanNode docIdSetPlanNode = new DocIdSetPlanNode(_indexSegment, brokerRequest, maxDocPerNextCall);
-      _projectionPlanNode = new ProjectionPlanNode(_indexSegment,
-          SelectionOperatorUtils.extractSelectionRelatedColumns(_selection, indexSegment), docIdSetPlanNode);
-    } else {
-      _projectionPlanNode = null;
-    }
+    _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest);
   }
 
   @Override
   public Operator run() {
+    TransformOperator transformOperator = _transformPlanNode.run();
     if (_selection.getSize() > 0) {
-      if (_selection.isSetSelectionSortSequence()) {
-        return new SelectionOrderByOperator(_indexSegment, _selection, _projectionPlanNode.run());
+      if (_selection.getSelectionSortSequence() == null) {
+        return new SelectionOnlyOperator(_indexSegment, _selection, transformOperator);
       } else {
-        return new SelectionOnlyOperator(_indexSegment, _selection, _projectionPlanNode.run());
+        return new SelectionOrderByOperator(_indexSegment, _selection, transformOperator);
       }
     } else {
-      return new EmptySelectionOperator(_indexSegment, _selection);
+      return new EmptySelectionOperator(_indexSegment, _selection, transformOperator);
     }
   }
 
@@ -87,9 +74,7 @@ public class SelectionPlanNode implements PlanNode {
     }
     LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
     LOGGER.debug(prefix + "Argument 1: Selections - " + _selection);
-    if (_selection.getSize() > 0) {
-      LOGGER.debug(prefix + "Argument 2: Projection -");
-      _projectionPlanNode.showTree(prefix + "    ");
-    }
+    LOGGER.debug(prefix + "Argument 2: Transform -");
+    _transformPlanNode.showTree(prefix + "    ");
   }
 }

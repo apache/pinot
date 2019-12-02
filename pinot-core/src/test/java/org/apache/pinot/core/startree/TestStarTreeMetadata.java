@@ -20,14 +20,12 @@ package org.apache.pinot.core.startree;
 
 import java.io.File;
 import java.util.Arrays;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.segment.StarTreeMetadata;
-import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
@@ -40,24 +38,18 @@ import org.testng.annotations.Test;
 
 
 public class TestStarTreeMetadata {
-  private final String AVRO_DATA = "data/test_sample_data.avro";
+  private static final String AVRO_DATA = "data/test_sample_data.avro";
   private static final int MAX_LEAF_RECORDS = 99;
 
   private static final int SKIP_CARDINALITY_THRESHOLD = 99999;
-  private static final List<String> DIMENSIONS_SPLIT_ORDER = Arrays.asList(new String[]{"column3", "column4"});
-
-  private static final Set<String> SKIP_STAR_NODE_CREATION_DIMENSTIONS =
-      new HashSet<String>(Arrays.asList(new String[]{"column9"}));
-
-  private static final Set<String> SKIP_MATERIALIZATION_DIMENSIONS =
-      new HashSet<String>(Arrays.asList(new String[]{"column11"}));
-
+  private static final List<String> DIMENSIONS_SPLIT_ORDER = Arrays.asList("column3", "column4");
+  private static final Set<String> SKIP_STAR_NODE_CREATION_DIMENSIONS = Collections.singleton("column9");
+  private static final Set<String> SKIP_MATERIALIZATION_DIMENSIONS = Collections.singleton("column11");
   private static final String TABLE_NAME = "starTreeTable";
   private static final String SEGMENT_NAME = "starTreeSegment";
 
   private static final String INDEX_DIR_NAME = FileUtils.getTempDirectory() + File.separator + "starTreeMetaData";
   private static File INDEX_DIR = new File(INDEX_DIR_NAME);
-  public static IndexSegment _indexSegment;
 
   /**
    * Build the StarTree segment
@@ -82,9 +74,8 @@ public class TestStarTreeMetadata {
       FileUtils.deleteQuietly(segmentDir);
     }
 
-    final SegmentGeneratorConfig config = SegmentTestUtils
-        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir, "time_day", TimeUnit.DAYS,
-            TABLE_NAME);
+    final SegmentGeneratorConfig config =
+        SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(new File(filePath), segmentDir, TABLE_NAME);
 
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
@@ -92,7 +83,7 @@ public class TestStarTreeMetadata {
     starTreeIndexSpec.setDimensionsSplitOrder(DIMENSIONS_SPLIT_ORDER);
     starTreeIndexSpec.setMaxLeafRecords(MAX_LEAF_RECORDS);
     starTreeIndexSpec.setSkipMaterializationCardinalityThreshold(SKIP_CARDINALITY_THRESHOLD);
-    starTreeIndexSpec.setSkipStarNodeCreationForDimensions(SKIP_STAR_NODE_CREATION_DIMENSTIONS);
+    starTreeIndexSpec.setSkipStarNodeCreationForDimensions(SKIP_STAR_NODE_CREATION_DIMENSIONS);
     starTreeIndexSpec.setSkipMaterializationForDimensions(SKIP_MATERIALIZATION_DIMENSIONS);
 
     config.enableStarTreeIndex(starTreeIndexSpec);
@@ -118,7 +109,7 @@ public class TestStarTreeMetadata {
     Assert.assertEquals(starTreeMetadata.getDimensionsSplitOrder(), DIMENSIONS_SPLIT_ORDER);
     Assert.assertEquals(starTreeMetadata.getMaxLeafRecords(), MAX_LEAF_RECORDS);
 
-    Assert.assertEquals(starTreeMetadata.getSkipStarNodeCreationForDimensions(), SKIP_STAR_NODE_CREATION_DIMENSTIONS);
+    Assert.assertEquals(starTreeMetadata.getSkipStarNodeCreationForDimensions(), SKIP_STAR_NODE_CREATION_DIMENSIONS);
     Assert.assertEquals(starTreeMetadata.getSkipMaterializationCardinality(), SKIP_CARDINALITY_THRESHOLD);
     Assert.assertEquals(starTreeMetadata.getSkipMaterializationForDimensions(), SKIP_MATERIALIZATION_DIMENSIONS);
   }

@@ -20,23 +20,31 @@ package org.apache.pinot.common.metrics;
 
 import com.yammer.metrics.core.MetricsRegistry;
 
+import static org.apache.pinot.common.utils.CommonConstants.Broker.DEFAULT_METRICS_GLOBAL_ENABLED;
+import static org.apache.pinot.common.utils.CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX;
+
 
 /**
  * Broker metrics utility class, which provides facilities to log the execution performance of queries.
  *
  */
 public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter, BrokerGauge, BrokerTimer> {
+
   /**
    * Constructs the broker metrics.
    *
    * @param metricsRegistry The metric registry used to register timers and meters.
    */
   public BrokerMetrics(MetricsRegistry metricsRegistry) {
-    super("pinot.broker.", metricsRegistry, BrokerMetrics.class);
+    this(metricsRegistry, DEFAULT_METRICS_GLOBAL_ENABLED);
   }
 
   public BrokerMetrics(MetricsRegistry metricsRegistry, boolean global) {
-    super("pinot.broker.", metricsRegistry, BrokerMetrics.class, global);
+    this(DEFAULT_METRICS_NAME_PREFIX, metricsRegistry, global);
+  }
+
+  public BrokerMetrics(String prefix, MetricsRegistry metricsRegistry, boolean global) {
+    super(prefix, metricsRegistry, BrokerMetrics.class, global);
   }
 
   @Override

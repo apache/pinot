@@ -121,7 +121,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
             PosixFilePermission.OTHERS_READ, PosixFilePermission.OTHERS_EXECUTE);
     try {
       Files.setPosixFilePermissions(v3Directory.toPath(), permissions);
-    } catch(UnsupportedOperationException ex) {
+    } catch (UnsupportedOperationException ex) {
       LOGGER.error("unsupported non-posix filesystem permissions setting");
     }
   }
@@ -143,6 +143,9 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
             copyDictionary(v2DataReader, v3DataWriter, column);
           }
           copyForwardIndex(v2DataReader, v3DataWriter, column);
+          if (v2DataReader.hasIndexFor(column, ColumnIndexType.NULLVALUE_VECTOR)) {
+            copyNullValueVector(v2DataReader, v3DataWriter, column);
+          }
         }
 
         // inverted indexes are intentionally stored at the end of the single file
@@ -189,6 +192,11 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     readCopyBuffers(reader, writer, column, ColumnIndexType.FORWARD_INDEX);
   }
 
+  private void copyNullValueVector(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column)
+      throws IOException {
+    readCopyBuffers(reader, writer, column, ColumnIndexType.NULLVALUE_VECTOR);
+  }
+
   private void copyExistingInvertedIndex(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column)
       throws IOException {
     if (reader.hasIndexFor(column, ColumnIndexType.INVERTED_INDEX)) {
@@ -200,8 +208,9 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
       ColumnIndexType indexType)
       throws IOException {
     PinotDataBuffer oldBuffer = reader.getIndexFor(column, indexType);
-    PinotDataBuffer newDictBuffer = writer.newIndexFor(column, indexType, oldBuffer.size());
-    oldBuffer.copyTo(0, newDictBuffer, 0, oldBuffer.size());
+    long oldBufferSize = oldBuffer.size();
+    PinotDataBuffer newBuffer = writer.newIndexFor(column, indexType, oldBufferSize);
+    oldBuffer.copyTo(0, newBuffer, 0, oldBufferSize);
   }
 
   private void createMetadataFile(File currentDir, File v3Dir)

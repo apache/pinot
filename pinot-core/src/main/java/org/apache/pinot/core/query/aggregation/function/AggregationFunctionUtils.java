@@ -22,13 +22,15 @@ import com.google.common.math.DoubleMath;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Locale;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.core.plan.AggregationFunctionInitializer;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 
 
 /**
@@ -38,44 +40,57 @@ public class AggregationFunctionUtils {
   private AggregationFunctionUtils() {
   }
 
-  public static final String COLUMN_KEY = "column";
+  public static final String COLUMN_KEY = FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO;
 
   /**
    * Extracts the aggregation column (could be column name or UDF expression) from the {@link AggregationInfo}.
    */
-  @Nonnull
-  public static String getColumn(@Nonnull AggregationInfo aggregationInfo) {
+  public static String getColumn(AggregationInfo aggregationInfo) {
     return aggregationInfo.getAggregationParams().get(COLUMN_KEY);
+  }
+
+  public static String getAggregationColumnName(AggregationInfo aggregationInfo) {
+    return aggregationInfo.getAggregationType().toLowerCase() + "(" + AggregationFunctionUtils.getColumn(aggregationInfo)
+        + ")";
   }
 
   /**
    * Creates an {@link AggregationFunctionColumnPair} from the {@link AggregationInfo}.
    */
-  @Nonnull
-  public static AggregationFunctionColumnPair getFunctionColumnPair(@Nonnull AggregationInfo aggregationInfo) {
+  public static AggregationFunctionColumnPair getFunctionColumnPair(AggregationInfo aggregationInfo) {
     AggregationFunctionType functionType =
         AggregationFunctionType.getAggregationFunctionType(aggregationInfo.getAggregationType());
     return new AggregationFunctionColumnPair(functionType, getColumn(aggregationInfo));
   }
 
+  public static boolean isDistinct(AggregationFunctionContext[] functionContexts) {
+    return functionContexts.length == 1
+        && functionContexts[0].getAggregationFunction().getType() == AggregationFunctionType.DISTINCT;
+  }
+
   /**
    * Creates an {@link AggregationFunctionContext} from the {@link AggregationInfo}.
    */
-  @Nonnull
-  public static AggregationFunctionContext getAggregationFunctionContext(@Nonnull AggregationInfo aggregationInfo) {
-    String functionName = aggregationInfo.getAggregationType();
-    AggregationFunction aggregationFunction = AggregationFunctionFactory.getAggregationFunction(functionName);
-    return new AggregationFunctionContext(aggregationFunction, AggregationFunctionUtils.getColumn(aggregationInfo));
+  public static AggregationFunctionContext getAggregationFunctionContext(AggregationInfo aggregationInfo) {
+    return getAggregationFunctionContext(aggregationInfo, null);
   }
 
-  @Nonnull
-  public static AggregationFunctionContext[] getAggregationFunctionContexts(
-      @Nonnull List<AggregationInfo> aggregationInfos, @Nullable SegmentMetadata segmentMetadata) {
+  public static AggregationFunctionContext getAggregationFunctionContext(AggregationInfo aggregationInfo,
+      @Nullable BrokerRequest brokerRequest) {
+    String column = getColumn(aggregationInfo);
+    AggregationFunction aggregationFunction =
+        AggregationFunctionFactory.getAggregationFunction(aggregationInfo, brokerRequest);
+    return new AggregationFunctionContext(aggregationFunction, column);
+  }
+
+  public static AggregationFunctionContext[] getAggregationFunctionContexts(BrokerRequest brokerRequest,
+      @Nullable SegmentMetadata segmentMetadata) {
+    List<AggregationInfo> aggregationInfos = brokerRequest.getAggregationsInfo();
     int numAggregationFunctions = aggregationInfos.size();
     AggregationFunctionContext[] aggregationFunctionContexts = new AggregationFunctionContext[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationInfo aggregationInfo = aggregationInfos.get(i);
-      aggregationFunctionContexts[i] = getAggregationFunctionContext(aggregationInfo);
+      aggregationFunctionContexts[i] = getAggregationFunctionContext(aggregationInfo, brokerRequest);
     }
     if (segmentMetadata != null) {
       AggregationFunctionInitializer aggregationFunctionInitializer =
@@ -87,19 +102,18 @@ public class AggregationFunctionUtils {
     return aggregationFunctionContexts;
   }
 
-  @Nonnull
-  public static AggregationFunction[] getAggregationFunctions(@Nonnull List<AggregationInfo> aggregationInfos) {
+  public static AggregationFunction[] getAggregationFunctions(BrokerRequest brokerRequest) {
+    List<AggregationInfo> aggregationInfos = brokerRequest.getAggregationsInfo();
     int numAggregationFunctions = aggregationInfos.size();
     AggregationFunction[] aggregationFunctions = new AggregationFunction[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       aggregationFunctions[i] =
-          AggregationFunctionFactory.getAggregationFunction(aggregationInfos.get(i).getAggregationType());
+          AggregationFunctionFactory.getAggregationFunction(aggregationInfos.get(i), brokerRequest);
     }
     return aggregationFunctions;
   }
 
-  @Nonnull
-  public static boolean[] getAggregationFunctionsSelectStatus(@Nonnull List<AggregationInfo> aggregationInfos) {
+  public static boolean[] getAggregationFunctionsSelectStatus(List<AggregationInfo> aggregationInfos) {
     int numAggregationFunctions = aggregationInfos.size();
     boolean[] aggregationFunctionsStatus = new boolean[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
@@ -108,15 +122,14 @@ public class AggregationFunctionUtils {
     return aggregationFunctionsStatus;
   }
 
-  @Nonnull
-  public static String formatValue(@Nonnull Object value) {
+  public static String formatValue(Object value) {
     if (value instanceof Double) {
       Double doubleValue = (Double) value;
 
       // String.format is very expensive, so avoid it for whole numbers that can fit in Long.
       // We simply append ".00000" to long, in order to keep the existing behavior.
       if (doubleValue <= Long.MAX_VALUE && DoubleMath.isMathematicalInteger(doubleValue)) {
-        return Long.toString(doubleValue.longValue()) + ".00000";
+        return doubleValue.longValue() + ".00000";
       } else {
         return String.format(Locale.US, "%1.5f", doubleValue);
       }
@@ -125,8 +138,7 @@ public class AggregationFunctionUtils {
     }
   }
 
-  @Nonnull
-  public static Serializable getSerializableValue(@Nonnull Object value) {
+  public static Serializable getSerializableValue(Object value) {
     if (value instanceof Number) {
       return (Number) value;
     } else {

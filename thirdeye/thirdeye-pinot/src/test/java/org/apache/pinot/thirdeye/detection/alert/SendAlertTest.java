@@ -51,9 +51,6 @@ import org.testng.annotations.Test;
 
 public class SendAlertTest {
   private static final String PROP_CLASS_NAME = "className";
-  private static final String PROP_RECIPIENTS = "recipients";
-  private static final String PROP_TO = "to";
-  private static final Set<String> PROP_RECIPIENTS_VALUE = new HashSet<>(Arrays.asList("test1@test.test", "test2@test.test"));
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   private static final String FROM_ADDRESS_VALUE = "test3@test.test";
   private static final String ALERT_NAME_VALUE = "alert_name";
@@ -112,14 +109,11 @@ public class SendAlertTest {
     this.alertConfigDTO = new DetectionAlertConfigDTO();
     Map<String, Object> properties = new HashMap<>();
     properties.put(PROP_CLASS_NAME, "org.apache.pinot.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
-    Map<String, Set<String>> recipients = new HashMap<>();
-    recipients.put(PROP_TO, PROP_RECIPIENTS_VALUE);
-    properties.put(PROP_RECIPIENTS, recipients);
     properties.put(PROP_DETECTION_CONFIG_IDS, Collections.singletonList(this.detectionConfigId));
 
     Map<String, Object> emailScheme = new HashMap<>();
     emailScheme.put("className", "org.apache.pinot.thirdeye.detection.alert.scheme.RandomAlerter");
-    this.alertConfigDTO.setAlertSchemes(Collections.singletonMap("EmailScheme", emailScheme));
+    this.alertConfigDTO.setAlertSchemes(Collections.singletonMap("emailScheme", emailScheme));
     this.alertConfigDTO.setProperties(properties);
     this.alertConfigDTO.setFrom(FROM_ADDRESS_VALUE);
     this.alertConfigDTO.setName(ALERT_NAME_VALUE);
@@ -172,6 +166,4 @@ public class SendAlertTest {
     DetectionAlertConfigDTO alert = alertConfigDAO.findById(this.alertConfigId);
     Assert.assertEquals((long) alert.getVectorClocks().get(this.detectionConfigId), 2000L);
   }
-
-
 }

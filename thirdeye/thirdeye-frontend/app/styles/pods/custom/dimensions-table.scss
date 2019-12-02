@@ -49,12 +49,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 164px;
-
-    &--first {
-      margin-left: 10px;
-      line-height: 14px;
-      display: inline-block;
-    }
+  }
+  &__dimension-content--first {
+    margin-left: 10px;
+    line-height: 14px;
+    display: inline-block;
+    overflow: auto !important;
+    text-overflow: initial !important;
   }
   &__header {
     border: 1px solid #ddd;

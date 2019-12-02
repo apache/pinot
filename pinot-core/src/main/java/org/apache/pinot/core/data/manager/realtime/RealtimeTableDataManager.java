@@ -28,15 +28,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
@@ -48,13 +46,11 @@ import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
-
-import static org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSchema;
+import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 
 
 @ThreadSafe
@@ -89,7 +85,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   @Override
   protected void doInit() {
-    _leaseExtender = SegmentBuildTimeLeaseExtender.create(_instanceId, _serverMetrics);
+    _leaseExtender = SegmentBuildTimeLeaseExtender.create(_instanceId, _serverMetrics, _tableNameWithType);
 
     File statsFile = new File(_tableDataDir, STATS_FILE_NAME);
     try {
@@ -180,12 +176,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     return consumerDir.getAbsolutePath();
   }
 
-  public void notifySegmentCommitted(String tableNameWithType, RealtimeSegmentZKMetadata metadata,
-      ImmutableSegment segment) {
-    ZKMetadataProvider.setRealtimeSegmentZKMetadata(_propertyStore, tableNameWithType, metadata);
-    addSegment(segment);
-  }
-
   /*
    * This call comes in one of two ways:
    * For HL Segments:
@@ -202,12 +192,20 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    *   to start consuming or download the segment.
    */
   @Override
-  public void addSegment(@Nonnull String segmentName, @Nonnull TableConfig tableConfig,
-      @Nonnull IndexLoadingConfig indexLoadingConfig)
+  public void addSegment(String segmentName, TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
+    SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
+    if (segmentDataManager != null) {
+      _logger.warn("Skipping adding existing segment: {} for table: {} with data manager class: {}", segmentName,
+          _tableNameWithType, segmentDataManager.getClass().getSimpleName());
+      return;
+    }
+
     RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
         ZKMetadataProvider.getRealtimeSegmentZKMetadata(_propertyStore, _tableNameWithType, segmentName);
     Preconditions.checkNotNull(realtimeSegmentZKMetadata);
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    Preconditions.checkNotNull(schema);
 
     File indexDir = new File(_indexDir, segmentName);
     // Restart during segment reload might leave segment in inconsistent state (index directory might not exist but
@@ -216,35 +214,19 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     LoaderUtils.reloadFailureRecovery(indexDir);
 
     if (indexDir.exists() && (realtimeSegmentZKMetadata.getStatus() == Status.DONE)) {
-      // segment already exists on file, and we have committed the realtime segment in ZK. Treat it like an offline segment
-      SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
-      if (segmentDataManager != null) {
-        _logger.warn("Got reload for segment already on disk {} table {}, have {}", segmentName, _tableNameWithType,
-            segmentDataManager.getClass().getSimpleName());
-        return;
-      }
+      // Segment already exists on disk, and metadata has been committed. Treat it like an offline segment
 
-      ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
-      addSegment(segment);
+      addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
     } else {
       // Either we don't have the segment on disk or we have not committed in ZK. We should be starting the consumer
       // for realtime segment here. If we wrote it on disk but could not get to commit to zk yet, we should replace the
       // on-disk segment next time
-      SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
-      if (segmentDataManager != null) {
-        _logger.warn("Got reload for segment not on disk {} table {}, have {}", segmentName, _tableNameWithType,
-            segmentDataManager.getClass().getSimpleName());
-        return;
-      }
 
-      Schema schema = ZKMetadataProvider
-          .getTableSchema(_propertyStore, TableNameBuilder.REALTIME.tableNameWithType(_tableNameWithType));
-      Preconditions.checkNotNull(schema);
       if (!isValid(schema, tableConfig.getIndexingConfig())) {
         _logger.error("Not adding segment {}", segmentName);
         throw new RuntimeException("Mismatching schema/table config for " + _tableNameWithType);
       }
-      addBuiltInVirtualColumnsToSchema(schema);
+      VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSchema(schema);
 
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(_propertyStore, _instanceId);
 
@@ -267,11 +249,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
   }
 
-  public void downloadAndReplaceSegment(@Nonnull String segmentName,
-      @Nonnull LLCRealtimeSegmentZKMetadata llcSegmentMetadata, @Nonnull IndexLoadingConfig indexLoadingConfig) {
+  public void downloadAndReplaceSegment(String segmentName, LLCRealtimeSegmentZKMetadata llcSegmentMetadata,
+      IndexLoadingConfig indexLoadingConfig) {
     final String uri = llcSegmentMetadata.getDownloadUrl();
-    File tempSegmentFolder =
-        new File(_indexDir, "tmp-" + segmentName + "." + String.valueOf(System.currentTimeMillis()));
+    File tempSegmentFolder = new File(_indexDir, "tmp-" + segmentName + "." + System.currentTimeMillis());
     File tempFile = new File(_indexDir, segmentName + ".tar.gz");
     final File segmentFolder = new File(_indexDir, segmentName);
     FileUtils.deleteQuietly(segmentFolder);
@@ -291,11 +272,25 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
   }
 
-  // Replace a committed segment.
-  public void replaceLLSegment(@Nonnull String segmentName, @Nonnull IndexLoadingConfig indexLoadingConfig) {
+  /**
+   * Replaces a committed HLC REALTIME segment.
+   */
+  public void replaceHLSegment(RealtimeSegmentZKMetadata segmentZKMetadata, IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
+    ZKMetadataProvider.setRealtimeSegmentZKMetadata(_propertyStore, _tableNameWithType, segmentZKMetadata);
+    File indexDir = new File(_indexDir, segmentZKMetadata.getSegmentName());
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
+  }
+
+  /**
+   * Replaces a committed LLC REALTIME segment.
+   */
+  public void replaceLLSegment(String segmentName, IndexLoadingConfig indexLoadingConfig) {
     try {
-      ImmutableSegment indexSegment = ImmutableSegmentLoader.load(new File(_indexDir, segmentName), indexLoadingConfig);
-      addSegment(indexSegment);
+      File indexDir = new File(_indexDir, segmentName);
+      Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+      addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

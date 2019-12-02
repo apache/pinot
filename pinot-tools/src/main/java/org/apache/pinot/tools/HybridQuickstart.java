@@ -23,12 +23,13 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import kafka.server.KafkaServerStartable;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.core.data.readers.FileFormat;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
+import org.apache.pinot.core.realtime.stream.StreamDataProvider;
+import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.streams.AirlineDataStream;
@@ -37,15 +38,20 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 public class HybridQuickstart {
-  private HybridQuickstart() {
-  }
-
   private File _offlineQuickStartDataDir;
   private File _realtimeQuickStartDataDir;
-  private KafkaServerStartable _kafkaStarter;
+  private StreamDataServerStartable _kafkaStarter;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
   private File _schemaFile;
   private File _dataFile;
+
+  private HybridQuickstart() {
+  }
+
+  public static void main(String[] args)
+      throws Exception {
+    new HybridQuickstart().execute();
+  }
 
   private QuickstartTableRequest prepareOfflineTableRequest()
       throws IOException {
@@ -84,7 +90,8 @@ public class HybridQuickstart {
 
     File tableConfigFile = new File(_realtimeQuickStartDataDir, "airlineStats_realtime_table_config.json");
 
-    URL resource = Quickstart.class.getClassLoader().getResource("sample_data/airlineStats_realtime_table_config.json");
+    URL resource = Quickstart.class.getClassLoader().getResource(
+        "sample_data/airlineStats_realtime_table_config.json");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
@@ -93,12 +100,13 @@ public class HybridQuickstart {
 
   private void startKafka() {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
-
-    _kafkaStarter = KafkaStarterUtils
-        .startServer(KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_BROKER_ID,
-            KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
-
-    KafkaStarterUtils.createTopic("airlineStatsEvents", KafkaStarterUtils.DEFAULT_ZK_STR, 10);
+    try {
+      _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, KafkaStarterUtils.getDefaultKafkaConfiguration());
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
+    }
+    _kafkaStarter.start();
+    _kafkaStarter.createTopic("airlineStatsEvents", KafkaStarterUtils.getTopicCreationProps(10));
   }
 
   public void execute()
@@ -153,7 +161,7 @@ public class HybridQuickstart {
           stream.shutdown();
           Thread.sleep(2000);
           runner.stop();
-          KafkaStarterUtils.stopServer(_kafkaStarter);
+          _kafkaStarter.stop();
           ZkStarter.stopLocalZkServer(_zookeeperInstance);
           FileUtils.deleteDirectory(_offlineQuickStartDataDir);
           FileUtils.deleteDirectory(_realtimeQuickStartDataDir);
@@ -162,10 +170,5 @@ public class HybridQuickstart {
         }
       }
     });
-  }
-
-  public static void main(String[] args)
-      throws Exception {
-    new HybridQuickstart().execute();
   }
 }

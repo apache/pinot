@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.realtime.impl.dictionary;
 
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 
 
@@ -26,7 +26,7 @@ public class MutableDictionaryFactory {
   private MutableDictionaryFactory() {
   }
 
-  public static MutableDictionary getMutableDictionary(FieldSpec.DataType dataType, boolean isOffHeapAllocation,
+  public static BaseMutableDictionary getMutableDictionary(FieldSpec.DataType dataType, boolean isOffHeapAllocation,
       PinotDataBufferMemoryManager memoryManager, int avgLength, int cardinality, String allocationContext) {
     if (isOffHeapAllocation) {
       // OnHeap allocation

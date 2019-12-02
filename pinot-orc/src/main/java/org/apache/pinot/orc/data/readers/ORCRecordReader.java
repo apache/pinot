@@ -19,14 +19,17 @@
 package org.apache.pinot.orc.data.readers;
 
 import com.google.common.collect.ImmutableList;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.hadoop.io.BooleanWritable;
+import org.apache.hadoop.io.ByteWritable;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.FloatWritable;
@@ -41,10 +44,10 @@ import org.apache.orc.Reader;
 import org.apache.orc.TypeDescription;
 import org.apache.orc.mapred.OrcList;
 import org.apache.orc.mapred.OrcMapredRecordReader;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.data.readers.RecordReader;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,10 +70,11 @@ public class ORCRecordReader implements RecordReader {
   private org.apache.orc.RecordReader _recordReader;
   private VectorizedRowBatch _reusableVectorizedRowBatch;
 
-  private void init(String inputPath, Schema schema)
+  @Override
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     _pinotSchema = schema;
-    Path dataFilePath = new Path(LOCAL_FS_PREFIX + inputPath);
+    Path dataFilePath = new Path(LOCAL_FS_PREFIX + dataFile.getAbsolutePath());
     LOGGER.info("Creating segment from path: {}", dataFilePath);
     _reader = OrcFile.createReader(dataFilePath, OrcFile.readerOptions(new Configuration()));
     _orcSchema = _reader.getSchema();
@@ -79,12 +83,6 @@ public class ORCRecordReader implements RecordReader {
 
     // Create a row batch with max size 1
     _reusableVectorizedRowBatch = _orcSchema.createRowBatch(1);
-  }
-
-  @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig)
-      throws IOException {
-    init(segmentGeneratorConfig.getInputFilePath(), segmentGeneratorConfig.getSchema());
   }
 
   @Override
@@ -152,6 +150,8 @@ public class ORCRecordReader implements RecordReader {
       obj = null;
     } else if (BooleanWritable.class.isAssignableFrom(w.getClass())) {
       obj = ((BooleanWritable) w).get();
+    } else if (ByteWritable.class.isAssignableFrom(w.getClass())) {
+      obj = ((ByteWritable) w).get();
     } else if (ShortWritable.class.isAssignableFrom(w.getClass())) {
       obj = ((ShortWritable) w).get();
     } else if (IntWritable.class.isAssignableFrom(w.getClass())) {
@@ -165,7 +165,7 @@ public class ORCRecordReader implements RecordReader {
     } else if (BytesWritable.class.isAssignableFrom(w.getClass())) {
       obj = ((BytesWritable) w).getBytes();
     } else if (Text.class.isAssignableFrom(w.getClass())) {
-      obj = ((Text) w).toString();
+      obj = w.toString();
     } else if (OrcList.class.isAssignableFrom(w.getClass())) {
       obj = translateList((OrcList) w);
     } else {
@@ -197,7 +197,7 @@ public class ORCRecordReader implements RecordReader {
   }
 
   @Override
-  public org.apache.pinot.common.data.Schema getSchema() {
+  public Schema getSchema() {
     return _pinotSchema;
   }
 

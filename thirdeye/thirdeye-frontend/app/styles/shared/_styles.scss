@@ -6,6 +6,12 @@ body {
   background-color: $te-main-background;
   margin: 0;
 }
+.popover-title {
+  font-size: 18px;
+  font-weight: normal;
+  color: app-shade(black, 9);
+  background-color: white;
+}
 
 .smaller {
   font-size: 19px;
@@ -36,6 +42,48 @@ body {
   &--flush {
     @include padding-reset;
     @include margin-reset;
+  }
+}
+
+.te-link-secondary {
+  color: #369ece !important;
+  font-weight: 600 !important;
+  font-size: 16px !important;
+}
+
+.te-table-global-filter {
+  display: inline-block;
+  padding-bottom: 5px;
+  padding-right:5px;
+}
+
+.te-column-dropdown {
+  display: inline-block;
+}
+
+.te-anomaly-table-wrapper {
+  text-align: right;
+  padding-top: 5px;
+}
+
+.te-anomaly-table-body {
+  text-align: left !important;
+}
+
+.te-dropdown {
+  padding-right: 5px;
+  padding-left: 5px;
+  text-align: left;
+  font-size: 15px !important;
+  min-width: 180px !important;
+
+  &__top-options {
+    padding: 0 0 0 0 !important;
+  }
+
+  &__close {
+    text-align: left;
+    border-top: 1px solid app-shade(black, 0.15);
   }
 }
 
@@ -191,6 +239,37 @@ body {
   margin: 10px 0 20px 0;
   background: white;
   padding: 24px;
+
+  &__alert-performance {
+    display: inline-block;
+    width: calc(80% - 20px);
+    margin-right: 10px;
+    font-family: "Source Sans Pro", sans-serif;
+    background: white;
+    padding: 24px;
+    padding-bottom: 100%;
+    margin-bottom: -100%;
+    border-right: 2px solid app-shade(black, 1);
+  }
+
+  &__detection-health {
+    width: 20%;
+    display: inline-block;
+    float: right;
+    margin-left: 10px;
+    font-family: "Source Sans Pro", sans-serif;
+    background: white;
+    padding: 24px;
+    padding-bottom: 100%;
+    margin-bottom: -100%;
+  }
+
+  &__performance-health-wrapper {
+    overflow: hidden;
+    border-radius: 5px;
+    border: 2px solid app-shade(black, 1);
+    background: white;
+  }
 }
 
 .te-hide {
@@ -203,6 +282,12 @@ body {
   margin-bottom: 12px;
 
   &--flush {
+    margin-bottom: 0;
+  }
+
+  &--no-bottom {
+    font-weight: normal;
+    color: app-shade(black, 9);
     margin-bottom: 0;
   }
 
@@ -335,6 +420,46 @@ body {
   }
 }
 
+.popover {
+  max-width: none;
+}
+
+.te-horizontal-metrics {
+  &__container {
+    display: flex;
+    clear: both;
+  }
+
+  &__metric {
+    list-style: none;
+    display: flex;
+    align-items: stretch;
+    flex-direction: column;
+
+    &:last-child {
+      margin-right: 0;
+    }
+  }
+
+  &__number {
+    color: black;
+    &--good {
+      color: #4B9D27;
+      font-weight: normal;
+    }
+
+    &--average {
+      color: #F5A623;
+      font-weight: normal;
+    }
+
+    &--poor {
+      color: #FF4B51;
+      font-weight: normal;
+    }
+  }
+}
+
 .te-horizontal-cards {
   &--hidden {
     visibility: hidden;
@@ -346,6 +471,10 @@ body {
     clear: both;
   }
 
+  &__val-group__margin-left {
+    margin-left: 30px;
+  }
+
   &__card {
     list-style: none;
     background-color: white;
@@ -354,6 +483,23 @@ body {
     border: 2px solid app-shade(black, 1);
     padding: 13px 15px 6px 17px;
     flex-basis: 25%;
+    display: flex;
+    align-items: stretch;
+    flex-direction: column;
+    justify-content: space-between;
+
+    &:last-child {
+      margin-right: 0;
+    }
+  }
+
+  &__single-card {
+    list-style: none;
+    background-color: white;
+    margin-right: 12px;
+    border-radius: 5px;
+    border: 2px solid app-shade(black, 1);
+    padding: 13px 15px 6px 17px;
     display: flex;
     align-items: stretch;
     flex-direction: column;
@@ -427,6 +573,24 @@ body {
   &__card-number {
     font-size: 28px;
     font-weight: normal;
+
+    &--good {
+      color: #4B9D27;
+      font-size: 28px;
+      font-weight: normal;
+    }
+
+    &--average {
+      color: #F5A623;
+      font-size: 28px;
+      font-weight: normal;
+    }
+
+    &--poor {
+      color: #FF4B51;
+      font-size: 28px;
+      font-weight: normal;
+    }
   }
 
   &__card-units {
@@ -669,7 +833,7 @@ body {
     line-height: 20px;
     border-radius: 3px;
     padding: 4px 8px;
-    margin: 0 20px;
+    margin-right: 20px;
     display: inline-block;
     color: white;
     width: auto;
@@ -763,4 +927,8 @@ body {
       margin-left: 0;
     }
   }
+}
+
+.activation-toggle {
+  display: inline-block;
 }

@@ -19,12 +19,13 @@
     under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.2.2.5-SNAPSHOT</version>
+    <version>0.3.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-perf</artifactId>
   <name>Pinot Perf</name>
@@ -49,11 +50,11 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-broker</artifactId>
     </dependency>
-    <!-- TODO: figure out a way to avoid explicitly setting the kafka module dependency, and instead inject it, such that any kafka stream implementation can use this -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-connector-kafka-0.9</artifactId>
+      <artifactId>pinot-connector-kafka-${kafka.version}</artifactId>
       <version>${project.version}</version>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -97,7 +98,7 @@
     <dependency>
       <groupId>org.openjdk.jmh</groupId>
       <artifactId>jmh-core</artifactId>
-      <version>1.15</version>
+      <version>1.21</version>
       <exclusions>
         <exclusion>
           <groupId>net.sf.jopt-simple</groupId>
@@ -108,7 +109,7 @@
     <dependency>
       <groupId>org.openjdk.jmh</groupId>
       <artifactId>jmh-generator-annprocess</artifactId>
-      <version>1.15</version>
+      <version>1.21</version>
       <scope>provided</scope>
     </dependency>
     <dependency>

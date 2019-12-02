@@ -85,7 +85,7 @@ public class GridSearchTuningAlgorithm implements TuningAlgorithm {
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
 
     TimeSeriesLoader timeseriesLoader =
-        new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache());
+        new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getTimeSeriesCache());
 
     AggregationLoader aggregationLoader =
         new DefaultAggregationLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(),
@@ -105,7 +105,8 @@ public class GridSearchTuningAlgorithm implements TuningAlgorithm {
    */
   @Override
   public void fit(AnomalySlice slice, long configId) throws Exception {
-    Collection<MergedAnomalyResultDTO> testAnomalies = this.provider.fetchAnomalies(Collections.singletonList(slice), configId).get(slice);
+    slice = slice.withDetectionId(configId);
+    Collection<MergedAnomalyResultDTO> testAnomalies = this.provider.fetchAnomalies(Collections.singletonList(slice)).get(slice);
     fit(slice, new HashMap<String, Number>(), testAnomalies);
   }
 

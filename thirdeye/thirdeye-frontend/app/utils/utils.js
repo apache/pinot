@@ -2,6 +2,7 @@ import d3 from 'd3';
 import { isNone } from '@ember/utils';
 import moment from 'moment';
 import { splitFilterFragment, toFilterMap, makeTime } from 'thirdeye-frontend/utils/rca-utils';
+import _ from 'lodash';
 
 /**
  * The Promise returned from fetch() won't reject on HTTP error status even if the response is an HTTP 404 or 500.
@@ -103,10 +104,7 @@ export function humanizeScore(f) {
  * Helps with shorthand for repetitive date generation
  */
 export function buildDateEod(unit, type) {
-  if (unit === 1) {
-    return makeTime().startOf('day');
-  }
-  return makeTime().subtract(unit-1, type).startOf('day');
+  return makeTime().subtract(unit, type).startOf('day');
 }
 
 /**
@@ -167,14 +165,13 @@ export function getProps() {
 }
 
 /**
- * Preps post object for Yaml payload
- * @param {string} text to post
+ * Preps put object
  * @returns {Object}
  */
-export function postYamlProps(postData) {
+export function putProps() {
   return {
-    method: 'post',
-    body: postData,
+    method: 'put',
+    body: '',
     headers: { 'content-type': 'text/plain' }
   };
 }
@@ -188,6 +185,27 @@ export function toIso(dateStr) {
 }
 
 /**
+ * Replace all Infinity and NaN with value from second time series
+ * @param {Array} series1 - time series to modify
+ * @param {Array} series2 - time series to get replacement values from
+ */
+export function replaceNonFiniteWithCurrent(series1, series2) {
+  if (_.isEmpty(series2)) {
+    return stripNonFiniteValues(series1);
+  }
+  for (let i = 0; i < series1.length; i++) {
+    if (!isFinite(series1[i]) || !series1[i]) {
+      let newValue = null;
+      if (i < series2.length) {
+        newValue = isFinite(series2[i]) ? series2[i] : null;
+      }
+      series1[i] = newValue;
+    }
+  }
+  return series1;
+}
+
+/**
  * Replace all Infinity and NaN with null in array of numbers
  * @param {Array} timeSeries - time series to modify
  */
@@ -195,40 +213,6 @@ export function stripNonFiniteValues(timeSeries) {
   return timeSeries.map(value => {
     return (isFinite(value) ? value : null);
   });
-}
-
-/**
- * The yaml filters formatter. Convert filters in the yaml file in to a legacy filters string
- * For example, filters = {
- *   "country": ["us", "cn"],
- *   "browser": ["chrome"]
- * }
- * will be convert into "country=us;country=cn;browser=chrome"
- *
- * @method _formatYamlFilter
- * @param {Map} filters multimap of filters
- * @return {String} - formatted filters string
- */
-export function formatYamlFilter(filters) {
-  if (filters){
-    const filterStrings = [];
-    Object.keys(filters).forEach(
-      function(filterKey) {
-        const filter = filters[filterKey];
-        if (filter && Array.isArray(filter)) {
-          filter.forEach(
-            function (filterValue) {
-              filterStrings.push(filterKey + '=' + filterValue);
-            }
-          );
-        } else {
-          filterStrings.push(filterKey + '=' + filter);
-        }
-      }
-    );
-    return filterStrings.join(';');
-  }
-  return '';
 }
 
 export default {
@@ -239,9 +223,9 @@ export default {
   makeFilterString,
   parseProps,
   postProps,
+  putProps,
   toIso,
+  replaceNonFiniteWithCurrent,
   stripNonFiniteValues,
-  postYamlProps,
-  formatYamlFilter,
   getProps
 };

@@ -21,7 +21,7 @@ package org.apache.pinot.core.realtime.converter.stats;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.pinot.common.config.ColumnPartitionConfig;
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockMultiValIterator;
@@ -29,7 +29,7 @@ import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
 import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
 import org.apache.pinot.core.operator.blocks.SingleValueBlock;
-import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionary;
+import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
 
@@ -41,7 +41,7 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
 
   private final ColumnDataSource _dataSource;
   private final int[] _sortedDocIdIterationOrder;
-  private final MutableDictionary _dictionaryReader;
+  private final BaseMutableDictionary _dictionaryReader;
   private final Block _block;
   private PartitionFunction _partitionFunction;
   private int _numPartitions;
@@ -51,7 +51,7 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
       ColumnPartitionConfig columnPartitionConfig) {
     _dataSource = dataSource;
     _sortedDocIdIterationOrder = sortedDocIdIterationOrder;
-    _dictionaryReader = (MutableDictionary) dataSource.getDictionary();
+    _dictionaryReader = (BaseMutableDictionary) dataSource.getDictionary();
     _block = dataSource.nextBlock();
     if (columnPartitionConfig != null) {
       String functionName = columnPartitionConfig.getFunctionName();

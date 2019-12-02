@@ -21,13 +21,15 @@ package org.apache.pinot.core.data.readers;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.util.AvroUtils;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
 /**
@@ -56,8 +58,7 @@ public class AvroRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
-
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig) {
   }
 
   @Override
@@ -82,7 +83,7 @@ public class AvroRecordReader implements RecordReader {
       Object value = _reusableAvroRecord.get(fieldName);
       // Allow default value for non-time columns
       if (value != null || fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
-        reuse.putField(fieldName, RecordReaderUtils.convert(fieldSpec, value));
+        AvroUtils.extractField(fieldSpec, _reusableAvroRecord, reuse);
       }
     }
     return reuse;

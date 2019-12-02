@@ -19,10 +19,6 @@
 package org.apache.pinot.controller;
 
 import java.io.File;
-import java.io.UnsupportedEncodingException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -30,11 +26,13 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.filesystem.LocalPinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.common.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
+import static org.apache.pinot.common.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
 
 
 public class ControllerConf extends PropertiesConfiguration {
@@ -59,9 +57,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String CONTROLLER_MODE = "controller.mode";
 
   public enum ControllerMode {
-    DUAL,
-    PINOT_ONLY,
-    HELIX_ONLY
+    DUAL, PINOT_ONLY, HELIX_ONLY
   }
 
   public static class ControllerPeriodicTasksConf {
@@ -169,43 +165,6 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public ControllerConf() {
     super();
-  }
-
-  /**
-   * Returns the URI for the given path, appends the local (file) scheme to the URI if no scheme exists.
-   */
-  public static URI getUriFromPath(String path) {
-    try {
-      URI uri = new URI(path);
-      if (uri.getScheme() != null) {
-        return uri;
-      } else {
-        return new URI(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME, path, null);
-      }
-    } catch (URISyntaxException e) {
-      LOGGER.error("Could not construct uri from path {}", path);
-      throw new RuntimeException(e);
-    }
-  }
-
-  public static URI constructSegmentLocation(String baseDataDir, String tableName, String segmentName) {
-    try {
-      return getUriFromPath(StringUtil.join(File.separator, baseDataDir, tableName, URLEncoder.encode(segmentName, "UTF-8")));
-    } catch (UnsupportedEncodingException e) {
-      LOGGER
-          .error("Could not construct segment location with baseDataDir {}, tableName {}, segmentName {}", baseDataDir,
-              tableName, segmentName);
-      throw new RuntimeException(e);
-    }
-  }
-
-  public static String constructDownloadUrl(String tableName, String segmentName, String vip) {
-    try {
-      return StringUtil.join("/", vip, "segments", tableName, URLEncoder.encode(segmentName, "UTF-8"));
-    } catch (UnsupportedEncodingException e) {
-      // Shouldn't happen
-      throw new AssertionError("Encountered error while encoding in UTF-8 format", e);
-    }
   }
 
   public void setLocalTempDir(String localTempDir) {
@@ -641,5 +600,9 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public void setHLCTablesAllowed(boolean allowHLCTables) {
     setProperty(ALLOW_HLC_TABLES, allowHLCTables);
+  }
+
+  public String getMetricsPrefix() {
+    return getString(CONFIG_OF_CONTROLLER_METRICS_PREFIX, DEFAULT_METRICS_PREFIX);
   }
 }

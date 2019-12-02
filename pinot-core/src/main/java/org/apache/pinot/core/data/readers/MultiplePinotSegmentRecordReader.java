@@ -22,15 +22,15 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
 /**
@@ -52,11 +52,6 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
   public MultiplePinotSegmentRecordReader(@Nonnull List<File> indexDirs)
       throws Exception {
     this(indexDirs, null, null);
-  }
-
-  @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
-
   }
 
   /**
@@ -115,6 +110,10 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
   }
 
   @Override
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig) {
+  }
+
+  @Override
   public boolean hasNext() {
     if (isSortedSegment()) {
       return _priorityQueue.size() > 0;
@@ -142,14 +141,12 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
       GenericRow currentRow = genericRowComparable.getRow();
 
       // Fill reuse with the information from the currentRow
-      reuse.clear();
-      for (Map.Entry<String, Object> entry : currentRow.getEntrySet()) {
-        reuse.putField(entry.getKey(), entry.getValue());
-      }
+      reuse.init(currentRow);
 
       // If the record reader has more rows left, put back the next minimum value to the queue
       PinotSegmentRecordReader recordReader = genericRowComparable.getRecordReader();
       if (recordReader.hasNext()) {
+        currentRow.clear();
         genericRowComparable.setRow(recordReader.next(currentRow));
         genericRowComparable.setRecordReader(recordReader);
         _priorityQueue.add(genericRowComparable);

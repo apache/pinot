@@ -18,17 +18,18 @@
  */
 package org.apache.pinot.integration.tests;
 
+import java.lang.reflect.Constructor;
 import java.util.Random;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStreamLevelConsumer;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.realtime.stream.PartitionLevelConsumer;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamConsumerFactory;
 import org.apache.pinot.core.realtime.stream.StreamLevelConsumer;
 import org.apache.pinot.core.realtime.stream.StreamMetadataProvider;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.testng.annotations.BeforeClass;
 
 
@@ -55,8 +56,15 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
 
     public FlakyStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig, Schema schema,
         InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
-      _streamLevelConsumer =
-          new KafkaStreamLevelConsumer(clientId, tableName, streamConfig, schema, instanceZKMetadata, serverMetrics);
+      try {
+        final Constructor constructor = Class.forName(KafkaStarterUtils.KAFKA_STREAM_LEVEL_CONSUMER_CLASS_NAME)
+            .getConstructor(String.class, String.class, StreamConfig.class, Schema.class, InstanceZKMetadata.class,
+                ServerMetrics.class);
+        _streamLevelConsumer = (StreamLevelConsumer) constructor
+            .newInstance(clientId, tableName, streamConfig, schema, instanceZKMetadata, serverMetrics);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
     }
 
     @Override

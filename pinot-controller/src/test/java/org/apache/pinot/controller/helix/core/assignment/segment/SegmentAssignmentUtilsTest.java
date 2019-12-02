@@ -26,8 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
-import org.apache.pinot.controller.helix.core.assignment.InstancePartitions;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -217,28 +217,28 @@ public class SegmentAssignmentUtilsTest {
     //   0_2=[instance_6, instance_7, instance_8]
     // }
     InstancePartitions instancePartitions = new InstancePartitions(null);
-    int numInstancesPerReplica = numInstances / NUM_REPLICAS;
+    int numInstancesPerReplicaGroup = numInstances / NUM_REPLICAS;
     int instanceIdToAdd = 0;
-    for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
-      List<String> instancesForReplica = new ArrayList<>(numInstancesPerReplica);
-      for (int i = 0; i < numInstancesPerReplica; i++) {
-        instancesForReplica.add(instances.get(instanceIdToAdd++));
+    for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
+      List<String> instancesForReplicaGroup = new ArrayList<>(numInstancesPerReplicaGroup);
+      for (int i = 0; i < numInstancesPerReplicaGroup; i++) {
+        instancesForReplicaGroup.add(instances.get(instanceIdToAdd++));
       }
-      instancePartitions.setInstances(0, replicaId, instancesForReplica);
+      instancePartitions.setInstances(0, replicaGroupId, instancesForReplicaGroup);
     }
 
     // Uniformly spray segments to the instances:
-    // Replica group 0: [instance_0, instance_1, instance_2],
-    // Replica group 1: [instance_3, instance_4, instance_5],
-    // Replica group 2: [instance_6, instance_7, instance_8]
+    // Replica-group 0: [instance_0, instance_1, instance_2],
+    // Replica-group 1: [instance_3, instance_4, instance_5],
+    // Replica-group 2: [instance_6, instance_7, instance_8]
     //                   segment_0   segment_1   segment_2
     //                   segment_3   segment_4   segment_5
     //                   ...
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     for (int segmentId = 0; segmentId < numSegments; segmentId++) {
       List<String> instancesAssigned = new ArrayList<>(NUM_REPLICAS);
-      for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
-        int assignedInstanceId = segmentId % numInstancesPerReplica + replicaId * numInstancesPerReplica;
+      for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
+        int assignedInstanceId = segmentId % numInstancesPerReplicaGroup + replicaGroupId * numInstancesPerReplicaGroup;
         instancesAssigned.add(instances.get(assignedInstanceId));
       }
       currentAssignment.put(segments.get(segmentId),
@@ -270,20 +270,20 @@ public class SegmentAssignmentUtilsTest {
     //   0_2=[instance_6, instance_7, instance_8]
     // }
     List<String> newInstances = new ArrayList<>(numInstances);
-    List<String> newReplica0Instances = new ArrayList<>(instancePartitions.getInstances(0, 0));
-    String newReplica0Instance = INSTANCE_NAME_PREFIX + 9;
-    newReplica0Instances.set(0, newReplica0Instance);
-    newInstances.addAll(newReplica0Instances);
-    List<String> newReplica1Instances = new ArrayList<>(instancePartitions.getInstances(0, 1));
-    String newReplica1Instance = INSTANCE_NAME_PREFIX + 10;
-    newReplica1Instances.set(1, newReplica1Instance);
-    newInstances.addAll(newReplica1Instances);
-    List<String> newReplica2Instances = instancePartitions.getInstances(0, 2);
-    newInstances.addAll(newReplica2Instances);
+    List<String> newReplicaGroup0Instances = new ArrayList<>(instancePartitions.getInstances(0, 0));
+    String newReplicaGroup0Instance = INSTANCE_NAME_PREFIX + 9;
+    newReplicaGroup0Instances.set(0, newReplicaGroup0Instance);
+    newInstances.addAll(newReplicaGroup0Instances);
+    List<String> newReplicaGroup1Instances = new ArrayList<>(instancePartitions.getInstances(0, 1));
+    String newReplicaGroup1Instance = INSTANCE_NAME_PREFIX + 10;
+    newReplicaGroup1Instances.set(1, newReplicaGroup1Instance);
+    newInstances.addAll(newReplicaGroup1Instances);
+    List<String> newReplicaGroup2Instances = instancePartitions.getInstances(0, 2);
+    newInstances.addAll(newReplicaGroup2Instances);
     InstancePartitions newInstancePartitions = new InstancePartitions(null);
-    newInstancePartitions.setInstances(0, 0, newReplica0Instances);
-    newInstancePartitions.setInstances(0, 1, newReplica1Instances);
-    newInstancePartitions.setInstances(0, 2, newReplica2Instances);
+    newInstancePartitions.setInstances(0, 0, newReplicaGroup0Instances);
+    newInstancePartitions.setInstances(0, 1, newReplicaGroup1Instances);
+    newInstancePartitions.setInstances(0, 2, newReplicaGroup2Instances);
     Map<String, Map<String, String>> newAssignment = SegmentAssignmentUtils
         .rebalanceReplicaGroupBasedTable(currentAssignment, newInstancePartitions, partitionIdToSegmentsMap);
     // There should be 90 segments assigned
@@ -301,34 +301,34 @@ public class SegmentAssignmentUtilsTest {
     Map<String, Integer> numSegmentsToBeMovedPerInstance =
         SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, newAssignment);
     assertEquals(numSegmentsToBeMovedPerInstance.size(), 2);
-    assertEquals((int) numSegmentsToBeMovedPerInstance.get(newReplica0Instance), numSegmentsPerInstance);
-    assertEquals((int) numSegmentsToBeMovedPerInstance.get(newReplica1Instance), numSegmentsPerInstance);
-    String replica0OldInstanceName = INSTANCE_NAME_PREFIX + 0;
-    String replica1OldInstanceName = INSTANCE_NAME_PREFIX + 4;
+    assertEquals((int) numSegmentsToBeMovedPerInstance.get(newReplicaGroup0Instance), numSegmentsPerInstance);
+    assertEquals((int) numSegmentsToBeMovedPerInstance.get(newReplicaGroup1Instance), numSegmentsPerInstance);
+    String oldReplicaGroup0Instance = INSTANCE_NAME_PREFIX + 0;
+    String oldReplicaGroup1Instance = INSTANCE_NAME_PREFIX + 4;
     for (String segmentName : segments) {
       Map<String, String> oldInstanceStateMap = currentAssignment.get(segmentName);
-      if (oldInstanceStateMap.containsKey(replica0OldInstanceName)) {
-        assertTrue(newAssignment.get(segmentName).containsKey(newReplica0Instance));
+      if (oldInstanceStateMap.containsKey(oldReplicaGroup0Instance)) {
+        assertTrue(newAssignment.get(segmentName).containsKey(newReplicaGroup0Instance));
       }
-      if (oldInstanceStateMap.containsKey(replica1OldInstanceName)) {
-        assertTrue(newAssignment.get(segmentName).containsKey(newReplica1Instance));
+      if (oldInstanceStateMap.containsKey(oldReplicaGroup1Instance)) {
+        assertTrue(newAssignment.get(segmentName).containsKey(newReplicaGroup1Instance));
       }
     }
 
-    // Remove 3 instances (1 from each replica)
+    // Remove 3 instances (1 from each replica-group)
     // {
     //   0_0=[instance_0, instance_1],
     //   0_1=[instance_3, instance_4],
     //   0_2=[instance_6, instance_7]
     // }
     int newNumInstances = numInstances - 3;
-    int newNumInstancesPerReplica = newNumInstances / NUM_REPLICAS;
+    int newNumInstancesPerReplicaGroup = newNumInstances / NUM_REPLICAS;
     newInstances = new ArrayList<>(newNumInstances);
-    for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
-      List<String> newInstancesForReplica =
-          instancePartitions.getInstances(0, replicaId).subList(0, newNumInstancesPerReplica);
-      newInstancePartitions.setInstances(0, replicaId, newInstancesForReplica);
-      newInstances.addAll(newInstancesForReplica);
+    for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
+      List<String> newInstancesForReplicaGroup =
+          instancePartitions.getInstances(0, replicaGroupId).subList(0, newNumInstancesPerReplicaGroup);
+      newInstancePartitions.setInstances(0, replicaGroupId, newInstancesForReplicaGroup);
+      newInstances.addAll(newInstancesForReplicaGroup);
     }
     newAssignment = SegmentAssignmentUtils
         .rebalanceReplicaGroupBasedTable(currentAssignment, newInstancePartitions, partitionIdToSegmentsMap);
@@ -354,22 +354,22 @@ public class SegmentAssignmentUtilsTest {
           newNumSegmentsPerInstance - numSegmentsPerInstance);
     }
 
-    // Add 6 instances (2 to each replica)
+    // Add 6 instances (2 to each replica-group)
     // {
     //   0_0=[instance_0, instance_1, instance_2, instance_9, instance_10],
     //   0_1=[instance_3, instance_4, instance_5, instance_11, instance_12],
     //   0_2=[instance_6, instance_7, instance_8, instance_13, instance_14]
     // }
     newNumInstances = numInstances + 6;
-    newNumInstancesPerReplica = newNumInstances / NUM_REPLICAS;
+    newNumInstancesPerReplicaGroup = newNumInstances / NUM_REPLICAS;
     newInstances = SegmentAssignmentTestUtils.getNameList(INSTANCE_NAME_PREFIX, newNumInstances);
     instanceIdToAdd = numInstances;
-    for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
-      List<String> newInstancesForReplica = new ArrayList<>(instancePartitions.getInstances(0, replicaId));
-      for (int i = 0; i < newNumInstancesPerReplica - numInstancesPerReplica; i++) {
-        newInstancesForReplica.add(newInstances.get(instanceIdToAdd++));
+    for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
+      List<String> newInstancesForReplicaGroup = new ArrayList<>(instancePartitions.getInstances(0, replicaGroupId));
+      for (int i = 0; i < newNumInstancesPerReplicaGroup - numInstancesPerReplicaGroup; i++) {
+        newInstancesForReplicaGroup.add(newInstances.get(instanceIdToAdd++));
       }
-      newInstancePartitions.setInstances(0, replicaId, newInstancesForReplica);
+      newInstancePartitions.setInstances(0, replicaGroupId, newInstancesForReplicaGroup);
     }
     newAssignment = SegmentAssignmentUtils
         .rebalanceReplicaGroupBasedTable(currentAssignment, newInstancePartitions, partitionIdToSegmentsMap);
@@ -402,12 +402,12 @@ public class SegmentAssignmentUtilsTest {
     // }
     newInstances = SegmentAssignmentTestUtils.getNameList("i_", numInstances);
     instanceIdToAdd = 0;
-    for (int replicaId = 0; replicaId < NUM_REPLICAS; replicaId++) {
-      List<String> instancesForReplica = new ArrayList<>(numInstancesPerReplica);
-      for (int i = 0; i < numInstancesPerReplica; i++) {
-        instancesForReplica.add(newInstances.get(instanceIdToAdd++));
+    for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
+      List<String> instancesForReplicaGroup = new ArrayList<>(numInstancesPerReplicaGroup);
+      for (int i = 0; i < numInstancesPerReplicaGroup; i++) {
+        instancesForReplicaGroup.add(newInstances.get(instanceIdToAdd++));
       }
-      newInstancePartitions.setInstances(0, replicaId, instancesForReplica);
+      newInstancePartitions.setInstances(0, replicaGroupId, instancesForReplicaGroup);
     }
     newAssignment = SegmentAssignmentUtils
         .rebalanceReplicaGroupBasedTable(currentAssignment, newInstancePartitions, partitionIdToSegmentsMap);

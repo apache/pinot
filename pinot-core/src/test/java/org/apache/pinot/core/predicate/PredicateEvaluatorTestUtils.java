@@ -54,4 +54,10 @@ public class PredicateEvaluatorTestUtils {
       randomValues[i] = RandomStringUtils.random(maxStringLength);
     }
   }
+
+  public static void fillRandom(byte[][] randomValues, int maxStringLength) {
+    for (int i = 0; i < randomValues.length; i++) {
+      randomValues[i] = RandomStringUtils.random(maxStringLength).getBytes();
+    }
+  }
 }

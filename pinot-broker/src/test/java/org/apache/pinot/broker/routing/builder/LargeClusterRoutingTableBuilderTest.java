@@ -27,6 +27,7 @@ import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -41,7 +42,7 @@ public class LargeClusterRoutingTableBuilderTest {
   private LargeClusterRoutingTableBuilder _largeClusterRoutingTableBuilder = new LargeClusterRoutingTableBuilder();
 
   private interface RoutingTableValidator {
-    boolean isRoutingTableValid(Map<String, List<String>> routingTable, ExternalView externalView,
+    boolean isRoutingTableValid(Map<ServerInstance, List<String>> routingTable, ExternalView externalView,
         List<InstanceConfig> instanceConfigs);
   }
 
@@ -49,7 +50,7 @@ public class LargeClusterRoutingTableBuilderTest {
   public void testRoutingTableCoversAllSegmentsExactlyOnce() {
     validateAssertionOverMultipleRoutingTables(new RoutingTableValidator() {
       @Override
-      public boolean isRoutingTableValid(Map<String, List<String>> routingTable, ExternalView externalView,
+      public boolean isRoutingTableValid(Map<ServerInstance, List<String>> routingTable, ExternalView externalView,
           List<InstanceConfig> instanceConfigs) {
         Set<String> unassignedSegments = new HashSet<>();
         unassignedSegments.addAll(externalView.getPartitionSet());
@@ -78,22 +79,28 @@ public class LargeClusterRoutingTableBuilderTest {
     ExternalView externalView = createExternalView(tableName, segmentCount, replicationFactor, instanceCount);
     List<InstanceConfig> instanceConfigs = createInstanceConfigs(instanceCount);
 
-    final InstanceConfig disabledHelixInstance = instanceConfigs.get(0);
-    final String disabledHelixInstanceName = disabledHelixInstance.getInstanceName();
-    disabledHelixInstance.setInstanceEnabled(false);
+    InstanceConfig helixDisabledInstanceConfig = instanceConfigs.get(0);
+    helixDisabledInstanceConfig.setInstanceEnabled(false);
+    ServerInstance helixDisabledInstance = new ServerInstance(helixDisabledInstanceConfig);
 
-    final InstanceConfig shuttingDownInstance = instanceConfigs.get(1);
-    final String shuttingDownInstanceName = shuttingDownInstance.getInstanceName();
-    shuttingDownInstance.getRecord()
+    InstanceConfig shuttingDownInstanceConfig = instanceConfigs.get(1);
+    shuttingDownInstanceConfig.getRecord()
         .setSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true));
+    ServerInstance shuttingDownInstance = new ServerInstance(shuttingDownInstanceConfig);
+
+    InstanceConfig queriesDisabledInstanceConfig = instanceConfigs.get(2);
+    queriesDisabledInstanceConfig.getRecord()
+        .setSimpleField(CommonConstants.Helix.QUERIES_DISABLED, Boolean.toString(true));
+    ServerInstance queriesDisabledInstance = new ServerInstance(queriesDisabledInstanceConfig);
 
     validateAssertionForOneRoutingTable(new RoutingTableValidator() {
       @Override
-      public boolean isRoutingTableValid(Map<String, List<String>> routingTable, ExternalView externalView,
+      public boolean isRoutingTableValid(Map<ServerInstance, List<String>> routingTable, ExternalView externalView,
           List<InstanceConfig> instanceConfigs) {
-        for (String serverName : routingTable.keySet()) {
+        for (ServerInstance serverInstance : routingTable.keySet()) {
           // These servers should not appear in the routing table
-          if (serverName.equals(disabledHelixInstanceName) || serverName.equals(shuttingDownInstanceName)) {
+          if (serverInstance.equals(helixDisabledInstance) || serverInstance.equals(shuttingDownInstance)
+              || serverInstance.equals(queriesDisabledInstance)) {
             return false;
           }
         }
@@ -116,12 +123,12 @@ public class LargeClusterRoutingTableBuilderTest {
 
     _largeClusterRoutingTableBuilder.computeOnExternalViewChange(tableName, externalView, instanceConfigs);
 
-    List<Map<String, List<String>>> routingTables = _largeClusterRoutingTableBuilder.getRoutingTables();
+    List<Map<ServerInstance, List<String>>> routingTables = _largeClusterRoutingTableBuilder.getRoutingTables();
 
     int routingTableCount = 0;
     int largerThanDesiredRoutingTableCount = 0;
 
-    for (Map<String, List<String>> routingTable : routingTables) {
+    for (Map<ServerInstance, List<String>> routingTable : routingTables) {
       routingTableCount++;
       if (desiredServerCount < routingTable.size()) {
         largerThanDesiredRoutingTableCount++;
@@ -148,22 +155,22 @@ public class LargeClusterRoutingTableBuilderTest {
 
       _largeClusterRoutingTableBuilder.computeOnExternalViewChange(tableName, externalView, instanceConfigs);
 
-      List<Map<String, List<String>>> routingTables = _largeClusterRoutingTableBuilder.getRoutingTables();
+      List<Map<ServerInstance, List<String>>> routingTables = _largeClusterRoutingTableBuilder.getRoutingTables();
 
-      Map<String, Integer> segmentCountPerServer = new HashMap<>();
+      Map<ServerInstance, Integer> segmentCountPerServer = new HashMap<>();
 
       // Count number of segments assigned per server
-      for (Map<String, List<String>> routingTable : routingTables) {
-        for (Map.Entry<String, List<String>> entry : routingTable.entrySet()) {
-          String serverName = entry.getKey();
-          Integer numSegmentsForServer = segmentCountPerServer.get(serverName);
+      for (Map<ServerInstance, List<String>> routingTable : routingTables) {
+        for (Map.Entry<ServerInstance, List<String>> entry : routingTable.entrySet()) {
+          ServerInstance serverInstance = entry.getKey();
+          Integer numSegmentsForServer = segmentCountPerServer.get(serverInstance);
 
           if (numSegmentsForServer == null) {
             numSegmentsForServer = 0;
           }
 
           numSegmentsForServer += entry.getValue().size();
-          segmentCountPerServer.put(serverName, numSegmentsForServer);
+          segmentCountPerServer.put(serverInstance, numSegmentsForServer);
         }
       }
 
@@ -247,9 +254,9 @@ public class LargeClusterRoutingTableBuilderTest {
       ExternalView externalView, List<InstanceConfig> instanceConfigs, String tableName) {
 
     _largeClusterRoutingTableBuilder.computeOnExternalViewChange(tableName, externalView, instanceConfigs);
-    List<Map<String, List<String>>> routingTables = _largeClusterRoutingTableBuilder.getRoutingTables();
+    List<Map<ServerInstance, List<String>>> routingTables = _largeClusterRoutingTableBuilder.getRoutingTables();
 
-    for (Map<String, List<String>> routingTable : routingTables) {
+    for (Map<ServerInstance, List<String>> routingTable : routingTables) {
       assertTrue(routingTableValidator.isRoutingTableValid(routingTable, externalView, instanceConfigs), message);
     }
   }

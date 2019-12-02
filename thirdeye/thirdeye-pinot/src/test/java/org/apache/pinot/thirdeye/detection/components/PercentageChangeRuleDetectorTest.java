@@ -187,6 +187,7 @@ public class PercentageChangeRuleDetectorTest {
     AnomalyDetector percentageRule = new PercentageChangeRuleDetector();
     PercentageChangeRuleDetectorSpec spec = new PercentageChangeRuleDetectorSpec();
     spec.setOffset("mo1m");
+    spec.setTimezone("UTC");
     spec.setPercentageChange(0.4);
     spec.setMonitoringGranularity("1_MONTHS");
     percentageRule.init(spec, new DefaultInputDataFetcher(this.provider, -1));

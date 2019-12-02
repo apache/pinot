@@ -21,7 +21,7 @@ package org.apache.pinot.core.segment.creator.impl.stats;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.pinot.common.utils.primitive.ByteArray;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
 
 

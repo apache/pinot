@@ -20,18 +20,22 @@ package org.apache.pinot.tools.admin.command;
 
 import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.Uninterruptibles;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
-import kafka.javaapi.producer.Producer;
-import kafka.producer.KeyedMessage;
-import kafka.producer.ProducerConfig;
 import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.BinaryEncoder;
+import org.apache.avro.io.DatumWriter;
+import org.apache.avro.io.EncoderFactory;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.apache.pinot.core.util.AvroUtils;
+import org.apache.pinot.core.realtime.stream.StreamDataProducer;
+import org.apache.pinot.core.realtime.stream.StreamDataProvider;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -43,7 +47,6 @@ import org.slf4j.LoggerFactory;
  */
 public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamAvroIntoKafkaCommand.class);
-
   @Option(name = "-avroFile", required = true, metaVar = "<String>", usage = "Avro file to stream.")
   private String _avroFile = null;
 
@@ -59,8 +62,12 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
   @Option(name = "-zkAddress", required = false, metaVar = "<string>", usage = "Address of Zookeeper.")
   private String _zkAddress = "localhost:2181";
 
+  @Option(name = "-outputFormat", required = false, metaVar = "<string>", usage = "Data format to produce to Kafka, supported: json(default) and avro")
+  private String _outputFormat = "json";
+
   @Option(name = "-millisBetweenMessages", required = false, metaVar = "<int>", usage = "Delay in milliseconds between messages (default 1000 ms)")
   private String _millisBetweenMessages = "1000";
+
 
   @Override
   public boolean getHelp() {
@@ -75,7 +82,7 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
   @Override
   public String toString() {
     return "StreamAvroInfoKafka -avroFile " + _avroFile + " -kafkaBrokerList " + _kafkaBrokerList + " -kafkaTopic "
-        + _kafkaTopic + " -millisBetweenMessages " + _millisBetweenMessages;
+        + _kafkaTopic + "-outputFormat" + _outputFormat + " -millisBetweenMessages " + _millisBetweenMessages;
   }
 
   @Override
@@ -104,22 +111,33 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
 
-    ProducerConfig producerConfig = new ProducerConfig(properties);
-    Producer<byte[], byte[]> producer = new Producer<byte[], byte[]>(producerConfig);
+    StreamDataProducer streamDataProducer;
+    try {
+      streamDataProducer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get StreamDataProducer - " + KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, e);
+    }
     try {
       // Open the Avro file
       DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(new File(_avroFile));
-
+      DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(reader.getSchema());
       // Iterate over every record
       for (GenericRecord genericRecord : reader) {
+        byte[] bytes;
+        switch (_outputFormat) {
+          case "avro":
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            BinaryEncoder encoder = EncoderFactory.get().binaryEncoder(outputStream, null);
+            datumWriter.write(genericRecord, encoder);
+            encoder.flush();
+            bytes = outputStream.toByteArray();
+            break;
+          default:
+            String recordJson = genericRecord.toString();
+            bytes = recordJson.getBytes("utf-8");
+        }
         // Write the message to Kafka
-        String recordJson = genericRecord.toString();
-        byte[] bytes = recordJson.getBytes("utf-8");
-        KeyedMessage<byte[], byte[]> data =
-            new KeyedMessage<byte[], byte[]>(_kafkaTopic, Longs.toByteArray(HashUtil.hash64(bytes, bytes.length)),
-                bytes);
-
-        producer.send(data);
+        streamDataProducer.produce(_kafkaTopic, Longs.toByteArray(HashUtil.hash64(bytes, bytes.length)), bytes);
 
         // Sleep between messages
         if (sleepRequired) {

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.executor;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -128,36 +127,36 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
     Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: " + tableNameWithType);
 
-    // acquire the segments
-    int missingSegments = 0;
     List<String> segmentsToQuery = queryRequest.getSegmentsToQuery();
-    List<SegmentDataManager> segmentDataManagers = new ArrayList<>();
-    for (String segmentName : segmentsToQuery) {
-      SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
-      if (segmentDataManager != null) {
-        segmentDataManagers.add(segmentDataManager);
-      } else {
-        if (!tableDataManager.isRecentlyDeleted(segmentName)) {
-          LOGGER.error("Could not find segment {} for table {} for requestId {}", segmentName, tableNameWithType,
-              requestId);
-          missingSegments++;
-        }
-      }
+    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery);
+
+    // When segment is removed from the IdealState:
+    // 1. Controller schedules a state transition to server to turn segment OFFLINE
+    // 2. Server gets the state transition, removes the segment data manager and update its CurrentState
+    // 3. Controller gathers the CurrentState and update the ExternalView
+    // 4. Broker watches ExternalView change and updates the routing table to stop querying the segment
+    //
+    // After step 2 but before step 4, segment will be missing on server side
+    // TODO: Change broker to watch both IdealState and ExternalView to not query the removed segments
+    int numSegmentsQueried = segmentsToQuery.size();
+    int numSegmentsAcquired = segmentDataManagers.size();
+    if (numSegmentsQueried > numSegmentsAcquired) {
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS,
+          numSegmentsQueried - numSegmentsAcquired);
     }
 
-    int numSegmentsQueried = segmentDataManagers.size();
     boolean enableTrace = queryRequest.isEnableTrace();
     if (enableTrace) {
       TraceContext.register(requestId);
     }
 
-    int numConsumingSegmentsQueried = 0;
+    int numConsumingSegmentsProcessed = 0;
     long minIndexTimeMs = Long.MAX_VALUE;
     long minIngestionTimeMs = Long.MAX_VALUE;
     // gather stats for realtime consuming segments
     for (SegmentDataManager segmentMgr : segmentDataManagers) {
       if (segmentMgr.getSegment() instanceof MutableSegment) {
-        numConsumingSegmentsQueried += 1;
+        numConsumingSegmentsProcessed += 1;
         SegmentMetadata metadata = segmentMgr.getSegment().getSegmentMetadata();
         long indexedTime = metadata.getLastIndexedTimestamp();
         if (indexedTime != Long.MIN_VALUE && indexedTime < minIndexTimeMs) {
@@ -171,12 +170,14 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     long minConsumingFreshnessTimeMs = minIngestionTimeMs;
-    if (numConsumingSegmentsQueried > 0) {
+    if (numConsumingSegmentsProcessed > 0) {
       if (minIngestionTimeMs == Long.MAX_VALUE) {
         LOGGER.debug("Did not find valid ingestionTimestamp across consuming segments! Using indexTime instead");
         minConsumingFreshnessTimeMs = minIndexTimeMs;
       }
-      LOGGER.debug("Querying {} consuming segments with min minConsumingFreshnessTimeMs {}", numConsumingSegmentsQueried, minConsumingFreshnessTimeMs);
+      LOGGER
+          .debug("Querying: {} consuming segments with minConsumingFreshnessTimeMs: {}", numConsumingSegmentsProcessed,
+              minConsumingFreshnessTimeMs);
     }
 
     DataTable dataTable = null;
@@ -244,21 +245,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_QUERIED, Integer.toString(numSegmentsQueried));
     dataTable.getMetadata().put(DataTable.TIME_USED_MS_METADATA_KEY, Long.toString(queryProcessingTime));
 
-    if (missingSegments > 0) {
-      // TODO: add this exception to the datatable after verfying the metrics
-      // Currently, given the deleted segments cache is in-memory only, a server restart will reset it
-      // We might end up sending partial-response metadata in such cases. It appears that the likelihood of
-      // this occurence is low; ie, segment has to be retained out and the server must be restarted while the
-      // broker view is still behind. We would however like to validate that and/or conf control this based on
-      // data.
-      /*dataTable.addException(QueryException.getException(QueryException.SEGMENTS_MISSING_ERROR,
-          "Could not find " + missingSegments + " segments on the server"));*/
-      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, missingSegments);
-    }
-
-    if (numConsumingSegmentsQueried > 0) {
-      dataTable.getMetadata().put(DataTable.NUM_CONSUMING_SEGMENTS_QUERIED, Integer.toString(numConsumingSegmentsQueried));
-      dataTable.getMetadata().put(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS, Long.toString(minConsumingFreshnessTimeMs));
+    if (numConsumingSegmentsProcessed > 0) {
+      dataTable.getMetadata()
+          .put(DataTable.NUM_CONSUMING_SEGMENTS_PROCESSED, Integer.toString(numConsumingSegmentsProcessed));
+      dataTable.getMetadata()
+          .put(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS, Long.toString(minConsumingFreshnessTimeMs));
     }
 
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);

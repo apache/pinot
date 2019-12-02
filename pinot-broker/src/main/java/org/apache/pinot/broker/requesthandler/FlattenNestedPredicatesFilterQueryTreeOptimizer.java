@@ -75,8 +75,9 @@ public class FlattenNestedPredicatesFilterQueryTreeOptimizer extends FilterQuery
       // Move all of 'node's children one level up. If 'node' has no children left, remove it from parent's list.
       List<FilterQueryTree> children = node.getChildren();
       Iterator<FilterQueryTree> it = children.iterator();
+      int insertIdx = parent.getChildren().indexOf(node);
       while (it.hasNext()) {
-        parent.getChildren().add(it.next());
+        parent.getChildren().add(insertIdx++, it.next());
         it.remove();
       }
       // 'node' is now childless

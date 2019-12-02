@@ -47,7 +47,7 @@ public class OnHeapFloatDictionary extends OnHeapDictionary {
     super(dataBuffer, length, Float.BYTES, (byte) 0);
 
     _valToDictId = new Float2IntOpenHashMap(length);
-    _valToDictId.defaultReturnValue(-1);
+    _valToDictId.defaultReturnValue(NULL_VALUE_INDEX);
     _dictIdToVal = new float[length];
 
     for (int dictId = 0; dictId < length; dictId++) {
@@ -58,34 +58,30 @@ public class OnHeapFloatDictionary extends OnHeapDictionary {
   }
 
   @Override
-  public int indexOf(Object rawValue) {
-    float value = getValue(rawValue);
-    return _valToDictId.get(value);
-  }
-
-  private float getValue(Object rawValue) {
-    float value;
-    if (rawValue instanceof String) {
-      value = Float.parseFloat((String) rawValue);
-    } else if (rawValue instanceof Float) {
-      value = (float) rawValue;
-    } else {
-      throw new IllegalArgumentException(
-          "Illegal data type for argument, actual: " + rawValue.getClass().getName() + " expected: " + Float.class
-              .getName());
-    }
-    return value;
+  public int insertionIndexOf(String stringValue) {
+    float floatValue = Float.parseFloat(stringValue);
+    int index = _valToDictId.get(floatValue);
+    return (index != NULL_VALUE_INDEX) ? index : Arrays.binarySearch(_dictIdToVal, floatValue);
   }
 
   @Override
-  public int insertionIndexOf(Object rawValue) {
-    int index = indexOf(rawValue);
-    return (index != -1) ? index : Arrays.binarySearch(_dictIdToVal, getValue(rawValue));
+  public int indexOf(String stringValue) {
+    return _valToDictId.get(Float.parseFloat(stringValue));
   }
 
   @Override
   public Float get(int dictId) {
     return _dictIdToVal[dictId];
+  }
+
+  @Override
+  public int getIntValue(int dictId) {
+    return (int) _dictIdToVal[dictId];
+  }
+
+  @Override
+  public long getLongValue(int dictId) {
+    return (long) _dictIdToVal[dictId];
   }
 
   @Override

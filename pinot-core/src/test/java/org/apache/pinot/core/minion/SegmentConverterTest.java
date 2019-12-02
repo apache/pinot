@@ -24,23 +24,23 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.data.DimensionFieldSpec;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.MetricFieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.data.TimeFieldSpec;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
-import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.operator.transform.transformer.datetime.BaseDateTimeTransformer;
-import org.apache.pinot.core.operator.transform.transformer.datetime.DateTimeTransformerFactory;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.testng.Assert;
+import org.joda.time.DateTime;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class SegmentConverterTest {
@@ -56,9 +56,9 @@ public class SegmentConverterTest {
   private static final String D2 = "d2";
   private static final String M1 = "m1";
   private static final String T = "t";
+  private static final long BASE_TIMESTAMP = new DateTime(2018, 9, 5, 0, 0).getMillis();
 
   private List<File> _segmentIndexDirList;
-  private final long _referenceTimestamp = System.currentTimeMillis();
 
   @BeforeClass
   public void setUp()
@@ -73,14 +73,13 @@ public class SegmentConverterTest {
     schema.addField(new TimeFieldSpec(T, FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS));
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
-    long timestamp = _referenceTimestamp;
     for (int i = 0; i < NUM_ROWS; i++) {
       int dimensionValue = i % (NUM_ROWS / REPEAT_ROWS);
       GenericRow row = new GenericRow();
-      row.putField(D1, dimensionValue);
-      row.putField(D2, Integer.toString(dimensionValue));
-      row.putField(M1, dimensionValue);
-      row.putField(T, timestamp++);
+      row.putValue(D1, dimensionValue);
+      row.putValue(D2, Integer.toString(dimensionValue));
+      row.putValue(M1, dimensionValue);
+      row.putValue(T, BASE_TIMESTAMP + i);
       rows.add(row);
     }
 
@@ -110,7 +109,7 @@ public class SegmentConverterTest {
 
     List<File> result = segmentConverter.convertSegment();
 
-    Assert.assertEquals(result.size(), 1);
+    assertEquals(result.size(), 1);
     List<GenericRow> outputRows = new ArrayList<>();
     try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(result.get(0))) {
       while (pinotSegmentRecordReader.hasNext()) {
@@ -118,20 +117,18 @@ public class SegmentConverterTest {
       }
     }
     // Check that the segment is correctly rolled up on the time column
-    Assert.assertEquals(outputRows.size(), NUM_ROWS * NUM_SEGMENTS,
+    assertEquals(outputRows.size(), NUM_ROWS * NUM_SEGMENTS,
         "Number of rows returned by segment converter is incorrect");
 
     // Check the value
     for (int i = 0; i < NUM_SEGMENTS; i++) {
-      int rowCount = 0;
-      long timestamp = _referenceTimestamp;
       for (int j = 0; j < NUM_ROWS; j++) {
-        int expectedValue = rowCount % (NUM_ROWS / REPEAT_ROWS);
-        Assert.assertEquals(outputRows.get(rowCount).getValue(D1), expectedValue);
-        Assert.assertEquals(outputRows.get(rowCount).getValue(D2), Integer.toString(expectedValue));
-        Assert.assertEquals(outputRows.get(rowCount).getValue(M1), expectedValue);
-        Assert.assertEquals(outputRows.get(rowCount).getValue(T), timestamp++);
-        rowCount++;
+        GenericRow row = outputRows.get(i * NUM_ROWS + j);
+        int expectedValue = j % (NUM_ROWS / REPEAT_ROWS);
+        assertEquals(row.getValue(D1), expectedValue);
+        assertEquals(row.getValue(D2), Integer.toString(expectedValue));
+        assertEquals(row.getValue(M1), expectedValue);
+        assertEquals(row.getValue(T), BASE_TIMESTAMP + j);
       }
     }
   }
@@ -139,32 +136,26 @@ public class SegmentConverterTest {
   @Test
   public void testSegmentRollupWithTimeConversion()
       throws Exception {
-    final BaseDateTimeTransformer dateTimeTransformer =
-        DateTimeTransformerFactory.getDateTimeTransformer("1:MILLISECONDS:EPOCH", "1:DAYS:EPOCH", "1:DAYS");
-
     SegmentConverter segmentConverter =
         new SegmentConverter.Builder().setTableName(TABLE_NAME).setSegmentName("segmentRollupWithTimeConversion")
-            .setInputIndexDirs(_segmentIndexDirList).setWorkingDir(WORKING_DIR).setRecordTransformer((row) -> {
-          long[] input = new long[1];
-          long[] output = new long[1];
-          input[0] = (Long) row.getValue(T);
-          dateTimeTransformer.transform(input, output, 1);
-          row.putField(T, output[0]);
-          return row;
-        }).setGroupByColumns(Arrays.asList(new String[]{D1, D2, T})).setRecordAggregator((rows) -> {
+            .setInputIndexDirs(_segmentIndexDirList).setWorkingDir(WORKING_DIR).setSkipTimeValueCheck(false)
+            .setRecordTransformer((row) -> {
+              row.putValue(T, BASE_TIMESTAMP);
+              return row;
+            }).setGroupByColumns(Arrays.asList(D1, D2, T)).setRecordAggregator((rows) -> {
           GenericRow result = rows.get(0);
           for (int i = 1; i < rows.size(); i++) {
             GenericRow current = rows.get(i);
             Object aggregatedValue =
                 ((Number) result.getValue(M1)).intValue() + ((Number) current.getValue(M1)).intValue();
-            result.putField(M1, aggregatedValue);
+            result.putValue(M1, aggregatedValue);
           }
           return result;
         }).setTotalNumPartition(1).build();
 
     List<File> result = segmentConverter.convertSegment();
 
-    Assert.assertEquals(result.size(), 1);
+    assertEquals(result.size(), 1);
     List<GenericRow> outputRows = new ArrayList<>();
     try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(result.get(0))) {
       while (pinotSegmentRecordReader.hasNext()) {
@@ -172,15 +163,16 @@ public class SegmentConverterTest {
       }
     }
     // Check that the segment is correctly rolled up on the time column
-    Assert.assertEquals(outputRows.size(), NUM_ROWS / REPEAT_ROWS,
+    assertEquals(outputRows.size(), NUM_ROWS / REPEAT_ROWS,
         "Number of rows returned by segment converter is incorrect");
 
     // Check the value
     int expectedValue = 0;
     for (GenericRow row : outputRows) {
-      Assert.assertEquals(row.getValue(D1), expectedValue);
-      Assert.assertEquals(row.getValue(D2), Integer.toString(expectedValue));
-      Assert.assertEquals(row.getValue(M1), expectedValue * NUM_SEGMENTS * REPEAT_ROWS);
+      assertEquals(row.getValue(D1), expectedValue);
+      assertEquals(row.getValue(D2), Integer.toString(expectedValue));
+      assertEquals(row.getValue(M1), expectedValue * NUM_SEGMENTS * REPEAT_ROWS);
+      assertEquals(row.getValue(T), BASE_TIMESTAMP);
       expectedValue++;
     }
   }
@@ -195,7 +187,7 @@ public class SegmentConverterTest {
 
     List<File> result = segmentConverter.convertSegment();
 
-    Assert.assertEquals(result.size(), 3);
+    assertEquals(result.size(), 3);
 
     List<List<GenericRow>> outputRows = new ArrayList<>();
     for (File resultFile : result) {
@@ -208,7 +200,7 @@ public class SegmentConverterTest {
       }
     }
 
-    Assert.assertEquals(outputRows.stream().mapToInt(r -> r.size()).sum(), NUM_ROWS * NUM_SEGMENTS);
+    assertEquals(outputRows.stream().mapToInt(List::size).sum(), NUM_ROWS * NUM_SEGMENTS);
   }
 
   @AfterClass

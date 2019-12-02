@@ -4,7 +4,7 @@ export default Factory.extend({
   metric(i) { return `test_metric_${i+1}`; },
   functionName(i) { return `test_function_${i+1}`; },
   createdBy : null,
-  detectionName(i) { return `test_function_${i+1}`; },
+  name(i) { return `test_function_${i+1}`; },
   rules : [ {
     detection : [ {
       name : "detection_rule_2",
@@ -35,5 +35,7 @@ export default Factory.extend({
     dimensions : [ "dimensionName" ],
     minContribution : 0.05,
     k : 10
-  }
+  },
+  datasetNames: ["test_dataset"],
+  monitoringGranularity: ["1_DAY"]
 });

@@ -19,6 +19,9 @@
 
 package org.apache.pinot.thirdeye.util;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -26,15 +29,10 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import com.google.common.cache.Weigher;
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import io.dropwizard.configuration.YamlConfigurationFactory;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
-import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
-
-import org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
-import org.apache.pinot.thirdeye.datalayer.util.DaoProviderUtil;
 import io.dropwizard.jackson.Jackson;
 import java.io.File;
 import java.io.IOException;
@@ -48,37 +46,40 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
-
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import javax.validation.Validation;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.apache.pinot.thirdeye.datasource.RelationalQuery;
-import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSet;
-import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
-import org.joda.time.Period;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
+import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
+import org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
-import org.apache.pinot.thirdeye.datalayer.pojo.DatasetConfigBean;
 import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
+import org.apache.pinot.thirdeye.datalayer.util.DaoProviderUtil;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.MetricExpression;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;
+import org.apache.pinot.thirdeye.datasource.RelationalQuery;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.cache.MetricDataset;
+import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSet;
+import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
+import org.joda.time.Period;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.thirdeye.detection.wrapper.GrouperWrapper.*;
 
 
 public abstract class ThirdEyeUtils {
@@ -88,13 +89,16 @@ public abstract class ThirdEyeUtils {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
-  private static final String TWO_DECIMALS_FORMAT = "##.##";
-  private static final String MAX_DECIMALS_FORMAT = "##.#####";
+  private static final String TWO_DECIMALS_FORMAT = "#,###.##";
+  private static final String MAX_DECIMALS_FORMAT = "#,###.#####";
   private static final String DECIMALS_FORMAT_TOKEN = "#";
 
   private static final int DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE = 50;
   private static final int DEFAULT_LOWER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 100;
   private static final int DEFAULT_UPPER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 8192;
+
+
+  public static final long DETECTION_TASK_MAX_LOOKBACK_WINDOW = TimeUnit.DAYS.toMillis(7);
 
   private ThirdEyeUtils () {
 
@@ -338,22 +342,6 @@ public abstract class ThirdEyeUtils {
     return alias;
   }
 
-
-  //By default, query only offline, unless dataset has been marked as realtime
-  public static String computeTableName(String collection) {
-    String dataset = null;
-    try {
-      DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
-      dataset = collection + DatasetConfigBean.DATASET_OFFLINE_PREFIX;
-      if (datasetConfig.isRealtime()) {
-        dataset = collection;
-      }
-    } catch (ExecutionException e) {
-      LOG.error("Exception in getting dataset name {}", collection, e);
-    }
-    return dataset;
-  }
-
   public static Period getbaselineOffsetPeriodByMode(COMPARE_MODE compareMode) {
     int numWeeksAgo = 1;
     switch (compareMode) {
@@ -384,9 +372,19 @@ public abstract class ThirdEyeUtils {
     return datasetConfig;
   }
 
-  public static String getDatasetFromMetricFunction(MetricFunction metricFunction) {
-    MetricConfigDTO metricConfig = getMetricConfigFromId(metricFunction.getMetricId());
-    return metricConfig.getDataset();
+  public static List<DatasetConfigDTO> getDatasetConfigsFromMetricUrn(String metricUrn) {
+    DatasetConfigManager datasetConfigManager = DAORegistry.getInstance().getDatasetConfigDAO();
+    MetricEntity me = MetricEntity.fromURN(metricUrn);
+    MetricConfigDTO metricConfig = DAORegistry.getInstance().getMetricConfigDAO().findById(me.getId());
+    if (metricConfig == null) return new ArrayList<>();
+    if (!metricConfig.isDerived()) {
+      return Collections.singletonList(datasetConfigManager.findByDataset(metricConfig.getDataset()));
+    } else {
+      MetricExpression metricExpression = ThirdEyeUtils.getMetricExpressionFromMetricConfig(metricConfig);
+      List<MetricFunction> functions = metricExpression.computeMetricFunctions();
+      return functions.stream().map(
+          f -> datasetConfigManager.findByDataset(f.getDataset())).collect(Collectors.toList());
+    }
   }
 
   public static MetricConfigDTO getMetricConfigFromId(Long metricId) {
@@ -436,6 +434,7 @@ public abstract class ThirdEyeUtils {
       compareValue = compareValue * 0.1;
     }
     DecimalFormat decimalFormat = new DecimalFormat(decimalFormatBuffer.toString());
+
     return decimalFormat.format(value);
   }
 
@@ -633,5 +632,80 @@ public abstract class ThirdEyeUtils {
       }
     }
     return (jvmMaxMemoryInBytes / 102400) * percentage;
+  }
+
+
+  /**
+   * Merge child's properties into parent's properties.
+   * If the property exists in both then use parent's property.
+   * For property = "detectorComponentName", combine the parent and child.
+   * @param parent The parent anomaly's properties.
+   * @param child The child anomaly's properties.
+   */
+  public static void mergeAnomalyProperties(Map<String, String> parent, Map<String, String> child) {
+    for (String key : child.keySet()) {
+      if (!parent.containsKey(key)) {
+        parent.put(key, child.get(key));
+      } else {
+        // combine detectorComponentName
+        if (key.equals(PROP_DETECTOR_COMPONENT_NAME)) {
+          String component = ThirdEyeUtils.combineComponents(parent.get(PROP_DETECTOR_COMPONENT_NAME), child.get(PROP_DETECTOR_COMPONENT_NAME));
+          parent.put(PROP_DETECTOR_COMPONENT_NAME, component);
+        }
+      }
+    }
+  }
+
+  public static long getCachingPeriodLookback(TimeGranularity granularity) {
+    long period;
+    switch (granularity.getUnit()) {
+      case DAYS:
+        // 90 days data for daily detection
+        period = TimeUnit.DAYS.toMillis(90);
+        break;
+      case HOURS:
+        // 60 days data for hourly detection
+        period = TimeUnit.DAYS.toMillis(60);
+        break;
+      case MINUTES:
+        // disable minute level cache warmup by default.
+        period = -1;
+        break;
+      default:
+        period = -1;
+    }
+    return period;
+  }
+
+  /**
+   * Combine two components with comma separated.
+   * For example, will combine "component1" and "component2" into "component1, component2".
+   *
+   * @param component1 The first component.
+   * @param component2 The second component.
+   * @return The combined components.
+   */
+  private static String combineComponents(String component1, String component2) {
+    List<String> components = new ArrayList<>();
+    for (String component : component1.split(",")) {
+      components.add(component);
+    }
+    for (String component : component2.split(",")) {
+      components.add(component);
+    }
+    return String.join(",", components.stream().distinct().collect(Collectors.toList()));
+  }
+
+  /**
+   * Parse job name to get the detection id
+   * @param jobName
+   * @return
+   */
+  public static long getDetectionIdFromJobName(String jobName) {
+    String[] parts = jobName.split("_");
+    if (parts.length < 2) {
+      throw new IllegalArgumentException("Invalid job name: " + jobName);
+    }
+    return Long.parseLong(parts[1]);
   }
 }

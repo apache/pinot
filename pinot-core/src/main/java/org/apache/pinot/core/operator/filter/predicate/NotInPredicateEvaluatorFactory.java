@@ -29,8 +29,10 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.NotInPredicate;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
@@ -75,6 +77,8 @@ public class NotInPredicateEvaluatorFactory {
         return new DoubleRawValueBasedNotInPredicateEvaluator(notInPredicate);
       case STRING:
         return new StringRawValueBasedNotInPredicateEvaluator(notInPredicate);
+      case BYTES:
+        return new BytesRawValueBasedNotInPredicateEvaluator(notInPredicate);
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType);
     }
@@ -249,6 +253,28 @@ public class NotInPredicateEvaluatorFactory {
     @Override
     public boolean applySV(String value) {
       return !_nonMatchingValues.contains(value);
+    }
+  }
+
+  private static final class BytesRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final Set<ByteArray> _nonMatchingValues;
+
+    BytesRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate) {
+      String[] values = notInPredicate.getValues();
+      _nonMatchingValues = new HashSet<>(HashUtil.getMinHashSetSize(values.length));
+      for (String value : values) {
+        _nonMatchingValues.add(BytesUtils.toByteArray(value));
+      }
+    }
+
+    @Override
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.NOT_IN;
+    }
+
+    @Override
+    public boolean applySV(byte[] value) {
+      return !_nonMatchingValues.contains(new ByteArray(value));
     }
   }
 }

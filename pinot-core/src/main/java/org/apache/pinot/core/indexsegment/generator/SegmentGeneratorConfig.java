@@ -41,16 +41,16 @@ import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.StarTreeIndexConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.FieldSpec.FieldType;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.FieldType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.common.data.TimeFieldSpec;
-import org.apache.pinot.common.data.TimeGranularitySpec;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.core.data.readers.CSVRecordReaderConfig;
 import org.apache.pinot.core.data.readers.FileFormat;
-import org.apache.pinot.core.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.segment.name.FixedSegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SegmentNameGenerator;
@@ -80,10 +80,11 @@ public class SegmentGeneratorConfig {
   private Map<String, ChunkCompressorFactory.CompressionType> _rawIndexCompressionType = new HashMap<>();
   private List<String> _invertedIndexCreationColumns = new ArrayList<>();
   private List<String> _columnSortOrder = new ArrayList<>();
+  private List<String> _varLengthDictionaryColumns = new ArrayList<>();
   private String _dataDir = null;
   private String _inputFilePath = null;
   private FileFormat _format = FileFormat.AVRO;
-  private String _recordReaderPath = null;
+  private String _recordReaderPath = null; //TODO: this should be renamed to recordReaderClass or even better removed
   private String _outDir = null;
   private boolean _overwrite = false;
   private String _tableName = null;
@@ -111,6 +112,8 @@ public class SegmentGeneratorConfig {
   private String _simpleDateFormat = null;
   // Use on-heap or off-heap memory to generate index (currently only affect inverted index and star-tree v2)
   private boolean _onHeap = false;
+  private boolean _skipTimeValueCheck = false;
+  private boolean _nullHandlingEnabled = false;
 
   public SegmentGeneratorConfig() {
   }
@@ -128,6 +131,7 @@ public class SegmentGeneratorConfig {
     _rawIndexCompressionType.putAll(config._rawIndexCompressionType);
     _invertedIndexCreationColumns.addAll(config._invertedIndexCreationColumns);
     _columnSortOrder.addAll(config._columnSortOrder);
+    _varLengthDictionaryColumns.addAll(config._varLengthDictionaryColumns);
     _dataDir = config._dataDir;
     _inputFilePath = config._inputFilePath;
     _format = config._format;
@@ -158,6 +162,8 @@ public class SegmentGeneratorConfig {
     _simpleDateFormat = config._simpleDateFormat;
     _onHeap = config._onHeap;
     _recordReaderPath = config._recordReaderPath;
+    _skipTimeValueCheck = config._skipTimeValueCheck;
+    _nullHandlingEnabled = config._nullHandlingEnabled;
   }
 
   /**
@@ -187,6 +193,9 @@ public class SegmentGeneratorConfig {
         this.setRawIndexCompressionType(serializedNoDictionaryColumnMap);
       }
     }
+    if (indexingConfig.getVarLengthDictionaryColumns() != null) {
+      setVarLengthDictionaryColumns(indexingConfig.getVarLengthDictionaryColumns());
+    }
     _segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
 
     // Star-tree V1 config
@@ -211,6 +220,8 @@ public class SegmentGeneratorConfig {
 
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     _hllConfig = validationConfig.getHllConfig();
+
+    _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
   }
 
   public SegmentGeneratorConfig(Schema schema) {
@@ -274,6 +285,14 @@ public class SegmentGeneratorConfig {
   public void setColumnSortOrder(List<String> sortOrder) {
     Preconditions.checkNotNull(sortOrder);
     _columnSortOrder.addAll(sortOrder);
+  }
+
+  public List<String> getVarLengthDictionaryColumns() {
+    return _varLengthDictionaryColumns;
+  }
+
+  public void setVarLengthDictionaryColumns(List<String> varLengthDictionaryColumns) {
+    this._varLengthDictionaryColumns = varLengthDictionaryColumns;
   }
 
   public void createInvertedIndexForColumn(String column) {
@@ -580,6 +599,14 @@ public class SegmentGeneratorConfig {
     _onHeap = onHeap;
   }
 
+  public boolean isSkipTimeValueCheck() {
+    return _skipTimeValueCheck;
+  }
+
+  public void setSkipTimeValueCheck(boolean skipTimeValueCheck) {
+    _skipTimeValueCheck = skipTimeValueCheck;
+  }
+
   public Map<String, ChunkCompressorFactory.CompressionType> getRawIndexCompressionType() {
     return _rawIndexCompressionType;
   }
@@ -644,17 +671,25 @@ public class SegmentGeneratorConfig {
   private String getQualifyingFields(FieldType type, boolean excludeVirtualColumns) {
     List<String> fields = new ArrayList<>();
 
-    for (final FieldSpec spec : getSchema().getAllFieldSpecs()) {
-      if (excludeVirtualColumns && getSchema().isVirtualColumn(spec.getName())) {
+    for (FieldSpec fieldSpec : getSchema().getAllFieldSpecs()) {
+      if (excludeVirtualColumns && fieldSpec.isVirtualColumn()) {
         continue;
       }
 
-      if (spec.getFieldType() == type) {
-        fields.add(spec.getName());
+      if (fieldSpec.getFieldType() == type) {
+        fields.add(fieldSpec.getName());
       }
     }
 
     Collections.sort(fields);
     return StringUtils.join(fields, ",");
+  }
+
+  public boolean isNullHandlingEnabled() {
+    return _nullHandlingEnabled;
+  }
+
+  public void setNullHandlingEnabled(boolean nullHandlingEnabled) {
+    _nullHandlingEnabled = nullHandlingEnabled;
   }
 }

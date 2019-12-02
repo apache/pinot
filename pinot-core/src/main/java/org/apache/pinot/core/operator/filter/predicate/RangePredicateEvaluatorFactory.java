@@ -18,14 +18,15 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.RangePredicate;
-import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionary;
+import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
+import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
-import org.apache.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 /**
@@ -44,10 +45,10 @@ public class RangePredicateEvaluatorFactory {
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(RangePredicate rangePredicate,
       Dictionary dictionary) {
-    if (dictionary instanceof ImmutableDictionaryReader) {
-      return new OfflineDictionaryBasedRangePredicateEvaluator(rangePredicate, (ImmutableDictionaryReader) dictionary);
+    if (dictionary instanceof BaseImmutableDictionary) {
+      return new OfflineDictionaryBasedRangePredicateEvaluator(rangePredicate, (BaseImmutableDictionary) dictionary);
     } else {
-      return new RealtimeDictionaryBasedRangePredicateEvaluator(rangePredicate, (MutableDictionary) dictionary);
+      return new RealtimeDictionaryBasedRangePredicateEvaluator(rangePredicate, (BaseMutableDictionary) dictionary);
     }
   }
 
@@ -71,6 +72,8 @@ public class RangePredicateEvaluatorFactory {
         return new DoubleRawValueBasedRangePredicateEvaluator(rangePredicate);
       case STRING:
         return new StringRawValueBasedRangePredicateEvaluator(rangePredicate);
+      case BYTES:
+        return new BytesRawValueBasedRangePredicateEvaluator(rangePredicate);
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType);
     }
@@ -83,7 +86,7 @@ public class RangePredicateEvaluatorFactory {
     final int _numMatchingDictIds;
     int[] _matchingDictIds;
 
-    OfflineDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, ImmutableDictionaryReader dictionary) {
+    OfflineDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, BaseImmutableDictionary dictionary) {
       String lowerBoundary = rangePredicate.getLowerBoundary();
       String upperBoundary = rangePredicate.getUpperBoundary();
       boolean includeLowerBoundary = rangePredicate.includeLowerBoundary();
@@ -162,38 +165,14 @@ public class RangePredicateEvaluatorFactory {
     final int _numMatchingDictIds;
     int[] _matchingDictIds;
 
-    RealtimeDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, MutableDictionary dictionary) {
-      _matchingDictIdSet = new IntOpenHashSet();
-
-      int dictionarySize = dictionary.length();
-      if (dictionarySize == 0) {
-        _numMatchingDictIds = 0;
-        _alwaysFalse = true;
-        return;
-      }
-
-      String lowerBoundary = rangePredicate.getLowerBoundary();
-      String upperBoundary = rangePredicate.getUpperBoundary();
-      boolean includeLowerBoundary = rangePredicate.includeLowerBoundary();
-      boolean includeUpperBoundary = rangePredicate.includeUpperBoundary();
-
-      if (lowerBoundary.equals("*")) {
-        lowerBoundary = dictionary.getMinVal().toString();
-      }
-      if (upperBoundary.equals("*")) {
-        upperBoundary = dictionary.getMaxVal().toString();
-      }
-
-      for (int dictId = 0; dictId < dictionarySize; dictId++) {
-        if (dictionary.inRange(lowerBoundary, upperBoundary, dictId, includeLowerBoundary, includeUpperBoundary)) {
-          _matchingDictIdSet.add(dictId);
-        }
-      }
-
+    RealtimeDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, BaseMutableDictionary dictionary) {
+      _matchingDictIdSet = dictionary
+          .getDictIdsInRange(rangePredicate.getLowerBoundary(), rangePredicate.getUpperBoundary(),
+              rangePredicate.includeLowerBoundary(), rangePredicate.includeUpperBoundary());
       _numMatchingDictIds = _matchingDictIdSet.size();
       if (_numMatchingDictIds == 0) {
         _alwaysFalse = true;
-      } else if (dictionarySize == _numMatchingDictIds) {
+      } else if (_numMatchingDictIds == dictionary.length()) {
         _alwaysTrue = true;
       }
     }
@@ -403,6 +382,53 @@ public class RangePredicateEvaluatorFactory {
           result &= _upperBoundary.compareTo(value) >= 0;
         } else {
           result &= _upperBoundary.compareTo(value) > 0;
+        }
+      }
+      return result;
+    }
+  }
+
+  private static final class BytesRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final byte[] _lowerBoundary;
+    final byte[] _upperBoundary;
+    final boolean _includeLowerBoundary;
+    final boolean _includeUpperBoundary;
+
+    BytesRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
+      if (!"*".equals(rangePredicate.getLowerBoundary())) {
+        _lowerBoundary = BytesUtils.toBytes(rangePredicate.getLowerBoundary());
+      } else {
+        _lowerBoundary = null;
+      }
+      if (!"*".equals(rangePredicate.getUpperBoundary())) {
+        _upperBoundary = BytesUtils.toBytes(rangePredicate.getUpperBoundary());
+      } else {
+        _upperBoundary = null;
+      }
+      _includeLowerBoundary = rangePredicate.includeLowerBoundary();
+      _includeUpperBoundary = rangePredicate.includeUpperBoundary();
+    }
+
+    @Override
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.RANGE;
+    }
+
+    @Override
+    public boolean applySV(byte[] value) {
+      boolean result = true;
+      if (_lowerBoundary != null) {
+        if (_includeLowerBoundary) {
+          result = ByteArray.compare(_lowerBoundary, value) <= 0;
+        } else {
+          result = ByteArray.compare(_lowerBoundary, value) < 0;
+        }
+      }
+      if (_upperBoundary != null) {
+        if (_includeUpperBoundary) {
+          result &= ByteArray.compare(_upperBoundary, value) >= 0;
+        } else {
+          result &= ByteArray.compare(_upperBoundary, value) > 0;
         }
       }
       return result;

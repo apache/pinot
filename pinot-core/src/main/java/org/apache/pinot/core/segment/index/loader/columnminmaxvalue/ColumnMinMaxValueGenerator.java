@@ -20,8 +20,8 @@ package org.apache.pinot.core.segment.index.loader.columnminmaxvalue;
 
 import com.clearspring.analytics.util.Preconditions;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;

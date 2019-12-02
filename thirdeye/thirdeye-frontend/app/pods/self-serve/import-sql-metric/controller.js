@@ -23,7 +23,7 @@ export default Controller.extend({
     this.timeFormatOptions = ['EPOCH', 'yyyyMMdd', 'yyyy-MM-dd', 'yyyy-MM-dd-HH', 'yyyy-MM-dd HH:mm:ss', 'yyyy-MM-dd HH:mm:ss.S', 'yyyyMMddHHmmss'];
     this.timeGranularityOptions = ['1MILLISECONDS', '1SECONDS', '1MINUTES', '1HOURS', '1DAYS', '1WEEKs', '1MONTHS', '1YEARS'];
     this.timezoneOptions = ["UTC", "Pacific/Midway", "US/Hawaii", "US/Alaska", "US/Pacific", "US/Arizona", "US/Mountain", "US/Central",
-      "US/Eastern", "America/Caracas", "America/Manaus", "America/Santiago", "Canada/Newfoundland", "Brazil/East", "America/Buenos_Aires", 
+      "US/Eastern", "America/Caracas", "America/Manaus", "America/Santiago", "Canada/Newfoundland", "Brazil/East", "America/Buenos_Aires",
       "America/Godthab", "America/Montevideo", "Atlantic/South_Georgia", "Atlantic/Azores", "Atlantic/Cape_Verde", "Africa/Casablanca",
       "Europe/London", "Europe/Berlin", "Europe/Belgrade", "Europe/Brussels", "Europe/Warsaw", "Africa/Algiers", "Asia/Amman", "Europe/Athens",
       "Asia/Beirut", "Africa/Cairo", "Africa/Harare", "Europe/Helsinki", "Asia/Jerusalem", "Europe/Minsk", "Africa/Windhoek",
@@ -47,7 +47,7 @@ export default Controller.extend({
           }
         }
       });
-    });
+    }).catch(err => {});
   },
 
   /**

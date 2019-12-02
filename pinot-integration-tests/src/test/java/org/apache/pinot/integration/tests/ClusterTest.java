@@ -31,7 +31,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericData;
@@ -45,22 +44,23 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpStatus;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
+import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
 import org.apache.pinot.common.config.IndexingConfig;
+import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.TableTaskConfig;
 import org.apache.pinot.common.config.TenantConfig;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.utils.CommonConstants.Broker;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Minion;
 import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.core.realtime.stream.AvroRecordToPinotRowGenerator;
@@ -86,16 +86,14 @@ public abstract class ClusterTest extends ControllerTest {
   private static final Random RANDOM = new Random();
   private static final int DEFAULT_BROKER_PORT = 18099;
 
-  protected final String _clusterName = getHelixClusterName();
   protected String _brokerBaseApiUrl;
 
   private List<HelixBrokerStarter> _brokerStarters = new ArrayList<>();
   private List<HelixServerStarter> _serverStarters = new ArrayList<>();
   private List<MinionStarter> _minionStarters = new ArrayList<>();
 
-  protected Schema _schema;
-  protected TableConfig _offlineTableConfig;
-  protected TableConfig _realtimeTableConfig;
+  // TODO: clean this up
+  private TableConfig _realtimeTableConfig;
 
   protected void startBroker()
       throws Exception {
@@ -127,7 +125,7 @@ public abstract class ClusterTest extends ControllerTest {
         brokerConf.setProperty(Broker.CONFIG_OF_REQUEST_HANDLER_TYPE, Broker.SINGLE_CONNECTION_REQUEST_HANDLER_TYPE);
       }
       overrideBrokerConf(brokerConf);
-      HelixBrokerStarter brokerStarter = new HelixBrokerStarter(brokerConf, _clusterName, zkStr);
+      HelixBrokerStarter brokerStarter = new HelixBrokerStarter(brokerConf, getHelixClusterName(), zkStr, LOCAL_HOST);
       brokerStarter.start();
       _brokerStarters.add(brokerStarter);
     }
@@ -169,7 +167,7 @@ public abstract class ClusterTest extends ControllerTest {
             .setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, baseAdminApiPort - i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
-        _serverStarters.add(new HelixServerStarter(_clusterName, zkStr, configuration));
+        _serverStarters.add(new HelixServerStarter(getHelixClusterName(), zkStr, configuration));
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -187,9 +185,9 @@ public abstract class ClusterTest extends ControllerTest {
       for (int i = 0; i < minionCount; i++) {
         Configuration config = new PropertiesConfiguration();
         config.setProperty(Helix.Instance.INSTANCE_ID_KEY,
-            Minion.INSTANCE_PREFIX + "minion" + i + "_" + (Minion.DEFAULT_HELIX_PORT + i));
+            Helix.PREFIX_OF_MINION_INSTANCE + "minion" + i + "_" + (Minion.DEFAULT_HELIX_PORT + i));
         config.setProperty(Helix.Instance.DATA_DIR_KEY, Minion.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
-        MinionStarter minionStarter = new MinionStarter(ZkStarter.DEFAULT_ZK_STR, _clusterName, config);
+        MinionStarter minionStarter = new MinionStarter(ZkStarter.DEFAULT_ZK_STR, getHelixClusterName(), config);
 
         // Register task executor factories
         if (taskExecutorFactoryRegistry != null) {
@@ -255,14 +253,10 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void addSchema(File schemaFile, String schemaName)
       throws Exception {
-    if (!isUsingNewConfigFormat()) {
-      try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-        fileUploadDownloadClient
-            .addSchema(FileUploadDownloadClient.getUploadSchemaHttpURI(LOCAL_HOST, _controllerPort), schemaName,
-                schemaFile);
-      }
-    } else {
-      _schema = Schema.fromFile(schemaFile);
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      fileUploadDownloadClient
+          .addSchema(FileUploadDownloadClient.getUploadSchemaHttpURI(LOCAL_HOST, _controllerPort), schemaName,
+              schemaFile);
     }
   }
 
@@ -271,7 +265,7 @@ public abstract class ClusterTest extends ControllerTest {
    *
    * @param segmentDir Segment directory
    */
-  protected void uploadSegments(@Nonnull File segmentDir)
+  protected void uploadSegments(String tableName, File segmentDir)
       throws Exception {
     String[] segmentNames = segmentDir.list();
     Assert.assertNotNull(segmentNames);
@@ -288,7 +282,7 @@ public abstract class ClusterTest extends ControllerTest {
           @Override
           public Integer call()
               throws Exception {
-            return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentName, segmentFile)
+            return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentName, segmentFile, tableName)
                 .getStatusCode();
           }
         }));
@@ -307,57 +301,47 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void addOfflineTable(String tableName, SegmentVersion segmentVersion)
       throws Exception {
-    addOfflineTable(tableName, null, null, null, null, null, segmentVersion, null, null, null);
+    addOfflineTable(tableName, null, null, null, null, null, segmentVersion, null, null, null, null, null);
   }
 
   protected void addOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
       String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
-      List<String> bloomFilterColumns, TableTaskConfig taskConfig)
+      List<String> bloomFilterColumns, TableTaskConfig taskConfig, SegmentPartitionConfig segmentPartitionConfig,
+      String sortedColumn)
       throws Exception {
     TableConfig tableConfig =
         getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
-            invertedIndexColumns, bloomFilterColumns, taskConfig);
-
-    if (!isUsingNewConfigFormat()) {
-      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
-    } else {
-      _offlineTableConfig = tableConfig;
-    }
+            invertedIndexColumns, bloomFilterColumns, taskConfig, segmentPartitionConfig, sortedColumn, "daily");
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
   }
 
   protected void updateOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
       String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
-      List<String> bloomFilterColumns, TableTaskConfig taskConfig)
+      List<String> bloomFilterColumns, TableTaskConfig taskConfig, SegmentPartitionConfig segmentPartitionConfig,
+      String sortedColumn)
       throws Exception {
     TableConfig tableConfig =
         getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
-            invertedIndexColumns, bloomFilterColumns, taskConfig);
-
-    if (!isUsingNewConfigFormat()) {
-      sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJsonConfigString());
-    } else {
-      _offlineTableConfig = tableConfig;
-    }
+            invertedIndexColumns, bloomFilterColumns, taskConfig, segmentPartitionConfig, sortedColumn, "daily");
+    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJsonConfigString());
   }
 
   private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,
       String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
-      List<String> invertedIndexColumns, List<String> bloomFilterColumns, TableTaskConfig taskConfig) {
+      List<String> invertedIndexColumns, List<String> bloomFilterColumns, TableTaskConfig taskConfig,
+      SegmentPartitionConfig segmentPartitionConfig, String sortedColumn, String segmentPushFrequency) {
     return new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName).setTimeColumnName(timeColumnName)
-        .setTimeType(timeType).setNumReplicas(3).setBrokerTenant(brokerTenant).setServerTenant(serverTenant)
-        .setLoadMode(loadMode).setSegmentVersion(segmentVersion.toString())
-        .setInvertedIndexColumns(invertedIndexColumns).setBloomFilterColumns(bloomFilterColumns)
-        .setTaskConfig(taskConfig).build();
+        .setTimeType(timeType).setSegmentPushFrequency(segmentPushFrequency).setNumReplicas(1)
+        .setBrokerTenant(brokerTenant).setServerTenant(serverTenant).setLoadMode(loadMode)
+        .setSegmentVersion(segmentVersion.toString()).setInvertedIndexColumns(invertedIndexColumns)
+        .setBloomFilterColumns(bloomFilterColumns).setTaskConfig(taskConfig)
+        .setSegmentPartitionConfig(segmentPartitionConfig).setSortedColumn(sortedColumn).build();
   }
 
   protected void dropOfflineTable(String tableName)
       throws Exception {
     sendDeleteRequest(
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
-  }
-
-  protected boolean isUsingNewConfigFormat() {
-    return false;
   }
 
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
@@ -403,6 +387,17 @@ public abstract class ClusterTest extends ControllerTest {
       List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
       TableTaskConfig taskConfig, String streamConsumerFactoryName)
       throws Exception {
+    addRealtimeTable(tableName, useLlc, kafkaBrokerList, kafkaZkUrl, kafkaTopic, realtimeSegmentFlushRows, avroFile,
+        timeColumnName, timeType, schemaName, brokerTenant, serverTenant, loadMode, sortedColumn, invertedIndexColumns,
+        bloomFilterColumns, noDictionaryColumns, taskConfig, streamConsumerFactoryName, 1);
+  }
+
+  protected void addRealtimeTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,
+      String kafkaTopic, int realtimeSegmentFlushRows, File avroFile, String timeColumnName, String timeType,
+      String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
+      List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
+      TableTaskConfig taskConfig, String streamConsumerFactoryName, int numReplicas)
+      throws Exception {
     Map<String, String> streamConfigs = new HashMap<>();
     String streamType = "kafka";
     streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);
@@ -421,6 +416,9 @@ public abstract class ClusterTest extends ControllerTest {
       streamConfigs.put(KafkaStreamConfigProperties
               .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING),
           kafkaZkUrl);
+      streamConfigs.put(KafkaStreamConfigProperties
+              .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_BOOTSTRAP_SERVER),
+          kafkaBrokerList);
     }
     streamConfigs.put(StreamConfigProperties
             .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
@@ -440,14 +438,13 @@ public abstract class ClusterTest extends ControllerTest {
         .setTimeColumnName(timeColumnName).setTimeType(timeType).setSchemaName(schemaName).setBrokerTenant(brokerTenant)
         .setServerTenant(serverTenant).setLoadMode(loadMode).setSortedColumn(sortedColumn)
         .setInvertedIndexColumns(invertedIndexColumns).setBloomFilterColumns(bloomFilterColumns)
-        .setNoDictionaryColumns(noDictionaryColumns).setStreamConfigs(streamConfigs).setTaskConfig(taskConfig).build();
+        .setNoDictionaryColumns(noDictionaryColumns).setStreamConfigs(streamConfigs).setTaskConfig(taskConfig)
+        .setNumReplicas(numReplicas).build();
 
     // save the realtime table config
     _realtimeTableConfig = tableConfig;
 
-    if (!isUsingNewConfigFormat()) {
-      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
-    }
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
   }
 
   protected void updateRealtimeTableConfig(String tablename, List<String> invertedIndexCols,
@@ -481,27 +478,13 @@ public abstract class ClusterTest extends ControllerTest {
       String kafkaTopic, int realtimeSegmentFlushSize, File avroFile, String timeColumnName, String timeType,
       String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
       List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
-      TableTaskConfig taskConfig, String streamConsumerFactoryName)
+      TableTaskConfig taskConfig, String streamConsumerFactoryName, SegmentPartitionConfig segmentPartitionConfig)
       throws Exception {
     addOfflineTable(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, SegmentVersion.v1,
-        invertedIndexColumns, bloomFilterColumns, taskConfig);
+        invertedIndexColumns, bloomFilterColumns, taskConfig, segmentPartitionConfig, sortedColumn);
     addRealtimeTable(tableName, useLlc, kafkaBrokerList, kafkaZkUrl, kafkaTopic, realtimeSegmentFlushSize, avroFile,
         timeColumnName, timeType, schemaName, brokerTenant, serverTenant, loadMode, sortedColumn, invertedIndexColumns,
         bloomFilterColumns, noDictionaryColumns, taskConfig, streamConsumerFactoryName);
-  }
-
-  protected void createBrokerTenant(String tenantName, int brokerCount)
-      throws Exception {
-    String request = ControllerRequestBuilderUtil.buildBrokerTenantCreateRequestJSON(tenantName, brokerCount);
-    sendPostRequest(_controllerRequestURLBuilder.forBrokerTenantCreate(), request);
-  }
-
-  protected void createServerTenant(String tenantName, int offlineServerCount, int realtimeServerCount)
-      throws Exception {
-    String request = ControllerRequestBuilderUtil
-        .buildServerTenantCreateRequestJSON(tenantName, offlineServerCount + realtimeServerCount, offlineServerCount,
-            realtimeServerCount);
-    sendPostRequest(_controllerRequestURLBuilder.forServerTenantCreate(), request);
   }
 
   protected JsonNode getDebugInfo(final String uri)
@@ -511,18 +494,18 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected JsonNode postQuery(String query)
       throws Exception {
-    return postQuery(query, _brokerBaseApiUrl);
+    return postQuery(new PinotQueryRequest("pql", query), _brokerBaseApiUrl);
   }
 
-  public static JsonNode postQuery(String query, String brokerBaseApiUrl)
+  public static JsonNode postQuery(PinotQueryRequest r, String brokerBaseApiUrl)
       throws Exception {
-    return postQuery(query, brokerBaseApiUrl, false);
+    return postQuery(r.getQuery(), brokerBaseApiUrl, false, r.getQueryFormat());
   }
 
-  public static JsonNode postQuery(String query, String brokerBaseApiUrl, boolean enableTrace)
+  public static JsonNode postQuery(String query, String brokerBaseApiUrl, boolean enableTrace, String queryType)
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
-    payload.put("pql", query);
+    payload.put(queryType, query);
     payload.put("trace", enableTrace);
 
     return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query", payload.toString()));

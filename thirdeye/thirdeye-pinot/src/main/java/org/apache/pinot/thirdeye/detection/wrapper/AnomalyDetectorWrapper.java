@@ -46,6 +46,7 @@ import org.apache.pinot.thirdeye.detection.DetectionPipelineException;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.PredictionResult;
+import org.apache.pinot.thirdeye.detection.cache.CacheConfig;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
 import org.apache.pinot.thirdeye.detection.spi.exception.DetectorDataInsufficientException;
 import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
@@ -60,6 +61,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
+import static org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator.*;
 
 
 /**
@@ -82,11 +84,6 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final String PROP_TIMEZONE = "timezone";
   private static final String PROP_BUCKET_PERIOD = "bucketPeriod";
   private static final String PROP_CACHE_PERIOD_LOOKBACK = "cachingPeriodLookback";
-  private static final long DEFAULT_CACHING_PERIOD_LOOKBACK = -1;
-  private static final long CACHING_PERIOD_LOOKBACK_DAILY = TimeUnit.DAYS.toMillis(90);
-  private static final long CACHING_PERIOD_LOOKBACK_HOURLY = TimeUnit.DAYS.toMillis(60);
-  // disable minute level cache warm up
-  private static final long CACHING_PERIOD_LOOKBACK_MINUTELY = -1;
   // fail detection job if it failed successively for the first 5 windows
   private static final long EARLY_TERMINATE_WINDOW = 5;
   // expression to consolidate the time series
@@ -95,6 +92,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectorWrapper.class);
 
   private final String metricUrn;
+  private final String entityName;
   private final AnomalyDetector anomalyDetector;
 
   private final int windowDelay;
@@ -114,6 +112,9 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
 
   public AnomalyDetectorWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
+
+    Preconditions.checkArgument(this.config.getProperties().containsKey(PROP_SUB_ENTITY_NAME));
+    this.entityName = MapUtils.getString(config.getProperties(), PROP_SUB_ENTITY_NAME);
 
     this.metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
     this.metricEntity = MetricEntity.fromURN(this.metricUrn);
@@ -147,7 +148,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     String bucketStr = MapUtils.getString(config.getProperties(), PROP_BUCKET_PERIOD);
     this.bucketPeriod = bucketStr == null ? this.getBucketSizePeriodForDataset() : Period.parse(bucketStr);
     this.cachingPeriodLookback = config.getProperties().containsKey(PROP_CACHE_PERIOD_LOOKBACK) ?
-        MapUtils.getLong(config.getProperties(), PROP_CACHE_PERIOD_LOOKBACK) : getCachingPeriodLookback(this.dataset.bucketTimeGranularity());
+        MapUtils.getLong(config.getProperties(), PROP_CACHE_PERIOD_LOOKBACK) : ThirdEyeUtils.getCachingPeriodLookback(this.dataset.bucketTimeGranularity());
 
     speedUpMinuteLevelDetection();
   }
@@ -158,13 +159,16 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     // 1. get the last time stamp for the time series.
     // 2. to calculate current values and  baseline values for the anomalies detected
     // 3. anomaly detection current and baseline time series value
-    if (this.cachingPeriodLookback >= 0) {
-      MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - cachingPeriodLookback, endTime,
-          this.metricEntity.getFilters());
-      this.provider.fetchTimeseries(Collections.singleton(cacheSlice));
+    if (CacheConfig.getInstance().useCentralizedCache() || CacheConfig.getInstance().useInMemoryCache()) {
+      if (this.cachingPeriodLookback >= 0) {
+        MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - cachingPeriodLookback, endTime,
+            this.metricEntity.getFilters());
+        this.provider.fetchTimeseries(Collections.singleton(cacheSlice));
+      }
     }
 
-    List<Interval> monitoringWindows = this.getMonitoringWindows();
+    List<Interval> monitoringWindows =
+        this.getMonitoringWindows().stream().filter(i -> i.getEndMillis() <= this.endTime).collect(Collectors.toList());
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     TimeSeries predictedResult = TimeSeries.empty();
     int totalWindows = monitoringWindows.size();
@@ -178,8 +182,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       Interval window = monitoringWindows.get(i);
       DetectionResult detectionResult = DetectionResult.empty();
       try {
-        LOG.info("[Pipeline] start detection for config {} metricUrn {} window ({}/{}) - start {} end {}",
-            config.getId(), metricUrn, i + 1, monitoringWindows.size(), window.getStart(), window.getEnd());
+        LOG.info("[Pipeline] start detection for config {} detector {} metricUrn {} window ({}/{}) - start {} end {}",
+            config.getId(), this.detectorName, metricUrn, i + 1, monitoringWindows.size(), window.getStart(), window.getEnd());
         long ts = System.currentTimeMillis();
         detectionResult = anomalyDetector.runDetection(window, this.metricUrn);
         LOG.info("[Pipeline] end detection for config {} metricUrn {} window ({}/{}) - start {} end {} used {} milliseconds, detected {} anomalies",
@@ -188,7 +192,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
         successWindows++;
       }
       catch (DetectorDataInsufficientException e) {
-        LOG.warn("[DetectionConfigID{}] Insufficient data ro run detection for window {} to {}.", this.config.getId(), window.getStart(), window.getEnd());
+        LOG.warn("[DetectionConfigID{}] Insufficient data to run detection for window {} to {}.", this.config.getId(), window.getStart(), window.getEnd());
         lastException = e;
       }
       catch (Exception e) {
@@ -208,12 +212,11 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       anomaly.setCollection(this.metric.getDataset());
       anomaly.setDimensions(DetectionUtils.toFilterMap(this.metricEntity.getFilters()));
       anomaly.getProperties().put(PROP_DETECTOR_COMPONENT_NAME, this.detectorName);
+      anomaly.getProperties().put(PROP_SUB_ENTITY_NAME, this.entityName);
     }
     long lastTimeStamp = this.getLastTimeStamp();
-    List<MergedAnomalyResultDTO> anomalyResults = anomalies.stream().filter(anomaly -> anomaly.getEndTime() <= lastTimeStamp).collect(
-        Collectors.toList());
     PredictionResult predictedTimeSeries = new PredictionResult(this.detectorName, this.metricUrn, predictedResult.getDataFrame());
-    return new DetectionPipelineResult(anomalyResults, lastTimeStamp, Collections.singletonList(predictedTimeSeries));
+    return new DetectionPipelineResult(anomalies, lastTimeStamp, Collections.singletonList(predictedTimeSeries));
   }
 
   /**
@@ -298,24 +301,6 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       }
     }
     return Collections.singletonList(new Interval(startTime, endTime));
-  }
-
-  private long getCachingPeriodLookback(TimeGranularity granularity) {
-    long period;
-    switch (granularity.getUnit()) {
-      case DAYS:
-        period = CACHING_PERIOD_LOOKBACK_DAILY;
-        break;
-      case HOURS:
-        period = CACHING_PERIOD_LOOKBACK_HOURLY;
-        break;
-      case MINUTES:
-        period = CACHING_PERIOD_LOOKBACK_MINUTELY;
-        break;
-      default:
-        period = DEFAULT_CACHING_PERIOD_LOOKBACK;
-    }
-    return period;
   }
 
   // get the list of monitoring window end times

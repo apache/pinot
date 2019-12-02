@@ -67,7 +67,20 @@ $(document).ready(function() {
     // execute query and draw the results
     var query = EDITOR.getValue().trim();
     var traceEnabled = document.getElementById('trace-enabled').checked;
-    HELPERS.executeQuery(query, traceEnabled, function(data) {
+    var groupByModeSQL = document.getElementById('group-by-mode-sql').checked;
+    var responseFormatSQL = document.getElementById('response-format-sql').checked;
+    var queryOptions = undefined;
+    if (groupByModeSQL === true) {
+      queryOptions = "groupByMode=sql";
+    }
+    if (responseFormatSQL === true) {
+      if (queryOptions === undefined) {
+        queryOptions = "responseFormat=sql";
+      } else {
+        queryOptions = queryOptions + ";responseFormat=sql";
+      }
+    }
+    HELPERS.executeQuery(query, traceEnabled, queryOptions, function(data) {
       RESULTS.setValue(js_beautify(data, JS_BEAUTIFY_SETTINGS));
 
       var queryResponse = null;
@@ -128,6 +141,16 @@ $(document).ready(function() {
         columns: columnList,
         scrollX: true
       });
+
+      new $.fn.dataTable.Buttons(table, {
+        buttons: [
+          'copy', 'excel', 'csv'
+        ]
+      });
+
+      table.buttons().container().prependTo(
+        table.table().container()
+      );
     })
   });
 });
@@ -178,6 +201,8 @@ var HELPERS = {
         "paging": false,
         "info": false
       });
+    }).fail(function() {
+      $(".schema-detail-view").html("Table " + tableName + " schema not found")
     });
   },
 
@@ -189,11 +214,12 @@ var HELPERS = {
     var query = EDITOR.getValue().trim();
   },
 
-  executeQuery: function(query, traceEnabled, callback) {
+  executeQuery: function(query, traceEnabled, queryOptions, callback) {
     var url = "/pql";
     var params = JSON.stringify({
       "pql": query,
-      "trace": traceEnabled
+      "trace": traceEnabled,
+      "queryOptions" : queryOptions
     });
     $.ajax({
       type: 'POST',

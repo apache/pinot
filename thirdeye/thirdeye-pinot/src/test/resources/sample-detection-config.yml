@@ -1,0 +1,19 @@
+detectionName: sample_detection
+
+# Tell the alert recipients what it means if this alert is fired.
+description: If this alert fires then it means so-and-so and check so-and-so for irregularities
+
+# The metric you want to do anomaly detection on. You may type a few characters and look ahead (ctrl + space) to auto-fill.
+metric: cost
+
+# The dataset or UMP table name to which the metric belongs. Look ahead should auto populate this field.
+dataset: test-collection
+
+rules:
+  - detection:
+      - name: detection_rule_1
+        type: THRESHOLD
+        params:
+          max: 900
+          min: 100
+          monitoringGranularity: 1_HOURS

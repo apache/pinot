@@ -33,7 +33,7 @@ import org.apache.http.HttpHost;
 import org.apache.http.HttpStatus;
 import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.slf4j.Logger;
@@ -159,7 +159,7 @@ public class BackfillSegmentUtils {
   /**
    * Uploads the segment tar to the controller.
    */
-  public boolean uploadSegment(String segmentName, File segmentDir, File outputDir) {
+  public boolean uploadSegment(String rawTableName, String segmentName, File segmentDir, File outputDir) {
     boolean success = true;
 
     File segmentTar = new File(outputDir, segmentName + TAR_SUFFIX);
@@ -170,12 +170,13 @@ public class BackfillSegmentUtils {
       try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
         SimpleHttpResponse response = fileUploadDownloadClient.uploadSegment(
             FileUploadDownloadClient.getUploadSegmentHttpURI(_controllerHost, Integer.parseInt(_controllerPort)),
-            segmentName, segmentTar);
+            segmentName, segmentTar, rawTableName);
         int statusCode = response.getStatusCode();
         if (statusCode != HttpStatus.SC_OK) {
           success = false;
         }
-        LOGGER.info("Uploaded segment: {} and got response {}: {}", segmentName, statusCode, response.getResponse());
+        LOGGER.info("Uploaded segment: {} to table {} and got response {}: {}", segmentName, rawTableName, statusCode,
+            response.getResponse());
       }
     } catch (Exception e) {
       LOGGER.error("Exception in segment upload {}", segmentTar, e);

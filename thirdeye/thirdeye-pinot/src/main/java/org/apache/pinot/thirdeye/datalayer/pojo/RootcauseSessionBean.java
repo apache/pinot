@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -52,6 +53,8 @@ public class RootcauseSessionBean extends AbstractBean {
   private Set<String> selectedUrns;
   private Long anomalyId;
   private String permissions = PermissionType.READ_WRITE.toString();
+  private Map<String, Object> customTableSettings;
+  private Boolean isUserCustomizingRequest;
 
   public String getName() {
     return name;
@@ -189,6 +192,14 @@ public class RootcauseSessionBean extends AbstractBean {
     this.permissions = permissions;
   }
 
+  public Map<String, Object> getCustomTableSettings() { return customTableSettings; }
+
+  public void setCustomTableSettings(Map<String, Object> customTableSettings) { this.customTableSettings = customTableSettings; }
+
+  public Boolean getIsUserCustomizingRequest() { return isUserCustomizingRequest; }
+
+  public void setIsUserCustomizingRequest( Boolean isUserCustomizingRequest ) { this.isUserCustomizingRequest = isUserCustomizingRequest; }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -205,13 +216,15 @@ public class RootcauseSessionBean extends AbstractBean {
         that.analysisRangeStart) && Objects.equals(analysisRangeEnd, that.analysisRangeEnd) && Objects.equals(created,
         that.created) && Objects.equals(updated, that.updated) && Objects.equals(contextUrns, that.contextUrns)
         && Objects.equals(anomalyUrns, that.anomalyUrns) && Objects.equals(selectedUrns, that.selectedUrns)
-        && Objects.equals(anomalyId, that.anomalyId) && Objects.equals(permissions, that.permissions);
+        && Objects.equals(anomalyId, that.anomalyId) && Objects.equals(permissions, that.permissions)
+        && Objects.equals(customTableSettings, that.customTableSettings)
+        && Objects.equals(isUserCustomizingRequest, that.isUserCustomizingRequest);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(name, text, owner, compareMode, granularity, previousId, anomalyRangeStart, anomalyRangeEnd,
         analysisRangeStart, analysisRangeEnd, created, updated, contextUrns, anomalyUrns, selectedUrns, anomalyId,
-        permissions);
+        permissions, customTableSettings, isUserCustomizingRequest);
   }
 }

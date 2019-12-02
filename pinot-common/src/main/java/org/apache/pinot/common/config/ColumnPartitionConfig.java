@@ -18,26 +18,14 @@
  */
 package org.apache.pinot.common.config;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import javax.annotation.Nonnull;
-import org.apache.pinot.common.utils.EqualityUtils;
 
 
-@SuppressWarnings("unused") // Suppress incorrect warnings as methods used for ser/de.
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class ColumnPartitionConfig {
-  public static final String PARTITION_VALUE_DELIMITER = ",";
-
-  @ConfigKey("functionName")
-  private String _functionName;
-
-  @ConfigKey("numPartitions")
+public class ColumnPartitionConfig extends BaseJsonConfig {
+  private final String _functionName;
   private int _numPartitions;
-
-  public ColumnPartitionConfig() {
-  }
 
   /**
    * Constructor for the class.
@@ -45,11 +33,12 @@ public class ColumnPartitionConfig {
    * @param functionName Name of the partition function.
    * @param numPartitions Number of partitions for this column.
    */
-  public ColumnPartitionConfig(@Nonnull @JsonProperty("functionName") String functionName,
-      @JsonProperty("numPartitions") int numPartitions) {
+  @JsonCreator
+  public ColumnPartitionConfig(@JsonProperty(value = "functionName", required = true) String functionName,
+      @JsonProperty(value = "numPartitions", required = true) int numPartitions) {
+    Preconditions.checkArgument(functionName != null, "'functionName' must be configured");
+    Preconditions.checkArgument(numPartitions > 0, "'numPartitions' must be positive");
     _functionName = functionName;
-
-    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > zero, specified: " + numPartitions);
     _numPartitions = numPartitions;
   }
 
@@ -72,32 +61,7 @@ public class ColumnPartitionConfig {
   }
 
   public void setNumPartitions(int numPartitions) {
-    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > zero, specified: " + numPartitions);
+    Preconditions.checkArgument(numPartitions > 0, "'numPartitions' must be positive");
     _numPartitions = numPartitions;
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (this == obj) {
-      return true;
-    }
-    if (obj instanceof ColumnPartitionConfig) {
-      ColumnPartitionConfig that = (ColumnPartitionConfig) obj;
-      return _functionName.equals(that._functionName) && _numPartitions == that._numPartitions;
-    }
-    return false;
-  }
-
-  @Override
-  public int hashCode() {
-    int hashCode = EqualityUtils.hashCodeOf(_functionName);
-    hashCode = EqualityUtils.hashCodeOf(hashCode, _numPartitions);
-    return hashCode;
-  }
-
-  @Override
-  public String toString() {
-    return "ColumnPartitionConfig{" + "_functionName='" + _functionName + '\'' + ", _numPartitions=" + _numPartitions
-        + '}';
   }
 }

@@ -19,15 +19,19 @@
 package org.apache.pinot.core.plan;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.CombineGroupByOperator;
+import org.apache.pinot.core.operator.CombineGroupByOrderByOperator;
 import org.apache.pinot.core.operator.CombineOperator;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
+import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.core.util.trace.TraceCallable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,8 +43,14 @@ import org.slf4j.LoggerFactory;
 public class CombinePlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(CombinePlanNode.class);
 
-  private static final int MAX_PLAN_THREADS = Math.min(10, (int) (Runtime.getRuntime().availableProcessors() * .5));
-  private static final int MIN_TASKS_PER_THREAD = 10;
+  // Use at most 10 or half of the processors threads for each query.
+  // If there are less than 2 processors, use 1 thread.
+  // Runtime.getRuntime().availableProcessors() may return value < 2 in container based environment, e.g. Kubernetes.
+  private static final int MAX_NUM_THREADS_PER_QUERY =
+      Math.max(1, Math.min(10, Runtime.getRuntime().availableProcessors() / 2));
+  // Try to schedule 10 plans for each thread, or evenly distribute plans to all MAX_NUM_THREADS_PER_QUERY threads
+  private static final int TARGET_NUM_PLANS_PER_THREAD = 10;
+
   private static final int TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN = 10_000;
 
   private final List<PlanNode> _planNodes;
@@ -72,7 +82,7 @@ public class CombinePlanNode implements PlanNode {
     int numPlanNodes = _planNodes.size();
     List<Operator> operators = new ArrayList<>(numPlanNodes);
 
-    if (numPlanNodes <= MIN_TASKS_PER_THREAD) {
+    if (numPlanNodes <= TARGET_NUM_PLANS_PER_THREAD) {
       // Small number of plan nodes, run them sequentially
       for (PlanNode planNode : _planNodes) {
         operators.add(planNode.run());
@@ -81,29 +91,42 @@ public class CombinePlanNode implements PlanNode {
       // Large number of plan nodes, run them in parallel
 
       // Calculate the time out timestamp
-      long endTime = System.currentTimeMillis() + TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN;
+      long endTimeMs = System.currentTimeMillis() + TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN;
 
-      int threads = Math.min(numPlanNodes / MIN_TASKS_PER_THREAD + ((numPlanNodes % MIN_TASKS_PER_THREAD == 0) ? 0 : 1),
-          // ceil without using double arithmetic
-          MAX_PLAN_THREADS);
-      int opsPerThread = Math.max(numPlanNodes / threads + ((numPlanNodes % threads == 0) ? 0 : 1),
-          // ceil without using double arithmetic
-          MIN_TASKS_PER_THREAD);
+      int numThreads = Math.min((numPlanNodes + TARGET_NUM_PLANS_PER_THREAD - 1) / TARGET_NUM_PLANS_PER_THREAD,
+          MAX_NUM_THREADS_PER_QUERY);
+
+      // Use a Phaser to ensure all the Futures are done (not scheduled, finished or interrupted) before the main thread
+      // returns. We need to ensure no execution left before the main thread returning because the main thread holds the
+      // reference to the segments, and if the segments are deleted/refreshed, the segments can be released after the
+      // main thread returns, which would lead to undefined behavior (even JVM crash) when executing queries against
+      // them.
+      Phaser phaser = new Phaser(1);
+
       // Submit all jobs
-      Future[] futures = new Future[threads];
-      for (int i = 0; i < threads; i++) {
-        final int index = i;
+      Future[] futures = new Future[numThreads];
+      for (int i = 0; i < numThreads; i++) {
+        int index = i;
         futures[i] = _executorService.submit(new TraceCallable<List<Operator>>() {
           @Override
-          public List<Operator> callJob()
-              throws Exception {
-            List<Operator> operators = new ArrayList<>();
-            int start = index * opsPerThread;
-            int limit = Math.min(opsPerThread, numPlanNodes - start);
-            for (int count = start; count < start + limit; count++) {
-              operators.add(_planNodes.get(count).run());
+          public List<Operator> callJob() {
+            try {
+              // Register the thread to the phaser.
+              // If the phaser is terminated (returning negative value) when trying to register the thread, that means
+              // the query execution has timed out, and the main thread has deregistered itself and returned the result.
+              // Directly return as no execution result will be taken.
+              if (phaser.register() < 0) {
+                return Collections.emptyList();
+              }
+
+              List<Operator> operators = new ArrayList<>();
+              for (int i = index; i < numPlanNodes; i += numThreads) {
+                operators.add(_planNodes.get(i).run());
+              }
+              return operators;
+            } finally {
+              phaser.arriveAndDeregister();
             }
-            return operators;
           }
         });
       }
@@ -111,7 +134,8 @@ public class CombinePlanNode implements PlanNode {
       // Get all results
       try {
         for (Future future : futures) {
-          List<Operator> ops = (List<Operator>) future.get(endTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+          List<Operator> ops =
+              (List<Operator>) future.get(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
           operators.addAll(ops);
         }
       } catch (Exception e) {
@@ -130,12 +154,19 @@ public class CombinePlanNode implements PlanNode {
             future.cancel(true);
           }
         }
+        // Deregister the main thread and wait for all threads done
+        phaser.awaitAdvance(phaser.arriveAndDeregister());
       }
     }
 
     // TODO: use the same combine operator for both aggregation and selection query.
     if (_brokerRequest.isSetAggregationsInfo() && _brokerRequest.getGroupBy() != null) {
       // Aggregation group-by query
+      QueryOptions queryOptions = new QueryOptions(_brokerRequest.getQueryOptions());
+      // new Combine operator only when GROUP_BY_MODE explicitly set to SQL
+      if (queryOptions.isGroupByModeSQL()) {
+        return new CombineGroupByOrderByOperator(operators, _brokerRequest, _executorService, _timeOutMs);
+      }
       return new CombineGroupByOperator(operators, _brokerRequest, _executorService, _timeOutMs, _numGroupsLimit);
     } else {
       // Selection or aggregation only query

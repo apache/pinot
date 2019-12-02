@@ -30,9 +30,10 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
 import org.apache.pinot.common.utils.LLCUtils;
 import org.apache.pinot.common.utils.SegmentName;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,7 +67,7 @@ public class LowLevelConsumerRoutingTableBuilder extends GeneratorBasedRoutingTa
   }
 
   @Override
-  protected Map<String, List<String>> computeSegmentToServersMapFromExternalView(ExternalView externalView,
+  protected Map<String, List<ServerInstance>> computeSegmentToServersMapFromExternalView(ExternalView externalView,
       List<InstanceConfig> instanceConfigs) {
     // We build the segment to servers mapping here. What we want to do is to make sure that we uphold
     // the guarantees clients expect (no duplicate records, eventual consistency) and spreading the load as equally as
@@ -80,7 +81,7 @@ public class LowLevelConsumerRoutingTableBuilder extends GeneratorBasedRoutingTa
     // The upstream code in BaseRoutingTableGenerator will generate routing tables based on taking a subset of servers
     // if the cluster is large enough as well as ensure that the best routing tables are used for routing.
 
-    Map<String, List<String>> segmentToServersMap = new HashMap<>();
+    Map<String, List<ServerInstance>> segmentToServersMap = new HashMap<>();
 
     // 1. Gather all segments and group them by partition, sorted by sequence number
     Map<String, SortedSet<SegmentName>> sortedSegmentsByStreamPartition =
@@ -90,10 +91,7 @@ public class LowLevelConsumerRoutingTableBuilder extends GeneratorBasedRoutingTa
     Map<String, SegmentName> allowedSegmentInConsumingStateByPartition =
         LowLevelRoutingTableBuilderUtil.getAllowedConsumingStateSegments(externalView, sortedSegmentsByStreamPartition);
 
-    // 3. Sort all the segments to be used during assignment in ascending order of replicas
-
-    // PriorityQueue throws IllegalArgumentException when given a size of zero
-    RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigs);
+    InstanceConfigManager instanceConfigManager = new InstanceConfigManager(instanceConfigs);
 
     for (Map.Entry<String, SortedSet<SegmentName>> entry : sortedSegmentsByStreamPartition.entrySet()) {
       String partitionId = entry.getKey();
@@ -103,29 +101,19 @@ public class LowLevelConsumerRoutingTableBuilder extends GeneratorBasedRoutingTa
       SegmentName validConsumingSegment = allowedSegmentInConsumingStateByPartition.get(partitionId);
 
       for (SegmentName segmentName : segmentNames) {
-        List<String> validServers = new ArrayList<>();
+        List<ServerInstance> validServers = new ArrayList<>();
         String segmentNameStr = segmentName.getSegmentName();
-        Map<String, String> externalViewState = externalView.getStateMap(segmentNameStr);
+        Map<String, String> instanceStateMap = externalView.getStateMap(segmentNameStr);
 
-        for (Map.Entry<String, String> instanceAndStateEntry : externalViewState.entrySet()) {
-          String instance = instanceAndStateEntry.getKey();
-          String state = instanceAndStateEntry.getValue();
-
-          // Skip pruned replicas (shutting down or otherwise disabled)
-          if (instancePruner.isInactive(instance)) {
-            continue;
-          }
-
-          // Replicas in ONLINE state are always allowed
-          if (state.equalsIgnoreCase(CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
-            validServers.add(instance);
-            continue;
-          }
-
-          // Replicas in CONSUMING state are only allowed on the last segment
-          if (state.equalsIgnoreCase(CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING)
-              && segmentName.equals(validConsumingSegment)) {
-            validServers.add(instance);
+        for (Map.Entry<String, String> instanceStateEntry : instanceStateMap.entrySet()) {
+          String state = instanceStateEntry.getValue();
+          if (state.equals(RealtimeSegmentOnlineOfflineStateModel.ONLINE) || (
+              state.equals(RealtimeSegmentOnlineOfflineStateModel.CONSUMING) && validConsumingSegment != null
+                  && segmentNameStr.equals(validConsumingSegment.getSegmentName()))) {
+            InstanceConfig instanceConfig = instanceConfigManager.getActiveInstanceConfig(instanceStateEntry.getKey());
+            if (instanceConfig != null) {
+              validServers.add(new ServerInstance(instanceConfig));
+            }
           }
         }
 

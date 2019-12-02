@@ -20,48 +20,36 @@ package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.core.realtime.stream.PartitionLevelStreamConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * Manager which maintains the flush threshold update objects for each table
  */
 public class FlushThresholdUpdateManager {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(FlushThresholdUpdateManager.class);
-
-  private ConcurrentMap<String, FlushThresholdUpdater> _flushThresholdUpdaterMap = new ConcurrentHashMap<>();
+  private final ConcurrentMap<String, FlushThresholdUpdater> _flushThresholdUpdaterMap = new ConcurrentHashMap<>();
 
   /**
    * Check table config for flush size.
    *
-   * If flush size < 0, create a new DefaultFlushThresholdUpdater with default flush size
    * If flush size > 0, create a new DefaultFlushThresholdUpdater with given flush size.
-   * If flush size == 0, create new SegmentSizeBasedFlushThresholdUpdater if not already created. Create only 1 per table, because we want to maintain tuning information for the table in the updater
-   * @param realtimeTableConfig
-   * @return
+   * If flush size <= 0, create new SegmentSizeBasedFlushThresholdUpdater if not already created. Create only 1 per
+   * table because we want to maintain tuning information for the table in the updater.
    */
-  public FlushThresholdUpdater getFlushThresholdUpdater(TableConfig realtimeTableConfig) {
-    final String tableName = realtimeTableConfig.getTableName();
-    PartitionLevelStreamConfig streamConfig =
-        new PartitionLevelStreamConfig(realtimeTableConfig.getIndexingConfig().getStreamConfigs());
+  public FlushThresholdUpdater getFlushThresholdUpdater(PartitionLevelStreamConfig streamConfig) {
+    String realtimeTableName = streamConfig.getTableNameWithType();
+    int flushThresholdRows = streamConfig.getFlushThresholdRows();
 
-    final int tableFlushSize = streamConfig.getFlushThresholdRows();
-    final long desiredSegmentSize = streamConfig.getFlushSegmentDesiredSizeBytes();
-
-    if (tableFlushSize == 0) {
-      return _flushThresholdUpdaterMap
-          .computeIfAbsent(tableName, k -> new SegmentSizeBasedFlushThresholdUpdater(desiredSegmentSize));
+    if (flushThresholdRows > 0) {
+      _flushThresholdUpdaterMap.remove(realtimeTableName);
+      return new DefaultFlushThresholdUpdater(flushThresholdRows);
     } else {
-      _flushThresholdUpdaterMap.remove(tableName);
-      return new DefaultFlushThresholdUpdater(tableFlushSize);
+      return _flushThresholdUpdaterMap
+          .computeIfAbsent(realtimeTableName, k -> new SegmentSizeBasedFlushThresholdUpdater());
     }
   }
 
-  public void clearFlushThresholdUpdater(TableConfig tableConfig) {
-    _flushThresholdUpdaterMap.remove(tableConfig.getTableName());
+  public void clearFlushThresholdUpdater(String realtimeTableName) {
+    _flushThresholdUpdaterMap.remove(realtimeTableName);
   }
 }

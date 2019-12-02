@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import javax.annotation.Nonnull;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.customobject.QuantileDigest;
@@ -31,52 +31,54 @@ public class PercentileEstMVAggregationFunction extends PercentileEstAggregation
     super(percentile);
   }
 
-  @Nonnull
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.PERCENTILEESTMV;
   }
 
-  @Nonnull
   @Override
-  public String getColumnName(@Nonnull String column) {
+  public String getColumnName(String column) {
     return AggregationFunctionType.PERCENTILEEST.getName() + _percentile + "MV_" + column;
   }
 
   @Override
-  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull BlockValSet... blockValSets) {
-    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
-    QuantileDigest quantileDigest = getQuantileDigest(aggregationResultHolder);
+  public void accept(AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
+
+  @Override
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
+    long[][] valuesArray = blockValSets[0].getLongValuesMV();
+    QuantileDigest quantileDigest = getDefaultQuantileDigest(aggregationResultHolder);
     for (int i = 0; i < length; i++) {
-      for (double value : valuesArray[i]) {
-        quantileDigest.add((long) value);
+      for (long value : valuesArray[i]) {
+        quantileDigest.add(value);
       }
     }
   }
 
   @Override
-  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
-    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
+  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
+    long[][] valuesArray = blockValSets[0].getLongValuesMV();
     for (int i = 0; i < length; i++) {
-      QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKeyArray[i]);
-      for (double value : valuesArray[i]) {
-        quantileDigest.add((long) value);
+      QuantileDigest quantileDigest = getDefaultQuantileDigest(groupByResultHolder, groupKeyArray[i]);
+      for (long value : valuesArray[i]) {
+        quantileDigest.add(value);
       }
     }
   }
 
   @Override
-  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
-    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
+    long[][] valuesArray = blockValSets[0].getLongValuesMV();
     for (int i = 0; i < length; i++) {
-      double[] values = valuesArray[i];
+      long[] values = valuesArray[i];
       for (int groupKey : groupKeysArray[i]) {
-        QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKey);
-        for (double value : values) {
-          quantileDigest.add((long) value);
+        QuantileDigest quantileDigest = getDefaultQuantileDigest(groupByResultHolder, groupKey);
+        for (long value : values) {
+          quantileDigest.add(value);
         }
       }
     }

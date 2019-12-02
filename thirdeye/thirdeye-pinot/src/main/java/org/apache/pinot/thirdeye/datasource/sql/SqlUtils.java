@@ -87,6 +87,7 @@ public class SqlUtils {
   private static final String PRESTO = "Presto";
   private static final String MYSQL = "MySQL";
   private static final String H2 = "H2";
+  private static final String VERTICA = "Vertica";
 
   /**
    * Insert a table to SQL database, currently only used by H2, that can be read by ThirdEye
@@ -98,22 +99,23 @@ public class SqlUtils {
    * @param dimensions list of dimensions
    * @throws SQLException SQL exception if SQL failed
    */
-  public static void createTable(DataSource ds, String tableName,
+  public static void createTableOverride(DataSource ds, String tableName,
       String timeColumn, List<String> metrics, List<String> dimensions) throws SQLException {
     StringBuilder sb = new StringBuilder();
-    sb.append("create table if not exists ");
-    sb.append(tableName);
-    sb.append(" (");
+    sb.append("drop table if exists ").append(tableName).append(";");
+    sb.append("create table ").append(tableName).append(" (");
 
     for (String metric: metrics) {
-      sb.append(metric).append(" decimal(20,3), ");
+      sb.append(metric).append(" decimal(50,3), ");
     }
     for (String dimension: dimensions) {
-      sb.append(dimension).append(" varchar(25), ");
+      sb.append(dimension).append(" varchar(50), ");
     }
-    sb.append(timeColumn).append(" varchar(25) ) ENGINE=InnoDB;");
+    sb.append(timeColumn).append(" varchar(50) ) ENGINE=InnoDB;");
 
     String sql = sb.toString();
+
+    LOG.info("Creating H2 table: " + sql);
 
     try (Connection connection = ds.getConnection();
         Statement statement = connection.createStatement()){
@@ -247,11 +249,7 @@ public class SqlUtils {
 
     sb.append("SELECT ").append(selectionClause).append(" FROM ").append(tableName);
     String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec, sourceName);
-    String datePartitionClause = getDatePartitionClause(startTime);
     sb.append(" WHERE ");
-    if (sourceName.equals(PRESTO)) {
-      sb.append(datePartitionClause).append(" AND ");
-    }
     sb.append(betweenClause);
 
 
@@ -274,20 +272,11 @@ public class SqlUtils {
   }
 
   static String getMaxDataTimeSQL(String timeColumn, String tableName, String sourceName) {
-    if (sourceName.equals(PRESTO)) {
-      return "SELECT MAX(" + timeColumn + ") FROM " + tableName + " WHERE datepartition >= daysago(1)";
-    } else {
-      return "SELECT MAX(" + timeColumn + ") FROM " + tableName;
-    }
-
+    return "SELECT MAX(" + timeColumn + ") FROM " + tableName;
   }
 
   static String getDimensionFiltersSQL(String dimension, String tableName, String sourceName) {
-    if (sourceName.equals(PRESTO)) {
-      return "SELECT DISTINCT(" + dimension + ") FROM " + tableName + " WHERE datepartition >= daysago(1)";
-    } else {
-      return "SELECT DISTINCT(" + dimension + ") FROM " + tableName;
-    }
+    return "SELECT DISTINCT(" + dimension + ") FROM " + tableName;
   }
 
   private static String getSelectionClause(MetricConfigDTO metricConfig, MetricFunction metricFunction, List<String> groupByKeys, TimeGranularity granularity, TimeSpec dateTimeSpec) {
@@ -580,6 +569,14 @@ public class SqlUtils {
     }
   }
 
+  private static String timeFormatToVerticaFormat(String timeFormat) {
+    if (timeFormat.contains("mm")) {
+      return timeFormat.replaceAll("(?i):mm", ":mi");
+    } else {
+      return timeFormat;
+    }
+  }
+
   /**
    * Return a SQL clause that cast any timeColumn as unix timestamp
    *
@@ -595,6 +592,8 @@ public class SqlUtils {
       return "UNIX_TIMESTAMP(STR_TO_DATE(CAST(" + timeColumn + " AS CHAR), '" + timeFormatToMySQLFormat(timeFormat) + "'))";
     } else if (sourceName.equals(H2)){
       return "TO_UNIXTIME(PARSEDATETIME(CAST(" + timeColumn + " AS VARCHAR), '" + timeFormat + "'))";
+    } else if (sourceName.equals(VERTICA)) {
+      return "EXTRACT(EPOCH FROM to_timestamp(to_char(" + timeColumn + "), '" + timeFormatToVerticaFormat(timeFormat) + "'))";
     }
     return "";
   }

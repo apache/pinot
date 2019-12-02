@@ -24,8 +24,9 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
@@ -34,6 +35,7 @@ import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
+import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 
 
@@ -84,17 +86,33 @@ public abstract class BaseQueriesTest {
    * @return broker response.
    */
   protected BrokerResponseNative getBrokerResponseForQuery(String query, PlanMaker planMaker) {
+    return getBrokerResponseForQuery(query, planMaker, null);
+  }
+
+  /**
+   * Run query on multiple index segments with custom plan maker and queryOptions.
+   * <p>Use this to test the whole flow from server to broker.
+   * <p>The result should be equivalent to querying 4 identical index segments.
+   *
+   * @param query PQL query.
+   * @param planMaker Plan maker.
+   * @return broker response.
+   */
+  private BrokerResponseNative getBrokerResponseForQuery(String query, PlanMaker planMaker,
+      Map<String, String> queryOptions) {
     BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
+    brokerRequest.setQueryOptions(queryOptions);
 
     // Server side.
-    Plan plan = planMaker.makeInterSegmentPlan(getSegmentDataManagers(), brokerRequest, EXECUTOR_SERVICE, 10_000);
+    Plan plan = planMaker.makeInterSegmentPlan(getSegmentDataManagers(), brokerRequest, EXECUTOR_SERVICE,
+        Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     DataTable instanceResponse = plan.execute();
 
     // Broker side.
     BrokerReduceService brokerReduceService = new BrokerReduceService();
-    Map<ServerInstance, DataTable> dataTableMap = new HashMap<>();
-    dataTableMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    dataTableMap.put(new ServerInstance("localhost:1111"), instanceResponse);
+    Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
+    dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE), instanceResponse);
+    dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME), instanceResponse);
     return brokerReduceService.reduceOnDataTable(brokerRequest, dataTableMap, null);
   }
 
@@ -108,6 +126,18 @@ public abstract class BaseQueriesTest {
    */
   protected BrokerResponseNative getBrokerResponseForQuery(String query) {
     return getBrokerResponseForQuery(query, PLAN_MAKER);
+  }
+
+  /**
+   * Run query on multiple index segments.
+   * <p>Use this to test the whole flow from server to broker.
+   * <p>The result should be equivalent to querying 4 identical index segments.
+   *
+   * @param query PQL query.
+   * @return broker response.
+   */
+  protected BrokerResponseNative getBrokerResponseForQuery(String query, Map<String, String> queryOptions) {
+    return getBrokerResponseForQuery(query, PLAN_MAKER, queryOptions);
   }
 
   /**

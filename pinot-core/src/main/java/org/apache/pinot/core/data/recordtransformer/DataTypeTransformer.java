@@ -19,10 +19,11 @@
 package org.apache.pinot.core.data.recordtransformer;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
@@ -57,13 +58,13 @@ public class DataTypeTransformer implements RecordTransformer {
     MULTI_VALUE_TYPE_MAP.put(String.class, PinotDataType.STRING_ARRAY);
   }
 
-  private final Schema _schema;
   private final Map<String, PinotDataType> _dataTypes = new HashMap<>();
 
   public DataTypeTransformer(Schema schema) {
-    _schema = schema;
-    for (Map.Entry<String, FieldSpec> entry : schema.getFieldSpecMap().entrySet()) {
-      _dataTypes.put(entry.getKey(), PinotDataType.getPinotDataType(entry.getValue()));
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (!fieldSpec.isVirtualColumn()) {
+        _dataTypes.put(fieldSpec.getName(), PinotDataType.getPinotDataType(fieldSpec));
+      }
     }
   }
 
@@ -71,43 +72,35 @@ public class DataTypeTransformer implements RecordTransformer {
   public GenericRow transform(GenericRow record) {
     for (Map.Entry<String, PinotDataType> entry : _dataTypes.entrySet()) {
       String column = entry.getKey();
-      PinotDataType dest = entry.getValue();
       Object value = record.getValue(column);
 
-      // NOTE: should not need to set default null value in normal case (RecordReader is responsible for filling in the
-      // default null value; TimeTransformer is responsible for filling in the outgoing time value if not exists)
-      if (value == null || (value instanceof Object[] && ((Object[]) value).length == 0)) {
-        // Set default null value
-        FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
-        Object defaultNullValue = fieldSpec.getDefaultNullValue();
-        if (fieldSpec.isSingleValueField()) {
-          value = defaultNullValue;
-        } else {
-          value = new Object[]{defaultNullValue};
-        }
-        record.putField(column, value);
-      } else {
-        PinotDataType source;
-        if (value instanceof Object[]) {
-          // Multi-valued column
-          Object[] values = (Object[]) value;
-          source = MULTI_VALUE_TYPE_MAP.get(values[0].getClass());
-          if (source == null) {
-            source = PinotDataType.OBJECT_ARRAY;
-          }
-        } else {
-          // Single-valued column
-          source = SINGLE_VALUE_TYPE_MAP.get(value.getClass());
-          if (source == null) {
-            source = PinotDataType.OBJECT;
-          }
-        }
+      // Convert List value to Object[]
+      if (value instanceof List) {
+        value = ((List) value).toArray();
+      }
 
-        if (source != dest) {
-          value = dest.convert(value, source);
-          record.putField(column, value);
+      // Convert data type if necessary
+      PinotDataType source;
+      if (value instanceof Object[]) {
+        // Multi-value column
+        Object[] values = (Object[]) value;
+        source = MULTI_VALUE_TYPE_MAP.get(values[0].getClass());
+        if (source == null) {
+          source = PinotDataType.OBJECT_ARRAY;
+        }
+      } else {
+        // Single-value column
+        source = SINGLE_VALUE_TYPE_MAP.get(value.getClass());
+        if (source == null) {
+          source = PinotDataType.OBJECT;
         }
       }
+      PinotDataType dest = entry.getValue();
+      if (source != dest) {
+        value = dest.convert(value, source);
+      }
+
+      record.putValue(column, value);
     }
     return record;
   }

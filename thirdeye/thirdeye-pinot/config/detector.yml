@@ -29,6 +29,12 @@ alerterConfiguration:
   smtpConfiguration:
     smtpHost: "localhost"
     smtpPort: 25
+#  jiraConfiguration:
+#    jiraUser: <REPLACE_ME>
+#    jiraPassword: <REPLACE_ME>
+#    jiraUrl: <REPLACE_ME>
+#    jiraDefaultProject: <REPLACE_ME>
+#    jiraIssueTypeId: 19
 failureFromAddress: "thirdeye@localhost"
 failureToAddress: "thirdeye@localhost"
 phantomJsPath: "/usr/local/bin/jstf"

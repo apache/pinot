@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -40,10 +41,10 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.events.SchemaEventType;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -120,14 +121,36 @@ public class PinotSchemaRestletResource {
     return addOrUpdateSchema(schemaName, multiPart);
   }
 
+  @PUT
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Path("/schemas/{schemaName}")
+  @ApiOperation(value = "Update a schema", notes = "Updates a schema")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully updated schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
+  public SuccessResponse updateSchema(@ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
+      Schema schema) {
+    return addOrUpdateSchema(schemaName, schema);
+  }
+
   // TODO: This should not update if the schema already exists
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas")
   @ApiOperation(value = "Add a new schema", notes = "Adds a new schema")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully deleted schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully created schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse addSchema(FormDataMultiPart multiPart) {
     return addOrUpdateSchema(null, multiPart);
+  }
+
+  // TODO: This should not update if the schema already exists
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Path("/schemas")
+  @ApiOperation(value = "Add a new schema", notes = "Adds a new schema")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully created schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
+  public SuccessResponse addSchema(Schema schema) {
+    return addOrUpdateSchema(null, schema);
   }
 
   @POST
@@ -145,6 +168,21 @@ public class PinotSchemaRestletResource {
     return schema.toPrettyJsonString();
   }
 
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Path("/schemas/validate")
+  @ApiOperation(value = "Validate schema", notes = "This API returns the schema that matches the one you get "
+      + "from 'GET /schema/{schemaName}'. This allows us to validate schema before apply.")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully validated schema"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
+  public String validateSchema(Schema schema) {
+    if (!schema.validate(LOGGER)) {
+      throw new ControllerApplicationException(LOGGER, "Invalid schema. Check controller logs",
+          Response.Status.BAD_REQUEST);
+    }
+    return schema.toPrettyJsonString();
+  }
+
   /**
    * Internal method to add or update schema
    * @param schemaName null value indicates new schema (POST request) where schemaName is
@@ -152,8 +190,17 @@ public class PinotSchemaRestletResource {
    * @return
    */
   private SuccessResponse addOrUpdateSchema(@Nullable String schemaName, FormDataMultiPart multiPart) {
+    return addOrUpdateSchema(schemaName, getSchemaFromMultiPart(multiPart));
+  }
+
+  /**
+   * Internal method to add or update schema
+   * @param schemaName null value indicates new schema (POST request) where schemaName is
+   *                   not part of URI
+   * @return
+   */
+  private SuccessResponse addOrUpdateSchema(@Nullable String schemaName, Schema schema) {
     final String schemaNameForLogging = (schemaName == null) ? "new schema" : schemaName + " schema";
-    Schema schema = getSchemaFromMultiPart(multiPart);
     if (!schema.validate(LOGGER)) {
       LOGGER.info("Invalid schema during create/update of {}", schemaNameForLogging);
       throw new ControllerApplicationException(LOGGER, "Invalid schema", Response.Status.BAD_REQUEST);
@@ -190,7 +237,7 @@ public class PinotSchemaRestletResource {
   private Schema getSchemaFromMultiPart(FormDataMultiPart multiPart) {
     try {
       Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
-      if (!PinotSegmentUploadRestletResource.validateMultiPart(map, null)) {
+      if (!PinotSegmentUploadDownloadRestletResource.validateMultiPart(map, null)) {
         throw new ControllerApplicationException(LOGGER, "Found not exactly one file from the multi-part fields",
             Response.Status.BAD_REQUEST);
       }

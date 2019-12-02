@@ -24,8 +24,9 @@ import java.net.URI;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.filesystem.LocalPinotFS;
-import org.apache.pinot.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.filesystem.PinotFSFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,7 +56,7 @@ public class FileUploadPathProvider {
     StringUtils.stripEnd(dataDir, "/");
     try {
       // URIs that are allowed to be remote
-      _baseDataDirURI = ControllerConf.getUriFromPath(dataDir);
+      _baseDataDirURI = URIUtils.getUri(dataDir);
       LOGGER.info("Data directory: {}", _baseDataDirURI);
       _schemasTmpDirURI = new URI(_baseDataDirURI + SCHEMAS_TEMP);
       LOGGER.info("Schema temporary directory: {}", _schemasTmpDirURI);
@@ -70,7 +71,7 @@ public class FileUploadPathProvider {
         LOGGER.info("Local temporary directory is not configured, use data directory as the local temporary directory");
         _localTempDirURI = _baseDataDirURI;
       } else {
-        _localTempDirURI = ControllerConf.getUriFromPath(localTempDir);
+        _localTempDirURI = URIUtils.getUri(localTempDir);
       }
       LOGGER.info("Local temporary directory: {}", _localTempDirURI);
       if (!_localTempDirURI.getScheme().equalsIgnoreCase(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {

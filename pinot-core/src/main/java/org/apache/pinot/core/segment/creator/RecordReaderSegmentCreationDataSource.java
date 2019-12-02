@@ -19,9 +19,9 @@
 package org.apache.pinot.core.segment.creator;
 
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.data.readers.RecordReader;
-import org.apache.pinot.core.data.recordtransformer.CompoundTransformer;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
 import org.apache.pinot.core.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
 import org.slf4j.Logger;
@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * {@link org.apache.pinot.core.segment.creator.SegmentCreationDataSource} that uses a
- * {@link org.apache.pinot.core.data.readers.RecordReader} as the underlying data source.
+ * {@link RecordReader} as the underlying data source.
  */
 // TODO: make it Closeable so that resource in record reader can be released
 public class RecordReaderSegmentCreationDataSource implements SegmentCreationDataSource {
@@ -45,16 +45,17 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
   @Override
   public SegmentPreIndexStatsCollector gatherStats(StatsCollectorConfig statsCollectorConfig) {
     try {
-      RecordTransformer recordTransformer = CompoundTransformer.getDefaultTransformer(statsCollectorConfig.getSchema());
+      RecordTransformer recordTransformer =
+          CompositeTransformer.getDefaultTransformer(statsCollectorConfig.getSchema());
 
       SegmentPreIndexStatsCollector collector = new SegmentPreIndexStatsCollectorImpl(statsCollectorConfig);
       collector.init();
 
       // Gather the stats
-      GenericRow readRow = null;
+      GenericRow reuse = new GenericRow();
       while (_recordReader.hasNext()) {
-        readRow = GenericRow.createOrReuseRow(readRow);
-        GenericRow transformedRow = recordTransformer.transform(_recordReader.next(readRow));
+        reuse.clear();
+        GenericRow transformedRow = recordTransformer.transform(_recordReader.next(reuse));
         if (transformedRow != null) {
           collector.collectRow(transformedRow);
         }

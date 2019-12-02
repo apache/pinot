@@ -30,7 +30,7 @@ import java.util.Map;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -39,7 +39,7 @@ import org.apache.pinot.common.utils.JsonUtils;
  *
  * Supports serialization via JSON.
  */
-@JsonPropertyOrder({"selectionResults", "aggregationResults", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs", "segmentStatistics", "traceInfo"})
+@JsonPropertyOrder({"selectionResults", "aggregationResults", "resultTable", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs", "segmentStatistics", "traceInfo"})
 public class BrokerResponseNative implements BrokerResponse {
   public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
   public static final BrokerResponseNative NO_TABLE_RESULT =
@@ -64,6 +64,7 @@ public class BrokerResponseNative implements BrokerResponse {
 
   private SelectionResults _selectionResults;
   private List<AggregationResult> _aggregationResults;
+  private ResultTable _resultTable;
 
   private Map<String, String> _traceInfo = new HashMap<>();
   private List<QueryProcessingException> _processingExceptions = new ArrayList<>();
@@ -109,6 +110,17 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("aggregationResults")
   public void setAggregationResults(List<AggregationResult> aggregationResults) {
     _aggregationResults = aggregationResults;
+  }
+
+  @JsonProperty("resultTable")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public ResultTable getResultTable() {
+    return _resultTable;
+  }
+
+  @JsonProperty("resultTable")
+  public void setResultTable(ResultTable resultTable) {
+    _resultTable = resultTable;
   }
 
   @JsonProperty("exceptions")

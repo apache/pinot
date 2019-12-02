@@ -28,7 +28,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -138,7 +138,7 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
-    uploadSegments(_tarDir);
+    uploadSegments(getTableName(), _tarDir);
   }
 
   @Test

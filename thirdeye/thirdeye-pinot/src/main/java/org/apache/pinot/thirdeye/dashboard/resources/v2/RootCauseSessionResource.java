@@ -239,6 +239,12 @@ public class RootCauseSessionResource {
     if (other.getPermissions() != null)
       session.setPermissions(other.getPermissions());
 
+    if (other.getIsUserCustomizingRequest() != null)
+      session.setIsUserCustomizingRequest(other.getIsUserCustomizingRequest());
+
+    if (other.getCustomTableSettings() != null)
+      session.setCustomTableSettings(other.getCustomTableSettings());
+
     return session;
   }
 

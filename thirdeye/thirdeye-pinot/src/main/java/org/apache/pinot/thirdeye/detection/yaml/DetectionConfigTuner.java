@@ -25,14 +25,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
-import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.InputDataFetcher;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
@@ -56,46 +54,22 @@ import static org.apache.pinot.thirdeye.detection.DetectionUtils.*;
 public class DetectionConfigTuner {
   protected static final Logger LOG = LoggerFactory.getLogger(DetectionConfigTuner.class);
 
-  private static final String PROP_FILTERS = "filters";
   private static final String PROP_CLASS_NAME = "className";
+  private static final String PROP_METRIC_URN = "metricUrn";
   private static final String DEFAULT_TIMEZONE = "America/Los_Angeles";
-  private static final String PROP_METRIC = "metric";
-  private static final String PROP_DATASET = "dataset";
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
-  static {
-    // do not tune for alerts migrated from legacy anomaly function.
-    DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibAlertFilter",
-        "MIGRATED_ALGORITHM_FILTER");
-    DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibAnomalyDetector",
-        "MIGRATED_ALGORITHM");
-  }
-
   public static final String PROP_YAML_PARAMS = "yamlParams";
   public static final Set<String> TURNOFF_TUNING_COMPONENTS =
       ImmutableSet.of("MIGRATED_ALGORITHM_FILTER", "MIGRATED_ALGORITHM", "MIGRATED_ALGORITHM_BASELINE");
 
   private final DetectionConfigDTO detectionConfig;
   private final DataProvider dataProvider;
-  private final DatasetConfigDTO datasetConfig;
-  private final String metricUrn;
 
   public DetectionConfigTuner(DetectionConfigDTO config, DataProvider dataProvider) {
     Preconditions.checkNotNull(config);
     this.detectionConfig = config;
     this.dataProvider = dataProvider;
-
-    Map<String, Object> yamlConfig = ConfigUtils.getMap(new org.yaml.snakeyaml.Yaml().load(config.getYaml()));
-
-    MetricConfigDTO metricConfig = dataProvider.fetchMetric(
-        MapUtils.getString(yamlConfig, PROP_METRIC),
-        MapUtils.getString(yamlConfig, PROP_DATASET));
-    Preconditions.checkNotNull(metricConfig, "metric not found");
-    this.datasetConfig = dataProvider.fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
-        .get(metricConfig.getDataset());
-    Preconditions.checkNotNull(this.datasetConfig, "dataset not found");
-
-    this.metricUrn = MetricEntity.fromMetric(ConfigUtils.getMap(yamlConfig.get(PROP_FILTERS)), metricConfig.getId()).getUrn();
   }
 
   /**
@@ -117,17 +91,22 @@ public class DetectionConfigTuner {
     Tunable tunable = instantiateTunable(componentClassName, yamlParams, dataFetcher);
 
     // round to daily boundary
-    DateTimeZone timezone = DateTimeZone.forID(this.datasetConfig.getTimezone() == null ? DEFAULT_TIMEZONE : this.datasetConfig.getTimezone());
+    Preconditions.checkNotNull(componentProps.get(PROP_METRIC_URN));
+    String metricUrn = componentProps.get(PROP_METRIC_URN).toString();
+    MetricEntity metricEntity = MetricEntity.fromURN(metricUrn);
+    Map<Long, MetricConfigDTO> metricConfigMap = dataProvider.fetchMetrics(Collections.singleton(metricEntity.getId()));
+    Preconditions.checkArgument(metricConfigMap.size() == 1, "Unable to find the metric to tune");
+
+    MetricConfigDTO metricConfig = metricConfigMap.values().iterator().next();
+    DatasetConfigDTO datasetConfig = dataProvider.fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
+        .get(metricConfig.getDataset());
+    DateTimeZone timezone = DateTimeZone.forID(datasetConfig.getTimezone() == null ? DEFAULT_TIMEZONE : datasetConfig.getTimezone());
     DateTime start = new DateTime(startTime, timezone).withTimeAtStartOfDay();
     DateTime end =  new DateTime(endTime, timezone).withTimeAtStartOfDay();
     Interval window = new Interval(start, end);
 
     // TODO: if dimension drill down applied, pass in the metric urn of top dimension
-    tunedSpec.putAll(tunable.tune(componentProps, window, this.metricUrn));
-
-    // Hack to retain the raw yaml parameters.
-    // The tunable requires raw yaml params and previously tuned params to generate fresh params
-    tunedSpec.put(PROP_YAML_PARAMS, yamlParams);
+    tunedSpec.putAll(tunable.tune(componentProps, window, metricUrn));
 
     return tunedSpec;
   }
@@ -162,15 +141,13 @@ public class DetectionConfigTuner {
       String type = DetectionUtils.getComponentType(componentKey);
       if (!TURNOFF_TUNING_COMPONENTS.contains(type) && DETECTION_REGISTRY.isTunable(componentClassName)) {
         try {
-          tunedComponentProps.put(PROP_CLASS_NAME, componentClassName);
           tunedComponentProps.putAll(getTunedSpecs(existingComponentProps, tuningWindowStart, tuningWindowEnd));
         } catch (Exception e) {
           LOG.error("Tuning failed for component " + type, e);
         }
-      } else {
-        tunedComponentProps.putAll(existingComponentProps);
       }
 
+      tunedComponentProps.putAll(existingComponentProps);
       tunedComponentSpecs.put(componentKey, tunedComponentProps);
     }
 

@@ -75,6 +75,13 @@ module.exports = function(defaults) {
     ]
   });
 
+  // imports yamljs node module as commonjs
+  app.import('node_modules/js-yaml/index.js', {
+    using: [
+      { transformation: 'cjs', as: 'js-yaml'}
+    ]
+  });
+
   // Use `app.import` to add additional libraries to the generated
   // output files.
 

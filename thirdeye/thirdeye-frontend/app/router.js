@@ -18,6 +18,8 @@ Router.map(function() {
     this.route('share-dashboard');
   });
 
+  this.route('aiavailability');
+
   this.route('anomalies');
 
   this.route('manage', function() {

@@ -35,6 +35,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
 import org.apache.pinot.thirdeye.datasource.TimeRangeUtils;
+import org.apache.pinot.thirdeye.detection.cache.CacheConfig;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -106,6 +107,7 @@ public class ThirdEyeResultSetUtils {
         for (int r = 0; r < numRows; r++) {
           boolean skipRowDueToError = false;
           String[] groupKeys;
+          String timestamp = null;
           if (hasGroupBy) {
             groupKeys = new String[resultSet.getGroupKeyLength()];
             for (int grpKeyIdx = 0; grpKeyIdx < resultSet.getGroupKeyLength(); grpKeyIdx++) {
@@ -136,6 +138,7 @@ public class ThirdEyeResultSetUtils {
                     .computeBucketIndex(request.getGroupByTimeGranularity(), startDateTime,
                         new DateTime(millis, dateTimeZone));
                 groupKeyVal = String.valueOf(timeBucket);
+                timestamp = String.valueOf(millis);
               }
               groupKeys[grpKeyIdx] = groupKeyVal;
             }
@@ -149,7 +152,12 @@ public class ThirdEyeResultSetUtils {
 
           String[] rowValues = dataMap.get(compositeGroupKey);
           if (rowValues == null) {
-            rowValues = new String[numCols];
+            // add one to include the timestamp, if applicable
+            if (timestamp != null && CacheConfig.getInstance().useCentralizedCache()) {
+              rowValues = new String[numCols + 1];
+            } else {
+              rowValues = new String[numCols];
+            }
             Arrays.fill(rowValues, "0");
             System.arraycopy(groupKeys, 0, rowValues, 0, groupKeys.length);
             dataMap.put(compositeGroupKey, rowValues);
@@ -172,6 +180,9 @@ public class ThirdEyeResultSetUtils {
                   sourceName
               ));
 
+          if (timestamp != null && CacheConfig.getInstance().useCentralizedCache()) {
+            rowValues[rowValues.length - 1] = timestamp;
+          }
         }
       }
       position ++;
@@ -188,9 +199,7 @@ public class ThirdEyeResultSetUtils {
       return (aggregate * prevCount + value) / (prevCount + 1);
     } else if (aggFunction.equals(MetricAggFunction.MAX)) {
       return Math.max(aggregate, value);
-    } else if (aggFunction.equals(MetricAggFunction.COUNT) && sourceName.equals(PINOT)) {
-      return aggregate + 1;
-    } else if (aggFunction.equals(MetricAggFunction.COUNT)) { // For all other COUNT cases
+    } else if (aggFunction.equals(MetricAggFunction.COUNT)) { // For all COUNT cases
       return aggregate + value;
     } else {
       throw new IllegalArgumentException(String.format("Unknown aggregation function '%s'", aggFunction));

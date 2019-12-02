@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import javax.annotation.Nonnull;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.DoubleAggregationResultHolder;
@@ -31,38 +31,33 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   private static final String COLUMN_NAME = AggregationFunctionType.COUNT.getName() + "_star";
   private static final double DEFAULT_INITIAL_VALUE = 0.0;
 
-  @Nonnull
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.COUNT;
   }
 
-  @Nonnull
   @Override
-  public String getColumnName(@Nonnull String column) {
+  public String getColumnName(String column) {
     return COLUMN_NAME;
   }
 
   @Override
-  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+  public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
 
-  @Nonnull
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
     return new DoubleAggregationResultHolder(DEFAULT_INITIAL_VALUE);
   }
 
-  @Nonnull
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
     return new DoubleGroupByResultHolder(initialCapacity, maxCapacity, DEFAULT_INITIAL_VALUE);
   }
 
   @Override
-  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull BlockValSet... blockValSets) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
     if (blockValSets.length == 0) {
       aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + length);
     } else {
@@ -77,8 +72,8 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   }
 
   @Override
-  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     if (blockValSets.length == 0) {
       for (int i = 0; i < length; i++) {
         int groupKey = groupKeyArray[i];
@@ -95,8 +90,8 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   }
 
   @Override
-  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     if (blockValSets.length == 0) {
       for (int i = 0; i < length; i++) {
         for (int groupKey : groupKeysArray[i]) {
@@ -115,21 +110,18 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
     }
   }
 
-  @Nonnull
   @Override
-  public Long extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+  public Long extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return (long) aggregationResultHolder.getDoubleResult();
   }
 
-  @Nonnull
   @Override
-  public Long extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+  public Long extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return (long) groupByResultHolder.getDoubleResult(groupKey);
   }
 
-  @Nonnull
   @Override
-  public Long merge(@Nonnull Long intermediateResult1, @Nonnull Long intermediateResult2) {
+  public Long merge(Long intermediateResult1, Long intermediateResult2) {
     return intermediateResult1 + intermediateResult2;
   }
 
@@ -138,15 +130,18 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
     return true;
   }
 
-  @Nonnull
   @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.LONG;
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.LONG;
   }
 
-  @Nonnull
   @Override
-  public Long extractFinalResult(@Nonnull Long intermediateResult) {
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.LONG;
+  }
+
+  @Override
+  public Long extractFinalResult(Long intermediateResult) {
     return intermediateResult;
   }
 }

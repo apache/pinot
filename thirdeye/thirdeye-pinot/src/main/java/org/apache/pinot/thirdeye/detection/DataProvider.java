@@ -23,6 +23,7 @@ import com.google.common.collect.Multimap;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -77,10 +78,9 @@ public interface DataProvider {
    * @see AnomalySlice
    *
    * @param slices anomaly slice
-   * @param configId configId
    * @return multimap of anomalies (keyed by slice)
    */
-  Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, long configId);
+  Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices);
 
   /**
    * Returns a multimap of events (keyed by slice) for a given set of slices.
@@ -149,4 +149,8 @@ public interface DataProvider {
    * @return a multimap of evaluations (keyed by the evaluations slice)
    */
   Multimap<EvaluationSlice, EvaluationDTO> fetchEvaluations(Collection<EvaluationSlice> evaluationSlices, long configId);
+
+  default List<DatasetConfigDTO> fetchDatasetByDisplayName(String datasetDisplayName) {
+    throw new NotImplementedException("the method is not implemented");
+  }
 }

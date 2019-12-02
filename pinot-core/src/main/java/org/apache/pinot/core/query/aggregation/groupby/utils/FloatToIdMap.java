@@ -51,7 +51,7 @@ public class FloatToIdMap extends BaseValueToIdMap {
   @Override
   public float getFloat(int id) {
     assert id < _idToValueMap.size();
-    return _idToValueMap.get(id);
+    return _idToValueMap.getFloat(id);
   }
 
   @Override

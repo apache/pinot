@@ -41,6 +41,8 @@ public class ConfigGenerator {
 
   private static final String PDT_TIMEZONE = "US/Pacific";
   private static final String BYTES_STRING = "BYTES";
+  private static final String NON_ADDITIVE = "non_additive";
+  private static final String PINOT_PRE_AGGREGATED_KEYWORD = "*";
 
   public static void setTimeSpecs(DatasetConfigDTO datasetConfigDTO, TimeGranularitySpec timeSpec) {
     datasetConfigDTO.setTimeColumn(timeSpec.getName());
@@ -71,6 +73,7 @@ public class ConfigGenerator {
     setTimeSpecs(datasetConfigDTO, timeSpec);
     datasetConfigDTO.setDataSource(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
     datasetConfigDTO.setProperties(customConfigs);
+    checkNonAdditive(datasetConfigDTO);
     return datasetConfigDTO;
   }
 
@@ -92,6 +95,16 @@ public class ConfigGenerator {
     return expectedDelay;
   }
 
+  /**
+   * Check if the dataset is non-additive. If it is, set the additive flag to false and set the pre-aggregated keyword.
+   * @param dataset the dataset DTO to check
+   */
+  static void checkNonAdditive(DatasetConfigDTO dataset) {
+    if (dataset.isAdditive() && dataset.getDataset().endsWith(NON_ADDITIVE)) {
+      dataset.setAdditive(false);
+      dataset.setPreAggregatedKeyword(PINOT_PRE_AGGREGATED_KEYWORD);
+    }
+  }
 
   public static MetricConfigDTO generateMetricConfig(MetricFieldSpec metricFieldSpec, String dataset) {
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();

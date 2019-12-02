@@ -22,6 +22,8 @@ import com.yammer.metrics.core.MetricsRegistry;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.LongAccumulator;
+
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -70,7 +72,7 @@ public class ServerBuilder {
     MetricsHelper.initializeMetrics(_serverConf.getMetricsConfig());
     MetricsRegistry metricsRegistry = new MetricsRegistry();
     MetricsHelper.registerMetricsRegistry(metricsRegistry);
-    _serverMetrics = new ServerMetrics(metricsRegistry, !_serverConf.emitTableLevelMetrics());
+    _serverMetrics = new ServerMetrics(_serverConf.getMetricsPrefix(), metricsRegistry, !_serverConf.emitTableLevelMetrics());
     _serverMetrics.initializeGlobalMeters();
   }
 

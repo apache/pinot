@@ -23,6 +23,9 @@ recipients:
 
 alertSchemes:
 - type: EMAIL
+  params:
+    template: ENTITY_GROUPBY_REPORT
+    subject: METRICS
 - type: IRIS
   params:
     plan: thirdye_test_plan

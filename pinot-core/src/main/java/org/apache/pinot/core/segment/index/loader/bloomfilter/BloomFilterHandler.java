@@ -24,7 +24,7 @@ import java.util.HashSet;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.bloom.BloomFilterCreator;
@@ -32,10 +32,9 @@ import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
-import org.apache.pinot.core.segment.index.loader.invertedindex.InvertedIndexHandler;
+import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.core.segment.index.readers.DoubleDictionary;
 import org.apache.pinot.core.segment.index.readers.FloatDictionary;
-import org.apache.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import org.apache.pinot.core.segment.index.readers.IntDictionary;
 import org.apache.pinot.core.segment.index.readers.LongDictionary;
 import org.apache.pinot.core.segment.index.readers.StringDictionary;
@@ -47,7 +46,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class BloomFilterHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(InvertedIndexHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BloomFilterHandler.class);
 
   private final File _indexDir;
   private final SegmentDirectory.Writer _segmentWriter;
@@ -107,7 +106,7 @@ public class BloomFilterHandler {
     try (BloomFilterCreator creator = new BloomFilterCreator(_indexDir, columnName, columnMetadata.getCardinality())) {
       if (columnMetadata.hasDictionary()) {
         // Read dictionary
-        try (ImmutableDictionaryReader dictionaryReader = getDictionaryReader(columnMetadata, _segmentWriter)) {
+        try (BaseImmutableDictionary dictionaryReader = getDictionaryReader(columnMetadata, _segmentWriter)) {
           for (int i = 0; i < dictionaryReader.length(); i++) {
             creator.add(dictionaryReader.get(i));
           }
@@ -128,13 +127,13 @@ public class BloomFilterHandler {
     LOGGER.info("Created bloom filter for segment: {}, column: {}", _segmentName, columnName);
   }
 
-  private ImmutableDictionaryReader getDictionaryReader(ColumnMetadata columnMetadata,
+  private BaseImmutableDictionary getDictionaryReader(ColumnMetadata columnMetadata,
       SegmentDirectory.Writer segmentWriter)
       throws IOException {
     PinotDataBuffer dictionaryBuffer =
         segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.DICTIONARY);
     int cardinality = columnMetadata.getCardinality();
-    ImmutableDictionaryReader dictionaryReader;
+    BaseImmutableDictionary dictionaryReader;
     DataType dataType = columnMetadata.getDataType();
     switch (dataType) {
       case INT:

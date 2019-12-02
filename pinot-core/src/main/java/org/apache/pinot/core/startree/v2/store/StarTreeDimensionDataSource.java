@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.startree.v2.store;
 
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
@@ -27,6 +27,7 @@ import org.apache.pinot.core.operator.blocks.SingleValueBlock;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
@@ -99,6 +100,11 @@ public class StarTreeDimensionDataSource extends DataSource {
   }
 
   @Override
+  public Dictionary getDictionary() {
+    return _dictionary;
+  }
+
+  @Override
   public InvertedIndexReader getInvertedIndex() {
     return null;
   }
@@ -109,8 +115,8 @@ public class StarTreeDimensionDataSource extends DataSource {
   }
 
   @Override
-  public Dictionary getDictionary() {
-    return _dictionary;
+  public NullValueVectorReader getNullValueVector() {
+    return null;
   }
 
   @Override

@@ -23,6 +23,7 @@ import com.google.inject.Singleton;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.naming.AuthenticationException;
 import javax.ws.rs.NotAuthorizedException;
 import org.apache.pinot.thirdeye.auth.ThirdEyeAuthFilter;
@@ -74,5 +75,11 @@ public class DetectionConfigManagerImpl extends AbstractManagerImpl<DetectionCon
     detectionConfigDTO.setComponents(Collections.emptyMap());
     DetectionConfigBean bean = convertDTO2Bean(detectionConfigDTO, DetectionConfigBean.class);
     return bean;
+  }
+
+  @Override
+  public List<DetectionConfigDTO> findAllActive() {
+    List<DetectionConfigDTO> detectionConfigs = findAll();
+    return detectionConfigs.stream().filter(DetectionConfigBean::isActive).collect(Collectors.toList());
   }
 }

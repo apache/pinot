@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.core.data.readers;
 
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
+import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.Assert;
 
 
@@ -33,14 +35,17 @@ public abstract class RecordReaderTest {
 
   protected static void checkValue(RecordReader recordReader)
       throws Exception {
+    CompositeTransformer defaultTransformer = CompositeTransformer.getDefaultTransformer(SCHEMA);
     for (Object[] expectedRecord : RECORDS) {
       GenericRow actualRecord = recordReader.next();
+      GenericRow transformedRecord = defaultTransformer.transform(actualRecord);
+
       int numColumns = COLUMNS.length;
       for (int i = 0; i < numColumns; i++) {
         if (expectedRecord[i] != null) {
-          Assert.assertEquals(actualRecord.getValue(COLUMNS[i]), expectedRecord[i]);
+          Assert.assertEquals(transformedRecord.getValue(COLUMNS[i]), expectedRecord[i]);
         } else {
-          Assert.assertEquals(actualRecord.getValue(COLUMNS[i]), DEFAULT_VALUES[i]);
+          Assert.assertEquals(transformedRecord.getValue(COLUMNS[i]), DEFAULT_VALUES[i]);
         }
       }
     }

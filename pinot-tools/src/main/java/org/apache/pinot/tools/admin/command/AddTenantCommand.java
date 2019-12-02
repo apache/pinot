@@ -19,7 +19,6 @@
 package org.apache.pinot.tools.admin.command;
 
 import org.apache.pinot.common.config.Tenant;
-import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.TenantRole;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
@@ -113,12 +112,10 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
     }
 
     LOGGER.info("Executing command: " + toString());
-    Tenant t = new Tenant.TenantBuilder(_name).setRole(_role).setTotalInstances(_instanceCount)
-        .setOfflineInstances(_offlineInstanceCount).setRealtimeInstances(_realtimeInstanceCount).build();
-
+    Tenant tenant = new Tenant(_role, _name, _instanceCount, _offlineInstanceCount, _realtimeInstanceCount);
     String res = AbstractBaseAdminCommand
         .sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTenantCreate(),
-            JsonUtils.objectToString(t));
+            tenant.toJsonString());
 
     LOGGER.info(res);
     System.out.print(res);

@@ -19,7 +19,7 @@
 package org.apache.pinot.core.segment.index.data.source;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.common.DataSource;
@@ -30,12 +30,13 @@ import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import org.apache.pinot.core.operator.blocks.MultiValueBlock;
 import org.apache.pinot.core.operator.blocks.SingleValueBlock;
-import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionary;
+import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
 
 
 public final class ColumnDataSource extends DataSource {
@@ -49,6 +50,7 @@ public final class ColumnDataSource extends DataSource {
   private final InvertedIndexReader _invertedIndex;
   private final Dictionary _dictionary;
   private final BloomFilterReader _bloomFilter;
+  private final NullValueVectorReader _nullValueVector;
   private final int _cardinality;
   private final DataSourceMetadata _metadata;
 
@@ -59,21 +61,24 @@ public final class ColumnDataSource extends DataSource {
     this(metadata.getColumnName(), metadata.getDataType(), metadata.isSingleValue(), metadata.isSorted(),
         metadata.getTotalDocs(), metadata.getMaxNumberOfMultiValues(), indexContainer.getForwardIndex(),
         indexContainer.getInvertedIndex(), indexContainer.getDictionary(), indexContainer.getBloomFilter(),
-        metadata.getCardinality());
+        indexContainer.getNullValueVector(), metadata.getCardinality());
   }
 
   /**
    * For REALTIME segment.
    */
   public ColumnDataSource(FieldSpec fieldSpec, int numDocs, int maxNumMultiValues, DataFileReader forwardIndex,
-      InvertedIndexReader invertedIndex, MutableDictionary dictionary, BloomFilterReader bloomFilter) {
+      InvertedIndexReader invertedIndex, BaseMutableDictionary dictionary, BloomFilterReader bloomFilter,
+      NullValueVectorReader nullValueVectorReader) {
     this(fieldSpec.getName(), fieldSpec.getDataType(), fieldSpec.isSingleValueField(), false, numDocs,
-        maxNumMultiValues, forwardIndex, invertedIndex, dictionary, bloomFilter, Constants.UNKNOWN_CARDINALITY);
+        maxNumMultiValues, forwardIndex, invertedIndex, dictionary, bloomFilter, nullValueVectorReader,
+        Constants.UNKNOWN_CARDINALITY);
   }
 
   private ColumnDataSource(String columnName, FieldSpec.DataType dataType, boolean isSingleValue, boolean isSorted,
       int numDocs, int maxNumMultiValues, DataFileReader forwardIndex, InvertedIndexReader invertedIndex,
-      Dictionary dictionary, BloomFilterReader bloomFilterReader, int cardinality) {
+      Dictionary dictionary, BloomFilterReader bloomFilterReader, NullValueVectorReader nullValueVectorReader,
+      int cardinality) {
     // Sanity check
     if (isSingleValue) {
       Preconditions.checkState(forwardIndex instanceof SingleColumnSingleValueReader);
@@ -100,6 +105,7 @@ public final class ColumnDataSource extends DataSource {
     _invertedIndex = invertedIndex;
     _dictionary = dictionary;
     _bloomFilter = bloomFilterReader;
+    _nullValueVector = nullValueVectorReader;
     _cardinality = cardinality;
 
     _metadata = new DataSourceMetadata() {
@@ -151,18 +157,23 @@ public final class ColumnDataSource extends DataSource {
   }
 
   @Override
-  public InvertedIndexReader getInvertedIndex() {
-    return _invertedIndex;
-  }
-
-  @Override
   public Dictionary getDictionary() {
     return _dictionary;
   }
 
   @Override
+  public InvertedIndexReader getInvertedIndex() {
+    return _invertedIndex;
+  }
+
+  @Override
   public BloomFilterReader getBloomFilter() {
     return _bloomFilter;
+  }
+
+  @Override
+  public NullValueVectorReader getNullValueVector() {
+    return _nullValueVector;
   }
 
   @Override

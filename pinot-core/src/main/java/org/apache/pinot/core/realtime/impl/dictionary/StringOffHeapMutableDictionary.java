@@ -18,18 +18,24 @@
  */
 package org.apache.pinot.core.realtime.impl.dictionary;
 
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.ints.IntSets;
 import java.io.IOException;
 import java.util.Arrays;
-import javax.annotation.Nonnull;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.core.common.predicate.RangePredicate;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
 
 
+@SuppressWarnings("Duplicates")
 public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   private final MutableOffHeapByteArrayStore _byteStore;
-  private String _min = null;
-  private String _max = null;
+
+  private volatile String _min = null;
+  private volatile String _max = null;
 
   public StringOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize,
       PinotDataBufferMemoryManager memoryManager, String allocationContext, int avgStringLen) {
@@ -38,84 +44,151 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   }
 
   @Override
-  public void doClose()
-      throws IOException {
-    _byteStore.close();
+  public int index(Object value) {
+    String stringValue = (String) value;
+    updateMinMax(stringValue);
+    return indexValue(stringValue, StringUtil.encodeUtf8(stringValue));
   }
 
   @Override
-  protected void setRawValueAt(int dictId, Object rawValue, byte[] serializedValue) {
-    _byteStore.add(serializedValue);
+  public int[] index(Object[] values) {
+    int numValues = values.length;
+    int[] dictIds = new int[numValues];
+    for (int i = 0; i < numValues; i++) {
+      String stringValue = (String) values[i];
+      updateMinMax(stringValue);
+      dictIds[i] = indexValue(stringValue, StringUtil.encodeUtf8(stringValue));
+    }
+    return dictIds;
   }
 
   @Override
-  public String get(int dictId) {
-    return StringUtil.decodeUtf8(_byteStore.get(dictId));
+  public int compare(int dictId1, int dictId2) {
+    return getStringValue(dictId1).compareTo(getStringValue(dictId2));
   }
 
   @Override
-  public void index(@Nonnull Object rawValue) {
-    if (rawValue instanceof String) {
-      // Single value
-      byte[] serializedValue = StringUtil.encodeUtf8((String) rawValue);
-      indexValue(rawValue, serializedValue);
-      updateMinMax((String) rawValue);
+  public IntSet getDictIdsInRange(String lower, String upper, boolean includeLower, boolean includeUpper) {
+    int numValues = length();
+    if (numValues == 0) {
+      return IntSets.EMPTY_SET;
+    }
+    IntSet dictIds = new IntOpenHashSet();
+
+    int lowerCompareThreshold = includeLower ? 0 : 1;
+    int upperCompareThreshold = includeUpper ? 0 : -1;
+    if (lower.equals(RangePredicate.UNBOUNDED)) {
+      for (int dictId = 0; dictId < numValues; dictId++) {
+        String value = getStringValue(dictId);
+        if (value.compareTo(upper) <= upperCompareThreshold) {
+          dictIds.add(dictId);
+        }
+      }
+    } else if (upper.equals(RangePredicate.UNBOUNDED)) {
+      for (int dictId = 0; dictId < numValues; dictId++) {
+        String value = getStringValue(dictId);
+        if (value.compareTo(lower) >= lowerCompareThreshold) {
+          dictIds.add(dictId);
+        }
+      }
     } else {
-      // Multi value
-      Object[] values = (Object[]) rawValue;
-      for (Object value : values) {
-        byte[] serializedValue = StringUtil.encodeUtf8((String) value);
-        indexValue(value, serializedValue);
-        updateMinMax((String) value);
+      for (int dictId = 0; dictId < numValues; dictId++) {
+        String value = getStringValue(dictId);
+        if (value.compareTo(lower) >= lowerCompareThreshold && value.compareTo(upper) <= upperCompareThreshold) {
+          dictIds.add(dictId);
+        }
       }
     }
+    return dictIds;
   }
 
-  private String getInternal(int dictId) {
-    return StringUtil.decodeUtf8(_byteStore.get(dictId));
-  }
-
-  @Override
-  public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare, boolean includeLower,
-      boolean includeUpper) {
-    String valueToCompare = getInternal(dictIdToCompare);
-    return valueInRange(lower, upper, includeLower, includeUpper, valueToCompare);
-  }
-
-  @Override
-  public int indexOf(Object rawValue) {
-    byte[] serializedValue = StringUtil.encodeUtf8((String) rawValue);
-    return getDictId(rawValue, serializedValue);
-  }
-
-  @Nonnull
   @Override
   public String getMinVal() {
     return _min;
   }
 
-  @Nonnull
   @Override
   public String getMaxVal() {
     return _max;
   }
 
-  @Nonnull
   @Override
   public String[] getSortedValues() {
     int numValues = length();
     String[] sortedValues = new String[numValues];
 
-    for (int i = 0; i < numValues; i++) {
-      sortedValues[i] = getInternal(i);
+    for (int dictId = 0; dictId < numValues; dictId++) {
+      sortedValues[dictId] = getStringValue(dictId);
     }
 
     Arrays.sort(sortedValues);
     return sortedValues;
   }
 
+  @Override
+  public int indexOf(String stringValue) {
+    return getDictId(stringValue, StringUtil.encodeUtf8(stringValue));
+  }
+
+  @Override
+  public String get(int dictId) {
+    return getStringValue(dictId);
+  }
+
+  @Override
+  public int getIntValue(int dictId) {
+    return Integer.parseInt(getStringValue(dictId));
+  }
+
+  @Override
+  public long getLongValue(int dictId) {
+    return Long.parseLong(getStringValue(dictId));
+  }
+
+  @Override
+  public float getFloatValue(int dictId) {
+    return Float.parseFloat(getStringValue(dictId));
+  }
+
+  @Override
+  public double getDoubleValue(int dictId) {
+    return Double.parseDouble(getStringValue(dictId));
+  }
+
+  @Override
+  public String getStringValue(int dictId) {
+    return StringUtil.decodeUtf8(_byteStore.get(dictId));
+  }
+
+  @Override
+  public byte[] getBytesValue(int dictId) {
+    return BytesUtils.toBytes(getStringValue(dictId));
+  }
+
+  @Override
+  protected void setValue(int dictId, Object value, byte[] serializedValue) {
+    _byteStore.add(serializedValue);
+  }
+
+  @Override
   protected boolean equalsValueAt(int dictId, Object value, byte[] serializedValue) {
     return _byteStore.equalsValueAt(serializedValue, dictId);
+  }
+
+  @Override
+  public int getAvgValueSize() {
+    return (int) _byteStore.getAvgValueSize();
+  }
+
+  @Override
+  public long getTotalOffHeapMemUsed() {
+    return getOffHeapMemUsed() + _byteStore.getTotalOffHeapMemUsed();
+  }
+
+  @Override
+  public void doClose()
+      throws IOException {
+    _byteStore.close();
   }
 
   private void updateMinMax(String value) {
@@ -130,20 +203,5 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
         _max = value;
       }
     }
-  }
-
-  @Override
-  public long getTotalOffHeapMemUsed() {
-    return super.getTotalOffHeapMemUsed() + _byteStore.getTotalOffHeapMemUsed();
-  }
-
-  @Override
-  public int getAvgValueSize() {
-    return (int) _byteStore.getAvgValueSize();
-  }
-
-  @Override
-  public int compare(int dictId1, int dictId2) {
-    return getStringValue(dictId1).compareTo(getStringValue(dictId2));
   }
 }

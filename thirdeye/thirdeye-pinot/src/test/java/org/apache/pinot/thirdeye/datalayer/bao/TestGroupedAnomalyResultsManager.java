@@ -16,6 +16,7 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao;
 
+import java.util.HashSet;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -101,9 +102,11 @@ public class TestGroupedAnomalyResultsManager {
   public Object[][] groupedAnomalies() {
     MergedAnomalyResultDTO mergedAnomalyResultDTO1 = new MergedAnomalyResultDTO();
     mergedAnomalyResultDTO1.setEndTime(10);
+    mergedAnomalyResultDTO1.setChildIds(new HashSet<>());
 
     MergedAnomalyResultDTO mergedAnomalyResultDTO2 = new MergedAnomalyResultDTO();
     mergedAnomalyResultDTO2.setEndTime(15);
+    mergedAnomalyResultDTO2.setChildIds(new HashSet<>());
 
     Long mergedAnomalyResultDTO1Id = mergedAnomalyResultDAO.save(mergedAnomalyResultDTO1);
     mergedAnomalyResultDTO1.setId(mergedAnomalyResultDTO1Id);
@@ -114,12 +117,13 @@ public class TestGroupedAnomalyResultsManager {
     mergedAnomalyResultsSet1.add(mergedAnomalyResultDTO2);
     mergedAnomalyResultsSet1.add(mergedAnomalyResultDTO1);
 
-
     MergedAnomalyResultDTO mergedAnomalyResultDTO3 = new MergedAnomalyResultDTO();
     mergedAnomalyResultDTO3.setEndTime(20);
+    mergedAnomalyResultDTO3.setChildIds(new HashSet<>());
 
     MergedAnomalyResultDTO mergedAnomalyResultDTO4 = new MergedAnomalyResultDTO();
     mergedAnomalyResultDTO4.setEndTime(25);
+    mergedAnomalyResultDTO4.setChildIds(new HashSet<>());
 
     Long mergedAnomalyResultDTO3Id = mergedAnomalyResultDAO.save(mergedAnomalyResultDTO3);
     mergedAnomalyResultDTO3.setId(mergedAnomalyResultDTO3Id);

@@ -42,6 +42,7 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 public class SitewideImpactRuleAnomalyFilterTest {
   private static final String METRIC_URN = "thirdeye:metric:123";
+  private static final long CONFIG_ID = 125L;
 
   private DataProvider testDataProvider;
   private Baseline baseline;
@@ -71,18 +72,11 @@ public class SitewideImpactRuleAnomalyFilterTest {
     spec.setOffset("median3w");
     spec.setPattern("down");
     SitewideImpactRuleAnomalyFilter filter = new SitewideImpactRuleAnomalyFilter();
-    filter.init(spec, new DefaultInputDataFetcher(this.testDataProvider, 125L));
-
+    filter.init(spec, new DefaultInputDataFetcher(this.testDataProvider, CONFIG_ID));
     List<Boolean> results =
-        Arrays.asList(makeAnomaly(0, 2), makeAnomaly(4, 6)).stream().map(anomaly -> filter.isQualified(anomaly)).collect(Collectors.toList());
+        Arrays.asList(
+            DetectionTestUtils.makeAnomaly(0, 2, CONFIG_ID, METRIC_URN, 150), DetectionTestUtils.makeAnomaly(4, 6, CONFIG_ID, METRIC_URN, 500)).stream().map(anomaly -> filter.isQualified(anomaly)).collect(Collectors.toList());
     Assert.assertEquals(results, Arrays.asList(false, true));
-  }
-
-  private static MergedAnomalyResultDTO makeAnomaly(long start, long end) {
-    Map<String, String> dimensions = new HashMap<>();
-    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(125L, start, end, dimensions);
-    anomaly.setMetricUrn(METRIC_URN);
-    return anomaly;
   }
 
   @Test
@@ -91,8 +85,10 @@ public class SitewideImpactRuleAnomalyFilterTest {
     spec.setThreshold(0.5);
     spec.setPattern("down");
     SitewideImpactRuleAnomalyFilter filter = new SitewideImpactRuleAnomalyFilter();
-    filter.init(spec, new DefaultInputDataFetcher(this.testDataProvider, 125L));
-    List<MergedAnomalyResultDTO> anomalyResultDTOs = Arrays.asList(makeAnomaly(0, 2), makeAnomaly(4, 6));
+    filter.init(spec, new DefaultInputDataFetcher(this.testDataProvider, CONFIG_ID));
+    List<MergedAnomalyResultDTO> anomalyResultDTOs = Arrays.asList(
+        DetectionTestUtils.makeAnomaly(0, 2, CONFIG_ID, METRIC_URN, 150), DetectionTestUtils.makeAnomaly(4, 6,
+        CONFIG_ID, METRIC_URN, 500));
     anomalyResultDTOs.get(0).setAvgCurrentVal(150);
     anomalyResultDTOs.get(0).setAvgBaselineVal(200);
     anomalyResultDTOs.get(1).setAvgCurrentVal(500);

@@ -1,0 +1,26 @@
+.subscription-yaml {
+  .subscription-yaml-msg {
+    color: #e75858;
+
+    &__icon {
+      font-size: 20px;
+      &--error {
+        padding-right: 5px;
+      }
+    }
+  }
+
+  .col-xs-4 {
+    margin-bottom: 20px;
+  }
+
+  .col-xs-12 {
+    &.bottom-margin {
+      margin-bottom: 10px;
+    }
+  }
+}
+
+.ace_editor.ace_autocomplete {
+  width: 650px;
+}

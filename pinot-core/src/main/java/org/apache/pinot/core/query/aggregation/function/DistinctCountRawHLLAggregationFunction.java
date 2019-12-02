@@ -19,8 +19,8 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import javax.annotation.Nonnull;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.customobject.SerializedHLL;
@@ -28,71 +28,70 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 
 public class DistinctCountRawHLLAggregationFunction implements AggregationFunction<HyperLogLog, SerializedHLL> {
+  private final DistinctCountHLLAggregationFunction _distinctCountHLLAggregationFunction;
 
-  private final DistinctCountHLLAggregationFunction _distinctCountHLLAggregationFunction = new DistinctCountHLLAggregationFunction();
+  public DistinctCountRawHLLAggregationFunction() {
+    this(new DistinctCountHLLAggregationFunction());
+  }
 
-  @Nonnull
+  DistinctCountRawHLLAggregationFunction(DistinctCountHLLAggregationFunction distinctCountHLLAggregationFunction) {
+    _distinctCountHLLAggregationFunction = distinctCountHLLAggregationFunction;
+  }
+
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.DISTINCTCOUNTRAWHLL;
   }
 
-  @Nonnull
   @Override
-  public String getColumnName(@Nonnull String column) {
+  public String getColumnName(String column) {
     return AggregationFunctionType.DISTINCTCOUNTRAWHLL.getName() + "_" + column;
   }
 
   @Override
-  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+  public void accept(AggregationFunctionVisitorBase visitor) {
     _distinctCountHLLAggregationFunction.accept(visitor);
   }
 
-  @Nonnull
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
     return _distinctCountHLLAggregationFunction.createAggregationResultHolder();
   }
 
-  @Nonnull
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
     return _distinctCountHLLAggregationFunction.createGroupByResultHolder(initialCapacity, maxCapacity);
   }
 
   @Override
-  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull BlockValSet... blockValSets) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
     _distinctCountHLLAggregationFunction.aggregate(length, aggregationResultHolder, blockValSets);
   }
 
   @Override
-  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     _distinctCountHLLAggregationFunction.aggregateGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSets);
   }
 
   @Override
-  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     _distinctCountHLLAggregationFunction.aggregateGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSets);
   }
 
-  @Nonnull
   @Override
-  public HyperLogLog extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+  public HyperLogLog extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return _distinctCountHLLAggregationFunction.extractAggregationResult(aggregationResultHolder);
   }
 
-  @Nonnull
   @Override
-  public HyperLogLog extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+  public HyperLogLog extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return _distinctCountHLLAggregationFunction.extractGroupByResult(groupByResultHolder, groupKey);
   }
 
-  @Nonnull
   @Override
-  public HyperLogLog merge(@Nonnull HyperLogLog intermediateResult1, @Nonnull HyperLogLog intermediateResult2) {
+  public HyperLogLog merge(HyperLogLog intermediateResult1, HyperLogLog intermediateResult2) {
     return _distinctCountHLLAggregationFunction.merge(intermediateResult1, intermediateResult2);
   }
 
@@ -101,15 +100,18 @@ public class DistinctCountRawHLLAggregationFunction implements AggregationFuncti
     return _distinctCountHLLAggregationFunction.isIntermediateResultComparable();
   }
 
-  @Nonnull
   @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
+  public ColumnDataType getIntermediateResultColumnType() {
     return _distinctCountHLLAggregationFunction.getIntermediateResultColumnType();
   }
 
-  @Nonnull
   @Override
-  public SerializedHLL extractFinalResult(@Nonnull HyperLogLog intermediateResult) {
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.STRING;
+  }
+
+  @Override
+  public SerializedHLL extractFinalResult(HyperLogLog intermediateResult) {
     return SerializedHLL.of(intermediateResult);
   }
 }

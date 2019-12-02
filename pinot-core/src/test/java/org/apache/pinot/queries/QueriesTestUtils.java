@@ -19,12 +19,17 @@
 package org.apache.pinot.queries;
 
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.Function;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.GroupByResult;
+import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
@@ -116,4 +121,55 @@ public class QueriesTestUtils {
       }
     }
   }
+
+  static void testInterSegmentGroupByOrderByResultSQL(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
+      long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
+      List<Object[]> expectedResults) {
+    Assert.assertEquals(brokerResponse.getNumDocsScanned(), expectedNumDocsScanned);
+    Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), expectedNumEntriesScannedInFilter);
+    Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), expectedNumEntriesScannedPostFilter);
+    Assert.assertEquals(brokerResponse.getTotalDocs(), expectedNumTotalDocs);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> actualResults = resultTable.getRows();
+
+    Assert.assertEquals(actualResults.size(), expectedResults.size());
+
+    for (int i = 0; i < actualResults.size(); i++) {
+      Assert.assertEquals(Arrays.asList(actualResults.get(i)), Arrays.asList(expectedResults.get(i)));
+    }
+  }
+
+  static void testInterSegmentGroupByOrderByResultPQL(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
+      long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
+      List<String[]> expectedGroups, List<List<Serializable>> expectedValues, boolean preserveType) {
+    Assert.assertEquals(brokerResponse.getNumDocsScanned(), expectedNumDocsScanned);
+    Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), expectedNumEntriesScannedInFilter);
+    Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), expectedNumEntriesScannedPostFilter);
+    Assert.assertEquals(brokerResponse.getTotalDocs(), expectedNumTotalDocs);
+
+    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
+    if (aggregationResults == null) {
+      Assert.assertEquals(expectedGroups.size(), 0);
+      Assert.assertEquals(expectedValues.size(), 0);
+    } else {
+      for (int i = 0; i < aggregationResults.size(); i++) {
+        List<GroupByResult> groupByResults = aggregationResults.get(i).getGroupByResult();
+        List<Serializable> expectedSerializables = expectedValues.get(i);
+        Assert.assertEquals(groupByResults.size(), expectedGroups.size());
+        Assert.assertEquals(groupByResults.size(), expectedSerializables.size());
+        for (int j = 0; j < groupByResults.size(); j++) {
+          GroupByResult groupByResult = groupByResults.get(j);
+          List<String> group = groupByResult.getGroup();
+          Assert.assertEquals(group, Arrays.asList(expectedGroups.get(j)));
+          Serializable expectedValue = expectedSerializables.get(j);
+          if (!preserveType) {
+            expectedValue = AggregationFunctionUtils.formatValue(expectedValue);
+          }
+          Assert.assertEquals(groupByResult.getValue(), expectedValue);
+        }
+      }
+    }
+  }
+
 }

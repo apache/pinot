@@ -84,3 +84,21 @@
     color: $te-blue;
   }
 }
+
+.te-button__no-border button {
+  border-radius: 2px;
+  border: none !important;
+  margin: 0 1px;
+  font-size: 17px;
+  line-height: 20px;
+  font-weight: 600;
+  border-color: #FFF;
+  color: $te-blue;
+  cursor: pointer;
+  text-decoration: none;
+
+  &:hover {
+    color: $te-blue;
+    text-decoration: none;
+  }
+}

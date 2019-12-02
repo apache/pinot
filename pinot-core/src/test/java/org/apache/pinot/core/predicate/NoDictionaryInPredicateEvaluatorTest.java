@@ -32,7 +32,9 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.lang.RandomStringUtils;
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.commons.lang3.mutable.MutableInt;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.core.common.predicate.InPredicate;
 import org.apache.pinot.core.common.predicate.NotInPredicate;
 import org.apache.pinot.core.operator.filter.predicate.InPredicateEvaluatorFactory;
@@ -93,8 +95,8 @@ public class NoDictionaryInPredicateEvaluatorTest {
     PredicateEvaluatorTestUtils.fillRandom(multiValues);
     multiValues[_random.nextInt(NUM_MULTI_VALUES)] =
         Integer.parseInt(stringValues.get(_random.nextInt(NUM_PREDICATE_VALUES)));
-    Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
-    Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
+    Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES, new MutableInt(0)));
+    Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES, new MutableInt(0)));
   }
 
   @Test
@@ -247,6 +249,45 @@ public class NoDictionaryInPredicateEvaluatorTest {
     String[] multiValues = new String[NUM_MULTI_VALUES];
     PredicateEvaluatorTestUtils.fillRandom(multiValues, MAX_STRING_LENGTH);
     multiValues[_random.nextInt(NUM_MULTI_VALUES)] = stringValues.get(_random.nextInt(NUM_PREDICATE_VALUES));
+
+    Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
+    Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
+  }
+
+  @Test
+  public void testBytesPredicateEvaluators() {
+    List<String> stringValues = new ArrayList<>(NUM_PREDICATE_VALUES);
+    Set<byte[]> valueSet = new HashSet<>();
+
+    for (int i = 0; i < 100; i++) {
+      byte[] value = RandomStringUtils.random(MAX_STRING_LENGTH).getBytes();
+      valueSet.add(value);
+      stringValues.add(BytesUtils.toHexString(value));
+    }
+
+    InPredicate inPredicate = new InPredicate(COLUMN_NAME, stringValues);
+    PredicateEvaluator inPredicateEvaluator =
+        InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.BYTES);
+
+    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME, stringValues);
+    PredicateEvaluator notInPredicateEvaluator =
+        NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.BYTES);
+
+    for (byte[] value : valueSet) {
+      Assert.assertTrue(inPredicateEvaluator.applySV(value));
+      Assert.assertFalse(notInPredicateEvaluator.applySV(value));
+    }
+
+    for (int i = 0; i < 100; i++) {
+      byte[] value = RandomStringUtils.random(MAX_STRING_LENGTH).getBytes();
+      Assert.assertEquals(inPredicateEvaluator.applySV(value), valueSet.contains(value));
+      Assert.assertEquals(notInPredicateEvaluator.applySV(value), !valueSet.contains(value));
+    }
+
+    byte[][] multiValues = new byte[NUM_MULTI_VALUES][];
+    PredicateEvaluatorTestUtils.fillRandom(multiValues, MAX_STRING_LENGTH);
+    multiValues[_random.nextInt(NUM_MULTI_VALUES)] =
+        BytesUtils.toBytes(stringValues.get(_random.nextInt(NUM_PREDICATE_VALUES)));
 
     Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
     Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));

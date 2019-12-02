@@ -19,12 +19,13 @@
     under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.2.2.5-SNAPSHOT</version>
+    <version>0.3.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-common</artifactId>
   <name>Pinot Common</name>
@@ -74,6 +75,10 @@
   </build>
   <dependencies>
     <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-spi</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpmime</artifactId>
     </dependency>
@@ -94,6 +99,10 @@
     <dependency>
       <groupId>org.antlr</groupId>
       <artifactId>antlr4-runtime</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.calcite</groupId>
+      <artifactId>calcite-core</artifactId>
     </dependency>
     <dependency>
       <groupId>org.testng</groupId>
@@ -193,10 +202,6 @@
       <artifactId>jopt-simple</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.scala-lang</groupId>
-      <artifactId>scala-library</artifactId>
-    </dependency>
-    <dependency>
       <groupId>nl.jqno.equalsverifier</groupId>
       <artifactId>equalsverifier</artifactId>
       <scope>test</scope>
@@ -278,14 +283,6 @@
       <artifactId>commons-lang</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.typesafe</groupId>
-      <artifactId>config</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.vavr</groupId>
-      <artifactId>vavr</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.zookeeper</groupId>
       <artifactId>zookeeper</artifactId>
     </dependency>
@@ -350,31 +347,31 @@
                 <phase>generate-sources</phase>
                 <configuration>
                   <tasks>
-                    <delete dir="target/generated-sources/gen-javabean" />
-                    <mkdir dir="target/generated-sources" />
+                    <delete dir="target/generated-sources/gen-javabean"/>
+                    <mkdir dir="target/generated-sources"/>
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen" />
-                      <arg value="java:beans" />
-                      <arg value="-o" />
-                      <arg value="target/generated-sources" />
-                      <arg value="src/thrift/query.thrift" />
+                      <arg value="--gen"/>
+                      <arg value="java:beans"/>
+                      <arg value="-o"/>
+                      <arg value="target/generated-sources"/>
+                      <arg value="src/thrift/query.thrift"/>
                     </exec>
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen" />
-                      <arg value="java:beans" />
-                      <arg value="-o" />
-                      <arg value="target/generated-sources" />
-                      <arg value="src/thrift/request.thrift" />
+                      <arg value="--gen"/>
+                      <arg value="java:beans"/>
+                      <arg value="-o"/>
+                      <arg value="target/generated-sources"/>
+                      <arg value="src/thrift/request.thrift"/>
                     </exec>
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen" />
-                      <arg value="java:beans" />
-                      <arg value="-o" />
-                      <arg value="target/generated-sources" />
-                      <arg value="src/thrift/response.thrift" />
+                      <arg value="--gen"/>
+                      <arg value="java:beans"/>
+                      <arg value="-o"/>
+                      <arg value="target/generated-sources"/>
+                      <arg value="src/thrift/response.thrift"/>
                     </exec>
                     <copy todir="src/main/java/">
-                      <fileset dir="target/generated-sources/gen-javabean" />
+                      <fileset dir="target/generated-sources/gen-javabean"/>
                     </copy>
                   </tasks>
                 </configuration>

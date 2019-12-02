@@ -20,8 +20,8 @@ package org.apache.pinot.core.segment.index.loader.defaultcolumn;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;

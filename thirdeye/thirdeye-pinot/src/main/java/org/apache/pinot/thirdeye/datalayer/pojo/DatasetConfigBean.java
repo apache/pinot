@@ -37,11 +37,12 @@ public class DatasetConfigBean extends AbstractBean {
 
   public static final String DEFAULT_COMPLETENESS_ALGORITHM = Wo4WAvgDataCompletenessAlgorithm.class.getName();
   public static String DEFAULT_PREAGGREGATED_DIMENSION_VALUE = "all";
-  public static String DATASET_OFFLINE_PREFIX = "_OFFLINE";
   public static TimeGranularity DEFAULT_HOURLY_EXPECTED_DELAY = new TimeGranularity(8, TimeUnit.HOURS);
   public static TimeGranularity DEFAULT_DAILY_EXPECTED_DELAY = new TimeGranularity(36, TimeUnit.HOURS);
 
   private String dataset;
+
+  private String displayName;
 
   private List<String> dimensions;
 
@@ -94,6 +95,8 @@ public class DatasetConfigBean extends AbstractBean {
   private String dataCompletenessAlgorithm = DEFAULT_COMPLETENESS_ALGORITHM;
   // expected percentage completeness for dataset to be marked complete
   private double expectedCompleteness = Wo4WAvgDataCompletenessAlgorithm.DEFAULT_EXPECTED_COMPLETENESS;
+  // latest timestamp of the dataset updated by external events
+  private long lastRefreshTime;
 
   private Map<String, String> properties = new HashMap<>();
 
@@ -286,41 +289,50 @@ public class DatasetConfigBean extends AbstractBean {
     this.properties = properties;
   }
 
+  public String getDisplayName() {
+    return displayName;
+  }
+
+  public void setDisplayName(String displayName) {
+    this.displayName = displayName;
+  }
+
+  public long getLastRefreshTime() {
+    return lastRefreshTime;
+  }
+
+  public void setLastRefreshTime(long lastRefreshTime) {
+    this.lastRefreshTime = lastRefreshTime;
+  }
+
   @Override
   public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
     if (!(o instanceof DatasetConfigBean)) {
       return false;
     }
-    DatasetConfigBean dc = (DatasetConfigBean) o;
-    return Objects.equals(getId(), dc.getId())
-        && Objects.equals(dataset, dc.getDataset())
-        && Objects.equals(dimensions, dc.getDimensions())
-        && Objects.equals(timeColumn, dc.getTimeColumn())
-        && Objects.equals(timeUnit, dc.getTimeUnit())
-        && Objects.equals(timeDuration, dc.getTimeDuration())
-        && Objects.equals(timeFormat, dc.getTimeFormat())
-        && Objects.equals(timezone, dc.getTimezone())
-        && Objects.equals(dataSource, dc.getDataSource())
-        && Objects.equals(active, dc.isActive())
-        && Objects.equals(additive, dc.isAdditive())
-        && Objects.equals(dimensionsHaveNoPreAggregation, dc.getDimensionsHaveNoPreAggregation())
-        && Objects.equals(preAggregatedKeyword, dc.getPreAggregatedKeyword())
-        && Objects.equals(nonAdditiveBucketUnit, dc.getNonAdditiveBucketUnit())
-        && Objects.equals(nonAdditiveBucketSize, dc.getNonAdditiveBucketSize())
-        && Objects.equals(realtime, dc.isRealtime())
-        && Objects.equals(requiresCompletenessCheck, dc.isRequiresCompletenessCheck())
-        && Objects.equals(expectedDelay, dc.getExpectedDelay())
-        && Objects.equals(dataCompletenessAlgorithm, dc.getDataCompletenessAlgorithm())
-        && Objects.equals(expectedCompleteness,dc.getExpectedCompleteness())
-        && Objects.equals(dataSource, dc.getDataSource());
+    DatasetConfigBean that = (DatasetConfigBean) o;
+    return active == that.active && additive == that.additive && realtime == that.realtime
+        && requiresCompletenessCheck == that.requiresCompletenessCheck
+        && Double.compare(that.expectedCompleteness, expectedCompleteness) == 0 && Objects.equals(dataset, that.dataset)
+        && Objects.equals(displayName, that.displayName) && Objects.equals(dimensions, that.dimensions)
+        && Objects.equals(timeColumn, that.timeColumn) && timeUnit == that.timeUnit && Objects.equals(timeDuration,
+        that.timeDuration) && Objects.equals(timeFormat, that.timeFormat) && Objects.equals(timezone, that.timezone)
+        && Objects.equals(dataSource, that.dataSource) && Objects.equals(owners, that.owners) && Objects.equals(
+        dimensionsHaveNoPreAggregation, that.dimensionsHaveNoPreAggregation) && Objects.equals(preAggregatedKeyword,
+        that.preAggregatedKeyword) && Objects.equals(nonAdditiveBucketSize, that.nonAdditiveBucketSize)
+        && nonAdditiveBucketUnit == that.nonAdditiveBucketUnit && Objects.equals(expectedDelay, that.expectedDelay)
+        && Objects.equals(dataCompletenessAlgorithm, that.dataCompletenessAlgorithm) && Objects.equals(properties,
+        that.properties);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), dataset, dimensions, timeColumn, timeUnit, timeDuration, timeFormat, timezone,
-        dataSource, active, additive, dimensionsHaveNoPreAggregation, preAggregatedKeyword, nonAdditiveBucketSize,
-        nonAdditiveBucketUnit, realtime, requiresCompletenessCheck, expectedDelay, dataCompletenessAlgorithm,
-        expectedCompleteness, dataSource);
+    return Objects.hash(dataset, displayName, dimensions, timeColumn, timeUnit, timeDuration, timeFormat, timezone,
+        dataSource, owners, active, additive, dimensionsHaveNoPreAggregation, preAggregatedKeyword,
+        nonAdditiveBucketSize, nonAdditiveBucketUnit, realtime, requiresCompletenessCheck, expectedDelay,
+        dataCompletenessAlgorithm, expectedCompleteness, properties);
   }
-
 }

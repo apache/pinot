@@ -25,6 +25,7 @@ import java.io.IOException;
  * Interface for value readers, which read a value at a given index.
  */
 public interface ValueReader {
+
   int getInt(int index);
 
   long getLong(int index);
@@ -33,11 +34,20 @@ public interface ValueReader {
 
   double getDouble(int index);
 
+  /**
+   * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
+   */
   String getUnpaddedString(int index, int numBytesPerValue, byte paddingByte, byte[] buffer);
 
+  /**
+   * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
+   */
   String getPaddedString(int index, int numBytesPerValue, byte[] buffer);
 
-  byte[] getBytes(int index, int numBytesPerValue, byte[] buffer);
+  /**
+   * NOTE: Do not reuse buffer for BYTES because the return value can have variable length.
+   */
+  byte[] getBytes(int index, int numBytesPerValue);
 
   void close()
       throws IOException;

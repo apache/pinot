@@ -20,81 +20,88 @@ package org.apache.pinot.core.operator.query;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.ProjectionOperator;
-import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
-import org.apache.pinot.core.query.selection.SelectionFetcher;
+import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 
 
-/**
- * This SelectionOnlyOperator will take care of applying a selection query to one IndexSegment.
- * nextBlock() will return an IntermediateResultBlock for the given IndexSegment.
- *
- *
- */
 public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "SelectionOnlyOperator";
 
   private final IndexSegment _indexSegment;
-  private final ProjectionOperator _projectionOperator;
+  private final TransformOperator _transformOperator;
+  private final List<TransformExpressionTree> _expressions;
+  private final BlockValSet[] _blockValSets;
   private final DataSchema _dataSchema;
-  private final Block[] _blocks;
-  private final int _limitDocs;
-  private final Collection<Serializable[]> _rowEvents;
+  private final int _numRowsToKeep;
+  private final List<Serializable[]> _rows;
+
   private ExecutionStatistics _executionStatistics;
 
-  public SelectionOnlyOperator(IndexSegment indexSegment, Selection selection, ProjectionOperator projectionOperator) {
+  public SelectionOnlyOperator(IndexSegment indexSegment, Selection selection, TransformOperator transformOperator) {
     _indexSegment = indexSegment;
-    _limitDocs = selection.getSize();
-    _projectionOperator = projectionOperator;
-    List<String> selectionColumns =
-        SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), indexSegment);
-    _dataSchema = SelectionOperatorUtils.extractDataSchema(null, selectionColumns, indexSegment);
-    _blocks = new Block[selectionColumns.size()];
-    _rowEvents = new ArrayList<>();
+    _transformOperator = transformOperator;
+    _expressions = SelectionOperatorUtils.extractExpressions(selection.getSelectionColumns(), indexSegment);
+
+    int numExpressions = _expressions.size();
+    _blockValSets = new BlockValSet[numExpressions];
+    String[] columnNames = new String[numExpressions];
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
+    for (int i = 0; i < numExpressions; i++) {
+      TransformExpressionTree expression = _expressions.get(i);
+      TransformResultMetadata expressionMetadata = _transformOperator.getResultMetadata(expression);
+      columnNames[i] = expression.toString();
+      columnDataTypes[i] =
+          DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
+    }
+    _dataSchema = new DataSchema(columnNames, columnDataTypes);
+
+    _numRowsToKeep = selection.getSize();
+    _rows = new ArrayList<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
   }
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
     int numDocsScanned = 0;
 
-    ProjectionBlock projectionBlock;
-    while ((projectionBlock = _projectionOperator.nextBlock()) != null) {
-      for (int i = 0; i < _dataSchema.size(); i++) {
-        _blocks[i] = projectionBlock.getBlock(_dataSchema.getColumnName(i));
+    TransformBlock transformBlock;
+    while ((transformBlock = _transformOperator.nextBlock()) != null) {
+      int numExpressions = _expressions.size();
+      for (int i = 0; i < numExpressions; i++) {
+        _blockValSets[i] = transformBlock.getBlockValueSet(_expressions.get(i));
       }
-      SelectionFetcher selectionFetcher = new SelectionFetcher(_blocks, _dataSchema);
-      DocIdSetBlock docIdSetBlock = projectionBlock.getDocIdSetBlock();
-      int numDocsToFetch = Math.min(docIdSetBlock.getSearchableLength(), _limitDocs - _rowEvents.size());
-      numDocsScanned += numDocsToFetch;
-      int[] docIdSet = docIdSetBlock.getDocIdSet();
-      for (int i = 0; i < numDocsToFetch; i++) {
-        _rowEvents.add(selectionFetcher.getRow(docIdSet[i]));
+      RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(_blockValSets);
+
+      int numDocsToAdd = Math.min(_numRowsToKeep - _rows.size(), transformBlock.getNumDocs());
+      numDocsScanned += numDocsToAdd;
+      for (int i = 0; i < numDocsToAdd; i++) {
+        _rows.add(blockValueFetcher.getRow(i));
       }
-      if (_rowEvents.size() == _limitDocs) {
+      if (_rows.size() == _numRowsToKeep) {
         break;
       }
     }
 
     // Create execution statistics.
-    long numEntriesScannedInFilter = _projectionOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    long numEntriesScannedPostFilter = numDocsScanned * _projectionOperator.getNumColumnsProjected();
+    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedPostFilter = numDocsScanned * _transformOperator.getNumColumnsProjected();
     long numTotalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
     _executionStatistics =
         new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
             numTotalRawDocs);
 
-    return new IntermediateResultsBlock(_dataSchema, _rowEvents);
+    return new IntermediateResultsBlock(_dataSchema, _rows);
   }
 
   @Override

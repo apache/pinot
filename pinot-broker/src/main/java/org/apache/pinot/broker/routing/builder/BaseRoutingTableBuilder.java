@@ -36,7 +36,9 @@ import org.apache.pinot.common.config.RoutingConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
+import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,10 +56,10 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
 
   // Set variable as volatile so all threads can get the up-to-date routing tables
   // Routing tables are used for storing pre-computed routing table
-  protected volatile List<Map<String, List<String>>> _routingTables;
+  protected volatile List<Map<ServerInstance, List<String>>> _routingTables;
 
   // A mapping of segments to servers is used for dynamic routing table building process
-  protected volatile Map<String, List<String>> _segmentToServersMap;
+  protected volatile Map<String, List<ServerInstance>> _segmentToServersMap;
 
   @Override
   public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
@@ -69,33 +71,35 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
     if (routingConfig != null) {
       Map<String, String> routingOption = routingConfig.getRoutingTableBuilderOptions();
-      _enableDynamicComputing = Boolean.valueOf(routingOption.get(RoutingConfig.ENABLE_DYNAMIC_COMPUTING_KEY));
-      if (_enableDynamicComputing) {
+      if (routingOption != null && Boolean
+          .parseBoolean(routingOption.get(RoutingConfig.ENABLE_DYNAMIC_COMPUTING_KEY))) {
         LOGGER.info("Dynamic routing table computation is enabled for table {}", _tableName);
+        _enableDynamicComputing = true;
       }
     }
   }
 
-  protected static String getServerWithLeastSegmentsAssigned(List<String> servers,
-      Map<String, List<String>> routingTable) {
+  protected static void assignSegmentToLeastAssignedServer(String segmentName, List<ServerInstance> servers,
+      Map<ServerInstance, List<String>> routingTable) {
     Collections.shuffle(servers);
 
-    String selectedServer = null;
+    List<String> segmentsForLeastAssignedServer = null;
     int minNumSegmentsAssigned = Integer.MAX_VALUE;
-    for (String server : servers) {
-      List<String> segments = routingTable.get(server);
-      if (segments == null) {
-        routingTable.put(server, new ArrayList<>());
-        return server;
+    for (ServerInstance serverInstance : servers) {
+      List<String> segments = routingTable.computeIfAbsent(serverInstance, k -> new ArrayList<>());
+      int numSegmentsAssigned = segments.size();
+      if (numSegmentsAssigned == 0) {
+        segments.add(segmentName);
+        return;
       } else {
-        int numSegmentsAssigned = segments.size();
         if (numSegmentsAssigned < minNumSegmentsAssigned) {
           minNumSegmentsAssigned = numSegmentsAssigned;
-          selectedServer = server;
+          segmentsForLeastAssignedServer = segments;
         }
       }
     }
-    return selectedServer;
+    assert segmentsForLeastAssignedServer != null;
+    segmentsForLeastAssignedServer.add(segmentName);
   }
 
   /**
@@ -114,7 +118,7 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
   @Override
   public void computeOnExternalViewChange(String tableName, ExternalView externalView,
       List<InstanceConfig> instanceConfigs) {
-    Map<String, List<String>> segmentToServersMap =
+    Map<String, List<ServerInstance>> segmentToServersMap =
         computeSegmentToServersMapFromExternalView(externalView, instanceConfigs);
 
     if (_enableDynamicComputing) {
@@ -122,15 +126,15 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
       _segmentToServersMap = segmentToServersMap;
     } else {
       // Otherwise, we cache the pre-computed routing tables
-      List<Map<String, List<String>>> routingTables = computeRoutingTablesFromSegmentToServersMap(segmentToServersMap);
-      _routingTables = routingTables;
+      _routingTables = computeRoutingTablesFromSegmentToServersMap(segmentToServersMap);
     }
   }
 
-  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request, SegmentSelector segmentSelector) {
+  public Map<ServerInstance, List<String>> getRoutingTable(RoutingTableLookupRequest request,
+      SegmentSelector segmentSelector) {
     if (_enableDynamicComputing) {
       // Copy the pointer for snapshot since the pointer for segment to servers map can change at anytime
-      Map<String, List<String>> segmentToServersMap = _segmentToServersMap;
+      Map<String, List<ServerInstance>> segmentToServersMap = _segmentToServersMap;
 
       // Selecting segments only required for processing a query
       Set<String> segmentsToQuery = segmentToServersMap.keySet();
@@ -147,7 +151,7 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
   }
 
   @Override
-  public List<Map<String, List<String>>> getRoutingTables() {
+  public List<Map<ServerInstance, List<String>>> getRoutingTables() {
     return _routingTables;
   }
 
@@ -158,14 +162,13 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
    * @param segmentsToQuery a list of segments that need to be processed for a particular query
    * @return a routing table
    */
-  public Map<String, List<String>> computeDynamicRoutingTable(Map<String, List<String>> segmentToServersMap,
-      Set<String> segmentsToQuery) {
-    Map<String, List<String>> routingTable = new HashMap<>();
+  public Map<ServerInstance, List<String>> computeDynamicRoutingTable(
+      Map<String, List<ServerInstance>> segmentToServersMap, Set<String> segmentsToQuery) {
+    Map<ServerInstance, List<String>> routingTable = new HashMap<>();
     for (String segmentName : segmentsToQuery) {
-      List<String> servers = segmentToServersMap.get(segmentName);
-      String selectedServer = servers.get(_random.nextInt(servers.size()));
-      List<String> segments = routingTable.computeIfAbsent(selectedServer, k -> new ArrayList<>());
-      segments.add(segmentName);
+      List<ServerInstance> servers = segmentToServersMap.get(segmentName);
+      ServerInstance selectedServer = servers.get(_random.nextInt(servers.size()));
+      routingTable.computeIfAbsent(selectedServer, k -> new ArrayList<>()).add(segmentName);
     }
     return routingTable;
   }
@@ -178,18 +181,22 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
    * @param instanceConfigs a list of instance config
    * @return a mapping of segment to servers
    */
-  protected Map<String, List<String>> computeSegmentToServersMapFromExternalView(ExternalView externalView,
+  protected Map<String, List<ServerInstance>> computeSegmentToServersMapFromExternalView(ExternalView externalView,
       List<InstanceConfig> instanceConfigs) {
-    Map<String, List<String>> segmentToServersMap = new HashMap<>();
-    RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigs);
-    for (String segmentName : externalView.getPartitionSet()) {
-      // List of servers that are active and are serving the segment
-      List<String> servers = new ArrayList<>();
-      for (Map.Entry<String, String> entry : externalView.getStateMap(segmentName).entrySet()) {
-        String serverName = entry.getKey();
-        if (entry.getValue().equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)
-            && !instancePruner.isInactive(serverName)) {
-          servers.add(serverName);
+    Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
+    Map<String, List<ServerInstance>> segmentToServersMap =
+        new HashMap<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
+    InstanceConfigManager instanceConfigManager = new InstanceConfigManager(instanceConfigs);
+    for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
+      String segmentName = entry.getKey();
+      Map<String, String> instanceStateMap = entry.getValue();
+      List<ServerInstance> servers = new ArrayList<>(instanceStateMap.size());
+      for (Map.Entry<String, String> instanceStateEntry : instanceStateMap.entrySet()) {
+        if (instanceStateEntry.getValue().equals(SegmentOnlineOfflineStateModel.ONLINE)) {
+          InstanceConfig instanceConfig = instanceConfigManager.getActiveInstanceConfig(instanceStateEntry.getKey());
+          if (instanceConfig != null) {
+            servers.add(new ServerInstance(instanceConfig));
+          }
         }
       }
       if (!servers.isEmpty()) {
@@ -208,6 +215,6 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
    * @param segmentToServersMap a mapping of segment to servers
    * @return a list of final routing tables
    */
-  protected abstract List<Map<String, List<String>>> computeRoutingTablesFromSegmentToServersMap(
-      Map<String, List<String>> segmentToServersMap);
+  protected abstract List<Map<ServerInstance, List<String>>> computeRoutingTablesFromSegmentToServersMap(
+      Map<String, List<ServerInstance>> segmentToServersMap);
 }

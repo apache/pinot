@@ -20,8 +20,8 @@ package org.apache.pinot.broker.broker.helix;
 
 import org.apache.helix.HelixConstants;
 import org.apache.helix.HelixManager;
-import org.apache.pinot.annotations.InterfaceAudience;
-import org.apache.pinot.annotations.InterfaceStability;
+import org.apache.pinot.spi.annotations.InterfaceAudience;
+import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
 /**

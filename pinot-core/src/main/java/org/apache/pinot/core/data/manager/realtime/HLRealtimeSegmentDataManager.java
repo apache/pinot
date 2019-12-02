@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -37,12 +37,10 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.data.recordtransformer.CompoundTransformer;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegment;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.core.realtime.converter.RealtimeSegmentConverter;
@@ -92,6 +90,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final String sortedColumn;
   private final List<String> invertedIndexColumns;
   private final List<String> noDictionaryColumns;
+  private final List<String> varLengthDictionaryColumns;
   private Logger segmentLogger = LOGGER;
   private final SegmentVersion _segmentVersion;
 
@@ -105,7 +104,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     super();
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     this.schema = schema;
-    _recordTransformer = CompoundTransformer.getDefaultTransformer(schema);
+    _recordTransformer = CompositeTransformer.getDefaultTransformer(schema);
     this.serverMetrics = serverMetrics;
     this.segmentName = realtimeSegmentZKMetadata.getSegmentName();
     this.tableNameWithType = tableConfig.getTableName();
@@ -145,7 +144,9 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // No DictionaryColumns
     noDictionaryColumns = new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns());
 
-    _streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+    varLengthDictionaryColumns = new ArrayList<>(indexLoadingConfig.getVarLengthDictionaryColumns());
+
+    _streamConfig = new StreamConfig(tableNameWithType, tableConfig.getIndexingConfig().getStreamConfigs());
 
     segmentLogger = LoggerFactory.getLogger(
         HLRealtimeSegmentDataManager.class.getName() + "_" + segmentName + "_" + _streamConfig.getTopicName());
@@ -162,8 +163,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // create and init stream level consumer
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     String clientId = HLRealtimeSegmentDataManager.class.getSimpleName() + "-" + _streamConfig.getTopicName();
-    _streamLevelConsumer =
-        _streamConsumerFactory.createStreamLevelConsumer(clientId, tableNameWithType, schema, instanceMetadata, serverMetrics);
+    _streamLevelConsumer = _streamConsumerFactory
+        .createStreamLevelConsumer(clientId, tableNameWithType, schema, instanceMetadata, serverMetrics);
     _streamLevelConsumer.start();
 
     tableStreamName = tableNameWithType + "_" + _streamConfig.getTopicName();
@@ -181,12 +182,14 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setSchema(schema).setCapacity(capacity)
             .setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
+            .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
             .setInvertedIndexColumns(invertedIndexColumns).setRealtimeSegmentZKMetadata(realtimeSegmentZKMetadata)
             .setOffHeap(indexLoadingConfig.isRealtimeOffheapAllocation()).setMemoryManager(
             getMemoryManager(realtimeTableDataManager.getConsumerDir(), segmentName,
                 indexLoadingConfig.isRealtimeOffheapAllocation(),
                 indexLoadingConfig.isDirectRealtimeOffheapAllocation(), serverMetrics))
-            .setStatsHistory(realtimeTableDataManager.getStatsHistory()).build();
+            .setStatsHistory(realtimeTableDataManager.getStatsHistory())
+            .setNullHandlingEnabled(indexingConfig.isNullHandlingEnabled()).build();
     realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfig);
 
     notifier = realtimeTableDataManager;
@@ -210,29 +213,40 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         segmentLogger.info("Starting to collect rows");
 
         int numRowsErrored = 0;
-        GenericRow consumedRow = null;
+        GenericRow reuse = new GenericRow();
         do {
+          reuse.clear();
           try {
-            consumedRow = GenericRow.createOrReuseRow(consumedRow);
-            consumedRow = _streamLevelConsumer.next(consumedRow);
+            GenericRow consumedRow;
+            try {
+              consumedRow = _streamLevelConsumer.next(reuse);
+            } catch (Exception e) {
+              segmentLogger.warn("Caught exception while consuming row, sleeping for {} ms", exceptionSleepMillis, e);
+              numRowsErrored++;
 
+              // Sleep for a short time as to avoid filling the logs with exceptions too quickly
+              Uninterruptibles.sleepUninterruptibly(exceptionSleepMillis, TimeUnit.MILLISECONDS);
+              exceptionSleepMillis = Math.min(60000L, exceptionSleepMillis * 2);
+              continue;
+            }
             if (consumedRow != null) {
-              GenericRow transformedRow = _recordTransformer.transform(consumedRow);
-              if (transformedRow != null) {
-                // we currently do not get ingestion data through stream-consumer
-                notFull = realtimeSegment.index(transformedRow, null);
-                exceptionSleepMillis = 50L;
+              try {
+                GenericRow transformedRow = _recordTransformer.transform(consumedRow);
+                if (transformedRow != null) {
+                  // we currently do not get ingestion data through stream-consumer
+                  notFull = realtimeSegment.index(transformedRow, null);
+                  exceptionSleepMillis = 50L;
+                }
+              } catch (Exception e) {
+                segmentLogger.warn("Caught exception while indexing row, sleeping for {} ms, row contents {}",
+                    exceptionSleepMillis, consumedRow, e);
+                numRowsErrored++;
+
+                // Sleep for a short time as to avoid filling the logs with exceptions too quickly
+                Uninterruptibles.sleepUninterruptibly(exceptionSleepMillis, TimeUnit.MILLISECONDS);
+                exceptionSleepMillis = Math.min(60000L, exceptionSleepMillis * 2);
               }
             }
-          } catch (Exception e) {
-            segmentLogger
-                .warn("Caught exception while indexing row, sleeping for {} ms, row contents {}", exceptionSleepMillis,
-                    consumedRow, e);
-            numRowsErrored++;
-
-            // Sleep for a short time as to avoid filling the logs with exceptions too quickly
-            Uninterruptibles.sleepUninterruptibly(exceptionSleepMillis, TimeUnit.MILLISECONDS);
-            exceptionSleepMillis = Math.min(60000L, exceptionSleepMillis * 2);
           } catch (Error e) {
             segmentLogger.error("Caught error in indexing thread", e);
             throw e;
@@ -252,14 +266,14 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           segmentStatusTask.cancel();
           updateCurrentDocumentCountMetrics();
           segmentLogger.info("Indexed {} raw events", realtimeSegment.getNumDocsIndexed());
-          File tempSegmentFolder = new File(resourceTmpDir, "tmp-" + String.valueOf(System.currentTimeMillis()));
+          File tempSegmentFolder = new File(resourceTmpDir, "tmp-" + System.currentTimeMillis());
 
           // lets convert the segment now
           RealtimeSegmentConverter converter =
               new RealtimeSegmentConverter(realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
-                  tableNameWithType, timeColumnName, realtimeSegmentZKMetadata.getSegmentName(),
-                  sortedColumn, HLRealtimeSegmentDataManager.this.invertedIndexColumns, noDictionaryColumns,
-                  null/*StarTreeIndexSpec*/); // Star tree not supported for HLC.
+                  tableNameWithType, timeColumnName, realtimeSegmentZKMetadata.getSegmentName(), sortedColumn,
+                  HLRealtimeSegmentDataManager.this.invertedIndexColumns, noDictionaryColumns,
+                  varLengthDictionaryColumns, null/*StarTreeIndexSpec*/, indexingConfig.isNullHandlingEnabled()); // Star tree not supported for HLC.
 
           segmentLogger.info("Trying to build segment");
           final long buildStartTime = System.nanoTime();
@@ -274,10 +288,6 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           FileUtils.deleteQuietly(tempSegmentFolder);
           long segStartTime = realtimeSegment.getMinTime();
           long segEndTime = realtimeSegment.getMaxTime();
-
-          TimeUnit timeUnit = schema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType();
-          ImmutableSegment segment =
-              ImmutableSegmentLoader.load(new File(resourceDir, segmentMetatdaZk.getSegmentName()), indexLoadingConfig);
 
           segmentLogger.info("Committing {} offsets", _streamConfig.getType());
           boolean commitSuccessful = false;
@@ -353,9 +363,9 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             metadataToOverwrite.setStatus(Status.DONE);
             metadataToOverwrite.setStartTime(segStartTime);
             metadataToOverwrite.setEndTime(segEndTime);
-            metadataToOverwrite.setTimeUnit(timeUnit);
+            metadataToOverwrite.setTimeUnit(schema.getOutgoingTimeUnit());
             metadataToOverwrite.setTotalRawDocs(realtimeSegment.getNumDocsIndexed());
-            notifier.notifySegmentCommitted(tableNameWithType, metadataToOverwrite, segment);
+            notifier.replaceHLSegment(metadataToOverwrite, indexLoadingConfig);
             segmentLogger
                 .info("Completed write of segment completion to Helix, waiting for controller to assign a new segment");
           } catch (Exception e) {
@@ -414,8 +424,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   private void updateCurrentDocumentCountMetrics() {
     int currentRawDocs = realtimeSegment.getNumDocsIndexed();
-    serverMetrics
-        .addValueToTableGauge(tableNameWithType, ServerGauge.DOCUMENT_COUNT, (currentRawDocs - lastUpdatedRawDocuments.get()));
+    serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.DOCUMENT_COUNT,
+        (currentRawDocs - lastUpdatedRawDocuments.get()));
     lastUpdatedRawDocuments.set(currentRawDocs);
   }
 

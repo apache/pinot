@@ -19,7 +19,7 @@
 package org.apache.pinot.broker.routing;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public interface TimeBoundaryService {

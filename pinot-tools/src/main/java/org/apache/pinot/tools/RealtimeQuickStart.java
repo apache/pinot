@@ -22,10 +22,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.net.URL;
-import kafka.server.KafkaServerStartable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
+import org.apache.pinot.core.realtime.stream.StreamDataProvider;
+import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.streams.MeetupRsvpStream;
@@ -35,7 +36,14 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 public class RealtimeQuickStart {
+  private StreamDataServerStartable _kafkaStarter;
+
   private RealtimeQuickStart() {
+  }
+
+  public static void main(String[] args)
+      throws Exception {
+    new RealtimeQuickStart().execute();
   }
 
   public void execute()
@@ -64,10 +72,14 @@ public class RealtimeQuickStart {
 
     printStatus(Color.CYAN, "***** Starting Kafka *****");
     final ZkStarter.ZookeeperInstance zookeeperInstance = ZkStarter.startLocalZkServer();
-    final KafkaServerStartable kafkaStarter = KafkaStarterUtils
-        .startServer(KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_BROKER_ID,
-            KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
-    KafkaStarterUtils.createTopic("meetupRSVPEvents", KafkaStarterUtils.DEFAULT_ZK_STR, 10);
+    try {
+      _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, KafkaStarterUtils.getDefaultKafkaConfiguration());
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
+    }
+    _kafkaStarter.start();
+    _kafkaStarter.createTopic("meetupRSVPEvents", KafkaStarterUtils.getTopicCreationProps(10));
+
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, server and broker *****");
     runner.startAll();
     printStatus(Color.CYAN, "***** Adding meetupRSVP schema *****");
@@ -87,7 +99,7 @@ public class RealtimeQuickStart {
           printStatus(Color.GREEN, "***** Shutting down realtime quick start *****");
           meetupRSVPProvider.stopPublishing();
           runner.stop();
-          KafkaStarterUtils.stopServer(kafkaStarter);
+          _kafkaStarter.stop();
           ZkStarter.stopLocalZkServer(zookeeperInstance);
           FileUtils.deleteDirectory(quickStartDataDir);
         } catch (Exception e) {
@@ -129,10 +141,5 @@ public class RealtimeQuickStart {
     printStatus(Color.GREEN, "***************************************************");
 
     printStatus(Color.GREEN, "You can always go to http://localhost:9000/query/ to play around in the query console");
-  }
-
-  public static void main(String[] args)
-      throws Exception {
-    new RealtimeQuickStart().execute();
   }
 }

@@ -26,8 +26,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
@@ -121,7 +121,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     aggregationOperator = getOperatorForQueryWithFilter(BASE_QUERY);
     resultsBlock = aggregationOperator.nextBlock();
     executionStatistics = aggregationOperator.getExecutionStatistics();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 6129L, 112472L, 12258L, 30000L);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 6129L, 112479L, 12258L, 30000L);
     aggregationResult = resultsBlock.getAggregationResult();
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(0)).cardinality(), 17L);
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1197L);
@@ -141,7 +141,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 4L, 0L, 8L, 120000L, new String[]{"21", "1762"});
     // Test inter segments query with filter
     brokerResponse = getBrokerResponseForQueryWithFilter(BASE_QUERY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 449888L, 49032L, 120000L,
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 449916L, 49032L, 120000L,
         new String[]{"17", "1197"});
     // Test inter segments query with group-by
     brokerResponse = getBrokerResponseForQuery(BASE_QUERY + GROUP_BY);
@@ -235,6 +235,12 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     segmentGeneratorConfig.setInputFilePath(filePath);
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
+    // The segment generation code in SegmentColumnarIndexCreator will throw
+    // exception if start and end time in time column are not in acceptable
+    // range. For this test, we first need to fix the input avro data
+    // to have the time column values in allowed range. Until then, the check
+    // is explicitly disabled
+    segmentGeneratorConfig.setSkipTimeValueCheck(true);
     segmentGeneratorConfig
         .setInvertedIndexCreationColumns(Arrays.asList("column6", "column7", "column11", "column17", "column18"));
     if (hasPreGeneratedHllColumns) {

@@ -19,18 +19,16 @@
 package org.apache.pinot.core.segment.virtualcolumn;
 
 import java.io.IOException;
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
-import org.apache.pinot.core.io.util.DictionaryDelegatingValueReader;
-import org.apache.pinot.core.io.util.ValueReader;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
-import org.apache.pinot.core.segment.index.readers.IntDictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 
 
@@ -38,6 +36,7 @@ import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
  * Virtual column provider that returns the current document id.
  */
 public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
+
   @Override
   public DataFileReader buildReader(VirtualColumnContext context) {
     return new DocIdSingleValueReader();
@@ -45,10 +44,7 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
 
   @Override
   public Dictionary buildDictionary(VirtualColumnContext context) {
-    DictionaryDelegatingValueReader valueReader = new DictionaryDelegatingValueReader();
-    DocIdDictionary docIdDictionary = new DocIdDictionary(valueReader, context.getTotalDocCount());
-    valueReader.setDictionary(docIdDictionary);
-    return docIdDictionary;
+    return new DocIdDictionary(context.getTotalDocCount());
   }
 
   @Override
@@ -130,29 +126,24 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
     }
   }
 
-  private class DocIdDictionary extends IntDictionary {
-    private int _length;
+  private class DocIdDictionary extends BaseImmutableDictionary {
+    final int _numDocs;
 
-    public DocIdDictionary(ValueReader valueReader, int length) {
-      super(valueReader, length);
-      _length = length;
+    DocIdDictionary(int numDocs) {
+      super(numDocs);
+      _numDocs = numDocs;
     }
 
     @Override
-    public int indexOf(Object rawValue) {
-      if (rawValue instanceof Number) {
-        return ((Number) rawValue).intValue();
+    public int insertionIndexOf(String stringValue) {
+      int intValue = Integer.parseInt(stringValue);
+      if (intValue < 0) {
+        return -1;
+      } else if (intValue >= _numDocs) {
+        return -(_numDocs + 1);
+      } else {
+        return intValue;
       }
-
-      if (rawValue instanceof String) {
-        try {
-          return Integer.parseInt((String) rawValue);
-        } catch (NumberFormatException e) {
-          return -1;
-        }
-      }
-
-      return -1;
     }
 
     @Override
@@ -183,21 +174,6 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
     @Override
     public String getStringValue(int dictId) {
       return Integer.toString(dictId);
-    }
-
-    @Override
-    public int length() {
-      return _length;
-    }
-
-    @Override
-    public boolean isSorted() {
-      return true;
-    }
-
-    @Override
-    public void close()
-        throws IOException {
     }
   }
 }

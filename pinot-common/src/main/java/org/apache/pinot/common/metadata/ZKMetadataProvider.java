@@ -29,7 +29,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -131,14 +131,6 @@ public class ZKMetadataProvider {
   public static void removeResourceConfigFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore,
       String resourceName) {
     String propertyStorePath = constructPropertyStorePathForResourceConfig(resourceName);
-    if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
-      propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
-    }
-  }
-
-  public static void removeInstancePartitionAssignmentFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String tableNameWithType) {
-    String propertyStorePath = constructPropertyStorePathForInstancePartitions(tableNameWithType);
     if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
       propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
     }

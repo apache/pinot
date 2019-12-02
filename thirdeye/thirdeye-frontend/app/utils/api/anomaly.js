@@ -22,14 +22,14 @@ export function getAnomaliesForYamlPreviewUrl(startTime, endTime, alertId) {
 }
 
 /**
- * Returns url for getting the time series and Anomalies for a given detection id
+ * Returns url for getting the time series with bounds for a given detection id
  * @param {String} detectionId - the detection id
  * @param {Number} startTime - the anomaly start time
  * @param {Number} endTime - the anomaly end time
  * @returns {String} the complete yaml/preview url
  * @example getBoundsAndAnomalies(111111, 1508472700000, 1508472800000) // yields => /detection/preview/111111?start=1508472700000&end=1508472800000&diagnostics=true
  */
-export function getBoundsAndAnomaliesUrl(detectionId, startTime, endTime) {
+export function getBoundsUrl(detectionId, startTime, endTime) {
   return `/detection/preview/${detectionId}?start=${startTime}&end=${endTime}&diagnostics=true`;
 }
 
@@ -65,13 +65,24 @@ export function getAnomalyFiltersByAnomalyIdUrl(startTime, endTime, anomalyIds) 
   return `/anomalies/search/anomalyIds/${startTime}/${endTime}/1?anomalyIds=${encodeURIComponent(anomalyIds)}`;
 }
 
+/**
+ * Returns the url for getting ai availability table
+ * @param {Number} startDate - beginning of time range of interest
+ * @param {Number} endDate - end of time range of interest
+ * @example getAiAvailabilityUrl(1, 1508472700000, 1508472800000) // yields => /thirdeye/table?detectionConfigId=1&start=1508472700000&end=1508472800000
+ */
+export function getAiAvailabilityUrl(startDate, endDate) {
+  return `/thirdeye/table?metricIds=143870702&metricIds=143870703&metricIds=143870700&start=${startDate}&end=${endDate}&dimensionKeys=grid&dimensionKeys=flow&dimensionKeys=project&dimensionKeys=owner&dimensionKeys=managers&dimensionKeys=sla&dimensionKeys=url`;
+}
+
 export const anomalyApiUrls = {
   getAnomalyDataUrl,
   getAnomaliesForYamlPreviewUrl,
   getAnomaliesByAlertIdUrl,
   getAnomalyFiltersByTimeRangeUrl,
   getAnomalyFiltersByAnomalyIdUrl,
-  getBoundsAndAnomaliesUrl
+  getBoundsUrl,
+  getAiAvailabilityUrl
 };
 
 export default {

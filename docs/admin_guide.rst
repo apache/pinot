@@ -17,6 +17,8 @@
 .. under the License.
 ..
 
+:orphan:
+
 ###########
 Admin Guide
 ###########
@@ -27,6 +29,7 @@ Admin Guide
    :maxdepth: 1
 
    tableconfig_schema
+   schema
    in_production
    pinot_hadoop
    customizations

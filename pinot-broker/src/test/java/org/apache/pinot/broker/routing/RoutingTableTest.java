@@ -42,6 +42,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -150,7 +151,7 @@ public class RoutingTableTest {
 
   private void assertResourceRequest(HelixExternalViewBasedRouting routing, String resource, String expectedSegmentList,
       int expectedNumSegment) {
-    Map<String, List<String>> routingTable = routing.getRoutingTable(new RoutingTableLookupRequest(resource));
+    Map<ServerInstance, List<String>> routingTable = routing.getRoutingTable(new RoutingTableLookupRequest(resource));
     List<String> selectedSegments = new ArrayList<>();
     for (List<String> segmentsForServer : routingTable.values()) {
       selectedSegments.addAll(segmentsForServer);
@@ -257,7 +258,7 @@ public class RoutingTableTest {
 
   private void assertResourceRequest(HelixExternalViewBasedRouting routing, String resource,
       String[] expectedSegmentLists, int expectedNumSegment) {
-    Map<String, List<String>> routingTable = routing.getRoutingTable(new RoutingTableLookupRequest(resource));
+    Map<ServerInstance, List<String>> routingTable = routing.getRoutingTable(new RoutingTableLookupRequest(resource));
     List<String> selectedSegments = new ArrayList<>();
     for (List<String> segmentsForServer : routingTable.values()) {
       selectedSegments.addAll(segmentsForServer);

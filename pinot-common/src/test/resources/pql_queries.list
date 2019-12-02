@@ -812,3 +812,8 @@ SELECT column1, column5, column6 FROM testTable ORDER BY column5, column9 WHERE 
 select $docId, $segmentName, $hostName from mytable where $docId < 5 limit 50
 select $docId, $segmentName, $hostName from mytable where $docId = 5 limit 50
 select $docId, $segmentName, $hostName from mytable where $docId > 19998 limit 50
+SELECT SUM(met) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = 1394323200
+select COUNT(*) from baseballStats where DIV(numberOfGames,10) = 100
+select mapKeys(mapField) from baseballStats where DIV(numberOfGames,10) = 100
+select mapKey(mapField,k1) from baseballStats where DIV(numberOfGames,10) = 100
+select mapKey(mapField,k1) from baseballStats where mapKey(mapField,k1) = 'v1'

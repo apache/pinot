@@ -4,6 +4,7 @@
       alertData=model.alertData
       subscribedGroups=model.subscribedGroups
       isLoadError=isLoadError
+      toggleActivation=(action "toggleActivation")
     }}
       <div class="te-search-results__cta">
         {{#link-to "manage.yaml" model.alertId}}
@@ -30,10 +31,12 @@
         dataIsCurrent=true
         alertId=model.alertId
         alertData=model.alertData
-        metricUrn=model.metricUrn
-        metricUrnList=model.metricUrnList
+        metricUrnRoute=model.metricUrn
+        metricUrnListRoute=model.metricUrnList
         granularity=model.granularity
         dimensionExploration=model.alertData.dimensionExploration
+        detectionHealth=model.detectionHealth
+        timeWindowSize=model.timeWindowSize
       }}
     {{/if}}
   </div>

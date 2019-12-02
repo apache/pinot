@@ -20,10 +20,8 @@ package org.apache.pinot.segments.v1.creator;
 
 import java.io.File;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -32,12 +30,12 @@ import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.data.DimensionFieldSpec;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.FieldSpec.DataType;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.utils.primitive.ByteArray;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
@@ -45,7 +43,6 @@ import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.core.segment.creator.impl.SegmentDictionaryCreator;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
 import org.apache.pinot.core.segment.creator.impl.stats.BytesColumnPredIndexStatsCollector;
 import org.apache.pinot.core.segment.creator.impl.stats.DoubleColumnPreIndexStatsCollector;
@@ -53,8 +50,6 @@ import org.apache.pinot.core.segment.creator.impl.stats.FloatColumnPreIndexStats
 import org.apache.pinot.core.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
 import org.apache.pinot.core.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
 import org.apache.pinot.core.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
-import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.DoubleDictionary;
 import org.apache.pinot.core.segment.index.readers.FloatDictionary;
@@ -94,6 +89,12 @@ public class DictionariesTest {
         .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "time_day", TimeUnit.DAYS,
             "test");
 
+    // The segment generation code in SegmentColumnarIndexCreator will throw
+    // exception if start and end time in time column are not in acceptable
+    // range. For this test, we first need to fix the input avro data
+    // to have the time column values in allowed range. Until then, the check
+    // is explicitly disabled
+    config.setSkipTimeValueCheck(true);
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
@@ -121,27 +122,9 @@ public class DictionariesTest {
         if (val instanceof Utf8) {
           val = ((Utf8) val).toString();
         }
-        uniqueEntries.get(column).add(getAppropriateType(schema.getFieldSpecFor(column).getDataType(), val));
+        uniqueEntries.get(column).add(val);
       }
     }
-  }
-
-  private static Object getAppropriateType(DataType spec, Object val) {
-    if (val == null) {
-      switch (spec) {
-        case DOUBLE:
-          return V1Constants.Numbers.NULL_DOUBLE;
-        case FLOAT:
-          return V1Constants.Numbers.NULL_FLOAT;
-        case INT:
-          return V1Constants.Numbers.NULL_INT;
-        case LONG:
-          return V1Constants.Numbers.NULL_LONG;
-        default:
-          return V1Constants.Str.NULL_STRING;
-      }
-    }
-    return val;
   }
 
   @Test
@@ -150,34 +133,40 @@ public class DictionariesTest {
     ImmutableSegment heapSegment = ImmutableSegmentLoader.load(segmentDirectory, ReadMode.heap);
     ImmutableSegment mmapSegment = ImmutableSegmentLoader.load(segmentDirectory, ReadMode.mmap);
 
-    for (final String column : ((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap()
-        .keySet()) {
-      Dictionary heapDictionary = heapSegment.getDictionary(column);
-      Dictionary mmapDictionary = mmapSegment.getDictionary(column);
+    Schema schema = heapSegment.getSegmentMetadata().getSchema();
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      // Skip virtual columns
+      if (fieldSpec.isVirtualColumn()) {
+        continue;
+      }
 
-      switch (((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap().get(column)
-          .getDataType()) {
-        case BOOLEAN:
-        case STRING:
-          Assert.assertTrue(heapDictionary instanceof StringDictionary);
-          Assert.assertTrue(mmapDictionary instanceof StringDictionary);
-          break;
-        case DOUBLE:
-          Assert.assertTrue(heapDictionary instanceof DoubleDictionary);
-          Assert.assertTrue(mmapDictionary instanceof DoubleDictionary);
-          break;
-        case FLOAT:
-          Assert.assertTrue(heapDictionary instanceof FloatDictionary);
-          Assert.assertTrue(mmapDictionary instanceof FloatDictionary);
+      String columnName = fieldSpec.getName();
+      Dictionary heapDictionary = heapSegment.getDictionary(columnName);
+      Dictionary mmapDictionary = mmapSegment.getDictionary(columnName);
+
+      switch (fieldSpec.getDataType()) {
+        case INT:
+          Assert.assertTrue(heapDictionary instanceof IntDictionary);
+          Assert.assertTrue(mmapDictionary instanceof IntDictionary);
           break;
         case LONG:
           Assert.assertTrue(heapDictionary instanceof LongDictionary);
           Assert.assertTrue(mmapDictionary instanceof LongDictionary);
           break;
-        case INT:
-          Assert.assertTrue(heapDictionary instanceof IntDictionary);
-          Assert.assertTrue(mmapDictionary instanceof IntDictionary);
+        case FLOAT:
+          Assert.assertTrue(heapDictionary instanceof FloatDictionary);
+          Assert.assertTrue(mmapDictionary instanceof FloatDictionary);
           break;
+        case DOUBLE:
+          Assert.assertTrue(heapDictionary instanceof DoubleDictionary);
+          Assert.assertTrue(mmapDictionary instanceof DoubleDictionary);
+          break;
+        case STRING:
+          Assert.assertTrue(heapDictionary instanceof StringDictionary);
+          Assert.assertTrue(mmapDictionary instanceof StringDictionary);
+          break;
+        default:
+          Assert.fail();
       }
 
       Assert.assertEquals(mmapDictionary.length(), heapDictionary.length());
@@ -193,25 +182,17 @@ public class DictionariesTest {
     ImmutableSegment heapSegment = ImmutableSegmentLoader.load(segmentDirectory, ReadMode.heap);
     ImmutableSegment mmapSegment = ImmutableSegmentLoader.load(segmentDirectory, ReadMode.mmap);
 
-    final Map<String, ColumnMetadata> metadataMap =
-        ((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap();
-    for (final String column : metadataMap.keySet()) {
-      final Dictionary heapDictionary = heapSegment.getDictionary(column);
-      final Dictionary mmapDictionary = mmapSegment.getDictionary(column);
+    Schema schema = heapSegment.getSegmentMetadata().getSchema();
+    for (String columnName : schema.getPhysicalColumnNames()) {
+      Dictionary heapDictionary = heapSegment.getDictionary(columnName);
+      Dictionary mmapDictionary = mmapSegment.getDictionary(columnName);
 
-      // Skip virtual columns
-      if (column.startsWith("$")) {
-        continue;
-      }
-
-      final Set<Object> uniques = uniqueEntries.get(column);
-      final List<Object> list = Arrays.asList(uniques.toArray());
-      Collections.shuffle(list);
-      for (final Object entry : list) {
-        Assert.assertEquals(mmapDictionary.indexOf(entry), heapDictionary.indexOf(entry));
-        if (!column.equals("pageKey")) {
-          Assert.assertFalse(heapDictionary.indexOf(entry) < 0);
-          Assert.assertFalse(mmapDictionary.indexOf(entry) < 0);
+      for (Object entry : uniqueEntries.get(columnName)) {
+        String stringValue = entry.toString();
+        Assert.assertEquals(mmapDictionary.indexOf(stringValue), heapDictionary.indexOf(stringValue));
+        if (!columnName.equals("pageKey")) {
+          Assert.assertFalse(heapDictionary.indexOf(stringValue) < 0);
+          Assert.assertFalse(mmapDictionary.indexOf(stringValue) < 0);
         }
       }
     }

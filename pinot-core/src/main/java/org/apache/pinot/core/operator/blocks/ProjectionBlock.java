@@ -63,13 +63,10 @@ public class ProjectionBlock implements Block {
     throw new UnsupportedOperationException();
   }
 
-  // TODO: let selection operator use DataBlockCache as well
-  public Block getBlock(String column) {
-    return _blockMap.get(column);
-  }
-
   public BlockValSet getBlockValueSet(String column) {
-    return new ProjectionBlockValSet(_dataBlockCache, column, _blockMap.get(column).getMetadata().getDataType());
+    BlockMetadata blockMetadata = _blockMap.get(column).getMetadata();
+    return new ProjectionBlockValSet(_dataBlockCache, column, blockMetadata.getDataType(),
+        blockMetadata.isSingleValue());
   }
 
   public DocIdSetBlock getDocIdSetBlock() {

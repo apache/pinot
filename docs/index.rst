@@ -27,21 +27,36 @@ Pinot
 #####
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
+   :caption: Introduction
 
-   introduction
-
-.. toctree::
-   :maxdepth: 2
-
-   user_guide
+   intro
+   architecture
+   getting_started
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
+   :caption: User Guide
 
-   admin_guide
+   pql_examples
+   client_api
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
+   :caption: Admin Guide
 
-   dev_guide
+   tableconfig_schema
+   schema
+   in_production
+   pinot_hadoop
+   customizations
+   tuning_pinot
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Developer Guide 
+
+   dev_env
+   code_modules
+   contribution_guidelines
+   extensions

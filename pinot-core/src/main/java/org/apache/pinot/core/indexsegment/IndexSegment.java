@@ -20,10 +20,10 @@ package org.apache.pinot.core.indexsegment;
 
 import java.util.List;
 import java.util.Set;
-import org.apache.pinot.annotations.InterfaceAudience;
+import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 
 @InterfaceAudience.Private
@@ -71,7 +71,7 @@ public interface IndexSegment {
   List<StarTreeV2> getStarTrees();
 
   /**
-   * Returns the record for the given document Id.
+   * Returns the record for the given document Id. Virtual column values are not returned.
    * <p>NOTE: don't use this method for high performance code.
    *
    * @param docId Document Id

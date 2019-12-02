@@ -29,7 +29,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.tools.query.comparison.QueryComparison;
 import org.apache.pinot.tools.query.comparison.SegmentInfoProvider;
 import org.apache.pinot.tools.query.comparison.StarTreeQueryGenerator;
@@ -135,7 +135,7 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
-    uploadSegments(_tarDir);
+    uploadSegments(getTableName(), _tarDir);
   }
 
   @Test

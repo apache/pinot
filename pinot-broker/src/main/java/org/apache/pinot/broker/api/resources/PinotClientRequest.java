@@ -39,7 +39,7 @@ import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,7 +82,7 @@ public class PinotClientRequest {
       return brokerResponse.toJsonString();
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
-      brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1);
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1L);
       throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
@@ -98,8 +98,8 @@ public class PinotClientRequest {
       BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson, null, new RequestStatistics());
       return brokerResponse.toJsonString();
     } catch (Exception e) {
-      LOGGER.error("Caught exception while processing GET request", e);
-      brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1);
+      LOGGER.error("Caught exception while processing POST request", e);
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
       throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
     }
   }

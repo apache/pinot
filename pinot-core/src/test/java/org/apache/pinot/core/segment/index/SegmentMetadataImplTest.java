@@ -21,7 +21,6 @@ package org.apache.pinot.core.segment.index;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -40,14 +39,12 @@ import static org.testng.Assert.assertTrue;
 
 public class SegmentMetadataImplTest {
   private static final String AVRO_DATA = "data/test_data-mv.avro";
-  private File INDEX_DIR;
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "SegmentMetadataImplTest");
   private File segmentDirectory;
 
   @BeforeMethod
   public void setUp()
       throws Exception {
-    INDEX_DIR = Files.createTempDirectory(SegmentMetadataImplTest.class.getName() + "_segmentDir").toFile();
-
     final String filePath =
         TestUtils.getFileFromResourceUrl(SegmentMetadataImplTest.class.getClassLoader().getResource(AVRO_DATA));
 
@@ -56,7 +53,12 @@ public class SegmentMetadataImplTest {
         .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.HOURS,
             "testTable");
     config.setSegmentNamePostfix("1");
-    config.setTimeColumnName("daysSinceEpoch");
+    // The segment generation code in SegmentColumnarIndexCreator will throw
+    // exception if start and end time in time column are not in acceptable
+    // range. For this test, we first need to fix the input avro data
+    // to have the time column values in allowed range. Until then, the check
+    // is explicitly disabled
+    config.setSkipTimeValueCheck(true);
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();

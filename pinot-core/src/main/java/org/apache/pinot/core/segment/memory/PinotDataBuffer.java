@@ -61,7 +61,7 @@ public abstract class PinotDataBuffer implements Closeable {
   // We use this threshold to decide whether we use bulk bytes processing or not
   // With number of bytes less than this threshold, we get/put bytes one by one
   // With number of bytes more than this threshold, we create a ByteBuffer from the buffer and use bulk get/put method
-  protected static int BULK_BYTES_PROCESSING_THRESHOLD = 10;
+  public static int BULK_BYTES_PROCESSING_THRESHOLD = 10;
 
   private static class BufferContext {
     enum Type {

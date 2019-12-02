@@ -15,17 +15,15 @@
 import Component from "@ember/component";
 import * as anomalyUtil from 'thirdeye-frontend/utils/anomaly';
 import { getAnomalyDataUrl } from 'thirdeye-frontend/utils/api/anomaly';
-import { inject as service } from '@ember/service';
 import {
   set,
   get,
-  computed,
   setProperties,
   getWithDefault
 } from '@ember/object';
 
 export default Component.extend({
-  tagName: '',//using tagless so i can add my own in hbs
+  tagName: '', //using tagless so i can add my own in hbs
   anomalyResponseNames: anomalyUtil.anomalyResponseObj.mapBy('name'),
   anomalyDataUrl: getAnomalyDataUrl(),
   showResponseSaved: false,
@@ -52,7 +50,7 @@ export default Component.extend({
      * @param {String} selectedResponse - user-selected anomaly feedback option
      * @param {Object} inputObj - the selection object
      */
-     onChangeAnomalyResponse: async function(humanizedAnomaly, selectedResponse, inputObj) {
+    onChangeAnomalyResponse: async function(humanizedAnomaly, selectedResponse, inputObj) {
       const responseObj = anomalyUtil.anomalyResponseObj.find(res => res.name === selectedResponse);
       set(inputObj, 'selected', selectedResponse);
       // Reset icon display props
@@ -69,9 +67,9 @@ export default Component.extend({
         const savedAnomaly = await anomalyUtil.verifyAnomalyFeedback(id);
         // TODO: right now we will update the union wrapper cached record for this anomaly
         humanizedAnomaly.set('anomaly.feedback', responseObj.value);
-        const filterMap = getWithDefault(savedAnomaly, 'searchFilters.statusFilterMap', null);
+        const filterMap = getWithDefault(savedAnomaly, 'feedback.feedbackType', null);
         // This verifies that the status change got saved as key in the anomaly statusFilterMap property
-        const keyPresent = filterMap && Object.keys(filterMap).find(key => responseObj.status.includes(key));
+        const keyPresent = filterMap && (filterMap === responseObj.value);
         if (keyPresent) {
           humanizedAnomaly.set('anomalyFeedback', selectedResponse);
           set(this, 'showResponseSaved', true);

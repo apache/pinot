@@ -9,7 +9,7 @@ import * as anomalyUtil from 'thirdeye-frontend/utils/anomaly';
 import { inject as service } from '@ember/service';
 
 const TIME_PICKER_INCREMENT = 5; // tells date picker hours field how granularly to display time
-const DEFAULT_ACTIVE_DURATION = 'today'; // setting this date range selection default as Today
+const DEFAULT_ACTIVE_DURATION = '1w'; // setting this date range selection default as Today
 const UI_DATE_FORMAT = 'MMM D, YYYY hh:mm a'; // format for date picker to use (usually varies by route or metric)
 const DISPLAY_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; // format used consistently across app to display custom date range
 const TIME_RANGE_OPTIONS = ['today', '1d', '2d', '1w'];
@@ -42,6 +42,29 @@ export default Controller.extend({
       anomalyResponseNames: anomalyResponseFilterTypes.mapBy('name')
     });
   },
+
+  /**
+   * flag for anomalies loading
+   * @type {Boolean}
+   */
+  isLoading: computed(
+    'model.getAnomaliesTask.isIdle',
+    function() {
+      return !get(this, 'model.getAnomaliesTask.isIdle');
+    }
+  ),
+
+  /**
+   * flag for showing anomalies or not
+   * @type {Boolean}
+   */
+  areAnomaliesCurrent: computed(
+    'isLoading',
+    'anomaliesCount',
+    function() {
+      return (!get(this, 'isLoading') && (get(this, 'anomaliesCount') > 0));
+    }
+  ),
 
   /**
    * Flag for showing appropriate dropdown
@@ -171,7 +194,7 @@ export default Controller.extend({
       let falseNegatives = 0;
       Object.keys(anomalyMapping).forEach(function (key) {
         anomalyMapping[key].forEach(function (attr) {
-          const classification = attr.anomaly.data.classification;
+          const classification = ((attr.anomaly || {}).data || {}).classification;
           if (classification != 'NONE') {
             respondedAnomaliesCount++;
             if (classification == 'TRUE_POSITIVE') {

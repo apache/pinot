@@ -21,6 +21,7 @@
 package org.apache.pinot.thirdeye.detection.health;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -40,6 +41,13 @@ public class RegressionStatus {
   // the overall regression health for the detection config
   @JsonProperty
   private final HealthStatus healthStatus;
+
+  // default constructor for deserialization
+  public RegressionStatus() {
+    this.detectorMapes = Collections.emptyMap();
+    this.detectorHealthStatus = Collections.emptyMap();
+    this.healthStatus = HealthStatus.UNKNOWN;
+  }
 
   public RegressionStatus(Map<String, Double> detectorMapes, Map<String, HealthStatus> detectorHealthStatus,
       HealthStatus healthStatus) {

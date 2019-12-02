@@ -17,8 +17,12 @@
 .. under the License.
 ..
 
+.. _pinot-architecture-section:
+
 Architecture
 ============
+
+.. _pinot-architecture-diagram:
 
 .. figure:: img/pinot-architecture.png
 
@@ -80,7 +84,7 @@ Pinot Tables
 ------------
 
 Pinot supports realtime, or offline, or hybrid tables. Data in Pinot tables is contained in the segments
-belonging to that table. A Pinot table is modeled as a Helix resource.  Each segment of a table is modeled as a Helix Partition,
+belonging to that table. A Pinot table is modeled as a Helix resource.  Each segment of a table is modeled as a Helix Partition.
 
 Table Schema defines column names and their metadata. Table configuration and schema is stored in zookeeper.
 
@@ -91,11 +95,13 @@ A hybrid Pinot table essentially has both realtime as well as offline tables.
 In such a table, offline segments may be pushed periodically (say, once a day). The retention on the offline table
 can be set to a high value (say, a few years) since segments are coming in on a periodic basis, whereas the retention
 on the realtime part can be small (say, a few days). Once an offline segment is pushed to cover a recent time period,
-the brokers automatically switch to using the offline table for segments in _that_ time period, and use realtime table
+the brokers automatically switch to using the offline table for segments in *that* time period, and use realtime table
 only to cover later segments for which offline data may not be available yet.
 
 Note that the query does not know the existence of offline or realtime tables. It only specifies the table name
 in the query.
+
+See section on :ref:`table-config-section` for how to customize table configuration as per requirements.
 
 
 Ingesting Offline data
@@ -103,7 +109,7 @@ Ingesting Offline data
 Segments for offline tables are constructed outside of Pinot, typically in Hadoop via map-reduce jobs
 and ingested into Pinot via REST API provided by the Controller.
 Pinot provides libraries to create Pinot segments out of input files in AVRO, JSON or CSV formats in a hadoop job, and push
-the constructed segments to the controlers via REST APIs.
+the constructed segments to the controllers via REST APIs.
 
 When an Offline segment is ingested, the controller looks up the table's configuration and assigns the segment
 to the servers that host the table. It may assign multiple servers for each segment depending on the number of replicas
@@ -120,24 +126,67 @@ start include the new
 segments for queries. Brokers support different routing strategies depending on the type of table, the segment assignment
 strategy and the use case.
 
-Data in offline segments are immmutable (Rows cannot be added, deleted, or modified). However, segments may be replaced with modified data.
+Data in offline segments are immutable (Rows cannot be added, deleted, or modified). However, segments may be replaced with modified data.
+
+.. _ingesting-realtime-data:
 
 Ingesting Realtime Data
 ^^^^^^^^^^^^^^^^^^^^^^^
-Segments for realtime tables are constructed by Pinot servers. The servers ingest rows from realtime streams (such as
-Kafka) until
-some completion threshold (such as number of rows, or a time threshold) and build a segment out of those rows. Depending
-on the type of ingestion mechanism used (stream or partition level), segments may be locally stored in the servers
-or in the controller's segment store.
+Segments for realtime tables are constructed by Pinot servers with rows ingested from data streams such as Kafka.
+Rows ingested from streams are made available for query processing as soon as they are ingested, thus enabling
+applications such as those that need real-time charts on analytics.
 
-Multiple servers may ingest the same data to increase availability and share query load.
+In large scale installations, data in streams is typically split across multiple stream partitions. The underlying
+stream may provide consumer implementations that allow applications to consume data from any subset of partitions,
+including all partitions (or, just from one partition).
 
-Once a realtime segment is built and loaded the servers continue
-to consume from where they left off.
+A pinot table can be configured to consume from streams in one of two modes:
 
-Realtime segments are immutable once they are completed. While realtime segments are being consumed they are mutable,
-in the sense that new rows can be added to them. Rows cannot be deleted from segments.
+    * ``LowLevel``: This is the preferred mode of consumption. Pinot creates independent partition-level consumers for
+      each partition. Depending on the the configured number of replicas, multiple consumers may be created for
+      each partition, taking care that no two replicas exist on the same server host. Therefore you need to provision
+      *at least* as many hosts as the number of replcias configured.
 
+    * ``HighLevel``: Pinot creates *one* stream-level consumer that consumes from all partitions. Each message consumed
+      could be from any of the partitions of the stream. Depending on the configured number of replicas, multiple
+      stream-level consumers are created, taking care that no two replicas exist on the same server host.  Therefore
+      you need to provision exactly as many hosts as the number of replicas configured.
+
+Of course, the underlying stream should support either mode of consumption in order for a Pinot table to use that
+mode. Kafka has support for both of these modes. See :ref:`pluggable-streams` for more information on support of other
+data streams in Pinot.
+
+In either mode, Pinot servers store the ingested rows in volatile memory until either one of the following conditions are met:
+
+    #. A certain number of rows are consumed
+    #. The consumption has gone on for a certain length of time
+
+(See :ref:`stream-config-description` on how to set these values, or have pinot compute them for you)
+
+Upon reaching either one of these limits, the servers do the following:
+
+    * Pause consumption
+    * Persist the rows consumed so far into non-volatile storage
+    * Continue consuming new rows into volatile memory again.
+
+The persisted rows form what we call a *completed* segment (as opposed to a *consuming*
+segment that resides in volatile memory).
+
+In ``LowLevel`` mode, the completed segments are persisted the into local non-volatile store of pinot server
+*as well as* the segment store of the pinot cluster (See :ref:`pinot-architecture-diagram`). This allows for
+easy and automated mechanisms for replacing pinot servers, or expanding capacity, etc. Pinot has
+`special mechanisms <https://cwiki.apache.org/confluence/display/PINOT/Consuming+and+Indexing+rows+in+Realtime#ConsumingandIndexingrowsinRealtime-Segmentcompletionprotocol>`_
+that ensure that the completed segment is equivalent across all replicas.
+
+During segment completion, one winner is chosen by the controller from all the replicas as the ``committer server``. The ``committer server`` builds the segment and uploads it to the controller. All the other ``non-committer servers`` follow one of these two paths:
+
+1. If the in-memory segment is equivalent to the committed segment, the ``non-committer`` server also builds the segment locally and replaces the in-memory segment
+2. If the in-memory segment is non equivalent to the committed segment, the ``non-committer`` server downloads the segment from the controller.
+
+For more details on this protocol, please refer to `this doc <https://cwiki.apache.org/confluence/display/PINOT/Consuming+and+Indexing+rows+in+Realtime#ConsumingandIndexingrowsinRealtime-Segmentcompletionprotocol>`_.
+
+In ``HighLevel`` mode, the servers persist the consumed rows into local store (and **not** the segment store). Since consumption of rows
+can be from any partition, it is not possible to guarantee equivalence of segments across replicas.
 
 See `Consuming and Indexing rows in Realtime <https://cwiki.apache.org/confluence/display/PINOT/Consuming+and+Indexing+rows+in+Realtime>`_ for details.
 
@@ -145,17 +194,19 @@ See `Consuming and Indexing rows in Realtime <https://cwiki.apache.org/confluenc
 Pinot Segments
 --------------
 
-A segment is laid out in a columnar format
-so that it can be directly mapped into memory for serving queries. Columns may be single or multi-valued. Column types may be
+A segment is laid out in a columnar format so that it can be directly mapped into memory for serving queries.
+
+Columns may be single or multi-valued. Column types may be
 STRING, INT, LONG, FLOAT, DOUBLE or BYTES. Columns may be declared to be metric or dimension (or specifically as a time dimension)
-in the schema.
+in the schema. Columns can have default null value. For example, the default null value of a integer column can be 0.
+Note: The default value of byte column has to be hex-encoded before adding to the schema.
 
 Pinot uses dictionary encoding to store values as a dictionary ID. Columns may be configured to be "no-dictionary" column in which
-case raw values are stored. Dictionary IDs are encoded using minimum number of bits for efficient storage (_e.g._ a column with cardinality
+case raw values are stored. Dictionary IDs are encoded using minimum number of bits for efficient storage (*e.g.* a column with cardinality
 of 3 will use only 3 bits for each dictionary ID).
 
 There is a forward index built for each column and compressed appropriately for efficient memory use.  In addition, optional inverted indices can be
 configured for any set of columns. Inverted indices, while take up more storage, offer better query performance.
 
-Specialized indexes like StartTree index is also supported.
+Specialized indexes like Star-Tree index is also supported.
 

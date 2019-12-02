@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.EqPredicate;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
@@ -63,6 +65,8 @@ public class EqualsPredicateEvaluatorFactory {
         return new DoubleRawValueBasedEqPredicateEvaluator(eqPredicate);
       case STRING:
         return new StringRawValueBasedEqPredicateEvaluator(eqPredicate);
+      case BYTES:
+        return new BytesRawValueBasedEqPredicateEvaluator(eqPredicate);
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType);
     }
@@ -188,6 +192,24 @@ public class EqualsPredicateEvaluatorFactory {
     @Override
     public boolean applySV(String value) {
       return _matchingValue.equals(value);
+    }
+  }
+
+  private static final class BytesRawValueBasedEqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final byte[] _matchingValue;
+
+    BytesRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
+      _matchingValue = BytesUtils.toBytes(eqPredicate.getEqualsValue());
+    }
+
+    @Override
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.EQ;
+    }
+
+    @Override
+    public boolean applySV(byte[] value) {
+      return ByteArray.compare(_matchingValue, value) == 0;
     }
   }
 }

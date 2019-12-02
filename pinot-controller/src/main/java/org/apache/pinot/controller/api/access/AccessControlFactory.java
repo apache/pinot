@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.controller.api.access;
 
-import org.apache.pinot.annotations.InterfaceAudience;
-import org.apache.pinot.annotations.InterfaceStability;
+import org.apache.pinot.spi.annotations.InterfaceAudience;
+import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
 @InterfaceAudience.Public

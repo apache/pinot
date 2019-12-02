@@ -20,55 +20,46 @@ package org.apache.pinot.common.response;
 
 import com.google.common.net.InternetDomainName;
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.commons.lang3.tuple.Triple;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.pinot.spi.utils.EqualityUtils;
 
 
 /**
  * Service abstraction.
- * A service is identified by its hostname and port.
- * Internally, an ip address is also resolved.
- *
- * Nuances:
- * -------
- * A hostname "localhost" will not be resolved to the
- * local hostname and will retain the hostname as "localhost".
- * If the name passed is "127.0.0.1", then it is resolved to the
- * local hostname.
+ * A service is identified by its host, port and sequence id.
  */
-public class ServerInstance implements Comparable<ServerInstance> {
-  protected static final Logger LOGGER = LoggerFactory.getLogger(ServerInstance.class);
-
+public class ServerInstance {
   public static final String NAME_PORT_DELIMITER = ":";
   public static final String NAME_PORT_DELIMITER_FOR_INSTANCE_NAME = "_";
 
+  private static class HostNamePair {
+    String _hostName;
+    String _shortHostName;
+
+    HostNamePair(String hostName, String shortHostName) {
+      _hostName = hostName;
+      _shortHostName = shortHostName;
+    }
+  }
+
+  private static final ConcurrentHashMap<String, HostNamePair> HOST_NAME_MAP = new ConcurrentHashMap<>();
+
   /** Host-name where the service is running **/
-  private final String _hostname;
+  private final String _hostName;
+
+  private final String _shortHostName;
 
   /** Service Port **/
   private final int _port;
 
-  /** IP Address. Not used in equals/hash-code generation **/
-  private final InetAddress _ipAddress;
-
   private final int _seq;
-
-  private final String _shortHostName;
-
-  private static final ConcurrentHashMap<String, Triple<String, String, InetAddress>> nameToInstanceInfo =
-      new ConcurrentHashMap<>();
 
   /**
    * Use this constructor if the name and port are embedded as string with ":" as delimiter
-   *
-   * @param namePortStr Name and Port settings
    */
-  public ServerInstance(String namePortStr) {
-    this(namePortStr.split(NAME_PORT_DELIMITER)[0], Integer.parseInt(namePortStr.split(NAME_PORT_DELIMITER)[1]));
+  public ServerInstance(String namePortPair) {
+    this(namePortPair.split(NAME_PORT_DELIMITER)[0], Integer.parseInt(namePortPair.split(NAME_PORT_DELIMITER)[1]));
   }
 
   public ServerInstance(String name, int port) {
@@ -76,28 +67,42 @@ public class ServerInstance implements Comparable<ServerInstance> {
   }
 
   public ServerInstance(String name, int port, int seq) {
-    InetAddress ipAddr = null;
-
-    try {
-      ipAddr = InetAddress.getByName(name);
-    } catch (UnknownHostException e) {
-      LOGGER.error("Unable to fetch IpAddresses for host:" + name, e);
-      ipAddr = null;
-    }
-
-    _ipAddress = ipAddr;
-    _hostname = _ipAddress != null ? _ipAddress.getHostName() : name;
+    HostNamePair hostNamePair = HOST_NAME_MAP.computeIfAbsent(name, key -> {
+      String hostName = getHostName(name);
+      String shortHostName = getShortHostName(hostName);
+      return new HostNamePair(hostName, shortHostName);
+    });
+    _hostName = hostNamePair._hostName;
+    _shortHostName = hostNamePair._shortHostName;
     _port = port;
     _seq = seq;
-    _shortHostName = makeShortHostName(_hostname);
   }
 
-  private ServerInstance(String hostname, String shortHostName, InetAddress ipAddress, int port, int seq) {
-    _hostname = hostname;
+  private ServerInstance(String hostName, String shortHostName, int port, int seq) {
+    _hostName = hostName;
     _shortHostName = shortHostName;
-    _ipAddress = ipAddress;
     _port = port;
     _seq = seq;
+  }
+
+  /**
+   * Server instance name is formatted as {@code Server_<host>_<port>}
+   */
+  public static ServerInstance forInstanceName(String instanceName) {
+    String[] parts = instanceName.split(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)[1]
+        .split(NAME_PORT_DELIMITER_FOR_INSTANCE_NAME);
+    return new ServerInstance(parts[0], Integer.parseInt(parts[1]));
+  }
+
+  /**
+   * Name can either be a machine name, or a textual representation of its IP address.
+   */
+  private static String getHostName(String name) {
+    try {
+      return InetAddress.getByName(name).getHostName();
+    } catch (Exception e) {
+      return name;
+    }
   }
 
   /**
@@ -119,39 +124,33 @@ public class ServerInstance implements Comparable<ServerInstance> {
    *
    * It will fail if there are host names starting with a digit, but will work right otherwise.
    */
-  private String makeShortHostName(final String name) {
+  private static String getShortHostName(String hostName) {
     try {
-      InternetDomainName domainName = InternetDomainName.from(name);
-      return domainName.parts().get(0);
+      return InternetDomainName.from(hostName).parts().get(0);
     } catch (Exception e) {
-      return name;
+      return hostName;
     }
+  }
+
+  public String getHostname() {
+    return _hostName;
   }
 
   public String getShortHostName() {
     return _shortHostName;
   }
 
-  public String getHostname() {
-    return _hostname;
-  }
-
   public int getPort() {
     return _port;
   }
 
-  public InetAddress getIpAddress() {
-    return _ipAddress;
+  public ServerInstance withSeq(int seq) {
+    return new ServerInstance(_hostName, _shortHostName, _port, seq);
   }
 
   @Override
   public int hashCode() {
-    final int prime = 31;
-    int result = 1;
-    result = (prime * result) + (_hostname == null ? 0 : _hostname.hashCode());
-    result = (prime * result) + _port;
-    result = (prime * result) + _seq;
-    return result;
+    return EqualityUtils.hashCodeOf(EqualityUtils.hashCodeOf(_hostName.hashCode(), _port), _seq);
   }
 
   @Override
@@ -159,66 +158,15 @@ public class ServerInstance implements Comparable<ServerInstance> {
     if (this == obj) {
       return true;
     }
-    if (obj == null) {
-      return false;
+    if (obj instanceof ServerInstance) {
+      ServerInstance that = (ServerInstance) obj;
+      return _hostName.equals(that._hostName) && _port == that._port && _seq == that._seq;
     }
-    if (getClass() != obj.getClass()) {
-      return false;
-    }
-    ServerInstance other = (ServerInstance) obj;
-    if (_hostname == null) {
-      if (other._hostname != null) {
-        return false;
-      }
-    } else if (!_hostname.equals(other._hostname)) {
-      return false;
-    }
-    if (_port != other._port) {
-      return false;
-    }
-    if (_seq != other._seq) {
-      return false;
-    }
-    return true;
-  }
-
-  public ServerInstance withSeq(int seq) {
-    return new ServerInstance(_hostname, _shortHostName, _ipAddress, _port, seq);
+    return false;
   }
 
   @Override
   public String toString() {
-    return _hostname + "_" + _port;
-  }
-
-  @Override
-  public int compareTo(ServerInstance o) {
-    return this.toString().compareTo(o.toString());
-  }
-
-  public static ServerInstance forHostPort(String name, int port) {
-    if (nameToInstanceInfo.containsKey(name)) {
-      Triple<String, String, InetAddress> instanceInfo = nameToInstanceInfo.get(name);
-      return new ServerInstance(instanceInfo.getLeft(), instanceInfo.getMiddle(), instanceInfo.getRight(), port, 0);
-    } else {
-      ServerInstance newInstance = new ServerInstance(name, port);
-
-      nameToInstanceInfo.putIfAbsent(name,
-          Triple.of(newInstance.getHostname(), newInstance.getShortHostName(), newInstance.getIpAddress()));
-
-      return newInstance;
-    }
-  }
-
-  public static ServerInstance forInstanceName(String instanceName) {
-    String namePortStr = instanceName.split(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)[1];
-    String hostName = namePortStr.split(NAME_PORT_DELIMITER_FOR_INSTANCE_NAME)[0];
-    int port;
-    try {
-      port = Integer.parseInt(namePortStr.split(NAME_PORT_DELIMITER_FOR_INSTANCE_NAME)[1]);
-    } catch (Exception e) {
-      port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
-    }
-    return forHostPort(hostName, port);
+    return _hostName + "_" + _port;
   }
 }

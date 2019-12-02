@@ -23,12 +23,18 @@ import javax.annotation.Nullable;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
+import org.joda.time.Interval;
 import org.joda.time.Period;
 import org.joda.time.format.PeriodFormatter;
 import org.joda.time.format.PeriodFormatterBuilder;
 
 
 public class TimeUtils {
+  public static final long VALID_MIN_TIME_MILLIS = new DateTime(1971, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
+  public static final long VALID_MAX_TIME_MILLIS = new DateTime(2071, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
+  public static final Interval VALID_TIME_INTERVAL =
+      new Interval(VALID_MIN_TIME_MILLIS, VALID_MAX_TIME_MILLIS, DateTimeZone.UTC);
+
   private static final String UPPER_CASE_DAYS = "DAYS";
   private static final String UPPER_CASE_DAYS_SINCE_EPOCH = "DAYSSINCEEPOCH";
   private static final String UPPER_CASE_HOURS = "HOURS";
@@ -46,9 +52,6 @@ public class TimeUtils {
   private static final String UPPER_CASE_NANOSECONDS = "NANOSECONDS";
   private static final String UPPER_CASE_NANOS_SINCE_EPOCH = "NANOSSINCEEPOCH";
   private static final String UPPER_CASE_NANOSECONDS_SINCE_EPOCH = "NANOSECONDSSINCEEPOCH";
-
-  private static final long VALID_MIN_TIME_MILLIS = new DateTime(1971, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
-  private static final long VALID_MAX_TIME_MILLIS = new DateTime(2071, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
 
   /**
    * Converts a time unit string into {@link TimeUnit}, ignoring case. For {@code null} or empty time unit string,
@@ -108,7 +111,16 @@ public class TimeUtils {
    * <p>The current valid range used is between beginning of 1971 and beginning of 2071.
    */
   public static boolean timeValueInValidRange(long timeValueInMillis) {
-    return (VALID_MIN_TIME_MILLIS <= timeValueInMillis && timeValueInMillis <= VALID_MAX_TIME_MILLIS);
+    return timeValueInMillis >= VALID_MIN_TIME_MILLIS && timeValueInMillis <= VALID_MAX_TIME_MILLIS;
+  }
+
+  /**
+   * Given a time interval, returns true if the interval is between a valid range, false otherwise.
+   * <p>The current valid range used is between beginning of 1971 and beginning of 2071.
+   */
+  public static boolean isValidTimeInterval(Interval timeInterval) {
+    return timeInterval.getStartMillis() >= VALID_MIN_TIME_MILLIS
+        && timeInterval.getEndMillis() <= VALID_MAX_TIME_MILLIS;
   }
 
   /**

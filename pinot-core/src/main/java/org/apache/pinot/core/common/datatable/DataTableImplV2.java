@@ -27,8 +27,6 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -65,9 +63,8 @@ public class DataTableImplV2 implements DataTable {
   /**
    * Construct data table with results. (Server side)
    */
-  public DataTableImplV2(int numRows, @Nonnull DataSchema dataSchema,
-      @Nonnull Map<String, Map<Integer, String>> dictionaryMap, @Nonnull byte[] fixedSizeDataBytes,
-      @Nonnull byte[] variableSizeDataBytes) {
+  public DataTableImplV2(int numRows, DataSchema dataSchema, Map<String, Map<Integer, String>> dictionaryMap,
+      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
     _numRows = numRows;
     _numColumns = dataSchema.size();
     _dataSchema = dataSchema;
@@ -101,7 +98,7 @@ public class DataTableImplV2 implements DataTable {
   /**
    * Construct data table from byte array. (broker side)
    */
-  public DataTableImplV2(@Nonnull ByteBuffer byteBuffer)
+  public DataTableImplV2(ByteBuffer byteBuffer)
       throws IOException {
     // Read header.
     _numRows = byteBuffer.getInt();
@@ -224,11 +221,10 @@ public class DataTableImplV2 implements DataTable {
   }
 
   @Override
-  public void addException(@Nonnull ProcessingException processingException) {
+  public void addException(ProcessingException processingException) {
     _metadata.put(EXCEPTION_METADATA_KEY + processingException.getErrorCode(), processingException.getMessage());
   }
 
-  @Nonnull
   @Override
   public byte[] toBytes()
       throws IOException {
@@ -346,13 +342,11 @@ public class DataTableImplV2 implements DataTable {
     return byteArrayOutputStream.toByteArray();
   }
 
-  @Nonnull
   @Override
   public Map<String, String> getMetadata() {
     return _metadata;
   }
 
-  @Nullable
   @Override
   public DataSchema getDataSchema() {
     return _dataSchema;
@@ -387,7 +381,6 @@ public class DataTableImplV2 implements DataTable {
     return _fixedSizeData.getDouble();
   }
 
-  @Nonnull
   @Override
   public String getString(int rowId, int colId) {
     _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
@@ -395,7 +388,6 @@ public class DataTableImplV2 implements DataTable {
     return _dictionaryMap.get(_dataSchema.getColumnName(colId)).get(dictId);
   }
 
-  @Nonnull
   @Override
   public <T> T getObject(int rowId, int colId) {
     int size = positionCursorInVariableBuffer(rowId, colId);
@@ -405,7 +397,6 @@ public class DataTableImplV2 implements DataTable {
     return ObjectSerDeUtils.deserialize(byteBuffer, objectTypeValue);
   }
 
-  @Nonnull
   @Override
   public int[] getIntArray(int rowId, int colId) {
     int length = positionCursorInVariableBuffer(rowId, colId);
@@ -416,7 +407,6 @@ public class DataTableImplV2 implements DataTable {
     return ints;
   }
 
-  @Nonnull
   @Override
   public long[] getLongArray(int rowId, int colId) {
     int length = positionCursorInVariableBuffer(rowId, colId);
@@ -427,7 +417,6 @@ public class DataTableImplV2 implements DataTable {
     return longs;
   }
 
-  @Nonnull
   @Override
   public float[] getFloatArray(int rowId, int colId) {
     int length = positionCursorInVariableBuffer(rowId, colId);
@@ -438,7 +427,6 @@ public class DataTableImplV2 implements DataTable {
     return floats;
   }
 
-  @Nonnull
   @Override
   public double[] getDoubleArray(int rowId, int colId) {
     int length = positionCursorInVariableBuffer(rowId, colId);
@@ -449,7 +437,6 @@ public class DataTableImplV2 implements DataTable {
     return doubles;
   }
 
-  @Nonnull
   @Override
   public String[] getStringArray(int rowId, int colId) {
     int length = positionCursorInVariableBuffer(rowId, colId);

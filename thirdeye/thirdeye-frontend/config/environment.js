@@ -23,6 +23,8 @@ module.exports = function(environment) {
       directory: 'app/mirage'
     },
 
+    https_only: false,
+
     moment: {
       includeTimezone: 'all'
     },

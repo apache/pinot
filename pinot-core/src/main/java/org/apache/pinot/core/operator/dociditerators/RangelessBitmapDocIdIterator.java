@@ -23,7 +23,7 @@ import org.apache.pinot.core.common.Constants;
 import org.roaringbitmap.IntIterator;
 
 
-public class RangelessBitmapDocIdIterator implements BlockDocIdIterator {
+public class RangelessBitmapDocIdIterator implements IndexBasedDocIdIterator {
 
   private IntIterator iterator;
   int currentDocId = -1;

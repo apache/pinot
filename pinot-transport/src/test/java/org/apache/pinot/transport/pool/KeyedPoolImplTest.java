@@ -38,15 +38,12 @@ import org.apache.pinot.transport.common.AsyncResponseFuture;
 import org.apache.pinot.transport.common.NoneType;
 import org.apache.pinot.transport.common.ServerResponseFuture;
 import org.apache.pinot.transport.metrics.AggregatedPoolStats;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 public class KeyedPoolImplTest {
-
-  protected static Logger LOGGER = LoggerFactory.getLogger(KeyedPoolImplTest.class);
+  private static final ExecutorService EXECUTOR_SERVICE = MoreExecutors.newDirectExecutorService();
 
   @Test
   public void testCancelAfterCheckingOut()
@@ -152,14 +149,14 @@ public class KeyedPoolImplTest {
   public void testCreateError()
       throws Exception {
     ScheduledExecutorService timedExecutor = new ScheduledThreadPoolExecutor(1);
-    ExecutorService service = MoreExecutors.sameThreadExecutor();
     int numKeys = 1;
     int numResourcesPerKey = 1;
     Map<ServerInstance, List<String>> resources = buildCreateMap(numKeys, numResourcesPerKey);
 
     TestResourceManager rm = new TestResourceManager(resources, resources, null, null);
 
-    KeyedPool<String> kPool = new KeyedPoolImpl<>(0, 1, 1000L, 1000 * 60 * 60, rm, timedExecutor, service, null);
+    KeyedPool<String> kPool =
+        new KeyedPoolImpl<>(0, 1, 1000L, 1000 * 60 * 60, rm, timedExecutor, EXECUTOR_SERVICE, null);
     AsyncResponseFuture<String> f = (AsyncResponseFuture<String>) kPool.checkoutObject(getKey(0), "none");
     Assert.assertTrue(f.isDone());
     Assert.assertNull(f.get());
@@ -175,14 +172,14 @@ public class KeyedPoolImplTest {
   public void testDestroyError()
       throws Exception {
     ScheduledExecutorService timedExecutor = new ScheduledThreadPoolExecutor(1);
-    ExecutorService service = MoreExecutors.sameThreadExecutor();
     int numKeys = 1;
     int numResourcesPerKey = 1;
     Map<ServerInstance, List<String>> resources = buildCreateMap(numKeys, numResourcesPerKey);
 
     TestResourceManager rm = new TestResourceManager(resources, null, resources, null);
 
-    KeyedPool<String> kPool = new KeyedPoolImpl<>(0, 5, 1000L, 1000 * 60 * 60, rm, timedExecutor, service, null);
+    KeyedPool<String> kPool =
+        new KeyedPoolImpl<>(0, 5, 1000L, 1000 * 60 * 60, rm, timedExecutor, EXECUTOR_SERVICE, null);
     AsyncResponseFuture<String> f = (AsyncResponseFuture<String>) kPool.checkoutObject(getKey(0), "none");
     String r = f.getOne();
     Assert.assertTrue(f.isDone());
@@ -216,13 +213,12 @@ public class KeyedPoolImplTest {
    */ public void testTimeout()
       throws Exception {
     ScheduledExecutorService timedExecutor = new ScheduledThreadPoolExecutor(1);
-    ExecutorService service = MoreExecutors.sameThreadExecutor();
     int numKeys = 5;
     int numResourcesPerKey = 1;
     TestResourceManager rm = new TestResourceManager(buildCreateMap(numKeys, numResourcesPerKey), null, null, null);
 
     // Idle Timeout 1 second
-    KeyedPool<String> kPool = new KeyedPoolImpl<>(0, 5, 1000L, 100, rm, timedExecutor, service, null);
+    KeyedPool<String> kPool = new KeyedPoolImpl<>(0, 5, 1000L, 100, rm, timedExecutor, EXECUTOR_SERVICE, null);
 
     // Create a countdown latch that waits for all resources to be deleted
     CountDownLatch latch = new CountDownLatch(numKeys * numResourcesPerKey);
@@ -279,11 +275,11 @@ public class KeyedPoolImplTest {
    */ public void testPoolImpl1()
       throws Exception {
     ScheduledExecutorService timedExecutor = new ScheduledThreadPoolExecutor(1);
-    ExecutorService service = MoreExecutors.sameThreadExecutor();
     int numKeys = 5;
     int numResourcesPerKey = 5;
     TestResourceManager rm = new TestResourceManager(buildCreateMap(numKeys, numResourcesPerKey), null, null, null);
-    KeyedPool<String> kPool = new KeyedPoolImpl<>(5, 5, 1000 * 60 * 60L, 100, rm, timedExecutor, service, null);
+    KeyedPool<String> kPool =
+        new KeyedPoolImpl<>(5, 5, 1000 * 60 * 60L, 100, rm, timedExecutor, EXECUTOR_SERVICE, null);
 
     kPool.start();
     AggregatedPoolStats s = (AggregatedPoolStats) kPool.getStats();
@@ -355,11 +351,11 @@ public class KeyedPoolImplTest {
    */ public void testShutdown()
       throws Exception {
     ScheduledExecutorService timedExecutor = new ScheduledThreadPoolExecutor(1);
-    ExecutorService service = MoreExecutors.sameThreadExecutor();
     int numKeys = 5;
     int numResourcesPerKey = 5;
     TestResourceManager rm = new TestResourceManager(buildCreateMap(numKeys, numResourcesPerKey), null, null, null);
-    KeyedPool<String> kPool = new KeyedPoolImpl<>(5, 5, 1000 * 60 * 60L, 100, rm, timedExecutor, service, null);
+    KeyedPool<String> kPool =
+        new KeyedPoolImpl<>(5, 5, 1000 * 60 * 60L, 100, rm, timedExecutor, EXECUTOR_SERVICE, null);
 
     kPool.start();
     AggregatedPoolStats s = (AggregatedPoolStats) kPool.getStats();
@@ -483,7 +479,6 @@ public class KeyedPoolImplTest {
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
-      LOGGER.info("Create Latch opened. Proceding with creating resource !!");
       return super.create(key);
     }
 

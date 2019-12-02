@@ -21,11 +21,11 @@ package org.apache.pinot.controller.validation;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
-import org.apache.helix.manager.zk.ZkClient;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -33,11 +33,10 @@ import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.helix.HelixHelper;
-import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.util.TestUtils;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
@@ -54,33 +53,23 @@ import static org.testng.Assert.assertEquals;
  * Tests for the ValidationManagers.
  */
 public class ValidationManagerTest extends ControllerTest {
-  private static final String ZK_STR = ZkStarter.DEFAULT_ZK_STR;
   private static final String TEST_TABLE_NAME = "testTable";
   private static final String TEST_TABLE_TWO = "testTable2";
   private static final String TEST_SEGMENT_NAME = "testSegment";
 
-  private ZkClient _zkClient;
-
-  private ZkStarter.ZookeeperInstance _zookeeperInstance;
   private TableConfig _offlineTableConfig;
-  private HelixManager _helixManager;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    _zookeeperInstance = ZkStarter.startLocalZkServer();
-    _zkClient = new ZkClient(ZK_STR);
-    Thread.sleep(1000);
-
+    startZk();
     startController();
-
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZK_STR, 2, true);
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZK_STR, 2, true);
+    addFakeBrokerInstancesToAutoJoinHelixCluster(2, true);
+    addFakeServerInstancesToAutoJoinHelixCluster(2, true);
 
     _offlineTableConfig =
         new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setNumReplicas(2)
             .build();
-    _helixManager = _helixResourceManager.getHelixZkManager();
     _helixResourceManager.addTable(_offlineTableConfig);
   }
 
@@ -124,11 +113,10 @@ public class ValidationManagerTest extends ControllerTest {
   }
 
   @Test
-  public void testPushTimePersistence()
-      throws Exception {
+  public void testPushTimePersistence() {
     SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
 
-    _helixResourceManager.addNewSegment(TEST_TABLE_NAME, segmentMetadata, "http://dummy/");
+    _helixResourceManager.addNewSegment(TEST_TABLE_NAME, segmentMetadata, "downloadUrl");
     OfflineSegmentZKMetadata offlineSegmentZKMetadata =
         _helixResourceManager.getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
     long pushTime = offlineSegmentZKMetadata.getPushTime();
@@ -138,11 +126,17 @@ public class ValidationManagerTest extends ControllerTest {
     assertEquals(offlineSegmentZKMetadata.getRefreshTime(), Long.MIN_VALUE);
 
     // Refresh the segment
+    // NOTE: In order to send the refresh message, the segment need to be in the ExternalView
+    TestUtils.waitForCondition(aVoid -> {
+      ExternalView externalView = _helixAdmin
+          .getResourceExternalView(getHelixClusterName(), TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME));
+      return externalView != null && externalView.getPartitionSet().contains(TEST_SEGMENT_NAME);
+    }, 30_000L, "Failed to find the segment in the ExternalView");
     Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
-    _helixResourceManager.refreshSegment(TEST_TABLE_NAME, segmentMetadata, offlineSegmentZKMetadata);
+    _helixResourceManager
+        .refreshSegment(TEST_TABLE_NAME, segmentMetadata, offlineSegmentZKMetadata, "downloadUrl", null);
 
-    offlineSegmentZKMetadata =
-        _helixResourceManager.getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
+    offlineSegmentZKMetadata = _helixResourceManager.getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
     // Check that the segment still has the same push time
     assertEquals(offlineSegmentZKMetadata.getPushTime(), pushTime);
     // Check that the refresh time is in the last 30 seconds
@@ -186,13 +180,6 @@ public class ValidationManagerTest extends ControllerTest {
         15);
   }
 
-  @AfterClass
-  public void shutDown() {
-    _helixResourceManager.stop();
-    _zkClient.close();
-    ZkStarter.stopLocalZkServer(_zookeeperInstance);
-  }
-
   @Test
   public void testComputeNumMissingSegments() {
     Interval jan1st = new Interval(new DateTime(2015, 1, 1, 0, 0, 0), new DateTime(2015, 1, 1, 23, 59, 59));
@@ -225,5 +212,12 @@ public class ValidationManagerTest extends ControllerTest {
     jan1st2nd4th5th.add(jan4th);
     jan1st2nd4th5th.add(jan5th);
     assertEquals(OfflineSegmentIntervalChecker.computeNumMissingSegments(jan1st2nd4th5th, Duration.standardDays(1)), 1);
+  }
+
+  @AfterClass
+  public void tearDown() {
+    stopFakeInstances();
+    stopController();
+    stopZk();
   }
 }

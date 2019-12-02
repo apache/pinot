@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import javax.annotation.Nonnull;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.function.AggregationFunctionType;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.DoubleAggregationResultHolder;
@@ -30,38 +30,33 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 public class MinAggregationFunction implements AggregationFunction<Double, Double> {
   private static final double DEFAULT_VALUE = Double.POSITIVE_INFINITY;
 
-  @Nonnull
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.MIN;
   }
 
-  @Nonnull
   @Override
-  public String getColumnName(@Nonnull String column) {
+  public String getColumnName(String column) {
     return AggregationFunctionType.MIN.getName() + "_" + column;
   }
 
   @Override
-  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+  public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
 
-  @Nonnull
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
     return new DoubleAggregationResultHolder(DEFAULT_VALUE);
   }
 
-  @Nonnull
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
     return new DoubleGroupByResultHolder(initialCapacity, maxCapacity, DEFAULT_VALUE);
   }
 
   @Override
-  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull BlockValSet... blockValSets) {
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder, BlockValSet... blockValSets) {
     double[] valueArray = blockValSets[0].getDoubleValuesSV();
     double min = aggregationResultHolder.getDoubleResult();
     for (int i = 0; i < length; i++) {
@@ -74,8 +69,8 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
   }
 
   @Override
-  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     double[] valueArray = blockValSets[0].getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
@@ -87,8 +82,8 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
   }
 
   @Override
-  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet... blockValSets) {
     double[] valueArray = blockValSets[0].getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
@@ -100,21 +95,18 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
     }
   }
 
-  @Nonnull
   @Override
-  public Double extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+  public Double extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getDoubleResult();
   }
 
-  @Nonnull
   @Override
-  public Double extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+  public Double extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getDoubleResult(groupKey);
   }
 
-  @Nonnull
   @Override
-  public Double merge(@Nonnull Double intermediateResult1, @Nonnull Double intermediateResult2) {
+  public Double merge(Double intermediateResult1, Double intermediateResult2) {
     if (intermediateResult1 < intermediateResult2) {
       return intermediateResult1;
     } else {
@@ -127,15 +119,18 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
     return true;
   }
 
-  @Nonnull
   @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.DOUBLE;
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.DOUBLE;
   }
 
-  @Nonnull
   @Override
-  public Double extractFinalResult(@Nonnull Double intermediateResult) {
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.DOUBLE;
+  }
+
+  @Override
+  public Double extractFinalResult(Double intermediateResult) {
     return intermediateResult;
   }
 }

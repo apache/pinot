@@ -27,7 +27,7 @@ import java.lang.reflect.Method;
 import java.util.LinkedList;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -111,7 +111,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
   private RealtimeTableDataManager createTableDataManager() {
     final String instanceId = "server-1";
-    SegmentBuildTimeLeaseExtender.create(instanceId, new ServerMetrics(new MetricsRegistry()));
+    SegmentBuildTimeLeaseExtender.create(instanceId, new ServerMetrics(new MetricsRegistry()), _tableName);
     RealtimeTableDataManager tableDataManager = mock(RealtimeTableDataManager.class);
     when(tableDataManager.getServerInstance()).thenReturn(instanceId);
     RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
@@ -126,6 +126,7 @@ public class LLRealtimeSegmentDataManagerTest {
     LLCRealtimeSegmentZKMetadata segmentZKMetadata = new LLCRealtimeSegmentZKMetadata();
     segmentZKMetadata.setSegmentName(_segmentNameStr);
     segmentZKMetadata.setStartOffset(_startOffset);
+    segmentZKMetadata.setCreationTime(System.currentTimeMillis());
     return segmentZKMetadata;
   }
 
@@ -672,7 +673,7 @@ public class LLRealtimeSegmentDataManagerTest {
     public boolean invokeCommit(String segTarFileName) {
       SegmentCompletionProtocol.Response response = mock(SegmentCompletionProtocol.Response.class);
       when(response.isSplitCommit()).thenReturn(false);
-      return super.commitSegment(response);
+      return super.commitSegment(response.getControllerVipUrl(), false);
     }
 
     private void terminateLoopIfNecessary() {
@@ -709,7 +710,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected SegmentCompletionProtocol.Response postSegmentCommitMsg() {
+    protected SegmentCompletionProtocol.Response commit(String controllerVipUrl, boolean isSplitCommit) {
       SegmentCompletionProtocol.Response response = _responses.remove();
       return response;
     }
@@ -755,7 +756,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected boolean commitSegment(SegmentCompletionProtocol.Response response) {
+    protected boolean commitSegment(String controllerVipUrl, boolean isSplitCommit) {
       _commitSegmentCalled = true;
       return true;
     }

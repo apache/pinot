@@ -22,7 +22,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.Iterator;
 import java.util.Map;
 import javax.annotation.Nonnull;
-import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
@@ -212,7 +212,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       }
 
       if (i > 0) {
-        builder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
+        builder.append(GroupKeyGenerator.DELIMITER);
       }
       builder.append(key);
     }

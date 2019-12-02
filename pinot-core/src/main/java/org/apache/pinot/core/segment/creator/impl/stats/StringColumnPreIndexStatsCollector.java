@@ -23,12 +23,11 @@ import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.Arrays;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
 
 
 public class StringColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
-  private String min = V1Constants.Str.NULL_STRING;
-  private String max = V1Constants.Str.NULL_STRING;
+  private String min;
+  private String max;
 
   private int smallestStringLength = Integer.MAX_VALUE;
   private int longestStringLength = 0;

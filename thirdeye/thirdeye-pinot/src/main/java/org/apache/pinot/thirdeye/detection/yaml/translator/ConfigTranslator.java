@@ -19,7 +19,10 @@
 
 package org.apache.pinot.thirdeye.detection.yaml.translator;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
@@ -40,6 +43,16 @@ public abstract class ConfigTranslator<T extends AbstractDTO, V extends ConfigVa
     this.yamlConfig = yamlConfig;
     this.validator = validator;
     this.yaml = new Yaml();
+  }
+
+  List<String> filterOwners(List<String> configuredOwners) {
+    List<String> owners = new ArrayList<>();
+    for (String configuredOwner : configuredOwners) {
+      // TODO: check if configured owner is a valid account
+      owners.add(configuredOwner.trim());
+    }
+    // Return after removing duplicates
+    return new ArrayList<>(new HashSet<>(owners));
   }
 
   abstract T translateConfig(Map<String, Object> yamlConfigMap) throws IllegalArgumentException;

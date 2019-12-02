@@ -25,10 +25,10 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.ZKMetadata;
 import org.apache.pinot.common.utils.StringUtil;
 
-import static org.apache.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static org.apache.pinot.common.utils.EqualityUtils.isEqual;
-import static org.apache.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
-import static org.apache.pinot.common.utils.EqualityUtils.isSameReference;
+import static org.apache.pinot.spi.utils.EqualityUtils.hashCodeOf;
+import static org.apache.pinot.spi.utils.EqualityUtils.isEqual;
+import static org.apache.pinot.spi.utils.EqualityUtils.isNullOrNotSameClass;
+import static org.apache.pinot.spi.utils.EqualityUtils.isSameReference;
 
 
 public final class InstanceZKMetadata implements ZKMetadata {

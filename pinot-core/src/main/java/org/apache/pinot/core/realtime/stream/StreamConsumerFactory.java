@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.realtime.stream;
 
-import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 
