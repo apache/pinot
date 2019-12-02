@@ -32,16 +32,6 @@ public class MaxMVAggregationFunction extends MaxAggregationFunction {
   }
 
   @Override
-  public String getColumnName(String column) {
-    return AggregationFunctionType.MAXMV.getName() + "_" + column;
-  }
-
-  @Override
-  public String getResultColumnName(String column) {
-    return AggregationFunctionType.MAXMV.getName().toLowerCase() + "(" + column + ")";
-  }
-
-  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }

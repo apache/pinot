@@ -41,12 +41,16 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   /**
    * Returns the result column name for the given aggregation column, e.g. 'SUM(foo)' -> 'sum_foo'.
    */
-  String getColumnName(String column);
+  default String getColumnName(String column) {
+    return getType().getName() + "_" + column;
+  }
 
   /**
-   * Returns the column name to be used in the data schema of results. e.g. 'MINMAXRANGEMV( foo)' -> 'minMaxRangeMV(foo)', 'PERCENTILE75(bar)' -> 'percentile75(bar)'
+   * Returns the column name to be used in the data schema of results. e.g. 'MINMAXRANGEMV( foo)' -> 'minmaxrangemv(foo)', 'PERCENTILE75(bar)' -> 'percentile75(bar)'
    */
-  String getResultColumnName(String column);
+  default String getResultColumnName(String column) {
+    return getType().getName().toLowerCase() + "(" + column + ")";
+  }
 
   /**
    * Accepts an aggregation function visitor to visit.

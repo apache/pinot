@@ -31,14 +31,4 @@ public class DistinctCountRawHLLMVAggregationFunction extends DistinctCountRawHL
   public AggregationFunctionType getType() {
     return AggregationFunctionType.DISTINCTCOUNTRAWHLLMV;
   }
-
-  @Override
-  public String getColumnName(String column) {
-    return AggregationFunctionType.DISTINCTCOUNTRAWHLLMV.getName() + "_" + column;
-  }
-
-  @Override
-  public String getResultColumnName(String column) {
-    return AggregationFunctionType.DISTINCTCOUNTRAWHLLMV.getName().toLowerCase() + "(" + column + ")";
-  }
 }
