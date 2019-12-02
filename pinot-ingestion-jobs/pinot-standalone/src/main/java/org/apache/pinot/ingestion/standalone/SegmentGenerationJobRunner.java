@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
@@ -38,6 +39,7 @@ import org.apache.pinot.common.utils.DataSize;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.filesystem.PinotFSFactory;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
+import org.apache.pinot.ingestion.common.PinotClusterSpec;
 import org.apache.pinot.ingestion.common.PinotFSSpec;
 import org.apache.pinot.ingestion.common.SegmentGenerationJobSpec;
 import org.apache.pinot.ingestion.common.SegmentGenerationTaskRunner;
@@ -57,6 +59,41 @@ public class SegmentGenerationJobRunner {
 
   public SegmentGenerationJobRunner(SegmentGenerationJobSpec spec) {
     _spec = spec;
+    if (_spec.getInputDirURI() == null) {
+      throw new RuntimeException("Missing property 'inputDirURI' in 'jobSpec' file");
+    }
+    if (_spec.getOutputDirURI() == null) {
+      throw new RuntimeException("Missing property 'outputDirURI' in 'jobSpec' file");
+    }
+    if (_spec.getRecordReaderSpec() == null) {
+      throw new RuntimeException("Missing property 'recordReaderSpec' in 'jobSpec' file");
+    }
+    if (_spec.getTableSpec() == null) {
+      throw new RuntimeException("Missing property 'tableSpec' in 'jobSpec' file");
+    }
+    if (_spec.getTableSpec().getTableName() == null) {
+      throw new RuntimeException("Missing property 'tableName' in 'tableSpec'");
+    }
+    if (_spec.getTableSpec().getSchemaURI() == null) {
+      if (_spec.getPinotClusterSpecs() == null || _spec.getPinotClusterSpecs().length == 0) {
+        throw new RuntimeException("Missing property 'schemaURI' in 'tableSpec'");
+      }
+      PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
+      String schemaURI = String
+          .format("http://%s:%d/tables/%s/schema", pinotClusterSpec.getHost(), pinotClusterSpec.getPort(),
+              _spec.getTableSpec().getTableName());
+      _spec.getTableSpec().setSchemaURI(schemaURI);
+    }
+    if (_spec.getTableSpec().getTableConfigURI() == null) {
+      if (_spec.getPinotClusterSpecs() == null || _spec.getPinotClusterSpecs().length == 0) {
+        throw new RuntimeException("Missing property 'tableConfigURI' in 'tableSpec'");
+      }
+      PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
+      String tableConfigURI = String
+          .format("http://%s:%d/tables/%s", pinotClusterSpec.getHost(), pinotClusterSpec.getPort(),
+              _spec.getTableSpec().getTableName());
+      _spec.getTableSpec().setTableConfigURI(tableConfigURI);
+    }
   }
 
   /**
@@ -73,6 +110,8 @@ public class SegmentGenerationJobRunner {
     URI relativePath = baseInputDir.relativize(inputFile);
     Preconditions.checkState(relativePath.getPath().length() > 0 && !relativePath.equals(inputFile),
         "Unable to extract out the relative path based on base input path: " + baseInputDir);
+    String outputDirStr = outputDir.toString();
+    outputDir = !outputDirStr.endsWith("/") ? URI.create(outputDirStr.concat("/")) : outputDir;
     URI relativeOutputURI = outputDir.resolve(relativePath).resolve(".");
     return relativeOutputURI;
   }
@@ -125,25 +164,18 @@ public class SegmentGenerationJobRunner {
       }
     }
 
-    //create localTempDir for input and output
     File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + System.currentTimeMillis());
     try {
-
+      //create localTempDir for input and output
       File localInputTempDir = new File(localTempDir, "input");
       FileUtils.forceMkdir(localInputTempDir);
       File localOutputTempDir = new File(localTempDir, "output");
       FileUtils.forceMkdir(localOutputTempDir);
 
       //Read TableConfig, Schema
-      String schemaJson = IOUtils.toString(new URI(_spec.getTableSpec().getSchemaURI()), StandardCharsets.UTF_8);
-      Schema schema = Schema.fromString(schemaJson);
-      String tableConfigJson =
-          IOUtils.toString(new URI(_spec.getTableSpec().getTableConfigURI()), StandardCharsets.UTF_8);
-      JsonNode tableJsonNode = new ObjectMapper().readTree(tableConfigJson);
-      if (tableJsonNode.has(OFFLINE)) {
-        tableJsonNode = tableJsonNode.get(OFFLINE);
-      }
-      TableConfig tableConfig = TableConfig.fromJsonConfig(tableJsonNode);
+      Schema schema = getSchema();
+      TableConfig tableConfig = getTableConfig();
+
       //iterate on the file list, for each
       for (int i = 0; i < filteredFiles.size(); i++) {
         URI inputFileURI = URI.create(filteredFiles.get(i));
@@ -195,5 +227,43 @@ public class SegmentGenerationJobRunner {
       //clean up
       FileUtils.deleteDirectory(localTempDir);
     }
+  }
+
+  private Schema getSchema()
+      throws Exception {
+    URI schemaURI = new URI(_spec.getTableSpec().getSchemaURI());
+    String scheme = schemaURI.getScheme();
+    String schemaJson;
+    if (PinotFSFactory.isSchemeSupported(scheme)) {
+      // Try to use PinotFS to read schema URI
+      PinotFS pinotFS = PinotFSFactory.create(scheme);
+      InputStream schemaStream = pinotFS.open(schemaURI);
+      schemaJson = IOUtils.toString(schemaStream, StandardCharsets.UTF_8);
+    } else {
+      // Try to directly read from URI.
+      schemaJson = IOUtils.toString(schemaURI, StandardCharsets.UTF_8);
+    }
+    return Schema.fromString(schemaJson);
+  }
+
+  private TableConfig getTableConfig()
+      throws Exception {
+    URI tableConfigURI = new URI(_spec.getTableSpec().getTableConfigURI());
+    String scheme = tableConfigURI.getScheme();
+    String tableConfigJson;
+    if (PinotFSFactory.isSchemeSupported(scheme)) {
+      // Try to use PinotFS to read table config URI
+      PinotFS pinotFS = PinotFSFactory.create(scheme);
+      tableConfigJson = IOUtils.toString(pinotFS.open(tableConfigURI), StandardCharsets.UTF_8);
+    } else {
+      tableConfigJson = IOUtils.toString(tableConfigURI, StandardCharsets.UTF_8);
+    }
+    // Controller API returns a wrapper of table config.
+    JsonNode tableJsonNode = new ObjectMapper().readTree(tableConfigJson);
+    if (tableJsonNode.has(OFFLINE)) {
+      tableJsonNode = tableJsonNode.get(OFFLINE);
+    }
+    TableConfig tableConfig = TableConfig.fromJsonConfig(tableJsonNode);
+    return tableConfig;
   }
 }

@@ -17,11 +17,11 @@
 # under the License.
 #
 
-jobType: SegmentCreation
-inputDirURI: 'file:///Users/xiangfu/sample_data/input1'
+jobType: SegmentTarPush
+inputDirURI: 'file:///path/to/input'
 includeFileNamePattern: 'glob:**/*.parquet'
 excludeFileNamePattern: 'glob:**/*.avro'
-outputDirURI: 'file:///Users/xiangfu/sample_data/output2'
+outputDirURI: 'file:///path/to/output'
 overwriteOutput: true
 pinotFSSpecs:
   - scheme: file
@@ -34,4 +34,5 @@ tableSpec:
   schemaURI: 'http://localhost:9000/tables/myTable/schema'
   tableConfigURI: 'http://localhost:9000/tables/myTable'
 pinotClusterSpecs:
-  - controllerURI: 'localhost:9000'
+  - host: 'localhost'
+    port: 9000

@@ -82,6 +82,10 @@ public class PinotFSFactory {
     return pinotFS;
   }
 
+  public static boolean isSchemeSupported(String scheme) {
+    return _fileSystemMap.containsKey(scheme);
+  }
+
   public static void shutdown()
       throws IOException {
     for (PinotFS pinotFS : _fileSystemMap.values()) {
