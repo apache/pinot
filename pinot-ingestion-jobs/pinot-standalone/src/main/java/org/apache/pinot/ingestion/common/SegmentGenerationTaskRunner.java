@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.net.URLClassLoader;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
@@ -72,7 +71,7 @@ public class SegmentGenerationTaskRunner {
 
     if (readerConfigClassName != null) {
       Map<String, String> configs = _taskSpec.getRecordReaderSpec().getConfigs();
-      if(configs == null) {
+      if (configs == null) {
         configs = new HashMap<>();
       }
       JsonNode jsonNode = new ObjectMapper().valueToTree(configs);
@@ -86,11 +85,15 @@ public class SegmentGenerationTaskRunner {
     recordReader.init(new File(_taskSpec.getInputFilePath()), schema, recordReaderConfig);
 
     //init segmentName Generator
-    String segmentNameGeneratorType = _taskSpec.getSegmentNameGeneratorSpec().getType();
+    SegmentNameGeneratorSpec segmentNameGeneratorSpec = _taskSpec.getSegmentNameGeneratorSpec();
+    if (segmentNameGeneratorSpec == null) {
+      segmentNameGeneratorSpec = new SegmentNameGeneratorSpec();
+    }
+    String segmentNameGeneratorType = segmentNameGeneratorSpec.getType();
     if (segmentNameGeneratorType == null) {
       segmentNameGeneratorType = SIMPLE_SEGMENT_NAME_GENERATOR;
     }
-    Map<String, String> segmentNameGeneratorConfigs = _taskSpec.getSegmentNameGeneratorSpec().getConfigs();
+    Map<String, String> segmentNameGeneratorConfigs = segmentNameGeneratorSpec.getConfigs();
     SegmentNameGenerator segmentNameGenerator;
     switch (segmentNameGeneratorType) {
       case SIMPLE_SEGMENT_NAME_GENERATOR:
