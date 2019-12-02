@@ -22,24 +22,48 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.Reader;
 import java.io.StringWriter;
+import java.util.Arrays;
+import org.apache.pinot.ingestion.common.PinotIngestionJobType;
 import org.apache.pinot.ingestion.common.SegmentGenerationJobSpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 
 public class StandaloneIngestionJobLauncher {
 
+  public static final Logger LOGGER = LoggerFactory.getLogger(StandaloneIngestionJobLauncher.class);
 
-  public static void main(String[] args) throws Exception{
+  private static final String USAGE = "usage: [jobSpec.yaml]";
+
+  private static void usage() {
+    System.err.println(USAGE);
+  }
+
+  public static void main(String[] args)
+      throws Exception {
+    if (args.length != 1) {
+      usage();
+      System.exit(1);
+    }
     String jobSpecFilePath = args[0];
 
-    try(Reader reader = new BufferedReader(new FileReader(jobSpecFilePath))) {
-
+    try (Reader reader = new BufferedReader(new FileReader(jobSpecFilePath))) {
       Yaml yaml = new Yaml();
       SegmentGenerationJobSpec spec = yaml.loadAs(reader, SegmentGenerationJobSpec.class);
       StringWriter sw = new StringWriter();
       yaml.dump(spec, sw);
-      System.out.println("dump = " + sw.toString());
-
+      LOGGER.info("SegmentGenerationJobSpec: \n{}", sw.toString());
+      PinotIngestionJobType jobType = PinotIngestionJobType.valueOf(spec.getJobType());
+      switch (jobType) {
+        case SegmentCreation:
+          new SegmentGenerationJobRunner(spec).run();
+          break;
+        default:
+          LOGGER.error("Unsupported job type - {}. Support job types: {}", spec.getJobType(),
+              Arrays.toString(PinotIngestionJobType.values()));
+          throw new RuntimeException("Unsupported job type - " + spec.getJobType());
+      }
     }
   }
 }

@@ -18,11 +18,8 @@
  */
 package org.apache.pinot.ingestion.common;
 
-import java.net.URI;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.core.segment.name.SegmentNameGenerator;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.RecordReader;
 
 
 public class SegmentGenerationTaskSpec {

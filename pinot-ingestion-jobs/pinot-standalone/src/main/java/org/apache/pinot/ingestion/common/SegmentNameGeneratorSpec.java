@@ -18,14 +18,15 @@
  */
 package org.apache.pinot.ingestion.common;
 
+import java.util.HashMap;
 import java.util.Map;
 
 
 public class SegmentNameGeneratorSpec {
 
-  String _type;
+  String _type = null;
 
-  Map<String, String> _configs;
+  Map<String, String> _configs = new HashMap<>();
 
   public String getType() {
     return _type;
