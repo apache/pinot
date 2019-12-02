@@ -32,7 +32,11 @@ import com.couchbase.client.java.query.N1qlQueryResult;
 import com.couchbase.client.java.query.N1qlQueryRow;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.configuration2.ConfigurationUtils;
 import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.util.CacheUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,30 +71,31 @@ public class CouchbaseCacheDAO implements CacheDAO {
    * Initialize connection to Couchbase and open bucket where data is stored.
    */
   private void createDataStoreConnection() {
-    CacheDataSource config = CacheConfig.getInstance().getCentralizedCacheSettings().getDataSourceConfig();
-    List<String> hosts = (List)config.getField(HOSTS);
+    CacheDataSource dataSource = CacheConfig.getInstance().getCentralizedCacheSettings().getDataSourceConfig();
+    Map<String, Object> config = dataSource.getConfig();
+    List<String> hosts = ConfigUtils.getList(config.get(HOSTS));
 
     Cluster cluster;
-    if (config.getFieldAsBoolean(USE_CERT_BASED_AUTH)) {
+    if (MapUtils.getBoolean(config, USE_CERT_BASED_AUTH)) {
       CouchbaseEnvironment env = DefaultCouchbaseEnvironment
           .builder()
           .sslEnabled(true)
           .certAuthEnabled(true)
-          .dnsSrvEnabled(config.getFieldAsBoolean(ENABLE_DNS_SRV))
-          .sslKeystoreFile(config.getFieldAsString(KEY_STORE_FILE_PATH))
-          .sslKeystorePassword(config.getFieldAsString(KEY_STORE_PASSWORD))
-          .sslTruststoreFile(config.getFieldAsString(TRUST_STORE_FILE_PATH))
-          .sslTruststorePassword(config.getFieldAsString(TRUST_STORE_PASSWORD))
+          .dnsSrvEnabled(MapUtils.getBoolean(config, ENABLE_DNS_SRV))
+          .sslKeystoreFile(MapUtils.getString(config, KEY_STORE_FILE_PATH))
+          .sslKeystorePassword(MapUtils.getString(config, KEY_STORE_PASSWORD))
+          .sslTruststoreFile(MapUtils.getString(config, TRUST_STORE_FILE_PATH))
+          .sslTruststorePassword(MapUtils.getString(config, TRUST_STORE_PASSWORD))
           .build();
 
       cluster = CouchbaseCluster.create(env, CacheUtils.getBootstrapHosts(hosts));
       cluster.authenticate(CertAuthenticator.INSTANCE);
     } else {
       cluster = CouchbaseCluster.create(hosts);
-      cluster.authenticate(config.getFieldAsString(AUTH_USERNAME), config.getFieldAsString(AUTH_PASSWORD));
+      cluster.authenticate(MapUtils.getString(config, AUTH_USERNAME), MapUtils.getString(config, AUTH_PASSWORD));
     }
 
-    this.bucket = cluster.openBucket(config.getFieldAsString(BUCKET_NAME));
+    this.bucket = cluster.openBucket(CacheUtils.getBucketName());
   }
 
   /**
@@ -117,7 +122,7 @@ public class CouchbaseCacheDAO implements CacheDAO {
 
   // NOTE: this will be slow unless indexes are created on "time" and "metricId".
   public ThirdEyeCacheResponse tryFetchExistingTimeSeries(ThirdEyeCacheRequest request) throws Exception {
-    String bucketName = CacheConfig.getInstance().getCentralizedCacheSettings().getDataSourceConfig().getFieldAsString(BUCKET_NAME);
+    String bucketName = CacheUtils.getBucketName();
     String dimensionKey = request.getDimensionKey();
 
     // NOTE: we subtract 1 granularity from the end date because Couchbase's BETWEEN clause is inclusive on both sides

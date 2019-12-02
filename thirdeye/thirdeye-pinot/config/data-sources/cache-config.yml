@@ -12,7 +12,7 @@ centralizedCacheSettings:
     couchbase:
       className: org.apache.pinot.thirdeye.detection.cache.CouchbaseCacheDAO
       config:
-        useCertificateBasedAuthentication: falses
+        useCertificateBasedAuthentication: false
         # at least 1 host needed
         hosts:
           - 'host1' # ex. http://localhost:8091
