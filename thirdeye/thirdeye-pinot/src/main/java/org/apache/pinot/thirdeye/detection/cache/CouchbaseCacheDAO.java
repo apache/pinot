@@ -34,7 +34,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections4.MapUtils;
-import org.apache.commons.configuration2.ConfigurationUtils;
 import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.util.CacheUtils;
