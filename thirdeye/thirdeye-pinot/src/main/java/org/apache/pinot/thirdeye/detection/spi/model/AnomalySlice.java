@@ -23,6 +23,7 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -129,21 +130,29 @@ public class AnomalySlice {
     if (this.end >= 0 && anomaly.getStartTime() >= this.end)
       return false;
 
+    // Matches anomalies on the specified dimension filters
+    //
+    // Let's assume you have anomalies say, A1 on overall pageviews, A2 on pageviews(country=US),
+    // A3 on pageviews(country=US,FR) and A4 on pageviews(country=US, device=Android).
+    //
+    // Now, if you want to fetch all the anomalies in US (country=US), then this matching will
+    // return A2 (country=US) and A4 (country=US, device=Android)
     for (String dimName : this.filters.keySet()) {
-      if (anomaly.getDimensions().containsKey(dimName)) {
-        String dimValue = anomaly.getDimensions().get(dimName);
-        if (!this.filters.get(dimName).contains(dimValue))
+      if (anomaly.getDimensionMap().containsKey(dimName)) {
+        Collection<String> dimValue = anomaly.getDimensionMap().get(dimName);
+        if (!this.filters.get(dimName).equals(dimValue))
           return false;
+      } else {
+        return false;
       }
     }
 
-    // Note:
     // Entity Anomalies with detectorComponentName can act as both child (sub-entity) and non-child
-    // (root entity) anomaly. Therefore, when matching based on detectionComponentNames, do not consider
+    // (root entity) anomaly. Therefore, when matching based on detectionComponentNames, we will not consider
     // isTaggedAsChild filter as it can take either of the values (true or false).
     if (this.detectionComponentNames != null && !this.detectionComponentNames.isEmpty()) {
-      return anomaly.getProperties().containsKey(PROP_DETECTOR_COMPONENT_NAME) && this.detectionComponentNames.contains(
-          anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_NAME));
+      return anomaly.getProperties().containsKey(PROP_DETECTOR_COMPONENT_NAME) &&
+          this.detectionComponentNames.contains(anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_NAME));
     } else {
       return isTaggedAsChild == anomaly.isChild();
     }

@@ -51,12 +51,14 @@ public interface AnomalyResult {
    * Sets the dimension of this anomaly.
    * @param dimensionMap the dimension information.
    */
+  @Deprecated
   void setDimensions(DimensionMap dimensionMap);
 
   /**
    * Gets the dimension of this anomaly.
    * @return the dimension information of this anomaly.
    */
+  @Deprecated
   DimensionMap getDimensions();
 
   /**
