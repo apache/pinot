@@ -289,7 +289,7 @@ public class DataProviderTest {
   public void testAnomalyMultiDimensions() {
     AnomalySlice slice = makeAnomalySlice(0, -1, Arrays.asList("a=1", "a=2", "c=3"));
 
-    Collection<MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(Collections.singleton(slice), -1).get(slice);
+    Collection<MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(Collections.singleton(slice)).get(slice);
     Assert.assertEquals(anomalies.size(), 2);
     Assert.assertTrue(anomalies.contains(makeAnomaly(this.anomalyIds.get(4), detectionIds.get(1), 14400000L, 18000000L, Arrays.asList("a=1", "a=2", "c=3"))));
     Assert.assertTrue(anomalies.contains(makeAnomaly(this.anomalyIds.get(6), detectionIds.get(1), 14400000L, 18000000L, Arrays.asList("a=1", "a=2", "c=3", "d=4"))));
