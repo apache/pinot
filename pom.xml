@@ -53,9 +53,9 @@
     <module>pinot-minion</module>
     <module>pinot-hadoop-filesystem</module>
     <module>pinot-azure-filesystem</module>
-    <module>pinot-avro</module>
-    <module>pinot-orc</module>
-    <module>pinot-parquet</module>
+    <module>pinot-record-readers/pinot-avro</module>
+    <module>pinot-record-readers/pinot-orc</module>
+    <module>pinot-record-readers/pinot-parquet</module>
     <module>pinot-connectors</module>
   </modules>
 
