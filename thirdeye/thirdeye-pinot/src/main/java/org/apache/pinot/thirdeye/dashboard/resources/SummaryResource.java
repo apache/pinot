@@ -81,6 +81,17 @@ public class SummaryResource {
   private static final String SIMPLE_RATIO_METRIC_EXPRESSION_ID_PARSER =
       "^id(?<" + NUMERATOR_GROUP_NAME + ">\\d*)\\/id(?<" + DENOMINATOR_GROUP_NAME + ">\\d*)$";
 
+  private MetricConfigDTO fetchMetricConfig(String metricUrn, String metric, String dataset) {
+    MetricConfigDTO metricConfigDTO;
+    MetricConfigManager metricConfigDAO = DAORegistry.getInstance().getMetricConfigDAO();
+    if (StringUtils.isNotBlank(metricUrn)) {
+      metricConfigDTO = metricConfigDAO.findById(MetricEntity.fromURN(metricUrn).getId());
+    } else {
+      metricConfigDTO = metricConfigDAO.findByMetricAndDataset(metric, dataset);
+    }
+    return metricConfigDTO;
+  }
+
   @GET
   @Path(value = "/summary/autoDimensionOrder")
   @Produces(MediaType.APPLICATION_JSON)
@@ -106,8 +117,7 @@ public class SummaryResource {
     String datasetName = dataset;
     SummaryResponse response = null;
     try {
-      MetricConfigManager metricConfigDAO = DAORegistry.getInstance().getMetricConfigDAO();
-      MetricConfigDTO metricConfigDTO = metricConfigDAO.findById(MetricEntity.fromURN(metricUrn).getId());
+      MetricConfigDTO metricConfigDTO = fetchMetricConfig(metricUrn, metric, dataset);
       if (metricConfigDTO != null) {
         metricName = metricConfigDTO.getName();
         datasetName = metricConfigDTO.getDataset();
@@ -184,8 +194,7 @@ public class SummaryResource {
     String datasetName = dataset;
     SummaryResponse response = null;
     try {
-      MetricConfigManager metricConfigDAO = DAORegistry.getInstance().getMetricConfigDAO();
-      MetricConfigDTO metricConfigDTO = metricConfigDAO.findById(MetricEntity.fromURN(metricUrn).getId());
+      MetricConfigDTO metricConfigDTO = fetchMetricConfig(metricUrn, metric, dataset);
       if (metricConfigDTO != null) {
         metricName = metricConfigDTO.getName();
         datasetName = metricConfigDTO.getDataset();
