@@ -35,8 +35,8 @@ public class KafkaConsumerFactory extends StreamConsumerFactory {
 
   @Override
   public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
-      InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
-    return new KafkaStreamLevelConsumer(clientId, tableName, _streamConfig, schema, instanceZKMetadata, serverMetrics);
+      String groupId) {
+    return new KafkaStreamLevelConsumer(clientId, tableName, _streamConfig, schema, groupId);
   }
 
   @Override

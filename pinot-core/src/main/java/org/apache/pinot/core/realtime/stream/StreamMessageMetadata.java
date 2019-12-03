@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.core.realtime.stream;
 
-import org.apache.pinot.common.metadata.RowMetadata;
-
-
 /**
  * A class that provides metadata associated with the message of a stream, for e.g.,
  * ingestion-timestamp of the message.

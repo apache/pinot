@@ -50,12 +50,11 @@ public abstract class StreamConsumerFactory {
    * @param clientId a client id to identify the creator of this consumer
    * @param tableName the table name for the topic of this consumer
    * @param schema the pinot schema of the event being consumed
-   * @param instanceZKMetadata the instance metadata
-   * @param serverMetrics metrics object to emit consumption related metrics
+   * @param groupId consumer group Id
    * @return
    */
   public abstract StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
-      InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics);
+      String groupId);
 
   /**
    * Creates a metadata provider which provides partition specific metadata

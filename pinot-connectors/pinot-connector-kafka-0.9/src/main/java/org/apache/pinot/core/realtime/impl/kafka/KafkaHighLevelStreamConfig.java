@@ -65,10 +65,10 @@ public class KafkaHighLevelStreamConfig {
    * Builds a wrapper around {@link StreamConfig} to fetch kafka stream level consumer specific configs
    * @param streamConfig
    * @param tableName
-   * @param instanceZKMetadata
+   * @param groupId
    */
   public KafkaHighLevelStreamConfig(StreamConfig streamConfig, String tableName,
-      InstanceZKMetadata instanceZKMetadata) {
+      String groupId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
 
     _kafkaTopicName = streamConfig.getTopicName();
@@ -78,7 +78,7 @@ public class KafkaHighLevelStreamConfig {
     _zkBrokerUrl = streamConfigMap.get(hlcZkBrokerUrlKey);
     Preconditions.checkNotNull(_zkBrokerUrl,
         "Must specify zk broker connect string " + hlcZkBrokerUrlKey + " in high level kafka consumer");
-    _groupId = instanceZKMetadata.getGroupId(tableName);
+    _groupId = groupId;
 
     _kafkaConsumerProperties = new HashMap<>();
     String kafkaConsumerPropertyPrefix =

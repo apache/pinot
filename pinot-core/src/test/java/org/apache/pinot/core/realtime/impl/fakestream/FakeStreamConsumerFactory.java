@@ -49,7 +49,7 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
 
   @Override
   public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
-      InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
+      String groupId) {
     return new FakeStreamLevelConsumer();
   }
 

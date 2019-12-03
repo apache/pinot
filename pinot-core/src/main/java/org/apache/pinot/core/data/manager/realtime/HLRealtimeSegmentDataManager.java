@@ -19,6 +19,7 @@
 package org.apache.pinot.core.data.manager.realtime;
 
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.yammer.metrics.core.Meter;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -94,6 +95,9 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private Logger segmentLogger = LOGGER;
   private final SegmentVersion _segmentVersion;
 
+  private Meter tableAndStreamRowsConsumed = null;
+  private Meter tableRowsConsumed = null;
+
   // An instance of this class exists only for the duration of the realtime segment that is currently being consumed.
   // Once the segment is committed, the segment is handled by OfflineSegmentDataManager
   public HLRealtimeSegmentDataManager(final RealtimeSegmentZKMetadata realtimeSegmentZKMetadata,
@@ -164,7 +168,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     String clientId = HLRealtimeSegmentDataManager.class.getSimpleName() + "-" + _streamConfig.getTopicName();
     _streamLevelConsumer = _streamConsumerFactory
-        .createStreamLevelConsumer(clientId, tableNameWithType, schema, instanceMetadata, serverMetrics);
+        .createStreamLevelConsumer(clientId, tableNameWithType, schema, instanceMetadata.getGroupId(tableNameWithType));
     _streamLevelConsumer.start();
 
     tableStreamName = tableNameWithType + "_" + _streamConfig.getTopicName();
@@ -220,9 +224,16 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             GenericRow consumedRow;
             try {
               consumedRow = _streamLevelConsumer.next(reuse);
+              tableAndStreamRowsConsumed = serverMetrics
+                  .addMeteredTableValue(tableStreamName, ServerMeter.REALTIME_ROWS_CONSUMED, 1L,
+                      tableAndStreamRowsConsumed);
+              tableRowsConsumed =
+                  serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L, tableRowsConsumed);
             } catch (Exception e) {
               segmentLogger.warn("Caught exception while consuming row, sleeping for {} ms", exceptionSleepMillis, e);
               numRowsErrored++;
+              serverMetrics.addMeteredTableValue(tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
+              serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
 
               // Sleep for a short time as to avoid filling the logs with exceptions too quickly
               Uninterruptibles.sleepUninterruptibly(exceptionSleepMillis, TimeUnit.MILLISECONDS);
@@ -297,6 +308,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             _streamLevelConsumer.shutdown();
             segmentLogger
                 .info("Successfully committed {} offsets, consumer release requested.", _streamConfig.getType());
+            serverMetrics.addMeteredTableValue(tableStreamName, ServerMeter.REALTIME_OFFSET_COMMITS, 1L);
+            serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_OFFSET_COMMITS, 1L);
           } catch (Throwable e) {
             // If we got here, it means that either the commit or the shutdown failed. Considering that the
             // KafkaConsumerManager delays shutdown and only adds the consumer to be released in a deferred way, this
