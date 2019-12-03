@@ -19,32 +19,23 @@
 
 package org.apache.pinot.thirdeye.detection.cache;
 
-import java.util.Map;
-
-
 /**
- * Config for a single centralized cache data source.
- * For example, this class could be for Couchbase, or Redis, or Cassandra, etc.
+ * interface for cache DAO. Should handle all read/write access to the data store of choice.
  */
-public class CacheDataSource {
+public interface CacheDAO {
 
   /**
-   * class name, e.g. org.apache.pinot.thirdeye.detection.cache.CouchbaseCacheDAO
+   * Tries to fetch the data for a given ThirdEyeCacheRequest and returns it.
+   * @param request ThirdEyeCacheRequest
+   * @return ThirdEyeCacheResponse containing a list of {@link org.apache.pinot.thirdeye.detection.cache.TimeSeriesDataPoint}
+   * @throws Exception Only thrown if query errored out, NOT if no data was found!
    */
-  private String className;
+  ThirdEyeCacheResponse tryFetchExistingTimeSeries(ThirdEyeCacheRequest request) throws Exception;
 
   /**
-   * settings/config for the specific data source. generic since different
-   * data stores may have different authentication methods.
+   * Insert a TimeSeriesDataPoint into data store. Schema design is up to the user, although we show an example
+   * schema that we use for Couchbase in {@link CouchbaseCacheDAO#insertTimeSeriesDataPoint(TimeSeriesDataPoint)}
+   * @param point TimeSeriesDataPoint
    */
-  private Map<String, Object> config;
-
-  // left blank
-  public CacheDataSource() {}
-
-  public String getClassName() { return className; }
-  public Map<String, Object> getConfig() { return config; }
-
-  public void setClassName(String className) { this.className = className; }
-  public void setConfig(Map<String, Object> config) { this.config = config; }
+  void insertTimeSeriesDataPoint(TimeSeriesDataPoint point);
 }

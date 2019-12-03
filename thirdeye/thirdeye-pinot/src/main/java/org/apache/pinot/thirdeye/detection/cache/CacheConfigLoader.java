@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.detection.cache;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.net.URL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,5 +48,11 @@ public class CacheConfigLoader {
       LOG.error("Exception in reading cache config {}", cacheConfigUrl, e);
     }
     return cacheConfig;
+  }
+
+  public static CacheDAO loadCacheDAO(CacheConfig config) throws Exception {
+    String className = config.getCentralizedCacheSettings().getDataSourceConfig().getClassName();
+    Constructor<?> constructor = Class.forName(className).getConstructor();
+    return (CacheDAO) constructor.newInstance();
   }
 }

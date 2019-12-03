@@ -20,9 +20,18 @@
 package org.apache.pinot.thirdeye.util;
 
 import com.couchbase.client.java.document.json.JsonObject;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.zip.CRC32;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.pinot.thirdeye.detection.cache.CacheConfig;
 import org.apache.pinot.thirdeye.detection.cache.CacheConstants;
 import org.apache.pinot.thirdeye.detection.cache.TimeSeriesDataPoint;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -31,9 +40,17 @@ import org.apache.pinot.thirdeye.detection.cache.TimeSeriesDataPoint;
 
 public class CacheUtils {
 
+  private static final Logger LOG = LoggerFactory.getLogger(CacheUtils.class);
+
+  private static final String BUCKET_NAME = "bucketName";
+
   // We use CRC32 as the hash function to generate keys for cache documents.
   public static CRC32 hashGenerator = new CRC32();
 
+  public static String getBucketName() {
+    Map<String, Object> config = CacheConfig.getInstance().getCentralizedCacheSettings().getDataSourceConfig().getConfig();
+    return MapUtils.getString(config, BUCKET_NAME);
+  }
   /**
    * Hashes the metricURN, so that the return value can be used as a key to
    * the key-value pair in a cache document.
@@ -79,11 +96,41 @@ public class CacheUtils {
    */
   public static String buildQuery(JsonObject parameters) {
     return String.format("SELECT timestamp, `%s` FROM `%s` WHERE metricId = %d AND `%s` IS NOT MISSING AND timestamp BETWEEN %d AND %d ORDER BY time ASC",
-        parameters.getString("dimensionKey"),
+        parameters.getString( "dimensionKey"),
         parameters.getString("bucket"),
         parameters.getLong("metricId"),
         parameters.getString("dimensionKey"),
         parameters.getLong("start"),
         parameters.getLong("end"));
+  }
+
+  /**
+   * Convert list of strings to their proper URL hosts. For each
+   * string, it will parse out the proper host for the URI.
+   * Example: "http://localhost:8091" -> "localhost"
+   * @param bootstrapUris
+   * @return list of hosts (as strings)
+   */
+  public static List<String> getBootstrapHosts(List<String> bootstrapUris) {
+    List<String> bootstrapHosts = new ArrayList<>(bootstrapUris.size());
+    for (String bootstrapUri : bootstrapUris) {
+      try {
+        URI uri = new URI(bootstrapUri);
+        // The next workaround is to correctly parse urls that don't include any schema
+        if (uri.getHost() == null) {
+          uri = new URI("http://" + bootstrapUri);
+        }
+        String host = uri.getHost();
+        if (host != null) {
+          bootstrapHosts.add(host);
+        } else {
+          LOG.warn("Received incorrectly formatted URI {}, excluding it from list of hosts to connect to...", bootstrapUri);
+        }
+      } catch (URISyntaxException e) {
+        LOG.error("Exception while parsing host for URI {}", bootstrapUri, e);
+      }
+    }
+
+    return bootstrapHosts;
   }
 }

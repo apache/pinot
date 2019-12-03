@@ -22,14 +22,20 @@ package org.apache.pinot.thirdeye.detection.cache;
 import com.couchbase.client.java.Bucket;
 import com.couchbase.client.java.Cluster;
 import com.couchbase.client.java.CouchbaseCluster;
+import com.couchbase.client.java.auth.CertAuthenticator;
 import com.couchbase.client.java.document.JsonDocument;
 import com.couchbase.client.java.document.json.JsonObject;
+import com.couchbase.client.java.env.CouchbaseEnvironment;
+import com.couchbase.client.java.env.DefaultCouchbaseEnvironment;
 import com.couchbase.client.java.query.N1qlQuery;
 import com.couchbase.client.java.query.N1qlQueryResult;
 import com.couchbase.client.java.query.N1qlQueryRow;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.util.CacheUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,26 +45,55 @@ import org.slf4j.LoggerFactory;
  * DAO class used to fetch data from Couchbase.
  */
 
-public class CouchbaseCacheDAO {
+public class CouchbaseCacheDAO implements CacheDAO {
+
+  private static final String USE_CERT_BASED_AUTH = "useCertificateBasedAuthentication";
+  private static final String HOSTS = "hosts";
+  private static final String AUTH_USERNAME = "authUsername";
+  private static final String AUTH_PASSWORD = "authPassword";
+  private static final String ENABLE_DNS_SRV = "enableDnsSrv";
+  private static final String KEY_STORE_FILE_PATH = "keyStoreFilePath";
+  private static final String KEY_STORE_PASSWORD = "keyStorePassword";
+  private static final String TRUST_STORE_FILE_PATH = "trustStoreFilePath";
+  private static final String TRUST_STORE_PASSWORD = "trustStorePassword";
 
   private static final Logger LOG = LoggerFactory.getLogger(CouchbaseCacheDAO.class);
 
   private Bucket bucket;
 
   public CouchbaseCacheDAO() {
-    if (CacheConfig.getInstance().useCentralizedCache()) {
-      this.createDataStoreConnection();
-    }
+    this.createDataStoreConnection();
   }
 
   /**
    * Initialize connection to Couchbase and open bucket where data is stored.
    */
   private void createDataStoreConnection() {
-    Cluster cluster = CouchbaseCluster.create(CacheConfig.getInstance().getHost());
-    cluster.authenticate(CacheConfig.getInstance().getAuthUsername(),
-                         CacheConfig.getInstance().getAuthPassword());
-    this.bucket = cluster.openBucket(CacheConfig.getInstance().getBucketName());
+    CacheDataSource dataSource = CacheConfig.getInstance().getCentralizedCacheSettings().getDataSourceConfig();
+    Map<String, Object> config = dataSource.getConfig();
+    List<String> hosts = ConfigUtils.getList(config.get(HOSTS));
+
+    Cluster cluster;
+    if (MapUtils.getBoolean(config, USE_CERT_BASED_AUTH)) {
+      CouchbaseEnvironment env = DefaultCouchbaseEnvironment
+          .builder()
+          .sslEnabled(true)
+          .certAuthEnabled(true)
+          .dnsSrvEnabled(MapUtils.getBoolean(config, ENABLE_DNS_SRV))
+          .sslKeystoreFile(MapUtils.getString(config, KEY_STORE_FILE_PATH))
+          .sslKeystorePassword(MapUtils.getString(config, KEY_STORE_PASSWORD))
+          .sslTruststoreFile(MapUtils.getString(config, TRUST_STORE_FILE_PATH))
+          .sslTruststorePassword(MapUtils.getString(config, TRUST_STORE_PASSWORD))
+          .build();
+
+      cluster = CouchbaseCluster.create(env, CacheUtils.getBootstrapHosts(hosts));
+      cluster.authenticate(CertAuthenticator.INSTANCE);
+    } else {
+      cluster = CouchbaseCluster.create(hosts);
+      cluster.authenticate(MapUtils.getString(config, AUTH_USERNAME), MapUtils.getString(config, AUTH_PASSWORD));
+    }
+
+    this.bucket = cluster.openBucket(CacheUtils.getBucketName());
   }
 
   /**
@@ -85,11 +120,12 @@ public class CouchbaseCacheDAO {
 
   // NOTE: this will be slow unless indexes are created on "time" and "metricId".
   public ThirdEyeCacheResponse tryFetchExistingTimeSeries(ThirdEyeCacheRequest request) throws Exception {
+    String bucketName = CacheUtils.getBucketName();
     String dimensionKey = request.getDimensionKey();
 
     // NOTE: we subtract 1 granularity from the end date because Couchbase's BETWEEN clause is inclusive on both sides
     JsonObject parameters = JsonObject.create()
-        .put(CacheConstants.BUCKET, CacheConfig.getInstance().getBucketName())
+        .put(CacheConstants.BUCKET, bucketName)
         .put(CacheConstants.METRIC_ID, request.getMetricId())
         .put(CacheConstants.DIMENSION_KEY, request.getDimensionKey())
         .put(CacheConstants.START, request.getStartTimeInclusive())
@@ -128,7 +164,7 @@ public class CouchbaseCacheDAO {
    * exists within Couchbase and the data value for the metricURN already exists in the cache,
    * we don't do anything. An example document generated and inserted for this might look like:
    * {
-   *   "time": 123456700000
+   *   "timestamp": 123456700000
    *   "metricId": 123456,
    *   "61427020": "3.0",
    *   "83958352": "59.6",
