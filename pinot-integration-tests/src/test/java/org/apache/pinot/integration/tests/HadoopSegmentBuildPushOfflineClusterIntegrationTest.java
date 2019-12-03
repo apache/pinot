@@ -40,7 +40,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.v2.MiniMRYarnCluster;
 import org.apache.pinot.common.config.ColumnPartitionConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
@@ -48,6 +47,7 @@ import org.apache.pinot.hadoop.job.HadoopSegmentCreationJob;
 import org.apache.pinot.hadoop.job.HadoopSegmentPreprocessingJob;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
 import org.apache.pinot.ingestion.jobs.SegmentTarPushJob;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -173,6 +173,8 @@ public class HadoopSegmentBuildPushOfflineClusterIntegrationTest extends BaseClu
     // Setting this will fetch the schema & table config from the controller
     properties.setProperty(JobConfigConstants.PUSH_TO_HOSTS, getDefaultControllerConfiguration().getControllerHost());
     properties.setProperty(JobConfigConstants.PUSH_TO_PORT, getDefaultControllerConfiguration().getControllerPort());
+
+    properties.setProperty(JobConfigConstants.CREATE_TAR_GZ, "true");
 
     Properties preComputeProperties = new Properties();
     preComputeProperties.putAll(properties);

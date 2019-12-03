@@ -32,12 +32,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.MetricFieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.readers.RecordReaderFactory;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
@@ -65,6 +61,11 @@ import org.apache.pinot.core.startree.hll.HllUtil;
 import org.apache.pinot.core.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.core.util.CrcUtils;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.startree.hll.HllConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -388,9 +389,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Move the temporary directory into its final location
     FileUtils.moveDirectory(tempIndexDir, segmentOutputDir);
 
-    // Delete the temporary directory
-    FileUtils.deleteQuietly(tempIndexDir);
-
     // Convert segment format if necessary
     convertFormatIfNeeded(segmentOutputDir);
 
@@ -414,6 +412,12 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     // Persist creation metadata to disk
     persistCreationMeta(segmentOutputDir, crc, creationTime);
+
+    if (config.isCreateTarGz()) {
+      File tarGzPath = new File(outputDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+      TarGzCompressionUtils.createTarGzOfDirectory(segmentOutputDir.getAbsolutePath(), tarGzPath.getAbsolutePath());
+      FileUtils.deleteQuietly(segmentOutputDir);
+    }
 
     LOGGER.info("Driver, record read time : {}", totalRecordReadTime);
     LOGGER.info("Driver, stats collector time : {}", totalStatsCollectorTime);

@@ -76,4 +76,7 @@ public class JobConfigConstants {
 
   // Assign sequence ids to input files based at each local directory level
   public static final String LOCAL_DIRECTORY_SEQUENCE_ID = "local.directory.sequence.id";
+
+  // Creates a tar gz file
+  public static final String CREATE_TAR_GZ = "create.tar.gz";
 }

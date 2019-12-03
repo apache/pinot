@@ -114,6 +114,7 @@ public class SegmentGeneratorConfig {
   private boolean _onHeap = false;
   private boolean _skipTimeValueCheck = false;
   private boolean _nullHandlingEnabled = false;
+  private boolean _createTarGz = false;
 
   public SegmentGeneratorConfig() {
   }
@@ -164,6 +165,7 @@ public class SegmentGeneratorConfig {
     _recordReaderPath = config._recordReaderPath;
     _skipTimeValueCheck = config._skipTimeValueCheck;
     _nullHandlingEnabled = config._nullHandlingEnabled;
+    _createTarGz = config._createTarGz;
   }
 
   /**
@@ -350,6 +352,14 @@ public class SegmentGeneratorConfig {
 
   public void setRecordReaderPath(String recordReaderPath) {
     _recordReaderPath = recordReaderPath;
+  }
+
+  public boolean isCreateTarGz() {
+    return _createTarGz;
+  }
+
+  public void setCreateTarGz(boolean createTarGz) {
+    _createTarGz = createTarGz;
   }
 
   public String getOutDir() {

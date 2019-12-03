@@ -36,14 +36,9 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.common.utils.DataSize;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.readers.CSVRecordReaderConfig;
 import org.apache.pinot.core.data.readers.FileFormat;
-import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.core.data.readers.ThriftRecordReaderConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
@@ -52,6 +47,10 @@ import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.ingestion.common.JobConfigConstants;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,6 +72,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   protected TableConfig _tableConfig;
   protected String _recordReaderPath;
   protected Path _readerConfigFile;
+  protected boolean _createTarGz;
 
   // HDFS segment tar directory
   protected Path _hdfsSegmentTarDir;
@@ -81,7 +81,6 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   protected File _localStagingDir;
   protected File _localInputDir;
   protected File _localSegmentDir;
-  protected File _localSegmentTarDir;
 
   /**
    * Generate a relative output directory path when `useRelativePath` flag is on.
@@ -120,6 +119,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
       _readerConfigFile = new Path(readerConfigFile);
     }
     _recordReaderPath = _jobConf.get(JobConfigConstants.RECORD_READER_PATH);
+    _createTarGz = _jobConf.getBoolean(JobConfigConstants.CREATE_TAR_GZ, false);
 
     // Set up segment name generator
     String segmentNameGeneratorType =
@@ -153,18 +153,16 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     _localStagingDir = new File(LOCAL_TEMP_DIR);
     _localInputDir = new File(_localStagingDir, "inputData");
     _localSegmentDir = new File(_localStagingDir, "segments");
-    _localSegmentTarDir = new File(_localStagingDir, JobConfigConstants.SEGMENT_TAR_DIR);
 
     if (_localStagingDir.exists()) {
       _logger.warn("Deleting existing file: {}", _localStagingDir);
       FileUtils.forceDelete(_localStagingDir);
     }
     _logger
-        .info("Making local temporary directories: {}, {}, {}", _localStagingDir, _localInputDir, _localSegmentTarDir);
+        .info("Making local temporary directories: {}, {}, {}", _localStagingDir, _localInputDir);
     Preconditions.checkState(_localStagingDir.mkdirs());
     Preconditions.checkState(_localInputDir.mkdir());
     Preconditions.checkState(_localSegmentDir.mkdir());
-    Preconditions.checkState(_localSegmentTarDir.mkdir());
 
     _logger.info("*********************************************************************");
     _logger.info("Raw Table Name: {}", _rawTableName);
@@ -176,7 +174,6 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     _logger.info("HDFS Segment Tar Directory: {}", _hdfsSegmentTarDir);
     _logger.info("Local Staging Directory: {}", _localStagingDir);
     _logger.info("Local Input Directory: {}", _localInputDir);
-    _logger.info("Local Segment Tar Directory: {}", _localSegmentTarDir);
     _logger.info("*********************************************************************");
   }
 
@@ -233,6 +230,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
       segmentGeneratorConfig.setReaderConfig(getReaderConfig(fileFormat));
     }
     segmentGeneratorConfig.setOnHeap(true);
+    segmentGeneratorConfig.setCreateTarGz(_createTarGz);
 
     addAdditionalSegmentGeneratorConfigs(segmentGeneratorConfig, hdfsInputFile, sequenceId);
 
@@ -260,16 +258,11 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     String segmentName = driver.getSegmentName();
     _logger.info("Finish creating segment: {} with sequence id: {}", segmentName, sequenceId);
 
-    File localSegmentDir = new File(_localSegmentDir, segmentName);
     String segmentTarFileName = segmentName + JobConfigConstants.TAR_GZ_FILE_EXT;
-    File localSegmentTarFile = new File(_localSegmentTarDir, segmentTarFileName);
-    _logger.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
-    TarGzCompressionUtils.createTarGzOfDirectory(localSegmentDir.getPath(), localSegmentTarFile.getPath());
+    File localSegmentTarFile = new File(_localSegmentDir, segmentTarFileName);
 
-    long uncompressedSegmentSize = FileUtils.sizeOf(localSegmentDir);
     long compressedSegmentSize = FileUtils.sizeOf(localSegmentTarFile);
-    _logger.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName,
-        DataSize.fromBytes(uncompressedSegmentSize), DataSize.fromBytes(compressedSegmentSize));
+    _logger.info("Size for segment: {}, compressed: {}", segmentName, DataSize.fromBytes(compressedSegmentSize));
 
     Path hdfsSegmentTarFile = new Path(_hdfsSegmentTarDir, segmentTarFileName);
     if (_useRelativePath) {
