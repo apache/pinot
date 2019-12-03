@@ -18,18 +18,14 @@
  */
 package org.apache.pinot.core.realtime.impl.kafka;
 
-import com.yammer.metrics.core.Meter;
 import kafka.consumer.ConsumerIterator;
 import kafka.javaapi.consumer.ConsumerConnector;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
-import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamDecoderProvider;
 import org.apache.pinot.core.realtime.stream.StreamLevelConsumer;
 import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,9 +50,6 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   private long lastLogTime = 0;
   private long lastCount = 0;
   private long currentCount = 0L;
-
-  private Meter tableAndStreamRowsConsumed = null;
-  private Meter tableRowsConsumed = null;
 
   public KafkaStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig, Schema schema,
       String groupId) {

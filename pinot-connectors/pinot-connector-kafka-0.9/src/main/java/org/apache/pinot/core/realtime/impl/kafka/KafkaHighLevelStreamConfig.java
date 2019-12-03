@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import kafka.consumer.ConsumerConfig;
-import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamConfigProperties;

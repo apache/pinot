@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.realtime.impl.kafka2;
 
-import com.yammer.metrics.core.Meter;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -30,9 +29,6 @@ import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
-import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamDecoderProvider;
