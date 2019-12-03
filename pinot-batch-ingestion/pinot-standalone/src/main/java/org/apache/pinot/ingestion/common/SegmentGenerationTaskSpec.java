@@ -31,37 +31,37 @@ public class SegmentGenerationTaskSpec {
   /**
    * Table config to create segment
    */
-  TableConfig _tableConfig;
+  private TableConfig _tableConfig;
 
   /**
    * Table schema
    */
-  Schema _schema;
+  private Schema _schema;
 
   /**
    * Used to init record reader to read from data file
    */
-  RecordReaderSpec _recordReaderSpec;
+  private RecordReaderSpec _recordReaderSpec;
 
   /**
    * Used to generate segment name
    */
-  SegmentNameGeneratorSpec _segmentNameGeneratorSpec;
+  private SegmentNameGeneratorSpec _segmentNameGeneratorSpec;
 
   /**
    * Data file path
    */
-  String _inputFilePath;
+  private String _inputFilePath;
 
   /**
    * Output segment directory to host all data files
    */
-  String _outputDirectoryPath;
+  private String _outputDirectoryPath;
 
   /**
    * sequence id
    */
-  int _sequenceId;
+  private int _sequenceId;
 
   public TableConfig getTableConfig() {
     return _tableConfig;

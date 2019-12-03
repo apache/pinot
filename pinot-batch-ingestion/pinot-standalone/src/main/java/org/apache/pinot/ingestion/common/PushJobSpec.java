@@ -24,26 +24,31 @@ package org.apache.pinot.ingestion.common;
 public class PushJobSpec {
 
   /**
-   * retris for push job, default is 1, which means no retry.
+   * number of attempts for push job, default is 1, which means no retry.
    */
-  int _retryCount = 1;
+  private int _pushAttempts = 1;
 
   /**
    * retry wait Ms, default to 1 second.
    */
-  long _retryWaitMs = 1000;
+  private long _pushRetryTimeinMillis = 1000;
 
   /**
    * Used in SegmentUriPushJobRunner, which is used to composite the segment uri to send to pinot controller.
    * The URI sends to controller is in the format ${segmentUriPrefix}${segmentPath}${segmentUriSuffix}
    */
-  String _segmentUriPrefix;
-  String _segmentUriSuffix;
+  private String _segmentUriPrefix;
+  private String _segmentUriSuffix;
 
   public String getSegmentUriPrefix() {
     return _segmentUriPrefix;
   }
 
+  /**
+   * Used in SegmentUriPushJobRunner, which is used to composite the segment uri to send to pinot controller.
+   * The URI sends to controller is in the format ${segmentUriPrefix}${segmentPath}${segmentUriSuffix}
+   * @param segmentUriPrefix
+   */
   public void setSegmentUriPrefix(String segmentUriPrefix) {
     _segmentUriPrefix = segmentUriPrefix;
   }
@@ -52,23 +57,36 @@ public class PushJobSpec {
     return _segmentUriSuffix;
   }
 
+  /**
+   * Used in SegmentUriPushJobRunner, which is used to composite the segment uri to send to pinot controller.
+   * The URI sends to controller is in the format ${segmentUriPrefix}${segmentPath}${segmentUriSuffix}
+   * @param segmentUriSuffix
+   */
   public void setSegmentUriSuffix(String segmentUriSuffix) {
     _segmentUriSuffix = segmentUriSuffix;
   }
 
-  public int getRetryCount() {
-    return _retryCount;
+  public int getPushAttempts() {
+    return _pushAttempts;
   }
 
-  public void setRetryCount(int retryCount) {
-    _retryCount = retryCount;
+  /**
+   * number of attempts for push job, default is 1, which means no retry.
+   * @param pushAttempts
+   */
+  public void setPushAttempts(int pushAttempts) {
+    _pushAttempts = pushAttempts;
   }
 
-  public long getRetryWaitMs() {
-    return _retryWaitMs;
+  public long getPushRetryTimeinMillis() {
+    return _pushRetryTimeinMillis;
   }
 
-  public void setRetryWaitMs(long retryWaitMs) {
-    _retryWaitMs = retryWaitMs;
+  /**
+   * retry wait Ms, default to 1 second.
+   * @param pushRetryTimeinMillis
+   */
+  public void setPushRetryTimeinMillis(long pushRetryTimeinMillis) {
+    _pushRetryTimeinMillis = pushRetryTimeinMillis;
   }
 }

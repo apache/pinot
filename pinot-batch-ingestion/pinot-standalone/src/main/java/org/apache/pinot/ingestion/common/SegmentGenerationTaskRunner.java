@@ -59,7 +59,7 @@ public class SegmentGenerationTaskRunner {
   public String run()
       throws Exception {
     String tableName = _taskSpec.getTableConfig().getTableName();
-    TableConfig tableConfig = _taskSpec._tableConfig;
+    TableConfig tableConfig = _taskSpec.getTableConfig();
     Schema schema = _taskSpec.getSchema();
 
     //init record reader config
@@ -100,7 +100,7 @@ public class SegmentGenerationTaskRunner {
 
   private SegmentNameGenerator getSegmentNameGerator() {
     String tableName = _taskSpec.getTableConfig().getTableName();
-    TableConfig tableConfig = _taskSpec._tableConfig;
+    TableConfig tableConfig = _taskSpec.getTableConfig();
     Schema schema = _taskSpec.getSchema();
     SegmentNameGeneratorSpec segmentNameGeneratorSpec = _taskSpec.getSegmentNameGeneratorSpec();
     if (segmentNameGeneratorSpec == null) {

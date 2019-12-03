@@ -29,23 +29,34 @@ public class PinotFSSpec {
 
   /**
    * Scheme used to identify a PinotFS.
+   * E.g. local, hdfs, dbfs, etc
    */
-  String _scheme;
+  private String _scheme;
 
   /**
    * Class name used to create the PinotFS instance.
+   * E.g.
+   *    org.apache.pinot.filesystem.LocalPinotFS is used for local filesystem
+   *    org.apache.pinot.filesystem.AzurePinotFS is used for Azure Data Lake
+   *    org.apache.pinot.filesystem.HadoopPinotFS is used for HDFS
    */
-  String _className;
+  private String _className;
 
   /**
    * Configs used to init the PinotFS instances.
    */
-  Map<String, String> _configs;
+  private Map<String, String> _configs;
 
   public String getScheme() {
     return _scheme;
   }
 
+  /**
+   * Scheme used to identify a Pinot FileSystem. It should match the scheme in the file uri for access.
+   * E.g. local, hdfs, dbfs, etc
+   *
+   * @param scheme
+   */
   public void setScheme(String scheme) {
     _scheme = scheme;
   }
@@ -54,6 +65,15 @@ public class PinotFSSpec {
     return _className;
   }
 
+  /**
+   * Class name used to create the PinotFS instance.
+   * E.g.
+   *    org.apache.pinot.filesystem.LocalPinotFS is used for local filesystem
+   *    org.apache.pinot.filesystem.AzurePinotFS is used for Azure Data Lake
+   *    org.apache.pinot.filesystem.HadoopPinotFS is used for HDFS
+   *
+   * @param className
+   */
   public void setClassName(String className) {
     _className = className;
   }

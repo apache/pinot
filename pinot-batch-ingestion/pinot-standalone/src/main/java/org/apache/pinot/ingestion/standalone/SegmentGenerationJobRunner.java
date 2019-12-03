@@ -22,8 +22,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.PathMatcher;
@@ -79,8 +81,7 @@ public class SegmentGenerationJobRunner {
         throw new RuntimeException("Missing property 'schemaURI' in 'tableSpec'");
       }
       PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
-      String schemaURI = String
-          .format("%s/tables/%s/schema", pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
+      String schemaURI = generateSchemaURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setSchemaURI(schemaURI);
     }
     if (_spec.getTableSpec().getTableConfigURI() == null) {
@@ -89,9 +90,17 @@ public class SegmentGenerationJobRunner {
       }
       PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
       String tableConfigURI =
-          String.format("%s/tables/%s", pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
+          generateTableConfigURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setTableConfigURI(tableConfigURI);
     }
+  }
+
+  private static String generateSchemaURI(String controllerUri, String table) {
+    return String.format("%s/tables/%s/schema", controllerUri, table);
+  }
+
+  private static String generateTableConfigURI(String controllerUri, String table) {
+    return String.format("%s/tables/%s", controllerUri, table);
   }
 
   /**
@@ -227,41 +236,83 @@ public class SegmentGenerationJobRunner {
     }
   }
 
-  private Schema getSchema()
-      throws Exception {
-    URI schemaURI = new URI(_spec.getTableSpec().getSchemaURI());
+  private Schema getSchema() {
+    URI schemaURI;
+    try {
+      schemaURI = new URI(_spec.getTableSpec().getSchemaURI());
+    } catch (URISyntaxException e) {
+      throw new RuntimeException("Schema URI is not valid - " + _spec.getTableSpec().getSchemaURI(), e);
+    }
     String scheme = schemaURI.getScheme();
     String schemaJson;
     if (PinotFSFactory.isSchemeSupported(scheme)) {
       // Try to use PinotFS to read schema URI
       PinotFS pinotFS = PinotFSFactory.create(scheme);
-      InputStream schemaStream = pinotFS.open(schemaURI);
-      schemaJson = IOUtils.toString(schemaStream, StandardCharsets.UTF_8);
+      InputStream schemaStream;
+      try {
+        schemaStream = pinotFS.open(schemaURI);
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to open schema file stream on Pinot fs - " + schemaURI, e);
+      }
+      try {
+        schemaJson = IOUtils.toString(schemaStream, StandardCharsets.UTF_8);
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to read from schema file data stream on Pinot fs - " + schemaURI, e);
+      }
     } else {
       // Try to directly read from URI.
-      schemaJson = IOUtils.toString(schemaURI, StandardCharsets.UTF_8);
+      try {
+        schemaJson = IOUtils.toString(schemaURI, StandardCharsets.UTF_8);
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to read from Schema URI - " + schemaURI, e);
+      }
     }
-    return Schema.fromString(schemaJson);
+    try {
+      return Schema.fromString(schemaJson);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to decode Pinot schema from json string - " + schemaJson, e);
+    }
   }
 
-  private TableConfig getTableConfig()
-      throws Exception {
-    URI tableConfigURI = new URI(_spec.getTableSpec().getTableConfigURI());
+  private TableConfig getTableConfig() {
+    URI tableConfigURI;
+    try {
+      tableConfigURI = new URI(_spec.getTableSpec().getTableConfigURI());
+    } catch (URISyntaxException e) {
+      throw new RuntimeException("Table config URI is not valid - " + _spec.getTableSpec().getTableConfigURI(), e);
+    }
     String scheme = tableConfigURI.getScheme();
     String tableConfigJson;
     if (PinotFSFactory.isSchemeSupported(scheme)) {
       // Try to use PinotFS to read table config URI
       PinotFS pinotFS = PinotFSFactory.create(scheme);
-      tableConfigJson = IOUtils.toString(pinotFS.open(tableConfigURI), StandardCharsets.UTF_8);
+      try {
+        tableConfigJson = IOUtils.toString(pinotFS.open(tableConfigURI), StandardCharsets.UTF_8);
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to open table config file stream on Pinot fs - " + tableConfigURI, e);
+      }
     } else {
-      tableConfigJson = IOUtils.toString(tableConfigURI, StandardCharsets.UTF_8);
+      try {
+        tableConfigJson = IOUtils.toString(tableConfigURI, StandardCharsets.UTF_8);
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to read from table config file data stream on Pinot fs - " + tableConfigURI,
+            e);
+      }
     }
     // Controller API returns a wrapper of table config.
-    JsonNode tableJsonNode = new ObjectMapper().readTree(tableConfigJson);
+    JsonNode tableJsonNode;
+    try {
+      tableJsonNode = new ObjectMapper().readTree(tableConfigJson);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to decode table config into JSON from String - " + tableConfigJson, e);
+    }
     if (tableJsonNode.has(OFFLINE)) {
       tableJsonNode = tableJsonNode.get(OFFLINE);
     }
-    TableConfig tableConfig = TableConfig.fromJsonConfig(tableJsonNode);
-    return tableConfig;
+    try {
+      return TableConfig.fromJsonConfig(tableJsonNode);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to decode table config from JSON - " + tableJsonNode, e);
+    }
   }
 }

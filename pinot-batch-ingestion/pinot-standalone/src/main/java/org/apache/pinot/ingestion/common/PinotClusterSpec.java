@@ -25,13 +25,20 @@ public class PinotClusterSpec {
 
   /**
    * Controller URI is used to fetch table/schema information and data push.
+   * E.g. http://localhost:9000
    */
-  String _controllerURI;
+  private String _controllerURI;
 
   public String getControllerURI() {
     return _controllerURI;
   }
 
+  /**
+   * Controller URI is used to fetch table/schema information and data push.
+   * E.g. http://localhost:9000
+   *
+   * @param controllerURI
+   */
   public void setControllerURI(String controllerURI) {
     _controllerURI = controllerURI;
   }

@@ -18,14 +18,20 @@
  */
 package org.apache.pinot.ingestion.standalone;
 
+import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.MapConfiguration;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.retry.AttemptsExceededException;
+import org.apache.pinot.common.utils.retry.RetriableOperationException;
+import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.apache.pinot.filesystem.PinotFSFactory;
 import org.apache.pinot.ingestion.common.Constants;
 import org.apache.pinot.ingestion.common.PinotClusterSpec;
@@ -49,8 +55,7 @@ public class SegmentUriPushJobRunner {
     }
   }
 
-  public void run()
-      throws Exception {
+  public void run() {
     //init all file systems
     List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
     for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
@@ -59,13 +64,21 @@ public class SegmentUriPushJobRunner {
     }
 
     //Get outputFS for writing output Pinot segments
-    URI outputDirURI = new URI(_spec.getOutputDirURI());
+    URI outputDirURI;
+    try {
+      outputDirURI = new URI(_spec.getOutputDirURI());
+    } catch (URISyntaxException e) {
+      throw new RuntimeException("outputDirURI is not valid - " + _spec.getOutputDirURI());
+    }
     PinotFS outputDirFS = PinotFSFactory.create(outputDirURI.getScheme());
-    outputDirFS.mkdir(outputDirURI);
 
     //Get list of files to process
-    String[] files = outputDirFS.listFiles(outputDirURI, true);
-
+    String[] files;
+    try {
+      files = outputDirFS.listFiles(outputDirURI, true);
+    } catch (IOException e) {
+      throw new RuntimeException("Unable to list all files under outputDirURI - " + outputDirURI);
+    }
     List<String> segmentUris = new ArrayList<>();
     for (String file : files) {
       URI uri = URI.create(file);
@@ -74,26 +87,58 @@ public class SegmentUriPushJobRunner {
             .getSegmentUriSuffix());
       }
     }
-    sendSegmentUris(segmentUris);
+    try {
+      sendSegmentUris(segmentUris);
+    } catch (RetriableOperationException | AttemptsExceededException e) {
+      throw new RuntimeException(e);
+    }
   }
 
-  public void sendSegmentUris(List<String> segmentUris) {
-    LOGGER.info("Start sending segment URIs: {} to locations: {}", segmentUris,
+  public void sendSegmentUris(List<String> segmentUris)
+      throws RetriableOperationException, AttemptsExceededException {
+    String tableName = _spec.getTableSpec().getTableName();
+    LOGGER.info("Start sending table {} segment URIs: {} to locations: {}", tableName,
+        Arrays.toString(segmentUris.subList(0, Math.min(5, segmentUris.size())).toArray()),
         Arrays.toString(_spec.getPinotClusterSpecs()));
     FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient();
     for (String segmentUri : segmentUris) {
       for (PinotClusterSpec pinotClusterSpec : _spec.getPinotClusterSpecs()) {
-        LOGGER.info("Sending segment URI: {} to location: {}", segmentUri, pinotClusterSpec.getControllerURI());
+        URI controllerURI;
         try {
-          SimpleHttpResponse response = fileUploadDownloadClient
-              .sendSegmentUri(URI.create(pinotClusterSpec.getControllerURI()), segmentUri,
-                  _spec.getTableSpec().getTableName());
-          LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
-        } catch (Exception e) {
-          LOGGER.error("Caught exception while sending segment URI: {} to location: {}", segmentUri,
-              pinotClusterSpec.getControllerURI(), e);
-          throw new RuntimeException(e);
+          controllerURI = new URI(pinotClusterSpec.getControllerURI());
+        } catch (URISyntaxException e) {
+          throw new RuntimeException("Got invalid controller uri - " + pinotClusterSpec.getControllerURI());
         }
+        LOGGER.info("Sending table {} segment URI: {} to location: {} for ", tableName, segmentUri, controllerURI);
+        int attempts = 1;
+        if (_spec.getPushJobSpec() != null && _spec.getPushJobSpec().getPushAttempts() > 0) {
+          _spec.getPushJobSpec().getPushAttempts();
+        }
+        long retryWaitMs = 1000L;
+        if (_spec.getPushJobSpec() != null && _spec.getPushJobSpec().getPushRetryTimeinMillis() > 0) {
+          retryWaitMs = _spec.getPushJobSpec().getPushRetryTimeinMillis();
+        }
+        RetryPolicies.exponentialBackoffRetryPolicy(attempts, retryWaitMs, 5).attempt(() -> {
+          try {
+            SimpleHttpResponse response = fileUploadDownloadClient.sendSegmentUri(controllerURI, segmentUri, tableName);
+            LOGGER.info("Response for pushing table {} segment uri {} to location {} - {}: {}", tableName, segmentUri,
+                controllerURI, response.getStatusCode(), response.getResponse());
+            return true;
+          } catch (HttpErrorStatusException e) {
+            int statusCode = e.getStatusCode();
+            if (statusCode >= 500) {
+              // Temporary exception
+              LOGGER.warn("Caught temporary exception while pushing table: {} segment uri: {} to {}, will retry",
+                  tableName, segmentUri, controllerURI, e);
+              return false;
+            } else {
+              // Permanent exception
+              LOGGER.error("Caught permanent exception while pushing table: {} segment uri: {} to {}, won't retry",
+                  tableName, segmentUri, controllerURI, e);
+              throw e;
+            }
+          }
+        });
       }
     }
   }

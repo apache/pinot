@@ -27,29 +27,43 @@ import java.util.Map;
 public class RecordReaderSpec {
 
   /**
-   * Record data format, e.g. 'avro', 'parquet', 'csv', etc.
+   * Record data format, e.g. 'avro', 'parquet', 'orc', 'csv', 'json', 'thrift' etc.
    */
-  String _dataFormat;
+  private String _dataFormat;
 
   /**
-   * Corresponding RecordReader class name
+   * Corresponding RecordReader class name.
+   * E.g.
+   *    org.apache.pinot.avro.data.readers.AvroRecordReader
+   *    org.apache.pinot.csv.data.readers.CSVRecordReader
+   *    org.apache.pinot.parquet.data.readers.ParquetRecordReader
+   *    org.apache.pinot.json.data.readers.JsonRecordReader
+   *    org.apache.pinot.orc.data.readers.OrcRecordReader
+   *    org.apache.pinot.thrift.data.readers.ThriftRecordReader
    */
-  String _className;
+  private String _className;
 
   /**
-   * Corresponding RecordReaderConfig class name
+   * Corresponding RecordReaderConfig class name, it's mandatory for CSV and Thrift file format.
+   * E.g.
+   *    org.apache.pinot.csv.data.readers.CSVRecordReaderConfig
+   *    org.apache.pinot.thrift.data.readers.ThriftRecordReaderConfig
    */
-  String _configClassName;
+  private String _configClassName;
 
   /**
-   * Used to init RecordReaderConfig class name, this config is required for Csv and Thrift data format.
+   * Used to init RecordReaderConfig class name, this config is required for CSV and Thrift data format.
    */
-  Map<String, String> _configs;
+  private Map<String, String> _configs;
 
   public String getDataFormat() {
     return _dataFormat;
   }
 
+  /**
+   * Record data format, e.g. 'avro', 'parquet', 'orc', 'csv', 'json', 'thrift' etc.
+   * @param dataFormat
+   */
   public void setDataFormat(String dataFormat) {
     _dataFormat = dataFormat;
   }
@@ -58,6 +72,18 @@ public class RecordReaderSpec {
     return _className;
   }
 
+  /**
+   * Corresponding RecordReader class name.
+   * E.g.
+   *    org.apache.pinot.avro.data.readers.AvroRecordReader
+   *    org.apache.pinot.csv.data.readers.CSVRecordReader
+   *    org.apache.pinot.parquet.data.readers.ParquetRecordReader
+   *    org.apache.pinot.json.data.readers.JsonRecordReader
+   *    org.apache.pinot.orc.data.readers.OrcRecordReader
+   *    org.apache.pinot.thrift.data.readers.ThriftRecordReader
+   *
+   * @param className
+   */
   public void setClassName(String className) {
     _className = className;
   }
@@ -66,6 +92,11 @@ public class RecordReaderSpec {
     return _configs;
   }
 
+  /**
+   * Used to init RecordReaderConfig class name, this config is required for CSV and Thrift data format.
+   *
+   * @param configs
+   */
   public void setConfigs(Map<String, String> configs) {
     _configs = configs;
   }
@@ -74,6 +105,14 @@ public class RecordReaderSpec {
     return _configClassName;
   }
 
+  /**
+   * Corresponding RecordReaderConfig class name, it's mandatory for CSV and Thrift file format.
+   * E.g.
+   *    org.apache.pinot.csv.data.readers.CSVRecordReaderConfig
+   *    org.apache.pinot.thrift.data.readers.ThriftRecordReaderConfig
+   *
+   * @param configClassName
+   */
   public void setConfigClassName(String configClassName) {
     _configClassName = configClassName;
   }

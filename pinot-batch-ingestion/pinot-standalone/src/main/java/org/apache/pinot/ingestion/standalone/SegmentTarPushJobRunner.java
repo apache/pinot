@@ -20,13 +20,16 @@ package org.apache.pinot.ingestion.standalone;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.MapConfiguration;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.retry.AttemptsExceededException;
@@ -52,8 +55,7 @@ public class SegmentTarPushJobRunner {
     _spec = spec;
   }
 
-  public void run()
-      throws Exception {
+  public void run() {
     //init all file systems
     List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
     for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
@@ -62,12 +64,20 @@ public class SegmentTarPushJobRunner {
     }
 
     //Get outputFS for writing output pinot segments
-    URI outputDirURI = new URI(_spec.getOutputDirURI());
+    URI outputDirURI;
+    try {
+      outputDirURI = new URI(_spec.getOutputDirURI());
+    } catch (URISyntaxException e) {
+      throw new RuntimeException("outputDirURI is not valid - " + _spec.getOutputDirURI());
+    }
     PinotFS outputDirFS = PinotFSFactory.create(outputDirURI.getScheme());
-    outputDirFS.mkdir(outputDirURI);
-
     //Get list of files to process
-    String[] files = outputDirFS.listFiles(outputDirURI, true);
+    String[] files;
+    try {
+      files = outputDirFS.listFiles(outputDirURI, true);
+    } catch (IOException e) {
+      throw new RuntimeException("Unable to list all files under outputDirURI - " + outputDirURI);
+    }
 
     List<String> segmentsToPush = new ArrayList<>();
     for (String file : files) {
@@ -75,13 +85,19 @@ public class SegmentTarPushJobRunner {
         segmentsToPush.add(file);
       }
     }
-    pushSegments(outputDirFS, segmentsToPush);
+    try {
+      pushSegments(outputDirFS, segmentsToPush);
+    } catch (RetriableOperationException | AttemptsExceededException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public void pushSegments(PinotFS fileSystem, List<String> tarFilePaths)
       throws RetriableOperationException, AttemptsExceededException {
-    LOGGER.info("Start pushing segments: {} to locations: {}", tarFilePaths,
-        Arrays.toString(_spec.getPinotClusterSpecs()));
+    String tableName = _spec.getTableSpec().getTableName();
+    LOGGER.info("Start pushing segments: {}... to locations: {} for table {}",
+        Arrays.toString(tarFilePaths.subList(0, Math.min(5, tarFilePaths.size())).toArray()),
+        Arrays.toString(_spec.getPinotClusterSpecs()), tableName);
     FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient();
     for (String tarFilePath : tarFilePaths) {
       URI tarFileURI = URI.create(tarFilePath);
@@ -90,26 +106,42 @@ public class SegmentTarPushJobRunner {
       Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
       String segmentName = fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length());
       for (PinotClusterSpec pinotClusterSpec : _spec.getPinotClusterSpecs()) {
-        LOGGER.info("Pushing segment: {} to location: {}", segmentName, pinotClusterSpec.getControllerURI());
-        int retryCount = 1;
-        if (_spec.getPushJobSpec() != null && _spec.getPushJobSpec().getRetryCount() > 0) {
-          _spec.getPushJobSpec().getRetryCount();
+        URI controllerURI;
+        try {
+          controllerURI = new URI(pinotClusterSpec.getControllerURI());
+        } catch (URISyntaxException e) {
+          throw new RuntimeException("Got invalid controller uri - " + pinotClusterSpec.getControllerURI());
+        }
+        LOGGER.info("Pushing segment: {} to location: {} for table {}", segmentName, controllerURI, tableName);
+        int attempts = 1;
+        if (_spec.getPushJobSpec() != null && _spec.getPushJobSpec().getPushAttempts() > 0) {
+          _spec.getPushJobSpec().getPushAttempts();
         }
         long retryWaitMs = 1000L;
-        if (_spec.getPushJobSpec() != null && _spec.getPushJobSpec().getRetryWaitMs() > 0) {
-          retryWaitMs = _spec.getPushJobSpec().getRetryWaitMs();
+        if (_spec.getPushJobSpec() != null && _spec.getPushJobSpec().getPushRetryTimeinMillis() > 0) {
+          retryWaitMs = _spec.getPushJobSpec().getPushRetryTimeinMillis();
         }
-        RetryPolicies.exponentialBackoffRetryPolicy(retryCount, retryWaitMs, 5).attempt(() -> {
+        RetryPolicies.exponentialBackoffRetryPolicy(attempts, retryWaitMs, 5).attempt(() -> {
           try (InputStream inputStream = fileSystem.open(tarFileURI)) {
-            SimpleHttpResponse response = fileUploadDownloadClient
-                .uploadSegment(URI.create(pinotClusterSpec.getControllerURI()), segmentName, inputStream,
-                    _spec.getTableSpec().getTableName());
-            LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
+            SimpleHttpResponse response =
+                fileUploadDownloadClient.uploadSegment(controllerURI, segmentName, inputStream, tableName);
+            LOGGER.info("Response for pushing table {} segment {} to location {} - {}: {}", tableName, segmentName,
+                controllerURI, response.getStatusCode(), response.getResponse());
             return true;
-          } catch (Exception e) {
-            LOGGER.error("Caught exception while pushing segment: {} to location: {}", segmentName,
-                pinotClusterSpec.getControllerURI(), e);
-            return false;
+          } catch (HttpErrorStatusException e) {
+            int statusCode = e.getStatusCode();
+            if (statusCode >= 500) {
+              // Temporary exception
+              LOGGER.warn("Caught temporary exception while pushing table: {} segment: {} to {}, will retry", tableName,
+                  segmentName, controllerURI, e);
+              return false;
+            } else {
+              // Permanent exception
+              LOGGER
+                  .error("Caught permanent exception while pushing table: {} segment: {} to {}, won't retry", tableName,
+                      segmentName, controllerURI, e);
+              throw e;
+            }
           }
         });
       }

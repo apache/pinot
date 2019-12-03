@@ -30,12 +30,12 @@ public class SegmentNameGeneratorSpec {
   /**
    * Current supported type is 'simple' and 'normalizedDate'.
    */
-  String _type = null;
+  private String _type = null;
 
   /**
    * Configs to init SegmentNameGenerator.
    */
-  Map<String, String> _configs = new HashMap<>();
+  private Map<String, String> _configs = new HashMap<>();
 
   public String getType() {
     return _type;

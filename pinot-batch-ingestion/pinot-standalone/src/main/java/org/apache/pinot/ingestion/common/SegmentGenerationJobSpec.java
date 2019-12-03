@@ -35,19 +35,20 @@ public class SegmentGenerationJobSpec {
    *  'SegmentCreationAndTarPush'
    *  'SegmentCreationAndUriPush'
    */
-  String jobType;
+  private String jobType;
 
   /**
    * Root directory of input data, expected to have scheme configured in PinotFS.
    */
-  String _inputDirURI;
+  private String _inputDirURI;
 
   /**
    * include file name pattern, supported glob pattern.
+   * Sample usage:
    *    'glob:*.avro' will include all avro files just under the inputDirURI, not sub directories;
    *    'glob:**\/*.avro' will include all the avro files under inputDirURI recursively.
    */
-  String _includeFileNamePattern;
+  private String _includeFileNamePattern;
 
   /**
    * exclude file name pattern, supported glob pattern.
@@ -55,52 +56,61 @@ public class SegmentGenerationJobSpec {
    *    'glob:*.avro' will exclude all avro files just under the inputDirURI, not sub directories;
    *    'glob:**\/*.avro' will exclude all the avro files under inputDirURI recursively.
    */
-  String _excludeFileNamePattern;
+  private String _excludeFileNamePattern;
 
   /**
    * Root directory of output data, expected to have scheme configured in PinotFS.
    */
-  String _outputDirURI;
+  private String _outputDirURI;
 
   /**
    * Should orverwrite output segments if existed.
    */
-  boolean _overwriteOutput;
+  private boolean _overwriteOutput;
 
   /**
    * All Pinot FS related specs
    */
-  List<PinotFSSpec> _pinotFSSpecs;
+  private List<PinotFSSpec> _pinotFSSpecs;
 
   /**
    * Pinot Table Spec
    */
-  TableSpec _tableSpec;
+  private TableSpec _tableSpec;
 
   /**
    * Data file RecordReader related spec
    */
-  RecordReaderSpec _recordReaderSpec;
+  private RecordReaderSpec _recordReaderSpec;
 
   /**
    * SegmentNameGenerator related spec
    */
-  SegmentNameGeneratorSpec _segmentNameGeneratorSpec;
+  private SegmentNameGeneratorSpec _segmentNameGeneratorSpec;
 
   /**
    * Pinot Cluster related specs
    */
-  PinotClusterSpec[] _pinotClusterSpecs;
+  private PinotClusterSpec[] _pinotClusterSpecs;
 
   /**
    * Segment Push job related spec
    */
-  PushJobSpec _pushJobSpec;
+  private PushJobSpec _pushJobSpec;
 
   public String getJobType() {
     return jobType;
   }
 
+  /**
+   * Supported job types are:
+   *    'SegmentCreation'
+   *    'SegmentTarPush'
+   *    'SegmentUriPush'
+   *    'SegmentCreationAndTarPush'
+   *    'SegmentCreationAndUriPush'
+   * @param jobType
+   */
   public void setJobType(String jobType) {
     this.jobType = jobType;
   }
@@ -117,6 +127,14 @@ public class SegmentGenerationJobSpec {
     return _includeFileNamePattern;
   }
 
+  /**
+   * include file name pattern, supported glob pattern.
+   * Sample usage:
+   *    'glob:*.avro' will include all avro files just under the inputDirURI, not sub directories;
+   *    'glob:**\/*.avro' will include all the avro files under inputDirURI recursively.
+   *
+   * @param includeFileNamePattern
+   */
   public void setIncludeFileNamePattern(String includeFileNamePattern) {
     _includeFileNamePattern = includeFileNamePattern;
   }
@@ -125,6 +143,14 @@ public class SegmentGenerationJobSpec {
     return _excludeFileNamePattern;
   }
 
+  /**
+   * exclude file name pattern, supported glob pattern.
+   * Sample usage:
+   *    'glob:*.avro' will exclude all avro files just under the inputDirURI, not sub directories;
+   *    'glob:**\/*.avro' will exclude all the avro files under inputDirURI recursively.
+   *
+   * @param excludeFileNamePattern
+   */
   public void setExcludeFileNamePattern(String excludeFileNamePattern) {
     _excludeFileNamePattern = excludeFileNamePattern;
   }
