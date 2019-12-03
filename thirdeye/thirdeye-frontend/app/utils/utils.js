@@ -194,7 +194,7 @@ export function replaceNonFiniteWithCurrent(series1, series2) {
     return stripNonFiniteValues(series1);
   }
   for (let i = 0; i < series1.length; i++) {
-    if (!isFinite(series1[i]) || !series1[i]) {
+    if (!isFinite(series1[i]) || (!series1[i] && (series1[i] !== 0))) {
       let newValue = null;
       if (i < series2.length) {
         newValue = isFinite(series2[i]) ? series2[i] : null;
