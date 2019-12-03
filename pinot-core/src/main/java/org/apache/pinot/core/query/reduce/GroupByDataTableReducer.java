@@ -42,6 +42,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
@@ -64,6 +65,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
   private final BrokerRequest _brokerRequest;
   private final AggregationFunction[] _aggregationFunctions;
   private final List<AggregationInfo> _aggregationInfos;
+  private final AggregationFunctionContext[] _aggregationFunctionContexts;
   private final List<SelectionSort> _orderBy;
   private final GroupBy _groupBy;
   private final int _numAggregationFunctions;
@@ -78,6 +80,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     _brokerRequest = brokerRequest;
     _aggregationFunctions = aggregationFunctions;
     _aggregationInfos = brokerRequest.getAggregationsInfo();
+    _aggregationFunctionContexts = AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest, null);
     _numAggregationFunctions = aggregationFunctions.length;
     _groupBy = brokerRequest.getGroupBy();
     _numGroupBy = _groupBy.getExpressionsSize();
@@ -187,9 +190,6 @@ public class GroupByDataTableReducer implements DataTableReducer {
       if (i < _numGroupBy) {
         finalColumnDataTypes[i] = dataSchema.getColumnDataType(i);
       } else {
-        _aggregationFunctions[aggIdx] =
-            AggregationFunctionUtils.getAggregationFunctionContext(_aggregationInfos.get(aggIdx))
-                .getAggregationFunction();
         finalColumnDataTypes[i] = _aggregationFunctions[aggIdx].getFinalResultColumnType();
         aggIdx++;
       }
@@ -445,7 +445,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
         if (aggregationFunctionsSelectStatus[i]) {
           finalColumnNames[count] = columnNames[i];
           finalOutResultMaps[count] = finalResultMaps[i];
-          finalResultTableAggNames[count] = AggregationFunctionUtils.getAggregationColumnName(_aggregationInfos.get(i));
+          finalResultTableAggNames[count] = _aggregationFunctionContexts[i].getResultColumnName();
           finalAggregationFunctions[count] = _aggregationFunctions[i];
           count++;
         }

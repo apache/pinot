@@ -32,6 +32,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
@@ -158,7 +159,9 @@ public class AggregationDataTableReducer implements DataTableReducer {
     String[] finalColumnNames = new String[_numAggregationFunctions];
     DataSchema.ColumnDataType[] finalColumnDataTypes = new DataSchema.ColumnDataType[_numAggregationFunctions];
     for (int i = 0; i < _numAggregationFunctions; i++) {
-      finalColumnNames[i] = AggregationFunctionUtils.getAggregationColumnName(_aggregationInfos.get(i));
+      AggregationFunctionContext aggregationFunctionContext =
+          AggregationFunctionUtils.getAggregationFunctionContext(_aggregationInfos.get(i));
+      finalColumnNames[i] = aggregationFunctionContext.getResultColumnName();
       finalColumnDataTypes[i] = _aggregationFunctions[i].getFinalResultColumnType();
     }
     return new DataSchema(finalColumnNames, finalColumnDataTypes);
