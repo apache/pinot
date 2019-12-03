@@ -23,7 +23,7 @@ centralizedCacheSettings:
         # if using certificate-based authentication, authUsername and authPassword values don't matter and won't be used
         authUsername: 'your_bucket_user_username'
         authPassword: 'your_bucket_user_password'
-        enableDnsSrv: true
+        enableDnsSrv: false
         # certificate based authentication is only available in Couchbase enterprise edition. 
         keyStoreFilePath: 'key/store/path/keystore_file' # e.g. '/var/identity.p12'
         # if your keystore has a password, enter it here. by default, Java uses 'work_around_jdk-6879539' to enable empty passwords for certificates.

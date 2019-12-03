@@ -49,7 +49,6 @@ public class CouchbaseCacheDAO implements CacheDAO {
 
   private static final String USE_CERT_BASED_AUTH = "useCertificateBasedAuthentication";
   private static final String HOSTS = "hosts";
-  private static final String BUCKET_NAME = "bucketName";
   private static final String AUTH_USERNAME = "authUsername";
   private static final String AUTH_PASSWORD = "authPassword";
   private static final String ENABLE_DNS_SRV = "enableDnsSrv";
