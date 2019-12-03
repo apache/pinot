@@ -21,6 +21,8 @@ package org.apache.pinot.core.data.readers;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import org.apache.pinot.avro.data.readers.AvroRecordReader;
+import org.apache.pinot.csv.data.readers.CSVRecordReader;
+import org.apache.pinot.csv.data.readers.CSVRecordReaderConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.data.readers.RecordReader;

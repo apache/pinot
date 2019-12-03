@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.avro.data.readers.AvroRecordReader;
+import org.apache.pinot.csv.data.readers.CSVRecordReader;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;

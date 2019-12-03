@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.readers;
+package org.apache.pinot.csv.data.readers;
 
 import java.io.File;
 import java.io.IOException;
