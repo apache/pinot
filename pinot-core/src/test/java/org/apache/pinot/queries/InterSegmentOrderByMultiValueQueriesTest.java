@@ -132,7 +132,7 @@ public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQuer
             new Object[]{"kCMyNVGCASKYDdQbftOPaqVMWc", 2.147483647E9}, new Object[]{"PbQd", 2.147483647E9},
             new Object[]{"OKyOqU", 2.147483647E9});
     dataSchema = new DataSchema(new String[]{"column5", "percentile90mv(column7)"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     numEntriesScannedPostFilter = 800000;
     data.add(new Object[]{query, results, numEntriesScannedPostFilter, dataSchema});
 
