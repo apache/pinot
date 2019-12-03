@@ -28,6 +28,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
@@ -122,20 +123,25 @@ public class QueriesTestUtils {
     }
   }
 
-  static void testInterSegmentGroupByOrderByResultSQL(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
+  static void testInterSegmentResultTable(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
       long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
-      List<Object[]> expectedResults) {
+      List<Object[]> expectedResults, int expectedResultsSize, DataSchema expectedDataSchema) {
     Assert.assertEquals(brokerResponse.getNumDocsScanned(), expectedNumDocsScanned);
     Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), expectedNumEntriesScannedInFilter);
     Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), expectedNumEntriesScannedPostFilter);
     Assert.assertEquals(brokerResponse.getTotalDocs(), expectedNumTotalDocs);
 
     ResultTable resultTable = brokerResponse.getResultTable();
+    DataSchema actualDataSchema = resultTable.getDataSchema();
     List<Object[]> actualResults = resultTable.getRows();
 
-    Assert.assertEquals(actualResults.size(), expectedResults.size());
+    Assert.assertEquals(actualResults.size(), expectedResultsSize);
+    Assert.assertEquals(actualDataSchema.size(), expectedDataSchema.size());
+    Assert.assertEquals(actualDataSchema.getColumnNames(), expectedDataSchema.getColumnNames());
+    // TODO : Add this back after PR 4863, which sets the right final column data types for aggregations
+    //Assert.assertEquals(actualDataSchema.getColumnDataTypes(), expectedDataSchema.getColumnDataTypes());
 
-    for (int i = 0; i < actualResults.size(); i++) {
+    for (int i = 0; i < expectedResults.size(); i++) {
       Assert.assertEquals(Arrays.asList(actualResults.get(i)), Arrays.asList(expectedResults.get(i)));
     }
   }

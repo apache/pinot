@@ -34,11 +34,6 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
   }
 
   @Override
-  public String getColumnName(String column) {
-    return AggregationFunctionType.DISTINCTCOUNTHLLMV.getName() + "_" + column;
-  }
-
-  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }

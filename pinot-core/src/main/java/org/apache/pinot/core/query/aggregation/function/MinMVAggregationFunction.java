@@ -32,11 +32,6 @@ public class MinMVAggregationFunction extends MinAggregationFunction {
   }
 
   @Override
-  public String getColumnName(String column) {
-    return AggregationFunctionType.MINMV.getName() + "_" + column;
-  }
-
-  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }

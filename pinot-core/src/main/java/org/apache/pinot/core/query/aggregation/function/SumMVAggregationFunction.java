@@ -32,11 +32,6 @@ public class SumMVAggregationFunction extends SumAggregationFunction {
   }
 
   @Override
-  public String getColumnName(String column) {
-    return AggregationFunctionType.SUMMV.getName() + "_" + column;
-  }
-
-  @Override
   public void accept(AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }

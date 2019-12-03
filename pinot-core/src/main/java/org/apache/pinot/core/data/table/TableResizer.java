@@ -58,14 +58,16 @@ public class TableResizer {
     int numKeyColumns = numColumns - numAggregations;
 
     Map<String, Integer> columnIndexMap = new HashMap<>();
+    Map<String, AggregationFunction> aggregationColumnToFunction = new HashMap<>();
     for (int i = 0; i < numColumns; i++) {
-      columnIndexMap.put(dataSchema.getColumnName(i), i);
-    }
-
-    Map<String, AggregationInfo> aggregationColumnToInfo = new HashMap<>();
-    for (AggregationInfo aggregationInfo : aggregationInfos) {
-      String aggregationColumn = AggregationFunctionUtils.getAggregationColumnName(aggregationInfo);
-      aggregationColumnToInfo.put(aggregationColumn, aggregationInfo);
+      String columnName = dataSchema.getColumnName(i);
+      columnIndexMap.put(columnName, i);
+      if (i >= numKeyColumns) {
+        AggregationInfo aggregationInfo = aggregationInfos.get(i - numKeyColumns);
+        AggregationFunction aggregationFunction =
+            AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction();
+        aggregationColumnToFunction.put(columnName, aggregationFunction);
+      }
     }
 
     _numOrderBy = orderBy.size();
@@ -82,9 +84,7 @@ public class TableResizer {
           if (index < numKeyColumns) {
             _orderByValueExtractors[orderByIdx] = new KeyColumnExtractor(index);
           } else {
-            AggregationInfo aggregationInfo = aggregationColumnToInfo.get(column);
-            AggregationFunction aggregationFunction =
-                AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationFunction();
+            AggregationFunction aggregationFunction = aggregationColumnToFunction.get(column);
             _orderByValueExtractors[orderByIdx] = new AggregationColumnExtractor(index, aggregationFunction);
           }
         } else {
