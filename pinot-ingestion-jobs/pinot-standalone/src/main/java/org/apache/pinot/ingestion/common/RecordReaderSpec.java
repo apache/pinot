@@ -21,14 +21,29 @@ package org.apache.pinot.ingestion.common;
 import java.util.Map;
 
 
+/**
+ * RecordReaderSpec defines how to initialize a RecordReader.
+ */
 public class RecordReaderSpec {
 
+  /**
+   * Record data format, e.g. 'avro', 'parquet', 'csv', etc.
+   */
   String _dataFormat;
 
+  /**
+   * Corresponding RecordReader class name
+   */
   String _className;
 
+  /**
+   * Corresponding RecordReaderConfig class name
+   */
   String _configClassName;
 
+  /**
+   * Used to init RecordReaderConfig class name, this config is required for Csv and Thrift data format.
+   */
   Map<String, String> _configs;
 
   public String getDataFormat() {

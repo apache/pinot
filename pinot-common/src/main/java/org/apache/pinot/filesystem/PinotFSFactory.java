@@ -50,7 +50,7 @@ public class PinotFSFactory {
       pinotFS.init(configuration);
       _fileSystemMap.put(scheme, pinotFS);
     } catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
-      LOGGER.error("Could not instantiate file system for class {}", fsClassName, e);
+      LOGGER.error("Could not instantiate file system for class {} with scheme {}", fsClassName, scheme, e);
       throw new RuntimeException(e);
     }
   }

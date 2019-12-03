@@ -22,10 +22,19 @@ import java.util.HashMap;
 import java.util.Map;
 
 
+/**
+ * SegmentNameGeneratorSpec defines how to init a SegmentNameGenerator.
+ */
 public class SegmentNameGeneratorSpec {
 
+  /**
+   * Current supported type is 'simple' and 'normalizedDate'.
+   */
   String _type = null;
 
+  /**
+   * Configs to init SegmentNameGenerator.
+   */
   Map<String, String> _configs = new HashMap<>();
 
   public String getType() {

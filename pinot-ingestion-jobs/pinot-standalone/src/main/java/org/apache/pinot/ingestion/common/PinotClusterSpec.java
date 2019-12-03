@@ -18,24 +18,21 @@
  */
 package org.apache.pinot.ingestion.common;
 
+/**
+ * PinotClusterSpec defines the Pinot Cluster Access Point.
+ */
 public class PinotClusterSpec {
 
-  String _host;
-  int _port;
+  /**
+   * Controller URI is used to fetch table/schema information and data push.
+   */
+  String _controllerURI;
 
-  public String getHost() {
-    return _host;
+  public String getControllerURI() {
+    return _controllerURI;
   }
 
-  public void setHost(String host) {
-    _host = host;
-  }
-
-  public int getPort() {
-    return _port;
-  }
-
-  public void setPort(int port) {
-    _port = port;
+  public void setControllerURI(String controllerURI) {
+    _controllerURI = controllerURI;
   }
 }

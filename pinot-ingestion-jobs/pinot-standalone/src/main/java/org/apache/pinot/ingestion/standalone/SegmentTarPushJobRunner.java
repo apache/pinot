@@ -18,19 +18,25 @@
  */
 package org.apache.pinot.ingestion.standalone;
 
+import com.google.common.base.Preconditions;
+import java.io.File;
+import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.MapConfiguration;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.retry.AttemptsExceededException;
+import org.apache.pinot.common.utils.retry.RetriableOperationException;
+import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.apache.pinot.filesystem.PinotFSFactory;
-import org.apache.pinot.ingestion.common.ControllerRestApi;
-import org.apache.pinot.ingestion.common.DefaultControllerRestApi;
-import org.apache.pinot.ingestion.common.JobConfigConstants;
+import org.apache.pinot.ingestion.common.Constants;
 import org.apache.pinot.ingestion.common.PinotClusterSpec;
 import org.apache.pinot.ingestion.common.PinotFSSpec;
 import org.apache.pinot.ingestion.common.SegmentGenerationJobSpec;
-import org.apache.pinot.ingestion.utils.PushLocation;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,19 +71,48 @@ public class SegmentTarPushJobRunner {
 
     List<String> segmentsToPush = new ArrayList<>();
     for (String file : files) {
-      if (file.endsWith(JobConfigConstants.TAR_GZ_FILE_EXT)) {
+      if (file.endsWith(Constants.TAR_GZ_FILE_EXT)) {
         segmentsToPush.add(file);
       }
     }
-    ControllerRestApi controllerRestApi = getControllerRestApi();
-    controllerRestApi.pushSegments(outputDirFS, segmentsToPush);
+    pushSegments(outputDirFS, segmentsToPush);
   }
 
-  protected ControllerRestApi getControllerRestApi() {
-    List<PushLocation> pushLocations = new ArrayList<>();
-    for (PinotClusterSpec pinotClusterSpec : _spec.getPinotClusterSpecs()) {
-      pushLocations.add(new PushLocation(pinotClusterSpec.getHost(), pinotClusterSpec.getPort()));
+  public void pushSegments(PinotFS fileSystem, List<String> tarFilePaths)
+      throws RetriableOperationException, AttemptsExceededException {
+    LOGGER.info("Start pushing segments: {} to locations: {}", tarFilePaths,
+        Arrays.toString(_spec.getPinotClusterSpecs()));
+    FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient();
+    for (String tarFilePath : tarFilePaths) {
+      URI tarFileURI = URI.create(tarFilePath);
+      File tarFile = new File(tarFilePath);
+      String fileName = tarFile.getName();
+      Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
+      String segmentName = fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length());
+      for (PinotClusterSpec pinotClusterSpec : _spec.getPinotClusterSpecs()) {
+        LOGGER.info("Pushing segment: {} to location: {}", segmentName, pinotClusterSpec.getControllerURI());
+        int retryCount = 1;
+        if (_spec.getPushJobSpec() != null && _spec.getPushJobSpec().getRetryCount() > 0) {
+          _spec.getPushJobSpec().getRetryCount();
+        }
+        long retryWaitMs = 1000L;
+        if (_spec.getPushJobSpec() != null && _spec.getPushJobSpec().getRetryWaitMs() > 0) {
+          retryWaitMs = _spec.getPushJobSpec().getRetryWaitMs();
+        }
+        RetryPolicies.exponentialBackoffRetryPolicy(retryCount, retryWaitMs, 5).attempt(() -> {
+          try (InputStream inputStream = fileSystem.open(tarFileURI)) {
+            SimpleHttpResponse response = fileUploadDownloadClient
+                .uploadSegment(URI.create(pinotClusterSpec.getControllerURI()), segmentName, inputStream,
+                    _spec.getTableSpec().getTableName());
+            LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
+            return true;
+          } catch (Exception e) {
+            LOGGER.error("Caught exception while pushing segment: {} to location: {}", segmentName,
+                pinotClusterSpec.getControllerURI(), e);
+            return false;
+          }
+        });
+      }
     }
-    return new DefaultControllerRestApi(pushLocations, _spec.getTableSpec().getTableName());
   }
 }

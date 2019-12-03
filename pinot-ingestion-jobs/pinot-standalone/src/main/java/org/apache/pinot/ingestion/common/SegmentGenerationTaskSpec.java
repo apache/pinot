@@ -22,20 +22,45 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
+/**
+ * SegmentGenerationTaskSpec defines all the required information in order to generate Pinot Segment.
+ * Note that this task creates a segment directory, not tar file.
+ */
 public class SegmentGenerationTaskSpec {
 
+  /**
+   * Table config to create segment
+   */
   TableConfig _tableConfig;
 
+  /**
+   * Table schema
+   */
   Schema _schema;
 
+  /**
+   * Used to init record reader to read from data file
+   */
   RecordReaderSpec _recordReaderSpec;
 
+  /**
+   * Used to generate segment name
+   */
   SegmentNameGeneratorSpec _segmentNameGeneratorSpec;
 
+  /**
+   * Data file path
+   */
   String _inputFilePath;
 
+  /**
+   * Output segment directory to host all data files
+   */
   String _outputDirectoryPath;
 
+  /**
+   * sequence id
+   */
   int _sequenceId;
 
   public TableConfig getTableConfig() {

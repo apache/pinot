@@ -24,7 +24,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.filesystem.PinotFS;
 
 
 public interface ControllerRestApi extends Closeable {
@@ -34,8 +33,6 @@ public interface ControllerRestApi extends Closeable {
   Schema getSchema();
 
   void pushSegments(FileSystem fileSystem, List<Path> tarFilePaths);
-
-  void pushSegments(PinotFS fileSystem, List<String> tarFilePaths);
 
   void sendSegmentUris(List<String> segmentUris);
 

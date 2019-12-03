@@ -21,10 +21,8 @@ package org.apache.pinot.ingestion.common;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.fs.FileSystem;
@@ -34,7 +32,6 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.ingestion.utils.PushLocation;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,11 +39,13 @@ import org.slf4j.LoggerFactory;
 
 public class DefaultControllerRestApi implements ControllerRestApi {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultControllerRestApi.class);
-  private static final String OFFLINE = "OFFLINE";
+
   private final List<PushLocation> _pushLocations;
   private final String _rawTableName;
   private final FileUploadDownloadClient _fileUploadDownloadClient = new FileUploadDownloadClient();
   private final int _retry;
+
+  private static final String OFFLINE = "OFFLINE";
 
   public DefaultControllerRestApi(List<PushLocation> pushLocations, String rawTableName) {
     this(pushLocations, rawTableName, 0);
@@ -122,47 +121,7 @@ public class DefaultControllerRestApi implements ControllerRestApi {
             LOGGER.error("Caught exception while pushing segment: {} to location: {}, retry {}/{}", segmentName,
                 pushLocation, retry, _retry, e);
             if (retry == _retry) {
-              throw new RuntimeException(
-                  String.format("Failed to push segment %s to %s with %d retries", segmentName, pushLocation, retry),
-                  e);
-            }
-            try {
-              // Exponential back-off, max sleep time is 64 seconds.
-              Thread.sleep(1000 * (int) Math.pow(2, Math.min(retry + 1, 6)));
-            } catch (InterruptedException ex) {
-              // Swallow
-            }
-          }
-        }
-      }
-    }
-  }
-
-  @Override
-  public void pushSegments(PinotFS fileSystem, List<String> tarFilePaths) {
-    LOGGER.info("Start pushing segments: {} to locations: {}", tarFilePaths, _pushLocations);
-    for (String tarFilePath : tarFilePaths) {
-      URI tarFileURI = URI.create(tarFilePath);
-      File tarFile = new File(tarFilePath);
-      String fileName = tarFile.getName();
-      Preconditions.checkArgument(fileName.endsWith(JobConfigConstants.TAR_GZ_FILE_EXT));
-      String segmentName = fileName.substring(0, fileName.length() - JobConfigConstants.TAR_GZ_FILE_EXT.length());
-      for (PushLocation pushLocation : _pushLocations) {
-        LOGGER.info("Pushing segment: {} to location: {}", segmentName, pushLocation);
-        for (int retry = 0; retry <= _retry; retry++) {
-          try (InputStream inputStream = fileSystem.open(tarFileURI)) {
-            SimpleHttpResponse response = _fileUploadDownloadClient.uploadSegment(
-                FileUploadDownloadClient.getUploadSegmentHttpURI(pushLocation.getHost(), pushLocation.getPort()),
-                segmentName, inputStream, _rawTableName);
-            LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
-            break;
-          } catch (Exception e) {
-            LOGGER.error("Caught exception while pushing segment: {} to location: {}, retry {}/{}", segmentName,
-                pushLocation, retry, _retry, e);
-            if (retry == _retry) {
-              throw new RuntimeException(
-                  String.format("Failed to push segment %s to %s with %d retries", segmentName, pushLocation, retry),
-                  e);
+              throw new RuntimeException(String.format("Failed to push segment %s to %s with %d retries",segmentName, pushLocation, retry), e);
             }
             try {
               // Exponential back-off, max sleep time is 64 seconds.
