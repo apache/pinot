@@ -29,9 +29,9 @@
     <version>0.3.0-SNAPSHOT</version>
   </parent>
 
-  <artifactId>pinot-ingestion-jobs</artifactId>
+  <artifactId>pinot-batch-ingestion</artifactId>
   <packaging>pom</packaging>
-  <name>Pinot Ingestion Jobs</name>
+  <name>Pinot Batch Ingestion</name>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
