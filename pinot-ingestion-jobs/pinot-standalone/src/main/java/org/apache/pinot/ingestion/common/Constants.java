@@ -18,23 +18,6 @@
  */
 package org.apache.pinot.ingestion.common;
 
-public class UriPushJobSpec {
-  String _segmentUriPrefix;
-  String _segmentUriSuffix;
-
-  public String getSegmentUriPrefix() {
-    return _segmentUriPrefix;
-  }
-
-  public void setSegmentUriPrefix(String segmentUriPrefix) {
-    _segmentUriPrefix = segmentUriPrefix;
-  }
-
-  public String getSegmentUriSuffix() {
-    return _segmentUriSuffix;
-  }
-
-  public void setSegmentUriSuffix(String segmentUriSuffix) {
-    _segmentUriSuffix = segmentUriSuffix;
-  }
+public class Constants {
+  public static final String TAR_GZ_FILE_EXT = ".tar.gz";
 }

@@ -23,7 +23,6 @@ import java.io.FileReader;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.util.Arrays;
-import org.apache.pinot.ingestion.common.PinotIngestionJobType;
 import org.apache.pinot.ingestion.common.SegmentGenerationJobSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,5 +78,9 @@ public class StandaloneIngestionJobLauncher {
           throw new RuntimeException("Unsupported job type - " + spec.getJobType());
       }
     }
+  }
+
+  enum PinotIngestionJobType {
+    SegmentCreation, SegmentTarPush, SegmentUriPush, SegmentCreationAndTarPush, SegmentCreationAndUriPush,
   }
 }

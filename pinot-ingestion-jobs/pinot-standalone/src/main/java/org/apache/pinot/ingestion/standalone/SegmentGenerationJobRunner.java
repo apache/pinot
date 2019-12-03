@@ -38,7 +38,7 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.DataSize;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.filesystem.PinotFSFactory;
-import org.apache.pinot.ingestion.common.JobConfigConstants;
+import org.apache.pinot.ingestion.common.Constants;
 import org.apache.pinot.ingestion.common.PinotClusterSpec;
 import org.apache.pinot.ingestion.common.PinotFSSpec;
 import org.apache.pinot.ingestion.common.SegmentGenerationJobSpec;
@@ -80,8 +80,7 @@ public class SegmentGenerationJobRunner {
       }
       PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
       String schemaURI = String
-          .format("http://%s:%d/tables/%s/schema", pinotClusterSpec.getHost(), pinotClusterSpec.getPort(),
-              _spec.getTableSpec().getTableName());
+          .format("%s/tables/%s/schema", pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setSchemaURI(schemaURI);
     }
     if (_spec.getTableSpec().getTableConfigURI() == null) {
@@ -89,9 +88,8 @@ public class SegmentGenerationJobRunner {
         throw new RuntimeException("Missing property 'tableConfigURI' in 'tableSpec'");
       }
       PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
-      String tableConfigURI = String
-          .format("http://%s:%d/tables/%s", pinotClusterSpec.getHost(), pinotClusterSpec.getPort(),
-              _spec.getTableSpec().getTableName());
+      String tableConfigURI =
+          String.format("%s/tables/%s", pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setTableConfigURI(tableConfigURI);
     }
   }
@@ -203,7 +201,7 @@ public class SegmentGenerationJobRunner {
 
         // Tar segment directory to compress file
         File localSegmentDir = new File(localOutputTempDir, segmentName);
-        String segmentTarFileName = segmentName + JobConfigConstants.TAR_GZ_FILE_EXT;
+        String segmentTarFileName = segmentName + Constants.TAR_GZ_FILE_EXT;
         File localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
         LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
         TarGzCompressionUtils.createTarGzOfDirectory(localSegmentDir.getPath(), localSegmentTarFile.getPath());

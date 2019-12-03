@@ -21,31 +21,81 @@ package org.apache.pinot.ingestion.common;
 import java.util.List;
 
 
+/**
+ * SegmentGenerationJobSpec defines all the required information in order to kick off a Pinot data ingestion job.
+ *
+ */
 public class SegmentGenerationJobSpec {
 
+  /**
+   * Supported job types are:
+   *  'SegmentCreation'
+   *  'SegmentTarPush'
+   *  'SegmentUriPush'
+   *  'SegmentCreationAndTarPush'
+   *  'SegmentCreationAndUriPush'
+   */
   String jobType;
 
+  /**
+   * Root directory of input data, expected to have scheme configured in PinotFS.
+   */
   String _inputDirURI;
 
+  /**
+   * include file name pattern, supported glob pattern.
+   *    'glob:*.avro' will include all avro files just under the inputDirURI, not sub directories;
+   *    'glob:**\/*.avro' will include all the avro files under inputDirURI recursively.
+   */
   String _includeFileNamePattern;
 
+  /**
+   * exclude file name pattern, supported glob pattern.
+   * Sample usage:
+   *    'glob:*.avro' will exclude all avro files just under the inputDirURI, not sub directories;
+   *    'glob:**\/*.avro' will exclude all the avro files under inputDirURI recursively.
+   */
   String _excludeFileNamePattern;
 
+  /**
+   * Root directory of output data, expected to have scheme configured in PinotFS.
+   */
   String _outputDirURI;
 
+  /**
+   * Should orverwrite output segments if existed.
+   */
   boolean _overwriteOutput;
 
+  /**
+   * All Pinot FS related specs
+   */
   List<PinotFSSpec> _pinotFSSpecs;
 
+  /**
+   * Pinot Table Spec
+   */
   TableSpec _tableSpec;
 
+  /**
+   * Data file RecordReader related spec
+   */
   RecordReaderSpec _recordReaderSpec;
 
+  /**
+   * SegmentNameGenerator related spec
+   */
   SegmentNameGeneratorSpec _segmentNameGeneratorSpec;
 
+  /**
+   * Pinot Cluster related specs
+   */
   PinotClusterSpec[] _pinotClusterSpecs;
 
-  UriPushJobSpec _uriPushJobSpec;
+  /**
+   * Segment Push job related spec
+   */
+  PushJobSpec _pushJobSpec;
 
   public String getJobType() {
     return jobType;
@@ -135,12 +185,12 @@ public class SegmentGenerationJobSpec {
     _segmentNameGeneratorSpec = segmentNameGeneratorSpec;
   }
 
-  public UriPushJobSpec getUriPushJobSpec() {
-    return _uriPushJobSpec;
+  public PushJobSpec getPushJobSpec() {
+    return _pushJobSpec;
   }
 
-  public void setUriPushJobSpec(UriPushJobSpec uriPushJobSpec) {
-    _uriPushJobSpec = uriPushJobSpec;
+  public void setPushJobSpec(PushJobSpec pushJobSpec) {
+    _pushJobSpec = pushJobSpec;
   }
 }
 

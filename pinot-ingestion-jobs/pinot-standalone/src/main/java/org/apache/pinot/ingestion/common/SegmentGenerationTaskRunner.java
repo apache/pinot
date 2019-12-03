@@ -40,10 +40,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 public class SegmentGenerationTaskRunner {
 
-  public static final String SEGMENT_NAME_GENERATOR_TYPE = "segment.name.generator.type";
   public static final String SIMPLE_SEGMENT_NAME_GENERATOR = "simple";
   public static final String NORMALIZED_DATE_SEGMENT_NAME_GENERATOR = "normalizedDate";
-  public static final String DEFAULT_SEGMENT_NAME_GENERATOR = SIMPLE_SEGMENT_NAME_GENERATOR;
 
   // For SimpleSegmentNameGenerator
   public static final String SEGMENT_NAME_POSTFIX = "segment.name.postfix";
@@ -60,7 +58,6 @@ public class SegmentGenerationTaskRunner {
 
   public String run()
       throws Exception {
-
     String tableName = _taskSpec.getTableConfig().getTableName();
     TableConfig tableConfig = _taskSpec._tableConfig;
     Schema schema = _taskSpec.getSchema();
@@ -85,39 +82,7 @@ public class SegmentGenerationTaskRunner {
     recordReader.init(new File(_taskSpec.getInputFilePath()), schema, recordReaderConfig);
 
     //init segmentName Generator
-    SegmentNameGeneratorSpec segmentNameGeneratorSpec = _taskSpec.getSegmentNameGeneratorSpec();
-    if (segmentNameGeneratorSpec == null) {
-      segmentNameGeneratorSpec = new SegmentNameGeneratorSpec();
-    }
-    String segmentNameGeneratorType = segmentNameGeneratorSpec.getType();
-    if (segmentNameGeneratorType == null) {
-      segmentNameGeneratorType = SIMPLE_SEGMENT_NAME_GENERATOR;
-    }
-    Map<String, String> segmentNameGeneratorConfigs = segmentNameGeneratorSpec.getConfigs();
-    SegmentNameGenerator segmentNameGenerator;
-    switch (segmentNameGeneratorType) {
-      case SIMPLE_SEGMENT_NAME_GENERATOR:
-        segmentNameGenerator =
-            new SimpleSegmentNameGenerator(tableName, segmentNameGeneratorConfigs.get(SEGMENT_NAME_POSTFIX));
-        break;
-      case NORMALIZED_DATE_SEGMENT_NAME_GENERATOR:
-        Preconditions.checkState(tableConfig != null,
-            "In order to use NormalizedDateSegmentNameGenerator, table config must be provided");
-        SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-        String timeFormat = null;
-        TimeFieldSpec timeFieldSpec = schema.getTimeFieldSpec();
-        if (timeFieldSpec != null) {
-          timeFormat = timeFieldSpec.getOutgoingGranularitySpec().getTimeFormat();
-        }
-        segmentNameGenerator =
-            new NormalizedDateSegmentNameGenerator(tableName, segmentNameGeneratorConfigs.get(SEGMENT_NAME_PREFIX),
-                Boolean.valueOf(segmentNameGeneratorConfigs.get(EXCLUDE_SEQUENCE_ID)),
-                validationConfig.getSegmentPushType(), validationConfig.getSegmentPushFrequency(),
-                validationConfig.getTimeType(), timeFormat);
-        break;
-      default:
-        throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
-    }
+    SegmentNameGenerator segmentNameGenerator = getSegmentNameGerator();
 
     //init segment generation config
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
@@ -131,5 +96,39 @@ public class SegmentGenerationTaskRunner {
     segmentIndexCreationDriver.init(segmentGeneratorConfig, recordReader);
     segmentIndexCreationDriver.build();
     return segmentIndexCreationDriver.getSegmentName();
+  }
+
+  private SegmentNameGenerator getSegmentNameGerator() {
+    String tableName = _taskSpec.getTableConfig().getTableName();
+    TableConfig tableConfig = _taskSpec._tableConfig;
+    Schema schema = _taskSpec.getSchema();
+    SegmentNameGeneratorSpec segmentNameGeneratorSpec = _taskSpec.getSegmentNameGeneratorSpec();
+    if (segmentNameGeneratorSpec == null) {
+      segmentNameGeneratorSpec = new SegmentNameGeneratorSpec();
+    }
+    String segmentNameGeneratorType = segmentNameGeneratorSpec.getType();
+    if (segmentNameGeneratorType == null) {
+      segmentNameGeneratorType = SIMPLE_SEGMENT_NAME_GENERATOR;
+    }
+    Map<String, String> segmentNameGeneratorConfigs = segmentNameGeneratorSpec.getConfigs();
+    switch (segmentNameGeneratorType) {
+      case SIMPLE_SEGMENT_NAME_GENERATOR:
+        return new SimpleSegmentNameGenerator(tableName, segmentNameGeneratorConfigs.get(SEGMENT_NAME_POSTFIX));
+      case NORMALIZED_DATE_SEGMENT_NAME_GENERATOR:
+        Preconditions.checkState(tableConfig != null,
+            "In order to use NormalizedDateSegmentNameGenerator, table config must be provided");
+        SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+        String timeFormat = null;
+        TimeFieldSpec timeFieldSpec = schema.getTimeFieldSpec();
+        if (timeFieldSpec != null) {
+          timeFormat = timeFieldSpec.getOutgoingGranularitySpec().getTimeFormat();
+        }
+        return new NormalizedDateSegmentNameGenerator(tableName, segmentNameGeneratorConfigs.get(SEGMENT_NAME_PREFIX),
+            Boolean.valueOf(segmentNameGeneratorConfigs.get(EXCLUDE_SEQUENCE_ID)),
+            validationConfig.getSegmentPushType(), validationConfig.getSegmentPushFrequency(),
+            validationConfig.getTimeType(), timeFormat);
+      default:
+        throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
+    }
   }
 }

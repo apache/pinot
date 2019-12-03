@@ -34,8 +34,7 @@ tableSpec:
   schemaURI: 'http://localhost:9000/tables/myTable/schema'
   tableConfigURI: 'http://localhost:9000/tables/myTable'
 pinotClusterSpecs:
-  - host: 'localhost'
-    port: 9000
+  - controllerURI: 'localhost:9000'
 uriPushJobSpec:
   segmentUriPrefix: 'file://'
   segmentUriSuffix: ''

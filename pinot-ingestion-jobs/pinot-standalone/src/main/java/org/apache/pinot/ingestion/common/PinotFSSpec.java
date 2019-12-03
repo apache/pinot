@@ -21,12 +21,25 @@ package org.apache.pinot.ingestion.common;
 import java.util.Map;
 
 
+/**
+ * PinotFSSpec defines how to initialize a PinotFS for given scheme.
+ *
+ */
 public class PinotFSSpec {
 
+  /**
+   * Scheme used to identify a PinotFS.
+   */
   String _scheme;
 
+  /**
+   * Class name used to create the PinotFS instance.
+   */
   String _className;
 
+  /**
+   * Configs used to init the PinotFS instances.
+   */
   Map<String, String> _configs;
 
   public String getScheme() {
