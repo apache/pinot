@@ -237,8 +237,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       // Delete segment temporary directory
       FileUtils.deleteDirectory(segmentTempDir);
     } finally {
-      LoaderUtils.reloadFailureRecovery(indexDir);
-      segmentLock.unlock();
+      try {
+        LoaderUtils.reloadFailureRecovery(indexDir);
+      } catch (Exception e) {
+        LOGGER.error("Failed to recover after reload failure, error: ", e);
+      } finally {
+        segmentLock.unlock();
+      }
     }
   }
 
