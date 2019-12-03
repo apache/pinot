@@ -86,12 +86,6 @@ pinot-common
 * ``response``: Definitions of response format returned by the Broker.
 * ``filesystem``: provides abstractions for working with ``segments`` on local or remote filesystems. This module allows for users to plugin filesystems specific to their usecase. Extensions to the base ``PinotFS`` should ideally be housed in their specific modules so as not pull in unnecessary dependencies for all users.
 
-
-pinot-transport
-^^^^^^^^^^^^^^^
-``pinot-transport`` module provides classes required to handle scatter-gather on Pinot Broker and netty wrapper classes
-used by Server to handle connections from Broker.
-
 pinot-core
 ^^^^^^^^^^
 ``pinot-core`` modules provides the core functionality of Pinot, specifically for handling segments, various index

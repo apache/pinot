@@ -24,7 +24,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
-import org.apache.pinot.broker.requesthandler.ConnectionPoolBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
 import org.apache.pinot.broker.routing.RoutingTable;
 import org.apache.pinot.broker.routing.TimeBoundaryService;
@@ -50,7 +49,6 @@ public class BrokerServerBuilder {
   private final long _delayedShutdownTimeMs;
   private final RoutingTable _routingTable;
   private final TimeBoundaryService _timeBoundaryService;
-  private final QueryQuotaManager _queryQuotaManager;
   private final AccessControlFactory _accessControlFactory;
   private final MetricsRegistry _metricsRegistry;
   private final BrokerMetrics _brokerMetrics;
@@ -64,31 +62,19 @@ public class BrokerServerBuilder {
         config.getLong(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, Broker.DEFAULT_DELAY_SHUTDOWN_TIME_MS);
     _routingTable = routingTable;
     _timeBoundaryService = timeBoundaryService;
-    _queryQuotaManager = queryQuotaManager;
     _accessControlFactory = AccessControlFactory.loadFactory(_config.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX));
     _metricsRegistry = new MetricsRegistry();
     MetricsHelper.initializeMetrics(config.subset(Broker.METRICS_CONFIG_PREFIX));
     MetricsHelper.registerMetricsRegistry(_metricsRegistry);
     _brokerMetrics =
-        new BrokerMetrics(config.getString(Broker.CONFIG_OF_METRICS_NAME_PREFIX, Broker.DEFAULT_METRICS_NAME_PREFIX), _metricsRegistry,
+        new BrokerMetrics(config.getString(Broker.CONFIG_OF_METRICS_NAME_PREFIX, Broker.DEFAULT_METRICS_NAME_PREFIX),
+            _metricsRegistry,
             !_config.getBoolean(Broker.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS, !Broker.DEFAULT_METRICS_GLOBAL_ENABLED));
     _brokerMetrics.initializeGlobalMeters();
-    _brokerRequestHandler = buildRequestHandler();
+    _brokerRequestHandler =
+        new SingleConnectionBrokerRequestHandler(_config, _routingTable, _timeBoundaryService, _accessControlFactory,
+            queryQuotaManager, _brokerMetrics);
     _brokerAdminApplication = new BrokerAdminApiApplication(this);
-  }
-
-  private BrokerRequestHandler buildRequestHandler() {
-    String requestHandlerType =
-        _config.getString(Broker.CONFIG_OF_REQUEST_HANDLER_TYPE, Broker.DEFAULT_REQUEST_HANDLER_TYPE);
-    if (requestHandlerType.equalsIgnoreCase(Broker.CONNECTION_POOL_REQUEST_HANDLER_TYPE)) {
-      LOGGER.info("Using ConnectionPoolBrokerRequestHandler");
-      return new ConnectionPoolBrokerRequestHandler(_config, _routingTable, _timeBoundaryService, _accessControlFactory,
-          _queryQuotaManager, _brokerMetrics, _metricsRegistry);
-    } else {
-      LOGGER.info("Using SingleConnectionBrokerRequestHandler");
-      return new SingleConnectionBrokerRequestHandler(_config, _routingTable, _timeBoundaryService,
-          _accessControlFactory, _queryQuotaManager, _brokerMetrics);
-    }
   }
 
   public void start() {
