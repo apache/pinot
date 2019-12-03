@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.PriorityQueue;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
@@ -178,5 +179,32 @@ public class SelectionOperatorService {
     }
 
     return new SelectionResults(_selectionColumns, rowsInSelectionResults);
+  }
+
+  /**
+   * Render the selection rows to a {@link ResultTable} object for selection queries with
+   * <code>ORDER BY</code>. (Broker side)
+   * <p>{@link ResultTable} object will be used to build the broker response.
+   * <p>Should be called after method "reduceWithOrdering()".
+   *
+   * @return {@link SelectionResults} object results.
+   */
+  public ResultTable renderResultTableWithOrdering() {
+    LinkedList<Object[]> rowsInSelectionResults = new LinkedList<>();
+    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(_selectionColumns, _dataSchema);
+    int numColumns = columnIndices.length;
+
+    while (_rows.size() > _offset) {
+      Serializable[] row = _rows.poll();
+      Object[] extractedRow = new Object[numColumns];
+      for (int i = 0; i < numColumns; i++) {
+        extractedRow[i] = row[columnIndices[i]];
+      }
+      rowsInSelectionResults.addFirst(extractedRow);
+    }
+
+    // final data schema in ResultTable should be created based on order in _selectionColumns
+    DataSchema finalDataSchema = SelectionOperatorUtils.getResultTableDataSchema(_dataSchema, _selectionColumns);
+    return new ResultTable(finalDataSchema, rowsInSelectionResults);
   }
 }

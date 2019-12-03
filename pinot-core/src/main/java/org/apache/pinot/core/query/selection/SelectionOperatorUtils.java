@@ -34,6 +34,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.common.utils.DataSchema;
@@ -181,6 +182,25 @@ public class SelectionOperatorUtils {
     } else {
       return selectionColumns;
     }
+  }
+
+  /**
+   * Constructs the final selection DataSchema based on the order of selection columns (data schema can have a different order, depending on order by clause)
+   * @param dataSchema data schema used for execution and ordering
+   * @param selectionColumns the selection order
+   * @return data schema for final results
+   */
+  public static DataSchema getResultTableDataSchema(DataSchema dataSchema, List<String> selectionColumns) {
+    int numColumns = selectionColumns.size();
+    Map<String, DataSchema.ColumnDataType> columnNameToDataType = new HashMap<>();
+    DataSchema.ColumnDataType[] finalColumnDataTypes = new DataSchema.ColumnDataType[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      columnNameToDataType.put(dataSchema.getColumnName(i), dataSchema.getColumnDataType(i));
+    }
+    for (int i = 0; i < numColumns; i++) {
+      finalColumnDataTypes[i] = columnNameToDataType.get(selectionColumns.get(i));
+    }
+    return new DataSchema(selectionColumns.toArray(new String[0]), finalColumnDataTypes);
   }
 
   /**
@@ -411,6 +431,22 @@ public class SelectionOperatorUtils {
       }
     }
     return new SelectionResults(selectionColumns, rows);
+  }
+
+  /**
+   * Render the selection rows to a formatted {@link ResultTable} object for selection queries without
+   * <code>ORDER BY</code>. (Broker side)
+   * <p>{@link ResultTable} object will be used to build the broker response.
+   * <p>Should be called after method "reduceWithoutOrdering()".
+   *
+   * @param rows unformatted selection rows.
+   * @param dataSchema data schema.
+   * @return {@link ResultTable} object results.
+   */
+  public static ResultTable renderResultTableWithoutOrdering(List<Serializable[]> rows, DataSchema dataSchema) {
+    List<Object[]> resultRows = new ArrayList<>(rows.size());
+    resultRows.addAll(rows);
+    return new ResultTable(dataSchema, resultRows);
   }
 
   /**

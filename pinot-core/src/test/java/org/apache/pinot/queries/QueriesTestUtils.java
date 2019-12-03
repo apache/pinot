@@ -27,7 +27,6 @@ import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
@@ -138,8 +137,7 @@ public class QueriesTestUtils {
     Assert.assertEquals(actualResults.size(), expectedResultsSize);
     Assert.assertEquals(actualDataSchema.size(), expectedDataSchema.size());
     Assert.assertEquals(actualDataSchema.getColumnNames(), expectedDataSchema.getColumnNames());
-    // TODO : Add this back after PR 4863, which sets the right final column data types for aggregations
-    //Assert.assertEquals(actualDataSchema.getColumnDataTypes(), expectedDataSchema.getColumnDataTypes());
+    Assert.assertEquals(actualDataSchema.getColumnDataTypes(), expectedDataSchema.getColumnDataTypes());
 
     for (int i = 0; i < expectedResults.size(); i++) {
       Assert.assertEquals(Arrays.asList(actualResults.get(i)), Arrays.asList(expectedResults.get(i)));
