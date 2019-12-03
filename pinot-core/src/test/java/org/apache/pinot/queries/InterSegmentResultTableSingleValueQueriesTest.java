@@ -855,7 +855,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Assert.assertEquals(resultTable.getDataSchema().size(), 1);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), new String[]{"column1"});
     Assert.assertEquals(resultTable.getDataSchema().getColumnDataTypes(),
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
     Assert.assertEquals(resultTable.getRows().size(), 6582);
 
     query = "SELECT DISTINCT(column1, column3) FROM testTable LIMIT 1000000";
@@ -864,7 +864,16 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Assert.assertEquals(resultTable.getDataSchema().size(), 2);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), new String[]{"column1", "column3"});
     Assert.assertEquals(resultTable.getDataSchema().getColumnDataTypes(),
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
+    Assert.assertEquals(resultTable.getRows().size(), 21968);
+
+    query = "SELECT DISTINCT(column1, column5, column3) FROM testTable LIMIT 1000000";
+    brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    resultTable = brokerResponse.getResultTable();
+    Assert.assertEquals(resultTable.getDataSchema().size(), 3);
+    Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), new String[]{"column1", "column5", "column3"});
+    Assert.assertEquals(resultTable.getDataSchema().getColumnDataTypes(),
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
     Assert.assertEquals(resultTable.getRows().size(), 21968);
   }
 

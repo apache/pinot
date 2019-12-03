@@ -71,7 +71,9 @@ public class DistinctDataTableReducer implements DataTableReducer {
 
     if (dataTableMap.isEmpty()) {
       if (_responseFormatSql) {
-        DataSchema finalDataSchema = getResultTableDataSchema();
+        // TODO: This returns schema with all STRING data types.
+        //  There's no way currently to get the data types of the distinct columns for empty results
+        DataSchema finalDataSchema = getEmptyResultTableDataSchema();
         brokerResponseNative.setResultTable(new ResultTable(finalDataSchema, Collections.emptyList()));
       } else {
         brokerResponseNative
@@ -150,8 +152,7 @@ public class DistinctDataTableReducer implements DataTableReducer {
       Record record = iterator.next();
       resultSet.add(record.getValues());
     }
-    DataSchema finalDataSchema = getResultTableDataSchema();
-    return new ResultTable(finalDataSchema, resultSet);
+    return new ResultTable(distinctTable.getDataSchema(), resultSet);
   }
 
   private String[] getDistinctColumns() {
@@ -160,10 +161,9 @@ public class DistinctDataTableReducer implements DataTableReducer {
         .split(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR);
   }
 
-  private DataSchema getResultTableDataSchema() {
+  private DataSchema getEmptyResultTableDataSchema() {
     String[] columns = getDistinctColumns();
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[columns.length];
-    // TODO: there's no way currently to get the data types of the distinct columns
     Arrays.fill(columnDataTypes, DataSchema.ColumnDataType.STRING);
     return new DataSchema(columns, columnDataTypes);
   }
