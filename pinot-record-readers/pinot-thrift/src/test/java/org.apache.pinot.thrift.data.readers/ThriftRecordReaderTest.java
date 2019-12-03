@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.readers;
+package org.apache.pinot.thrift.data.readers;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -41,7 +41,7 @@ import org.testng.annotations.Test;
 
 
 /**
- * Test {@code org.apache.pinot.core.data.readers.ThriftRecordReader} for a given sample thrift
+ * Test {@code org.apache.pinot.thrift.data.readers.ThriftRecordReader} for a given sample thrift
  * data.
  */
 public class ThriftRecordReaderTest {

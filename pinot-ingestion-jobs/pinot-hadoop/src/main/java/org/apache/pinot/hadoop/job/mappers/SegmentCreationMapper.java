@@ -44,7 +44,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-import org.apache.pinot.core.data.readers.ThriftRecordReaderConfig;
+import org.apache.pinot.thrift.data.readers.ThriftRecordReaderConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;

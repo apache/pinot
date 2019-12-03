@@ -21,7 +21,7 @@
 // (powered by Fernflower decompiler)
 //
 
-package org.apache.pinot.core.data.readers;
+package org.apache.pinot.thrift.data.readers;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;

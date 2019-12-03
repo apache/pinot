@@ -27,6 +27,8 @@ import org.apache.pinot.json.data.readers.JSONRecordReader;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.thrift.data.readers.ThriftRecordReader;
+import org.apache.pinot.thrift.data.readers.ThriftRecordReaderConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
