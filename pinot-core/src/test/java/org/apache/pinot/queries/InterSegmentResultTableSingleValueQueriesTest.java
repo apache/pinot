@@ -23,16 +23,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
-import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.common.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.startree.hll.HllUtil;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
