@@ -135,7 +135,7 @@ public class ThriftRecordReaderTest {
 
   private ThriftRecordReaderConfig getThriftRecordReaderConfig() {
     ThriftRecordReaderConfig config = new ThriftRecordReaderConfig();
-    config.setThriftClass("org.apache.pinot.core.data.readers.ThriftSampleData");
+    config.setThriftClass("org.apache.pinot.thrift.data.readers.ThriftSampleData");
     return config;
   }
 
