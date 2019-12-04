@@ -50,6 +50,7 @@ import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.query.pruner.SegmentPrunerService;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.TimerContext;
+import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.core.util.trace.TraceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -182,6 +183,18 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     DataTable dataTable = null;
     try {
+      // The behavior of GROUP BY with multiple aggregations, is different in PQL vs SQL.
+      // As a result, we have 2 groupByModes, to maintain backward compatibility.
+      // The results of PQL groupByMode (if numAggregations > 1) cannot be returned in SQL responseFormat, as the results are non-tabular
+      // Checking for this upfront, to avoid executing the query and wasting resources
+      QueryOptions queryOptions = new QueryOptions(brokerRequest.getQueryOptions());
+      if (brokerRequest.isSetAggregationsInfo() && brokerRequest.getGroupBy() != null) {
+        if (brokerRequest.getAggregationsInfoSize() > 1 && queryOptions.isResponseFormatSQL() && !queryOptions
+            .isGroupByModeSQL()) {
+          throw new UnsupportedOperationException(
+              "The results of a GROUP BY query with multiple aggregations in PQL is not tabular, and cannot be returned in SQL responseFormat");
+        }
+      }
       TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
       long totalRawDocs = pruneSegments(tableDataManager, segmentDataManagers, queryRequest);
       segmentPruneTimer.stopAndRecord();
