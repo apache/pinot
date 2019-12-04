@@ -78,7 +78,7 @@ Pinot also provides k8s integration with interactive query engine [Presto](kuber
    dev-subscribe@pinot.apache.org (subscribe to pinot-dev mailing list)  
    dev@pinot.apache.org (posting to pinot-dev mailing list)  
    users-subscribe@pinot.apache.org (subscribe to pinot-user mailing list)  
-   users@pinot.apache.org (positng to pinot-user mailing list)
+   users@pinot.apache.org (posting to pinot-user mailing list)
 
 ## Documentation
 Check out [Pinot documentation](https://pinot.readthedocs.io) for a complete description of Pinot's features.
