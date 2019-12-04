@@ -100,13 +100,6 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     Assert.assertNotNull(brokerResponse.getAggregationResults());
     Assert.assertNull(brokerResponse.getResultTable());
 
-    // PQL, SQL - don't execute order by, multiple agg not supported
-    queryOptions.put(QueryOptionKey.GROUP_BY_MODE, Request.PQL);
-    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
-    brokerResponse = getBrokerResponseForQuery(query, queryOptions);
-    Assert.assertNull(brokerResponse.getAggregationResults());
-    Assert.assertNull(brokerResponse.getResultTable());
-
     // PQL, SQL - don't execute order by, return aggregationResults.
     query = "SELECT SUM(column1) FROM testTable GROUP BY column11 ORDER BY column11";
     queryOptions.put(QueryOptionKey.GROUP_BY_MODE, Request.PQL);
