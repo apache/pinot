@@ -98,15 +98,6 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
   }
 
   @Test
-  public void testMultipleAggregationsFailure() {
-    String query = "SELECT MAX(column1), MAX(column3) FROM testTable";
-    Map<String, String> queryOptions = new HashMap<>(2);
-    queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query + GROUP_BY, queryOptions);
-    Assert.assertEquals(brokerResponse.getProcessingExceptions().size(), 1);
-  }
-
-  @Test
   public void testMax() {
     DataSchema dataSchema;
     List<Object[]> rows;
