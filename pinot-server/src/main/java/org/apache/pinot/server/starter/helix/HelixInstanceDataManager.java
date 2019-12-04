@@ -240,7 +240,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       try {
         LoaderUtils.reloadFailureRecovery(indexDir);
       } catch (Exception recoveryFailureException) {
-        LOGGER.error("Failed to recover after reload failure ", recoveryFailureException);
+        LOGGER.error("Failed to recover after reload failure", recoveryFailureException);
         reloadFailureException.addSuppressed(recoveryFailureException);
       }
       throw reloadFailureException;
