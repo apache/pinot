@@ -42,7 +42,7 @@ import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.utils.DataSize;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.thrift.data.readers.ThriftRecordReaderConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;

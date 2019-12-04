@@ -16,23 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.readers;
+package org.apache.pinot.spi.data.readers;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class RecordReaderFactory {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(RecordReaderFactory.class);
   private static final Map<FileFormat, String> DEFAULT_RECORD_READER_CLASS_MAP = new HashMap<>();
 
   private static final String DEFAULT_AVRO_RECORD_READER_CLASS = "org.apache.pinot.avro.data.readers.AvroRecordReader";
@@ -74,39 +67,4 @@ public class RecordReaderFactory {
     throw new UnsupportedOperationException("No supported RecordReader found for file format - '" + fileFormat + "'");
   }
 
-  public static RecordReader getRecordReader(SegmentGeneratorConfig segmentGeneratorConfig)
-      throws Exception {
-    File dataFile = new File(segmentGeneratorConfig.getInputFilePath());
-    Preconditions.checkState(dataFile.exists(), "Input file: " + dataFile.getAbsolutePath() + " does not exist");
-
-    Schema schema = segmentGeneratorConfig.getSchema();
-    FileFormat fileFormat = segmentGeneratorConfig.getFormat();
-    String recordReaderPath = segmentGeneratorConfig.getRecordReaderPath();
-
-    // Allow for instantiation general record readers from a record reader path passed into segment generator config
-    // If this is set, this will override the file format
-    if (recordReaderPath != null) {
-      if (fileFormat != FileFormat.OTHER) {
-        // NOTE: we currently have default file format set to AVRO inside segment generator config, do not want to break
-        // this behavior for clients.
-        LOGGER
-            .warn("Using class: {} to read segment, ignoring configured file format: {}", recordReaderPath, fileFormat);
-      }
-      return getRecordReader(recordReaderPath, dataFile, schema, segmentGeneratorConfig.getReaderConfig());
-    }
-
-    switch (fileFormat) {
-      case AVRO:
-      case GZIPPED_AVRO:
-      case CSV:
-      case JSON:
-      case THRIFT:
-        return getRecordReader(fileFormat, dataFile, schema, segmentGeneratorConfig.getReaderConfig());
-      // NOTE: PinotSegmentRecordReader does not support time conversion (field spec must match)
-      case PINOT:
-        return new PinotSegmentRecordReader(dataFile, schema, segmentGeneratorConfig.getColumnSortOrder());
-      default:
-        throw new UnsupportedOperationException("Unsupported input file format: " + fileFormat);
-    }
-  }
 }
