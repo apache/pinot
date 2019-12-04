@@ -20,11 +20,11 @@ package org.apache.pinot.core.realtime.stream;
 
 import com.google.common.base.Preconditions;
 import org.apache.avro.generic.GenericData;
+import org.apache.pinot.avro.data.readers.AvroUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.core.util.AvroUtils;
 
 
 public class AvroRecordToPinotRowGenerator {

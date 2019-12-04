@@ -31,10 +31,10 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.avro.data.readers.AvroUtils;
 import org.apache.pinot.core.realtime.stream.MessageBatch;
 import org.apache.pinot.core.realtime.stream.PartitionLevelConsumer;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
-import org.apache.pinot.core.util.AvroUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
