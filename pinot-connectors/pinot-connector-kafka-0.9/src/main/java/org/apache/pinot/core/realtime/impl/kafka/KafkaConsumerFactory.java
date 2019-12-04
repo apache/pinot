@@ -19,8 +19,6 @@
 package org.apache.pinot.core.realtime.impl.kafka;
 
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.realtime.stream.PartitionLevelConsumer;
 import org.apache.pinot.core.realtime.stream.StreamConsumerFactory;
 import org.apache.pinot.core.realtime.stream.StreamLevelConsumer;
@@ -48,14 +46,13 @@ public class KafkaConsumerFactory extends StreamConsumerFactory {
    * @param clientId
    * @param tableName
    * @param schema
-   * @param instanceZKMetadata
-   * @param serverMetrics
+   * @param groupId
    * @return
    */
   @Override
   public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
-      InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
-    return new KafkaStreamLevelConsumer(clientId, tableName, _streamConfig, schema, instanceZKMetadata, serverMetrics);
+      String groupId) {
+    return new KafkaStreamLevelConsumer(clientId, tableName, _streamConfig, schema, groupId);
   }
 
   /**

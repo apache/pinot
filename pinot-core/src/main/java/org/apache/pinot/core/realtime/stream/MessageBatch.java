@@ -20,7 +20,6 @@ package org.apache.pinot.core.realtime.stream;
 
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
-import org.apache.pinot.common.metadata.RowMetadata;
 
 
 /**

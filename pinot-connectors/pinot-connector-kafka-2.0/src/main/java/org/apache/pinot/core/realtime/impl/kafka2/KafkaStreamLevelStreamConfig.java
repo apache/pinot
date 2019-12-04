@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
@@ -46,10 +45,10 @@ public class KafkaStreamLevelStreamConfig {
    * Builds a wrapper around {@link StreamConfig} to fetch kafka stream level consumer specific configs
    * @param streamConfig
    * @param tableName
-   * @param instanceZKMetadata
+   * @param groupId
    */
   public KafkaStreamLevelStreamConfig(StreamConfig streamConfig, String tableName,
-      InstanceZKMetadata instanceZKMetadata) {
+      String groupId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
 
     _kafkaTopicName = streamConfig.getTopicName();
@@ -58,7 +57,7 @@ public class KafkaStreamLevelStreamConfig {
     _bootstrapServers = streamConfigMap.get(hlcBootstrapBrokerUrlKey);
     Preconditions.checkNotNull(_bootstrapServers,
         "Must specify bootstrap broker connect string " + hlcBootstrapBrokerUrlKey + " in high level kafka consumer");
-    _groupId = instanceZKMetadata.getGroupId(tableName);
+    _groupId = groupId;
 
     _kafkaConsumerProperties = new HashMap<>();
     String kafkaConsumerPropertyPrefix =

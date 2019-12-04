@@ -55,13 +55,12 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
     private Random _random = new Random();
 
     public FlakyStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig, Schema schema,
-        InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
+        String groupId) {
       try {
         final Constructor constructor = Class.forName(KafkaStarterUtils.KAFKA_STREAM_LEVEL_CONSUMER_CLASS_NAME)
-            .getConstructor(String.class, String.class, StreamConfig.class, Schema.class, InstanceZKMetadata.class,
-                ServerMetrics.class);
+            .getConstructor(String.class, String.class, StreamConfig.class, Schema.class, String.class);
         _streamLevelConsumer = (StreamLevelConsumer) constructor
-            .newInstance(clientId, tableName, streamConfig, schema, instanceZKMetadata, serverMetrics);
+            .newInstance(clientId, tableName, streamConfig, schema, groupId);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -114,9 +113,8 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
 
     @Override
     public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
-        InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
-      return new FlakyStreamLevelConsumer(clientId, tableName, _streamConfig, schema, instanceZKMetadata,
-          serverMetrics);
+        String groupId) {
+      return new FlakyStreamLevelConsumer(clientId, tableName, _streamConfig, schema, groupId);
     }
 
     @Override

@@ -18,18 +18,14 @@
  */
 package org.apache.pinot.core.realtime.impl.kafka;
 
-import com.yammer.metrics.core.Meter;
 import kafka.consumer.ConsumerIterator;
 import kafka.javaapi.consumer.ConsumerConnector;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
-import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamDecoderProvider;
 import org.apache.pinot.core.realtime.stream.StreamLevelConsumer;
 import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,16 +51,11 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   private long lastCount = 0;
   private long currentCount = 0L;
 
-  private ServerMetrics _serverMetrics;
-  private Meter tableAndStreamRowsConsumed = null;
-  private Meter tableRowsConsumed = null;
-
   public KafkaStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig, Schema schema,
-      InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
+      String groupId) {
     _clientId = clientId;
     _streamConfig = streamConfig;
-    _kafkaHighLevelStreamConfig = new KafkaHighLevelStreamConfig(streamConfig, tableName, instanceZKMetadata);
-    _serverMetrics = serverMetrics;
+    _kafkaHighLevelStreamConfig = new KafkaHighLevelStreamConfig(streamConfig, tableName, groupId);
 
     _messageDecoder = StreamDecoderProvider.create(streamConfig, schema);
 
@@ -87,12 +78,6 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
     if (kafkaIterator.hasNext()) {
       try {
         destination = _messageDecoder.decode(kafkaIterator.next().message(), destination);
-        tableAndStreamRowsConsumed = _serverMetrics
-            .addMeteredTableValue(_tableAndStreamName, ServerMeter.REALTIME_ROWS_CONSUMED, 1L,
-                tableAndStreamRowsConsumed);
-        tableRowsConsumed =
-            _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L, tableRowsConsumed);
-
         ++currentCount;
 
         final long now = System.currentTimeMillis();
@@ -110,8 +95,6 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
         return destination;
       } catch (Exception e) {
         INSTANCE_LOGGER.warn("Caught exception while consuming events", e);
-        _serverMetrics.addMeteredTableValue(_tableAndStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
         throw e;
       }
     }
@@ -121,8 +104,6 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   @Override
   public void commit() {
     consumer.commitOffsets();
-    _serverMetrics.addMeteredTableValue(_tableAndStreamName, ServerMeter.REALTIME_OFFSET_COMMITS, 1L);
-    _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_OFFSET_COMMITS, 1L);
   }
 
   @Override

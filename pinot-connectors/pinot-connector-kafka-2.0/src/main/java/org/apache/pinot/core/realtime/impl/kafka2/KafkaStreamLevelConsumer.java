@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.realtime.impl.kafka2;
 
-import com.yammer.metrics.core.Meter;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -30,9 +29,6 @@ import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
-import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamDecoderProvider;
@@ -65,16 +61,13 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   private long lastCount = 0;
   private long currentCount = 0L;
 
-  private ServerMetrics _serverMetrics;
-  private Meter tableAndStreamRowsConsumed = null;
-  private Meter tableRowsConsumed = null;
+
 
   public KafkaStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig, Schema schema,
-      InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
+      String groupId) {
     _clientId = clientId;
     _streamConfig = streamConfig;
-    _kafkaStreamLevelStreamConfig = new KafkaStreamLevelStreamConfig(streamConfig, tableName, instanceZKMetadata);
-    _serverMetrics = serverMetrics;
+    _kafkaStreamLevelStreamConfig = new KafkaStreamLevelStreamConfig(streamConfig, tableName, groupId);
 
     _messageDecoder = StreamDecoderProvider.create(streamConfig, schema);
 
@@ -112,11 +105,6 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
         final ConsumerRecord<Bytes, Bytes> record = kafkaIterator.next();
         updateOffsets(record.partition(), record.offset());
         destination = _messageDecoder.decode(record.value().get(), destination);
-        tableAndStreamRowsConsumed = _serverMetrics
-            .addMeteredTableValue(_tableAndStreamName, ServerMeter.REALTIME_ROWS_CONSUMED, 1L,
-                tableAndStreamRowsConsumed);
-        tableRowsConsumed =
-            _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L, tableRowsConsumed);
 
         ++currentCount;
 
@@ -135,8 +123,6 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
         return destination;
       } catch (Exception e) {
         INSTANCE_LOGGER.warn("Caught exception while consuming events", e);
-        _serverMetrics.addMeteredTableValue(_tableAndStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
         throw e;
       }
     }
@@ -153,8 +139,6 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
     // Since the lastest batch may not be consumed fully, so we need to reset kafka consumer's offset.
     resetOffsets();
     consumerOffsets.clear();
-    _serverMetrics.addMeteredTableValue(_tableAndStreamName, ServerMeter.REALTIME_OFFSET_COMMITS, 1L);
-    _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_OFFSET_COMMITS, 1L);
   }
 
   private Map<TopicPartition, OffsetAndMetadata> getOffsetsMap() {
