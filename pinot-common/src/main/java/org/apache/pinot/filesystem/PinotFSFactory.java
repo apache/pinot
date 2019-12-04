@@ -43,6 +43,18 @@ public class PinotFSFactory {
 
   }
 
+  public static void register(String scheme, String fsClassName, Configuration configuration) {
+    try {
+      LOGGER.info("Initializing PinotFS for scheme {}, classname {}", scheme, fsClassName);
+      PinotFS pinotFS = (PinotFS) Class.forName(fsClassName).newInstance();
+      pinotFS.init(configuration);
+      _fileSystemMap.put(scheme, pinotFS);
+    } catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
+      LOGGER.error("Could not instantiate file system for class {} with scheme {}", fsClassName, scheme, e);
+      throw new RuntimeException(e);
+    }
+  }
+
   public static void init(Configuration fsConfig) {
     // Get schemes and their respective classes
     Iterator<String> keys = fsConfig.subset(CLASS).getKeys();
@@ -53,17 +65,7 @@ public class PinotFSFactory {
       String key = keys.next();
       String fsClassName = (String) fsConfig.getProperty(CLASS + "." + key);
       LOGGER.info("Got scheme {}, classname {}, starting to initialize", key, fsClassName);
-
-      try {
-        PinotFS pinotFS = (PinotFS) Class.forName(fsClassName).newInstance();
-        pinotFS.init(fsConfig.subset(key));
-
-        LOGGER.info("Initializing PinotFS for scheme {}, classname {}", key, fsClassName);
-        _fileSystemMap.put(key, pinotFS);
-      } catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
-        LOGGER.error("Could not instantiate file system for class {}", fsClassName, e);
-        throw new RuntimeException(e);
-      }
+      register(key, fsClassName, fsConfig.subset(key));
     }
 
     if (!_fileSystemMap.containsKey(DEFAULT_FS_SCHEME)) {
@@ -78,6 +80,10 @@ public class PinotFSFactory {
       throw new RuntimeException("Pinot file system not configured for scheme: " + scheme);
     }
     return pinotFS;
+  }
+
+  public static boolean isSchemeSupported(String scheme) {
+    return _fileSystemMap.containsKey(scheme);
   }
 
   public static void shutdown()
