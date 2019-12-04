@@ -241,7 +241,7 @@ public class SegmentGenerationJobRunner {
     try {
       schemaURI = new URI(_spec.getTableSpec().getSchemaURI());
     } catch (URISyntaxException e) {
-      throw new RuntimeException("Schema URI is not valid - " + _spec.getTableSpec().getSchemaURI(), e);
+      throw new RuntimeException("Schema URI is not valid - '" + _spec.getTableSpec().getSchemaURI() + "'", e);
     }
     String scheme = schemaURI.getScheme();
     String schemaJson;
@@ -252,25 +252,25 @@ public class SegmentGenerationJobRunner {
       try {
         schemaStream = pinotFS.open(schemaURI);
       } catch (IOException e) {
-        throw new RuntimeException("Failed to open schema file stream on Pinot fs - " + schemaURI, e);
+        throw new RuntimeException("Failed to fetch schema from PinotFS - '" + schemaURI + "'", e);
       }
       try {
         schemaJson = IOUtils.toString(schemaStream, StandardCharsets.UTF_8);
       } catch (IOException e) {
-        throw new RuntimeException("Failed to read from schema file data stream on Pinot fs - " + schemaURI, e);
+        throw new RuntimeException("Failed to read from schema file data stream on Pinot fs - '" + schemaURI + "'", e);
       }
     } else {
       // Try to directly read from URI.
       try {
         schemaJson = IOUtils.toString(schemaURI, StandardCharsets.UTF_8);
       } catch (IOException e) {
-        throw new RuntimeException("Failed to read from Schema URI - " + schemaURI, e);
+        throw new RuntimeException("Failed to read from Schema URI - '" + schemaURI + "'", e);
       }
     }
     try {
       return Schema.fromString(schemaJson);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to decode Pinot schema from json string - " + schemaJson, e);
+      throw new RuntimeException("Failed to decode Pinot schema from json string - '" + schemaJson + "'", e);
     }
   }
 
@@ -279,7 +279,8 @@ public class SegmentGenerationJobRunner {
     try {
       tableConfigURI = new URI(_spec.getTableSpec().getTableConfigURI());
     } catch (URISyntaxException e) {
-      throw new RuntimeException("Table config URI is not valid - " + _spec.getTableSpec().getTableConfigURI(), e);
+      throw new RuntimeException("Table config URI is not valid - '" + _spec.getTableSpec().getTableConfigURI() + "'",
+          e);
     }
     String scheme = tableConfigURI.getScheme();
     String tableConfigJson;
@@ -289,14 +290,14 @@ public class SegmentGenerationJobRunner {
       try {
         tableConfigJson = IOUtils.toString(pinotFS.open(tableConfigURI), StandardCharsets.UTF_8);
       } catch (IOException e) {
-        throw new RuntimeException("Failed to open table config file stream on Pinot fs - " + tableConfigURI, e);
+        throw new RuntimeException("Failed to open table config file stream on Pinot fs - '" + tableConfigURI + "'", e);
       }
     } else {
       try {
         tableConfigJson = IOUtils.toString(tableConfigURI, StandardCharsets.UTF_8);
       } catch (IOException e) {
-        throw new RuntimeException("Failed to read from table config file data stream on Pinot fs - " + tableConfigURI,
-            e);
+        throw new RuntimeException(
+            "Failed to read from table config file data stream on Pinot fs - '" + tableConfigURI + "'", e);
       }
     }
     // Controller API returns a wrapper of table config.
@@ -304,7 +305,7 @@ public class SegmentGenerationJobRunner {
     try {
       tableJsonNode = new ObjectMapper().readTree(tableConfigJson);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to decode table config into JSON from String - " + tableConfigJson, e);
+      throw new RuntimeException("Failed to decode table config into JSON from String - '" + tableConfigJson + "'", e);
     }
     if (tableJsonNode.has(OFFLINE)) {
       tableJsonNode = tableJsonNode.get(OFFLINE);
@@ -312,7 +313,7 @@ public class SegmentGenerationJobRunner {
     try {
       return TableConfig.fromJsonConfig(tableJsonNode);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to decode table config from JSON - " + tableJsonNode, e);
+      throw new RuntimeException("Failed to decode table config from JSON - '" + tableJsonNode + "'", e);
     }
   }
 }

@@ -68,7 +68,7 @@ public class SegmentTarPushJobRunner {
     try {
       outputDirURI = new URI(_spec.getOutputDirURI());
     } catch (URISyntaxException e) {
-      throw new RuntimeException("outputDirURI is not valid - " + _spec.getOutputDirURI());
+      throw new RuntimeException("outputDirURI is not valid - '" + _spec.getOutputDirURI() + "'");
     }
     PinotFS outputDirFS = PinotFSFactory.create(outputDirURI.getScheme());
     //Get list of files to process
@@ -76,7 +76,7 @@ public class SegmentTarPushJobRunner {
     try {
       files = outputDirFS.listFiles(outputDirURI, true);
     } catch (IOException e) {
-      throw new RuntimeException("Unable to list all files under outputDirURI - " + outputDirURI);
+      throw new RuntimeException("Unable to list all files under outputDirURI - '" + outputDirURI + "'");
     }
 
     List<String> segmentsToPush = new ArrayList<>();
@@ -110,7 +110,7 @@ public class SegmentTarPushJobRunner {
         try {
           controllerURI = new URI(pinotClusterSpec.getControllerURI());
         } catch (URISyntaxException e) {
-          throw new RuntimeException("Got invalid controller uri - " + pinotClusterSpec.getControllerURI());
+          throw new RuntimeException("Got invalid controller uri - '" + pinotClusterSpec.getControllerURI() + "'");
         }
         LOGGER.info("Pushing segment: {} to location: {} for table {}", segmentName, controllerURI, tableName);
         int attempts = 1;
@@ -118,8 +118,8 @@ public class SegmentTarPushJobRunner {
           _spec.getPushJobSpec().getPushAttempts();
         }
         long retryWaitMs = 1000L;
-        if (_spec.getPushJobSpec() != null && _spec.getPushJobSpec().getPushRetryTimeinMillis() > 0) {
-          retryWaitMs = _spec.getPushJobSpec().getPushRetryTimeinMillis();
+        if (_spec.getPushJobSpec() != null && _spec.getPushJobSpec().getPushRetryIntervalMillis() > 0) {
+          retryWaitMs = _spec.getPushJobSpec().getPushRetryIntervalMillis();
         }
         RetryPolicies.exponentialBackoffRetryPolicy(attempts, retryWaitMs, 5).attempt(() -> {
           try (InputStream inputStream = fileSystem.open(tarFileURI)) {

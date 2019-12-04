@@ -31,7 +31,7 @@ public class PushJobSpec {
   /**
    * retry wait Ms, default to 1 second.
    */
-  private long _pushRetryTimeinMillis = 1000;
+  private long _pushRetryIntervalMillis = 1000;
 
   /**
    * Used in SegmentUriPushJobRunner, which is used to composite the segment uri to send to pinot controller.
@@ -78,15 +78,15 @@ public class PushJobSpec {
     _pushAttempts = pushAttempts;
   }
 
-  public long getPushRetryTimeinMillis() {
-    return _pushRetryTimeinMillis;
+  public long getPushRetryIntervalMillis() {
+    return _pushRetryIntervalMillis;
   }
 
   /**
    * retry wait Ms, default to 1 second.
-   * @param pushRetryTimeinMillis
+   * @param pushRetryIntervalMillis
    */
-  public void setPushRetryTimeinMillis(long pushRetryTimeinMillis) {
-    _pushRetryTimeinMillis = pushRetryTimeinMillis;
+  public void setPushRetryIntervalMillis(long pushRetryIntervalMillis) {
+    _pushRetryIntervalMillis = pushRetryIntervalMillis;
   }
 }

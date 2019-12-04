@@ -37,4 +37,4 @@ pinotClusterSpecs:
   - controllerURI: 'localhost:9000'
 pushJobSpec:
   pushAttempts: 2
-  pushRetryTimeinMillis: 1000
+  pushRetryIntervalMillis: 1000
