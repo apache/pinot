@@ -93,9 +93,9 @@ public class ThriftRecordReaderTest {
 
   @Test
   public void testReadData()
-      throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException {
-    ThriftRecordReader recordReader = new ThriftRecordReader(_tempFile, getSchema(), getThriftRecordReaderConfig());
-
+      throws IOException {
+    ThriftRecordReader recordReader = new ThriftRecordReader();
+    recordReader.init(_tempFile, getSchema(), getThriftRecordReaderConfig());
     List<GenericRow> genericRows = new ArrayList<>();
     while (recordReader.hasNext()) {
       genericRows.add(recordReader.next());
@@ -112,8 +112,9 @@ public class ThriftRecordReaderTest {
 
   @Test
   public void testRewind()
-      throws ClassNotFoundException, InstantiationException, IllegalAccessException, IOException {
-    ThriftRecordReader recordReader = new ThriftRecordReader(_tempFile, getSchema(), getThriftRecordReaderConfig());
+      throws IOException {
+    ThriftRecordReader recordReader = new ThriftRecordReader();
+    recordReader.init(_tempFile, getSchema(), getThriftRecordReaderConfig());
     List<GenericRow> genericRows = new ArrayList<>();
     while (recordReader.hasNext()) {
       genericRows.add(recordReader.next());
