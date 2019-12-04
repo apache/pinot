@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.BiFunction;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.AggregationInfo;
@@ -40,21 +39,20 @@ import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.GroupByResult;
-import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptions;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
@@ -141,33 +139,29 @@ public class GroupByDataTableReducer implements DataTableReducer {
       }
     } else {
 
-      if (_responseFormatSql && _numAggregationFunctions > 1) {
-        // 3. groupByMode = pql, responseFormat = sql
-        // This mode is for users who want response presented in SQL style, but want PQL style group by behavior
-        // Multiple aggregations in PQL violates the tabular nature of results
-        // As a result, in this mode, only single aggregations are supported
+      // 3. groupByMode = pql, responseFormat = sql
+      // This mode is for users who want response presented in SQL style, but want PQL style group by behavior
+      // Multiple aggregations in PQL violates the tabular nature of results
+      // As a result, in this mode, only single aggregations are supported
 
-        brokerResponseNative.addToExceptions(new QueryProcessingException(QueryException.MERGE_RESPONSE_ERROR_CODE,
-            "Sql response format is unsupported for pql execution mode with multiple aggregations"));
+      // 4. groupByMode = pql, responseFormat = pql
+      // This is the primary PQL compliant group by
+
+      boolean[] aggregationFunctionSelectStatus =
+          AggregationFunctionUtils.getAggregationFunctionsSelectStatus(_aggregationInfos);
+      setGroupByHavingResults(brokerResponseNative, aggregationFunctionSelectStatus, dataTables,
+          _brokerRequest.getHavingFilterQuery(), _brokerRequest.getHavingFilterSubQueryMap());
+
+      if (_responseFormatSql) {
+        resultSize = brokerResponseNative.getResultTable().getRows().size();
       } else {
-        // 4. groupByMode = pql, responseFormat = pql
-        // This is the primary PQL compliant group by
-
-        boolean[] aggregationFunctionSelectStatus =
-            AggregationFunctionUtils.getAggregationFunctionsSelectStatus(_aggregationInfos);
-        setGroupByHavingResults(brokerResponseNative, aggregationFunctionSelectStatus, dataTables,
-            _brokerRequest.getHavingFilterQuery(), _brokerRequest.getHavingFilterSubQueryMap());
-
-        if (_responseFormatSql) {
-          resultSize = brokerResponseNative.getResultTable().getRows().size();
-        } else {
-          // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the same.
-          // Thus, we can just emit the one from the 1st result.
-          if (!brokerResponseNative.getAggregationResults().isEmpty()) {
-            resultSize = brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size();
-          }
+        // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the same.
+        // Thus, we can just emit the one from the 1st result.
+        if (!brokerResponseNative.getAggregationResults().isEmpty()) {
+          resultSize = brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size();
         }
       }
+
     }
 
     if (brokerMetrics != null && resultSize > 0) {
