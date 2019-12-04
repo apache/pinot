@@ -16,28 +16,44 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.stream;
+package org.apache.pinot.spi.stream;
 
-import java.io.Closeable;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * Interface for a consumer which fetches messages at the partition level of a stream, for given offsets
+ * Interface for a consumer that consumes at stream level and is unaware of any partitions of the stream
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
-public interface PartitionLevelConsumer extends Closeable {
+public interface StreamLevelConsumer {
 
   /**
-   * Fetch messages from the stream between the specified offsets
-   * @param startOffset
-   * @param endOffset
-   * @param timeoutMillis
-   * @return
-   * @throws java.util.concurrent.TimeoutException
+   * Initialize and start the stream level consumer
+   * @throws Exception
    */
-  MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
-      throws java.util.concurrent.TimeoutException;
+  void start()
+      throws Exception;
+
+  /**
+   * Get next row from the stream and decode it into a generic row
+   * @param destination
+   * @return
+   */
+  GenericRow next(GenericRow destination);
+
+  /**
+   * Commit the offsets consumed so far
+   * The next call to consume should exclude all events consumed before the commit was called, and start from newer events not yet consumed
+   */
+  void commit();
+
+  /**
+   * Shutdown the stream consumer
+   * @throws Exception
+   */
+  void shutdown()
+      throws Exception;
 }

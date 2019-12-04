@@ -20,7 +20,7 @@ package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import org.apache.pinot.core.realtime.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 
 
 /**

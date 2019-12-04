@@ -19,7 +19,7 @@
 package org.apache.pinot.core.realtime.impl.kafka;
 
 import com.google.common.base.Joiner;
-import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 
 
 /**

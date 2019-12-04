@@ -16,29 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.stream;
+package org.apache.pinot.spi.stream;
 
-import org.apache.pinot.common.Utils;
+import java.util.Properties;
 
 
 /**
- * Provider class for {@link StreamConsumerFactory}
+ * StreamDataServerStartable is the interface for stream data sources. E.g. KafkaServerStartable, KinesisServerStarable.
  */
-public abstract class StreamConsumerFactoryProvider {
+public interface StreamDataProducer {
+  void init(Properties props);
 
-  /**
-   * Constructs the {@link StreamConsumerFactory} using the {@link StreamConfig::getConsumerFactoryClassName()} property and initializes it
-   * @param streamConfig
-   * @return
-   */
-  public static StreamConsumerFactory create(StreamConfig streamConfig) {
-    StreamConsumerFactory factory = null;
-    try {
-      factory = (StreamConsumerFactory) Class.forName(streamConfig.getConsumerFactoryClassName()).newInstance();
-    } catch (Exception e) {
-      Utils.rethrowException(e);
-    }
-    factory.init(streamConfig);
-    return factory;
-  }
+  void produce(String topic, byte[] payload);
+
+  void produce(String topic, byte[] key, byte[] payload);
+
+  void close();
 }

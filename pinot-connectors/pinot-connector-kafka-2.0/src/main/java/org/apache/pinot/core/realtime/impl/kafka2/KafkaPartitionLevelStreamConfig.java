@@ -23,7 +23,7 @@ import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
-import org.apache.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfig;
 
 
 /**

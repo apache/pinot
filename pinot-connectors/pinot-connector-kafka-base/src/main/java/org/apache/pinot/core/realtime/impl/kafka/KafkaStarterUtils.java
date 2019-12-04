@@ -23,9 +23,9 @@ import java.util.List;
 import java.util.Properties;
 import java.util.ServiceLoader;
 import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.core.realtime.stream.StreamConsumerFactory;
-import org.apache.pinot.core.realtime.stream.StreamDataProvider;
-import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
+import org.apache.pinot.spi.stream.StreamDataProvider;
+import org.apache.pinot.spi.stream.StreamDataServerStartable;
 
 
 public class KafkaStarterUtils {

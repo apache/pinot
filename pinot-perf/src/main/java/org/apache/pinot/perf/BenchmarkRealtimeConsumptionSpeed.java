@@ -27,7 +27,7 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
-import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
+import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.integration.tests.RealtimeClusterIntegrationTest;
 import org.apache.pinot.util.TestUtils;

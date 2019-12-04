@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.realtime.stream;
 
+import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

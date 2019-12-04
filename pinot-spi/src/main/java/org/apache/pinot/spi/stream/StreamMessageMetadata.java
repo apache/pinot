@@ -16,22 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.stream;
-
-import nl.jqno.equalsverifier.EqualsVerifier;
-import nl.jqno.equalsverifier.Warning;
-import org.apache.pinot.spi.stream.StreamConfig;
-import org.testng.annotations.Test;
-
+package org.apache.pinot.spi.stream;
 
 /**
- * Test for equals and hashCode for the various ZK metadata classes
- *
+ * A class that provides metadata associated with the message of a stream, for e.g.,
+ * ingestion-timestamp of the message.
  */
-public class MetadataEqualsHashCodeTest {
-  @Test
-  public void testEqualsAndHashCode() {
-    EqualsVerifier.forClass(StreamConfig.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
-        usingGetClass().verify();
+public class StreamMessageMetadata implements RowMetadata {
+
+  private final long _ingestionTimeMs;
+
+  /**
+   * Construct the stream based message/row message metadata
+   *
+   * @param ingestionTimeMs  the time that the message was ingested by the stream provider
+   *                         use Long.MIN_VALUE if not applicable
+   */
+  public StreamMessageMetadata(long ingestionTimeMs) {
+    _ingestionTimeMs = ingestionTimeMs;
   }
+
+  @Override
+  public long getIngestionTimeMs() {
+    return _ingestionTimeMs;
+  }
+
 }

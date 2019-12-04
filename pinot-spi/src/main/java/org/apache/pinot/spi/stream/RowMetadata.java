@@ -16,14 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.stream;
+package org.apache.pinot.spi.stream;
+
+import org.apache.pinot.spi.annotations.InterfaceAudience;
+import org.apache.pinot.spi.annotations.InterfaceStability;
+
 
 /**
- * A stream subsystem error that indicates a situation that is likely to be transient (for example, network error or
- * broker not available).
+ * A class that provides relevant row-level metadata for rows indexed into a segment.
+ *
+ * Currently this is relevant for rows ingested into a mutable segment - the metadata is expected to be
+ * provided by the underlying stream.
  */
-public class TransientConsumerException extends RuntimeException {
-  public TransientConsumerException(Throwable cause) {
-    super(cause);
-  }
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
+public interface RowMetadata {
+
+  /**
+   * Return the timestamp associated with when the row was ingested upstream.
+   * Expected to be mainly used for stream-based sources.
+   *
+   * @return timestamp (epoch in milliseconds) when the row was ingested upstream
+   *         Long.MIN_VALUE if not available
+   */
+  long getIngestionTimeMs();
 }

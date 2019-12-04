@@ -34,9 +34,9 @@ import kafka.javaapi.TopicMetadataResponse;
 import kafka.javaapi.consumer.SimpleConsumer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.common.protocol.Errors;
-import org.apache.pinot.core.realtime.stream.PermanentConsumerException;
-import org.apache.pinot.core.realtime.stream.StreamConfig;
-import org.apache.pinot.core.realtime.stream.TransientConsumerException;
+import org.apache.pinot.spi.stream.PermanentConsumerException;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.TransientConsumerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

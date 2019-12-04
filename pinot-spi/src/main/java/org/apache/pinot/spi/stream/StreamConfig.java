@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.stream;
+package org.apache.pinot.spi.stream;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -24,10 +24,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.utils.DataSize;
+import org.apache.pinot.spi.utils.DataSize;
 import org.apache.pinot.spi.utils.EqualityUtils;
-import org.apache.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,10 +77,6 @@ public class StreamConfig {
   private final String _groupId;
 
   private final Map<String, String> _streamConfigMap = new HashMap<>();
-
-  public StreamConfig(TableConfig tableConfig) {
-    this(tableConfig.getTableName(), tableConfig.getIndexingConfig().getStreamConfigs());
-  }
 
   /**
    * Initializes a StreamConfig using the map of stream configs from the table config

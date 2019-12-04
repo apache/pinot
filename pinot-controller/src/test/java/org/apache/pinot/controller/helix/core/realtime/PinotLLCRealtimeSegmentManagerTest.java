@@ -53,9 +53,9 @@ import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegment
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
-import org.apache.pinot.core.realtime.stream.OffsetCriteria;
-import org.apache.pinot.core.realtime.stream.PartitionLevelStreamConfig;
-import org.apache.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.filesystem.PinotFSFactory;
 import org.apache.zookeeper.data.Stat;
@@ -797,7 +797,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       _tableConfig =
           new TableConfig.Builder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(_numReplicas)
               .setLLC(true).setStreamConfigs(streamConfigs).build();
-      _streamConfig = new PartitionLevelStreamConfig(_tableConfig);
+      _streamConfig = new PartitionLevelStreamConfig(_tableConfig.getTableName(),
+          _tableConfig.getIndexingConfig().getStreamConfigs());
     }
 
     void makeConsumingInstancePartitions() {

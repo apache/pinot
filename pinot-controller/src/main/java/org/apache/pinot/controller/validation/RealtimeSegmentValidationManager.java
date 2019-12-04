@@ -21,7 +21,6 @@ package org.apache.pinot.controller.validation;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
@@ -36,8 +35,8 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import org.apache.pinot.core.realtime.stream.PartitionLevelStreamConfig;
-import org.apache.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.spi.stream.StreamConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,7 +95,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
         updateRealtimeDocumentCount(tableConfig);
       }
 
-      PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig);
+      PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
+          tableConfig.getIndexingConfig().getStreamConfigs());
       if (streamConfig.hasLowLevelConsumerType()) {
         _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig);
       }

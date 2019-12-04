@@ -104,7 +104,7 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
-import org.apache.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1150,7 +1150,8 @@ public class PinotHelixResourceManager {
 
   private void ensureRealtimeClusterIsSetUp(TableConfig realtimeTableConfig) {
     String realtimeTableName = realtimeTableConfig.getTableName();
-    StreamConfig streamConfig = new StreamConfig(realtimeTableConfig);
+    StreamConfig streamConfig = new StreamConfig(realtimeTableConfig.getTableName(),
+        realtimeTableConfig.getIndexingConfig().getStreamConfigs());
     IdealState idealState = getTableIdealState(realtimeTableName);
 
     if (streamConfig.hasHighLevelConsumerType()) {

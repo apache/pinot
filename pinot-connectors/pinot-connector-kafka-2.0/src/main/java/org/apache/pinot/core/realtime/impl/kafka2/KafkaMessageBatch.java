@@ -23,7 +23,7 @@ import java.util.List;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.core.realtime.impl.kafka.MessageAndOffset;
-import org.apache.pinot.core.realtime.stream.MessageBatch;
+import org.apache.pinot.spi.stream.MessageBatch;
 
 
 public class KafkaMessageBatch implements MessageBatch<byte[]> {

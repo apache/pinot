@@ -37,7 +37,7 @@ import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.utils.DataSize;
+import org.apache.pinot.spi.utils.DataSize;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.filesystem.PinotFSFactory;
 import org.apache.pinot.ingestion.common.Constants;

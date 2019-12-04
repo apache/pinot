@@ -39,7 +39,7 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.csv.data.readers.CSVRecordReaderConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.common.utils.DataSize;
+import org.apache.pinot.spi.utils.DataSize;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.readers.FileFormat;
