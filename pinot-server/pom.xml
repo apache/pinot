@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.3.1-SNAPSHOT</version>
+    <version>0.3.1</version>
   </parent>
   <artifactId>pinot-server</artifactId>
   <name>Pinot Server</name>
