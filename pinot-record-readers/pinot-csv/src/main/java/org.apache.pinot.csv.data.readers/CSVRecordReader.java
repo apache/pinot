@@ -39,21 +39,25 @@ import org.apache.pinot.spi.data.readers.RecordReaderUtils;
  * Record reader for CSV file.
  */
 public class CSVRecordReader implements RecordReader {
-  private final File _dataFile;
-  private final Schema _schema;
-  private final List<FieldSpec> _fieldSpecs;
-  private final CSVFormat _format;
-  private final char _multiValueDelimiter;
+  private File _dataFile;
+  private Schema _schema;
+  private List<FieldSpec> _fieldSpecs;
+  private CSVFormat _format;
+  private char _multiValueDelimiter;
 
   private CSVParser _parser;
   private Iterator<CSVRecord> _iterator;
 
-  public CSVRecordReader(File dataFile, Schema schema, CSVRecordReaderConfig config)
+  public CSVRecordReader() {
+  }
+
+  @Override
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     _dataFile = dataFile;
     _schema = schema;
     _fieldSpecs = RecordReaderUtils.extractFieldSpecs(schema);
-
+    CSVRecordReaderConfig config = (CSVRecordReaderConfig) recordReaderConfig;
     if (config == null) {
       _format = CSVFormat.DEFAULT.withDelimiter(CSVRecordReaderConfig.DEFAULT_DELIMITER).withHeader();
       _multiValueDelimiter = CSVRecordReaderConfig.DEFAULT_MULTI_VALUE_DELIMITER;
@@ -92,7 +96,6 @@ public class CSVRecordReader implements RecordReader {
       _format = format;
       _multiValueDelimiter = config.getMultiValueDelimiter();
     }
-
     init();
   }
 
@@ -100,10 +103,6 @@ public class CSVRecordReader implements RecordReader {
       throws IOException {
     _parser = _format.parse(RecordReaderUtils.getBufferedReader(_dataFile));
     _iterator = _parser.iterator();
-  }
-
-  @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig) {
   }
 
   @Override

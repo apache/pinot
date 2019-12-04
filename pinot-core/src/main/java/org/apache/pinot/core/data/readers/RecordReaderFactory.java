@@ -20,15 +20,12 @@ package org.apache.pinot.core.data.readers;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import org.apache.pinot.avro.data.readers.AvroRecordReader;
-import org.apache.pinot.csv.data.readers.CSVRecordReader;
-import org.apache.pinot.csv.data.readers.CSVRecordReaderConfig;
-import org.apache.pinot.json.data.readers.JSONRecordReader;
-import org.apache.pinot.spi.data.Schema;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.thrift.data.readers.ThriftRecordReader;
-import org.apache.pinot.thrift.data.readers.ThriftRecordReaderConfig;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,8 +33,45 @@ import org.slf4j.LoggerFactory;
 public class RecordReaderFactory {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RecordReaderFactory.class);
+  private static final Map<FileFormat, String> DEFAULT_RECORD_READER_CLASS_MAP = new HashMap<>();
+
+  private static final String DEFAULT_AVRO_RECORD_READER_CLASS = "org.apache.pinot.avro.data.readers.AvroRecordReader";
+  private static final String DEFAULT_CSV_RECORD_READER_CLASS = "org.apache.pinot.csv.data.readers.CSVRecordReader";
+  private static final String DEFAULT_JSON_RECORD_READER_CLASS = "org.apache.pinot.json.data.readers.JSONRecordReader";
+  private static final String DEFAULT_THRIFT_RECORD_READER_CLASS =
+      "org.apache.pinot.thrift.data.readers.ThriftRecordReader";
+  private static final String DEFAULT_ORC_RECORD_READER_CLASS = "org.apache.pinot.orc.data.readers.ORCRecordReader";
+  private static final String DEFAULT_PARQUET_RECORD_READER_CLASS =
+      "org.apache.pinot.parquet.data.readers.ParquetRecordReader";
+
+  static {
+    DEFAULT_RECORD_READER_CLASS_MAP.put(FileFormat.AVRO, DEFAULT_AVRO_RECORD_READER_CLASS);
+    DEFAULT_RECORD_READER_CLASS_MAP.put(FileFormat.GZIPPED_AVRO, DEFAULT_AVRO_RECORD_READER_CLASS);
+    DEFAULT_RECORD_READER_CLASS_MAP.put(FileFormat.CSV, DEFAULT_CSV_RECORD_READER_CLASS);
+    DEFAULT_RECORD_READER_CLASS_MAP.put(FileFormat.JSON, DEFAULT_JSON_RECORD_READER_CLASS);
+    DEFAULT_RECORD_READER_CLASS_MAP.put(FileFormat.THRIFT, DEFAULT_THRIFT_RECORD_READER_CLASS);
+    DEFAULT_RECORD_READER_CLASS_MAP.put(FileFormat.ORC, DEFAULT_ORC_RECORD_READER_CLASS);
+    DEFAULT_RECORD_READER_CLASS_MAP.put(FileFormat.PARQUET, DEFAULT_PARQUET_RECORD_READER_CLASS);
+  }
 
   private RecordReaderFactory() {
+  }
+
+  public static RecordReader getRecordReader(String recordReaderClassName, File dataFile, Schema schema,
+      RecordReaderConfig config)
+      throws Exception {
+    RecordReader recordReader = (RecordReader) Class.forName(recordReaderClassName).newInstance();
+    recordReader.init(dataFile, schema, config);
+    return recordReader;
+  }
+
+  public static RecordReader getRecordReader(FileFormat fileFormat, File dataFile, Schema schema,
+      RecordReaderConfig config)
+      throws Exception {
+    if (DEFAULT_RECORD_READER_CLASS_MAP.containsKey(fileFormat)) {
+      return getRecordReader(DEFAULT_RECORD_READER_CLASS_MAP.get(fileFormat), dataFile, schema, config);
+    }
+    throw new UnsupportedOperationException("No supported RecordReader found for file format - '" + fileFormat + "'");
   }
 
   public static RecordReader getRecordReader(SegmentGeneratorConfig segmentGeneratorConfig)
@@ -58,22 +92,16 @@ public class RecordReaderFactory {
         LOGGER
             .warn("Using class: {} to read segment, ignoring configured file format: {}", recordReaderPath, fileFormat);
       }
-      RecordReader recordReader = (RecordReader) Class.forName(recordReaderPath).newInstance();
-      recordReader.init(dataFile, schema, segmentGeneratorConfig.getReaderConfig());
-      return recordReader;
+      return getRecordReader(recordReaderPath, dataFile, schema, segmentGeneratorConfig.getReaderConfig());
     }
 
     switch (fileFormat) {
       case AVRO:
       case GZIPPED_AVRO:
-        return new AvroRecordReader(dataFile, schema);
       case CSV:
-        return new CSVRecordReader(dataFile, schema, (CSVRecordReaderConfig) segmentGeneratorConfig.getReaderConfig());
       case JSON:
-        return new JSONRecordReader(dataFile, schema);
       case THRIFT:
-        return new ThriftRecordReader(dataFile, schema,
-            (ThriftRecordReaderConfig) segmentGeneratorConfig.getReaderConfig());
+        return getRecordReader(fileFormat, dataFile, schema, segmentGeneratorConfig.getReaderConfig());
       // NOTE: PinotSegmentRecordReader does not support time conversion (field spec must match)
       case PINOT:
         return new PinotSegmentRecordReader(dataFile, schema, segmentGeneratorConfig.getColumnSortOrder());

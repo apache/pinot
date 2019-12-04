@@ -36,14 +36,18 @@ import org.apache.pinot.spi.data.readers.RecordReaderUtils;
  * Record reader for AVRO file.
  */
 public class AvroRecordReader implements RecordReader {
-  private final File _dataFile;
-  private final Schema _schema;
-  private final List<FieldSpec> _fieldSpecs;
+  private File _dataFile;
+  private Schema _schema;
+  private List<FieldSpec> _fieldSpecs;
 
   private DataFileStream<GenericRecord> _avroReader;
   private GenericRecord _reusableAvroRecord = null;
 
-  public AvroRecordReader(File dataFile, Schema schema)
+  public AvroRecordReader() {
+  }
+
+  @Override
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     _dataFile = dataFile;
     _schema = schema;
@@ -55,10 +59,6 @@ public class AvroRecordReader implements RecordReader {
       _avroReader.close();
       throw e;
     }
-  }
-
-  @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig) {
   }
 
   @Override

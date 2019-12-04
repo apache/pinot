@@ -38,7 +38,9 @@ public class AvroRecordReaderTest extends AbstractRecordReaderTest {
   @Override
   protected RecordReader createRecordReader()
       throws Exception {
-    return new AvroRecordReader(_dataFile, getPinotSchema());
+    AvroRecordReader avroRecordReader = new AvroRecordReader();
+    avroRecordReader.init(_dataFile, getPinotSchema(), null);
+    return avroRecordReader;
   }
 
   @Override

@@ -39,7 +39,9 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
       throws Exception {
     CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
     csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
-    return new CSVRecordReader(_dataFile, getPinotSchema(), csvRecordReaderConfig);
+    CSVRecordReader csvRecordReader = new CSVRecordReader();
+    csvRecordReader.init(_dataFile, getPinotSchema(), csvRecordReaderConfig);
+    return csvRecordReader;
   }
 
   @Override
