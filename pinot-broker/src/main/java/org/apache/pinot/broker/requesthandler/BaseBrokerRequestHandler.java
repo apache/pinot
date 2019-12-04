@@ -63,6 +63,7 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Broker;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.util.QueryOptions;
 import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -478,6 +479,19 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       if (topN > queryResponseLimit) {
         throw new IllegalStateException(
             "Value for 'TOP' (" + topN + ") exceeds maximum allowed value of " + queryResponseLimit);
+      }
+    }
+
+    // The behavior of GROUP BY with multiple aggregations, is different in PQL vs SQL.
+    // As a result, we have 2 groupByModes, to maintain backward compatibility.
+    // The results of PQL groupByMode (if numAggregations > 1) cannot be returned in SQL responseFormat, as the results are non-tabular
+    // Checking for this upfront, to avoid executing the query and wasting resources
+    QueryOptions queryOptions = new QueryOptions(brokerRequest.getQueryOptions());
+    if (brokerRequest.isSetAggregationsInfo() && brokerRequest.getGroupBy() != null) {
+      if (brokerRequest.getAggregationsInfoSize() > 1 && queryOptions.isResponseFormatSQL() && !queryOptions
+          .isGroupByModeSQL()) {
+        throw new UnsupportedOperationException(
+            "The results of a GROUP BY query with multiple aggregations in PQL is not tabular, and cannot be returned in SQL responseFormat");
       }
     }
 

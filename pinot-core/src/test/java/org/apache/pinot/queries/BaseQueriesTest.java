@@ -101,7 +101,17 @@ public abstract class BaseQueriesTest {
   private BrokerResponseNative getBrokerResponseForQuery(String query, PlanMaker planMaker,
       Map<String, String> queryOptions) {
     BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
-    brokerRequest.setQueryOptions(queryOptions);
+    Map<String, String> allQueryOptions = new HashMap<>();
+
+    if (queryOptions != null) {
+      allQueryOptions.putAll(queryOptions);
+    }
+    if (brokerRequest.getQueryOptions() != null) {
+      allQueryOptions.putAll(brokerRequest.getQueryOptions());
+    }
+    if (!allQueryOptions.isEmpty()) {
+      brokerRequest.setQueryOptions(allQueryOptions);
+    }
 
     // Server side.
     Plan plan = planMaker.makeInterSegmentPlan(getSegmentDataManagers(), brokerRequest, EXECUTOR_SERVICE,

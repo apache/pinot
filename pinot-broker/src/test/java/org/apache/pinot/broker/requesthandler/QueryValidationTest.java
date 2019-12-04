@@ -26,12 +26,56 @@ import org.testng.annotations.Test;
 
 
 public class QueryValidationTest {
+
+  /**
+   * The behavior of GROUP BY with multiple aggregations, is different in PQL vs SQL.
+   * As a result, we have 2 groupByModes, to maintain backward compatibility.
+   * The results of PQL groupByMode (if numAggregations > 1) cannot be returned in SQL responseFormat, as the results are non-tabular
+   * Checking for this upfront, in validateRequest, to avoid executing the query and wasting resources
+   *
+   * Tests for this case as described above
+   */
+  @Test
+  public void testUnsupportedGroupByQueries() {
+    Pql2Compiler compiler = new Pql2Compiler();
+    String errorMsg =
+        "The results of a GROUP BY query with multiple aggregations in PQL is not tabular, and cannot be returned in SQL responseFormat";
+
+    String query =
+        "SELECT MAX(column1), SUM(column2) FROM testTable GROUP BY column3 ORDER BY column3 option(responseFormat=sql)";
+    testUnsupportedQueriesHelper(compiler, query, errorMsg);
+
+    query =
+        "SELECT MAX(column1), SUM(column2) FROM testTable GROUP BY column3 TOP 3 option(groupByMode=pql,responseFormat=sql)";
+    testUnsupportedQueriesHelper(compiler, query, errorMsg);
+
+    query =
+        "SELECT MAX(column1), SUM(column2) FROM testTable WHERE column5 = '100' GROUP BY column3 option(responseFormat=sql)";
+    testUnsupportedQueriesHelper(compiler, query, errorMsg);
+
+    query =
+        "SELECT MAX(column1), SUM(column2), SUM(column10) FROM testTable GROUP BY column3 option(groupByMode=pql,responseFormat=sql)";
+    testUnsupportedQueriesHelper(compiler, query, errorMsg);
+
+    query = "SELECT MAXMV(column1), SUMMV(column2) FROM testTable GROUP BY column3 option(responseFormat=sql)";
+    testUnsupportedQueriesHelper(compiler, query, errorMsg);
+
+    query =
+        "SELECT MAXMV(column1), SUM(column2) FROM testTable GROUP BY column3 ORDER BY MAXMV(column1) option(responseFormat=sql)";
+    testUnsupportedQueriesHelper(compiler, query, errorMsg);
+
+    query =
+        "SELECT PERCENTILE95(column1), DISTINCTCOUNTHLL(column2) FROM testTable GROUP BY column3 option(responseFormat=sql)";
+    testUnsupportedQueriesHelper(compiler, query, errorMsg);
+  }
+
   @Test
   public void testUnsupportedDistinctQueries() {
     Pql2Compiler compiler = new Pql2Compiler();
 
     String pql = "SELECT DISTINCT(col1, col2) FROM foo ORDER BY col3";
-    testUnsupportedQueriesHelper(compiler, pql, "ORDER By should be only on some/all of the columns passed as arguments to DISTINCT");
+    testUnsupportedQueriesHelper(compiler, pql,
+        "ORDER By should be only on some/all of the columns passed as arguments to DISTINCT");
 
     pql = "SELECT DISTINCT(col1, col2) FROM foo GROUP BY col1";
     testUnsupportedQueriesHelper(compiler, pql, "DISTINCT with GROUP BY is currently not supported");
@@ -55,7 +99,7 @@ public class QueryValidationTest {
       BaseBrokerRequestHandler.validateRequest(brokerRequest, 1000);
       Assert.fail("query should have failed");
     } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().equals(errorMessage));
+      Assert.assertEquals(errorMessage, e.getMessage());
     }
   }
 }
