@@ -313,6 +313,7 @@
                   <mainClass>org.apache.pinot.tools.PinotToolLauncher</mainClass>
                 </manifest>
               </archive>
+              <appendAssemblyId>true</appendAssemblyId>
               <finalName>pinot-tool-launcher</finalName>
             </configuration>
             <phase>package</phase>
@@ -331,6 +332,7 @@
                   <mainClass>org.apache.pinot.tools.query.comparison.QueryComparison</mainClass>
                 </manifest>
               </archive>
+              <appendAssemblyId>true</appendAssemblyId>
               <finalName>query-comparison</finalName>
             </configuration>
             <phase>package</phase>
