@@ -64,7 +64,7 @@ public class TableDataManagerConfig {
   }
 
   public String getTableSegmentStoreRootDir() {
-    return _tableDataManagerConfig.getString(TABLE_DATA_MANAGER_CONSUMER_DIRECTORY);
+    return _tableDataManagerConfig.getString(TABLE_SEGMENT_STORE_ROOT_DIR);
   }
 
   public static TableDataManagerConfig getDefaultHelixTableDataManagerConfig(

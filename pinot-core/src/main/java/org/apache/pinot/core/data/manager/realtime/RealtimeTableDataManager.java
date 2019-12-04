@@ -24,7 +24,6 @@ import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -153,7 +152,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
     try {
       _pinotFS = PinotFSFactory.create(new URI(_tableDataManagerConfig.getTableSegmentStoreRootDir()).getScheme());
-    } catch (URISyntaxException e) {
+    } catch (Exception e) {
       _logger.error("Failed to init Pinot FS from store store URI {}", _tableDataManagerConfig.getTableSegmentStoreRootDir());
     }
   }
@@ -356,7 +355,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       SegmentFetcherFactory.getSegmentFetcher(new URI(uri).getScheme()).fetchSegmentToLocal(new URI(uri), tempFile);
       _logger.info("Downloaded file from {} to {}; Length of downloaded file: {}", uri, tempFile, tempFile.length());
     } catch (Exception e) {
-      _logger.warn("Download segment from {} failed.", uri);
+      _logger.warn("Download segment from {} failed: {}", uri, e.getMessage());
       return false;
     }
     return true;
@@ -439,7 +438,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           _tableDataManagerConfig.getTableSegmentStoreRootDir(), this._tableNameWithType, segmentTarFile.getName())));
       return true;
     } catch (Exception e) {
-      _logger.error("Failed copy segment tar file to segment store {}", segmentTarFile.getName());
+      _logger.error("Failed copy segment tar file to segment store {}: {}", segmentTarFile.getName(), e.getMessage());
     }
     return false;
   }

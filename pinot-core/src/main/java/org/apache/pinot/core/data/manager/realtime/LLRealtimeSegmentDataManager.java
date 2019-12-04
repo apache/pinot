@@ -273,6 +273,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final boolean _isOffHeap;
   private final boolean _nullHandlingEnabled;
   private final SegmentCommitterFactory _segmentCommitterFactory;
+  // Indicating if the segment is waiting to be upload to segment stores.
+  private boolean _waitingForUploadToSegmentStore = false;
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
@@ -594,8 +596,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                     response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit());
                 if (success) {
                   _state = State.COMMITTED;
-                  // Asynchronously upload the segment file to Pinot FS for backup.
-                  uploadSegmentToSegmentStore();
                 } else {
                   // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
                   // Change the state to HOLDING before looping around.
@@ -631,8 +631,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   // Upload the tar file of the committed segment to the configure segment store.
-  private boolean uploadSegmentToSegmentStore() {
-    final File segmentTarFile = new File(_segmentBuildDescriptor.getSegmentTarFilePath());
+  private boolean uploadSegmentToSegmentStore(File segmentTarFile) {
+    if (segmentTarFile == null) {
+      return false;
+    }
+    if (!segmentTarFile.exists()) {
+      segmentLogger.warn("File does not exist: {}", segmentTarFile.getAbsolutePath());
+    }
     return _realtimeTableDataManager.uploadRealtimeSegment(segmentTarFile);
   }
 
@@ -805,7 +810,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (!commitResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
       return false;
     }
-
+    // Asynchronously upload the segment file to Pinot FS for backup.
+    uploadSegmentToSegmentStore(segTarFile);
+    // Reset the flag regardless of the upload results and this means the tar file is free to be removed.
+    _waitingForUploadToSegmentStore = false;
     _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
     removeSegmentFile();
     return true;
@@ -904,7 +912,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   private void removeSegmentFile() {
-    if (_segmentBuildDescriptor != null) {
+    if (_segmentBuildDescriptor != null && !_waitingForUploadToSegmentStore) {
       _segmentBuildDescriptor.deleteSegmentFile();
       _segmentBuildDescriptor = null;
     }
