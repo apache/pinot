@@ -58,8 +58,7 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
         String groupId) {
       try {
         final Constructor constructor = Class.forName(KafkaStarterUtils.KAFKA_STREAM_LEVEL_CONSUMER_CLASS_NAME)
-            .getConstructor(String.class, String.class, StreamConfig.class, Schema.class, InstanceZKMetadata.class,
-                ServerMetrics.class);
+            .getConstructor(String.class, String.class, StreamConfig.class, Schema.class, String.class);
         _streamLevelConsumer = (StreamLevelConsumer) constructor
             .newInstance(clientId, tableName, streamConfig, schema, groupId);
       } catch (Exception e) {
