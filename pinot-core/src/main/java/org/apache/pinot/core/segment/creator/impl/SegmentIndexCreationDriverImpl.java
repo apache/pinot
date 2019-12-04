@@ -32,13 +32,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.MetricFieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.core.data.readers.RecordReaderFactory;
+import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -65,6 +60,12 @@ import org.apache.pinot.core.startree.hll.HllUtil;
 import org.apache.pinot.core.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.core.util.CrcUtils;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.startree.hll.HllConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -105,7 +106,45 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   @Override
   public void init(SegmentGeneratorConfig config)
       throws Exception {
-    init(config, RecordReaderFactory.getRecordReader(config));
+    init(config, getRecordReader(config));
+  }
+
+  private RecordReader getRecordReader(SegmentGeneratorConfig segmentGeneratorConfig)
+      throws Exception {
+    File dataFile = new File(segmentGeneratorConfig.getInputFilePath());
+    Preconditions.checkState(dataFile.exists(), "Input file: " + dataFile.getAbsolutePath() + " does not exist");
+
+    Schema schema = segmentGeneratorConfig.getSchema();
+    FileFormat fileFormat = segmentGeneratorConfig.getFormat();
+    String recordReaderPath = segmentGeneratorConfig.getRecordReaderPath();
+
+    // Allow for instantiation general record readers from a record reader path passed into segment generator config
+    // If this is set, this will override the file format
+    if (recordReaderPath != null) {
+      if (fileFormat != FileFormat.OTHER) {
+        // NOTE: we currently have default file format set to AVRO inside segment generator config, do not want to break
+        // this behavior for clients.
+        LOGGER
+            .warn("Using class: {} to read segment, ignoring configured file format: {}", recordReaderPath, fileFormat);
+      }
+      return org.apache.pinot.spi.data.readers.RecordReaderFactory
+          .getRecordReader(recordReaderPath, dataFile, schema, segmentGeneratorConfig.getReaderConfig());
+    }
+
+    switch (fileFormat) {
+      case AVRO:
+      case GZIPPED_AVRO:
+      case CSV:
+      case JSON:
+      case THRIFT:
+        return org.apache.pinot.spi.data.readers.RecordReaderFactory
+            .getRecordReader(fileFormat, dataFile, schema, segmentGeneratorConfig.getReaderConfig());
+      // NOTE: PinotSegmentRecordReader does not support time conversion (field spec must match)
+      case PINOT:
+        return new PinotSegmentRecordReader(dataFile, schema, segmentGeneratorConfig.getColumnSortOrder());
+      default:
+        throw new UnsupportedOperationException("Unsupported input file format: " + fileFormat);
+    }
   }
 
   public void init(SegmentGeneratorConfig config, RecordReader recordReader) {

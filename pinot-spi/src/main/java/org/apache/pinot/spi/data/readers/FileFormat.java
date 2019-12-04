@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.readers;
+package org.apache.pinot.spi.data.readers;
 
 public enum FileFormat {
   AVRO, GZIPPED_AVRO, CSV, JSON, PINOT, THRIFT, PARQUET, ORC, OTHER

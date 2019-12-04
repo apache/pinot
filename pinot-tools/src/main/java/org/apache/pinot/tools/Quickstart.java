@@ -24,7 +24,7 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.net.URL;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 
