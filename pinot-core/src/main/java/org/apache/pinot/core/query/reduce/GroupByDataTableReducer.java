@@ -107,12 +107,33 @@ public class GroupByDataTableReducer implements DataTableReducer {
     int resultSize = 0;
     Collection<DataTable> dataTables = dataTableMap.values();
 
+    // For group by, PQL behavior is different than the SQL behavior. In the PQL way,
+    // a result is generated for each aggregation in the query,
+    // and the group by keys are not the same across the aggregations
+    // This PQL style of execution makes it impossible to support order by on group by.
+    //
+    // We could not simply change the group by execution behavior,
+    // as that would not be backward compatible for existing users of group by.
+    // As a result, we have 2 modes of group by execution - pql and sql - which can be controlled via query options
+    //
+    // Long term, we may completely move to sql, and keep only full sql mode alive
+    // Until then, we need to support responseFormat = sql for both the modes of execution.
+    // The 4 variants are as described below:
+
     if (_groupByModeSql) {
 
       if (_responseFormatSql) {
+        // 1. groupByMode = sql, responseFormat = sql
+        // This is the primary SQL compliant group by
+
         setSQLGroupByInResultTable(brokerResponseNative, dataSchema, dataTables);
         resultSize = brokerResponseNative.getResultTable().getRows().size();
       } else {
+        // 2. groupByMode = sql, responseFormat = pql
+        // This mode will invoke SQL style group by execution, but present results in PQL way
+        // This mode is useful for users who want to avail of SQL compliant group by behavior,
+        // w/o having to forcefully move to a new result type
+
         setSQLGroupByInAggregationResults(brokerResponseNative, dataSchema, dataTables);
         if (!brokerResponseNative.getAggregationResults().isEmpty()) {
           resultSize = brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size();
@@ -121,13 +142,22 @@ public class GroupByDataTableReducer implements DataTableReducer {
     } else {
 
       if (_responseFormatSql && _numAggregationFunctions > 1) {
+        // 3. groupByMode = pql, responseFormat = sql
+        // This mode is for users who want response presented in SQL style, but want PQL style group by behavior
+        // Multiple aggregations in PQL violates the tabular nature of results
+        // As a result, in this mode, only single aggregations are supported
+
         brokerResponseNative.addToExceptions(new QueryProcessingException(QueryException.MERGE_RESPONSE_ERROR_CODE,
             "Sql response format is unsupported for pql execution mode with multiple aggregations"));
       } else {
+        // 4. groupByMode = pql, responseFormat = pql
+        // This is the primary PQL compliant group by
+
         boolean[] aggregationFunctionSelectStatus =
             AggregationFunctionUtils.getAggregationFunctionsSelectStatus(_aggregationInfos);
         setGroupByHavingResults(brokerResponseNative, aggregationFunctionSelectStatus, dataTables,
             _brokerRequest.getHavingFilterQuery(), _brokerRequest.getHavingFilterSubQueryMap());
+
         if (_responseFormatSql) {
           resultSize = brokerResponseNative.getResultTable().getRows().size();
         } else {

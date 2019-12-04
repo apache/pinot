@@ -434,12 +434,12 @@ public class SelectionOperatorUtils {
   }
 
   /**
-   * Render the selection rows to a formatted {@link ResultTable} object for selection queries without
-   * <code>ORDER BY</code>. (Broker side)
-   * <p>{@link ResultTable} object will be used to build the broker response.
+   * Render the selection rows to a {@link ResultTable} object
+   * for selection queries without <code>ORDER BY</code>
+   * <p>{@link ResultTable} object will be used to set in the broker response.
    * <p>Should be called after method "reduceWithoutOrdering()".
    *
-   * @param rows unformatted selection rows.
+   * @param rows selection rows.
    * @param dataSchema data schema.
    * @return {@link ResultTable} object results.
    */
