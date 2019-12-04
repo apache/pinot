@@ -20,7 +20,7 @@ package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.startree.hll.HllConfig;
 
 

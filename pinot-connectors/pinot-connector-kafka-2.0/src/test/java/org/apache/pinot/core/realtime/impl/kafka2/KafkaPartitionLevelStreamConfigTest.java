@@ -21,8 +21,8 @@ package org.apache.pinot.core.realtime.impl.kafka2;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
-import org.apache.pinot.core.realtime.stream.StreamConfig;
-import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

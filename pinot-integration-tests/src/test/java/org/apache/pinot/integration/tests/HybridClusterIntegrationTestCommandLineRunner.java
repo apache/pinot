@@ -39,7 +39,7 @@ import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
+import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.query.comparison.QueryComparison;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;

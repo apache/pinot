@@ -24,7 +24,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationRuntimeException;
-import org.apache.pinot.common.utils.DataSize;
+import org.apache.pinot.spi.utils.DataSize;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

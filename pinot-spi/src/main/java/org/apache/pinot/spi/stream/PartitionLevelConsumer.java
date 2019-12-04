@@ -16,29 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.stream;
+package org.apache.pinot.spi.stream;
+
+import java.io.Closeable;
+import org.apache.pinot.spi.annotations.InterfaceAudience;
+import org.apache.pinot.spi.annotations.InterfaceStability;
+
 
 /**
- * A class that provides metadata associated with the message of a stream, for e.g.,
- * ingestion-timestamp of the message.
+ * Interface for a consumer which fetches messages at the partition level of a stream, for given offsets
  */
-public class StreamMessageMetadata implements RowMetadata {
-
-  private final long _ingestionTimeMs;
+@InterfaceAudience.Public
+@InterfaceStability.Stable
+public interface PartitionLevelConsumer extends Closeable {
 
   /**
-   * Construct the stream based message/row message metadata
-   *
-   * @param ingestionTimeMs  the time that the message was ingested by the stream provider
-   *                         use Long.MIN_VALUE if not applicable
+   * Fetch messages from the stream between the specified offsets
+   * @param startOffset
+   * @param endOffset
+   * @param timeoutMillis
+   * @return
+   * @throws java.util.concurrent.TimeoutException
    */
-  public StreamMessageMetadata(long ingestionTimeMs) {
-    _ingestionTimeMs = ingestionTimeMs;
-  }
-
-  @Override
-  public long getIngestionTimeMs() {
-    return _ingestionTimeMs;
-  }
-
+  MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
+      throws java.util.concurrent.TimeoutException;
 }

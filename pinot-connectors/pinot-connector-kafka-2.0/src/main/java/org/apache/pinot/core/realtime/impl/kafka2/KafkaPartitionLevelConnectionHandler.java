@@ -29,7 +29,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.BytesDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.utils.Bytes;
-import org.apache.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfig;
 
 
 /**

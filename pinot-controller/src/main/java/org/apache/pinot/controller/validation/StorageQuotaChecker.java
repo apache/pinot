@@ -27,7 +27,7 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.utils.DataSize;
+import org.apache.pinot.spi.utils.DataSize;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

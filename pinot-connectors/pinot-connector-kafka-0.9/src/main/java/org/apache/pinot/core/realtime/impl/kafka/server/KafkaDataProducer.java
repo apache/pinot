@@ -22,7 +22,7 @@ import java.util.Properties;
 import kafka.javaapi.producer.Producer;
 import kafka.producer.KeyedMessage;
 import kafka.producer.ProducerConfig;
-import org.apache.pinot.core.realtime.stream.StreamDataProducer;
+import org.apache.pinot.spi.stream.StreamDataProducer;
 
 
 public class KafkaDataProducer implements StreamDataProducer {

@@ -20,8 +20,12 @@ package org.apache.pinot.core.realtime.stream;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.utils.DataSize;
-import org.apache.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.utils.DataSize;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.testng.Assert;

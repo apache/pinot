@@ -32,7 +32,7 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.controller.util.SegmentIntervalUtils;
 import org.apache.pinot.tools.Command;
 import org.joda.time.Interval;

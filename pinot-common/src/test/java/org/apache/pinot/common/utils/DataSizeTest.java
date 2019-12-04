@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import org.apache.pinot.spi.utils.DataSize;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

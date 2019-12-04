@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.stream;
+package org.apache.pinot.spi.stream;
 
 import java.util.Map;
-import org.apache.pinot.common.Utils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -42,7 +42,7 @@ public abstract class StreamDecoderProvider {
       decoder = (StreamMessageDecoder) Class.forName(decoderClass).newInstance();
       decoder.init(decoderProperties, schema, streamConfig.getTopicName());
     } catch (Exception e) {
-      Utils.rethrowException(e);
+      ExceptionUtils.rethrow(e);
     }
     return decoder;
   }

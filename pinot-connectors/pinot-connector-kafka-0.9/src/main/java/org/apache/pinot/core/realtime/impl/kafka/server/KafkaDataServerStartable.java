@@ -26,7 +26,7 @@ import kafka.server.KafkaConfig;
 import kafka.server.KafkaServerStartable;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.realtime.stream.StreamDataServerStartable;
+import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

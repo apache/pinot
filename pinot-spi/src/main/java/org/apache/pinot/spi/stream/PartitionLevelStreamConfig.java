@@ -16,12 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.stream;
+package org.apache.pinot.spi.stream;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,10 +31,6 @@ import org.slf4j.LoggerFactory;
  */
 public class PartitionLevelStreamConfig extends StreamConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionLevelStreamConfig.class);
-
-  public PartitionLevelStreamConfig(TableConfig tableConfig) {
-    super(tableConfig);
-  }
 
   public PartitionLevelStreamConfig(String tableNameWithType, Map<String, String> streamConfigMap) {
     super(tableNameWithType, streamConfigMap);
