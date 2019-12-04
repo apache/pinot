@@ -120,7 +120,8 @@ public class SegmentUriPushJobRunner {
         }
         RetryPolicies.exponentialBackoffRetryPolicy(attempts, retryWaitMs, 5).attempt(() -> {
           try {
-            SimpleHttpResponse response = fileUploadDownloadClient.sendSegmentUri(controllerURI, segmentUri, tableName);
+            SimpleHttpResponse response = fileUploadDownloadClient
+                .sendSegmentUri(FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentUri, tableName);
             LOGGER.info("Response for pushing table {} segment uri {} to location {} - {}: {}", tableName, segmentUri,
                 controllerURI, response.getStatusCode(), response.getResponse());
             return true;

@@ -73,7 +73,7 @@
                   <transformers>
                     <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                     <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                      <mainClass>org.apache.pinot.spark.PinotSparkJobLauncher</mainClass>
+                      <mainClass>org.apache.pinot.ingestion.standalone.StandaloneIngestionJobLauncher</mainClass>
                     </transformer>
                   </transformers>
                 </configuration>

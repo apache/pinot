@@ -123,8 +123,9 @@ public class SegmentTarPushJobRunner {
         }
         RetryPolicies.exponentialBackoffRetryPolicy(attempts, retryWaitMs, 5).attempt(() -> {
           try (InputStream inputStream = fileSystem.open(tarFileURI)) {
-            SimpleHttpResponse response =
-                fileUploadDownloadClient.uploadSegment(controllerURI, segmentName, inputStream, tableName);
+            SimpleHttpResponse response = fileUploadDownloadClient
+                .uploadSegment(FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentName, inputStream,
+                    tableName);
             LOGGER.info("Response for pushing table {} segment {} to location {} - {}: {}", tableName, segmentName,
                 controllerURI, response.getStatusCode(), response.getResponse());
             return true;
