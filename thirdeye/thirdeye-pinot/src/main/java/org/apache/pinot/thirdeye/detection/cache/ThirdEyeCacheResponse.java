@@ -144,7 +144,6 @@ public class ThirdEyeCacheResponse {
         if (previousTimestamp + timeGranularity < currentTimestamp) {
           long missingIntervalStart = previousTimestamp + timeGranularity;
           long missingIntervalEnd = currentTimestamp - timeGranularity;
-
           missingPeriods.add(new Interval(missingIntervalStart, missingIntervalEnd));
         }
       }

@@ -86,10 +86,9 @@ public class IntervalUtils {
    * turns a list of intervals into a string.
    * Ex. [1-5, 6-6, 9-15] -> "{1-5, 6, 9-15}"
    * @param intervals
-   * @return
+   * @return string form of interval list
    */
   public static String getIntervalRangesAsString(List<Interval> intervals) {
-
     if (intervals.isEmpty()) {
       return "";
     }
