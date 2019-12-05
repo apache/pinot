@@ -25,7 +25,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 
 public class SubscriptionUtils {
 
-  public static DetectionAlertConfigDTO makeChildSubscriptionConfig(Map<String, Map<String, Object>> alertSchemes) {
+  public static DetectionAlertConfigDTO makeChildSubscriptionConfig(Map<String, Object> alertSchemes) {
     return SubscriptionUtils.makeChildSubscriptionConfig(new DetectionAlertConfigDTO(), alertSchemes, null);
   }
 
@@ -36,7 +36,7 @@ public class SubscriptionUtils {
    */
   public static DetectionAlertConfigDTO makeChildSubscriptionConfig(
       DetectionAlertConfigDTO parentConfig,
-      Map<String, Map<String, Object>> alertSchemes,
+      Map<String, Object> alertSchemes,
       Map<String, String> refLinks) {
     DetectionAlertConfigDTO subsConfig = new DetectionAlertConfigDTO();
     subsConfig.setId(parentConfig.getId());

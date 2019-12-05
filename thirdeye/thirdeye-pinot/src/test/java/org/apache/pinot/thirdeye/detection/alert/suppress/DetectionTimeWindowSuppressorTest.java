@@ -63,7 +63,7 @@ public class DetectionTimeWindowSuppressorTest {
     Map<String, Object> params = new HashMap<>();
     params.put(TIME_WINDOWS_KEY, suppressWindowList);
 
-    Map<String, Map<String, Object>> alertSuppressors = new HashMap<>();
+    Map<String, Object> alertSuppressors = new HashMap<>();
     alertSuppressors.put(TIME_WINDOW_SUPPRESSOR_KEY, params);
     config.setAlertSuppressors(alertSuppressors);
   }
@@ -122,7 +122,7 @@ public class DetectionTimeWindowSuppressorTest {
     recipients.put("to", Collections.singleton("test@test"));
 
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
-    Map<String, Map<String, Object>> alertProps = new HashMap<>();
+    Map<String, Object> alertProps = new HashMap<>();
     alertProps.put("emailScheme", recipients);
     DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(alertProps);
     result.addMapping(new DetectionAlertFilterNotification(subsConfig), anomalies);
@@ -149,7 +149,7 @@ public class DetectionTimeWindowSuppressorTest {
     Map<String, Object> params = new HashMap<>();
     params.put(TIME_WINDOWS_KEY, suppressWindowList);
 
-    Map<String, Map<String, Object>> alertSuppressors = new HashMap<>();
+    Map<String, Object> alertSuppressors = new HashMap<>();
     alertSuppressors.put(TIME_WINDOW_SUPPRESSOR_KEY, params);
     config.setAlertSuppressors(alertSuppressors);
 
@@ -157,7 +157,7 @@ public class DetectionTimeWindowSuppressorTest {
     recipients.put("to", Collections.singleton("test@test"));
 
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
-    Map<String, Map<String, Object>> alertProps = new HashMap<>();
+    Map<String, Object> alertProps = new HashMap<>();
     alertProps.put("emailScheme", recipients);
     DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(alertProps);
     result.addMapping(new DetectionAlertFilterNotification(subsConfig), anomalies);

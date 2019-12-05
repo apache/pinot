@@ -29,7 +29,7 @@ public class DetectionAlertTaskFactoryTest {
   private DAOTestBase testDAOProvider;
   private DetectionAlertConfigDTO alertConfigDTO;
   private DetectionAlertConfigManager alertConfigDAO;
-  private Map<String, Map<String, Object>> alerters;
+  private Map<String, Object> alerters;
 
   @BeforeMethod
   public void beforeClass() throws Exception {
@@ -53,7 +53,7 @@ public class DetectionAlertTaskFactoryTest {
     testDAOProvider.cleanup();
   }
 
-  private DetectionAlertConfigDTO createAlertConfig(Map<String, Map<String, Object>> schemes, String filter) {
+  private DetectionAlertConfigDTO createAlertConfig(Map<String, Object> schemes, String filter) {
     Map<String, Object> properties = new HashMap<>();
     properties.put("className", filter);
     properties.put("detectionConfigIds", Collections.singletonList(1000));

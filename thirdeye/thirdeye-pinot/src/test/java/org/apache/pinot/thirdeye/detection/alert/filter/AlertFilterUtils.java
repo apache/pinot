@@ -51,7 +51,7 @@ public class AlertFilterUtils {
 
   static DetectionAlertFilterNotification makeEmailNotifications(DetectionAlertConfigDTO config,
       Set<String> toRecipients, Set<String> ccRecipients, Set<String> bccRecipients) {
-    Map<String, Map<String, Object>> alertProps = new HashMap<>();
+    Map<String, Object> alertProps = new HashMap<>();
 
     Map<String, Set<String>> recipients = new HashMap<>();
     recipients.put(PROP_TO, new HashSet<>(toRecipients));

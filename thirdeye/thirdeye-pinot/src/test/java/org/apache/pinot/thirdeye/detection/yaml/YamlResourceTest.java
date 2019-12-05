@@ -11,6 +11,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
 import java.io.IOException;
 import org.apache.commons.io.IOUtils;
@@ -241,8 +242,8 @@ public class YamlResourceTest {
       Assert.assertEquals(alertDTO.getName(), "Subscription Group Name");
       Assert.assertEquals(alertDTO.getApplication(), "test_application");
       Assert.assertNotNull(alertDTO.getAlertSchemes().get("emailScheme"));
-      Assert.assertEquals(alertDTO.getAlertSchemes().get("emailScheme").get("template"), "ENTITY_GROUPBY_REPORT");
-      Assert.assertEquals(alertDTO.getAlertSchemes().get("emailScheme").get("subject"), "METRICS");
+      Assert.assertEquals(ConfigUtils.getMap(alertDTO.getAlertSchemes().get("emailScheme")).get("template"), "ENTITY_GROUPBY_REPORT");
+      Assert.assertEquals(ConfigUtils.getMap(alertDTO.getAlertSchemes().get("emailScheme")).get("subject"), "METRICS");
 
       // Verify if the vector clock is updated with the updated detection
       Assert.assertEquals(alertDTO.getVectorClocks().keySet().size(), 1);

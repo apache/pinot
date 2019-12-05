@@ -51,7 +51,6 @@ public class PerUserDimensionAlertFilterTest {
   private static final String PROP_DIMENSION = "dimension";
   private static final String PROP_DIMENSION_VALUE = "key";
   private static final String PROP_DIMENSION_TO = "dimensionRecipients";
-  private static final Map<String, Object> ALERT_PROPS = new HashMap<>();
   private static final Map<String, Collection<String>> PROP_DIMENSION_TO_VALUE = new HashMap<>();
   static {
     PROP_DIMENSION_TO_VALUE.put("value", PROP_TO_FOR_VALUE);
