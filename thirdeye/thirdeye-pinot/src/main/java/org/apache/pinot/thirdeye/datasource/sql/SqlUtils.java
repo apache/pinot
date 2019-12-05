@@ -52,6 +52,7 @@ import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.apache.tomcat.jdbc.pool.DataSource;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
@@ -252,7 +253,6 @@ public class SqlUtils {
     sb.append(" WHERE ");
     sb.append(betweenClause);
 
-
     String dimensionWhereClause = getDimensionWhereClause(filterSet);
     if (StringUtils.isNotBlank(dimensionWhereClause)) {
       sb.append(" AND ").append(dimensionWhereClause);
@@ -325,10 +325,25 @@ public class SqlUtils {
       long endUnits = (long) Math.ceil(endExclusive.getMillis() / (double) dataGranularityMillis);
 
       if (startUnits == endUnits) {
-        return String.format(" %s = %d", timeField, startUnits);
+        return String.format("%s = %d", timeField, startUnits);
       }
 
-      return String.format(" %s BETWEEN %d AND %d", timeField, startUnits, endUnits);
+      return String.format("%s BETWEEN %d AND %d", timeField, startUnits, endUnits);
+    }
+
+    // don't enable this piece of code for non-Presto datasets, since we haven't done
+    // enough analysis on their performance.
+    if (sourceName.equals(PRESTO)) {
+      String startTime = getCeilingAlignedStartDateTimeString(start, dataGranularityMillis, timeFormat);
+      String endTime = getFloorAlignedEndDateTimeString(endExclusive, dataGranularityMillis, timeFormat);
+
+      // we may need to consider how the user is storing their data. does it matter
+      // if they are keeping their time field as string vs long? '20191204' vs 20191204.
+
+      if (startTime.equals(endTime)) {
+        return String.format("%s = %s", startTime);
+      }
+      return String.format("%s BETWEEN %s AND %s", timeField, startTime, endTime);
     }
 
     // NOTE:
@@ -341,6 +356,47 @@ public class SqlUtils {
       return String.format(" %s = %d", getToUnixTimeClause(timeFormat, timeField, sourceName), startUnits);
     }
     return String.format(" %s BETWEEN %d AND %d", getToUnixTimeClause(timeFormat, timeField, sourceName), startUnits, endUnits);
+}
+
+  /**
+   * This is used to align a time to the nearest upper boundary and get the string version in dataset's format.
+   * @param dateTime datetime
+   * @return formatted string, aligned to upper bound
+   */
+  private static String getCeilingAlignedStartDateTimeString(DateTime dateTime, long dataGranularityMillis, String timeFormat) {
+    long distanceToNextGranularityBoundary = dateTime.getMillis() % dataGranularityMillis;
+
+    // if the date isn't a perfect multiple of the granularity, then we need to shift the given date to the next granularity.
+    // but if the date is a perfect multiple, we don't need to shift because the start is inclusive.
+    // e.g. 1 day granularity, 12/02/2019 0:00 doesn't need to shift, but 12/02/2019 12:00 needs to shift to 12/03/2019 0:00
+    if (distanceToNextGranularityBoundary == 0) {
+      distanceToNextGranularityBoundary = dataGranularityMillis - (dateTime.getMillis() % dataGranularityMillis);
+    }
+
+    // Round up
+    DateTime alignedDateTime = dateTime.withPeriodAdded(new Period(distanceToNextGranularityBoundary), 1);
+    return DateTimeFormat.forPattern(timeFormat).print(alignedDateTime);
+  }
+
+  /**
+   * This is used to align a time to the nearest lower boundary and get the string version in dataset's format.
+   * @param dateTime datetime
+   * @return formatted string, aligned to lower bound
+   */
+  private static String getFloorAlignedEndDateTimeString(DateTime dateTime, long dataGranularityMillis, String timeFormat) {
+    long distanceToNextGranularityBoundary = dateTime.getMillis() % dataGranularityMillis;
+
+    // if the date is a perfect multiple of the granularity, subtract one whole granularity instead.
+    // e.g. 1 day granularity, 12/03/2019 0:00 needs to become 12/02/2019 0:00 instead to main exclusive end.
+    if (distanceToNextGranularityBoundary == 0) {
+      distanceToNextGranularityBoundary = dataGranularityMillis;
+    }
+
+    DateTimeFormatter formatter = DateTimeFormat.forPattern(timeFormat);
+
+    // Round down, since the end date is exclusive.
+    DateTime alignedDateTime = dateTime.withPeriodAdded(new Period(distanceToNextGranularityBoundary), -1);
+    return DateTimeFormat.forPattern(timeFormat).print(alignedDateTime);
   }
 
   /**
