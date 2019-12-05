@@ -313,27 +313,7 @@
                   <mainClass>org.apache.pinot.tools.PinotToolLauncher</mainClass>
                 </manifest>
               </archive>
-              <appendAssemblyId>true</appendAssemblyId>
               <finalName>pinot-tool-launcher</finalName>
-            </configuration>
-            <phase>package</phase>
-            <goals>
-              <goal>single</goal>
-            </goals>
-          </execution>
-          <execution>
-            <id>build-query-comparison</id>
-            <configuration>
-              <descriptorRefs>
-                <descriptorRef>jar-with-dependencies</descriptorRef>
-              </descriptorRefs>
-              <archive>
-                <manifest>
-                  <mainClass>org.apache.pinot.tools.query.comparison.QueryComparison</mainClass>
-                </manifest>
-              </archive>
-              <appendAssemblyId>true</appendAssemblyId>
-              <finalName>query-comparison</finalName>
             </configuration>
             <phase>package</phase>
             <goals>
