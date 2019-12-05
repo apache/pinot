@@ -127,26 +127,29 @@ public class ThirdEyeCacheResponse {
    */
   private void checkAndLogMissingMiddleSlices() {
 
-    List<String> missingTimestamps = new ArrayList<>();
-    long timeGranularity = request.getRequest().getGroupByTimeGranularity().toMillis();
+    if (!this.hasNoRows()) {
+      List<String> missingTimestamps = new ArrayList<>();
+      long timeGranularity = request.getRequest().getGroupByTimeGranularity().toMillis();
 
-    // remember that we return the cached timeseries in sorted order,
-    // but this assumption is not necessarily true if mergeSliceIntoRows() has been called.
-    for (int i = 1; i < timeSeriesRows.size(); i++) {
-      long previousTimestamp = timeSeriesRows.get(i - 1).getTimestamp();
-      long currentTimestamp = timeSeriesRows.get(i).getTimestamp();
+      // remember that we return the cached timeseries in sorted order,
+      // but this assumption is not necessarily true if mergeSliceIntoRows() has been called.
+      for (int i = 1; i < timeSeriesRows.size(); i++) {
+        long previousTimestamp = timeSeriesRows.get(i - 1).getTimestamp();
+        long currentTimestamp = timeSeriesRows.get(i).getTimestamp();
 
-      // add all missing timestamps between previous timestamp and current timestamp to
-      // the list of missing timestamps.
-      while (previousTimestamp + timeGranularity < currentTimestamp) {
-        missingTimestamps.add(String.valueOf(previousTimestamp + timeGranularity));
-        previousTimestamp += timeGranularity;
+        // add all missing timestamps between previous timestamp and current timestamp to
+        // the list of missing timestamps.
+        while (previousTimestamp + timeGranularity < currentTimestamp) {
+          missingTimestamps.add(String.valueOf(previousTimestamp + timeGranularity));
+          previousTimestamp += timeGranularity;
+        }
       }
-    }
 
-    if (missingTimestamps.size() > 0) {
-      LOG.info("cached time-series for metricUrn {} was missing data points in the middle for {} timestamps: {}",
-          request.getMetricUrn(), missingTimestamps.size(), String.join(",", missingTimestamps));
+      // we will need to evaluate whether this is generating too many logs.
+      if (missingTimestamps.size() > 0) {
+        LOG.info("cached time-series for metricUrn {} was missing data points in the middle for {} timestamps: {}",
+            request.getMetricUrn(), missingTimestamps.size(), String.join(",", missingTimestamps));
+      }
     }
   }
 
