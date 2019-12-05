@@ -128,7 +128,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
             .warn("Using class: {} to read segment, ignoring configured file format: {}", recordReaderPath, fileFormat);
       }
       return org.apache.pinot.spi.data.readers.RecordReaderFactory
-          .getRecordReader(recordReaderPath, dataFile, schema, segmentGeneratorConfig.getReaderConfig());
+          .getRecordReaderByClass(recordReaderPath, dataFile, schema, segmentGeneratorConfig.getReaderConfig());
     }
 
     switch (fileFormat) {
