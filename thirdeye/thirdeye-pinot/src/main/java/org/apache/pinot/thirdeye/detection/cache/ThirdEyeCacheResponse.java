@@ -26,6 +26,8 @@ import java.util.Map;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
+import org.apache.pinot.thirdeye.util.IntervalUtils;
+import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,8 +129,8 @@ public class ThirdEyeCacheResponse {
    */
   private void checkAndLogMissingMiddleSlices() {
 
-    if (!this.hasNoRows()) {
-      List<String> missingTimestamps = new ArrayList<>();
+    if (!this.timeSeriesRows.isEmpty()) {
+      List<Interval> missingPeriods = new ArrayList<>();
       long timeGranularity = request.getRequest().getGroupByTimeGranularity().toMillis();
 
       // remember that we return the cached timeseries in sorted order,
@@ -139,16 +141,18 @@ public class ThirdEyeCacheResponse {
 
         // add all missing timestamps between previous timestamp and current timestamp to
         // the list of missing timestamps.
-        while (previousTimestamp + timeGranularity < currentTimestamp) {
-          missingTimestamps.add(String.valueOf(previousTimestamp + timeGranularity));
-          previousTimestamp += timeGranularity;
+        if (previousTimestamp + timeGranularity < currentTimestamp) {
+          long missingIntervalStart = previousTimestamp + timeGranularity;
+          long missingIntervalEnd = currentTimestamp - timeGranularity;
+
+          missingPeriods.add(new Interval(missingIntervalStart, missingIntervalEnd));
         }
       }
 
       // we will need to evaluate whether this is generating too many logs.
-      if (missingTimestamps.size() > 0) {
-        LOG.info("cached time-series for metricUrn {} was missing data points in the middle for {} timestamps: {}",
-            request.getMetricUrn(), missingTimestamps.size(), String.join(",", missingTimestamps));
+      if (missingPeriods.size() > 0) {
+        LOG.info("cached time-series for metricUrn {} was missing data for {} time slice(s) in the middle: {}",
+            request.getMetricUrn(), missingPeriods.size(), IntervalUtils.getIntervalRangesAsString(missingPeriods));
       }
     }
   }
