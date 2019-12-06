@@ -116,34 +116,32 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     Schema schema = segmentGeneratorConfig.getSchema();
     FileFormat fileFormat = segmentGeneratorConfig.getFormat();
-    String recordReaderPath = segmentGeneratorConfig.getRecordReaderPath();
+    String recordReaderClassName = segmentGeneratorConfig.getRecordReaderPath();
 
     // Allow for instantiation general record readers from a record reader path passed into segment generator config
     // If this is set, this will override the file format
-    if (recordReaderPath != null) {
+    if (recordReaderClassName != null) {
       if (fileFormat != FileFormat.OTHER) {
         // NOTE: we currently have default file format set to AVRO inside segment generator config, do not want to break
         // this behavior for clients.
-        LOGGER
-            .warn("Using class: {} to read segment, ignoring configured file format: {}", recordReaderPath, fileFormat);
+        LOGGER.warn("Using class: {} to read segment, ignoring configured file format: {}", recordReaderClassName,
+            fileFormat);
       }
       return org.apache.pinot.spi.data.readers.RecordReaderFactory
-          .getRecordReaderByClass(recordReaderPath, dataFile, schema, segmentGeneratorConfig.getReaderConfig());
+          .getRecordReaderByClass(recordReaderClassName, dataFile, schema, segmentGeneratorConfig.getReaderConfig());
     }
 
     switch (fileFormat) {
-      case AVRO:
-      case GZIPPED_AVRO:
-      case CSV:
-      case JSON:
-      case THRIFT:
-        return org.apache.pinot.spi.data.readers.RecordReaderFactory
-            .getRecordReader(fileFormat, dataFile, schema, segmentGeneratorConfig.getReaderConfig());
       // NOTE: PinotSegmentRecordReader does not support time conversion (field spec must match)
       case PINOT:
         return new PinotSegmentRecordReader(dataFile, schema, segmentGeneratorConfig.getColumnSortOrder());
       default:
-        throw new UnsupportedOperationException("Unsupported input file format: " + fileFormat);
+        try {
+          return org.apache.pinot.spi.data.readers.RecordReaderFactory
+              .getRecordReader(fileFormat, dataFile, schema, segmentGeneratorConfig.getReaderConfig());
+        } catch (Exception e) {
+          throw new UnsupportedOperationException("Unsupported input file format: '" + fileFormat + "'", e);
+        }
     }
   }
 
