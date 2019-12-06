@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.crypt;
+package org.apache.pinot.spi.crypt;
 
 import java.io.File;
 import org.apache.commons.configuration.Configuration;
