@@ -98,8 +98,8 @@ public class DimensionsRecipientAlertFilter extends StatefulDetectionAlertFilter
       Multimap<String, String> dimensionFilters = ConfigUtils.getMultimap(dimensionRecipient.get(PROP_DIMENSION));
       Set<MergedAnomalyResultDTO> notifyAnomalies = new HashSet<>();
       for (MergedAnomalyResultDTO anomaly : anomalies) {
-        Multimap<String, String> anamolousDims = MetricEntity.fromURN(anomaly.getMetricUrn()).getFilters();
-        if (anamolousDims.entries().containsAll(dimensionFilters.entries())) {
+        Multimap<String, String> anomalousDims = MetricEntity.fromURN(anomaly.getMetricUrn()).getFilters();
+        if (anomalousDims.entries().containsAll(dimensionFilters.entries())) {
           notifyAnomalies.add(anomaly);
         }
       }

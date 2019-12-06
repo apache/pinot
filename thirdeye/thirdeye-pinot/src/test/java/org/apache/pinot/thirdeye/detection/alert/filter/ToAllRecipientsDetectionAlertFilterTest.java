@@ -169,6 +169,7 @@ public class ToAllRecipientsDetectionAlertFilterTest {
     DetectionAlertFilterResult result = this.alertFilter.run();
 
     DetectionAlertFilterNotification notification = AlertFilterUtils.makeEmailNotifications(PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
+    Assert.assertTrue(result.getResult().containsKey(notification));
     Assert.assertEquals(result.getResult().get(notification).size(), 1);
     Assert.assertTrue(result.getResult().get(notification).contains(existingFuture));
   }

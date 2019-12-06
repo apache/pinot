@@ -57,8 +57,8 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
   public static final String PROP_DETECTION_NAMES = "subscribedDetections";
   public static final String PROP_TYPE = "type";
   public static final String PROP_CLASS_NAME = "className";
+  public static final String PROP_PARAM = "params";
 
-  static final String PROP_PARAM = "params";
   static final String PROP_ALERT_SUPPRESSORS = "alertSuppressors";
   static final String PROP_REFERENCE_LINKS = "referenceLinks";
   static final String PROP_TIME_WINDOWS = "timeWindows";
@@ -108,9 +108,9 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
   }
 
   @SuppressWarnings("unchecked")
-  private Map<String,Map<String,Object>> buildAlertSuppressors(Map<String,Object> yamlAlertConfig) {
+  private Map<String, Object> buildAlertSuppressors(Map<String, Object> yamlAlertConfig) {
     List<Map<String, Object>> alertSuppressors = ConfigUtils.getList(yamlAlertConfig.get(PROP_ALERT_SUPPRESSORS));
-    Map<String, Map<String, Object>> alertSuppressorsHolder = new HashMap<>();
+    Map<String, Object> alertSuppressorsHolder = new HashMap<>();
     Map<String, Object> alertSuppressorsParsed = new HashMap<>();
     if (!alertSuppressors.isEmpty()) {
       for (Map<String, Object> alertSuppressor : alertSuppressors) {
@@ -137,9 +137,9 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
   }
 
   @SuppressWarnings("unchecked")
-  private Map<String,Map<String,Object>>  buildAlertSchemes(Map<String,Object> yamlAlertConfig) {
+  private Map<String, Object>  buildAlertSchemes(Map<String,Object> yamlAlertConfig) {
     List<Map<String, Object>> alertSchemes = ConfigUtils.getList(yamlAlertConfig.get(PROP_ALERT_SCHEMES));
-    Map<String, Map<String, Object>> alertSchemesHolder = new HashMap<>();
+    Map<String, Object> alertSchemesHolder = new HashMap<>();
     if (!alertSchemes.isEmpty()) {
       for (Map<String, Object> alertScheme : alertSchemes) {
         Map<String, Object> alertSchemesParsed = new HashMap<>();

@@ -199,7 +199,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
         anomalyResultListOfGroup.sort(COMPARATOR_DESC);
 
         Properties emailClientConfigs = new Properties();
-        emailClientConfigs.putAll(subsConfig.getAlertSchemes().get(PROP_EMAIL_SCHEME));
+        emailClientConfigs.putAll(ConfigUtils.getMap(subsConfig.getAlertSchemes().get(PROP_EMAIL_SCHEME)));
 
         if (emailClientConfigs.get(PROP_RECIPIENTS) != null) {
           Map<String, Object> emailRecipients = ConfigUtils.getMap(emailClientConfigs.get(PROP_RECIPIENTS));

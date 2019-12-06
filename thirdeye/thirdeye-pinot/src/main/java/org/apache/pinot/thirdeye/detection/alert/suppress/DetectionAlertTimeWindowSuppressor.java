@@ -111,7 +111,7 @@ public class DetectionAlertTimeWindowSuppressor extends DetectionAlertSuppressor
     MergedAnomalyResultManager anomalyMergedResultDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
 
     List<Map<String, Object>> suppressWindowPropsList
-        = ConfigUtils.getList(config.getAlertSuppressors().get(TIME_WINDOW_SUPPRESSOR_KEY).get(TIME_WINDOWS_KEY));
+        = ConfigUtils.getList(ConfigUtils.getMap(config.getAlertSuppressors().get(TIME_WINDOW_SUPPRESSOR_KEY)).get(TIME_WINDOWS_KEY));
 
     while (anomaliesIt.hasNext()) {
       MergedAnomalyResultDTO anomaly = anomaliesIt.next();

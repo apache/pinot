@@ -114,27 +114,25 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
     return filteredRecipients;
   }
 
-  protected Map<String, Map<String, Object>> generateNotificationSchemeProps(DetectionAlertConfigDTO config,
+  /**
+   * Extracts the alert schemes from config and also merges (overrides)
+   * recipients explicitly defined outside the scope of alert schemes.
+   */
+  protected Map<String, Object> generateNotificationSchemeProps(DetectionAlertConfigDTO config,
       Set<String> to, Set<String> cc, Set<String> bcc) {
-    Map<String, Map<String, Object>> notificationSchemeProps = new HashMap<>();
+    Map<String, Object> notificationSchemeProps = new HashMap<>();
 
-    if (config.getAlertSchemes() == null) {
-      Map<String, Map<String, Object>> alertSchemes = new HashMap<>();
-      alertSchemes.put(PROP_EMAIL_SCHEME, new HashMap<>());
-      config.setAlertSchemes(alertSchemes);
+    if (config.getAlertSchemes() != null) {
+      notificationSchemeProps.putAll(config.getAlertSchemes());
     }
 
-    for (Map.Entry<String, Map<String, Object>> schemeProps : config.getAlertSchemes().entrySet()) {
-      notificationSchemeProps.put(schemeProps.getKey(), new HashMap<>(schemeProps.getValue()));
-    }
-
-    if (notificationSchemeProps.get(PROP_EMAIL_SCHEME) != null) {
-      Map<String, Set<String>> recipients = new HashMap<>();
-      recipients.put(PROP_TO, cleanupRecipients(to));
-      recipients.put(PROP_CC, cleanupRecipients(cc));
-      recipients.put(PROP_BCC, cleanupRecipients(bcc));
-      ((Map<String, Object>) notificationSchemeProps.get(PROP_EMAIL_SCHEME)).put(PROP_RECIPIENTS, recipients);
-    }
+    Map<String, Object> recipients = new HashMap<>();
+    recipients.put(PROP_TO, cleanupRecipients(to));
+    recipients.put(PROP_CC, cleanupRecipients(cc));
+    recipients.put(PROP_BCC, cleanupRecipients(bcc));
+    Map<String, Object> recipientsHolder = new HashMap<>();
+    recipientsHolder.put(PROP_RECIPIENTS, recipients);
+    notificationSchemeProps.put(PROP_EMAIL_SCHEME, recipientsHolder);
 
     return notificationSchemeProps;
   }
