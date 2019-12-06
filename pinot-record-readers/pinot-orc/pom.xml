@@ -61,7 +61,7 @@
                   <goal>shade</goal>
                 </goals>
                 <configuration>
-                  <outputDirectory>target/plugins/record-reader/orc-record-reader-package</outputDirectory>
+                  <outputDirectory>target/plugins/record-readers/pinot-orc</outputDirectory>
                 </configuration>
               </execution>
             </executions>

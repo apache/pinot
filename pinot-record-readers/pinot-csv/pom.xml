@@ -60,7 +60,7 @@
                   <goal>shade</goal>
                 </goals>
                 <configuration>
-                  <outputDirectory>target/plugins/record-reader/csv-record-reader-package</outputDirectory>
+                  <outputDirectory>target/plugins/record-readers/pinot-csv</outputDirectory>
                 </configuration>
               </execution>
             </executions>

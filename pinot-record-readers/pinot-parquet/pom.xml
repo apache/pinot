@@ -60,7 +60,7 @@
                   <goal>shade</goal>
                 </goals>
                 <configuration>
-                  <outputDirectory>target/plugins/record-reader/parquet-record-reader-package</outputDirectory>
+                  <outputDirectory>target/plugins/record-readers/pinot-parquet</outputDirectory>
                 </configuration>
               </execution>
             </executions>
