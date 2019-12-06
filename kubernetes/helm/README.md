@@ -497,6 +497,30 @@ Splits: 17 total, 17 done (100.00%)
 0:00 [1 rows, 8B] [2 rows/s, 19B/s]
 ```
 
+### (Optional) Deploy more Presto workers
+
+You can run below command to deploy more presto workers if needed.
+
+```bash
+kubectl apply -f presto-worker.yaml
+```
+
+Then you could verify the new worker nodes are added by:
+
+```bash
+presto:default> select * from system.runtime.nodes;
+               node_id                |         http_uri         |      node_version      | coordinator | state
+--------------------------------------+--------------------------+------------------------+-------------+--------
+ 38959968-6262-46a1-a321-ee0db6cbcbd3 | http://10.244.0.182:8080 | 0.230-SNAPSHOT-4e66289 | false       | active
+ 83851b8c-fe7f-49fe-ae0c-e3daf6d92bef | http://10.244.2.183:8080 | 0.230-SNAPSHOT-4e66289 | false       | active
+ presto-coordinator                   | http://10.244.1.25:8080  | 0.230-SNAPSHOT-4e66289 | true        | active
+(3 rows)
+
+Query 20191206_095812_00027_na99c, FINISHED, 2 nodes
+Splits: 17 total, 17 done (100.00%)
+0:00 [3 rows, 248B] [11 rows/s, 984B/s]
+```
+
 ## How to clean up Pinot deployment
 
 ```bash
