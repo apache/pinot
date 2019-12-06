@@ -80,7 +80,8 @@ public class DetectionJiraAlerterTest {
     properties.put(PROP_DETECTION_CONFIG_IDS, Collections.singletonList(this.detectionConfigId));
 
     this.alertConfigDTO = TestJiraContentFormatter.createDimRecipientsDetectionAlertConfig(this.detectionConfigId);
-    this.alertConfigDAO.save(this.alertConfigDTO);
+    long id = this.alertConfigDAO.save(this.alertConfigDTO);
+    alertConfigDTO.setId(id);
 
     MergedAnomalyResultDTO anomalyResultDTO = new MergedAnomalyResultDTO();
     anomalyResultDTO.setStartTime(1000L);
@@ -125,7 +126,9 @@ public class DetectionJiraAlerterTest {
   @Test
   public void testUpdateJiraSuccessful() throws Exception {
     DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(
-        ConfigUtils.getMap(this.alertConfigDTO.getAlertSchemes()));
+        this.alertConfigDTO,
+        ConfigUtils.getMap(this.alertConfigDTO.getAlertSchemes()),
+        new HashMap<>());
     Map<DetectionAlertFilterNotification, Set<MergedAnomalyResultDTO>> result = new HashMap<>();
     result.put(new DetectionAlertFilterNotification(subsConfig), new HashSet<>(this.anomalyDAO.findAll()));
     DetectionAlertFilterResult notificationResults = new DetectionAlertFilterResult(result);
