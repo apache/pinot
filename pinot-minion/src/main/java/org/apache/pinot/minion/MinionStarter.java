@@ -39,7 +39,7 @@ import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
-import org.apache.pinot.core.crypt.PinotCrypterFactory;
+import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.filesystem.PinotFSFactory;
 import org.apache.pinot.minion.events.EventObserverFactoryRegistry;
 import org.apache.pinot.minion.events.MinionEventObserverFactory;

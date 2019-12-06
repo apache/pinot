@@ -71,7 +71,7 @@ import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
 import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
-import org.apache.pinot.core.crypt.PinotCrypterFactory;
+import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.apache.pinot.filesystem.PinotFSFactory;
