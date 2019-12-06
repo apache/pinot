@@ -93,7 +93,8 @@ public class DetectionEmailAlerterTest {
     this.alertConfigDTO.setName(ALERT_NAME_VALUE);
     Map<Long, Long> vectorClocks = new HashMap<>();
     this.alertConfigDTO.setVectorClocks(vectorClocks);
-    this.alertConfigDAO.save(this.alertConfigDTO);
+    long id = this.alertConfigDAO.save(this.alertConfigDTO);
+    this.alertConfigDTO.setId(id);
 
     MergedAnomalyResultDTO anomalyResultDTO = new MergedAnomalyResultDTO();
     anomalyResultDTO.setStartTime(1000L);
@@ -122,7 +123,7 @@ public class DetectionEmailAlerterTest {
   }
 
   @AfterMethod(alwaysRun = true)
-  void afterClass() {
+  void AfterMethod() {
     testDAOProvider.cleanup();
   }
 
@@ -136,7 +137,9 @@ public class DetectionEmailAlerterTest {
   public void testSendEmailSuccessful() throws Exception {
     Map<DetectionAlertFilterNotification, Set<MergedAnomalyResultDTO>> result = new HashMap<>();
     DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(
-        ConfigUtils.getMap(this.alertConfigDTO.getAlertSchemes()));
+        this.alertConfigDTO,
+        ConfigUtils.getMap(this.alertConfigDTO.getAlertSchemes()),
+        new HashMap<>());
     result.put(
         new DetectionAlertFilterNotification(subsConfig),
         new HashSet<>(this.anomalyDAO.findAll()));
