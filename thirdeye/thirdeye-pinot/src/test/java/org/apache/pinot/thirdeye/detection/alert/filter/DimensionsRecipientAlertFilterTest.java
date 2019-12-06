@@ -51,7 +51,7 @@ import static org.apache.pinot.thirdeye.detection.DetectionTestUtils.*;
 import static org.apache.pinot.thirdeye.detection.alert.filter.DimensionsRecipientAlertFilter.*;
 
 
-public class DimensionsDetectionAlertFilterTest {
+public class DimensionsRecipientAlertFilterTest {
 
   private static final String PROP_RECIPIENTS = "recipients";
   private static final String PROP_TO = "to";
@@ -62,13 +62,11 @@ public class DimensionsDetectionAlertFilterTest {
   private static final Set<String> PROP_BCC_VALUE = new HashSet<>(Arrays.asList("bcctest@example.com", "bcctest@example.org"));
   private static final Set<String> PROP_TO_FOR_VALUE = new HashSet<>(Arrays.asList("myTest@example.com", "myTest@example.org"));
   private static final Set<String> PROP_TO_FOR_ANOTHER_VALUE = Collections.singleton("myTest@example.net");
-  //private static final List<Long> PROP_ID_VALUE = Arrays.asList(1001l, 1002l);
   private static final List<Long> PROP_ID_VALUE = new ArrayList<>();
   private static final List<Map<String, Object>> PROP_DIMENSION_RECIPIENTS_VALUE = new ArrayList<>();
 
   private DetectionAlertFilter alertFilter;
   private List<MergedAnomalyResultDTO> detectedAnomalies;
-  private YamlResource yamlResource;
   private MockDataProvider provider;
   private DetectionAlertConfigDTO alertConfig;
   private DAOTestBase testDAOProvider;
@@ -78,7 +76,7 @@ public class DimensionsDetectionAlertFilterTest {
   private long detectionId3;
 
   @BeforeMethod
-  public void beforeMethod() throws IOException {
+  public void beforeMethod() {
     testDAOProvider = DAOTestBase.getInstance();
 
     DetectionAlertRegistry.getInstance().registerAlertFilter("DIMENSIONS_ALERTER_PIPELINE",
@@ -119,6 +117,9 @@ public class DimensionsDetectionAlertFilterTest {
     notificationEmailParams1.put(PROP_RECIPIENTS, recipients1);
     notificationValues1.put("emailScheme", notificationEmailParams1);
     dimensionRecipient1.put(PROP_NOTIFY, notificationValues1);
+    Map<String, String> refLinks1 = new HashMap<>();
+    refLinks1.put("link1", "value1");
+    dimensionRecipient1.put(PROP_REF_LINKS, refLinks1);
 
     Map<String, Object> dimensionRecipient2 = new HashMap<>();
     Multimap<String, String> dimensionKeys2 = ArrayListMultimap.create();
@@ -134,6 +135,9 @@ public class DimensionsDetectionAlertFilterTest {
     notificationEmailParams2.put(PROP_RECIPIENTS, recipients2);
     notificationValues2.put("emailScheme", notificationEmailParams2);
     dimensionRecipient2.put(PROP_NOTIFY, notificationValues2);
+    Map<String, String> refLinks2 = new HashMap<>();
+    refLinks2.put("link2", "value2");
+    dimensionRecipient2.put(PROP_REF_LINKS, refLinks2);
 
     PROP_DIMENSION_RECIPIENTS_VALUE.add(dimensionRecipient1);
     PROP_DIMENSION_RECIPIENTS_VALUE.add(dimensionRecipient2);
@@ -181,6 +185,10 @@ public class DimensionsDetectionAlertFilterTest {
     vectorClocks.put(PROP_ID_VALUE.get(0), 0L);
     alertConfig.setVectorClocks(vectorClocks);
 
+    Map<String, String> refLinks = new HashMap<>();
+    refLinks.put("global_key", "global_value");
+    alertConfig.setReferenceLinks(refLinks);
+
     return alertConfig;
   }
 
@@ -192,25 +200,34 @@ public class DimensionsDetectionAlertFilterTest {
 
     // Send anomalies on un-configured dimensions to default recipients
     // Anomaly 0, 3 and 4 do not fall into any of the dimensionRecipients bucket. Send them to default recipients
-    DetectionAlertFilterNotification recDefault = AlertFilterUtils.makeEmailNotifications();
+    DetectionAlertFilterNotification recDefault = AlertFilterUtils.makeEmailNotifications(
+        this.alertConfig, PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
     Assert.assertEquals(result.getResult().get(recDefault), makeSet(0, 3, 4));
 
+    // Send anomalies who dimensions are configured to appropriate recipients
+    DetectionAlertFilterNotification recValue = AlertFilterUtils.makeEmailNotifications(
+        this.alertConfig, PROP_TO_FOR_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
     Multimap<String, String> dimFilters = ArrayListMultimap.create();
     dimFilters.put("key", "value");
-
-    // Send anomalies who dimensions are configured to appropriate recipients
-    DetectionAlertFilterNotification recValue = AlertFilterUtils.makeEmailNotifications(PROP_TO_FOR_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
     recValue.setDimensionFilters(dimFilters);
+    Map<String, String> refLinks = new HashMap<>();
+    refLinks.put("link1", "value1");
+    recValue.getSubscriptionConfig().setReferenceLinks(refLinks);
+    Assert.assertTrue(result.getResult().containsKey(recValue));
     Assert.assertEquals(result.getResult().get(recValue), makeSet(1, 5));
-
-    dimFilters.removeAll("key");
-    dimFilters.put("key1", "anotherValue1");
-    dimFilters.put("key2", "anotherValue2");
 
     // Send alert when configured dimensions is a subset of anomaly dimensions
     // Anomaly 2 occurs on 3 dimensions (key 1, 2 & 3), dimensionRecipients is configured on (key 1 & 2) - send alert
-    DetectionAlertFilterNotification recAnotherValue = AlertFilterUtils.makeEmailNotifications(PROP_TO_FOR_ANOTHER_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
+    DetectionAlertFilterNotification recAnotherValue = AlertFilterUtils.makeEmailNotifications(
+        this.alertConfig, PROP_TO_FOR_ANOTHER_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
+    dimFilters.removeAll("key");
+    dimFilters.put("key1", "anotherValue1");
+    dimFilters.put("key2", "anotherValue2");
     recAnotherValue.setDimensionFilters(dimFilters);
+    refLinks.clear();
+    refLinks.put("link2", "value2");
+    recAnotherValue.getSubscriptionConfig().setReferenceLinks(refLinks);
+    Assert.assertTrue(result.getResult().containsKey(recAnotherValue));
     Assert.assertEquals(result.getResult().get(recAnotherValue), makeSet(2));
   }
 
@@ -224,10 +241,14 @@ public class DimensionsDetectionAlertFilterTest {
 
     this.detectedAnomalies.add(child);
 
+    DetectionAlertFilterNotification recValue = AlertFilterUtils.makeEmailNotifications(
+        this.alertConfig, PROP_TO_FOR_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
     Multimap<String, String> dimFilters = ArrayListMultimap.create();
     dimFilters.put("key", "value");
-    DetectionAlertFilterNotification recValue = AlertFilterUtils.makeEmailNotifications(PROP_TO_FOR_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
     recValue.setDimensionFilters(dimFilters);
+    Map<String, String> refLinks = new HashMap<>();
+    refLinks.put("link1", "value1");
+    recValue.getSubscriptionConfig().setReferenceLinks(refLinks);
 
     DetectionAlertFilterResult result = this.alertFilter.run();
 
@@ -262,17 +283,21 @@ public class DimensionsDetectionAlertFilterTest {
     DetectionAlertFilterResult result = this.alertFilter.run();
     Assert.assertEquals(result.getResult().size(), 2);
 
-    Multimap<String, String> dimFilters = ArrayListMultimap.create();
-    dimFilters.put("key", "value");
-
-    DetectionAlertFilterNotification recDefault = AlertFilterUtils.makeEmailNotifications(PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
+    DetectionAlertFilterNotification recDefault = AlertFilterUtils.makeEmailNotifications(
+        this.alertConfig, PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
     Assert.assertTrue(result.getResult().containsKey(recDefault));
     Assert.assertEquals(result.getResult().get(recDefault).size(), 2);
     Assert.assertTrue(result.getResult().get(recDefault).contains(anomalyWithoutFeedback));
     Assert.assertTrue(result.getResult().get(recDefault).contains(anomalyWithNull));
 
-    DetectionAlertFilterNotification recValue = AlertFilterUtils.makeEmailNotifications(PROP_TO_FOR_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
+    DetectionAlertFilterNotification recValue = AlertFilterUtils.makeEmailNotifications(
+        this.alertConfig, PROP_TO_FOR_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
+    Multimap<String, String> dimFilters = ArrayListMultimap.create();
+    dimFilters.put("key", "value");
     recValue.setDimensionFilters(dimFilters);
+    Map<String, String> refLinks = new HashMap<>();
+    refLinks.put("link1", "value1");
+    recValue.getSubscriptionConfig().setReferenceLinks(refLinks);
     Assert.assertTrue(result.getResult().containsKey(recValue));
     Assert.assertEquals(result.getResult().get(recValue).size(), 1);
   }

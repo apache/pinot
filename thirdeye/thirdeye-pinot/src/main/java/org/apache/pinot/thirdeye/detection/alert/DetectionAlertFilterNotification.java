@@ -24,6 +24,7 @@ import com.google.common.collect.Multimap;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 
 
 /**
@@ -31,24 +32,24 @@ import java.util.Objects;
  */
 public class DetectionAlertFilterNotification {
 
-  Map<String, Object> notificationSchemeProps;
+  DetectionAlertConfigDTO subsConfig;
   Multimap<String, String> dimensionFilters;
 
-  public DetectionAlertFilterNotification(Map<String, Object> notificationSchemeProps) {
-    this(notificationSchemeProps, ArrayListMultimap.create());
+  public DetectionAlertFilterNotification(DetectionAlertConfigDTO subsConfig) {
+    this(subsConfig, ArrayListMultimap.create());
   }
 
-  public DetectionAlertFilterNotification(Map<String, Object> notificationSchemeProps, Multimap<String, String> dimensionFilters) {
-    this.notificationSchemeProps = notificationSchemeProps;
+  public DetectionAlertFilterNotification(DetectionAlertConfigDTO subsConfig, Multimap<String, String> dimensionFilters) {
+    this.subsConfig = subsConfig;
     this.dimensionFilters = dimensionFilters;
   }
 
-  public Map<String, Object> getNotificationSchemeProps() {
-    return notificationSchemeProps;
+  public DetectionAlertConfigDTO getSubscriptionConfig() {
+    return subsConfig;
   }
 
-  public void setNotificationSchemeProps(Map<String, Object> notificationSchemeProps) {
-    this.notificationSchemeProps = notificationSchemeProps;
+  public void setSubscriptionConfig(DetectionAlertConfigDTO subsConfig) {
+    this.subsConfig = subsConfig;
   }
 
   public Multimap<String, String> getDimensionFilters() {
@@ -68,13 +69,13 @@ public class DetectionAlertFilterNotification {
       return false;
     }
     DetectionAlertFilterNotification that = (DetectionAlertFilterNotification) o;
-    return Objects.equals(notificationSchemeProps, that.notificationSchemeProps) &&
+    return Objects.equals(subsConfig, that.subsConfig) &&
         Objects.equals(dimensionFilters, that.dimensionFilters);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(notificationSchemeProps, dimensionFilters);
+    return Objects.hash(subsConfig, dimensionFilters);
   }
 
 }

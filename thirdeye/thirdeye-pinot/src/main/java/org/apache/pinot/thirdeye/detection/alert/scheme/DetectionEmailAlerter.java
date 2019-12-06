@@ -137,14 +137,15 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     }
   }
 
-  private HtmlEmail prepareEmailContent(Properties emailClientConfigs, List<AnomalyResult> anomalies, DetectionAlertFilterRecipients recipients) throws Exception {
+  private HtmlEmail prepareEmailContent(DetectionAlertConfigDTO subsConfig, Properties emailClientConfigs,
+      List<AnomalyResult> anomalies, DetectionAlertFilterRecipients recipients) throws Exception {
     configureAdminRecipients(recipients);
     whitelistRecipients(recipients);
     blacklistRecipients(recipients);
     validateAlert(recipients, anomalies);
 
     BaseNotificationContent content = buildNotificationContent(emailClientConfigs);
-    EmailEntity emailEntity = new EmailContentFormatter(emailClientConfigs, content, this.teConfig, this.subsConfig)
+    EmailEntity emailEntity = new EmailContentFormatter(emailClientConfigs, content, this.teConfig, subsConfig)
         .getEmailEntity(anomalies);
     if (Strings.isNullOrEmpty(this.subsConfig.getFrom())) {
       throw new IllegalArgumentException("Invalid sender's email");
@@ -189,16 +190,16 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     Preconditions.checkNotNull(results.getResult());
     for (Map.Entry<DetectionAlertFilterNotification, Set<MergedAnomalyResultDTO>> result : results.getResult().entrySet()) {
       try {
-        Map<String, Object> notificationSchemeProps = result.getKey().getNotificationSchemeProps();
-        if (notificationSchemeProps == null || notificationSchemeProps.get(PROP_EMAIL_SCHEME) == null) {
+        DetectionAlertConfigDTO subsConfig = result.getKey().getSubscriptionConfig();
+        if (subsConfig.getAlertSchemes().get(PROP_EMAIL_SCHEME) == null) {
           throw new IllegalArgumentException("Invalid email settings in subscription group " + this.subsConfig.getId());
         }
 
-        Properties emailClientConfigs = new Properties();
-        emailClientConfigs.putAll(ConfigUtils.getMap(notificationSchemeProps.get(PROP_EMAIL_SCHEME)));
-
         List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>(result.getValue());
         anomalyResultListOfGroup.sort(COMPARATOR_DESC);
+
+        Properties emailClientConfigs = new Properties();
+        emailClientConfigs.putAll(subsConfig.getAlertSchemes().get(PROP_EMAIL_SCHEME));
 
         if (emailClientConfigs.get(PROP_RECIPIENTS) != null) {
           Map<String, Object> emailRecipients = ConfigUtils.getMap(emailClientConfigs.get(PROP_RECIPIENTS));
@@ -210,7 +211,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
               new HashSet<>(ConfigUtils.getList(emailRecipients.get(PROP_TO))),
               new HashSet<>(ConfigUtils.getList(emailRecipients.get(PROP_CC))),
               new HashSet<>(ConfigUtils.getList(emailRecipients.get(PROP_BCC))));
-          sendEmail(prepareEmailContent(emailClientConfigs, anomalyResultListOfGroup, recipients));
+          sendEmail(prepareEmailContent(subsConfig, emailClientConfigs, anomalyResultListOfGroup, recipients));
         }
       } catch (IllegalArgumentException e) {
         super.handleAlertFailure(result.getValue().size(), e);

@@ -20,7 +20,6 @@
 package org.apache.pinot.thirdeye.detection.alert.filter;
 
 import com.google.common.collect.Multimap;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +40,9 @@ import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
  * The detection alert filter that can send notifications through multiple channels
  * to a set of unconditional and another set of conditional recipients, based on the
  * value of a specified anomaly dimension combinations.
+ *
+ * Unlike {@link DimensionDetectionAlertFilter}, here you can configure multiple dimension
+ * combinations along with a variety of alerting channels and reference links.
  *
  * <pre>
  * dimensionRecipients:
@@ -69,19 +71,16 @@ public class DimensionsRecipientAlertFilter extends StatefulDetectionAlertFilter
   public static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   public static final String PROP_DIMENSION = "dimensions";
   public static final String PROP_NOTIFY = "notify";
+  public static final String PROP_REF_LINKS = "referenceLinks";
   public static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
   private static final String PROP_SEND_ONCE = "sendOnce";
 
-  private Map<String, Object> defaultNotificationSchemeProps = new HashMap<>();
   final List<Map<String, Object>> dimensionRecipients;
   final List<Long> detectionConfigIds;
   final boolean sendOnce;
 
   public DimensionsRecipientAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) {
     super(provider, config, endTime);
-    for (Map.Entry<String, Map<String, Object>> schemeProps : this.config.getAlertSchemes().entrySet()) {
-      defaultNotificationSchemeProps.put(schemeProps.getKey(), new HashMap<>(schemeProps.getValue()));
-    }
     this.dimensionRecipients = ConfigUtils.getList(this.config.getProperties().get(PROP_DIMENSION_RECIPIENTS));
     this.detectionConfigIds = ConfigUtils.getLongs(this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS));
     this.sendOnce = MapUtils.getBoolean(this.config.getProperties(), PROP_SEND_ONCE, true);
@@ -106,8 +105,10 @@ public class DimensionsRecipientAlertFilter extends StatefulDetectionAlertFilter
       }
 
       if (!notifyAnomalies.isEmpty()) {
+        DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(config,
+            ConfigUtils.getMap(dimensionRecipient.get(PROP_NOTIFY)), ConfigUtils.getMap(dimensionRecipient.get(PROP_REF_LINKS)));
         result.addMapping(
-            new DetectionAlertFilterNotification(ConfigUtils.getMap(dimensionRecipient.get(PROP_NOTIFY)), dimensionFilters),
+            new DetectionAlertFilterNotification(subsConfig, dimensionFilters),
             notifyAnomalies);
       }
     }
@@ -121,7 +122,7 @@ public class DimensionsRecipientAlertFilter extends StatefulDetectionAlertFilter
       }
     }
     if (!defaultAnomalies.isEmpty()) {
-      result.addMapping(new DetectionAlertFilterNotification(defaultNotificationSchemeProps), defaultAnomalies);
+      result.addMapping(new DetectionAlertFilterNotification(config), defaultAnomalies);
     }
 
     return result;
