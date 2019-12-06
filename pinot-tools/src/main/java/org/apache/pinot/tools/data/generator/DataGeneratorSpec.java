@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
-import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.FileFormat;
 
 
 /**

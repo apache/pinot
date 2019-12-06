@@ -32,7 +32,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.Schema.SchemaBuilder;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.data.generator.DataGenerator;
 import org.apache.pinot.tools.data.generator.DataGeneratorSpec;

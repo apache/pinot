@@ -38,19 +38,13 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * Record reader for JSON file.
  */
 public class JSONRecordReader implements RecordReader {
-  private final File _dataFile;
-  private final Schema _schema;
-  private final List<FieldSpec> _fieldSpecs;
+  private File _dataFile;
+  private Schema _schema;
+  private List<FieldSpec> _fieldSpecs;
 
   private MappingIterator<Map<String, Object>> _iterator;
 
-  public JSONRecordReader(File dataFile, Schema schema)
-      throws IOException {
-    _dataFile = dataFile;
-    _schema = schema;
-    _fieldSpecs = RecordReaderUtils.extractFieldSpecs(schema);
-
-    init();
+  public JSONRecordReader() {
   }
 
   private void init()
@@ -65,7 +59,12 @@ public class JSONRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig) {
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig)
+      throws IOException {
+    _dataFile = dataFile;
+    _schema = schema;
+    _fieldSpecs = RecordReaderUtils.extractFieldSpecs(schema);
+    init();
   }
 
   @Override

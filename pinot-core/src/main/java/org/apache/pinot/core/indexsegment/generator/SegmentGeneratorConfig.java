@@ -42,15 +42,14 @@ import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.StarTreeIndexConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.csv.data.readers.CSVRecordReaderConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.RecordReaderFactory;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.segment.name.FixedSegmentNameGenerator;
@@ -640,7 +639,13 @@ public class SegmentGeneratorConfig {
     }
 
     if (_readerConfigFile != null) {
-      setReaderConfig(JsonUtils.fileToObject(new File(_readerConfigFile), CSVRecordReaderConfig.class));
+      try {
+        setReaderConfig(RecordReaderFactory.getRecordReaderConfig(FileFormat.CSV, _readerConfigFile));
+      } catch (IOException e) {
+        throw e;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 

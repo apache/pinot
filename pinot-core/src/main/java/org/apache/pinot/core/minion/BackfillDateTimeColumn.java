@@ -24,7 +24,7 @@ import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.segment.StarTreeMetadata;
-import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;

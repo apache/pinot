@@ -20,7 +20,7 @@ package org.apache.pinot.tools;
 
 import java.io.File;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
-import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.FileFormat;
 
 
 public class QuickstartTableRequest {

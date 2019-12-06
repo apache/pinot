@@ -24,7 +24,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;

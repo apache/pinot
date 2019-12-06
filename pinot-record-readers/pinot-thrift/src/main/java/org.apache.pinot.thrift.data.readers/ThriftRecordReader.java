@@ -42,31 +42,17 @@ import org.apache.thrift.transport.TIOStreamTransport;
  * Record reader for Thrift file.
  */
 public class ThriftRecordReader implements RecordReader {
-  private final File _dataFile;
-  private final Schema _schema;
-  private final List<FieldSpec> _fieldSpecs;
-  private final Class<?> _thriftClass;
-  private final Map<String, Integer> _fieldIds = new HashMap<>();
+  private File _dataFile;
+  private Schema _schema;
+  private List<FieldSpec> _fieldSpecs;
+  private Class<?> _thriftClass;
+  private Map<String, Integer> _fieldIds = new HashMap<>();
 
   private InputStream _inputStream;
   private TProtocol _tProtocol;
   private boolean _hasNext;
 
-  public ThriftRecordReader(File dataFile, Schema schema, ThriftRecordReaderConfig recordReaderConfig)
-      throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException {
-    _dataFile = dataFile;
-    _schema = schema;
-    _fieldSpecs = RecordReaderUtils.extractFieldSpecs(schema);
-    _thriftClass = Class.forName(recordReaderConfig.getThriftClass());
-    TBase tObject = (TBase) _thriftClass.newInstance();
-    int index = 1;
-    TFieldIdEnum tFieldIdEnum;
-    while ((tFieldIdEnum = tObject.fieldForId(index)) != null) {
-      _fieldIds.put(tFieldIdEnum.getFieldName(), index);
-      index++;
-    }
-
-    init();
+  public ThriftRecordReader() {
   }
 
   private void init()
@@ -90,7 +76,27 @@ public class ThriftRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig recordReaderConfig) {
+  public void init(File dataFile, Schema schema, @Nullable RecordReaderConfig config)
+      throws IOException {
+    ThriftRecordReaderConfig recordReaderConfig = (ThriftRecordReaderConfig) config;
+    _dataFile = dataFile;
+    _schema = schema;
+    _fieldSpecs = RecordReaderUtils.extractFieldSpecs(schema);
+    TBase tObject;
+    try {
+      _thriftClass = Class.forName(recordReaderConfig.getThriftClass());
+      tObject = (TBase) _thriftClass.newInstance();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+    int index = 1;
+    TFieldIdEnum tFieldIdEnum;
+    while ((tFieldIdEnum = tObject.fieldForId(index)) != null) {
+      _fieldIds.put(tFieldIdEnum.getFieldName(), index);
+      index++;
+    }
+
+    init();
   }
 
   @Override
