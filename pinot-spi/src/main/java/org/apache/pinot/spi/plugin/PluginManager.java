@@ -25,6 +25,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -32,14 +33,14 @@ import org.apache.commons.io.FileUtils;
 
 public class PluginManager {
 
+  public static final String DEFAULT_PLUGIN_NAME = "DEFAULT";
   static PluginManager PLUGIN_MANAGER = new PluginManager();
 
   Map<Plugin, PluginClassLoader> _registry = new HashMap<>();
 
   private PluginManager() {
-
+    _registry.put(new Plugin(DEFAULT_PLUGIN_NAME), createClassLoader(Collections.emptyList()));
   }
-
 
   /**
    * Loads jars recursively
@@ -68,11 +69,79 @@ public class PluginManager {
     return new PluginClassLoader(urls, Thread.currentThread().getContextClassLoader());
   }
 
-  public Class<?> loadClass(String pluginName, String className)
+  /**
+   * Loads a class. The class name can be in any of the following formats
+   * <li>com.x.y.foo</li> loads the class in the default class path
+   * <li>pluginName:com.x.y.foo</li> loads the class in plugin specific classloader
+   * @param className
+   * @return
+   * @throws ClassNotFoundException
+   */
+  public Class<?> loadClass(String className)
       throws ClassNotFoundException {
-    return PLUGIN_MANAGER._registry.get(new Plugin(pluginName)).loadClass(className, true);
+    String pluginName = DEFAULT_PLUGIN_NAME;
+    String realClassName = DEFAULT_PLUGIN_NAME;
+    if (className.indexOf(":") > -1) {
+      String[] split = className.split("\\:");
+      pluginName = split[0];
+      realClassName = split[1];
+    }
+    return loadClass(pluginName, realClassName);
   }
 
+  /**
+   * Loads a class using the plugin specific class loader
+   * @param pluginName
+   * @param className
+   * @return
+   * @throws ClassNotFoundException
+   */
+  public Class<?> loadClass(String pluginName, String className)
+      throws ClassNotFoundException {
+    return _registry.get(new Plugin(pluginName)).loadClass(className, true);
+  }
+
+  /**
+   * Create an instance of the className. The className can be in any of the following formats
+   * <li>com.x.y.foo</li> loads the class in the default class path
+   * <li>pluginName:com.x.y.foo</li> loads the class in plugin specific classloader
+   * @param className
+   * @return
+   * @throws ClassNotFoundException
+   */
+  public <T> T createInstance(String className)
+      throws Exception {
+    return createInstance(className, new Class[]{}, new Object[]{});
+  }
+
+  /**
+   * Create an instance of the className. The className can be in any of the following formats
+   * <li>com.x.y.foo</li> loads the class in the default class path
+   * <li>pluginName:com.x.y.foo</li> loads the class in plugin specific classloader
+   * @param className
+   * @return
+   * @throws ClassNotFoundException
+   */
+  public <T> T createInstance(String className, Class[] argTypes, Object[] argValues)
+      throws Exception {
+    String pluginName = DEFAULT_PLUGIN_NAME;
+    String realClassName = DEFAULT_PLUGIN_NAME;
+    if (className.indexOf(":") > -1) {
+      String[] split = className.split("\\:");
+      pluginName = split[0];
+      realClassName = split[1];
+    }
+    return createInstance(pluginName, realClassName, argTypes, argValues);
+  }
+
+  /**
+   * Creates an instance of className using classloader specific to the plugin
+   * @param pluginName
+   * @param className
+   * @param <T>
+   * @return
+   * @throws Exception
+   */
   public <T> T createInstance(String pluginName, String className)
       throws Exception {
     return createInstance(pluginName, className, new Class[]{}, new Object[]{});
