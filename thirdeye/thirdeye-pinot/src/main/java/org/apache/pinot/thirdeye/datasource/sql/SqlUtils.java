@@ -564,6 +564,8 @@ public class SqlUtils {
         return "%y%m%d";
       case "yyyy-MM-dd hh:mm:ss":
         return "%Y-%m-%d %H:%i:%s";
+      case "yyyy-MM-dd-HH":
+        return "%Y-%m-%d-%H";
       default:
           return "%Y-%m-%d %H:%i:%s";
     }
