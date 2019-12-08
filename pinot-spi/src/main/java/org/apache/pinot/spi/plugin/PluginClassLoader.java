@@ -58,10 +58,6 @@ public class PluginClassLoader extends URLClassLoader {
   @Override
   protected Class<?> loadClass(String name, boolean resolve)
       throws ClassNotFoundException {
-    if (name.endsWith("LocalFileSystem")) {
-      System.out.println("name = " + name);
-    }
-    System.out.println("PluginClassLoader.loadClass: " + name);
     // has the class loaded already?
     Class<?> loadedClass = findLoadedClass(name);
     if (loadedClass == null) {

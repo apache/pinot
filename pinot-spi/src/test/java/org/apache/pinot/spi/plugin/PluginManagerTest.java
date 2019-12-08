@@ -19,86 +19,75 @@
 package org.apache.pinot.spi.plugin;
 
 import java.io.File;
-import org.apache.pinot.spi.data.Schema;
+import java.io.FileOutputStream;
+import java.net.URL;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
+import javax.tools.JavaCompiler;
+import javax.tools.ToolProvider;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
-//import org.xeustechnologies.jcl.JarClassLoader;
-//import org.xeustechnologies.jcl.JclObjectFactory;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 public class PluginManagerTest {
-//  public static void main(String[] args)
-//      throws Exception {
-////    testAvro();
-//
-////    testParquetWithJcl();
-//    testParquet();
-//  }
-//
-//  private static void testParquetWithJcl()
-//      throws Exception {
-//    File dir = new File("/tmp/pinot-plugins/pinot-parquet");
-//    PluginManager pluginManager = PluginManager.get();
-//    String pluginName = "pinot-parquet";
-//    pluginManager.load(pluginName, dir);
-//
-//    JarClassLoader jcl = new JarClassLoader();
-//    jcl.add(dir.toURI().toURL());
-//
-//    String parquetFilePath = "/tmp/sample.c000.snappy.parquet";
-//    File pinotSchemaFile = new File("/tmp/ops_wb_table_schema.json");
-//    Schema pinotSchema = Schema.fromFile(pinotSchemaFile);
-//    String recordReaderClassName = "org.apache.pinot.parquet.data.readers.ParquetRecordReader";
-//
-//    jcl.loadClass(recordReaderClassName, true);
-//    JclObjectFactory objectFactory = JclObjectFactory.getInstance();
-//    RecordReader recordReader = (RecordReader) objectFactory.create(jcl, recordReaderClassName);
-//    recordReader.init(new File(parquetFilePath), pinotSchema, null);
-//    while (recordReader.hasNext()) {
-//      GenericRow row = recordReader.next();
-//      System.out.println("row = " + row);
-//    }
-//  }
-//
-//  private static void testParquet()
-//      throws Exception {
-//    File dir = new File("/tmp/pinot-plugins/pinot-parquet");
-//    PluginManager pluginManager = PluginManager.get();
-//    String pluginName = "pinot-parquet";
-//    pluginManager.load(pluginName, dir);
-//
-//    String recordReaderClassName = "org.apache.pinot.parquet.data.readers.ParquetRecordReader";
-//    Class<?> recordReaderClass = pluginManager.loadClass(pluginName, recordReaderClassName);
-//    Class<?> fsClass = pluginManager.loadClass(pluginName, "org.apache.hadoop.fs.LocalFileSystem");
-//    System.out.println("recordReaderClass = " + recordReaderClass);
-//
-//    String parquetFilePath = "/tmp/sample.c000.snappy.parquet";
-//    File pinotSchemaFile = new File("/tmp/ops_wb_table_schema.json");
-//    Schema pinotSchema = Schema.fromFile(pinotSchemaFile);
-//
-//    RecordReader recordReader =
-//        pluginManager.createInstance(pluginName, recordReaderClassName, new Class[]{}, new Object[]{});
-//    Thread.currentThread().setContextClassLoader(recordReader.getClass().getClassLoader());
-//    recordReader.init(new File(parquetFilePath), pinotSchema, null);
-//
-//    while (recordReader.hasNext()) {
-//      GenericRow row = recordReader.next();
-//      System.out.println("row = " + row);
-//    }
-//  }
-//
-//  private static void testAvro()
-//      throws ClassNotFoundException {
-//    File dir =
-//        new File("/Users/kishoreg/projects/incubator-pinot/pinot-record-readers/pinot-avro/target/pinot-avro-pkg");
-//    PluginManager pluginManager = PluginManager.get();
-//    pluginManager.load("pinot-avro", dir);
-//
-//    Class<?> recordReaderClass =
-//        pluginManager.loadClass("pinot-avro", "org.apache.pinot.avro.data.readers.AvroRecordReader");
-//    System.out.println("recordReaderClass = " + recordReaderClass);
-//
-//    String avroFilePath =
-//        "/Users/kishoreg/projects/incubator-pinot/pinot-tools/src/main/resources/sample_data/airlineStats_data.avro";
-//  }
+
+  private File tempDir;
+  private String jarFile;
+  private File jarDirFile;
+
+  @BeforeClass
+  public void setup() {
+
+    tempDir = new File(System.getProperty("java.io.tmpdir"), "pinot-plugin-test");
+    tempDir.delete();
+    tempDir.mkdirs();
+
+    String jarDir = tempDir + "/" + "test-record-reader";
+    jarFile = jarDir + "/" + "test-record-reader.jar";
+    jarDirFile = new File(jarDir);
+    jarDirFile.mkdirs();
+  }
+
+  @Test
+  public void testSimple()
+      throws Exception {
+    JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+    URL javaFile = Thread.currentThread().getContextClassLoader().getResource("TestRecordReader.java");
+    if (javaFile != null) {
+      compiler.run(null, null, null, javaFile.getFile(), "-d", tempDir.getAbsolutePath());
+
+      URL classFile = Thread.currentThread().getContextClassLoader().getResource("TestRecordReader.class");
+
+      if (classFile != null) {
+        JarOutputStream jos = new JarOutputStream(new FileOutputStream(jarFile));
+        jos.putNextEntry(new JarEntry(new File(classFile.getFile()).getName()));
+        jos.write(FileUtils.readFileToByteArray(new File(classFile.getFile())));
+        jos.closeEntry();
+        jos.close();
+
+        PluginManager.get().load("test-record-reader", jarDirFile);
+
+        RecordReader testRecordReader = PluginManager.get().createInstance("test-record-reader", "TestRecordReader");
+        testRecordReader.init(null, null, null);
+        int count = 0;
+        while (testRecordReader.hasNext()) {
+          GenericRow row = testRecordReader.next();
+          count++;
+        }
+
+        Assert.assertEquals(count, 10);
+      }
+    }
+  }
+
+  @AfterClass
+  public void tearDown() {
+    tempDir.delete();
+    FileUtils.deleteQuietly(jarDirFile);
+  }
 }

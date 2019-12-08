@@ -66,7 +66,7 @@ public class PluginManager {
     urlList.toArray(urls);
     //always sort to make the behavior predictable
     Arrays.sort(urls);
-    return new PluginClassLoader(urls, Thread.currentThread().getContextClassLoader());
+    return new PluginClassLoader(urls, this.getClass().getClassLoader());
   }
 
   /**
