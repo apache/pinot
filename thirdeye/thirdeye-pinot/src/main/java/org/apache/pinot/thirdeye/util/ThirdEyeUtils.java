@@ -97,6 +97,12 @@ public abstract class ThirdEyeUtils {
   private static final int DEFAULT_LOWER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 100;
   private static final int DEFAULT_UPPER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 8192;
 
+  // How much data to prefetch to warm up the cache
+  private static final long DEFAULT_CACHING_PERIOD_LOOKBACK = -1;
+  private static final long CACHING_PERIOD_LOOKBACK_DAILY = TimeUnit.DAYS.toMillis(90);
+  private static final long CACHING_PERIOD_LOOKBACK_HOURLY = TimeUnit.DAYS.toMillis(60);
+  // disable minute level cache warm up
+  private static final long CACHING_PERIOD_LOOKBACK_MINUTELY = -1;
 
   public static final long DETECTION_TASK_MAX_LOOKBACK_WINDOW = TimeUnit.DAYS.toMillis(7);
 
@@ -661,18 +667,18 @@ public abstract class ThirdEyeUtils {
     switch (granularity.getUnit()) {
       case DAYS:
         // 90 days data for daily detection
-        period = TimeUnit.DAYS.toMillis(90);
+        period = CACHING_PERIOD_LOOKBACK_DAILY;
         break;
       case HOURS:
         // 60 days data for hourly detection
-        period = TimeUnit.DAYS.toMillis(60);
+        period = CACHING_PERIOD_LOOKBACK_HOURLY;
         break;
       case MINUTES:
         // disable minute level cache warmup by default.
-        period = -1;
+        period = CACHING_PERIOD_LOOKBACK_MINUTELY;
         break;
       default:
-        period = -1;
+        period = DEFAULT_CACHING_PERIOD_LOOKBACK;
     }
     return period;
   }
