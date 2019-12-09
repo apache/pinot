@@ -81,4 +81,40 @@ public class IntervalUtils {
       anomalyIntervals.put(dimension ,mergeIntervals(anomalyIntervals.get(dimension)));
     }
   }
+
+  /**
+   * turns a list of intervals into a string.
+   * Ex. [1-5, 6-6, 9-15] -> "{1-5, 6, 9-15}"
+   * @param intervals
+   * @return string form of interval list
+   */
+  public static String getIntervalRangesAsString(List<Interval> intervals) {
+    if (intervals.isEmpty()) {
+      return "";
+    }
+
+    StringBuilder sb = new StringBuilder("{");
+
+    for (Interval interval : intervals) {
+      long start = interval.getStartMillis();
+      long end = interval.getEndMillis();
+
+      // we check using >= because times may not be 100% perfectly aligned due to boundary shifting misalignment.
+      if (start >= end) {
+        sb.append(start);
+      } else {
+        sb.append(start);
+        sb.append("-");
+        sb.append(end);
+      }
+      sb.append(", ");
+    }
+
+    // delete the last "," and " " characters.
+    // StringBuilder start is inclusive, end is exclusive.
+    sb.delete(sb.length() - 2, sb.length());
+    sb.append("}");
+
+    return sb.toString();
+  }
 }
