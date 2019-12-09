@@ -39,6 +39,8 @@ import org.apache.pinot.common.request.FilterQueryMap;
  *
  * (2) single value IN predicate into equality predicate
  * e.g COL IN (1) is rewritten as COL = 1
+ *
+ * (3) Deduplicates the predicate values for IN.
  */
 public class MultipleOrEqualitiesToInClauseFilterQueryOptimizer extends FilterQueryOptimizer {
 
