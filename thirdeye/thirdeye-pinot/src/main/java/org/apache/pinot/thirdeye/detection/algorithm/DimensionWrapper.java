@@ -34,7 +34,6 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.MapUtils;
-import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -88,12 +87,8 @@ public class DimensionWrapper extends DetectionPipeline {
   // Stop running if the first several dimension combinations all failed.
   private static final int EARLY_STOP_THRESHOLD = 10;
 
-  // How much data to prefetch to warm up the cache
+  // by default, don't pre-fetch data into the cache
   private static final long DEFAULT_CACHING_PERIOD_LOOKBACK = -1;
-  private static final long CACHING_PERIOD_LOOKBACK_DAILY = TimeUnit.DAYS.toMillis(90);
-  private static final long CACHING_PERIOD_LOOKBACK_HOURLY = TimeUnit.DAYS.toMillis(60);
-  // disable minute level cache warm up
-  private static final long CACHING_PERIOD_LOOKBACK_MINUTELY = -1;
 
   // the max number of dimensions to calculate the evaluations for
   // this is to prevent storing the evaluations for too many dimensions
@@ -256,23 +251,26 @@ public class DimensionWrapper extends DetectionPipeline {
     // don't use in-memory cache for dimension exploration, it will cause thrashing
     // we add a "duplicate" condition so that tests can run. will fix tests later on
     if (CacheConfig.getInstance().useCentralizedCache() && !CacheConfig.getInstance().useInMemoryCache()) {
-      Map<Long, MetricConfigDTO> metricConfigs =
+      Map<Long, MetricConfigDTO> metricIdToConfigMap =
           this.provider.fetchMetrics(nestedMetrics.stream().map(MetricEntity::getId).collect(Collectors.toSet()));
-      Map<String, DatasetConfigDTO> datasets = this.provider.fetchDatasets(
-          metricConfigs.values().stream().map(MetricConfigBean::getDataset).collect(Collectors.toSet()));
+      Map<String, DatasetConfigDTO> datasetToConfigMap = this.provider.fetchDatasets(
+          metricIdToConfigMap.values().stream().map(MetricConfigBean::getDataset).collect(Collectors.toSet()));
       // group the metric entities by dataset
       Map<DatasetConfigDTO, List<MetricEntity>> nestedMetricsByDataset = nestedMetrics.stream()
-          .collect(Collectors.groupingBy(metric -> datasets.get(metricConfigs.get(metric.getId()).getDataset()),
+          .collect(Collectors.groupingBy(metric -> datasetToConfigMap.get(metricIdToConfigMap.get(metric.getId()).getDataset()),
               Collectors.toList()));
 
+      long cachingPeriodLookback = config.getProperties().containsKey(PROP_CACHE_PERIOD_LOOKBACK) ? MapUtils.getLong(config.getProperties(),
+          PROP_CACHE_PERIOD_LOOKBACK) : DEFAULT_CACHING_PERIOD_LOOKBACK;
       // prefetch each
       for (Map.Entry<DatasetConfigDTO, List<MetricEntity>> entry : nestedMetricsByDataset.entrySet()) {
-        long cachingPeriodLookback = config.getProperties().containsKey(PROP_CACHE_PERIOD_LOOKBACK) ? MapUtils.getLong(config.getProperties(),
-            PROP_CACHE_PERIOD_LOOKBACK) : getCachingPeriodLookback(entry.getKey().bucketTimeGranularity());
+        // if cachingPeriodLookback is set in the config, use that value.
+        // otherwise, set the lookback period based on data granularity.
+        long metricLookbackPeriod = cachingPeriodLookback < 0 ? ThirdEyeUtils.getCachingPeriodLookback(entry.getKey().bucketTimeGranularity()) : cachingPeriodLookback;
 
         this.provider.fetchTimeseries(entry.getValue()
             .stream()
-            .map(metricEntity -> MetricSlice.from(metricEntity.getId(), startTime - cachingPeriodLookback, endTime,
+            .map(metricEntity -> MetricSlice.from(metricEntity.getId(), startTime - metricLookbackPeriod, endTime,
                 metricEntity.getFilters()))
             .collect(Collectors.toList()));
       }
@@ -410,23 +408,5 @@ public class DimensionWrapper extends DetectionPipeline {
     DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);
 
     return pipeline.run();
-  }
-
-  private static long getCachingPeriodLookback(TimeGranularity granularity) {
-    long period;
-    switch (granularity.getUnit()) {
-      case DAYS:
-        period = CACHING_PERIOD_LOOKBACK_DAILY;
-        break;
-      case HOURS:
-        period = CACHING_PERIOD_LOOKBACK_HOURLY;
-        break;
-      case MINUTES:
-        period = CACHING_PERIOD_LOOKBACK_MINUTELY;
-        break;
-      default:
-        period = DEFAULT_CACHING_PERIOD_LOOKBACK;
-    }
-    return period;
   }
 }
