@@ -109,36 +109,6 @@ public class HelixServerStarter {
     // Make a clone so that changes to the config won't propagate to the caller
     _serverConf = ConfigurationUtils.cloneConfiguration(serverConf);
 
-    // Log warnings for usage of deprecated config keys
-    Map<String, String> deprecatedConfigKeyWarnings = new HashMap<String, String>() {{
-      //noinspection deprecation
-      put(CONFIG_OF_STARTER_ENABLE_SEGMENTS_LOADING_CHECK, String.format(
-          "use %s instead, which will check the service status instead of comparing currentState/externalView with idealState (enabled by default)",
-          CONFIG_OF_STARTUP_ENABLE_SERVICE_STATUS_CHECK));
-      //noinspection deprecation
-      put(CONFIG_OF_STARTER_TIMEOUT_IN_SECONDS, String
-          .format("use %s instead, which is the timeout for the whole startup process (10 minutes by default)",
-              CONFIG_OF_STARTUP_TIMEOUT_MS));
-      //noinspection deprecation
-      put(CONFIG_OF_ENABLE_SHUTDOWN_DELAY, String.format(
-          "use %s instead, which will drain the queries (no incoming queries and all existing queries finished) (enabled by default)",
-          CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK));
-      //noinspection deprecation
-      put(CONFIG_OF_INSTANCE_MAX_SHUTDOWN_WAIT_TIME, String
-          .format("use %s instead, which is the timeout for the whole shutdown process (10 minutes by default)",
-              CONFIG_OF_SHUTDOWN_TIMEOUT_MS));
-      //noinspection deprecation
-      put(CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME, String
-          .format("use %s instead, which is the interval for the resource check (10 seconds by default)",
-              CONFIG_OF_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS));
-    }};
-    for (Map.Entry<String, String> entry : deprecatedConfigKeyWarnings.entrySet()) {
-      String deprecatedConfigKey = entry.getKey();
-      if (_serverConf.containsKey(deprecatedConfigKey)) {
-        LOGGER.warn("Found usage of deprecated config key: {}, {}", deprecatedConfigKey, entry.getValue());
-      }
-    }
-
     if (_serverConf.containsKey(CONFIG_OF_INSTANCE_ID)) {
       _instanceId = _serverConf.getString(CONFIG_OF_INSTANCE_ID);
     } else {
