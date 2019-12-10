@@ -32,18 +32,19 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.config.CompletionConfig;
+import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.TableTaskConfig;
-import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
-import org.apache.pinot.core.realtime.stream.StreamConfig;
-import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -71,6 +72,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
   private final boolean _enableSplitCommit = true;
   private final boolean _enableLeadControllerResource = RANDOM.nextBoolean();
   private final long _startTime = System.currentTimeMillis();
+  private TableConfig _tableConfig;
 
   @BeforeClass
   @Override
@@ -138,7 +140,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     streamConfigs.put(StreamConfigProperties
         .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
 
-    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(tableName).setLLC(useLlc)
+    _tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(tableName).setLLC(useLlc)
         .setTimeColumnName(timeColumnName).setTimeType(timeType).setSchemaName(schemaName).setBrokerTenant(brokerTenant)
         .setServerTenant(serverTenant).setLoadMode(loadMode).setSortedColumn(sortedColumn)
         .setInvertedIndexColumns(invertedIndexColumns).setBloomFilterColumns(bloomFilterColumns)
@@ -147,18 +149,12 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
 
 
     SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig = new SegmentsValidationAndRetentionConfig();
-    CompletionConfig completionConfig = new CompletionConfig();
-    completionConfig.setCompletionMode("DOWNLOAD");
+    CompletionConfig completionConfig = new CompletionConfig("DOWNLOAD");
     segmentsValidationAndRetentionConfig.setCompletionConfig(completionConfig);
     segmentsValidationAndRetentionConfig.setReplicasPerPartition(String.valueOf(numReplicas));
-    tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
+    _tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
 
-    // save the realtime table config
-    _realtimeTableConfig = tableConfig;
-
-    if (!isUsingNewConfigFormat()) {
-      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
-    }
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), _tableConfig.toJsonConfigString());
   }
 
   @Override
@@ -231,7 +227,14 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
     assertTrue(queryResponse.get("numEntriesScannedInFilter").asLong() > 0L);
 
-    updateRealtimeTableConfig(getTableName(), UPDATED_INVERTED_INDEX_COLUMNS, null);
+    {
+      IndexingConfig config = _tableConfig.getIndexingConfig();
+      config.setInvertedIndexColumns(UPDATED_INVERTED_INDEX_COLUMNS);
+      config.setBloomFilterColumns(null);
+
+      sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(getTableName()),
+          _tableConfig.toJsonConfigString());
+    }
     sendPostRequest(_controllerRequestURLBuilder.forTableReload(getTableName(), "realtime"), null);
 
     TestUtils.waitForCondition(aVoid -> {

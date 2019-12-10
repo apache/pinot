@@ -592,6 +592,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 // We could not build the segment. Go into error state.
                 _state = State.ERROR;
               } else {
+                // Commit the segment meta data to controller and asynchronously write the segment file to Pinot FS.
                 success = commitSegment(response.getControllerVipUrl(),
                     response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit());
                 if (success) {
