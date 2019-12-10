@@ -24,15 +24,18 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
+import com.oracle.javafx.jmx.json.JSONException;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -70,9 +73,7 @@ public class TableConfig extends BaseJsonConfig {
   private RoutingConfig _routingConfig;
   private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
 
-  @ConfigKey("updateSemantic")
-  @ConfigDoc(value = "The update semantic of the table, either append or upsert, default as append", mandatory = false)
-  private UpdateSemantic _updateSemantic;
+  private CommonConstants.UpdateSemantic _updateSemantic;
 
   /**
    * NOTE: DO NOT use this constructor, use builder instead. This constructor is for deserializer only.
@@ -83,21 +84,12 @@ public class TableConfig extends BaseJsonConfig {
     _customConfig = new TableCustomConfig(null);
   }
 
-  //
-  private TableConfig(@Nonnull String tableName, @Nonnull TableType tableType,
-                      @Nonnull SegmentsValidationAndRetentionConfig validationConfig, @Nonnull TenantConfig tenantConfig,
-                      @Nonnull IndexingConfig indexingConfig, @Nonnull TableCustomConfig customConfig,
-                      @Nullable QuotaConfig quotaConfig, @Nullable TableTaskConfig taskConfig, @Nullable RoutingConfig routingConfig) {
-    this(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig, quotaConfig,
-        taskConfig, routingConfig, UpdateSemantic.APPEND);
-  }
-
   private TableConfig(@Nonnull String tableName, @Nonnull TableType tableType,
       @Nonnull SegmentsValidationAndRetentionConfig validationConfig, @Nonnull TenantConfig tenantConfig,
       @Nonnull IndexingConfig indexingConfig, @Nonnull TableCustomConfig customConfig,
       @Nullable QuotaConfig quotaConfig, @Nullable TableTaskConfig taskConfig, @Nullable RoutingConfig routingConfig,
       Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap,
-      @Nullable UpdateSemantic updateSemantic) {
+      @Nullable CommonConstants.UpdateSemantic updateSemantic) {
     _tableName = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
     _tableType = tableType;
     _validationConfig = validationConfig;
@@ -157,9 +149,9 @@ public class TableConfig extends BaseJsonConfig {
             new TypeReference<Map<InstancePartitionsType, InstanceAssignmentConfig>>() {
             });
 
-    UpdateSemantic updateSemantic = UpdateSemantic.DEFAULT_SEMANTIC;
+    CommonConstants.UpdateSemantic updateSemantic = CommonConstants.UpdateSemantic.DEFAULT_SEMANTIC;
     if (jsonConfig.has(UPDATE_SEMANTIC_CONFIG_KEY)) {
-      updateSemantic = UpdateSemantic.getUpdateSemantic(jsonConfig.getString(UPDATE_SEMANTIC_CONFIG_KEY));
+      updateSemantic = CommonConstants.UpdateSemantic.getUpdateSemantic(jsonConfig.getString(UPDATE_SEMANTIC_CONFIG_KEY));
     }
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, instanceAssignmentConfigMap, updateSemantic);
@@ -433,11 +425,13 @@ public class TableConfig extends BaseJsonConfig {
   @Nullable
   public Map<InstancePartitionsType, InstanceAssignmentConfig> getInstanceAssignmentConfigMap() {
     return _instanceAssignmentConfigMap;
-  public UpdateSemantic getUpdateSemantic() {
+  }
+
+  public CommonConstants.UpdateSemantic getUpdateSemantic() {
     return _updateSemantic;
   }
 
-  public void setUpdateSemantic(UpdateSemantic updateSemantic) {
+  public void setUpdateSemantic(CommonConstants.UpdateSemantic updateSemantic) {
     _updateSemantic = updateSemantic;
   }
 
@@ -506,7 +500,7 @@ public class TableConfig extends BaseJsonConfig {
     private RoutingConfig _routingConfig;
     private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
 
-    private UpdateSemantic _updateSemantic;
+    private CommonConstants.UpdateSemantic _updateSemantic;
 
     public Builder(TableType tableType) {
       _tableType = tableType;
@@ -664,8 +658,7 @@ public class TableConfig extends BaseJsonConfig {
       return this;
     }
 
-    public TableConfig build() {
-    public Builder setUpdateSemantic(UpdateSemantic updateSemantic) {
+    public Builder setUpdateSemantic(CommonConstants.UpdateSemantic updateSemantic) {
       _updateSemantic = updateSemantic;
       return this;
     }
@@ -709,7 +702,7 @@ public class TableConfig extends BaseJsonConfig {
       }
 
       if (_updateSemantic == null) {
-        _updateSemantic = UpdateSemantic.DEFAULT_SEMANTIC;
+        _updateSemantic = CommonConstants.UpdateSemantic.DEFAULT_SEMANTIC;
       }
 
       return new TableConfig(_tableName, _tableType, validationConfig, tenantConfig, indexingConfig, _customConfig,

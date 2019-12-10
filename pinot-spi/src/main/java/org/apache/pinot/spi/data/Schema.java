@@ -109,7 +109,7 @@ public final class Schema {
     return _primaryKey;
   }
 
-  public void setPrimaryKey(@Nonnull String primaryKey) {
+  public void setPrimaryKey(String primaryKey) {
     _primaryKey = primaryKey;
   }
 
@@ -117,7 +117,7 @@ public final class Schema {
     return _offsetKey;
   }
 
-  public void setOffsetKey(@Nonnull String offsetKey) {
+  public void setOffsetKey(String offsetKey) {
     _offsetKey = offsetKey;
   }
 
@@ -125,7 +125,7 @@ public final class Schema {
     return _updateSemantic;
   }
 
-  public void setUpdateSemantic(@Nonnull String updateSemantic) {
+  public void setUpdateSemantic(String updateSemantic) {
     _updateSemantic = updateSemantic;
   }
 
