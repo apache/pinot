@@ -27,9 +27,6 @@ import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.SubCommand;
 import org.kohsuke.args4j.spi.SubCommandHandler;
 import org.kohsuke.args4j.spi.SubCommands;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import static org.apache.calcite.util.Benchmark.LOGGER;
 
 
 /**
@@ -37,9 +34,6 @@ import static org.apache.calcite.util.Benchmark.LOGGER;
  * locally (ConvertSegment)
  */
 public class DruidToPinotMigrationTool {
-  // TODO: Figure out why logger is not working
-  //private static final Logger LOGGER = LoggerFactory.getLogger(DruidToPinotMigrationTool.class);
-
   @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
   @SubCommands({
       @SubCommand(name = "ConvertSegment", impl = DruidToPinotSegmentConverterCommand.class),

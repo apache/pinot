@@ -22,8 +22,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import org.apache.druid.jackson.DefaultObjectMapper;
+import org.apache.druid.java.util.common.FileUtils;
 import org.apache.druid.query.DruidProcessingConfig;
 import org.apache.druid.segment.IndexIO;
 import org.apache.druid.segment.QueryableIndex;
@@ -66,23 +68,23 @@ public class DruidSegmentUtils {
   }
 
   public static File uncompressSegmentFile(File druidSegment) {
-    List<File> uncompressedFileList = new ArrayList<>();
     File uncompressedInput = new File(druidSegment.getParentFile().getPath(), "uncompressedInput");
     uncompressedInput.mkdir();
 
     if (druidSegment.getName().endsWith(".zip")) {
       try {
         CompressionUtils.unzip(druidSegment, uncompressedInput);
+        return new File(uncompressedInput.getPath());
       } catch (IOException e) {
         e.printStackTrace();
       }
     } else if (druidSegment.getName().endsWith("tar.gz")) {
       try {
-        uncompressedFileList = TarGzCompressionUtils.unTar(druidSegment, uncompressedInput);
+        return TarGzCompressionUtils.unTar(druidSegment, uncompressedInput).get(0);
       } catch (Exception e) {
         e.printStackTrace();
       }
     }
-    return uncompressedFileList.get(0);
+    throw new IllegalArgumentException("Unsupported file type for Druid segment.");
   }
 }

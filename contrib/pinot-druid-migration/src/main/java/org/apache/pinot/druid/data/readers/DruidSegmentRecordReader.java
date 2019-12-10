@@ -144,7 +144,7 @@ public class DruidSegmentRecordReader implements RecordReader {
           Preconditions.checkState(value instanceof List,
               String.format("The multi-valued dimension %s should be java.util.Arrays$ArrayList, but it is %s.",
                   columnName, value.getClass()));
-          // Store the multi-valued dimension as a String[] to follow Pinot format; null if empty
+          // Store the multi-valued dimension as a String[] to follow Pinot format
           value = ((List<String>) value).toArray(new String[0]);
         }
         reuse.putField(columnName, value);
@@ -192,7 +192,7 @@ public class DruidSegmentRecordReader implements RecordReader {
       final String columnName = _columnNames.get(i);
       ColumnCapabilities druidColumnCapabilities = adapter.getColumnCapabilities(columnName);
       if (druidColumnCapabilities == null) {
-        LOGGER.warn("Column {} is not in record", columnName);
+        LOGGER.warn("Column {} is not in record; Ignoring column.", columnName);
       } else {
         if (druidColumnCapabilities.getType() == ValueType.COMPLEX) {
           throw new IllegalArgumentException(

@@ -45,7 +45,7 @@ public class DruidToPinotSegmentConverterCommand extends AbstractBaseAdminComman
   @Option(name = "-pinotSegmentName", metaVar = "<string>", usage = "Name of the segment.", required = true)
   private String _pinotSegmentName;
 
-  @Option(name = "-pinotTableConfigPath", metaVar = "<string>", usage = "Path to the Pinot table config.")
+  @Option(name = "-pinotTableConfigPath", metaVar = "<string>", usage = "Path to the Pinot table config.", required = true)
   private String _pinotTableConfigPath;
 
   @Option(name = "-pinotSchemaPath", metaVar = "<string>", usage = "Path to the Pinot schema.")
@@ -104,7 +104,7 @@ public class DruidToPinotSegmentConverterCommand extends AbstractBaseAdminComman
 
   @Override
   public String description() {
-    return "Create a Pinot segment from the provided Druid segment directory.";
+    return "Create a Pinot segment from the provided Druid segment.";
   }
 
   @Override
@@ -119,6 +119,7 @@ public class DruidToPinotSegmentConverterCommand extends AbstractBaseAdminComman
     File segment = new File(_druidSegmentPath);
     if (segment.getName().endsWith(".zip") || segment.getName().endsWith(".tar.gz")) {
       segment = DruidSegmentUtils.uncompressSegmentFile(segment);
+      _druidSegmentPath = segment.getPath();
     }
 
     File tableConfigFile = new File(_pinotTableConfigPath);
@@ -144,6 +145,14 @@ public class DruidToPinotSegmentConverterCommand extends AbstractBaseAdminComman
     DruidSegmentRecordReader recordReader = new DruidSegmentRecordReader(segment, segmentGeneratorConfig.getSchema());
     driver.init(config, recordReader);
     driver.build();
+
+    // Delete uncompressed segment from the input directory
+    String[] filenames = segment.list();
+    for (String f: filenames) {
+      File currentFile = new File(_druidSegmentPath, f);
+      currentFile.delete();
+    }
+    segment.delete();
     return true;
   }
 }
