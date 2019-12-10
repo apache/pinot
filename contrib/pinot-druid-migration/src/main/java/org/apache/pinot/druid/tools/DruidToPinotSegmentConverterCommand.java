@@ -18,15 +18,16 @@
  */
 package org.apache.pinot.druid.tools;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
+import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.druid.data.readers.DruidSegmentRecordReader;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.admin.command.AbstractBaseAdminCommand;
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,7 +45,10 @@ public class DruidToPinotSegmentConverterCommand extends AbstractBaseAdminComman
   @Option(name = "-pinotSegmentName", metaVar = "<string>", usage = "Name of the segment.", required = true)
   private String _pinotSegmentName;
 
-  @Option(name = "-pinotSchemaPath", metaVar = "<string>", usage = "Path to the Pinot schema.", required = true)
+  @Option(name = "-pinotTableConfigPath", metaVar = "<string>", usage = "Path to the Pinot table config.")
+  private String _pinotTableConfigPath;
+
+  @Option(name = "-pinotSchemaPath", metaVar = "<string>", usage = "Path to the Pinot schema.")
   private String _pinotSchemaPath;
 
   @Option(name = "-druidSegmentPath", metaVar = "<string>", usage = "Path to the Druid segment.", required = true)
@@ -66,6 +70,11 @@ public class DruidToPinotSegmentConverterCommand extends AbstractBaseAdminComman
     return this;
   }
 
+  public DruidToPinotSegmentConverterCommand setPinotTableConfigPath(String pinotTableConfigPath) {
+    _pinotTableConfigPath = pinotTableConfigPath;
+    return this;
+  }
+
   public DruidToPinotSegmentConverterCommand setPinotSchemaPath(String pinotSchemaPath) {
     _pinotSchemaPath = pinotSchemaPath;
     return this;
@@ -84,8 +93,8 @@ public class DruidToPinotSegmentConverterCommand extends AbstractBaseAdminComman
   @Override
   public String toString() {
     return ("ConvertSegment  -pinotTableName " + _pinotTableName + " -pinotSegmentName " + _pinotSegmentName
-        + " -pinotSchemaPath " + _pinotSchemaPath + " -druidSegmentPath " + _druidSegmentPath + " -outputPath "
-        + _outputPath);
+        + " -pinotSchemaPath " + _pinotSchemaPath + "-pinotTableConfigPath " + _pinotTableConfigPath + " -druidSegmentPath "
+        + _druidSegmentPath + " -outputPath " + _outputPath);
   }
 
   @Override
@@ -107,19 +116,28 @@ public class DruidToPinotSegmentConverterCommand extends AbstractBaseAdminComman
   public boolean execute()
       throws Exception {
     LOGGER.info("Executing command: {}", toString());
-
-    // if anything is null... you should probably print out the usage
-
     File segment = new File(_druidSegmentPath);
-    Schema schema = Schema.fromFile(new File(_pinotSchemaPath));
+    if (segment.getName().endsWith(".zip") || segment.getName().endsWith(".tar.gz")) {
+      segment = DruidSegmentUtils.uncompressSegmentFile(segment);
+    }
 
-    final SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig();
+    File tableConfigFile = new File(_pinotTableConfigPath);
+    JsonNode tableConfigJsonNode = JsonUtils.fileToJsonNode(tableConfigFile);
+    TableConfig tableConfig = TableConfig.fromJsonConfig(tableConfigJsonNode);
+
+    Schema schema;
+    if (_pinotSchemaPath == null) {
+      schema = DruidToPinotSchemaConverter.createSchema(_pinotTableName, _druidSegmentPath);
+    } else {
+      schema = Schema.fromFile(new File(_pinotSchemaPath));
+    }
+
+    final SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setDataDir(_druidSegmentPath);
     segmentGeneratorConfig.setOutDir(_outputPath);
     segmentGeneratorConfig.setOverwrite(true);
     segmentGeneratorConfig.setTableName(_pinotTableName);
     segmentGeneratorConfig.setSegmentName(_pinotSegmentName);
-    segmentGeneratorConfig.setSchema(schema);
 
     final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(segmentGeneratorConfig);

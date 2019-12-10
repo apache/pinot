@@ -18,10 +18,10 @@
     under the License.
 
 -->
-# Druid to Pinot Segment Converter Tool
+# Druid to Pinot Segment Converter
 
-This tool takes a local Druid segment and uses it to generate a corresponding Pinot segment with all of the columns 
-specified in a given Pinot schema.
+This project, which can run both locally and on Hadoop, takes a Druid segment and uses it to generate a corresponding 
+Pinot segment.
 
 ## Build
 To build the project:
@@ -32,45 +32,42 @@ mvn clean install -DskipTests
 
 This will create `druid-to-pinot-migration-tool-jar-with-dependencies.jar` inside the `target` directory.
 
-##Commands
-
-###ConvertSchema
-
-In order to convert Druid segments, a Pinot schema is required, which can either be written and provided by the user or
-generated from the Druid segment with the `ConvertSchema` command.
-
-The `ConvertSchema` command is used as follows*:
-
-```
-java -jar druid-to-pinot-schema-generator-jar-with-dependencies.jar ConvertSchema \
--ingestionSpec <path_to_druid_ingestion_spec> \
--outputPath <pinot_schema_output_path>
-```
+##Tools
 
 ###ConvertSegment
 
-Keep in mind that a Druid segment is a directory rather than a single file.
+Keep in mind that a Druid segment is comprised of multiple file components (`meta.smoosh`, `version.bin`, etc.) rather 
+than a single file. This tool works with both Druid segment directories and compressed Druid segment files (`.zip` and 
+`.tar.gz` files).
 
-The `ConvertSegment` command is used as follows*:
+The `ConvertSegment` command is used as follows*.
+
+The `-pinotSchemaPath` is optional; If it is not specified, the tool will generate a Pinot schema from the given Druid
+segment.
 
 ```
 java -jar druid-to-pinot-segment-converter-jar-with-dependencies.jar ConvertSegment \
 -pinotTableName <pinot_table_name> \
 -pinotSegmentName <pinot_segment_name> \
 -pinotSchemaPath <pinot_schema_path> \
+-pinotTableConfigPath <pinot_table_config_path> \
 -druidSegmentPath <druid_segment_path> \
 -outputPath <segment_output_path>
 ```
 
-###ConvertSegmentHadoop
+###Segment Converter Hadoop Job _(Section unfinished)_
 
-The `ConvertSegmentHadoop` command converts a Druid segment into a Pinot segment and automatically pushes the resulting
-Pinot segment to the specified Pinot cluster.
+The `SegmentConverterHadoopJob` converts a Druid segment into a Pinot segment on Hadoop.
 
 The Hadoop job for converting segments can only validate data in single files, and will do a recursive search for single
-data files if a directory path is given. Since a Druid segment is a directory containing all its multiple file components
-(`meta.smoosh`, `version.bin`, etc.), the Druid segment directory must be compressed into a `tar.gz` file. This can be 
-done with the following command:
+data files if a directory path is given. 
+
+Since a Druid segment is a collection of multiple file components, the Druid segment directory must be compressed into a
+ `.zip` or `.tar.gz` file. 
+
+
+Druid segments in storage are typically already compressed, but compression to a `.tar.gz` file can be done with the 
+following command:
 
 ```
 tar -czvf name-of-newly-compressed-directory.tar.gz /path/to/directory-to-be-compressed
@@ -101,14 +98,16 @@ push.to.port=9000
 
 ```
 
-Before running this command, please also make sure that the Pinot cluster is running on the host and port specified in 
-the job properties file.
+****Before running this command, please also make sure that the Pinot cluster is running on the host and port specified in 
+the job properties file, _AND_ make sure that a Pinot TableConfig has already been pushed to the cluster.**
 
 Finally, the  `ConvertSegmentHadoop` command is used as follows*:
 
+
 ```
 java -jar druid-to-pinot-migration-tool-jar-with-dependencies.jar ConvertSegmentHadoop \
--jobProperties <path_to_job_properties_file>
+-jobProperties <path_to_job_properties_file> \
+-pinotTableConfigPath <path_to_pinot_table_config>
 ```
 
 

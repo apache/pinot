@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.druid.data.readers;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import java.io.File;
@@ -28,27 +27,24 @@ import java.util.List;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.druid.jackson.DefaultObjectMapper;
 import org.apache.druid.java.util.common.granularity.Granularities;
 import org.apache.druid.java.util.common.guava.Sequence;
 import org.apache.druid.java.util.common.guava.Sequences;
 import org.apache.druid.segment.BaseObjectColumnValueSelector;
 import org.apache.druid.segment.ColumnSelectorFactory;
 import org.apache.druid.segment.Cursor;
-import org.apache.druid.segment.IndexIO;
 import org.apache.druid.segment.QueryableIndex;
 import org.apache.druid.segment.QueryableIndexStorageAdapter;
 import org.apache.druid.segment.VirtualColumns;
 import org.apache.druid.segment.column.ColumnCapabilities;
-import org.apache.druid.segment.column.ColumnConfig;
 import org.apache.druid.segment.column.ValueType;
 import org.apache.druid.segment.filter.Filters;
-import org.apache.druid.query.DruidProcessingConfig;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.druid.tools.DruidSegmentUtils;
 import org.joda.time.chrono.ISOChronology;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,32 +74,7 @@ public class DruidSegmentRecordReader implements RecordReader {
       throws IOException {
     // Only the columns whose names are in the Pinot schema will get processed
     _pinotSchema = schema;
-
-    ColumnConfig config = new DruidProcessingConfig() {
-      @Override
-      public String getFormatString() {
-        return "processing-%s";
-      }
-
-      @Override
-      public int intermediateComputeSizeBytes() {
-        return 100 * 1024 * 1024;
-      }
-
-      @Override
-      public int getNumThreads() {
-        return 1;
-      }
-
-      @Override
-      public int columnCacheSizeBytes() {
-        return 25 * 1024 * 1024;
-      }
-    };
-
-    ObjectMapper mapper = new DefaultObjectMapper();
-    final IndexIO indexIO = new IndexIO(mapper, config);
-    _index = indexIO.loadIndex(indexDir);
+    _index = DruidSegmentUtils.createIndex(indexDir);
     QueryableIndexStorageAdapter adapter = new QueryableIndexStorageAdapter(_index);
 
     // A Sequence "represents an iterable sequence of elements. Unlike normal Iterators however, it doesn't expose
@@ -154,7 +125,7 @@ public class DruidSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next() throws IOException {
+  public GenericRow next() {
     return next(new GenericRow());
   }
 

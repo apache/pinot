@@ -19,7 +19,6 @@
 package org.apache.pinot.druid.tools;
 
 import java.lang.reflect.Field;
-import org.apache.pinot.druid.tools.hadoop.DruidToPinotSegmentConverterHadoopJobCommand;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
@@ -30,15 +29,12 @@ import org.kohsuke.args4j.spi.SubCommandHandler;
 import org.kohsuke.args4j.spi.SubCommands;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import static org.apache.calcite.util.Benchmark.LOGGER;
 
 
 /**
- * Class to implement the DruidToPinotMigrationTool, which provides commands to:
- * - Convert a Druid ingestion spec to a Pinot schema (ConvertSchema)
- * - Convert a Druid segment to a Pinot segment locally (ConvertSegment)
- * - Convert a Druid segment to a Pinot segment on Hadoop (ConvertSegmentHadoop)
+ * Class to implement the DruidToPinotMigrationTool, which the command to convert a Druid segment to a Pinot segment
+ * locally (ConvertSegment)
  */
 public class DruidToPinotMigrationTool {
   // TODO: Figure out why logger is not working
@@ -46,10 +42,7 @@ public class DruidToPinotMigrationTool {
 
   @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
   @SubCommands({
-      // TODO: Finish implementing ConvertSchema Command
-      //@SubCommand(name = "ConvertSchema", impl = DruidToPinotSchemaConverterCommand.class),
       @SubCommand(name = "ConvertSegment", impl = DruidToPinotSegmentConverterCommand.class),
-      @SubCommand(name = "ConvertSegmentHadoop", impl = DruidToPinotSegmentConverterHadoopJobCommand.class)
   })
   Command _subCommand;
 
