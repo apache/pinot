@@ -39,14 +39,14 @@ public class AlertFilterUtils {
   public static final Set<String> PROP_CC_VALUE = new HashSet<>(Arrays.asList("cctest@example.com", "cctest@example.org"));
   public static final Set<String> PROP_BCC_VALUE = new HashSet<>(Arrays.asList("bcctest@example.com", "bcctest@example.org"));
 
-  static DetectionAlertFilterNotification makeEmailNotifications() {
-    return makeEmailNotifications(new HashSet<String>());
+  static DetectionAlertFilterNotification makeEmailNotifications(DetectionAlertConfigDTO config) {
+    return makeEmailNotifications(config, new HashSet<String>());
   }
 
-  static DetectionAlertFilterNotification makeEmailNotifications(Set<String> toRecipients) {
+  static DetectionAlertFilterNotification makeEmailNotifications(DetectionAlertConfigDTO config, Set<String> toRecipients) {
     Set<String> recipients = new HashSet<>(toRecipients);
     recipients.addAll(PROP_TO_VALUE);
-    return makeEmailNotifications(recipients, PROP_CC_VALUE, PROP_BCC_VALUE);
+    return makeEmailNotifications(config, recipients, PROP_CC_VALUE, PROP_BCC_VALUE);
   }
 
   static DetectionAlertFilterNotification makeEmailNotifications(DetectionAlertConfigDTO config,
@@ -63,15 +63,8 @@ public class AlertFilterUtils {
 
     alertProps.put(PROP_EMAIL_SCHEME, emailRecipients);
 
-    DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(alertProps);
-    subsConfig.setProperties(config.getProperties());
-    subsConfig.setVectorClocks(config.getVectorClocks());
-    subsConfig.setReferenceLinks(config.getReferenceLinks());
+    DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(config, alertProps, config.getReferenceLinks());
 
     return new DetectionAlertFilterNotification(subsConfig);
-  }
-
-  static DetectionAlertFilterNotification makeEmailNotifications(Set<String> toRecipients, Set<String> ccRecipients, Set<String> bccRecipients) {
-    return makeEmailNotifications(new DetectionAlertConfigDTO(), toRecipients, ccRecipients, bccRecipients);
   }
 }

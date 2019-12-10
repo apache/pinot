@@ -120,13 +120,13 @@ public class DimensionDetectionAlertFilterTest {
 
     DetectionAlertFilterResult result = this.alertFilter.run();
 
-    DetectionAlertFilterNotification recDefault = AlertFilterUtils.makeEmailNotifications();
+    DetectionAlertFilterNotification recDefault = AlertFilterUtils.makeEmailNotifications(this.alertConfig);
     Assert.assertEquals(result.getResult().get(recDefault), makeSet(0, 3, 4));
 
-    DetectionAlertFilterNotification recValue = AlertFilterUtils.makeEmailNotifications(PROP_TO_FOR_VALUE);
+    DetectionAlertFilterNotification recValue = AlertFilterUtils.makeEmailNotifications(this.alertConfig, PROP_TO_FOR_VALUE);
     Assert.assertEquals(result.getResult().get(recValue), makeSet(1, 5));
 
-    DetectionAlertFilterNotification recAnotherValue = AlertFilterUtils.makeEmailNotifications(PROP_TO_FOR_ANOTHER_VALUE);
+    DetectionAlertFilterNotification recAnotherValue = AlertFilterUtils.makeEmailNotifications(this.alertConfig, PROP_TO_FOR_ANOTHER_VALUE);
     Assert.assertEquals(result.getResult().get(recAnotherValue), makeSet(2));
     // 6, 7 are out of search range
   }
@@ -141,7 +141,7 @@ public class DimensionDetectionAlertFilterTest {
 
     this.detectedAnomalies.add(child);
 
-    DetectionAlertFilterNotification recValue = AlertFilterUtils.makeEmailNotifications(PROP_TO_FOR_VALUE);
+    DetectionAlertFilterNotification recValue = AlertFilterUtils.makeEmailNotifications(this.alertConfig, PROP_TO_FOR_VALUE);
 
     DetectionAlertFilterResult result = this.alertFilter.run();
 
@@ -176,13 +176,14 @@ public class DimensionDetectionAlertFilterTest {
     DetectionAlertFilterResult result = this.alertFilter.run();
     Assert.assertEquals(result.getResult().size(), 2);
 
-    DetectionAlertFilterNotification recDefault = AlertFilterUtils.makeEmailNotifications(PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
+    DetectionAlertFilterNotification recDefault = AlertFilterUtils.makeEmailNotifications(
+        this.alertConfig, PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
     Assert.assertTrue(result.getResult().containsKey(recDefault));
     Assert.assertEquals(result.getResult().get(recDefault).size(), 2);
     Assert.assertTrue(result.getResult().get(recDefault).contains(anomalyWithoutFeedback));
     Assert.assertTrue(result.getResult().get(recDefault).contains(anomalyWithNull));
 
-    DetectionAlertFilterNotification recValue = AlertFilterUtils.makeEmailNotifications(PROP_TO_FOR_VALUE);
+    DetectionAlertFilterNotification recValue = AlertFilterUtils.makeEmailNotifications(this.alertConfig, PROP_TO_FOR_VALUE);
     Assert.assertTrue(result.getResult().containsKey(recValue));
   }
 

@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import java.util.Collection;
@@ -132,7 +133,8 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
     recipients.put(PROP_BCC, cleanupRecipients(bcc));
     Map<String, Object> recipientsHolder = new HashMap<>();
     recipientsHolder.put(PROP_RECIPIENTS, recipients);
-    notificationSchemeProps.put(PROP_EMAIL_SCHEME, recipientsHolder);
+    notificationSchemeProps.computeIfAbsent(PROP_EMAIL_SCHEME, k -> new HashMap<>());
+    ((Map<String, Object>) notificationSchemeProps.get(PROP_EMAIL_SCHEME)).putAll(recipientsHolder);
 
     return notificationSchemeProps;
   }

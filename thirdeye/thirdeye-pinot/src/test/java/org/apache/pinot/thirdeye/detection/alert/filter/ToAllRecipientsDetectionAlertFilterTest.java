@@ -53,7 +53,6 @@ public class ToAllRecipientsDetectionAlertFilterTest {
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   private static final List<Long> PROP_ID_VALUE = Arrays.asList(1001L, 1002L);
   private static final String PROP_SEND_ONCE = "sendOnce";
-  private static final Map<String, Object> ALERT_PROPS = new HashMap<>();
 
   private DetectionAlertFilter alertFilter;
   private List<MergedAnomalyResultDTO> detectedAnomalies;
@@ -106,7 +105,8 @@ public class ToAllRecipientsDetectionAlertFilterTest {
 
     DetectionAlertFilterResult result = this.alertFilter.run();
 
-    DetectionAlertFilterNotification notification = AlertFilterUtils.makeEmailNotifications(PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
+    DetectionAlertFilterNotification notification = AlertFilterUtils.makeEmailNotifications(
+        this.alertConfig, PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
     Assert.assertEquals(result.getResult().get(notification), new HashSet<>(this.detectedAnomalies.subList(0, 4)));
   }
 
@@ -137,7 +137,8 @@ public class ToAllRecipientsDetectionAlertFilterTest {
     DetectionAlertFilterResult result = this.alertFilter.run();
     Assert.assertEquals(result.getResult().size(), 1);
 
-    DetectionAlertFilterNotification notification = AlertFilterUtils.makeEmailNotifications(PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
+    DetectionAlertFilterNotification notification = AlertFilterUtils.makeEmailNotifications(
+        this.alertConfig, PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
     Assert.assertTrue(result.getResult().containsKey(notification));
     Assert.assertEquals(result.getResult().get(notification).size(), 3);
     Assert.assertTrue(result.getResult().get(notification).contains(this.detectedAnomalies.get(5)));
@@ -168,7 +169,8 @@ public class ToAllRecipientsDetectionAlertFilterTest {
 
     DetectionAlertFilterResult result = this.alertFilter.run();
 
-    DetectionAlertFilterNotification notification = AlertFilterUtils.makeEmailNotifications(PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
+    DetectionAlertFilterNotification notification = AlertFilterUtils.makeEmailNotifications(
+        this.alertConfig, PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
     Assert.assertTrue(result.getResult().containsKey(notification));
     Assert.assertEquals(result.getResult().get(notification).size(), 1);
     Assert.assertTrue(result.getResult().get(notification).contains(existingFuture));
@@ -198,7 +200,8 @@ public class ToAllRecipientsDetectionAlertFilterTest {
 
     DetectionAlertFilterResult result = this.alertFilter.run();
 
-    DetectionAlertFilterNotification notification = AlertFilterUtils.makeEmailNotifications(PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
+    DetectionAlertFilterNotification notification = AlertFilterUtils.makeEmailNotifications(
+        this.alertConfig, PROP_TO_VALUE, PROP_CC_VALUE, PROP_BCC_VALUE);
     Assert.assertEquals(result.getResult().get(notification).size(), 2);
     Assert.assertTrue(result.getResult().get(notification).contains(existingNew));
     Assert.assertTrue(result.getResult().get(notification).contains(existingFuture));

@@ -124,7 +124,8 @@ public class DetectionTimeWindowSuppressorTest {
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
     Map<String, Object> alertProps = new HashMap<>();
     alertProps.put("emailScheme", recipients);
-    DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(alertProps);
+    DetectionAlertConfigDTO subsConfig = new DetectionAlertConfigDTO();
+    subsConfig.setAlertSchemes(alertProps);
     result.addMapping(new DetectionAlertFilterNotification(subsConfig), anomalies);
 
     DetectionAlertTimeWindowSuppressor suppressor = new DetectionAlertTimeWindowSuppressor(config);
@@ -159,7 +160,8 @@ public class DetectionTimeWindowSuppressorTest {
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
     Map<String, Object> alertProps = new HashMap<>();
     alertProps.put("emailScheme", recipients);
-    DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(alertProps);
+    DetectionAlertConfigDTO subsConfig = new DetectionAlertConfigDTO();
+    subsConfig.setAlertSchemes(alertProps);
     result.addMapping(new DetectionAlertFilterNotification(subsConfig), anomalies);
 
     DetectionAlertTimeWindowSuppressor suppressor = new DetectionAlertTimeWindowSuppressor(config);

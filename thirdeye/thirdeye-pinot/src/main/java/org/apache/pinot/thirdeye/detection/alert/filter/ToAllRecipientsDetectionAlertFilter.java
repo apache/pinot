@@ -69,17 +69,13 @@ public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertF
     // Fetch all the anomalies to be notified to the recipients
     Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds), minId);
 
-    DetectionAlertConfigDTO subsConfig = SubscriptionUtils.makeChildSubscriptionConfig(
-        generateNotificationSchemeProps(
-            this.config,
-            this.recipients.get(PROP_TO),
-            this.recipients.get(PROP_CC),
-            this.recipients.get(PROP_BCC))
-    );
+    this.config.setAlertSchemes(generateNotificationSchemeProps(
+        this.config,
+        this.recipients.get(PROP_TO),
+        this.recipients.get(PROP_CC),
+        this.recipients.get(PROP_BCC)));
 
-    return result.addMapping(
-        new DetectionAlertFilterNotification(subsConfig),
-        anomalies);
+    return result.addMapping(new DetectionAlertFilterNotification(this.config), anomalies);
   }
 
   private long getMinId(long highWaterMark) {
