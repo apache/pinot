@@ -153,7 +153,7 @@ public class PinotDataAndQueryAnonymizer {
   private Schema _pinotSchema = null;
   private org.apache.avro.Schema _avroSchema = null;
 
-  private final Map<String, FieldSpec.DataType> _columnToDataTypeMap;
+  private final Map<String, FieldSpec> _columnToFieldSpecMap;
   // name of columns to build global dictionary for and corresponding total cardinality
   private final Map<String, Integer> _globalDictionaryColumns;
   // name of time (or time derived) columns for which we will retain data
@@ -178,7 +178,7 @@ public class PinotDataAndQueryAnonymizer {
     _filePrefix = fileNamePrefix;
     _columnToGlobalDictionary = new HashMap<>();
     _origToDerivedColumnsMap = new HashMap<>();
-    _columnToDataTypeMap = new HashMap<>();
+    _columnToFieldSpecMap = new HashMap<>();
     _globalDictionaryColumns = globalDictionaryColumns;
     _columnsNotAnonymized = columnsNotAnonymized;
 
@@ -686,7 +686,7 @@ public class PinotDataAndQueryAnonymizer {
   private void buildAvroRow(
       DataFileWriter<GenericData.Record> avroRecordWriter,
       GenericRow pinotRow) throws Exception {
-    GenericData.Record record = new GenericData.Record(_avroSchema);
+    GenericData.Record avroRow = new GenericData.Record(_avroSchema);
     Map<String, Object> fieldToValueMap = pinotRow.getFieldToValueMap();
     for (Map.Entry<String, Object> entry : fieldToValueMap.entrySet()) {
       String columnName = entry.getKey();
@@ -694,33 +694,73 @@ public class PinotDataAndQueryAnonymizer {
       String derivedColumnName = _origToDerivedColumnsMap.get(columnName);
       if (_columnsNotAnonymized.contains(columnName)) {
         // retain the value
-        record.put(derivedColumnName, origValue);
+        // this should work for both SV and MV
+        avroRow.put(derivedColumnName, origValue);
       } else if (_globalDictionaryColumns.containsKey(columnName)) {
         // use the randomly generated value from global dictionary
+        FieldSpec fieldSpec = _columnToFieldSpecMap.get(columnName);
         OrigAndDerivedValueHolder valueHolder = _columnToGlobalDictionary.get(columnName);
-        Object derivedValue = valueHolder.getDerivedValueForOrigValue(origValue);
-        record.put(derivedColumnName, derivedValue);
+        if (fieldSpec.isSingleValueField()) {
+          // SV
+          Object derivedValue = valueHolder.getDerivedValueForOrigValue(origValue);
+          avroRow.put(derivedColumnName, derivedValue);
+        } else {
+          // MV
+          if (origValue == null) {
+            avroRow.put(derivedColumnName, null);
+          } else {
+            Object[] origMultiValues = (Object[])origValue;
+            int length = origMultiValues.length;
+            Object[] derivedMultiValues = new Object[length];
+            for (int i = 0; i < length; i++) {
+              derivedMultiValues[i] = valueHolder.getDerivedValueForOrigValue(origMultiValues[i]);
+            }
+            avroRow.put(derivedColumnName, derivedMultiValues);
+          }
+        }
       } else {
         // generate random value; but we don't need to store this value
         // anywhere as it won't be needed again during query generation phase
-        Object derivedValue = generateRandomDerivedValue(origValue, _columnToDataTypeMap.get(columnName));
-        record.put(derivedColumnName, derivedValue);
+        // generateRandomDerivedValue() takes care of generating SV/MV
+        // depending on the original value
+        Object derivedValue = generateRandomDerivedValue(origValue, _columnToFieldSpecMap.get(columnName));
+        avroRow.put(derivedColumnName, derivedValue);
       }
     }
-    avroRecordWriter.append(record);
+    avroRecordWriter.append(avroRow);
   }
 
   /**
-   * Used for columns that are neither date columns (for which we retain value)
+   * Used for columns that are neither time (time related) columns (for which we retain value)
    * or filter columns (for which we generate global dictionary 1:1 mapping between
    * original and generated values).
    * We can generate any random value for such columns and it doesn't matter to
    * the query generation.
    * @param origValue original value as seen when reading Pinot segment record
-   * @param dataType data type of column
+   * @param fieldSpec field spec of column
    * @return random generated value
    */
-  private Object generateRandomDerivedValue(Object origValue, FieldSpec.DataType dataType) {
+  private Object generateRandomDerivedValue(Object origValue, FieldSpec fieldSpec) {
+    if (fieldSpec.isSingleValueField()) {
+      // SV column
+      return generateDerivedRandomValueHelper(origValue, fieldSpec.getDataType());
+    } else {
+      // MV column
+      if (origValue == null) {
+        return null;
+      }
+      Object[] origMultiValues = (Object[]) origValue;
+      int length = origMultiValues.length;
+      Object[] derivedMultiValues = new Object[length];
+      for (int i = 0; i < length; i++) {
+        derivedMultiValues[i] = generateDerivedRandomValueHelper(origMultiValues[i], fieldSpec.getDataType());
+      }
+      return derivedMultiValues;
+    }
+  }
+
+  private Object generateDerivedRandomValueHelper(Object origValue, FieldSpec.DataType dataType) {
+    // origValue is used only for STRING to get the length
     Random random = new Random();
     switch (dataType) {
       case INT:
@@ -757,10 +797,7 @@ public class PinotDataAndQueryAnonymizer {
     for (Map.Entry<String, FieldSpec> entry : fieldSpecMap.entrySet()) {
       String columnName = entry.getKey();
       FieldSpec fieldSpec = entry.getValue();
-      if (!fieldSpec.isSingleValueField()) {
-        // TODO: add multi-value column support
-        throw new UnsupportedOperationException("Data generator currently does not support multi-value columns");
-      }
+
       if (fieldSpec instanceof DimensionFieldSpec) {
         prefix = "DIMENSION";
       } else if (fieldSpec instanceof MetricFieldSpec) {
@@ -770,6 +807,13 @@ public class PinotDataAndQueryAnonymizer {
       } else if (fieldSpec instanceof DateTimeFieldSpec) {
         prefix = "DATE_TIME";
       }
+
+      if (fieldSpec.isSingleValueField()) {
+        prefix = prefix + "_SV";
+      } else {
+        prefix = prefix + "_MV";
+      }
+
       String newColumnName = prefix +"_COL_" + col;
       _origToDerivedColumnsMap.put(columnName, newColumnName);
       ++col;
@@ -785,26 +829,53 @@ public class PinotDataAndQueryAnonymizer {
     SchemaBuilder.FieldAssembler<org.apache.avro.Schema> fieldAssembler = SchemaBuilder.record("record").fields();
     for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
       FieldSpec.DataType dataType = fieldSpec.getDataType();
-      _columnToDataTypeMap.put(fieldSpec.getName(), dataType);
-      switch (dataType) {
-        case INT:
-          fieldAssembler = fieldAssembler.name(_origToDerivedColumnsMap.get(fieldSpec.getName())).type().intType().noDefault();
-          break;
-        case LONG:
-          fieldAssembler = fieldAssembler.name(_origToDerivedColumnsMap.get(fieldSpec.getName())).type().longType().noDefault();
-          break;
-        case FLOAT:
-          fieldAssembler = fieldAssembler.name(_origToDerivedColumnsMap.get(fieldSpec.getName())).type().floatType().noDefault();
-          break;
-        case DOUBLE:
-          fieldAssembler = fieldAssembler.name(_origToDerivedColumnsMap.get(fieldSpec.getName())).type().doubleType().noDefault();
-          break;
-        case STRING:
-          fieldAssembler = fieldAssembler.name(_origToDerivedColumnsMap.get(fieldSpec.getName())).type().stringType().noDefault();
-          break;
-        default:
-          // TODO: add BYTES support
-          throw new UnsupportedOperationException("Data generator does not support type: " + dataType);
+      String columnName = fieldSpec.getName();
+      String derivedColumnName = _origToDerivedColumnsMap.get(columnName);
+      _columnToFieldSpecMap.put(columnName, fieldSpec);
+      if (fieldSpec.isSingleValueField()) {
+        // SV
+        switch (dataType) {
+          case INT:
+            fieldAssembler = fieldAssembler.name(derivedColumnName).type().intType().noDefault();
+            break;
+          case LONG:
+            fieldAssembler = fieldAssembler.name(derivedColumnName).type().longType().noDefault();
+            break;
+          case FLOAT:
+            fieldAssembler = fieldAssembler.name(derivedColumnName).type().floatType().noDefault();
+            break;
+          case DOUBLE:
+            fieldAssembler = fieldAssembler.name(derivedColumnName).type().doubleType().noDefault();
+            break;
+          case STRING:
+            fieldAssembler = fieldAssembler.name(derivedColumnName).type().stringType().noDefault();
+            break;
+          default:
+            // TODO: add BYTES support
+            throw new UnsupportedOperationException("Data generator does not support type: " + dataType);
+        }
+      } else {
+        // MV
+        switch (dataType) {
+          case INT:
+            fieldAssembler = fieldAssembler.name(derivedColumnName).type().array().items().intType().noDefault();
+            break;
+          case LONG:
+            fieldAssembler = fieldAssembler.name(derivedColumnName).type().array().items().longType().noDefault();
+            break;
+          case FLOAT:
+            fieldAssembler = fieldAssembler.name(derivedColumnName).type().array().items().floatType().noDefault();
+            break;
+          case DOUBLE:
+            fieldAssembler = fieldAssembler.name(derivedColumnName).type().array().items().doubleType().noDefault();
+            break;
+          case STRING:
+            fieldAssembler = fieldAssembler.name(derivedColumnName).type().array().items().stringType().noDefault();
+            break;
+          default:
+            // TODO: add BYTES support
+            throw new UnsupportedOperationException("Data generator does not support type: " + dataType);
+        }
       }
     }
 
