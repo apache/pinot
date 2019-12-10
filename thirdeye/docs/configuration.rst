@@ -132,6 +132,47 @@ Please note ThirdEye support MySQL data source, and this configuration is differ
 
 For more examples on datasource configurations please check :ref:`alert-setup`.
 
+.. _cache-config.yml:
+
+cache-config.yml
+--------------------
+
+Decides which caching scheme(s) to use in ThirdEye for optimizing data fetching process. If applicable,
+contains settings for a user specified cache data source configuration. 
+
+.. code-block:: yaml
+
+	useInMemoryCache: true
+	useCentralizedCache: false
+
+	centralizedCacheSettings:
+	  # TTL (time-to-live) for documents in seconds
+	  ttl: 3600
+	  # if inserting data points individually, max number of threads to spawn to parallel insert at a time
+	  maxParallelInserts: 10
+	  # which store to use
+	  cacheDataStoreName: <cache data source of choice>
+	  cacheDataSources:
+            <cache data source name>:
+              className: <class name>
+              config:
+                <your config setting>: <value>
+                <your config setting>: <value>
+                ...
+                <your config setting>: <value>
+            <cache data source name>:
+              className: <class name>
+              config:
+                <your config setting>: <value>
+                <your config setting>: <value>
+                ...
+                <your config setting>: <value> 
+	    # you can add more cache data sources below if you like
+
+The configs for cache data sources are flexible and schemaless, so you can add as many config settings as you need or want. 
+For the most part, these settings will probably be used for connection and authentication configuration settings, like host URI(s)
+or username/password/certificate files to authenticate to the data source.
+
 .. _dashboard.yml:
 
 dashboard.yml

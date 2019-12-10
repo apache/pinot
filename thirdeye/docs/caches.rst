@@ -17,15 +17,13 @@
 .. under the License.
 ..
 
-########
-ThirdEye
-########
+#######################
+Caching in ThirdEye
+#######################
 
 .. toctree::
-   :maxdepth: 2
+    :maxdepth: 1
 
-   introduction
-   configuration
-   datasources
-   caches
-   alert_setup
+    cache_intro
+    couchbase
+    setup_cache_datastore
