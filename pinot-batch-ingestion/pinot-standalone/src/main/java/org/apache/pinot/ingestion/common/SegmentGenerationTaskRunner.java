@@ -35,6 +35,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -72,13 +73,14 @@ public class SegmentGenerationTaskRunner {
         configs = new HashMap<>();
       }
       JsonNode jsonNode = new ObjectMapper().valueToTree(configs);
-      JsonUtils.jsonNodeToObject(jsonNode, Class.forName(readerConfigClassName));
-      recordReaderConfig = (RecordReaderConfig) Class.forName(readerConfigClassName).newInstance();
+      Class<?> clazz = PluginManager.get().loadClass(readerConfigClassName);
+      recordReaderConfig = (RecordReaderConfig) JsonUtils.jsonNodeToObject(jsonNode, clazz);
     }
 
     //init record reader
     String readerClassName = _taskSpec.getRecordReaderSpec().getClassName();
-    RecordReader recordReader = (RecordReader) Class.forName(readerClassName).newInstance();
+    RecordReader recordReader = PluginManager.get().createInstance(readerClassName);
+
     recordReader.init(new File(_taskSpec.getInputFilePath()), schema, recordReaderConfig);
 
     //init segmentName Generator

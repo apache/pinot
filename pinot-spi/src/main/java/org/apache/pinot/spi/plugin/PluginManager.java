@@ -20,6 +20,7 @@ package org.apache.pinot.spi.plugin;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -29,6 +30,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 
 
 public class PluginManager {
@@ -107,7 +109,6 @@ public class PluginManager {
    * <li>pluginName:com.x.y.foo</li> loads the class in plugin specific classloader
    * @param className
    * @return
-   * @throws ClassNotFoundException
    */
   public <T> T createInstance(String className)
       throws Exception {
@@ -120,7 +121,6 @@ public class PluginManager {
    * <li>pluginName:com.x.y.foo</li> loads the class in plugin specific classloader
    * @param className
    * @return
-   * @throws ClassNotFoundException
    */
   public <T> T createInstance(String className, Class[] argTypes, Object[] argValues)
       throws Exception {
@@ -156,14 +156,20 @@ public class PluginManager {
    * @param <T>
    * @return
    */
-  public <T> T createInstance(String pluginName, String className, Class[] argTypes, Object[] argValues)
-      throws Exception {
+  public <T> T createInstance(String pluginName, String className, Class[] argTypes, Object[] argValues) throws Exception{
     PluginClassLoader pluginClassLoader = PLUGIN_MANAGER._registry.get(new Plugin(pluginName));
-    Class<T> loadedClass = (Class<T>) pluginClassLoader.loadClass(className, true);
-    Constructor<?> constructor = loadedClass.getConstructor(argTypes);
-    if (constructor != null) {
-      Object instance = constructor.newInstance(argValues);
-      return (T) instance;
+    try {
+      Class<T> loadedClass = (Class<T>) pluginClassLoader.loadClass(className, true);
+      Constructor<?> constructor = null;
+      constructor = loadedClass.getConstructor(argTypes);
+      if (constructor != null) {
+        Object instance = null;
+        instance = constructor.newInstance(argValues);
+
+        return (T) instance;
+      }
+    } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException | ClassNotFoundException e) {
+      throw e;
     }
     return null;
   }

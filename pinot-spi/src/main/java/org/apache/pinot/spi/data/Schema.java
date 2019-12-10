@@ -626,4 +626,21 @@ public final class Schema {
     result = EqualityUtils.hashCodeOf(result, _dateTimeFieldSpecs);
     return result;
   }
+
+  public static void main(String[] args) {
+    String defaultString = "";
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
+        .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 10)
+        .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, defaultString)
+        .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
+        .addMetric("derivedMetric", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL)
+        .addMetric("derivedMetricWithDefault", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL,
+            defaultString).addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
+        .addDateTime("payment_date", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .addDateTime("launch_date", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .addDateTime("due_date", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .build();
+    System.out.println("schema.toPrettyJsonString() = " + schema.toPrettyJsonString());
+  }
 }

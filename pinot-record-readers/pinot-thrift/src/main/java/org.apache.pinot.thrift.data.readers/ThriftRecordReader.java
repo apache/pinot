@@ -84,7 +84,7 @@ public class ThriftRecordReader implements RecordReader {
     _fieldSpecs = RecordReaderUtils.extractFieldSpecs(schema);
     TBase tObject;
     try {
-      _thriftClass = Class.forName(recordReaderConfig.getThriftClass());
+      _thriftClass = this.getClass().getClassLoader().loadClass(recordReaderConfig.getThriftClass());
       tObject = (TBase) _thriftClass.newInstance();
     } catch (Exception e) {
       throw new RuntimeException(e);

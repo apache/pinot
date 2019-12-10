@@ -79,7 +79,10 @@ public class SchemaTest {
         .addMetric("derivedMetric", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL)
         .addMetric("derivedMetricWithDefault", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL,
             defaultString).addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
-        .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
+        .addDateTime("launch_date", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .addDateTime("launch_date", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .addDateTime("due_date", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .build();
 
     DimensionFieldSpec dimensionFieldSpec = schema.getDimensionSpec("svDimension");
     Assert.assertNotNull(dimensionFieldSpec);

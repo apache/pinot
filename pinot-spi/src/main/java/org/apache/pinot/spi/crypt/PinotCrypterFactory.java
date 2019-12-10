@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,12 +61,11 @@ public class PinotCrypterFactory {
       LOGGER.info("Got crypter class name {}, full crypter path {}, starting to initialize", key, className);
 
       try {
-        PinotCrypter pinotCrypter = (PinotCrypter) Class.forName(className).newInstance();
+        PinotCrypter pinotCrypter = PluginManager.get().createInstance(className);
         pinotCrypter.init(config.subset(key));
-
         LOGGER.info("Initializing PinotCrypter for scheme {}, classname {}", key, className);
         _crypterMap.put(key.toLowerCase(), pinotCrypter);
-      } catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
+      } catch (Exception e) {
         LOGGER.error("Could not instantiate crypter for class {}", className, e);
         throw new RuntimeException(e);
       }

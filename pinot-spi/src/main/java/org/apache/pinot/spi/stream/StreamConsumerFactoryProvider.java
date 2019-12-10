@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.stream;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.pinot.spi.plugin.PluginManager;
 
 
 /**
@@ -34,7 +35,7 @@ public abstract class StreamConsumerFactoryProvider {
   public static StreamConsumerFactory create(StreamConfig streamConfig) {
     StreamConsumerFactory factory = null;
     try {
-      factory = (StreamConsumerFactory) Class.forName(streamConfig.getConsumerFactoryClassName()).newInstance();
+      factory = PluginManager.get().createInstance(streamConfig.getConsumerFactoryClassName());
     } catch (Exception e) {
       ExceptionUtils.rethrow(e);
     }
