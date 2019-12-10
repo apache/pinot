@@ -24,7 +24,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import com.oracle.javafx.jmx.json.JSONException;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -438,8 +437,7 @@ public class TableConfig extends BaseJsonConfig {
   }
 
   @Nonnull
-  public String toJSONConfigString()
-      throws IOException, JSONException {
+  public String toJSONConfigString() {
     return toJsonConfig().toString();
   }
 
@@ -665,8 +663,7 @@ public class TableConfig extends BaseJsonConfig {
       return this;
     }
 
-    public TableConfig build()
-        throws IOException, JSONException {
+    public TableConfig build() {
       // Validation config
       SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
       validationConfig.setTimeColumnName(_timeColumnName);
