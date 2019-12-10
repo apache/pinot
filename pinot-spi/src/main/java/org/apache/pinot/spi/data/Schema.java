@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -59,7 +60,6 @@ import org.slf4j.LoggerFactory;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class Schema {
   private static final Logger LOGGER = LoggerFactory.getLogger(Schema.class);
-  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   private static final String UPSERT_TABLE_CONFIG = "upsert";
   private DimensionFieldSpec _primaryKeyFieldSpec = null;
@@ -175,7 +175,6 @@ public final class Schema {
   }
 
 
-  @Nonnull
   public List<DimensionFieldSpec> getDimensionFieldSpecs() {
     return _dimensionFieldSpecs;
   }
@@ -348,7 +347,6 @@ public final class Schema {
   }
 
   @JsonIgnore
-  @Nonnull
   public Collection<FieldSpec> getAllPhysicalFieldSpecs() {
     return _physicalFieldSpecMap.values();
   }
@@ -645,10 +643,9 @@ public final class Schema {
       return this;
     }
 
-    public SchemaBuilder addTime(@Nonnull String incomingName, int incomingTimeUnitSize,
-        @Nonnull TimeUnit incomingTimeUnit, @Nonnull DataType incomingDataType, @Nonnull String outgoingName,
-        int outgoingTimeUnitSize, @Nonnull TimeUnit outgoingTimeUnit, @Nonnull DataType outgoingDataType,
-        @Nonnull Object defaultNullValue) {
+    public SchemaBuilder addTime(String incomingName, int incomingTimeUnitSize, TimeUnit incomingTimeUnit,
+        DataType incomingDataType, String outgoingName, int outgoingTimeUnitSize, TimeUnit outgoingTimeUnit,
+        DataType outgoingDataType, Object defaultNullValue) {
       _schema.addField(
           new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, outgoingName,
               outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit, defaultNullValue));

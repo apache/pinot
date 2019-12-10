@@ -151,10 +151,9 @@ public class TableConfig extends BaseJsonConfig {
             new TypeReference<Map<InstancePartitionsType, InstanceAssignmentConfig>>() {
             });
 
-    CommonConstants.UpdateSemantic updateSemantic = CommonConstants.UpdateSemantic.DEFAULT_SEMANTIC;
     UpdateSemantic updateSemantic = UpdateSemantic.DEFAULT_SEMANTIC;
     if (jsonConfig.has(UPDATE_SEMANTIC_CONFIG_KEY)) {
-      updateSemantic = CommonConstants.UpdateSemantic.getUpdateSemantic(jsonConfig.getString(UPDATE_SEMANTIC_CONFIG_KEY));
+      updateSemantic = UpdateSemantic.getUpdateSemantic(jsonConfig.get(UPDATE_SEMANTIC_CONFIG_KEY).asText());
     }
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, instanceAssignmentConfigMap, updateSemantic);
@@ -709,7 +708,7 @@ public class TableConfig extends BaseJsonConfig {
       }
 
       return new TableConfig(_tableName, _tableType, validationConfig, tenantConfig, indexingConfig, _customConfig,
-          _quotaConfig, _taskConfig, _routingConfig, _instanceAssignmentConfigMap, , _updateSemantic);
+          _quotaConfig, _taskConfig, _routingConfig, _instanceAssignmentConfigMap, _updateSemantic);
     }
   }
 }
