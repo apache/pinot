@@ -30,7 +30,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 
 
 public class PluginManager {
@@ -82,7 +81,7 @@ public class PluginManager {
   public Class<?> loadClass(String className)
       throws ClassNotFoundException {
     String pluginName = DEFAULT_PLUGIN_NAME;
-    String realClassName = DEFAULT_PLUGIN_NAME;
+    String realClassName = className;
     if (className.indexOf(":") > -1) {
       String[] split = className.split("\\:");
       pluginName = split[0];
@@ -125,7 +124,7 @@ public class PluginManager {
   public <T> T createInstance(String className, Class[] argTypes, Object[] argValues)
       throws Exception {
     String pluginName = DEFAULT_PLUGIN_NAME;
-    String realClassName = DEFAULT_PLUGIN_NAME;
+    String realClassName = className;
     if (className.indexOf(":") > -1) {
       String[] split = className.split("\\:");
       pluginName = split[0];
@@ -163,9 +162,7 @@ public class PluginManager {
       Constructor<?> constructor = null;
       constructor = loadedClass.getConstructor(argTypes);
       if (constructor != null) {
-        Object instance = null;
-        instance = constructor.newInstance(argValues);
-
+        Object instance = constructor.newInstance(argValues);
         return (T) instance;
       }
     } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException | ClassNotFoundException e) {
