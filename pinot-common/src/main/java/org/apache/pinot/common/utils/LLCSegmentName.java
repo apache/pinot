@@ -21,9 +21,13 @@ package org.apache.pinot.common.utils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+
 
 public class LLCSegmentName extends SegmentName implements Comparable {
   private final static String DATE_FORMAT = "yyyyMMdd'T'HHmm'Z'";
+  private final static SimpleDateFormat SIMPLE_DATE_FORMAT = new SimpleDateFormat(DATE_FORMAT);
   private final String _tableName;
   private final int _partitionId;
   private final int _sequenceNumber;
@@ -52,7 +56,7 @@ public class LLCSegmentName extends SegmentName implements Comparable {
     _sequenceNumber = sequenceNumber;
     // ISO8601 date: 20160120T1234Z
     DateTime dateTime = new DateTime(msSinceEpoch, DateTimeZone.UTC);
-    _creationTime = dateTime.toString("yyyyMMdd'T'HHmm'Z'");
+    _creationTime = dateTime.toString(DATE_FORMAT);
     _segmentName = tableName + SEPARATOR + partitionId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
   }
 
@@ -83,6 +87,14 @@ public class LLCSegmentName extends SegmentName implements Comparable {
 
   public String getCreationTime() {
     return _creationTime;
+  }
+
+  public long getCreationTimeStamp() {
+    try {
+      return SIMPLE_DATE_FORMAT.parse(getCreationTime()).getTime();
+    } catch (ParseException e) {
+      throw new RuntimeException("failed to parse creation time " + getCreationTime(), e);
+    }
   }
 
   @Override

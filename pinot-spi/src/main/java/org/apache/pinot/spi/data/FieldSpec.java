@@ -21,6 +21,7 @@ package org.apache.pinot.spi.data;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -117,6 +118,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
 
   public boolean isSingleValueField() {
     return _isSingleValueField;
+  }
+
+  public boolean isVirtualColumnField() {
+    return _virtualColumnProvider != null;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
@@ -254,6 +259,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
     jsonObject.put("dataType", _dataType.name());
     if (!_isSingleValueField) {
       jsonObject.put("singleValueField", false);
+    }
+    if (StringUtils.isNotEmpty(_virtualColumnProvider)) {
+      jsonObject.put("virtualColumnProvider", _virtualColumnProvider);
     }
     if (_maxLength != DEFAULT_MAX_LENGTH) {
       jsonObject.put("maxLength", _maxLength);
