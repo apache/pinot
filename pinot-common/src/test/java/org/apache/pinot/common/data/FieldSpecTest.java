@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema;
-import org.apache.pinot.common.utils.AvroSchemaUtil;
+import org.apache.pinot.avro.data.readers.AvroSchemaUtil;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;

@@ -41,7 +41,7 @@ import org.apache.avro.util.Utf8;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.common.utils.AvroSchemaUtil;
+import org.apache.pinot.avro.data.readers.AvroSchemaUtil;
 
 
 public class AvroQueryGenerator {
