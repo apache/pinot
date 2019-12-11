@@ -26,10 +26,14 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
+import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
+import org.apache.pinot.thirdeye.detection.cache.builder.AnomaliesCacheBuilder;
+import org.apache.pinot.thirdeye.detection.cache.builder.TimeSeriesCacheBuilder;
 import org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector;
 import org.apache.pinot.thirdeye.notification.commons.EmailEntity;
 import org.apache.pinot.thirdeye.notification.formatter.channels.EmailContentFormatter;
@@ -54,8 +58,8 @@ import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.thirdeye.datalayer.DaoTestUtils.*;
@@ -79,8 +83,8 @@ public class TestMetricAnomaliesContent {
   private DetectionPipelineLoader detectionPipelineLoader;
   private DataProvider provider;
 
-  @BeforeClass
-  public void beforeClass(){
+  @BeforeMethod
+  public void beforeMethod(){
     testDAOProvider = DAOTestBase.getInstance();
     DAORegistry daoRegistry = DAORegistry.getInstance();
     detectionConfigDAO = daoRegistry.getDetectionConfigManager();
@@ -93,16 +97,19 @@ public class TestMetricAnomaliesContent {
     evaluationDAO = daoRegistry.getEvaluationManager();
     detectionPipelineLoader = new DetectionPipelineLoader();
 
+    TimeSeriesLoader timeseriesLoader =
+        new DefaultTimeSeriesLoader(daoRegistry.getMetricConfigDAO(), datasetDAO, null, null);
     AggregationLoader aggregationLoader =
         new DefaultAggregationLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(),
             ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
 
     provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, evaluationDAO,
-        aggregationLoader, detectionPipelineLoader);
+        timeseriesLoader, aggregationLoader, detectionPipelineLoader, TimeSeriesCacheBuilder.getInstance(),
+        AnomaliesCacheBuilder.getInstance());
   }
 
-  @AfterClass(alwaysRun = true)
-  void afterClass() {
+  @AfterMethod(alwaysRun = true)
+  void afterMethod() {
     testDAOProvider.cleanup();
   }
 

@@ -39,7 +39,7 @@ import org.apache.pinot.thirdeye.detection.alert.filter.SubscriptionUtils;
 import org.apache.pinot.thirdeye.notification.commons.JiraEntity;
 import org.apache.pinot.thirdeye.notification.commons.ThirdEyeJiraClient;
 import org.apache.pinot.thirdeye.notification.formatter.channels.TestJiraContentFormatter;
-import org.testng.annotations.AfterMethod;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -112,7 +112,7 @@ public class DetectionJiraAlerterTest {
     thirdEyeConfig.setAlerterConfiguration(alerterProps);
   }
 
-  @AfterMethod(alwaysRun = true)
+  @AfterClass(alwaysRun = true)
   void afterClass() {
     testDAOProvider.cleanup();
   }

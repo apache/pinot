@@ -49,6 +49,7 @@ import org.apache.pinot.thirdeye.notification.commons.JiraConfiguration;
 import org.apache.pinot.thirdeye.notification.commons.JiraEntity;
 import org.apache.pinot.thirdeye.notification.content.BaseNotificationContent;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -79,10 +80,11 @@ public class TestJiraContentFormatter {
   private Long detectionConfigId;
   private Long subsId1;
   private Long subsId2;
+  private DAOTestBase testDAOProvider;
 
   @BeforeMethod
   public void beforeMethod() throws Exception {
-    DAOTestBase.getInstance();
+    testDAOProvider = DAOTestBase.getInstance();
     DAORegistry daoRegistry = DAORegistry.getInstance();
     this.alertConfigDAO = daoRegistry.getDetectionAlertConfigManager();
     this.anomalyDAO = daoRegistry.getMergedAnomalyResultDAO();
@@ -121,6 +123,11 @@ public class TestJiraContentFormatter {
     this.alertConfigDimAlerter = createDimRecipientsDetectionAlertConfig(this.detectionConfigId);
     subsId2 = this.alertConfigDAO.save(this.alertConfigDimAlerter);
     alertConfigDimAlerter.setId(subsId2);
+  }
+
+  @AfterClass(alwaysRun = true)
+  void afterClass() {
+    testDAOProvider.cleanup();
   }
 
   public static DetectionAlertConfigDTO createDetectionAlertConfig(Long detectionConfigId) {

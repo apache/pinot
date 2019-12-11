@@ -18,7 +18,6 @@ package org.apache.pinot.thirdeye.detection.alert;
 
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import org.apache.pinot.thirdeye.anomaly.task.TaskContext;
-import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
@@ -31,20 +30,13 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
-import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
-import org.apache.pinot.thirdeye.datasource.ThirdEyeDataSource;
-import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
-import org.apache.pinot.thirdeye.datasource.csv.CSVThirdEyeDataSource;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Executors;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -83,24 +75,8 @@ public class SendAlertTest {
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
     metricConfigDTO.setName(METRIC_VALUE);
     metricConfigDTO.setDataset(COLLECTION_VALUE);
-    metricConfigDTO.setAlias("test");
-    long metricId = this.metricDAO.save(metricConfigDTO);
-
-    Map<String, ThirdEyeDataSource> dataSourceMap = new HashMap<>();
-
-    DataFrame data = new DataFrame();
-    data.addSeries("timestamp", 1526414678000L, 1527019478000L);
-    data.addSeries("value", 100, 200);
-    Map<String, DataFrame> datasets = new HashMap<>();
-    datasets.put(COLLECTION_VALUE, data);
-
-    Map<Long, String> id2name = new HashMap<>();
-    id2name.put(metricId, "value");
-
-    dataSourceMap.put("myDataSource", CSVThirdEyeDataSource.fromDataFrame(datasets, id2name));
-    QueryCache cache = new QueryCache(dataSourceMap, Executors.newSingleThreadExecutor());
-    ThirdEyeCacheRegistry.getInstance().registerQueryCache(cache);
-    ThirdEyeCacheRegistry.initMetaDataCaches();
+    metricConfigDTO.setAlias(COLLECTION_VALUE + ":" + METRIC_VALUE);
+    this.metricDAO.save(metricConfigDTO);
 
     DetectionConfigDTO detectionConfig = new DetectionConfigDTO();
     detectionConfig.setName(DETECTION_NAME_VALUE);
@@ -132,14 +108,13 @@ public class SendAlertTest {
 
     DatasetConfigDTO datasetConfigDTO = new DatasetConfigDTO();
     datasetConfigDTO.setDataset(COLLECTION_VALUE);
-    datasetConfigDTO.setDataSource("myDataSource");
     this.dataSetDAO.save(datasetConfigDTO);
 
     this.taskRunner = new DetectionAlertTaskRunner();
   }
 
   @AfterMethod(alwaysRun = true)
-  void afterClass() {
+  void afterMethod() {
     testDAOProvider.cleanup();
   }
 

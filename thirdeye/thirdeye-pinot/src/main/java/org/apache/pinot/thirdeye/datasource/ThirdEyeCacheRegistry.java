@@ -136,7 +136,7 @@ public class ThirdEyeCacheRegistry {
     cfg.setMaxParallelInserts(1);
 
     CacheConfig.getInstance().setUseCentralizedCache(false);
-    CacheConfig.getInstance().setUseInMemoryCache(true);
+    CacheConfig.getInstance().setUseInMemoryCache(false);
     CacheConfig.getInstance().setCentralizedCacheSettings(cfg);
   }
 

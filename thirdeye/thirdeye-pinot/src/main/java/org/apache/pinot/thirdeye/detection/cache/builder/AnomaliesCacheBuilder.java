@@ -1,3 +1,22 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 package org.apache.pinot.thirdeye.detection.cache.builder;
 
 import com.google.common.cache.CacheBuilder;
@@ -10,6 +29,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -33,40 +53,35 @@ public class AnomaliesCacheBuilder {
   private static final Logger LOG = LoggerFactory.getLogger(AnomaliesCacheBuilder.class);
 
   private static final String PROP_DETECTION_CONFIG_ID = "detectionConfigId";
+  // Timeout to fetch anomalies from data source
   private static final long TIMEOUT = 60000;
-  private static LoadingCache<AnomalySlice, Collection<MergedAnomalyResultDTO>> CACHE;
+
+  private final LoadingCache<AnomalySlice, Collection<MergedAnomalyResultDTO>> cache;
   private final ExecutorService executor = Executors.newCachedThreadPool();
 
+  private static AnomaliesCacheBuilder INSTANCE;
   private MergedAnomalyResultManager anomalyDAO;
 
-  private boolean cacheEnabled;
-
-  private AnomaliesCacheBuilder(boolean enabled) {
-    this.cacheEnabled = enabled;
-    this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
+  private AnomaliesCacheBuilder() {
+    this.cache = initCache();
   }
 
-  public static LoadingCache<AnomalySlice, Collection<MergedAnomalyResultDTO>> getInstance(boolean cacheEnabled) {
-    if (CACHE == null) {
-      AnomaliesCacheBuilder anomaliesCache = new AnomaliesCacheBuilder(cacheEnabled);
-      anomaliesCache.init();
+  synchronized public static AnomaliesCacheBuilder getInstance() {
+    if (INSTANCE == null) {
+      INSTANCE = new AnomaliesCacheBuilder();
     }
 
-    return CACHE;
+    INSTANCE.setAnomalyDAO(DAORegistry.getInstance().getMergedAnomalyResultDAO());
+    return INSTANCE;
   }
 
-  public static LoadingCache<AnomalySlice, Collection<MergedAnomalyResultDTO>> getInstance() {
-    if (CacheConfig.getInstance().useInMemoryCache()) {
-      return getInstance(true);
-    }
-
-    return getInstance(false);
+  private void setAnomalyDAO(MergedAnomalyResultManager mergedAnomalyResultDAO) {
+    this.anomalyDAO = mergedAnomalyResultDAO;
   }
 
-
-  private void init() {
+  private LoadingCache<AnomalySlice, Collection<MergedAnomalyResultDTO>> initCache() {
     LOG.info("Initializing anomalies cache");
-    CACHE = CacheBuilder.newBuilder()
+    return CacheBuilder.newBuilder()
         .expireAfterAccess(10, TimeUnit.MINUTES)
         .maximumSize(10000)
         .build(new CacheLoader<AnomalySlice, Collection<MergedAnomalyResultDTO>>() {
@@ -82,15 +97,23 @@ public class AnomaliesCacheBuilder {
         });
   }
 
+  public Collection<MergedAnomalyResultDTO> fetchSlice(AnomalySlice slice) throws ExecutionException {
+    if (CacheConfig.getInstance().useInMemoryCache()) {
+      return this.cache.get(slice);
+    } else {
+      return loadAnomalies(Collections.singleton(slice)).get(slice);
+    }
+  }
+
   private Map<AnomalySlice, Collection<MergedAnomalyResultDTO>> loadAnomalies(Collection<AnomalySlice> slices) {
     Map<AnomalySlice, Collection<MergedAnomalyResultDTO>> output = new HashMap<>();
     try {
       long ts = System.currentTimeMillis();
 
       // if the anomalies are already in cache, return directly
-      if (cacheEnabled) {
+      if (CacheConfig.getInstance().useInMemoryCache()) {
         for (AnomalySlice slice : slices) {
-          for (Map.Entry<AnomalySlice, Collection<MergedAnomalyResultDTO>> entry : CACHE.asMap().entrySet()) {
+          for (Map.Entry<AnomalySlice, Collection<MergedAnomalyResultDTO>> entry : this.cache.asMap().entrySet()) {
             // if the anomaly slice is already in cache, return directly. Otherwise fetch from data source.
             if (entry.getKey().containSlice(slice)) {
               output.computeIfAbsent(slice, k -> new ArrayList<>());

@@ -32,7 +32,7 @@ public class DetectionAlertTaskFactoryTest {
   private Map<String, Object> alerters;
 
   @BeforeMethod
-  public void beforeClass() throws Exception {
+  public void beforeMethod() throws Exception {
     Map<String, Object> randomAlerter = new HashMap<>();
     randomAlerter.put("className", "org.apache.pinot.thirdeye.detection.alert.scheme.RandomAlerter");
     Map<String, Object> anotherRandomAlerter = new HashMap<>();
