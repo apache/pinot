@@ -52,12 +52,12 @@ import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.core.util.ReplicationUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.LoggerFactory;
 
 
@@ -214,8 +214,8 @@ public class PinotTableRestletResource {
         ObjectNode offline = JsonUtils.newObjectNode();
         tableExists = true;
 
-        offline.put(FileUploadPathProvider.TABLE_NAME, offlineTableName);
-        offline.set(FileUploadPathProvider.STATE,
+        offline.put("tableName", offlineTableName);
+        offline.set("state",
             JsonUtils.objectToJsonNode(_pinotHelixResourceManager.toggleTableState(offlineTableName, stateType)));
         ret.add(offline);
       }
@@ -225,8 +225,8 @@ public class PinotTableRestletResource {
         ObjectNode realtime = JsonUtils.newObjectNode();
         tableExists = true;
 
-        realtime.put(FileUploadPathProvider.TABLE_NAME, realtimeTableName);
-        realtime.set(FileUploadPathProvider.STATE,
+        realtime.put("tableName", realtimeTableName);
+        realtime.set("state",
             JsonUtils.objectToJsonNode(_pinotHelixResourceManager.toggleTableState(realtimeTableName, stateType)));
         ret.add(realtime);
       }
