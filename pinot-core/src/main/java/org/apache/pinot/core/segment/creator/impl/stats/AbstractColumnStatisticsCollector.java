@@ -20,11 +20,11 @@ package org.apache.pinot.core.segment.creator.impl.stats;
 
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.avro.reflect.Nullable;
-import org.apache.pinot.spi.data.FieldSpec;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
