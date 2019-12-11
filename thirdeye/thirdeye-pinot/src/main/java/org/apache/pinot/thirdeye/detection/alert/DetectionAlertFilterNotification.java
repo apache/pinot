@@ -69,13 +69,11 @@ public class DetectionAlertFilterNotification {
       return false;
     }
     DetectionAlertFilterNotification that = (DetectionAlertFilterNotification) o;
-    return Objects.equals(subsConfig, that.subsConfig) &&
-        Objects.equals(dimensionFilters, that.dimensionFilters);
+    return Objects.equals(subsConfig, that.subsConfig) && Objects.equals(dimensionFilters, that.dimensionFilters);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(subsConfig, dimensionFilters);
   }
-
 }

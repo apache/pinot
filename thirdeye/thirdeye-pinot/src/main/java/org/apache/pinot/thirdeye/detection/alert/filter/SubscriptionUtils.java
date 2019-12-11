@@ -19,15 +19,13 @@
 
 package org.apache.pinot.thirdeye.detection.alert.filter;
 
+import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.lang3.SerializationUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 
 
 public class SubscriptionUtils {
-
-  public static DetectionAlertConfigDTO makeChildSubscriptionConfig(Map<String, Object> alertSchemes) {
-    return SubscriptionUtils.makeChildSubscriptionConfig(new DetectionAlertConfigDTO(), alertSchemes, null);
-  }
 
   /**
    * Make a new(child) subscription group from given(parent) subscription group.
@@ -38,6 +36,7 @@ public class SubscriptionUtils {
       DetectionAlertConfigDTO parentConfig,
       Map<String, Object> alertSchemes,
       Map<String, String> refLinks) {
+    // TODO: clone object using serialization rather than manual copy
     DetectionAlertConfigDTO subsConfig = new DetectionAlertConfigDTO();
     subsConfig.setId(parentConfig.getId());
     subsConfig.setFrom(parentConfig.getFrom());
@@ -49,6 +48,7 @@ public class SubscriptionUtils {
     subsConfig.setSubjectType(parentConfig.getSubjectType());
     subsConfig.setProperties(parentConfig.getProperties());
     subsConfig.setVectorClocks(parentConfig.getVectorClocks());
+    subsConfig.setHighWaterMark(parentConfig.getHighWaterMark());
 
     subsConfig.setAlertSchemes(alertSchemes);
     subsConfig.setReferenceLinks(refLinks);

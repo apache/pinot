@@ -110,13 +110,13 @@ public class PerUserDimensionAlertFilterTest {
     DetectionAlertFilterResult result = this.alertFilter.run();
     Assert.assertEquals(result.getResult().size(), 3);
 
-    DetectionAlertFilterNotification notification1 = AlertFilterUtils.makeEmailNotifications(Collections.singleton("myTest@example.com"));
+    DetectionAlertFilterNotification notification1 = AlertFilterUtils.makeEmailNotifications(this.alertConfig, Collections.singleton("myTest@example.com"));
     Assert.assertEquals(result.getResult().get(notification1), makeSet(1, 2, 5));
 
-    DetectionAlertFilterNotification notification2 = AlertFilterUtils.makeEmailNotifications(Collections.singleton("myTest@example.org"));
+    DetectionAlertFilterNotification notification2 = AlertFilterUtils.makeEmailNotifications(this.alertConfig, Collections.singleton("myTest@example.org"));
     Assert.assertEquals(result.getResult().get(notification2), makeSet(1, 5));
 
-    DetectionAlertFilterNotification notification3 = AlertFilterUtils.makeEmailNotifications(Collections.singleton("myTest@example.net"));
+    DetectionAlertFilterNotification notification3 = AlertFilterUtils.makeEmailNotifications(this.alertConfig, Collections.singleton("myTest@example.net"));
     Assert.assertEquals(result.getResult().get(notification3), makeSet(2));
   }
 
