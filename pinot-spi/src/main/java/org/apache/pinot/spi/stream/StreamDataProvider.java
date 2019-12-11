@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.stream;
 
 import java.util.Properties;
+import org.apache.pinot.spi.plugin.PluginManager;
 
 
 /**
@@ -30,16 +31,14 @@ import java.util.Properties;
 public class StreamDataProvider {
   public static StreamDataServerStartable getServerDataStartable(String clazz, Properties props)
       throws Exception {
-    final StreamDataServerStartable streamDataServerStartable =
-        (StreamDataServerStartable) Class.forName(clazz).newInstance();
+    final StreamDataServerStartable streamDataServerStartable = PluginManager.get().createInstance(clazz);
     streamDataServerStartable.init(props);
     return streamDataServerStartable;
   }
 
   public static StreamDataProducer getStreamDataProducer(String clazz, Properties props)
       throws Exception {
-
-    final StreamDataProducer streamDataProducer = (StreamDataProducer) Class.forName(clazz).newInstance();
+    final StreamDataProducer streamDataProducer = PluginManager.get().createInstance(clazz);;
     streamDataProducer.init(props);
     return streamDataProducer;
   }

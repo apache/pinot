@@ -20,6 +20,7 @@ package org.apache.pinot.spi.plugin;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -80,7 +81,7 @@ public class PluginManager {
   public Class<?> loadClass(String className)
       throws ClassNotFoundException {
     String pluginName = DEFAULT_PLUGIN_NAME;
-    String realClassName = DEFAULT_PLUGIN_NAME;
+    String realClassName = className;
     if (className.indexOf(":") > -1) {
       String[] split = className.split("\\:");
       pluginName = split[0];
@@ -107,7 +108,6 @@ public class PluginManager {
    * <li>pluginName:com.x.y.foo</li> loads the class in plugin specific classloader
    * @param className
    * @return
-   * @throws ClassNotFoundException
    */
   public <T> T createInstance(String className)
       throws Exception {
@@ -120,12 +120,11 @@ public class PluginManager {
    * <li>pluginName:com.x.y.foo</li> loads the class in plugin specific classloader
    * @param className
    * @return
-   * @throws ClassNotFoundException
    */
   public <T> T createInstance(String className, Class[] argTypes, Object[] argValues)
       throws Exception {
     String pluginName = DEFAULT_PLUGIN_NAME;
-    String realClassName = DEFAULT_PLUGIN_NAME;
+    String realClassName = className;
     if (className.indexOf(":") > -1) {
       String[] split = className.split("\\:");
       pluginName = split[0];
@@ -159,13 +158,15 @@ public class PluginManager {
   public <T> T createInstance(String pluginName, String className, Class[] argTypes, Object[] argValues)
       throws Exception {
     PluginClassLoader pluginClassLoader = PLUGIN_MANAGER._registry.get(new Plugin(pluginName));
-    Class<T> loadedClass = (Class<T>) pluginClassLoader.loadClass(className, true);
-    Constructor<?> constructor = loadedClass.getConstructor(argTypes);
-    if (constructor != null) {
+    try {
+      Class<T> loadedClass = (Class<T>) pluginClassLoader.loadClass(className, true);
+      Constructor<?> constructor;
+      constructor = loadedClass.getConstructor(argTypes);
       Object instance = constructor.newInstance(argValues);
       return (T) instance;
+    } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException | ClassNotFoundException e) {
+      throw e;
     }
-    return null;
   }
 
   public static PluginManager get() {

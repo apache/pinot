@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -66,7 +67,8 @@ public class RecordReaderFactory {
    * @throws IOException
    * @throws ClassNotFoundException
    */
-  public static RecordReaderConfig getRecordReaderConfigByClassName(String recordReaderConfigClassName, String readerConfigFile)
+  public static RecordReaderConfig getRecordReaderConfigByClassName(String recordReaderConfigClassName,
+      String readerConfigFile)
       throws IOException, ClassNotFoundException {
     return getRecordReaderConfigByClassName(recordReaderConfigClassName, new File(readerConfigFile));
   }
@@ -80,9 +82,10 @@ public class RecordReaderFactory {
    * @throws IOException
    * @throws ClassNotFoundException
    */
-  public static RecordReaderConfig getRecordReaderConfigByClassName(String recordReaderConfigClassName, File readerConfigFile)
+  public static RecordReaderConfig getRecordReaderConfigByClassName(String recordReaderConfigClassName,
+      File readerConfigFile)
       throws IOException, ClassNotFoundException {
-    Class recordReaderConfigClass = Class.forName(recordReaderConfigClassName);
+    Class recordReaderConfigClass = PluginManager.get().loadClass(recordReaderConfigClassName);
     RecordReaderConfig recordReaderConfig =
         (RecordReaderConfig) JsonUtils.fileToObject(readerConfigFile, recordReaderConfigClass);
     return recordReaderConfig;
@@ -94,14 +97,14 @@ public class RecordReaderFactory {
    * @param fileFormat
    * @param readerConfigFile
    * @return a RecordReaderConfig instance
-   * @throws IOException
-   * @throws ClassNotFoundException
+   * @throws Exception
    */
   public static RecordReaderConfig getRecordReaderConfig(FileFormat fileFormat, String readerConfigFile)
-      throws IOException, ClassNotFoundException {
+      throws Exception {
     String fileFormatKey = fileFormat.name().toUpperCase();
     if (DEFAULT_RECORD_READER_CONFIG_CLASS_MAP.containsKey(fileFormatKey)) {
-      return getRecordReaderConfigByClassName(DEFAULT_RECORD_READER_CONFIG_CLASS_MAP.get(fileFormatKey), readerConfigFile);
+      return getRecordReaderConfigByClassName(DEFAULT_RECORD_READER_CONFIG_CLASS_MAP.get(fileFormatKey),
+          readerConfigFile);
     }
     throw new UnsupportedOperationException("No supported RecordReader found for file format - '" + fileFormat + "'");
   }
@@ -114,15 +117,12 @@ public class RecordReaderFactory {
    * @param schema
    * @param recordReaderConfig
    * @return an initialized RecordReader instance.
-   * @throws IOException
-   * @throws ClassNotFoundException
-   * @throws IllegalAccessException
-   * @throws InstantiationException
+   * @throws Exception
    */
   public static RecordReader getRecordReaderByClass(String recordReaderClassName, File dataFile, Schema schema,
       RecordReaderConfig recordReaderConfig)
-      throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException {
-    RecordReader recordReader = (RecordReader) Class.forName(recordReaderClassName).newInstance();
+      throws Exception {
+    RecordReader recordReader = PluginManager.get().createInstance(recordReaderClassName);
     recordReader.init(dataFile, schema, recordReaderConfig);
     return recordReader;
   }
@@ -135,14 +135,11 @@ public class RecordReaderFactory {
    * @param schema
    * @param recordReaderConfig
    * @return an initialized RecordReader instance.
-   * @throws ClassNotFoundException
-   * @throws IOException
-   * @throws InstantiationException
-   * @throws IllegalAccessException
+   * @throws Exception Any exception while initializing the RecordReader
    */
   public static RecordReader getRecordReader(FileFormat fileFormat, File dataFile, Schema schema,
       RecordReaderConfig recordReaderConfig)
-      throws ClassNotFoundException, IOException, InstantiationException, IllegalAccessException {
+      throws Exception {
     return getRecordReader(fileFormat.name(), dataFile, schema, recordReaderConfig);
   }
 
@@ -154,14 +151,11 @@ public class RecordReaderFactory {
    * @param schema
    * @param recordReaderConfig
    * @return an initialized RecordReader instance.
-   * @throws ClassNotFoundException
-   * @throws InstantiationException
-   * @throws IllegalAccessException
-   * @throws IOException
+   * @throws Exception Any exception while initializing the RecordReader
    */
   public static RecordReader getRecordReader(String fileFormatStr, File dataFile, Schema schema,
       RecordReaderConfig recordReaderConfig)
-      throws ClassNotFoundException, InstantiationException, IllegalAccessException, IOException {
+      throws Exception {
     String fileFormatKey = fileFormatStr.toUpperCase();
     if (DEFAULT_RECORD_READER_CLASS_MAP.containsKey(fileFormatKey)) {
       return getRecordReaderByClass(DEFAULT_RECORD_READER_CLASS_MAP.get(fileFormatKey), dataFile, schema,

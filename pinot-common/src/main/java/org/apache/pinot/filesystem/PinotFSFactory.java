@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.Map;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,10 +47,10 @@ public class PinotFSFactory {
   public static void register(String scheme, String fsClassName, Configuration configuration) {
     try {
       LOGGER.info("Initializing PinotFS for scheme {}, classname {}", scheme, fsClassName);
-      PinotFS pinotFS = (PinotFS) Class.forName(fsClassName).newInstance();
+      PinotFS pinotFS = PluginManager.get().createInstance(fsClassName);
       pinotFS.init(configuration);
       _fileSystemMap.put(scheme, pinotFS);
-    } catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
+    } catch (Exception e) {
       LOGGER.error("Could not instantiate file system for class {} with scheme {}", fsClassName, scheme, e);
       throw new RuntimeException(e);
     }
