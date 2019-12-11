@@ -155,20 +155,18 @@ public class PluginManager {
    * @param <T>
    * @return
    */
-  public <T> T createInstance(String pluginName, String className, Class[] argTypes, Object[] argValues) throws Exception{
+  public <T> T createInstance(String pluginName, String className, Class[] argTypes, Object[] argValues)
+      throws Exception {
     PluginClassLoader pluginClassLoader = PLUGIN_MANAGER._registry.get(new Plugin(pluginName));
     try {
       Class<T> loadedClass = (Class<T>) pluginClassLoader.loadClass(className, true);
-      Constructor<?> constructor = null;
+      Constructor<?> constructor;
       constructor = loadedClass.getConstructor(argTypes);
-      if (constructor != null) {
-        Object instance = constructor.newInstance(argValues);
-        return (T) instance;
-      }
+      Object instance = constructor.newInstance(argValues);
+      return (T) instance;
     } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException | ClassNotFoundException e) {
       throw e;
     }
-    return null;
   }
 
   public static PluginManager get() {
