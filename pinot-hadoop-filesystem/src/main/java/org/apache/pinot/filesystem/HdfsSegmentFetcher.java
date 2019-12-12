@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.segment.fetcher;
+package org.apache.pinot.filesystem;
 
 import com.google.common.base.Strings;
 import java.io.File;
@@ -27,6 +27,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.pinot.common.segment.fetcher.SegmentFetcher;
 import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.apache.pinot.common.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
@@ -41,6 +42,8 @@ import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.RE
 import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.RETRY_WAITIME_MS_DEFAULT;
 
 
+// Use PinotFSSegmentFetcher instead
+@Deprecated
 public class HdfsSegmentFetcher implements SegmentFetcher {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HdfsSegmentFetcher.class);
