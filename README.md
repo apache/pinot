@@ -68,7 +68,7 @@ $ bin/quick-start-offline.sh
 ```
 
 ## Deploy Pinot on Kubernetes
-Please refer to [Kubernetes Readme](kubernetes/helm/README.md) to deploy Pinot using [Helm](<https://helm.sh/docs/using_helm/#installing-helm> and load demo data set.
+Please refer to [Kubernetes Readme](kubernetes/helm/README.md) to deploy Pinot using [Helm](https://helm.sh/docs/using_helm/#installing-helm) and load demo data set.
 
 Pinot also provides k8s integration with interactive query engine [Presto](kubernetes/helm/presto-coordinator.yaml) and data visualization tool [Apache Superset](kubernetes/helm/superset.yaml).
 
