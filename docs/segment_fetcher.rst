@@ -77,7 +77,7 @@ For example, the following curl requests to Controller will notify it to downloa
 
 .. code-block:: none
 
-  curl -X POST -H "UPLOAD_TYPE:URI" -H "DOWNLOAD_URI:hdfs://nameservice1/hadoop/path/to/segment/file.gz" -H "content-type:application/json" -d '' localhost:9000/segments
+  curl -X POST -H "UPLOAD_TYPE:URI" -H "DOWNLOAD_URI:hdfs://nameservice1/hadoop/path/to/segment/file.gz" -H "content-type:application/json" -d '' localhost:9000/v2/segments
 
 Implement your own segment fetcher for other systems
 ----------------------------------------------------
