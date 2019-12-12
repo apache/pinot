@@ -603,18 +603,12 @@ public class PinotDataAndQueryAnonymizer {
     String[] values = new String[cardinality];
     for (int i = 0; i < cardinality; i++) {
       String val = (String)valueHolder._origValues[i];
-      int origValLength;
       if (val == null || val.equals("") || val.equals(" ") || val.equals("null")) {
-        // can't map to null since sort will rearrange and two undesirable cases are possible:
-        // (1) a non-null original value can map to a null derived value in the GD
-        // (2) a null original value can map to a non-null derived value in the GD
-        // so it is better to map both null and non-null to non-null value
-        // arbitrary size chosen as 10
-        origValLength = 10;
+        values[i] = "null";
       } else {
-        origValLength = val.length();
+        int origValLength = val.length();
+        values[i] = RandomStringUtils.randomAlphanumeric(origValLength);
       }
-      values[i] = RandomStringUtils.randomAlphanumeric(origValLength);
     }
     Arrays.sort(values);
     return values;
@@ -626,20 +620,14 @@ public class PinotDataAndQueryAnonymizer {
     Random random = new Random();
     for (int i = 0; i < cardinality; i++) {
       ByteArray byteArray = (ByteArray)valueHolder._origValues[i];
-      int origValLength;
       if (byteArray == null || byteArray.length() == 0) {
-        // can't map to null since sort will rearrange and two undesirable cases are possible:
-        // (1) a non-null original value can map to a null derived value in the GD
-        // (2) a null original value can map to a non-null derived value in the GD
-        // so it is better to map both null and non-null to non-null value
-        // arbitrary size chosen as 10
-        origValLength = 10;
+        values[i] = new ByteArray(new byte[0]);
       } else {
-        origValLength = byteArray.length();
+        int origValLength = byteArray.length();
+        byte[] generated = new byte[origValLength];
+        random.nextBytes(generated);
+        values[i] = new ByteArray(generated);
       }
-      byte[] generated = new byte[origValLength];
-      random.nextBytes(generated);
-      values[i] = new ByteArray(generated);
     }
     Arrays.sort(values);
     return values;
@@ -800,6 +788,8 @@ public class PinotDataAndQueryAnonymizer {
     } else {
       // MV column
       if (origValue == null) {
+        // for non-GD columns, if the original MV is null or empty array,
+        // derived value will be the same
         return null;
       }
       Object[] origMultiValues = (Object[]) origValue;
@@ -827,6 +817,8 @@ public class PinotDataAndQueryAnonymizer {
       case STRING:
         String val = (String)origValue;
         if (val == null || val.equals("") || val.equals(" ") || val.equals("null")) {
+          // for non-GD columns, if the original value is one of these (null, null string, empty),
+          // derived value will be the same
           return val;
         } else {
           return RandomStringUtils.randomAlphanumeric(val.length());
@@ -834,6 +826,8 @@ public class PinotDataAndQueryAnonymizer {
       case BYTES:
         byte[] value = (byte[])origValue;
         if (value == null || value.length == 0) {
+          // for non-GD columns, if the original value is one of these (null, empty array),
+          // derived value will be the same
           return value;
         }
         byte[] derived = new byte[value.length];
@@ -1141,7 +1135,6 @@ public class PinotDataAndQueryAnonymizer {
         if (count > 0) {
           orderBy.append(", ");
         }
-        Preconditions.checkState(orderByChild instanceof OrderByExpressionAstNode);
         OrderByExpressionAstNode orderByExpr = (OrderByExpressionAstNode) orderByChild;
         String origColumn = orderByExpr.getColumn();
         String derivedColumn = getAnonymousColumnName(origColumn);
