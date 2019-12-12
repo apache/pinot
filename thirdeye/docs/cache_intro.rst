@@ -24,7 +24,7 @@ Intro to Caching in ThirdEye
 
 By default, ThirdEye uses an in-memory cache to reduce the number of fetch requests it needs to make to the data source.
 The in-memory cache is set to use no more than 1/3 of the JVM's available memory, and can be disabled completely by setting
-"useInMemoryCache" to be "false" in cache-config.yml. See :ref: The code for the in-memory cache can be found in:
+"useInMemoryCache" to be "false" in cache-config.yml. See :ref:`cache-config.yml`. The code for the in-memory cache can be found in:
 
 ``org.apache.pinot.thirdeye.detection.DefaultDataProvider``
 
