@@ -58,8 +58,6 @@ public class TestDataAndQueryAnonymizer {
     File queryFile = new File(resourceUrl.getFile());
     String pathToQueryFile = queryFile.getAbsolutePath();
     String pathToQueryDir = pathToQueryFile.substring(0, pathToQueryFile.indexOf(ORIGINAL_QUERY_FILE_NAME) - 1);
-
-
     String[] origQueries = new String[100];
     int queryCount = 0;
     try (InputStream inputStream = new FileInputStream(queryFile);

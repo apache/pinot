@@ -43,6 +43,8 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.pinot.pql.parsers.pql2.ast.OrderByAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.OrderByExpressionAstNode;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -76,6 +78,7 @@ import org.apache.pinot.pql.parsers.pql2.ast.StarColumnListAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.StarExpressionAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.WhereAstNode;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,21 +113,18 @@ import org.slf4j.LoggerFactory;
  * {@link org.apache.pinot.tools.admin.command.AnonymizeDataCommand} to learn
  * how this tool can be invoked from command line.
  *
- * Future work
- * (1) Add support for multi-value columns
- * (2) Add support for BYTES type
- * (3) Add support for partitioning (where dataset is hash partitioned on column)
- * (4) Add support for ORDER BY in query generator
- * (5) Potential memory explosion for extreme high cardinality global dictionary columns
- *     Please read the design doc for details.
- * (6) Add support for no dictionary filter columns (Generally this should not happen since
- *     whoever is using filter on a column should have created a dictionary for that column.
- *     But in case the filter column does not have segment dictionary, then we will not be
- *     able to build global dictionary)
- * (7) Make the global dictionary building phase per column basis to reduce the memory footprint
- * (8) Add support for generating queries when a predicate was not there in the original table
- *     and therefore not present in global dictionary either. The current implementation won't be
- *     able to rewrite this predicate correctly. It will substitute the original value with null.
+ * Future workadd --
+ * - Add support for partitioning (where dataset is hash partitioned on column)
+ * - Potential memory explosion for extreme high cardinality global dictionary columns
+ *   Please read the design doc for details.
+ * - Add support for no dictionary filter columns (Generally this should not happen since
+ *   whoever is using filter on a column should have created a dictionary for that column.
+ *   But in case the filter column does not have segment dictionary, then we will not be
+ *   able to build global dictionary)
+ * - Make the global dictionary building phase per column basis to reduce the memory footprint
+ * - Add support for generating queries when a predicate was not there in the original table
+ *   and therefore not present in global dictionary either. The current implementation won't be
+ *   able to rewrite this predicate correctly. It will substitute the original value with null.
  */
 public class PinotDataAndQueryAnonymizer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotDataAndQueryAnonymizer.class);
@@ -323,6 +323,14 @@ public class PinotDataAndQueryAnonymizer {
             }
           };
           break;
+        case BYTES:
+          _comparator = new Comparator() {
+            @Override
+            public int compare(Object o1, Object o2) {
+              return ((ByteArray)o1).compareTo((ByteArray) o2);
+            }
+          };
+          break;
         default:
           throw new UnsupportedOperationException("global dictionary currently does not support: " + _dataType.name());
       }
@@ -399,6 +407,8 @@ public class PinotDataAndQueryAnonymizer {
           return ((Float) o1).compareTo((Float) o2);
         case STRING:
           return ((String) o1).compareTo((String) o2);
+        case BYTES:
+          return ((ByteArray) o1).compareTo((ByteArray) o2);
         default:
           throw new IllegalStateException("unexpected data type: " + _dataType);
       }
@@ -495,7 +505,11 @@ public class PinotDataAndQueryAnonymizer {
       int cardinality) {
     _columnToGlobalDictionary.putIfAbsent(column, new OrigAndDerivedValueHolder(columnMetadata.getDataType(), cardinality));
     OrigAndDerivedValueHolder holder = _columnToGlobalDictionary.get(column);
-    holder.addOrigValue(origValue);
+    if (columnMetadata.getDataType() == FieldSpec.DataType.BYTES) {
+      holder.addOrigValue(new ByteArray((byte[])origValue));
+    } else {
+      holder.addOrigValue(origValue);
+    }
   }
 
   /**
@@ -530,26 +544,29 @@ public class PinotDataAndQueryAnonymizer {
     int cardinality = valueHolder._index;
     switch (valueHolder._dataType) {
       case INT:
-        valueHolder.setDerivedValues(generateDerivedIntValues(cardinality));
+        valueHolder.setDerivedValues(generateDerivedIntValuesForGD(cardinality));
         break;
       case LONG:
-        valueHolder.setDerivedValues(generateDerivedLongValues(cardinality));
+        valueHolder.setDerivedValues(generateDerivedLongValuesForGD(cardinality));
         break;
       case FLOAT:
-        valueHolder.setDerivedValues(generateDerivedFloatValues(cardinality));
+        valueHolder.setDerivedValues(generateDerivedFloatValuesForGD(cardinality));
         break;
       case DOUBLE:
-        valueHolder.setDerivedValues(generateDerivedDoubleValues(cardinality));
+        valueHolder.setDerivedValues(generateDerivedDoubleValuesForGD(cardinality));
         break;
       case STRING:
-        valueHolder.setDerivedValues(generateDerivedStringValues(valueHolder));
+        valueHolder.setDerivedValues(generateDerivedStringValuesForGD(valueHolder));
+        break;
+      case BYTES:
+        valueHolder.setDerivedValues(generateDerivedByteValuesForGD(valueHolder));
         break;
       default:
         throw new UnsupportedOperationException("global dictionary currently does not support: " + valueHolder._dataType.name());
     }
   }
 
-  private Integer[] generateDerivedIntValues(int cardinality) {
+  private Integer[] generateDerivedIntValuesForGD(int cardinality) {
     Integer[] values = new Integer[cardinality];
     for (int i = 0; i < cardinality; i++) {
       values[i] = INT_BASE_VALUE + i;
@@ -557,7 +574,7 @@ public class PinotDataAndQueryAnonymizer {
     return values;
   }
 
-  private Long[] generateDerivedLongValues(int cardinality) {
+  private Long[] generateDerivedLongValuesForGD(int cardinality) {
     Long[] values = new Long[cardinality];
     for (int i = 0; i < cardinality; i++) {
       values[i] = LONG_BASE_VALUE + (long)i;
@@ -565,7 +582,7 @@ public class PinotDataAndQueryAnonymizer {
     return values;
   }
 
-  private Float[] generateDerivedFloatValues(int cardinality) {
+  private Float[] generateDerivedFloatValuesForGD(int cardinality) {
     Float[] values = new Float[cardinality];
     for (int i = 0; i < cardinality; i++) {
       values[i] = FLOAT_BASE_VALUE + (float)i;
@@ -573,7 +590,7 @@ public class PinotDataAndQueryAnonymizer {
     return values;
   }
 
-  private Double[] generateDerivedDoubleValues(int cardinality) {
+  private Double[] generateDerivedDoubleValuesForGD(int cardinality) {
     Double[] values = new Double[cardinality];
     for (int i = 0; i < cardinality; i++) {
       values[i] = DOUBLE_BASE_VALUE + (double)i;
@@ -581,12 +598,36 @@ public class PinotDataAndQueryAnonymizer {
     return values;
   }
 
-  private String[] generateDerivedStringValues(OrigAndDerivedValueHolder valueHolder) {
+  private String[] generateDerivedStringValuesForGD(OrigAndDerivedValueHolder valueHolder) {
     int cardinality = valueHolder._index;
     String[] values = new String[cardinality];
     for (int i = 0; i < cardinality; i++) {
-      int origValLength = ((String)valueHolder._origValues[i]).length();
-      values[i] = RandomStringUtils.randomAlphanumeric(origValLength);
+      String val = (String)valueHolder._origValues[i];
+      if (val == null || val.equals("") || val.equals(" ") || val.equals("null")) {
+        values[i] = "null";
+      } else {
+        int origValLength = val.length();
+        values[i] = RandomStringUtils.randomAlphanumeric(origValLength);
+      }
+    }
+    Arrays.sort(values);
+    return values;
+  }
+
+  private ByteArray[] generateDerivedByteValuesForGD(OrigAndDerivedValueHolder valueHolder) {
+    int cardinality = valueHolder._index;
+    ByteArray[] values = new ByteArray[cardinality];
+    Random random = new Random();
+    for (int i = 0; i < cardinality; i++) {
+      ByteArray byteArray = (ByteArray)valueHolder._origValues[i];
+      if (byteArray == null || byteArray.length() == 0) {
+        values[i] = new ByteArray(new byte[0]);
+      } else {
+        int origValLength = byteArray.length();
+        byte[] generated = new byte[origValLength];
+        random.nextBytes(generated);
+        values[i] = new ByteArray(generated);
+      }
     }
     Arrays.sort(values);
     return values;
@@ -747,6 +788,8 @@ public class PinotDataAndQueryAnonymizer {
     } else {
       // MV column
       if (origValue == null) {
+        // for non-GD columns, if the original MV is null or empty array,
+        // derived value will be the same
         return null;
       }
       Object[] origMultiValues = (Object[]) origValue;
@@ -760,7 +803,7 @@ public class PinotDataAndQueryAnonymizer {
   }
 
   private Object generateDerivedRandomValueHelper(Object origValue, FieldSpec.DataType dataType) {
-    // origValue is used only for STRING to get the length
+    // origValue is used only for STRING and BYTES to get the length
     Random random = new Random();
     switch (dataType) {
       case INT:
@@ -774,10 +817,22 @@ public class PinotDataAndQueryAnonymizer {
       case STRING:
         String val = (String)origValue;
         if (val == null || val.equals("") || val.equals(" ") || val.equals("null")) {
+          // for non-GD columns, if the original value is one of these (null, null string, empty),
+          // derived value will be the same
           return val;
         } else {
           return RandomStringUtils.randomAlphanumeric(val.length());
         }
+      case BYTES:
+        byte[] value = (byte[])origValue;
+        if (value == null || value.length == 0) {
+          // for non-GD columns, if the original value is one of these (null, empty array),
+          // derived value will be the same
+          return value;
+        }
+        byte[] derived = new byte[value.length];
+        random.nextBytes(derived);
+        return derived;
       default:
         // we should not be here as during schema read step
         // (which is the first thing we do)
@@ -850,8 +905,10 @@ public class PinotDataAndQueryAnonymizer {
           case STRING:
             fieldAssembler = fieldAssembler.name(derivedColumnName).type().stringType().noDefault();
             break;
+          case BYTES:
+            fieldAssembler = fieldAssembler.name(derivedColumnName).type().bytesType().noDefault();
+            break;
           default:
-            // TODO: add BYTES support
             throw new UnsupportedOperationException("Data generator does not support type: " + dataType);
         }
       } else {
@@ -873,7 +930,7 @@ public class PinotDataAndQueryAnonymizer {
             fieldAssembler = fieldAssembler.name(derivedColumnName).type().array().items().stringType().noDefault();
             break;
           default:
-            // TODO: add BYTES support
+           // BYTES is not supported in Pinot for MV
             throw new UnsupportedOperationException("Data generator does not support type: " + dataType);
         }
       }
@@ -1030,10 +1087,9 @@ public class PinotDataAndQueryAnonymizer {
           // handle SELECT * ....
           genQuery.append("* FROM ").append(_tableName).append(" ");
           rewrittenSelectList = true;
-        } else {
-          // TODO: handle order by
-          // for now throw exception instead of generating incorrect query
-          throw new UnsupportedOperationException("Order by is currently not supported");
+        } else if (child instanceof OrderByAstNode) {
+          String orderBy = rewriteOrderBy((OrderByAstNode)child);
+          genQuery.append(orderBy).append(" ");
         }
       }
 
@@ -1068,6 +1124,24 @@ public class PinotDataAndQueryAnonymizer {
         count++;
       }
       return groupBy.toString();
+    }
+
+    private String rewriteOrderBy(OrderByAstNode orderByAstNode) {
+      StringBuilder orderBy = new StringBuilder();
+      orderBy.append("ORDER BY ");
+      List<? extends AstNode> children = orderByAstNode.getChildren();
+      int count = 0;
+      for (AstNode orderByChild : children) {
+        if (count > 0) {
+          orderBy.append(", ");
+        }
+        OrderByExpressionAstNode orderByExpr = (OrderByExpressionAstNode) orderByChild;
+        String origColumn = orderByExpr.getColumn();
+        String derivedColumn = getAnonymousColumnName(origColumn);
+        orderBy.append(derivedColumn).append(" ").append(orderByExpr.getOrdering());
+        count++;
+      }
+      return orderBy.toString();
     }
 
     private String rewriteSelectList(OutputColumnListAstNode outputColumnListAstNode) {
