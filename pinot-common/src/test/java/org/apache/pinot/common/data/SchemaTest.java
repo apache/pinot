@@ -21,6 +21,7 @@ package org.apache.pinot.common.data;
 import java.io.File;
 import java.net.URL;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -30,7 +31,6 @@ import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec.TimeFormat;
 import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.common.utils.SchemaUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -329,5 +329,93 @@ public class SchemaTest {
 
     Assert.assertEquals(actualSchema, expectedSchema);
     Assert.assertEquals(actualSchema.hashCode(), expectedSchema.hashCode());
+  }
+
+  @Test
+  public void testSchemaBackwardCompatibility() {
+    Schema oldSchema = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
+        .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 10)
+        .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
+        .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
+        .addMetric("derivedMetric", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL)
+        .addMetric("derivedMetricWithDefault", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL,
+            "default").addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
+        .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
+
+    Assert.assertThrows(NullPointerException.class, () -> oldSchema.isBackwardCompatibleWith(null));
+
+    // remove column
+    Schema schema1 = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
+        // Remove column svDimensionWithDefault
+        .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
+        .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
+        .addMetric("derivedMetric", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL)
+        .addMetric("derivedMetricWithDefault", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL,
+            "default").addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
+        .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
+    Assert.assertFalse(schema1.isBackwardCompatibleWith(oldSchema));
+
+    // change column type
+    Schema schema2 = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
+        .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.LONG, 10)  // INT -> LONG
+        .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
+        .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
+        .addMetric("derivedMetric", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL)
+        .addMetric("derivedMetricWithDefault", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL,
+            "default").addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
+        .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
+    Assert.assertFalse(schema2.isBackwardCompatibleWith(oldSchema));
+
+    // change time column
+    Schema schema3 = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
+        .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 10)
+        .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
+        .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
+        .addMetric("derivedMetric", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL)
+        .addMetric("derivedMetricWithDefault", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL,
+            "default").addTime("time", TimeUnit.HOURS, FieldSpec.DataType.LONG) // DAYS -> HOURS
+        .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
+    Assert.assertFalse(schema3.isBackwardCompatibleWith(oldSchema));
+
+    // change datetime column
+    Schema schema4 = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
+        .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 10)
+        .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
+        .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
+        .addMetric("derivedMetric", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL)
+        .addMetric("derivedMetricWithDefault", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL,
+            "default").addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
+        .addDateTime("dateTime", FieldSpec.DataType.LONG, "2:HOURS:EPOCH", "1:HOURS").build();  // timeUnit 1 -> 2
+    Assert.assertFalse(schema4.isBackwardCompatibleWith(oldSchema));
+
+    // change default value
+    Schema schema5 = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
+        .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 100) // default value 10 -> 100
+        .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
+        .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
+        .addMetric("derivedMetric", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL)
+        .addMetric("derivedMetricWithDefault", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL,
+            "default").addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
+        .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
+    Assert.assertFalse(schema5.isBackwardCompatibleWith(oldSchema));
+
+    // add a new column
+    Schema schema6 = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
+        .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 10)
+        .addSingleValueDimension("svDimensionWithDefault1", FieldSpec.DataType.INT, 10)
+        .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
+        .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
+        .addMetric("derivedMetric", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL)
+        .addMetric("derivedMetricWithDefault", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL,
+            "default").addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
+        .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
+    Assert.assertTrue(schema6.isBackwardCompatibleWith(oldSchema));
   }
 }
