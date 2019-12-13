@@ -18,24 +18,19 @@
  */
 package org.apache.pinot.core.common.predicate;
 
-import java.util.Arrays;
-import java.util.List;
-import org.apache.pinot.core.common.Predicate;
+public class EqPredicate implements Predicate {
+  private final String _value;
 
+  public EqPredicate(String value) {
+    _value = value;
+  }
 
-public class EqPredicate extends Predicate {
-
-  public EqPredicate(String lhs, List<String> rhs) {
-    super(lhs, Type.EQ, rhs);
+  public String getValue() {
+    return _value;
   }
 
   @Override
-  public String toString() {
-    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : " + Arrays
-        .toString(getRhs().toArray(new String[0])) + "\n";
-  }
-
-  public String getEqualsValue() {
-    return getRhs().get(0);
+  public Type getType() {
+    return Type.EQ;
   }
 }

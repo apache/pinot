@@ -21,17 +21,19 @@ package org.apache.pinot.core.common.predicate;
 import java.util.List;
 
 
-/**
- * This class implements the IN predicate.
- */
-public class NotInPredicate extends BaseInPredicate {
+public class NotInPredicate implements Predicate {
+  private final List<String> _values;
 
-  /**
-   * Constructor for the class
-   * @param lhs LHS for the NOT-IN predicate (column name)
-   * @param rhs RHS for the NOT-IN predicate (list of values)
-   */
-  public NotInPredicate(String lhs, List<String> rhs) {
-    super(lhs, Type.NOT_IN, rhs);
+  public NotInPredicate(List<String> values) {
+    _values = values;
+  }
+
+  public List<String> getValues() {
+    return _values;
+  }
+
+  @Override
+  public Type getType() {
+    return Type.NOT_IN;
   }
 }

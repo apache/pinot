@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.core.common.predicate.RangePredicate;
@@ -32,6 +31,7 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -138,7 +138,7 @@ public class ColumnValueSegmentPruner extends AbstractSegmentPruner {
 
         // Get lower/upper boundary value
         FieldSpec.DataType dataType = columnMetadata.getDataType();
-        RangePredicate rangePredicate = new RangePredicate(null, filterQueryTree.getValue());
+        RangePredicate rangePredicate = new RangePredicate(filterQueryTree.getValue().get(0));
         String lowerBoundary = rangePredicate.getLowerBoundary();
         boolean includeLowerBoundary = rangePredicate.includeLowerBoundary();
         Comparable lowerBoundaryValue = null;

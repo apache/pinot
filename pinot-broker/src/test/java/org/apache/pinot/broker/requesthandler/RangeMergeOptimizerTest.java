@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,8 +34,8 @@ import org.testng.annotations.Test;
  * Unit test for {@link RangeMergeOptimizerTest}
  */
 public class RangeMergeOptimizerTest {
-
   private static final String TIME_COLUMN = "time";
+
   private RangeMergeOptimizer _optimizer;
   private FilterQueryOptimizerRequest.FilterQueryOptimizerRequestBuilder _builder;
   private Pql2Compiler _compiler;
@@ -50,47 +49,47 @@ public class RangeMergeOptimizerTest {
 
   @Test
   public void testRangeIntersection() {
-    List<String> range1 = Arrays.asList("");
-    List<String> range2 = Arrays.asList("");
+    String range1;
+    String range2;
 
     // One range within another
-    range1.set(0, "(1\t\t100)");
-    range2.set(0, "(10\t\t20]");
+    range1 = "(1\t\t100)";
+    range2 = "(10\t\t20]";
     testRangeOptimizer(range1, range2, "(10\t\t20]");
 
     // One range within another, and one range is unbounded
-    range1.set(0, "(*\t\t*)");
-    range2.set(0, "[1\t\t2)");
+    range1 = "(*\t\t*)";
+    range2 = "[1\t\t2)";
     testRangeOptimizer(range1, range2, "[1\t\t2)");
 
     // One range with unbounded lower
-    range1.set(0, "(*\t\t5]");
-    range2.set(0, "[1\t\t20)");
+    range1 = "(*\t\t5]";
+    range2 = "[1\t\t20)";
     testRangeOptimizer(range1, range2, "[1\t\t5]");
 
     // One range with unbounded upper
-    range1.set(0, "(5\t\t*)");
-    range2.set(0, "[1\t\t20)");
+    range1 = "(5\t\t*)";
+    range2 = "[1\t\t20)";
     testRangeOptimizer(range1, range2, "(5\t\t20)");
 
     // Partial overlap
-    range1.set(0, "(1\t\t10]");
-    range2.set(0, "[5\t\t20)");
+    range1 = "(1\t\t10]";
+    range2 = "[5\t\t20)";
     testRangeOptimizer(range1, range2, "[5\t\t10]");
 
     // No overlap
-    range1.set(0, "(1\t\t10]");
-    range2.set(0, "[20\t\t30)");
+    range1 = "(1\t\t10]";
+    range2 = "[20\t\t30)";
     testRangeOptimizer(range1, range2, "[20\t\t10]");
 
     // Single point overlap
-    range1.set(0, "(1\t\t10]");
-    range2.set(0, "[10\t\t30)");
+    range1 = "(1\t\t10]";
+    range2 = "[10\t\t30)";
     testRangeOptimizer(range1, range2, "[10\t\t10]");
 
     // Redundant case
-    range1.set(0, "(*\t\t10]");
-    range2.set(0, "(*\t\t30)");
+    range1 = "(*\t\t10]";
+    range2 = "(*\t\t30)";
     testRangeOptimizer(range1, range2, "(*\t\t10]");
   }
 
@@ -190,12 +189,9 @@ public class RangeMergeOptimizerTest {
     compareTrees(actualTree, expectedTree);
   }
 
-  private void testRangeOptimizer(List<String> range1, List<String> range2, String expected) {
-    String actual;
-    actual = RangeMergeOptimizer.intersectRanges(range1, range2).get(0);
-    Assert.assertEquals(actual, expected);
-    actual = RangeMergeOptimizer.intersectRanges(range2, range1).get(0);
-    Assert.assertEquals(actual, expected);
+  private void testRangeOptimizer(String range1, String range2, String expected) {
+    Assert.assertEquals(RangeMergeOptimizer.intersectRanges(range1, range2), expected);
+    Assert.assertEquals(RangeMergeOptimizer.intersectRanges(range2, range1), expected);
   }
 
   /**

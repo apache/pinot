@@ -18,20 +18,14 @@
  */
 package org.apache.pinot.core.common.predicate;
 
-import java.util.List;
-import org.apache.pinot.core.common.Predicate;
+public interface Predicate {
+  enum Type {
+    EQ, NEQ, REGEXP_LIKE, RANGE, IN, NOT_IN;
 
-
-/**
- * Abstract base class for IN and NOT IN predicates.
- */
-public abstract class BaseInPredicate extends Predicate {
-
-  public BaseInPredicate(String lhs, Type predicateType, List<String> rhs) {
-    super(lhs, predicateType, rhs);
+    public boolean isExclusive() {
+      return this == NEQ || this == NOT_IN;
+    }
   }
 
-  public String[] getValues() {
-    return getRhs().toArray(new String[0]);
-  }
+  Type getType();
 }

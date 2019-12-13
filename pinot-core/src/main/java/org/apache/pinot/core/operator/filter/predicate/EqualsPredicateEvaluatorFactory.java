@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.EqPredicate;
+import org.apache.pinot.core.common.predicate.Predicate;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
@@ -77,7 +77,7 @@ public class EqualsPredicateEvaluatorFactory {
     final int[] _matchingDictIds;
 
     DictionaryBasedEqPredicateEvaluator(EqPredicate eqPredicate, Dictionary dictionary) {
-      _matchingDictId = dictionary.indexOf(eqPredicate.getEqualsValue());
+      _matchingDictId = dictionary.indexOf(eqPredicate.getValue());
       if (_matchingDictId >= 0) {
         _matchingDictIds = new int[]{_matchingDictId};
         if (dictionary.length() == 1) {
@@ -109,7 +109,7 @@ public class EqualsPredicateEvaluatorFactory {
     final int _matchingValue;
 
     IntRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
-      _matchingValue = Integer.parseInt(eqPredicate.getEqualsValue());
+      _matchingValue = Integer.parseInt(eqPredicate.getValue());
     }
 
     @Override
@@ -127,7 +127,7 @@ public class EqualsPredicateEvaluatorFactory {
     final long _matchingValue;
 
     LongRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
-      _matchingValue = Long.parseLong(eqPredicate.getEqualsValue());
+      _matchingValue = Long.parseLong(eqPredicate.getValue());
     }
 
     @Override
@@ -145,7 +145,7 @@ public class EqualsPredicateEvaluatorFactory {
     final float _matchingValue;
 
     FloatRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
-      _matchingValue = Float.parseFloat(eqPredicate.getEqualsValue());
+      _matchingValue = Float.parseFloat(eqPredicate.getValue());
     }
 
     @Override
@@ -163,7 +163,7 @@ public class EqualsPredicateEvaluatorFactory {
     final double _matchingValue;
 
     DoubleRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
-      _matchingValue = Double.parseDouble(eqPredicate.getEqualsValue());
+      _matchingValue = Double.parseDouble(eqPredicate.getValue());
     }
 
     @Override
@@ -181,7 +181,7 @@ public class EqualsPredicateEvaluatorFactory {
     final String _matchingValue;
 
     StringRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
-      _matchingValue = eqPredicate.getEqualsValue();
+      _matchingValue = eqPredicate.getValue();
     }
 
     @Override
@@ -199,7 +199,7 @@ public class EqualsPredicateEvaluatorFactory {
     final byte[] _matchingValue;
 
     BytesRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
-      _matchingValue = BytesUtils.toBytes(eqPredicate.getEqualsValue());
+      _matchingValue = BytesUtils.toBytes(eqPredicate.getValue());
     }
 
     @Override

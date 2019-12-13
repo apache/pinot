@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.NEqPredicate;
+import org.apache.pinot.core.common.predicate.Predicate;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
@@ -79,7 +79,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     int[] _matchingDictIds;
 
     DictionaryBasedNeqPredicateEvaluator(NEqPredicate nEqPredicate, Dictionary dictionary) {
-      _nonMatchingDictId = dictionary.indexOf(nEqPredicate.getNotEqualsValue());
+      _nonMatchingDictId = dictionary.indexOf(nEqPredicate.getValue());
       if (_nonMatchingDictId >= 0) {
         _nonMatchingDictIds = new int[]{_nonMatchingDictId};
         if (dictionary.length() == 1) {
@@ -134,7 +134,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     final int _nonMatchingValue;
 
     IntRawValueBasedNeqPredicateEvaluator(NEqPredicate nEqPredicate) {
-      _nonMatchingValue = Integer.parseInt(nEqPredicate.getNotEqualsValue());
+      _nonMatchingValue = Integer.parseInt(nEqPredicate.getValue());
     }
 
     @Override
@@ -152,7 +152,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     final long _nonMatchingValue;
 
     LongRawValueBasedNeqPredicateEvaluator(NEqPredicate nEqPredicate) {
-      _nonMatchingValue = Long.parseLong(nEqPredicate.getNotEqualsValue());
+      _nonMatchingValue = Long.parseLong(nEqPredicate.getValue());
     }
 
     @Override
@@ -170,7 +170,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     final float _nonMatchingValue;
 
     FloatRawValueBasedNeqPredicateEvaluator(NEqPredicate nEqPredicate) {
-      _nonMatchingValue = Float.parseFloat(nEqPredicate.getNotEqualsValue());
+      _nonMatchingValue = Float.parseFloat(nEqPredicate.getValue());
     }
 
     @Override
@@ -188,7 +188,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     final double _nonMatchingValue;
 
     DoubleRawValueBasedNeqPredicateEvaluator(NEqPredicate nEqPredicate) {
-      _nonMatchingValue = Double.parseDouble(nEqPredicate.getNotEqualsValue());
+      _nonMatchingValue = Double.parseDouble(nEqPredicate.getValue());
     }
 
     @Override
@@ -206,7 +206,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     final String _nonMatchingValue;
 
     StringRawValueBasedNeqPredicateEvaluator(NEqPredicate nEqPredicate) {
-      _nonMatchingValue = nEqPredicate.getNotEqualsValue();
+      _nonMatchingValue = nEqPredicate.getValue();
     }
 
     @Override
@@ -224,7 +224,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     final byte[] _nonMatchingValue;
 
     BytesRawValueBasedNeqPredicateEvaluator(NEqPredicate nEqPredicate) {
-      _nonMatchingValue = BytesUtils.toBytes(nEqPredicate.getNotEqualsValue());
+      _nonMatchingValue = BytesUtils.toBytes(nEqPredicate.getValue());
     }
 
     @Override

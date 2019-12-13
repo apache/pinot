@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.predicate;
+package org.apache.pinot.core.operator.filter.predicate;
 
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.doubles.DoubleSet;
@@ -33,13 +33,10 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.core.common.predicate.InPredicate;
 import org.apache.pinot.core.common.predicate.NotInPredicate;
-import org.apache.pinot.core.operator.filter.predicate.InPredicateEvaluatorFactory;
-import org.apache.pinot.core.operator.filter.predicate.NotInPredicateEvaluatorFactory;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -49,8 +46,6 @@ import org.testng.annotations.Test;
  * Unit test for all implementations of no-dictionary based predicate evaluators.
  */
 public class NoDictionaryInPredicateEvaluatorTest {
-
-  private static final String COLUMN_NAME = "column";
   private static final int NUM_PREDICATE_VALUES = 100;
   private static final int NUM_MULTI_VALUES = 10;
   private static final int MAX_STRING_LENGTH = 100;
@@ -72,11 +67,11 @@ public class NoDictionaryInPredicateEvaluatorTest {
       valueSet.add(value);
     }
 
-    InPredicate inPredicate = new InPredicate(COLUMN_NAME, stringValues);
+    InPredicate inPredicate = new InPredicate(stringValues);
     PredicateEvaluator inPredicateEvaluator =
         InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.INT);
 
-    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME, stringValues);
+    NotInPredicate notInPredicate = new NotInPredicate(stringValues);
     PredicateEvaluator notInPredicateEvaluator =
         NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.INT);
 
@@ -110,11 +105,11 @@ public class NoDictionaryInPredicateEvaluatorTest {
       valueSet.add(value);
     }
 
-    InPredicate inPredicate = new InPredicate(COLUMN_NAME, stringValues);
+    InPredicate inPredicate = new InPredicate(stringValues);
     PredicateEvaluator inPredicateEvaluator =
         InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.LONG);
 
-    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME, stringValues);
+    NotInPredicate notInPredicate = new NotInPredicate(stringValues);
     PredicateEvaluator notInPredicateEvaluator =
         NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.LONG);
 
@@ -149,11 +144,11 @@ public class NoDictionaryInPredicateEvaluatorTest {
       valueSet.add(value);
     }
 
-    InPredicate inPredicate = new InPredicate(COLUMN_NAME, stringValues);
+    InPredicate inPredicate = new InPredicate(stringValues);
     PredicateEvaluator inPredicateEvaluator =
         InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.FLOAT);
 
-    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME, stringValues);
+    NotInPredicate notInPredicate = new NotInPredicate(stringValues);
     PredicateEvaluator notInPredicateEvaluator =
         NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.FLOAT);
 
@@ -188,11 +183,11 @@ public class NoDictionaryInPredicateEvaluatorTest {
       valueSet.add(value);
     }
 
-    InPredicate inPredicate = new InPredicate(COLUMN_NAME, stringValues);
+    InPredicate inPredicate = new InPredicate(stringValues);
     PredicateEvaluator inPredicateEvaluator =
         InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.DOUBLE);
 
-    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME, stringValues);
+    NotInPredicate notInPredicate = new NotInPredicate(stringValues);
     PredicateEvaluator notInPredicateEvaluator =
         NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.DOUBLE);
 
@@ -227,11 +222,11 @@ public class NoDictionaryInPredicateEvaluatorTest {
       valueSet.add(value);
     }
 
-    InPredicate inPredicate = new InPredicate(COLUMN_NAME, stringValues);
+    InPredicate inPredicate = new InPredicate(stringValues);
     PredicateEvaluator inPredicateEvaluator =
         InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.STRING);
 
-    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME, stringValues);
+    NotInPredicate notInPredicate = new NotInPredicate(stringValues);
     PredicateEvaluator notInPredicateEvaluator =
         NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.STRING);
 
@@ -265,11 +260,11 @@ public class NoDictionaryInPredicateEvaluatorTest {
       stringValues.add(BytesUtils.toHexString(value));
     }
 
-    InPredicate inPredicate = new InPredicate(COLUMN_NAME, stringValues);
+    InPredicate inPredicate = new InPredicate(stringValues);
     PredicateEvaluator inPredicateEvaluator =
         InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.BYTES);
 
-    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME, stringValues);
+    NotInPredicate notInPredicate = new NotInPredicate(stringValues);
     PredicateEvaluator notInPredicateEvaluator =
         NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.BYTES);
 

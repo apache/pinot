@@ -16,13 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.predicate;
+package org.apache.pinot.core.operator.filter.predicate;
 
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
 
 
 public class PredicateEvaluatorTestUtils {
+  private PredicateEvaluatorTestUtils() {
+  }
+
   public static final Random RANDOM = new Random();
 
   public static void fillRandom(int[] randomValues) {

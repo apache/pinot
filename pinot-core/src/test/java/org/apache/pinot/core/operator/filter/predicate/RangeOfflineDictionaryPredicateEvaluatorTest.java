@@ -16,12 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.predicate;
+package org.apache.pinot.core.operator.filter.predicate;
 
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.pinot.core.common.predicate.RangePredicate;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory;
 import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
 import org.testng.Assert;
 import org.testng.annotations.Test;

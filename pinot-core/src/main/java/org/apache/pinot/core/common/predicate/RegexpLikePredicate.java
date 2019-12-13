@@ -18,29 +18,19 @@
  */
 package org.apache.pinot.core.common.predicate;
 
-import com.google.common.base.Preconditions;
-import java.util.Arrays;
-import java.util.List;
-import org.apache.pinot.core.common.Predicate;
+public class RegexpLikePredicate implements Predicate {
+  private final String _value;
 
+  public RegexpLikePredicate(String value) {
+    _value = value;
+  }
 
-public class RegexpLikePredicate extends Predicate {
-  String _regex;
-
-  public RegexpLikePredicate(String lhs, List<String> rhs) {
-    super(lhs, Type.REGEXP_LIKE, rhs);
-    //we should have atleast one regex, we will ignore the remaining part instead of throwing exception
-    Preconditions.checkArgument(rhs.size() >= 1);
-    _regex = rhs.get(0);
+  public String getValue() {
+    return _value;
   }
 
   @Override
-  public String toString() {
-    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : " + Arrays
-        .toString(getRhs().toArray(new String[0])) + "\n";
-  }
-
-  public String getRegex() {
-    return _regex;
+  public Type getType() {
+    return Type.REGEXP_LIKE;
   }
 }

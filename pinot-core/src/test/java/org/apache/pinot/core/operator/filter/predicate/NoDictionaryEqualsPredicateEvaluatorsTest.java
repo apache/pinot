@@ -16,20 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.predicate;
+package org.apache.pinot.core.operator.filter.predicate;
 
-import java.util.Collections;
 import java.util.Random;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.core.common.predicate.EqPredicate;
 import org.apache.pinot.core.common.predicate.NEqPredicate;
-import org.apache.pinot.core.operator.filter.predicate.EqualsPredicateEvaluatorFactory;
-import org.apache.pinot.core.operator.filter.predicate.NotEqualsPredicateEvaluatorFactory;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -39,8 +35,6 @@ import org.testng.annotations.Test;
  * Unit test for no-dictionary based Eq and NEq predicate evaluators.
  */
 public class NoDictionaryEqualsPredicateEvaluatorsTest {
-
-  private static final String COLUMN_NAME = "column";
   private static final int NUM_MULTI_VALUES = 100;
   private static final int MAX_STRING_LENGTH = 100;
   private Random _random;
@@ -53,11 +47,11 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
   @Test
   public void testIntPredicateEvaluators() {
     int intValue = _random.nextInt();
-    EqPredicate eqPredicate = new EqPredicate(COLUMN_NAME, Collections.singletonList(Integer.toString(intValue)));
+    EqPredicate eqPredicate = new EqPredicate(Integer.toString(intValue));
     PredicateEvaluator eqPredicateEvaluator =
         EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(eqPredicate, FieldSpec.DataType.INT);
 
-    NEqPredicate neqPredicate = new NEqPredicate(COLUMN_NAME, Collections.singletonList(Integer.toString(intValue)));
+    NEqPredicate neqPredicate = new NEqPredicate(Integer.toString(intValue));
     PredicateEvaluator neqPredicateEvaluator =
         NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(neqPredicate, FieldSpec.DataType.INT);
 
@@ -87,11 +81,11 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
   @Test
   public void testLongPredicateEvaluators() {
     long longValue = _random.nextLong();
-    EqPredicate eqPredicate = new EqPredicate(COLUMN_NAME, Collections.singletonList(Long.toString(longValue)));
+    EqPredicate eqPredicate = new EqPredicate(Long.toString(longValue));
     PredicateEvaluator eqPredicateEvaluator =
         EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(eqPredicate, FieldSpec.DataType.LONG);
 
-    NEqPredicate neqPredicate = new NEqPredicate(COLUMN_NAME, Collections.singletonList(Long.toString(longValue)));
+    NEqPredicate neqPredicate = new NEqPredicate(Long.toString(longValue));
     PredicateEvaluator neqPredicateEvaluator =
         NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(neqPredicate, FieldSpec.DataType.LONG);
 
@@ -122,11 +116,11 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
   public void testFloatPredicateEvaluators() {
     // FLOAT data type
     float floatValue = _random.nextFloat();
-    EqPredicate eqPredicate = new EqPredicate(COLUMN_NAME, Collections.singletonList(Float.toString(floatValue)));
+    EqPredicate eqPredicate = new EqPredicate(Float.toString(floatValue));
     PredicateEvaluator eqPredicateEvaluator =
         EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(eqPredicate, FieldSpec.DataType.FLOAT);
 
-    NEqPredicate neqPredicate = new NEqPredicate(COLUMN_NAME, Collections.singletonList(Float.toString(floatValue)));
+    NEqPredicate neqPredicate = new NEqPredicate(Float.toString(floatValue));
     PredicateEvaluator neqPredicateEvaluator =
         NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(neqPredicate, FieldSpec.DataType.FLOAT);
 
@@ -156,11 +150,11 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
   @Test
   public void testDoublePredicateEvaluators() {
     double doubleValue = _random.nextDouble();
-    EqPredicate eqPredicate = new EqPredicate(COLUMN_NAME, Collections.singletonList(Double.toString(doubleValue)));
+    EqPredicate eqPredicate = new EqPredicate(Double.toString(doubleValue));
     PredicateEvaluator eqPredicateEvaluator =
         EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(eqPredicate, FieldSpec.DataType.DOUBLE);
 
-    NEqPredicate neqPredicate = new NEqPredicate(COLUMN_NAME, Collections.singletonList(Double.toString(doubleValue)));
+    NEqPredicate neqPredicate = new NEqPredicate(Double.toString(doubleValue));
     PredicateEvaluator neqPredicateEvaluator =
         NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(neqPredicate, FieldSpec.DataType.DOUBLE);
 
@@ -190,11 +184,11 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
   @Test
   public void testStringPredicateEvaluators() {
     String stringValue = RandomStringUtils.random(MAX_STRING_LENGTH);
-    EqPredicate eqPredicate = new EqPredicate(COLUMN_NAME, Collections.singletonList(stringValue));
+    EqPredicate eqPredicate = new EqPredicate(stringValue);
     PredicateEvaluator eqPredicateEvaluator =
         EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(eqPredicate, FieldSpec.DataType.STRING);
 
-    NEqPredicate neqPredicate = new NEqPredicate(COLUMN_NAME, Collections.singletonList(stringValue));
+    NEqPredicate neqPredicate = new NEqPredicate(stringValue);
     PredicateEvaluator neqPredicateEvaluator =
         NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(neqPredicate, FieldSpec.DataType.STRING);
 
@@ -225,11 +219,11 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
   public void testBytesPredicateEvaluators() {
     byte[] bytesValue = RandomStringUtils.random(MAX_STRING_LENGTH).getBytes();
     String hexStringValue = BytesUtils.toHexString(bytesValue);
-    EqPredicate eqPredicate = new EqPredicate(COLUMN_NAME, Collections.singletonList(hexStringValue));
+    EqPredicate eqPredicate = new EqPredicate(hexStringValue);
     PredicateEvaluator eqPredicateEvaluator =
         EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(eqPredicate, FieldSpec.DataType.BYTES);
 
-    NEqPredicate neqPredicate = new NEqPredicate(COLUMN_NAME, Collections.singletonList(hexStringValue));
+    NEqPredicate neqPredicate = new NEqPredicate(hexStringValue);
     PredicateEvaluator neqPredicateEvaluator =
         NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(neqPredicate, FieldSpec.DataType.BYTES);
 

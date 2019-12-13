@@ -18,19 +18,31 @@
  */
 package org.apache.pinot.core.common.predicate;
 
-public class NEqPredicate implements Predicate {
-  private final String _value;
+import java.util.List;
+import org.apache.pinot.common.utils.request.FilterQueryTree;
 
-  public NEqPredicate(String value) {
-    _value = value;
+
+public class PredicateFactory {
+  private PredicateFactory() {
   }
 
-  public String getValue() {
-    return _value;
-  }
-
-  @Override
-  public Type getType() {
-    return Type.NEQ;
+  public static Predicate getPredicate(FilterQueryTree filterQueryTree) {
+    List<String> values = filterQueryTree.getValue();
+    switch (filterQueryTree.getOperator()) {
+      case EQUALITY:
+        return new EqPredicate(values.get(0));
+      case NOT:
+        return new NEqPredicate(values.get(0));
+      case RANGE:
+        return new RangePredicate(values.get(0));
+      case REGEXP_LIKE:
+        return new RegexpLikePredicate(values.get(0));
+      case NOT_IN:
+        return new NotInPredicate(values);
+      case IN:
+        return new InPredicate(values);
+      default:
+        throw new IllegalStateException();
+    }
   }
 }

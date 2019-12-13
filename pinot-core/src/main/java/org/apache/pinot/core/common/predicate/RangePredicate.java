@@ -18,73 +18,49 @@
  */
 package org.apache.pinot.core.common.predicate;
 
-import java.util.Arrays;
-import java.util.List;
-import org.apache.pinot.core.common.Predicate;
+import org.apache.commons.lang3.StringUtils;
 
 
-public class RangePredicate extends Predicate {
-
+public class RangePredicate implements Predicate {
   public static final String DELIMITER = "\t\t";
-  public static final String LOWER_INCLUSIVE = "[";
-  public static final String LOWER_EXCLUSIVE = "(";
-
-  public static final String UPPER_INCLUSIVE = "]";
-  public static final String UPPER_EXCLUSIVE = ")";
+  public static final char LOWER_INCLUSIVE = '[';
+  public static final char LOWER_EXCLUSIVE = '(';
+  public static final char UPPER_INCLUSIVE = ']';
+  public static final char UPPER_EXCLUSIVE = ')';
   public static final String UNBOUNDED = "*";
 
-  private final boolean incLower;
-  private final boolean incUpper;
-  private final String lowerBoundary;
-  private final String upperBoundary;
+  private final boolean _includeLowerBoundary;
+  private final boolean _includeUpperBoundary;
+  private final String _lowerBoundary;
+  private final String _upperBoundary;
 
-  public RangePredicate(String lhs, List<String> rhs) {
-    super(lhs, Type.RANGE, rhs);
+  public RangePredicate(String value) {
+    _includeLowerBoundary = value.charAt(0) == LOWER_INCLUSIVE;
+    _includeUpperBoundary = value.charAt(value.length() - 1) == UPPER_INCLUSIVE;
 
-    final String rangeString = rhs.get(0).trim();
-    lowerBoundary = rangeString.split(DELIMITER)[0].substring(1, rangeString.split(DELIMITER)[0].length());
-    upperBoundary = rangeString.split(DELIMITER)[1].substring(0, rangeString.split(DELIMITER)[1].length() - 1);
-
-    if (rangeString.trim().startsWith(LOWER_EXCLUSIVE)) {
-      if (lowerBoundary.equals(UNBOUNDED)) {
-        incLower = true;
-      } else {
-        incLower = false;
-      }
-    } else {
-      incLower = true;
-    }
-
-    if (rangeString.trim().endsWith(UPPER_EXCLUSIVE)) {
-      if (upperBoundary.equals(UNBOUNDED)) {
-        incUpper = true;
-      } else {
-        incUpper = false;
-      }
-    } else {
-      incUpper = true;
-    }
-  }
-
-  @Override
-  public String toString() {
-    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : " + Arrays
-        .toString(getRhs().toArray(new String[0])) + "\n";
+    String[] parts = StringUtils.splitByWholeSeparator(value, DELIMITER);
+    _lowerBoundary = parts[0].substring(1);
+    _upperBoundary = parts[1].substring(0, parts[1].length() - 1);
   }
 
   public boolean includeLowerBoundary() {
-    return incLower;
+    return _includeLowerBoundary;
   }
 
   public boolean includeUpperBoundary() {
-    return incUpper;
+    return _includeUpperBoundary;
   }
 
   public String getLowerBoundary() {
-    return lowerBoundary;
+    return _lowerBoundary;
   }
 
   public String getUpperBoundary() {
-    return upperBoundary;
+    return _upperBoundary;
+  }
+
+  @Override
+  public Type getType() {
+    return Type.RANGE;
   }
 }

@@ -19,11 +19,8 @@
 package org.apache.pinot.core.plan;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterOperator;
@@ -31,7 +28,8 @@ import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.common.Predicate;
+import org.apache.pinot.core.common.predicate.Predicate;
+import org.apache.pinot.core.common.predicate.PredicateFactory;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
@@ -40,10 +38,6 @@ import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
-import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.operator.transform.function.TransformFunction;
-import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,7 +103,7 @@ public class FilterPlanNode implements PlanNode {
       }
     } else {
       // Leaf filter operator
-      Predicate predicate = Predicate.newPredicate(filterQueryTree);
+      Predicate predicate = PredicateFactory.getPredicate(filterQueryTree);
 
       TransformExpressionTree expression = filterQueryTree.getExpression();
       if (expression.getExpressionType() == TransformExpressionTree.ExpressionType.FUNCTION) {

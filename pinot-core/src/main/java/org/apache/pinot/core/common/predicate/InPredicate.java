@@ -21,17 +21,19 @@ package org.apache.pinot.core.common.predicate;
 import java.util.List;
 
 
-/**
- * This class implements the IN predicate.
- */
-public class InPredicate extends BaseInPredicate {
+public class InPredicate implements Predicate {
+  private final List<String> _values;
 
-  /**
-   * Constructor for the class
-   * @param lhs LHS for the IN predicate (column name)
-   * @param rhs RHS for the IN predicate (list of values)
-   */
-  public InPredicate(String lhs, List<String> rhs) {
-    super(lhs, Type.IN, rhs);
+  public InPredicate(List<String> values) {
+    _values = values;
+  }
+
+  public List<String> getValues() {
+    return _values;
+  }
+
+  @Override
+  public Type getType() {
+    return Type.IN;
   }
 }

@@ -36,7 +36,8 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.common.Predicate;
+import org.apache.pinot.core.common.predicate.Predicate;
+import org.apache.pinot.core.common.predicate.PredicateFactory;
 import org.apache.pinot.core.operator.blocks.EmptyFilterBlock;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
@@ -191,7 +192,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
       List<FilterQueryTree> children = filterNode.getChildren();
       if (children == null) {
         String columnName = filterNode.getColumn();
-        Predicate predicate = Predicate.newPredicate(filterNode);
+        Predicate predicate = PredicateFactory.getPredicate(filterNode);
         predicatesMap.computeIfAbsent(columnName, k -> new ArrayList<>()).add(predicate);
       } else {
         queue.addAll(children);

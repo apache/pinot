@@ -16,14 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.predicate;
+package org.apache.pinot.core.operator.filter.predicate;
 
-import java.util.Collections;
+import org.apache.pinot.core.common.predicate.RangePredicate;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.core.common.predicate.RangePredicate;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -32,7 +29,6 @@ import org.testng.annotations.Test;
  * Unit test for no-dictionary based range predicate evaluators.
  */
 public class NoDictionaryRangePredicateEvaluatorTest {
-  private static final String COLUMN_NAME = "column";
 
   @Test
   public void testIntPredicateEvaluator() {
@@ -318,7 +314,6 @@ public class NoDictionaryRangePredicateEvaluatorTest {
   }
 
   private PredicateEvaluator buildRangePredicate(String rangeString, FieldSpec.DataType dataType) {
-    RangePredicate predicate = new RangePredicate(COLUMN_NAME, Collections.singletonList(rangeString));
-    return RangePredicateEvaluatorFactory.newRawValueBasedEvaluator(predicate, dataType);
+    return RangePredicateEvaluatorFactory.newRawValueBasedEvaluator(new RangePredicate(rangeString), dataType);
   }
 }

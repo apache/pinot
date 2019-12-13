@@ -19,7 +19,7 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import org.apache.commons.lang3.mutable.MutableInt;
-import org.apache.pinot.core.common.Predicate;
+import org.apache.pinot.core.common.predicate.Predicate;
 
 
 public interface PredicateEvaluator {
