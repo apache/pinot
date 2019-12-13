@@ -22,13 +22,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
@@ -42,20 +38,17 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
-import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.slf4j.Logger;
@@ -66,14 +59,9 @@ import org.slf4j.LoggerFactory;
 // @Api(tags = Constants.INTERNAL_TAG)
 @Path("/")
 public class LLCSegmentCompletionHandlers {
-
-  private static final String SEGMENT_TMP_DIR = "segment.tmp";
-  private static Logger LOGGER = LoggerFactory.getLogger(LLCSegmentCompletionHandlers.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(LLCSegmentCompletionHandlers.class);
+  private static final Object SEGMENT_UPLOAD_LOCK = new Object();
   private static final String SCHEME = "file://";
-  private static final String METADATA_TEMP_DIR_SUFFIX = ".metadata.tmp";
-
-  @Inject
-  ControllerConf _controllerConf;
 
   @Inject
   SegmentCompletionManager _segmentCompletionManager;
@@ -190,6 +178,7 @@ public class LLCSegmentCompletionHandlers {
     return responseStr;
   }
 
+  // TODO: remove this API. Should not allow committing without metadata
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_END)
   @Produces(MediaType.APPLICATION_JSON)
@@ -211,12 +200,10 @@ public class LLCSegmentCompletionHandlers {
 
     SegmentMetadataImpl segmentMetadata;
     try {
-      segmentMetadata = extractMetadataFromSegmentFile(segmentName, new URI(segmentLocation));
-    } catch (URISyntaxException e) {
-      LOGGER.error("Invalid segment location: {} for segment {}", segmentLocation, segmentName);
-      return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
-    }
-    if (segmentMetadata == null) {
+      segmentMetadata = extractMetadataFromSegmentFileURI(new URI(segmentLocation), segmentName);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while extracting metadata from segment: {} at location: {} from instance: {}",
+          segmentName, segmentLocation, instanceId, e);
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
@@ -264,58 +251,45 @@ public class LLCSegmentCompletionHandlers {
     boolean success = false;
 
     if (response.equals(SegmentCompletionProtocol.RESP_COMMIT_CONTINUE)) {
-      File localTmpFile = null;
+      File localTempFile = null;
       try {
-        // Get the segment from the form input and put it in a tmp area in the local file system.
-        localTmpFile = uploadFileToLocalTmpFile(multiPart, instanceId, segmentName);
-        if (localTmpFile == null) {
-          LOGGER.error("Unable to get the segment file from multipart input to local file {}", segmentName);
-        } else {
-          // Extract the segment metadata from the segment file.
-          SegmentMetadataImpl segmentMetadata =
-              getSegmentMetadataFromLocalFile(new LLCSegmentName(segmentName), localTmpFile);
-          if (segmentMetadata == null) {
-            LOGGER.error("Unable to extract segment metadata from segment data: {}", segmentName);
-          } else {
-            // Store the segment file to Pinot FS.
-            try {
-              FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
-              final String rawTableName = new LLCSegmentName(segmentName).getTableName();
-              URI segmentFileURI =
-                  URIUtils.getUri(provider.getBaseDataDirURI().toString(), rawTableName, URIUtils.encode(segmentName));
-              PinotFS pinotFS = PinotFSFactory.create(segmentFileURI.getScheme());
-              // Multiple threads can reach this point at the same time, if the following scenario happens
-              // The server that was asked to commit did so very slowly (due to network speeds). Meanwhile the FSM in
-              // SegmentCompletionManager timed out, and allowed another server to commit, which did so very quickly (somehow
-              // the network speeds changed). The second server made it through the FSM and reached this point.
-              // The synchronization below takes care that exactly one file gets moved in place.
-              // There are still corner conditions that are not handled correctly. For example,
-              // 1. What if the offset of the faster server was different?
-              // 2. We know that only the faster server will get to complete the COMMIT call successfully. But it is possible
-              //    that the race to this statement is won by the slower server, and so the real segment that is in there is that
-              //    of the slower server.
-              // In order to overcome controller restarts after the segment is moved to PinotFS, but before it is committed, we DO need to
-              // check for existing segment file and remove it. So, the block cannot be removed altogether.
-              // For now, we live with these corner cases. Once we have split-commit enabled and working, this code will no longer
-              // be used.
-              synchronized (_segmentCompletionManager) {
-                if (pinotFS.exists(segmentFileURI)) {
-                  LOGGER.warn("Segment file {} exists. Replacing with upload from {} for segment {}",
-                      segmentFileURI.toString(), instanceId, segmentName);
-                  pinotFS.delete(segmentFileURI, true);
-                }
-                pinotFS.copyFromLocalFile(localTmpFile, segmentFileURI);
-              }
-              committingSegmentDescriptor =
-                  CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams, segmentMetadata);
-              success = true;
-            } catch (Exception e) {
-              LOGGER.error("Could not save segment {} to PinotFS", segmentName, e);
-            }
+        localTempFile = extractSegmentFromFormToLocalTempFile(multiPart, segmentName);
+        SegmentMetadataImpl segmentMetadata = extractMetadataFromLocalSegmentFile(localTempFile);
+        // Store the segment file to Pinot FS.
+        String rawTableName = new LLCSegmentName(segmentName).getTableName();
+        URI segmentFileURI = URIUtils
+            .getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), rawTableName,
+                URIUtils.encode(segmentName));
+        PinotFS pinotFS = PinotFSFactory.create(segmentFileURI.getScheme());
+        // Multiple threads can reach this point at the same time, if the following scenario happens
+        // The server that was asked to commit did so very slowly (due to network speeds). Meanwhile the FSM in
+        // SegmentCompletionManager timed out, and allowed another server to commit, which did so very quickly (somehow
+        // the network speeds changed). The second server made it through the FSM and reached this point.
+        // The synchronization below takes care that exactly one file gets moved in place.
+        // There are still corner conditions that are not handled correctly. For example,
+        // 1. What if the offset of the faster server was different?
+        // 2. We know that only the faster server will get to complete the COMMIT call successfully. But it is possible
+        //    that the race to this statement is won by the slower server, and so the real segment that is in there is that
+        //    of the slower server.
+        // In order to overcome controller restarts after the segment is moved to PinotFS, but before it is committed, we DO need to
+        // check for existing segment file and remove it. So, the block cannot be removed altogether.
+        // For now, we live with these corner cases. Once we have split-commit enabled and working, this code will no longer
+        // be used.
+        synchronized (SEGMENT_UPLOAD_LOCK) {
+          if (pinotFS.exists(segmentFileURI)) {
+            LOGGER.warn("Segment file: {} already exists. Replacing it with segment: {} from instance: {}",
+                segmentFileURI, segmentName, instanceId);
+            pinotFS.delete(segmentFileURI, true);
           }
+          pinotFS.copyFromLocalFile(localTempFile, segmentFileURI);
         }
+        committingSegmentDescriptor =
+            CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams, segmentMetadata);
+        success = true;
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while committing segment: {} from instance: {}", segmentName, instanceId, e);
       } finally {
-        FileUtils.deleteQuietly(localTmpFile);
+        FileUtils.deleteQuietly(localTempFile);
       }
     }
 
@@ -328,6 +302,7 @@ public class LLCSegmentCompletionHandlers {
 
   // This method may be called in any controller, leader or non-leader. It is used only when the server decides to use
   // split commit protocol for the segment commit.
+  // TODO: remove this API. Should not upload segment via controller
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_SEGMENT_UPLOAD)
   @Produces(MediaType.APPLICATION_JSON)
@@ -339,35 +314,28 @@ public class LLCSegmentCompletionHandlers {
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset);
     LOGGER.info("Processing segmentUpload:{}", requestParams.toString());
 
-    // Get the segment from the form input and put it in the right place.
-    File localTmpFile = uploadFileToLocalTmpFile(multiPart, instanceId, segmentName);
-    if (localTmpFile == null) {
-      LOGGER.error("Unable to get the segment file from multipart input to local file {}", segmentName);
-      return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
-    }
+    // Get the segment from the form input and put it into the data directory (could be remote)
+    File localTempFile = null;
     try {
-      FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
-      URI uri = localSegementFileToPinotFsTmpLocation(provider, localTmpFile, segmentName);
-      if (uri == null) {
-        LOGGER.error("Unable to upload local segment file {} to Pinot storage for segment ", localTmpFile.toPath(),
-            segmentName);
-        return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
-      }
+      localTempFile = extractSegmentFromFormToLocalTempFile(multiPart, segmentName);
+      String rawTableName = new LLCSegmentName(segmentName).getTableName();
+      URI segmentFileURI = URIUtils
+          .getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), rawTableName,
+              URIUtils.encode(SegmentCompletionUtils.generateSegmentFileName(segmentName)));
+      PinotFSFactory.create(segmentFileURI.getScheme()).copyFromLocalFile(localTempFile, segmentFileURI);
       SegmentCompletionProtocol.Response.Params responseParams =
           new SegmentCompletionProtocol.Response.Params().withOffset(requestParams.getOffset())
-              .withSegmentLocation(uri.toString())
+              .withSegmentLocation(segmentFileURI.toString())
               .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS);
 
       String response = new SegmentCompletionProtocol.Response(responseParams).toJsonString();
-
       LOGGER.info("Response to segmentUpload for segment:{} is:{}", segmentName, response);
-
       return response;
     } catch (Exception e) {
-
+      LOGGER.error("Caught exception while uploading segment: {} from instance: {}", segmentName, instanceId, e);
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     } finally {
-      FileUtils.deleteQuietly(localTmpFile);
+      FileUtils.deleteQuietly(localTempFile);
     }
   }
 
@@ -399,14 +367,17 @@ public class LLCSegmentCompletionHandlers {
         .withMemoryUsedBytes(memoryUsedBytes);
     LOGGER.info("Processing segmentCommitEndWithMetadata:{}", requestParams.toString());
 
-    final boolean isSuccess = true;
-    final boolean isSplitCommit = true;
-    SegmentMetadataImpl segmentMetadata = extractMetadataFromInput(metadataFiles, segmentName);
-    // If it fails to extract metadata from the input form, return failure.
-    if (segmentMetadata == null) {
-      LOGGER.error("Segment metadata extraction failure for segment {}", segmentName);
+    SegmentMetadataImpl segmentMetadata;
+    try {
+      segmentMetadata = extractSegmentMetadataFromForm(metadataFiles, segmentName);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while extracting metadata for segment: {} from instance: {}", segmentName,
+          instanceId, e);
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
+
+    final boolean isSuccess = true;
+    final boolean isSplitCommit = true;
     SegmentCompletionProtocol.Response response = _segmentCompletionManager
         .segmentCommitEnd(requestParams, isSuccess, isSplitCommit,
             CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams, segmentMetadata));
@@ -416,166 +387,120 @@ public class LLCSegmentCompletionHandlers {
   }
 
   /**
-   * Extract and return the segment metadata from the two input form data files (metadata file and creation meta).
-   * Return null if any of the two files is missing or there is exception during parsing and extraction.
+   * Extracts the segment file from the form into a local temporary file under file upload temporary directory.
    */
-  private SegmentMetadataImpl extractMetadataFromInput(FormDataMultiPart metadataFiles, String segmentNameStr) {
-    String tempMetadataDirStr = StringUtil.join("/", _controllerConf.getLocalTempDir(),
-        segmentNameStr + METADATA_TEMP_DIR_SUFFIX + String.valueOf(System.currentTimeMillis()));
-    File tempMetadataDir = new File(tempMetadataDirStr);
+  private static File extractSegmentFromFormToLocalTempFile(FormDataMultiPart form, String segmentName)
+      throws IOException {
     try {
-      Preconditions.checkState(tempMetadataDir.mkdirs(), "Failed to create directory: %s", tempMetadataDirStr);
-      // Extract metadata.properties from the metadataFiles.
-      if (!extractMetadataFromInputField(metadataFiles, tempMetadataDirStr, V1Constants.MetadataKeys.METADATA_FILE_NAME,
-          segmentNameStr)) {
-        return null;
+      Map<String, List<FormDataBodyPart>> map = form.getFields();
+      Preconditions.checkState(PinotSegmentUploadDownloadRestletResource.validateMultiPart(map, segmentName),
+          "Invalid multi-part for segment: %s", segmentName);
+      FormDataBodyPart bodyPart = map.values().iterator().next().get(0);
+
+      File localTempFile = new File(ControllerFilePathProvider.getInstance().getFileUploadTempDir(),
+          getTempSegmentFileName(segmentName));
+      try (InputStream inputStream = bodyPart.getValueAs(InputStream.class)) {
+        Files.copy(inputStream, localTempFile.toPath());
+      } catch (Exception e) {
+        FileUtils.deleteQuietly(localTempFile);
+        throw e;
       }
-      // Extract creation.meta from the metadataFiles.
-      if (!extractMetadataFromInputField(metadataFiles, tempMetadataDirStr, V1Constants.SEGMENT_CREATION_META,
-          segmentNameStr)) {
-        return null;
-      }
-      // Load segment metadata
-      return new SegmentMetadataImpl(tempMetadataDir);
-    } catch (Exception e) {
-      LOGGER.error("Exception extracting and reading segment metadata for {}", segmentNameStr, e);
-      return null;
+      return localTempFile;
     } finally {
-      FileUtils.deleteQuietly(tempMetadataDir);
+      form.cleanup();
     }
   }
 
   /**
-   *
-   * Extract a single file with name metaFileName from the input FormDataMultiPart and put it under the path
-   * tempMetadataDirStr + metaFileName.
-   * Return true iff the extraction and copy is successful.
+   * Extracts the segment metadata from the local segment file. Use the untarred file temporary directory to store the
+   * metadata files temporarily.
    */
-  private boolean extractMetadataFromInputField(FormDataMultiPart metadataFiles, String tempMetadataDirStr,
-      String metaFileName, String segmentName) {
-    FormDataBodyPart metadataFilesField = metadataFiles.getField(metaFileName);
-    Preconditions.checkNotNull(metadataFilesField, "The metadata input field %s does not exist.", metaFileName);
-
-    try (InputStream metadataPropertiesInputStream = metadataFilesField.getValueAs(InputStream.class)) {
-      Preconditions.checkNotNull(metadataPropertiesInputStream, "Unable to parse %s from input.", metaFileName);
-      java.nio.file.Path metadataPropertiesPath = FileSystems.getDefault().getPath(tempMetadataDirStr, metaFileName);
-      Files.copy(metadataPropertiesInputStream, metadataPropertiesPath);
-      return true;
-    } catch (IOException e) {
-      LOGGER.error("Failed to extract metadata property file: {} for segment {}", metaFileName, segmentName, e);
-    }
-    return false;
-  }
-
-  /**
-   * Extract metadata from a segment found in a URI (i.e., segmentLocation) in PinotFS.
-   * <p>We extract the metadata.properties and creation.meta into a temporary metadata directory:
-   * DATADIR/rawTableName/segmentName.metadata.tmp, and load metadata from there.
-   *
-   * @param segmentNameStr Name of the segment
-   * @param segmentLocation the location of the segment file in PinotFS.
-   * @return SegmentMetadataImpl if it is able to extract the metadata file from the tar-zipped segment file.
-   */
-  private SegmentMetadataImpl extractMetadataFromSegmentFile(final String segmentNameStr, final URI segmentLocation) {
-    LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    String baseDirStr = StringUtil.join("/", _controllerConf.getDataDir(), segmentName.getTableName());
-    String tempSegmentDataDirStr =
-        StringUtil.join("/", baseDirStr, segmentNameStr + SEGMENT_TMP_DIR + String.valueOf(System.currentTimeMillis()));
-    File tempSegmentDataDir = new File(tempSegmentDataDirStr);
-    File segDstFile = new File(StringUtil.join("/", tempSegmentDataDirStr, segmentNameStr));
-    // Use PinotFS to copy the segment file to local fs for metadata extraction.
-    PinotFS pinotFS = PinotFSFactory.create(URIUtils.getUri(_controllerConf.getDataDir()).getScheme());
-    try {
-      Preconditions.checkState(tempSegmentDataDir.mkdirs(), "Failed to create directory: %s", tempSegmentDataDir);
-      pinotFS.copyToLocalFile(segmentLocation, segDstFile);
-      return getSegmentMetadataFromLocalFile(segmentName, segDstFile);
-    } catch (Exception e) {
-      LOGGER.error("Exception in extracting segment file to local {}", segmentNameStr, e);
-      return null;
-    } finally {
-      FileUtils.deleteQuietly(tempSegmentDataDir);
-    }
-  }
-
-  private SegmentMetadataImpl getSegmentMetadataFromLocalFile(LLCSegmentName segmentName, File segmentFile) {
-    String baseDirStr = StringUtil.join("/", _controllerConf.getDataDir(), segmentName.getTableName());
-    String tempMetadataDirStr = StringUtil.join("/", baseDirStr,
-        segmentName.getSegmentName() + METADATA_TEMP_DIR_SUFFIX + String.valueOf(System.currentTimeMillis()));
-    File tempMetadataDir = new File(tempMetadataDirStr);
-    try (// Extract metadata.properties
-        InputStream metadataPropertiesInputStream = TarGzCompressionUtils
-            .unTarOneFile(new FileInputStream(segmentFile), V1Constants.MetadataKeys.METADATA_FILE_NAME);
-        // Extract creation.meta
-        InputStream creationMetaInputStream = TarGzCompressionUtils
-            .unTarOneFile(new FileInputStream(segmentFile), V1Constants.SEGMENT_CREATION_META)) {
-      Preconditions.checkState(tempMetadataDir.mkdirs(), "Failed to create directory: %s", tempMetadataDirStr);
-      Preconditions.checkNotNull(metadataPropertiesInputStream, "%s does not exist",
-          V1Constants.MetadataKeys.METADATA_FILE_NAME);
-      java.nio.file.Path metadataPropertiesPath =
-          FileSystems.getDefault().getPath(tempMetadataDirStr, V1Constants.MetadataKeys.METADATA_FILE_NAME);
-      Files.copy(metadataPropertiesInputStream, metadataPropertiesPath);
-
-      Preconditions.checkNotNull(creationMetaInputStream, "%s does not exist", V1Constants.SEGMENT_CREATION_META);
-      java.nio.file.Path creationMetaPath =
-          FileSystems.getDefault().getPath(tempMetadataDirStr, V1Constants.SEGMENT_CREATION_META);
-      Files.copy(creationMetaInputStream, creationMetaPath);
-      // Load segment metadata
-      return new SegmentMetadataImpl(tempMetadataDir);
-    } catch (Exception e) {
-      LOGGER.error("Exception extracting and reading segment metadata for {}", segmentName.getSegmentName(), e);
-      return null;
-    } finally {
-      FileUtils.deleteQuietly(tempMetadataDir);
-    }
-  }
-
-  /**
-   *
-   * Copy the uploaded segment file in the input form to a local tmp file and return the tmp file.
-   * Return null when there is any error during the process.
-   */
-  private File uploadFileToLocalTmpFile(FormDataMultiPart multiPart, String instanceId, String segmentName) {
-    try {
-      Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
-      if (!PinotSegmentUploadDownloadRestletResource.validateMultiPart(map, segmentName)) {
-        return null;
-      }
-      String name = map.keySet().iterator().next();
-      FormDataBodyPart bodyPart = map.get(name).get(0);
-
-      FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
-
-      File localTmpFile = new File(provider.getFileUploadTmpDir(), name + "." + UUID.randomUUID().toString());
-      localTmpFile.deleteOnExit();
-
-      // Copy multipart to local
-      try (InputStream inputStream = bodyPart.getValueAs(InputStream.class);
-          OutputStream outputStream = new FileOutputStream(localTmpFile)) {
-        IOUtils.copyLarge(inputStream, outputStream);
-      }
-      return localTmpFile;
-    } catch (InvalidControllerConfigException e) {
-      LOGGER.error("Invalid controller config exception from instance {} for segment {}", instanceId, segmentName, e);
-      return null;
-    } catch (IOException e) {
-      LOGGER.error("File upload exception from instance {} for segment {}", instanceId, segmentName, e);
-      return null;
-    } finally {
-      multiPart.cleanup();
-    }
-  }
-
-  private URI localSegementFileToPinotFsTmpLocation(FileUploadPathProvider provider, File localTmpFile,
-      String segmentName)
+  private static SegmentMetadataImpl extractMetadataFromLocalSegmentFile(File segmentFile)
       throws Exception {
-    final String rawTableName = new LLCSegmentName(segmentName).getTableName();
-    // We only clean up tmp segment file under table dir, so don't create any sub-dir under table dir.
-    // See PinotLLCRealtimeSegmentManager.commitSegmentFile().
-    // TODO: move tmp file logic into SegmentCompletionUtils.
-    String uniqueSegmentFileName = SegmentCompletionUtils.generateSegmentFileName(segmentName);
-    URI segmentFileURI = URIUtils.getUri(provider.getBaseDataDirURI().toString(), rawTableName, uniqueSegmentFileName);
-    PinotFS pinotFS = PinotFSFactory.create(provider.getBaseDataDirURI().getScheme());
-    pinotFS.copyFromLocalFile(localTmpFile, segmentFileURI);
-    return segmentFileURI;
+    File tempIndexDir =
+        new File(ControllerFilePathProvider.getInstance().getUntarredFileTempDir(), segmentFile.getName());
+    try {
+      FileUtils.forceMkdir(tempIndexDir);
+
+      // Extract metadata.properties
+      try (InputStream metadataPropertiesInputStream = TarGzCompressionUtils
+          .unTarOneFile(new FileInputStream(segmentFile), V1Constants.MetadataKeys.METADATA_FILE_NAME)) {
+        Preconditions.checkState(metadataPropertiesInputStream != null, "Failed to find: %s from: %s",
+            V1Constants.MetadataKeys.METADATA_FILE_NAME, segmentFile);
+        Files.copy(metadataPropertiesInputStream,
+            new File(tempIndexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME).toPath());
+      }
+
+      // Extract creation.meta
+      try (InputStream metadataPropertiesInputStream = TarGzCompressionUtils
+          .unTarOneFile(new FileInputStream(segmentFile), V1Constants.SEGMENT_CREATION_META)) {
+        Preconditions.checkState(metadataPropertiesInputStream != null, "Failed to find: %s from: %s",
+            V1Constants.SEGMENT_CREATION_META, segmentFile);
+        Files.copy(metadataPropertiesInputStream, new File(tempIndexDir, V1Constants.SEGMENT_CREATION_META).toPath());
+      }
+
+      // Load segment metadata
+      return new SegmentMetadataImpl(tempIndexDir);
+    } finally {
+      FileUtils.deleteQuietly(tempIndexDir);
+    }
+  }
+
+  /**
+   * Extracts the segment metadata from the form. Use the untarred file temporary directory to store the metadata files
+   * temporarily.
+   */
+  private static SegmentMetadataImpl extractSegmentMetadataFromForm(FormDataMultiPart form, String segmentName)
+      throws IOException {
+    File tempIndexDir = new File(ControllerFilePathProvider.getInstance().getUntarredFileTempDir(),
+        getTempSegmentFileName(segmentName));
+    try {
+      FileUtils.forceMkdir(tempIndexDir);
+
+      // Extract metadata.properties
+      extractFileFromForm(form, V1Constants.MetadataKeys.METADATA_FILE_NAME, tempIndexDir);
+
+      // Extract creation.meta
+      extractFileFromForm(form, V1Constants.SEGMENT_CREATION_META, tempIndexDir);
+
+      // Load segment metadata
+      return new SegmentMetadataImpl(tempIndexDir);
+    } finally {
+      FileUtils.deleteQuietly(tempIndexDir);
+    }
+  }
+
+  /**
+   * Extracts a file from the form into the given directory.
+   */
+  private static void extractFileFromForm(FormDataMultiPart form, String fileName, File outputDir)
+      throws IOException {
+    FormDataBodyPart bodyPart = form.getField(fileName);
+    Preconditions.checkState(bodyPart != null, "Failed to find: %s", fileName);
+
+    try (InputStream inputStream = bodyPart.getValueAs(InputStream.class)) {
+      Files.copy(inputStream, new File(outputDir, fileName).toPath());
+    }
+  }
+
+  /**
+   * Extracts the segment metadata from the segment file URI (could be remote). Copy the segment file to local under
+   * file upload temporary directory first, then use the untarred file temporary directory to store the metadata files
+   * temporarily.
+   */
+  private static SegmentMetadataImpl extractMetadataFromSegmentFileURI(URI segmentFileURI, String segmentName)
+      throws Exception {
+    File localTempFile =
+        new File(ControllerFilePathProvider.getInstance().getFileUploadTempDir(), getTempSegmentFileName(segmentName));
+    try {
+      PinotFSFactory.create(segmentFileURI.getScheme()).copyToLocalFile(segmentFileURI, localTempFile);
+      return extractMetadataFromLocalSegmentFile(localTempFile);
+    } finally {
+      FileUtils.deleteQuietly(localTempFile);
+    }
+  }
+
+  private static String getTempSegmentFileName(String segmentName) {
+    return segmentName + "." + UUID.randomUUID();
   }
 }

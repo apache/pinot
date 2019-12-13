@@ -172,7 +172,7 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public String getLocalTempDir() {
-    return getString(LOCAL_TEMP_DIR, getDataDir());
+    return getString(LOCAL_TEMP_DIR);
   }
 
   public void setPinotFSFactoryClasses(Configuration pinotFSFactoryClasses) {
