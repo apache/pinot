@@ -27,8 +27,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.core.transport.ServerInstance;
 
 
@@ -40,10 +45,21 @@ import org.apache.pinot.core.transport.ServerInstance;
 public abstract class GeneratorBasedRoutingTableBuilder extends BaseRoutingTableBuilder {
 
   /** Number of routing tables to keep */
-  private static final int ROUTING_TABLE_COUNT = 500;
+  private int routingTableCount = 500;
 
   /** Number of routing tables to generate during the optimization phase */
-  private static final int ROUTING_TABLE_GENERATION_COUNT = 1000;
+  private int routingTableGenerationCount = 1000;
+
+  @Override
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      BrokerMetrics brokerMetrics) {
+    super.init(configuration, tableConfig, propertyStore, brokerMetrics);
+    int numReplicas = tableConfig.getValidationConfig().getReplicationNumber();
+    if (numReplicas == 1) {
+      routingTableCount = 1;
+      routingTableGenerationCount = 1;
+    }
+  }
 
   /**
    * Generates a routing table, decorated with a metric.
@@ -254,18 +270,18 @@ public abstract class GeneratorBasedRoutingTableBuilder extends BaseRoutingTable
     // according to a per-routing table metric and discard the worst routing tables.
 
     PriorityQueue<Pair<Map<ServerInstance, List<String>>, Float>> topRoutingTables =
-        new PriorityQueue<>(ROUTING_TABLE_COUNT, (left, right) -> {
+        new PriorityQueue<>(routingTableCount, (left, right) -> {
           // Float.compare sorts in ascending order and we want a max heap, so we need to return the negative
           // of the comparison
           return -Float.compare(left.getValue(), right.getValue());
         });
 
-    for (int i = 0; i < ROUTING_TABLE_COUNT; i++) {
+    for (int i = 0; i < routingTableCount; i++) {
       topRoutingTables.add(generateRoutingTableWithMetric(segmentToServersMap));
     }
 
     // Generate routing more tables and keep the ROUTING_TABLE_COUNT top ones
-    for (int i = 0; i < (ROUTING_TABLE_GENERATION_COUNT - ROUTING_TABLE_COUNT); ++i) {
+    for (int i = 0; i < (routingTableGenerationCount - routingTableCount); ++i) {
       Pair<Map<ServerInstance, List<String>>, Float> newRoutingTable =
           generateRoutingTableWithMetric(segmentToServersMap);
       Pair<Map<ServerInstance, List<String>>, Float> worstRoutingTable = topRoutingTables.peek();
