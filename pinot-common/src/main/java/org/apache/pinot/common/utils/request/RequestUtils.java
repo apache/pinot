@@ -53,8 +53,6 @@ import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
 
 
 public class RequestUtils {
-  private static String DELIMTER = "\t\t";
-
   private RequestUtils() {
   }
 

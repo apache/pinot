@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
-import com.google.common.base.Splitter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -104,8 +103,7 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends Filt
     for (FilterQueryTree childQueryTree : filterQueryTree.getChildren()) {
       if (childQueryTree.getOperator() == FilterOperator.EQUALITY
           || childQueryTree.getOperator() == FilterOperator.IN) {
-        List<String> childValues = valueDoubleTabListToElements(childQueryTree.getValue());
-
+        List<String> childValues = childQueryTree.getValue();
         if (!columnToValues.containsKey(childQueryTree.getColumn())) {
           TreeSet<String> value = new TreeSet<>(childValues);
           columnToValues.put(childQueryTree.getColumn(), value);
@@ -165,16 +163,5 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends Filt
       return new FilterQueryTree(columnAndValues.getKey(), new ArrayList<>(columnAndValues.getValue()),
           FilterOperator.IN, null);
     }
-  }
-
-  private List<String> valueDoubleTabListToElements(List<String> doubleTabSeparatedElements) {
-    Splitter valueSplitter = Splitter.on("\t\t");
-    List<String> valueElements = new ArrayList<>();
-
-    for (String value : doubleTabSeparatedElements) {
-      valueElements.addAll(valueSplitter.splitToList(value));
-    }
-
-    return valueElements;
   }
 }

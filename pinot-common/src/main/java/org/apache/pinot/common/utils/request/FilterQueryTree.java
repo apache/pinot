@@ -18,13 +18,9 @@
  */
 package org.apache.pinot.common.utils.request;
 
-import com.google.common.collect.Lists;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.common.utils.StringUtil;
 
 
 public class FilterQueryTree {
@@ -78,27 +74,12 @@ public class FilterQueryTree {
     }
     if (operator == FilterOperator.OR || operator == FilterOperator.AND) {
       stringBuffer.append(operator);
-    } else {
-      List<String> sortedValues = new ArrayList<>(value);
-
-      // Old style double-tab separated list
-      if (sortedValues.size() == 1) {
-        String firstItem = sortedValues.get(0);
-        List<String> firstItemValues = Lists.newArrayList(firstItem.split("\t\t"));
-        Collections.sort(firstItemValues);
-        sortedValues.set(0, StringUtil.join("\t\t", firstItemValues.toArray(new String[firstItemValues.size()])));
-      }
-
-      Collections.sort(sortedValues);
-
-      stringBuffer.append(column).append(" ").append(operator).append(" ").append(sortedValues);
-    }
-
-    if (children != null) {
       for (FilterQueryTree child : children) {
         stringBuffer.append('\n');
         child.recursiveToStringIntoBuffer(indent + 1, stringBuffer);
       }
+    } else {
+      stringBuffer.append(column).append(' ').append(operator).append(' ').append(value);
     }
   }
 }

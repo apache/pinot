@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.common.predicate;
 
-import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.core.common.Predicate;
 
@@ -27,25 +26,12 @@ import org.apache.pinot.core.common.Predicate;
  * Abstract base class for IN and NOT IN predicates.
  */
 public abstract class BaseInPredicate extends Predicate {
-  public static final String DELIMITER = "\t\t";
 
   public BaseInPredicate(String lhs, Type predicateType, List<String> rhs) {
     super(lhs, predicateType, rhs);
   }
 
-  @Override
-  public String toString() {
-    List<String> rhs = getRhs();
-    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : " + Arrays
-        .toString(rhs.toArray(new String[rhs.size()])) + "\n";
-  }
-
   public String[] getValues() {
-    /* To maintain backward compatibility, we always split if number of values is one. We do not support
-       case where DELIMITER is a sub-string of value.
-       TODO: Clean this up after broker changes to enable splitting have been around for sometime.
-     */
-    List<String> values = getRhs();
-    return (values.size() > 1) ? values.toArray(new String[values.size()]) : values.get(0).split(DELIMITER);
+    return getRhs().toArray(new String[0]);
   }
 }
