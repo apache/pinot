@@ -19,12 +19,9 @@
 package org.apache.pinot.pql.parsers.pql2.ast;
 
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.HavingQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -32,7 +29,6 @@ import org.apache.pinot.pql.parsers.Pql2CompilationException;
 
 
 public class RegexpLikePredicateAstNode extends PredicateAstNode {
-  private static final String SEPERATOR = "\t\t";
   private String _identifier;
 
   @Override
@@ -56,24 +52,12 @@ public class RegexpLikePredicateAstNode extends PredicateAstNode {
     if (_identifier == null) {
       throw new Pql2CompilationException("REGEXP_LIKE predicate has no identifier");
     }
-
-    Set<String> values = new HashSet<>();
-
-    for (AstNode astNode : getChildren()) {
-      if (astNode instanceof LiteralAstNode) {
-        LiteralAstNode node = (LiteralAstNode) astNode;
-        String expr = node.getValueAsString();
-        values.add(expr);
-      }
-    }
-    if (values.size() > 1) {
+    List<? extends AstNode> children = getChildren();
+    if (children.size() > 1) {
       throw new Pql2CompilationException("Matching more than one regex is NOT supported currently");
     }
-
-    String[] valueArray = values.toArray(new String[values.size()]);
-    FilterOperator filterOperator = FilterOperator.REGEXP_LIKE;
-    List<String> value = Collections.singletonList(StringUtil.join(SEPERATOR, valueArray));
-    return new FilterQueryTree(_identifier, value, filterOperator, null);
+    String value = ((LiteralAstNode) children.get(0)).getValueAsString();
+    return new FilterQueryTree(_identifier, Collections.singletonList(value), FilterOperator.REGEXP_LIKE, null);
   }
 
   @Override

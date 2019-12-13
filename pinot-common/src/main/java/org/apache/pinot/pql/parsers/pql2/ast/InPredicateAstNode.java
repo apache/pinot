@@ -19,13 +19,10 @@
 package org.apache.pinot.pql.parsers.pql2.ast;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.List;
 import java.util.TreeSet;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.HavingQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -94,23 +91,17 @@ public class InPredicateAstNode extends PredicateAstNode {
       throw new Pql2CompilationException("IN predicate has no identifier");
     }
 
-    Set<String> values = new LinkedHashSet<>();
-
-    for (AstNode astNode : getChildren()) {
-      if (astNode instanceof LiteralAstNode) {
-        LiteralAstNode node = (LiteralAstNode) astNode;
-        values.add(node.getValueAsString());
+    List<? extends AstNode> children = getChildren();
+    int numChildren = children.size();
+    List<String> values = new ArrayList<>(numChildren);
+    for (AstNode child : children) {
+      if (child instanceof LiteralAstNode) {
+        values.add(((LiteralAstNode) child).getValueAsString());
       }
     }
 
-    FilterOperator filterOperator;
-    if (_isNotInClause) {
-      filterOperator = FilterOperator.NOT_IN;
-    } else {
-      filterOperator = FilterOperator.IN;
-    }
-
-    return new FilterQueryTree(_identifier, new ArrayList<>(values), filterOperator, null);
+    FilterOperator filterOperator = _isNotInClause ? FilterOperator.NOT_IN : FilterOperator.IN;
+    return new FilterQueryTree(_identifier, values, filterOperator, null);
   }
 
   @Override
@@ -118,39 +109,30 @@ public class InPredicateAstNode extends PredicateAstNode {
     if (_identifier == null) {
       throw new Pql2CompilationException("IN predicate has no identifier");
     }
-    FilterKind filterOperator;
-    if (_isNotInClause) {
-      filterOperator = FilterKind.NOT_IN;
-    } else {
-      filterOperator = FilterKind.IN;
-    }
-    Expression expr = RequestUtils.getFunctionExpression(filterOperator.name());
-    expr.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression(_identifier));
 
-    Set<String> values = new LinkedHashSet<>();
-
-    for (AstNode astNode : getChildren()) {
-      if (astNode instanceof LiteralAstNode) {
-        LiteralAstNode node = (LiteralAstNode) astNode;
-        if(!values.contains(node.getValueAsString())) {
-          values.add(node.getValueAsString());
-          Expression literalExpression = RequestUtils.createLiteralExpression(node);
-          expr.getFunctionCall().addToOperands(literalExpression);
-        }
+    List<? extends AstNode> children = getChildren();
+    int numChildren = children.size();
+    List<Expression> operands = new ArrayList<>(numChildren + 1);
+    operands.add(RequestUtils.createIdentifierExpression(_identifier));
+    for (AstNode child : children) {
+      if (child instanceof LiteralAstNode) {
+        operands.add(RequestUtils.createLiteralExpression((LiteralAstNode) child));
       }
     }
-    return expr;
+
+    FilterKind filterKind = _isNotInClause ? FilterKind.NOT_IN : FilterKind.IN;
+    Expression functionExpression = RequestUtils.getFunctionExpression(filterKind.name());
+    functionExpression.getFunctionCall().setOperands(operands);
+    return functionExpression;
   }
 
   @Override
   public HavingQueryTree buildHavingQueryTree() {
-
     if (_function == null) {
       throw new Pql2CompilationException("IN predicate has no function");
     }
 
     TreeSet<String> values = new TreeSet<>();
-
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof LiteralAstNode) {
         LiteralAstNode node = (LiteralAstNode) astNode;
@@ -158,15 +140,7 @@ public class InPredicateAstNode extends PredicateAstNode {
       }
     }
 
-    String[] valueArray = values.toArray(new String[values.size()]);
-    FilterOperator filterOperator;
-    if (_isNotInClause) {
-      filterOperator = FilterOperator.NOT_IN;
-    } else {
-      filterOperator = FilterOperator.IN;
-    }
-
-    return new HavingQueryTree(_function.buildAggregationInfo(),
-        Collections.singletonList(StringUtil.join("\t\t", valueArray)), filterOperator, null);
+    FilterOperator filterOperator = _isNotInClause ? FilterOperator.NOT_IN : FilterOperator.IN;
+    return new HavingQueryTree(_function.buildAggregationInfo(), new ArrayList<>(values), filterOperator, null);
   }
 }

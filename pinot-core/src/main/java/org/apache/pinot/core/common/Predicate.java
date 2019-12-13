@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.common;
 
-import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
@@ -64,8 +63,7 @@ public abstract class Predicate {
 
   @Override
   public String toString() {
-    return "Predicate: type: " + type + ", left : " + lhs + ", right : " + Arrays.toString(rhs.toArray(new String[0]))
-        + "\n";
+    return "Predicate: type: " + type + ", left: " + lhs + ", right: " + rhs;
   }
 
   public static Predicate newPredicate(FilterQueryTree filterQueryTree) {
