@@ -23,13 +23,11 @@ import java.io.File;
 import java.util.concurrent.locks.Lock;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.NotificationContext;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.Message;
 import org.apache.helix.participant.statemachine.StateModel;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -55,14 +53,12 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
   private final String _instanceId;
   private final InstanceDataManager _instanceDataManager;
   private final SegmentFetcherAndLoader _fetcherAndLoader;
-  private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   public SegmentOnlineOfflineStateModelFactory(String instanceId, InstanceDataManager instanceDataManager,
-      SegmentFetcherAndLoader fetcherAndLoader, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+      SegmentFetcherAndLoader fetcherAndLoader) {
     _instanceId = instanceId;
     _instanceDataManager = instanceDataManager;
     _fetcherAndLoader = fetcherAndLoader;
-    _propertyStore = propertyStore;
   }
 
   public static String getStateModelName() {
@@ -116,8 +112,9 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
           return;
         }
         LLRealtimeSegmentDataManager segmentDataManager = (LLRealtimeSegmentDataManager) acquiredSegment;
-        RealtimeSegmentZKMetadata metadata =
-            ZKMetadataProvider.getRealtimeSegmentZKMetadata(_propertyStore, segmentName.getTableName(), segmentNameStr);
+        RealtimeSegmentZKMetadata metadata = ZKMetadataProvider
+            .getRealtimeSegmentZKMetadata(_instanceDataManager.getPropertyStore(), segmentName.getTableName(),
+                segmentNameStr);
         segmentDataManager.goOnlineFromConsuming(metadata);
       } catch (InterruptedException e) {
         _logger.warn("State transition interrupted", e);
