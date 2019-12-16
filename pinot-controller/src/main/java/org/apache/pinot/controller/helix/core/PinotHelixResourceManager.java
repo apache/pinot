@@ -983,13 +983,15 @@ public class PinotHelixResourceManager {
     boolean isNewSchemaBackwardCompatible = schema.isBackwardCompatibleWith(oldSchema);
     if (!isNewSchemaBackwardCompatible) {
       LOGGER.warn(String.format("New schema %s is not backward compatible", schemaName));
-    }
-
-    if (reload && isNewSchemaBackwardCompatible) {
-      // Automatically reload all tables that have this schema
-      LOGGER.info("Reloading all tables with schema name: {}", schemaName);
-      for (String tableNameWithType : getExistingTableNamesWithType(schemaName, null)) {
-        reloadAllSegments(tableNameWithType);
+    } else if (reload) {
+      LOGGER.info("Reloading tables with name: {}", schemaName);
+      List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
+      if (tableNamesWithType.isEmpty()) {
+        LOGGER.warn("Found no tables with name {}", schemaName);
+      } else {
+        for (String tableNameWithType : tableNamesWithType) {
+          reloadAllSegments(tableNameWithType);
+        }
       }
     }
   }

@@ -119,9 +119,9 @@ public class PinotSchemaRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully updated schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse updateSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
-      @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false") @QueryParam("shouldAutoReload") boolean shouldAutoReload,
+      @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false") @QueryParam("reload") boolean reload,
       FormDataMultiPart multiPart) {
-    return updateSchema(schemaName, multiPart, shouldAutoReload);
+    return updateSchema(schemaName, getSchemaFromMultiPart(multiPart), reload);
   }
 
   @PUT
@@ -145,7 +145,7 @@ public class PinotSchemaRestletResource {
   public SuccessResponse addSchema(
       @ApiParam(value = "Whether to override the schema if the schema exists") @DefaultValue("true") @QueryParam("override") boolean override,
       FormDataMultiPart multiPart) {
-    return addSchema(multiPart, override);
+    return addSchema(getSchemaFromMultiPart(multiPart), override);
   }
 
   @POST
@@ -188,28 +188,6 @@ public class PinotSchemaRestletResource {
           Response.Status.BAD_REQUEST);
     }
     return schema.toPrettyJsonString();
-  }
-
-  /**
-   * Internal method to add schema
-   *
-   * @param multiPart data that contains the schema
-   * @param override  set to true to override the existing schema with the same name
-   * @return
-   */
-  private SuccessResponse addSchema(FormDataMultiPart multiPart, boolean override) {
-    return addSchema(getSchemaFromMultiPart(multiPart), override);
-  }
-
-  /**
-   * Internal method to update schema
-   * @param schemaName  name of the schema to update
-   * @param multiPart data that contains the schema
-   * @param reload  set to true to reload the tables using the schema, so committed segments can pick up the new schema
-   * @return
-   */
-  private SuccessResponse updateSchema(String schemaName, FormDataMultiPart multiPart, boolean reload) {
-    return updateSchema(schemaName, getSchemaFromMultiPart(multiPart), reload);
   }
 
   /**
