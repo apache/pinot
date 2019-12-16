@@ -264,7 +264,7 @@ public class PinotHelixResourceManager {
   private void addInstanceGroupTagIfNeeded() {
     InstanceConfig instanceConfig = getHelixInstanceConfig(_instanceId);
     assert instanceConfig != null;
-    if (!instanceConfig.containsTag(Helix.CONTROLLER_INSTANCE)) {
+    if (instanceConfig != null && !instanceConfig.containsTag(Helix.CONTROLLER_INSTANCE)) {
       LOGGER.info("Controller: {} doesn't contain group tag: {}. Adding one.", _instanceId, Helix.CONTROLLER_INSTANCE);
       instanceConfig.addTag(Helix.CONTROLLER_INSTANCE);
       HelixDataAccessor accessor = _helixZkManager.getHelixDataAccessor();
