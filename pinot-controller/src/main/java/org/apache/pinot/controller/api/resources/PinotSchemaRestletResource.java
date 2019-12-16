@@ -193,31 +193,6 @@ public class PinotSchemaRestletResource {
 
   /**
    * Internal method to add schema
-   <<<<<<< HEAD
-   =======
-   *
-   * @param multiPart data that contains the schema
-   * @param override  set to true to override the existing schema with the same name
-   * @return
-   */
-  private SuccessResponse addSchema(FormDataMultiPart multiPart, boolean override) {
-    return addSchema(getSchemaFromMultiPart(multiPart), override);
-  }
-
-  /**
-   * Internal method to update schema
-   * @param schemaName  name of the schema to update
-   * @param multiPart data that contains the schema
-   * @param reload  set to true to reload the tables using the schema, so committed segments can pick up the new schema
-   * @return
-   */
-  private SuccessResponse updateSchema(String schemaName, FormDataMultiPart multiPart, boolean reload) {
-    return updateSchema(schemaName, getSchemaFromMultiPart(multiPart), reload);
-  }
-
-  /**
-   * Internal method to add schema
-   >>>>>>> Add the option to reload table on schema change
    * @param schema  schema
    * @param override  set to true to override the existing schema with the same name
    * @return
