@@ -30,21 +30,22 @@ import org.slf4j.LoggerFactory;
 public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableRoaringBitmap> {
   public static final Logger LOGGER = LoggerFactory.getLogger(BitmapInvertedIndexReader.class);
 
-  private final int _numberOfBitmaps;
+  private final int _numBitmaps;
   private volatile SoftReference<SoftReference<ImmutableRoaringBitmap>[]> _bitmaps = null;
-  private PinotDataBuffer _buffer;
+  private final PinotDataBuffer _buffer;
 
   /**
    * Constructs an inverted index with the specified size.
    * @param cardinality the number of bitmaps in the inverted index, which should be the same as the
    *          number of values in
    *          the dictionary.
-   * @throws IOException
    */
-  public BitmapInvertedIndexReader(PinotDataBuffer indexDataBuffer, int cardinality)
-      throws IOException {
-    _numberOfBitmaps = cardinality;
-    load(indexDataBuffer);
+  public BitmapInvertedIndexReader(PinotDataBuffer indexDataBuffer, int cardinality) {
+    _numBitmaps = cardinality;
+    _buffer = indexDataBuffer;
+
+    final int lastOffset = _buffer.getInt(_numBitmaps * Integer.BYTES);
+    assert lastOffset == _buffer.size();
   }
 
   /**
@@ -65,11 +66,11 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
           }
         }
       } else {
-        bitmapArrayReference = new SoftReference[_numberOfBitmaps];
+        bitmapArrayReference = new SoftReference[_numBitmaps];
         _bitmaps = new SoftReference<SoftReference<ImmutableRoaringBitmap>[]>(bitmapArrayReference);
       }
     } else {
-      bitmapArrayReference = new SoftReference[_numberOfBitmaps];
+      bitmapArrayReference = new SoftReference[_numBitmaps];
       _bitmaps = new SoftReference<SoftReference<ImmutableRoaringBitmap>[]>(bitmapArrayReference);
     }
     synchronized (this) {
@@ -91,26 +92,11 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
 
     // Slice the buffer appropriately for Roaring Bitmap
     ByteBuffer bb = _buffer.toDirectByteBuffer(currentOffset, bufferLength);
-    ImmutableRoaringBitmap immutableRoaringBitmap = null;
-    try {
-      immutableRoaringBitmap = new ImmutableRoaringBitmap(bb);
-    } catch (Exception e) {
-      LOGGER.error(
-          "Error creating immutableRoaringBitmap for dictionary id:{} currentOffset:{} bufferLength:{} slice position{} limit:{}",
-          index, currentOffset, bufferLength, bb.position(), bb.limit());
-    }
-    return immutableRoaringBitmap;
+    return new ImmutableRoaringBitmap(bb);
   }
 
   private int getOffset(final int index) {
     return _buffer.getInt(index * Integer.BYTES);
-  }
-
-  private void load(PinotDataBuffer indexDataBuffer)
-      throws IOException {
-    final int lastOffset = indexDataBuffer.getInt(_numberOfBitmaps * Integer.BYTES);
-    assert lastOffset == indexDataBuffer.size();
-    this._buffer = indexDataBuffer;
   }
 
   @Override
