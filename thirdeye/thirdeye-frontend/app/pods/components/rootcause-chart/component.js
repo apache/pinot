@@ -1,7 +1,6 @@
 import { computed, get, getProperties } from '@ember/object';
 import { equal } from '@ember/object/computed';
 import Component from '@ember/component';
-import d3 from 'd3';
 import buildTooltip from 'thirdeye-frontend/utils/build-tooltip';
 import {
   toBaselineUrn,
@@ -83,7 +82,15 @@ export default Component.extend({
     function () {
       return {
         grouped: true,
-        contents: (items, defaultTitleFormat, defaultValueFormat, color) => {
+        position: function (data, width, height, element) {
+          const chartOffsetX = document.querySelector("#chart").getBoundingClientRect().left;
+          const graphOffsetX = document.querySelector("#chart g.c3-axis-y").getBoundingClientRect().right;
+          const tooltipWidth = document.getElementById('tooltip').parentNode.clientWidth;
+          const x = (parseInt(element.getAttribute('cx'))) + graphOffsetX - chartOffsetX - Math.floor(tooltipWidth/2);
+          const y = element.getAttribute('cy') - height - 14;
+          return {top: y, left: x};
+        },
+        contents: (items) => {
           const t = makeTime(items[0].x);
           const hoverUrns = this._onHover(t.valueOf());
 
@@ -116,7 +123,7 @@ export default Component.extend({
         y: {
           show: true,
           tick: {
-            format: function(d){return humanizeFloat(d)}
+            format: function(d){return humanizeFloat(d);}
           }
         },
         y2: {
@@ -171,8 +178,8 @@ export default Component.extend({
     'displayableUrns',
     'timeseriesMode',
     function () {
-      const { timeseries, timeseriesMode, displayableUrns } =
-        getProperties(this, 'timeseries', 'timeseriesMode', 'displayableUrns');
+      const { timeseriesMode, displayableUrns } =
+        getProperties(this, 'timeseriesMode', 'displayableUrns');
 
       if (timeseriesMode === TIMESERIES_MODE_SPLIT) {
         return {};
