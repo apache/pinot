@@ -75,8 +75,8 @@ public class AutoOnboardPinotMetricsUtils {
       try {
         // Accept all SSL certificate because we assume that the Pinot broker are setup in the same internal network
         SSLContext sslContext = new SSLContextBuilder().loadTrustMaterial(null, new AcceptAllTrustStrategy()).build();
-        this.pinotControllerClient =
-            HttpClients.custom().setSSLContext(sslContext).setSSLHostnameVerifier(new NoopHostnameVerifier()).build();
+        //this.pinotControllerClient =
+        //    HttpClients.custom().setSSLContext(sslContext).setSSLHostnameVerifier(new NoopHostnameVerifier()).build();
       } catch (NoSuchAlgorithmException | KeyManagementException | KeyStoreException e) {
         // This section shouldn't happen because we use Accept All Strategy
         LOG.error("Failed to start auto onboard for Pinot data source.");

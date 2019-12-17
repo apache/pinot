@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao;
 
+import java.util.Set;
 import org.apache.pinot.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import java.util.List;
 
@@ -79,7 +80,7 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
 
   MergedAnomalyResultBean convertMergeAnomalyDTO2Bean(MergedAnomalyResultDTO entity);
 
-  MergedAnomalyResultDTO convertMergedAnomalyBean2DTO(MergedAnomalyResultBean mergedAnomalyResultBean);
+  MergedAnomalyResultDTO convertMergedAnomalyBean2DTO(MergedAnomalyResultBean mergedAnomalyResultBean, Set<Long> visitedAnomalyIds);
 
   List<MergedAnomalyResultDTO> convertMergedAnomalyBean2DTO(List<MergedAnomalyResultBean> mergedAnomalyResultBeanList);
 }
