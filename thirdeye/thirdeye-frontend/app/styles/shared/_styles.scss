@@ -575,19 +575,19 @@ body {
     font-weight: normal;
 
     &--good {
-      color: #4B9D27;
+      color: $te-good;
       font-size: 28px;
       font-weight: normal;
     }
 
     &--average {
-      color: #F5A623;
+      color: $te-average;
       font-size: 28px;
       font-weight: normal;
     }
 
     &--poor {
-      color: #FF4B51;
+      color: $te-poor;
       font-size: 28px;
       font-weight: normal;
     }
@@ -835,8 +835,10 @@ body {
     padding: 4px 8px;
     margin-right: 20px;
     display: inline-block;
-    color: white;
+    color: white !important;
     width: auto;
+    font-weight: bold;
+    border: 2px solid;
 
     &--list {
       margin: 3px 10px 0 0;
@@ -845,7 +847,63 @@ body {
     }
 
     &--active {
-      background-color: $te-blue;
+      background-color: $te-good;
+      border-color: $te-good;
+    }
+
+    &--good {
+      background-color: white;
+      font-weight: bold;
+      border-radius: 15px;
+      border: 2px solid;
+      border-color: $te-good;
+    }
+
+    &--average {
+      background-color: white;
+      font-weight: bold;
+      border-radius: 15px;
+      border: 2px solid;
+      border-color: $te-average;
+    }
+
+    &--poor {
+      background-color: white;
+      font-weight: bold;
+      border-radius: 15px;
+      border: 2px solid;
+      border-color: $te-poor;
+    }
+
+    &--unknown {
+      background-color: white;
+      font-weight: bold;
+      border-radius: 15px;
+      border: 2px solid;
+      border-color: app-shade(black, 3);
+    }
+  }
+
+  &__a-tag {
+
+    &--good {
+      text-decoration: none !important;
+      color: $te-good !important;
+    }
+
+    &--average {
+      text-decoration: none !important;
+      color: $te-average !important;
+    }
+
+    &--poor {
+      text-decoration: none !important;
+      color: $te-poor !important;
+    }
+
+    &--unknown {
+      text-decoration: none !important;
+      color: app-shade(black, 3) !important;
     }
   }
 
