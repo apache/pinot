@@ -184,9 +184,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     MergedAnomalyResultBean mergedAnomalyResultBean = genericPojoDao.get(id, MergedAnomalyResultBean.class);
     if (mergedAnomalyResultBean != null) {
       MergedAnomalyResultDTO mergedAnomalyResultDTO;
-      Set<Long> visitedIds = new HashSet<>();
-      visitedIds.add(mergedAnomalyResultBean.getId());
-      mergedAnomalyResultDTO = convertMergedAnomalyBean2DTO(mergedAnomalyResultBean, visitedIds);
+      mergedAnomalyResultDTO = convertMergedAnomalyBean2DTO(mergedAnomalyResultBean, new HashSet<>());
       return mergedAnomalyResultDTO;
     } else {
       return null;
@@ -375,9 +373,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
     if (CollectionUtils.isNotEmpty(list)) {
       MergedAnomalyResultBean mostRecentConflictMergedAnomalyResultBean = list.get(0);
-      Set<Long> visitedIds = new HashSet<>();
-      visitedIds.add(mostRecentConflictMergedAnomalyResultBean.getId());
-      return convertMergedAnomalyBean2DTO(mostRecentConflictMergedAnomalyResultBean, visitedIds);
+      return convertMergedAnomalyBean2DTO(mostRecentConflictMergedAnomalyResultBean, new HashSet<>());
     }
     return null;
   }
@@ -507,6 +503,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       mergedAnomalyResultDTO.setFeedback(anomalyFeedbackDTO);
     }
 
+    visitedAnomalyIds.add(mergedAnomalyResultBean.getId());
     mergedAnomalyResultDTO.setChildren(getChildAnomalies(mergedAnomalyResultBean, visitedAnomalyIds));
 
     return mergedAnomalyResultDTO;
@@ -520,7 +517,6 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
           continue;
         }
 
-        visitedAnomalyIds.add(id);
         MergedAnomalyResultBean childBean = genericPojoDao.get(id, MergedAnomalyResultBean.class);
         MergedAnomalyResultDTO child = convertMergedAnomalyBean2DTO(childBean, visitedAnomalyIds);
         children.add(child);
@@ -537,9 +533,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       Future<MergedAnomalyResultDTO> future =
           EXECUTOR_SERVICE.submit(new Callable<MergedAnomalyResultDTO>() {
             @Override public MergedAnomalyResultDTO call() throws Exception {
-              Set<Long> visitedIds = new HashSet<>();
-              visitedIds.add(mergedAnomalyResultBean.getId());
-              return MergedAnomalyResultManagerImpl.this.convertMergedAnomalyBean2DTO(mergedAnomalyResultBean, visitedIds);
+              return MergedAnomalyResultManagerImpl.this.convertMergedAnomalyBean2DTO(mergedAnomalyResultBean, new HashSet<>());
             }
           });
       mergedAnomalyResultDTOFutureList.add(future);
