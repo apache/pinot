@@ -31,20 +31,21 @@ import org.slf4j.LoggerFactory;
 public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableRoaringBitmap> {
   public static final Logger LOGGER = LoggerFactory.getLogger(BitmapInvertedIndexReader.class);
 
-  private final int _numBitmaps;
   private final PinotDataBuffer _buffer;
+  private final int _numBitmaps;
 
   private volatile SoftReference<SoftReference<ImmutableRoaringBitmap>[]> _bitmaps = null;
 
   /**
    * Constructs an inverted index with the specified size.
+   * @param indexDataBuffer data buffer for the inverted index.
    * @param cardinality the number of bitmaps in the inverted index, which should be the same as the
    *          number of values in
    *          the dictionary.
    */
   public BitmapInvertedIndexReader(PinotDataBuffer indexDataBuffer, int cardinality) {
-    _numBitmaps = cardinality;
     _buffer = indexDataBuffer;
+    _numBitmaps = cardinality;
 
     final int lastOffset = _buffer.getInt(_numBitmaps * Integer.BYTES);
     Preconditions.checkState(lastOffset == _buffer.size(),
