@@ -184,7 +184,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     MergedAnomalyResultBean mergedAnomalyResultBean = genericPojoDao.get(id, MergedAnomalyResultBean.class);
     if (mergedAnomalyResultBean != null) {
       MergedAnomalyResultDTO mergedAnomalyResultDTO;
-      mergedAnomalyResultDTO = convertMergedAnomalyBean2DTO(mergedAnomalyResultBean);
+      mergedAnomalyResultDTO = convertMergedAnomalyBean2DTO(mergedAnomalyResultBean, new HashSet<>());
       return mergedAnomalyResultDTO;
     } else {
       return null;
@@ -373,7 +373,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
     if (CollectionUtils.isNotEmpty(list)) {
       MergedAnomalyResultBean mostRecentConflictMergedAnomalyResultBean = list.get(0);
-      return convertMergedAnomalyBean2DTO(mostRecentConflictMergedAnomalyResultBean);
+      return convertMergedAnomalyBean2DTO(mostRecentConflictMergedAnomalyResultBean, new HashSet<>());
     }
     return null;
   }
@@ -487,7 +487,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   }
 
   @Override
-  public MergedAnomalyResultDTO convertMergedAnomalyBean2DTO(MergedAnomalyResultBean mergedAnomalyResultBean) {
+  public MergedAnomalyResultDTO convertMergedAnomalyBean2DTO(MergedAnomalyResultBean mergedAnomalyResultBean, Set<Long> visitedAnomalyIds) {
     MergedAnomalyResultDTO mergedAnomalyResultDTO;
     mergedAnomalyResultDTO = MODEL_MAPPER.map(mergedAnomalyResultBean, MergedAnomalyResultDTO.class);
 
@@ -503,21 +503,22 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       mergedAnomalyResultDTO.setFeedback(anomalyFeedbackDTO);
     }
 
-    mergedAnomalyResultDTO.setChildren(getChildAnomalies(mergedAnomalyResultBean));
+    visitedAnomalyIds.add(mergedAnomalyResultBean.getId());
+    mergedAnomalyResultDTO.setChildren(getChildAnomalies(mergedAnomalyResultBean, visitedAnomalyIds));
 
     return mergedAnomalyResultDTO;
   }
 
-  private Set<MergedAnomalyResultDTO> getChildAnomalies(MergedAnomalyResultBean mergedAnomalyResultBean) {
+  private Set<MergedAnomalyResultDTO> getChildAnomalies(MergedAnomalyResultBean mergedAnomalyResultBean, Set<Long> visitedAnomalyIds) {
     Set<MergedAnomalyResultDTO> children = new HashSet<>();
     if (mergedAnomalyResultBean.getChildIds() != null) {
       for (Long id : mergedAnomalyResultBean.getChildIds()) {
-        if (id == null) {
+        if (id == null || visitedAnomalyIds.contains(id)) {
           continue;
         }
 
         MergedAnomalyResultBean childBean = genericPojoDao.get(id, MergedAnomalyResultBean.class);
-        MergedAnomalyResultDTO child = convertMergedAnomalyBean2DTO(childBean);
+        MergedAnomalyResultDTO child = convertMergedAnomalyBean2DTO(childBean, visitedAnomalyIds);
         children.add(child);
       }
     }
@@ -532,7 +533,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       Future<MergedAnomalyResultDTO> future =
           EXECUTOR_SERVICE.submit(new Callable<MergedAnomalyResultDTO>() {
             @Override public MergedAnomalyResultDTO call() throws Exception {
-              return MergedAnomalyResultManagerImpl.this.convertMergedAnomalyBean2DTO(mergedAnomalyResultBean);
+              return MergedAnomalyResultManagerImpl.this.convertMergedAnomalyBean2DTO(mergedAnomalyResultBean, new HashSet<>());
             }
           });
       mergedAnomalyResultDTOFutureList.add(future);
