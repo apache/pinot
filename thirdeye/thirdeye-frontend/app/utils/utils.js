@@ -206,6 +206,60 @@ export function replaceNonFiniteWithCurrent(series1, series2) {
 }
 
 /**
+ * Check if all values in array are null
+ * @param {Array} toCheck - array to check for all nulls
+ */
+export function isAllNull(toCheck) {
+  return _.isEmpty(toCheck.filter(value => value !== null));
+}
+
+/**
+ * Builds upper and lower bounds, as relevant
+ * @param {Object} series - object that holds series that will be passed to time series chart component
+ * @param {Object} baseline - baseline object taken from json response
+ * @param {Object} timeseries - time series object taken from json response
+ * @param {Boolean} useCurrent - whether to use current or value, decided by caller
+ */
+export function buildBounds(series, baseline, timeseries, useCurrent) {
+  if (baseline) {
+    const upperExists = (!_.isEmpty(baseline.upper_bound) && !isAllNull(baseline.upper_bound));
+    const lowerExists = (!_.isEmpty(baseline.lower_bound) && !isAllNull(baseline.lower_bound));
+    if (upperExists && lowerExists) {
+      series['Upper and lower bound'] = {
+        timestamps: baseline.timestamp,
+        values: replaceNonFiniteWithCurrent(baseline.upper_bound,
+          useCurrent ? timeseries.current : timeseries.value),
+        type: 'line',
+        color: 'screenshot-bounds'
+      };
+      series['lowerBound'] = {
+        timestamps: baseline.timestamp,
+        values: replaceNonFiniteWithCurrent(baseline.lower_bound,
+          useCurrent ? timeseries.current : timeseries.value),
+        type: 'line',
+        color: 'screenshot-bounds'
+      };
+    } else if (upperExists) {
+      series['Upper Bound'] = {
+        timestamps: baseline.timestamp,
+        values: replaceNonFiniteWithCurrent(baseline.upper_bound,
+          useCurrent ? timeseries.current : timeseries.value),
+        type: 'line',
+        color: 'screenshot-bounds'
+      };
+    } else if (lowerExists) {
+      series['Lower Bound'] = {
+        timestamps: baseline.timestamp,
+        values: replaceNonFiniteWithCurrent(baseline.lower_bound,
+          useCurrent ? timeseries.current : timeseries.value),
+        type: 'line',
+        color: 'screenshot-bounds'
+      };
+    }
+  }
+}
+
+/**
  * Replace all Infinity and NaN with null in array of numbers
  * @param {Array} timeSeries - time series to modify
  */
@@ -227,5 +281,7 @@ export default {
   toIso,
   replaceNonFiniteWithCurrent,
   stripNonFiniteValues,
-  getProps
+  getProps,
+  isAllNull,
+  buildBounds
 };

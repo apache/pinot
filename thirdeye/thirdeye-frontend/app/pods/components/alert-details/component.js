@@ -19,8 +19,8 @@ import { later } from '@ember/runloop';
 import { checkStatus,
   humanizeFloat,
   postProps,
-  replaceNonFiniteWithCurrent,
-  stripNonFiniteValues } from 'thirdeye-frontend/utils/utils';
+  stripNonFiniteValues,
+  buildBounds } from 'thirdeye-frontend/utils/utils';
 import { toastOptions } from 'thirdeye-frontend/utils/constants';
 import { colorMapping, makeTime, toMetricLabel, extractTail } from 'thirdeye-frontend/utils/rca-utils';
 import { getYamlPreviewAnomalies,
@@ -534,25 +534,9 @@ export default Component.extend({
         };
       }
 
-      if (baseline && !_.isEmpty(baseline.upper_bound)) {
-        series['Upper and lower bound'] = {
-          timestamps: baseline.timestamp,
-          values: replaceNonFiniteWithCurrent(baseline.upper_bound,
-            showRules ? timeseries.current : timeseries.value),
-          type: 'line',
-          color: 'screenshot-bounds'
-        };
-      }
+      // build upper and lower bounds, as relevant
+      buildBounds(series, baseline, timeseries, showRules);
 
-      if (baseline && !_.isEmpty(baseline.lower_bound)) {
-        series['lowerBound'] = {
-          timestamps: baseline.timestamp,
-          values: replaceNonFiniteWithCurrent(baseline.lower_bound,
-            showRules ? timeseries.current : timeseries.value),
-          type: 'line',
-          color: 'screenshot-bounds'
-        };
-      }
       // build set of anomalous values (newer of 2 sets of anomalies)
       if (!_.isEmpty(filteredAnomaliesCurrent) && timeseries && !_.isEmpty(series.Current)) {
         const valuesCurrent = [];

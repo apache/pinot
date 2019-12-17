@@ -20,7 +20,7 @@ import { getFormattedDuration,
 } from 'thirdeye-frontend/utils/anomaly';
 import RSVP from "rsvp";
 import fetch from 'fetch';
-import { checkStatus, humanizeFloat, stripNonFiniteValues } from 'thirdeye-frontend/utils/utils';
+import { checkStatus, humanizeFloat, buildBounds } from 'thirdeye-frontend/utils/utils';
 import columns from 'thirdeye-frontend/shared/anomaliesTableColumns';
 import moment from 'moment';
 import _ from 'lodash';
@@ -166,23 +166,7 @@ export default Component.extend({
         };
       }
 
-      if (predicted && !_.isEmpty(predicted.upper_bound)) {
-        series['Upper and lower bound'] = {
-          timestamps: predicted.timestamp,
-          values: stripNonFiniteValues(predicted.upper_bound),
-          type: 'line',
-          color: 'screenshot-bounds'
-        };
-      }
-
-      if (predicted && !_.isEmpty(predicted.lower_bound)) {
-        series['lowerBound'] = {
-          timestamps: predicted.timestamp,
-          values: stripNonFiniteValues(predicted.lower_bound),
-          type: 'line',
-          color: 'screenshot-bounds'
-        };
-      }
+      buildBounds(series, predicted, current, true);
 
       return series;
     }
