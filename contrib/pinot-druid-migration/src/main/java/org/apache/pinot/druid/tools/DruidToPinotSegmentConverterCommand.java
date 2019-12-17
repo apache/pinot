@@ -117,7 +117,9 @@ public class DruidToPinotSegmentConverterCommand extends AbstractBaseAdminComman
       throws Exception {
     LOGGER.info("Executing command: {}", toString());
     File segment = new File(_druidSegmentPath);
+    boolean compressed = false;
     if (segment.getName().endsWith(".zip") || segment.getName().endsWith(".tar.gz")) {
+      compressed = true;
       segment = DruidSegmentUtils.uncompressSegmentFile(segment);
       _druidSegmentPath = segment.getPath();
     }
@@ -147,12 +149,14 @@ public class DruidToPinotSegmentConverterCommand extends AbstractBaseAdminComman
     driver.build();
 
     // Delete uncompressed segment from the input directory
-    String[] filenames = segment.list();
-    for (String f: filenames) {
-      File currentFile = new File(_druidSegmentPath, f);
-      currentFile.delete();
+    if (compressed) {
+      String[] filenames = segment.list();
+      for (String f: filenames) {
+        File currentFile = new File(_druidSegmentPath, f);
+        currentFile.delete();
+      }
+      segment.delete();
     }
-    segment.delete();
     return true;
   }
 }

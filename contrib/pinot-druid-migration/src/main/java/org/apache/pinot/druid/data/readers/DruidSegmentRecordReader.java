@@ -195,6 +195,7 @@ public class DruidSegmentRecordReader implements RecordReader {
         LOGGER.warn("Column {} is not in record; Ignoring column.", columnName);
       } else {
         if (druidColumnCapabilities.getType() == ValueType.COMPLEX) {
+          // TODO: Should this actually terminate the program, or should the column just be ignored?
           throw new IllegalArgumentException(
               String.format("Column %s: DruidSegmentRecordReader does not support complex metric columns.", columnName));
         }
