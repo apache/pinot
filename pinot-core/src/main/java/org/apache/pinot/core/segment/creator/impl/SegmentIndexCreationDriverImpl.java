@@ -66,6 +66,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.startree.hll.HllConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -127,7 +128,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         LOGGER.warn("Using class: {} to read segment, ignoring configured file format: {}", recordReaderClassName,
             fileFormat);
       }
-      return org.apache.pinot.spi.data.readers.RecordReaderFactory
+      return RecordReaderFactory
           .getRecordReaderByClass(recordReaderClassName, dataFile, schema, segmentGeneratorConfig.getReaderConfig());
     }
 

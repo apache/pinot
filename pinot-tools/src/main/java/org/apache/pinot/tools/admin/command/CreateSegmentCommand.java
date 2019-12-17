@@ -34,6 +34,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.pinot.csv.data.readers.CSVRecordReader;
+import org.apache.pinot.csv.data.readers.CSVRecordReaderConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.segment.ReadMode;
@@ -404,7 +406,6 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
               dataDirPath.getFileSystem(new Configuration()).copyToLocalFile(dataFilePath, localFilePath);
               config.setInputFilePath(localFile);
               config.setSegmentName(_segmentName + "_" + segCnt);
-              config.loadConfigFiles();
 
               final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
               switch (config.getFormat()) {
@@ -417,6 +418,12 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
                   RecordReader orcRecordReader = new ORCRecordReader();
                   orcRecordReader.init(new File(localFile), Schema.fromFile(new File(_schemaFile)), null);
                   driver.init(config, orcRecordReader);
+                  break;
+                case CSV:
+                  RecordReader csvRecordReader = new CSVRecordReader();
+                  CSVRecordReaderConfig readerConfig = JsonUtils.fileToObject(new File(_readerConfigFile), CSVRecordReaderConfig.class);
+                  csvRecordReader.init(new File(localFile), Schema.fromFile(new File(_schemaFile)), readerConfig);
+                  driver.init(config, csvRecordReader);
                   break;
                 default:
                   driver.init(config);
