@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.lang.ref.SoftReference;
 import java.nio.ByteBuffer;
@@ -31,8 +32,9 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
   public static final Logger LOGGER = LoggerFactory.getLogger(BitmapInvertedIndexReader.class);
 
   private final int _numBitmaps;
-  private volatile SoftReference<SoftReference<ImmutableRoaringBitmap>[]> _bitmaps = null;
   private final PinotDataBuffer _buffer;
+
+  private volatile SoftReference<SoftReference<ImmutableRoaringBitmap>[]> _bitmaps = null;
 
   /**
    * Constructs an inverted index with the specified size.
@@ -45,7 +47,9 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
     _buffer = indexDataBuffer;
 
     final int lastOffset = _buffer.getInt(_numBitmaps * Integer.BYTES);
-    assert lastOffset == _buffer.size();
+    Preconditions.checkState(lastOffset == _buffer.size(),
+        "The last offset should be equal to buffer size! Current lastOffset: " + lastOffset + ", buffer size: "
+            + _buffer.size());
   }
 
   /**
