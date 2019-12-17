@@ -144,7 +144,6 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-json</artifactId>
       <version>${project.version}</version>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
