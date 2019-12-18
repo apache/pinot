@@ -48,8 +48,9 @@ public class PinotFSFactory {
     try {
       LOGGER.info("Initializing PinotFS for scheme {}, classname {}", scheme, fsClassName);
       PinotFS pinotFS = PluginManager.get().createInstance(fsClassName);
-      pinotFS.init(configuration);
-      _fileSystemMap.put(scheme, pinotFS);
+      PinotFSDelegator delegator = new PinotFSDelegator(pinotFS);
+      delegator.init(configuration);
+      _fileSystemMap.put(scheme, delegator);
     } catch (Exception e) {
       LOGGER.error("Could not instantiate file system for class {} with scheme {}", fsClassName, scheme, e);
       throw new RuntimeException(e);

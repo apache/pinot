@@ -33,29 +33,21 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.pinot.common.utils.retry.RetryPolicies;
-import org.apache.pinot.common.utils.retry.RetryPolicy;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.HadoopSegmentOperations.HADOOP_CONF_PATH;
-import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.HadoopSegmentOperations.KEYTAB;
-import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.HadoopSegmentOperations.PRINCIPAL;
-import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.RETRY;
-import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.RETRY_DEFAULT;
-import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.RETRY_WAITIME_MS;
-import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.RETRY_WAITIME_MS_DEFAULT;
-
 
 /**
  * Implementation of PinotFS for the Hadoop Filesystem
  */
 public class HadoopPinotFS extends PinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(HadoopPinotFS.class);
+
+  private static final String PRINCIPAL = "hadoop.kerberos.principle";
+  private static final String KEYTAB = "hadoop.kerberos.keytab";
+  private static final String HADOOP_CONF_PATH = "hadoop.conf.path";
+
   private org.apache.hadoop.fs.FileSystem _hadoopFS = null;
-  private int _retryCount = RETRY_DEFAULT;
-  private int _retryWaitMs = RETRY_WAITIME_MS_DEFAULT;
   private org.apache.hadoop.conf.Configuration _hadoopConf;
 
   public HadoopPinotFS() {
@@ -65,8 +57,6 @@ public class HadoopPinotFS extends PinotFS {
   @Override
   public void init(Configuration config) {
     try {
-      _retryCount = config.getInt(RETRY, _retryCount);
-      _retryWaitMs = config.getInt(RETRY_WAITIME_MS, _retryWaitMs);
       _hadoopConf = getConf(config.getString(HADOOP_CONF_PATH));
       authenticate(_hadoopConf, config);
       _hadoopFS = org.apache.hadoop.fs.FileSystem.get(_hadoopConf);
@@ -93,7 +83,7 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  protected boolean doMove(URI srcUri, URI dstUri)
+  public boolean doMove(URI srcUri, URI dstUri)
       throws IOException {
     return _hadoopFS.rename(new Path(srcUri), new Path(dstUri));
   }
@@ -151,13 +141,14 @@ public class HadoopPinotFS extends PinotFS {
     return retArray;
   }
 
-  private List<FileStatus> listStatus(Path path, boolean recursive) throws IOException {
+  private List<FileStatus> listStatus(Path path, boolean recursive)
+      throws IOException {
     List<FileStatus> fileStatuses = new ArrayList<>();
     FileStatus[] files = _hadoopFS.listStatus(path);
     for (FileStatus file : files) {
       fileStatuses.add(file);
       if (file.isDirectory() && recursive) {
-        List<FileStatus> subFiles =listStatus(file.getPath(), true);
+        List<FileStatus> subFiles = listStatus(file.getPath(), true);
         fileStatuses.addAll(subFiles);
       }
     }
@@ -169,28 +160,19 @@ public class HadoopPinotFS extends PinotFS {
       throws Exception {
     LOGGER.debug("starting to fetch segment from hdfs");
     final String dstFilePath = dstFile.getAbsolutePath();
-    try {
-      final Path remoteFile = new Path(srcUri);
-      final Path localFile = new Path(dstFile.toURI());
 
-      RetryPolicy fixedDelayRetryPolicy = RetryPolicies.fixedDelayRetryPolicy(_retryCount, _retryWaitMs);
-      fixedDelayRetryPolicy.attempt(() -> {
-        try {
-          if (_hadoopFS == null) {
-            throw new RuntimeException("_hadoopFS client is not initialized when trying to copy files");
-          }
-          long startMs = System.currentTimeMillis();
-          _hadoopFS.copyToLocalFile(remoteFile, localFile);
-          LOGGER.debug("copied {} from hdfs to {} in local for size {}, take {} ms", srcUri, dstFilePath,
-              dstFile.length(), System.currentTimeMillis() - startMs);
-          return true;
-        } catch (IOException e) {
-          LOGGER.warn("failed to fetch segment {} from hdfs, might retry", srcUri, e);
-          return false;
-        }
-      });
-    } catch (Exception e) {
-      LOGGER.error("failed to fetch {} from hdfs to local {}", srcUri, dstFilePath, e);
+    final Path remoteFile = new Path(srcUri);
+    final Path localFile = new Path(dstFile.toURI());
+    try {
+      if (_hadoopFS == null) {
+        throw new RuntimeException("_hadoopFS client is not initialized when trying to copy files");
+      }
+      long startMs = System.currentTimeMillis();
+      _hadoopFS.copyToLocalFile(remoteFile, localFile);
+      LOGGER.debug("copied {} from hdfs to {} in local for size {}, take {} ms", srcUri, dstFilePath, dstFile.length(),
+          System.currentTimeMillis() - startMs);
+    } catch (IOException e) {
+      LOGGER.warn("failed to fetch segment {} from hdfs, might retry", srcUri, e);
       throw e;
     }
   }

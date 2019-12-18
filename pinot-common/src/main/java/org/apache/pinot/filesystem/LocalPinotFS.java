@@ -70,7 +70,7 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
-  protected boolean doMove(URI srcUri, URI dstUri)
+  public boolean doMove(URI srcUri, URI dstUri)
       throws IOException {
     File srcFile = toFile(srcUri);
     File dstFile = toFile(dstUri);

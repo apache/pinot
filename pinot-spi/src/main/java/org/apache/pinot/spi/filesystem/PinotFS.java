@@ -111,7 +111,7 @@ public abstract class PinotFS implements Closeable {
   /**
    * Does the actual behavior of move in each FS.
    */
-  protected abstract boolean doMove(URI srcUri, URI dstUri)
+  public abstract boolean doMove(URI srcUri, URI dstUri)
       throws IOException;
 
   /**
