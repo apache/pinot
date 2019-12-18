@@ -22,7 +22,7 @@ import com.google.common.base.Function;
 import javax.annotation.Nullable;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.utils.helix.HelixHelper;
-import org.apache.pinot.common.utils.retry.RetryPolicies;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

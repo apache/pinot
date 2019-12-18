@@ -16,23 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.filesystem;
+package org.apache.pinot.spi.filesystem;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.common.utils.retry.RetryPolicies;
-import org.apache.pinot.common.utils.retry.RetryPolicy;
-import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.RETRY;
-import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.RETRY_DEFAULT;
-import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.RETRY_WAITIME_MS;
-import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.RETRY_WAITIME_MS_DEFAULT;
 
 
 public class PinotFSDelegator extends PinotFS {
@@ -40,8 +34,8 @@ public class PinotFSDelegator extends PinotFS {
 
   private PinotFS _pinotFS;
 
-  private int _retryCount = RETRY_DEFAULT;
-  private int _retryWaitMs = RETRY_WAITIME_MS_DEFAULT;
+  private int _retryCount = PinotFS.SegmentOperations.RETRY_DEFAULT;
+  private int _retryWaitMs = PinotFS.SegmentOperations.RETRY_WAITIME_MS_DEFAULT;
 
   PinotFSDelegator(PinotFS pinotFS) {
 
@@ -50,8 +44,8 @@ public class PinotFSDelegator extends PinotFS {
 
   @Override
   public void init(Configuration config) {
-    _retryCount = config.getInt(RETRY, _retryCount);
-    _retryWaitMs = config.getInt(RETRY_WAITIME_MS, _retryWaitMs);
+    _retryCount = config.getInt(PinotFS.SegmentOperations.RETRY, _retryCount);
+    _retryWaitMs = config.getInt(PinotFS.SegmentOperations.RETRY_WAITIME_MS, _retryWaitMs);
     _pinotFS.init(config);
   }
 

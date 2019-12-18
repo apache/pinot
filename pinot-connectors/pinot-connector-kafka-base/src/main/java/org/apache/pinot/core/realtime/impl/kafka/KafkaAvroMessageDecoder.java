@@ -39,7 +39,7 @@ import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.common.utils.retry.RetryPolicies;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.realtime.stream.AvroRecordToPinotRowGenerator;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;

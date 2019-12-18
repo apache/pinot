@@ -24,7 +24,7 @@ import java.util.Collections;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.spi.filesystem.PinotFS;
-import org.apache.pinot.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 
 
 public class PinotFSSegmentFetcher implements SegmentFetcher {

@@ -16,24 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils.retry;
+package org.apache.pinot.spi.utils.retry;
 
 import java.util.concurrent.Callable;
 
 
 /**
- * Retry policy, encapsulating the logic needed to retry an operation until it succeeds.
+ * The <code>AttemptFailureException</code> indicates that the {@link RetryPolicy#attempt(Callable)} failed because of
+ * either operation throwing an exception or running out of attempts.
  */
-public interface RetryPolicy {
+public class AttemptFailureException extends Exception {
 
-  /**
-   * Attempts to do the operation until it succeeds, aborting if an exception is thrown by the operation or number of
-   * attempts exhausted.
-   *
-   * @param operation The operation to attempt, which returns true on success and false on failure.
-   * @throws AttemptsExceededException
-   * @throws RetriableOperationException
-   */
-  void attempt(Callable<Boolean> operation)
-      throws AttemptsExceededException, RetriableOperationException;
+  public AttemptFailureException(String message) {
+    super(message);
+  }
+
+  public AttemptFailureException(Throwable cause) {
+    super(cause);
+  }
 }

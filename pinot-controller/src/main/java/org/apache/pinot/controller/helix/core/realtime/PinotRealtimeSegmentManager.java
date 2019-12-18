@@ -51,7 +51,7 @@ import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
-import org.apache.pinot.common.utils.retry.RetryPolicies;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;

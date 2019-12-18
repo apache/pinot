@@ -72,7 +72,7 @@ import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.metadata.DefaultMetadataExtractor;
 import org.apache.pinot.core.metadata.MetadataExtractorFactory;
-import org.apache.pinot.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.crypt.NoOpPinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;

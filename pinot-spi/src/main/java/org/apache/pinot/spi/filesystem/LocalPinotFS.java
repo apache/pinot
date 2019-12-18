@@ -16,22 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.filesystem;
+package org.apache.pinot.spi.filesystem;
 
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
+import java.net.URLDecoder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.URIUtils;
-import org.apache.pinot.spi.filesystem.PinotFS;
 
 
 /**
@@ -156,7 +156,11 @@ public class LocalPinotFS extends PinotFS {
   private static File toFile(URI uri) {
     // NOTE: Do not use new File(uri) because scheme might not exist and it does not decode '+' to ' '
     //       Do not use uri.getPath() because it does not decode '+' to ' '
-    return new File(URIUtils.decode(uri.getRawPath()));
+    try {
+      return new File(URLDecoder.decode(uri.getRawPath(), "UTF-8"));
+    } catch (UnsupportedEncodingException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private static void copy(File srcFile, File dstFile)

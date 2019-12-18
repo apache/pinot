@@ -46,7 +46,7 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
-import org.apache.pinot.common.utils.retry.RetryPolicies;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.PinotZKChanger;
 import org.kohsuke.args4j.CmdLineException;

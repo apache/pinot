@@ -370,12 +370,4 @@ public class CommonConstants {
     @Deprecated
     public static final String TABLE_NAME = "segment.table.name";
   }
-
-  public static class SegmentOperations {
-
-    public static final String RETRY = "retry.count";
-    public static final int RETRY_DEFAULT = 3;
-    public static final String RETRY_WAITIME_MS = "retry.wait.ms";
-    public static final int RETRY_WAITIME_MS_DEFAULT = 100;
-  }
 }

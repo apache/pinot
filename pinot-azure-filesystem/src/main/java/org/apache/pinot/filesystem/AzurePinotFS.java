@@ -55,10 +55,10 @@ public class AzurePinotFS extends PinotFS {
   private static final int BUFFER_SIZE = 4096;
   private ADLStoreClient _adlStoreClient;
   private static final String[] EMPTY_ARR = new String[0];
-  private static final String ACCOUNT_ID = "accountId";
-  private static final String AUTH_ENDPOINT = "authEndpoint";
-  private static final String CLIENT_ID = "clientId";
-  private static final String CLIENT_SECRET = "clientSecret";
+  public static final String ACCOUNT_ID = "accountId";
+  public static final String AUTH_ENDPOINT = "authEndpoint";
+  public static final String CLIENT_ID = "clientId";
+  public static final String CLIENT_SECRET = "clientSecret";
 
   public AzurePinotFS() {
 
