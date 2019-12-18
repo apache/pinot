@@ -99,8 +99,8 @@ public class PinotFSDelegator extends PinotFS {
       try {
         long startMs = System.currentTimeMillis();
         _pinotFS.copyToLocalFile(srcUri, dstFile);
-        LOGGER.debug("copied {} to {},  size {}, took {} ms", srcUri, dstFile,
-            dstFile.length(), System.currentTimeMillis() - startMs);
+        LOGGER.debug("copied {} to {},  size {}, took {} ms", srcUri, dstFile, dstFile.length(),
+            System.currentTimeMillis() - startMs);
 
         return true;
       } catch (Exception e) {
@@ -137,5 +137,9 @@ public class PinotFSDelegator extends PinotFS {
   public InputStream open(URI uri)
       throws IOException {
     return _pinotFS.open(uri);
+  }
+
+  public PinotFS getUnderlyingPinotFS() {
+    return _pinotFS;
   }
 }
