@@ -37,6 +37,10 @@
   </properties>
 
   <dependencies>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-avro</artifactId>
+    </dependency>
     <!-- test -->
     <dependency>
       <groupId>org.testng</groupId>
