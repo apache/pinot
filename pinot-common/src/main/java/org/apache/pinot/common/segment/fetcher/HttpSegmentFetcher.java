@@ -25,14 +25,11 @@ import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.filesystem.PinotFS.SegmentOperations.RETRY;
-import static org.apache.pinot.spi.filesystem.PinotFS.SegmentOperations.RETRY_DEFAULT;
-import static org.apache.pinot.spi.filesystem.PinotFS.SegmentOperations.RETRY_WAITIME_MS;
-import static org.apache.pinot.spi.filesystem.PinotFS.SegmentOperations.RETRY_WAITIME_MS_DEFAULT;
 
 
 public class HttpSegmentFetcher implements SegmentFetcher {
@@ -45,8 +42,8 @@ public class HttpSegmentFetcher implements SegmentFetcher {
   @Override
   public void init(Configuration configs) {
     initHttpClient(configs);
-    _retryCount = configs.getInt(RETRY, RETRY_DEFAULT);
-    _retryWaitMs = configs.getInt(RETRY_WAITIME_MS, RETRY_WAITIME_MS_DEFAULT);
+    _retryCount = configs.getInt(PinotFS.Constants.RETRY, PinotFS.Constants.RETRY_DEFAULT);
+    _retryWaitMs = configs.getInt(PinotFS.Constants.RETRY_WAITIME_MS, PinotFS.Constants.RETRY_WAITIME_MS_DEFAULT);
   }
 
   protected void initHttpClient(Configuration configs) {

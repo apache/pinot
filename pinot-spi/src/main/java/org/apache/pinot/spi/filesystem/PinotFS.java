@@ -231,7 +231,7 @@ public abstract class PinotFS implements Closeable {
 
   }
 
-  public static class SegmentOperations {
+  public static class Constants {
 
     public static final String RETRY = "retry.count";
     public static final int RETRY_DEFAULT = 3;

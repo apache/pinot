@@ -34,8 +34,8 @@ public class PinotFSDelegator extends PinotFS {
 
   private PinotFS _pinotFS;
 
-  private int _retryCount = PinotFS.SegmentOperations.RETRY_DEFAULT;
-  private int _retryWaitMs = PinotFS.SegmentOperations.RETRY_WAITIME_MS_DEFAULT;
+  private int _retryCount = Constants.RETRY_DEFAULT;
+  private int _retryWaitMs = Constants.RETRY_WAITIME_MS_DEFAULT;
 
   PinotFSDelegator(PinotFS pinotFS) {
 
@@ -44,8 +44,8 @@ public class PinotFSDelegator extends PinotFS {
 
   @Override
   public void init(Configuration config) {
-    _retryCount = config.getInt(PinotFS.SegmentOperations.RETRY, _retryCount);
-    _retryWaitMs = config.getInt(PinotFS.SegmentOperations.RETRY_WAITIME_MS, _retryWaitMs);
+    _retryCount = config.getInt(Constants.RETRY, _retryCount);
+    _retryWaitMs = config.getInt(Constants.RETRY_WAITIME_MS, _retryWaitMs);
     _pinotFS.init(config);
   }
 
