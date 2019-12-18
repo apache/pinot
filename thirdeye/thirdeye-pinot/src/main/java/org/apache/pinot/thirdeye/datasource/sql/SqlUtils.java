@@ -38,6 +38,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.time.DateUtils;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
@@ -333,8 +334,8 @@ public class SqlUtils {
     // don't enable this piece of code for non-Presto datasets, since we haven't done
     // enough analysis on their performance.
     if (sourceName.equals(PRESTO)) {
-      String startTime = getCeilingAlignedStartDateTimeString(start, dataGranularityMillis, timeFormat);
-      String endTime = getFloorAlignedEndDateTimeString(endExclusive, dataGranularityMillis, timeFormat);
+      String startTime = getCeilingAlignedStartDateTimeString(start, dataGranularity, timeFormat);
+      String endTime = getFloorAlignedEndDateTimeString(endExclusive, dataGranularity, timeFormat);
 
       // we may need to consider how the user is storing their data. does it matter
       // if they are keeping their time field as string vs long? '20191204' vs 20191204.
@@ -362,18 +363,18 @@ public class SqlUtils {
    * @param dateTime datetime
    * @return formatted string, aligned to upper bound
    */
-  public static String getCeilingAlignedStartDateTimeString(DateTime dateTime, long dataGranularityMillis, String timeFormat) {
-    long distanceToNextGranularityBoundary = dateTime.getMillis() % dataGranularityMillis;
+  public static String getCeilingAlignedStartDateTimeString(DateTime dateTime, TimeGranularity granularity, String timeFormat) {
 
-    // if the date isn't a perfect multiple of the granularity, then we need to shift the given date to the next granularity.
-    // but if the date is a perfect multiple, we don't need to shift because the start is inclusive.
-    // e.g. 1 day granularity, 12/02/2019 0:00 doesn't need to shift, but 12/02/2019 12:00 needs to shift to 12/03/2019 0:00
-    if (distanceToNextGranularityBoundary == 0) {
-      distanceToNextGranularityBoundary = dataGranularityMillis - (dateTime.getMillis() % dataGranularityMillis);
+    // TODO: figure out how to round to granularity, since it can be something like 2 DAYS
+    DateTime alignedDateTime = getDateGranularityProperty(dateTime, granularity).roundCeilingCopy();
+
+    /*
+        We need to add 1 granularity to imitate ceiling function since Joda time only offers half rounding.
+     */
+    if (alignedDateTime.isBefore(dateTime)) {
+      alignedDateTime = alignedDateTime.plus(granularity.toMillis());
     }
 
-    // Round up
-    DateTime alignedDateTime = dateTime.withPeriodAdded(new Period(distanceToNextGranularityBoundary), 1);
     return DateTimeFormat.forPattern(timeFormat).withOffsetParsed().print(alignedDateTime);
   }
 
@@ -382,18 +383,39 @@ public class SqlUtils {
    * @param dateTime datetime
    * @return formatted string, aligned to lower bound
    */
-  public static String getFloorAlignedEndDateTimeString(DateTime dateTime, long dataGranularityMillis, String timeFormat) {
-    long distanceToNextGranularityBoundary = dateTime.getMillis() % dataGranularityMillis;
+  public static String getFloorAlignedEndDateTimeString(DateTime dateTime, TimeGranularity granularity, String timeFormat) {
 
-    // if the date is a perfect multiple of the granularity, subtract one whole granularity instead.
-    // e.g. 1 day granularity, 12/03/2019 0:00 needs to become 12/02/2019 0:00 instead to main exclusive end.
-    if (distanceToNextGranularityBoundary == 0) {
-      distanceToNextGranularityBoundary = dataGranularityMillis;
+    // TODO: figure out how to round to granularity, since it can be something like 2 DAYS
+    DateTime alignedDateTime = getDateGranularityProperty(dateTime, granularity).roundFloorCopy();
+
+    /*
+        There are two cases where we need to subtract one:
+        1. The date time is an exact factor of the data granularity.
+        2. The rounded time is greater than the original time. Joda time only offers
+           this type of rounding, so we need to subtract 1 granularity to get absolute
+     */
+    if (alignedDateTime.equals(dateTime) || alignedDateTime.isAfter(dateTime)) {
+      alignedDateTime = alignedDateTime.minus(granularity.toMillis());
     }
 
-    // Round down, since the end date is exclusive.
-    DateTime alignedDateTime = dateTime.withPeriodAdded(new Period(distanceToNextGranularityBoundary), -1);
     return DateTimeFormat.forPattern(timeFormat).withOffsetParsed().print(alignedDateTime);
+  }
+
+  public static DateTime.Property getDateGranularityProperty(DateTime dateTime, TimeGranularity granularity) {
+    switch(granularity.getUnit()) {
+      case DAYS:
+        return dateTime.dayOfMonth();
+      case HOURS:
+        return dateTime.hourOfDay();
+      case MINUTES:
+        return dateTime.minuteOfHour();
+      case SECONDS:
+        return dateTime.secondOfMinute();
+      case MILLISECONDS:
+        return dateTime.millisOfSecond();
+    }
+
+    return null;
   }
 
   /**

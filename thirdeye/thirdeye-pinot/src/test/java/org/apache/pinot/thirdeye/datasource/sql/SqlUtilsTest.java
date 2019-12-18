@@ -43,7 +43,7 @@ public class SqlUtilsTest {
 
   @BeforeMethod
   public void beforeMethod() {
-    dateTime = DateTimeFormat.forPattern("mm/DD/yyyy").parseDateTime("01/01/2000").withZone(DateTimeZone.forID("US/Pacific"));
+    dateTime = DateTimeFormat.forPattern("MM/dd/yyyy HH:mm:ss").parseDateTime("01/01/2000 00:00:00").withZone(DateTimeZone.forID("America/Los_Angeles"));
   }
 
   @AfterMethod
@@ -57,7 +57,7 @@ public class SqlUtilsTest {
   @Test
   public void testGetCeilingAlignedStartDateTimeStringWithPerfectFactorDailyGranularity() {
     Assert.assertEquals(
-        SqlUtils.getCeilingAlignedStartDateTimeString(dateTime, dailyGranularity.toMillis(), dailyTimeFormat),
+        SqlUtils.getCeilingAlignedStartDateTimeString(dateTime, dailyGranularity, dailyTimeFormat),
         "20000101");
   }
 
@@ -66,7 +66,7 @@ public class SqlUtilsTest {
   public void testGetCeilingAlignedStartDateTimeStringWithoutPerfectFactorDailyGranularity() {
     addHalfStep();
     Assert.assertEquals(
-        SqlUtils.getCeilingAlignedStartDateTimeString(dateTime, dailyGranularity.toMillis(), dailyTimeFormat),
+        SqlUtils.getCeilingAlignedStartDateTimeString(dateTime, dailyGranularity, dailyTimeFormat),
         "20000102");
   }
 
@@ -74,7 +74,7 @@ public class SqlUtilsTest {
   public void testGetFloorAlignedEndDateTimeStringWithPerfectFactorDailyGranularity() {
     // should be dateTime minus one full time granularity.
     Assert.assertEquals(
-        SqlUtils.getFloorAlignedEndDateTimeString(dateTime, dailyGranularity.toMillis(), dailyTimeFormat),
+        SqlUtils.getFloorAlignedEndDateTimeString(dateTime, dailyGranularity, dailyTimeFormat),
         "19991231");
   }
 
@@ -82,7 +82,7 @@ public class SqlUtilsTest {
   public void testGetFloorAlignedEndDateTimeStringWithoutPerfectFactorDailyGranularity() {
     addHalfStep();
     Assert.assertEquals(
-        SqlUtils.getFloorAlignedEndDateTimeString(dateTime, dailyGranularity.toMillis(), dailyTimeFormat),
+        SqlUtils.getFloorAlignedEndDateTimeString(dateTime, dailyGranularity, dailyTimeFormat),
         "20000101");
   }
 
