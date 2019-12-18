@@ -37,7 +37,6 @@ import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
-import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -83,10 +82,6 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   public void init(Map<String, String> props, Schema indexingSchema, String topicName)
       throws Exception {
     schemaRegistryUrls = parseSchemaRegistryUrls(props.get(SCHEMA_REGISTRY_REST_URL));
-
-    for (String schemaRegistryUrl : schemaRegistryUrls) {
-      StringUtils.chomp(schemaRegistryUrl, "/");
-    }
 
     String avroSchemaName = topicName;
     if (props.containsKey(SCHEMA_REGISTRY_SCHEMA_NAME) && props.get(SCHEMA_REGISTRY_SCHEMA_NAME) != null && !props

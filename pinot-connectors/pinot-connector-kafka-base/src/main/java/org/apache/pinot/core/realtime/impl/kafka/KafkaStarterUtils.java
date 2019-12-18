@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.ServiceLoader;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
@@ -30,7 +29,8 @@ import org.apache.pinot.spi.stream.StreamDataServerStartable;
 
 public class KafkaStarterUtils {
   public static final int DEFAULT_BROKER_ID = 0;
-  public static final String DEFAULT_ZK_STR = ZkStarter.DEFAULT_ZK_STR + "/kafka";
+  public static final int DEFAULT_ZK_TEST_PORT = 2191;
+  public static final String DEFAULT_ZK_STR = "localhost:" + DEFAULT_ZK_TEST_PORT + "/kafka";
   public static int DEFAULT_KAFKA_PORT = 19092;
   public static final String DEFAULT_KAFKA_BROKER = "localhost:" + DEFAULT_KAFKA_PORT;
 
