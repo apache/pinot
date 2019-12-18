@@ -346,13 +346,11 @@ public class DimensionWrapper extends DetectionPipeline {
         MapUtils.getLong(config.getProperties(), PROP_CACHE_PERIOD_LOOKBACK) : ThirdEyeUtils
         .getCachingPeriodLookback(dataset.bucketTimeGranularity());
 
-    long paddingBuffer = TimeUnit.DAYS.toMillis(1); // 100000
+    long paddingBuffer = TimeUnit.DAYS.toMillis(1);
     AnomalySlice anomalySlice = new AnomalySlice()
         .withDetectionId(this.config.getId())
         .withStart(startTime - cachingPeriodLookback - paddingBuffer)
         .withEnd(endTime + paddingBuffer);
-    //.withFilters(this.metricEntity.getFilters())
-    //.withDetectionCompNames(Collections.singletonList(this.detectorName));
     Multimap<AnomalySlice, MergedAnomalyResultDTO> warmUpResults = this.provider.fetchAnomalies(Collections.singleton(anomalySlice));
     LOG.info("Warmed up anomalies cache for detection {} with {} anomalies - start: {} end: {}", config.getId(),
         warmUpResults.values().size(), (startTime - cachingPeriodLookback), endTime);

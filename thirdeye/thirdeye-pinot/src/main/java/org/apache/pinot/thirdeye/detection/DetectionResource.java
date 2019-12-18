@@ -450,6 +450,7 @@ public class DetectionResource {
       @QueryParam("end") long end,
       @QueryParam("deleteExistingAnomaly") @DefaultValue("false") boolean deleteExistingAnomaly) throws Exception {
     Map<String, String> responseMessage = new HashMap<>();
+    long ts = System.currentTimeMillis();
     DetectionPipelineResult result;
     try {
       DetectionConfigDTO config = this.configDAO.findById(detectionId);
@@ -490,7 +491,9 @@ public class DetectionResource {
       return Response.serverError().entity(responseMessage).build();
     }
 
-    LOG.info("Replay detection pipeline {} generated {} anomalies.", detectionId, result.getAnomalies().size());
+    long duration = System.currentTimeMillis() - ts;
+    LOG.info("Replay detection pipeline {} generated {} anomalies and took {} millis.",
+        detectionId, result.getAnomalies().size(), duration);
     return Response.ok(result).build();
   }
 
