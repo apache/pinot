@@ -421,7 +421,10 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
                   break;
                 case CSV:
                   RecordReader csvRecordReader = new CSVRecordReader();
-                  CSVRecordReaderConfig readerConfig = JsonUtils.fileToObject(new File(_readerConfigFile), CSVRecordReaderConfig.class);
+                  CSVRecordReaderConfig readerConfig = null;
+                  if (_readerConfigFile != null) {
+                    readerConfig = JsonUtils.fileToObject(new File(_readerConfigFile), CSVRecordReaderConfig.class);
+                  }
                   csvRecordReader.init(new File(localFile), Schema.fromFile(new File(_schemaFile)), readerConfig);
                   driver.init(config, csvRecordReader);
                   break;
