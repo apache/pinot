@@ -46,6 +46,8 @@ import org.slf4j.LoggerFactory;
 public abstract class PinotFS implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFS.class);
 
+
+
   /**
    * Initializes the configurations specific to that filesystem. For instance, any security related parameters can be
    * initialized here and will not be logged.
@@ -111,7 +113,7 @@ public abstract class PinotFS implements Closeable {
   /**
    * Does the actual behavior of move in each FS.
    */
-  protected abstract boolean doMove(URI srcUri, URI dstUri)
+  public abstract boolean doMove(URI srcUri, URI dstUri)
       throws IOException;
 
   /**
@@ -227,5 +229,13 @@ public abstract class PinotFS implements Closeable {
   public void close()
       throws IOException {
 
+  }
+
+  public static class Constants {
+
+    public static final String RETRY = "retry.count";
+    public static final int RETRY_DEFAULT = 3;
+    public static final String RETRY_WAITIME_MS = "retry.wait.ms";
+    public static final int RETRY_WAITIME_MS_DEFAULT = 100;
   }
 }

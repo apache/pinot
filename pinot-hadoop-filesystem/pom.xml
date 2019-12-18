@@ -73,7 +73,8 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-common</artifactId>
+      <artifactId>pinot-spi</artifactId>
+      <scope>provided</scope>
     </dependency>
   </dependencies>
 </project>

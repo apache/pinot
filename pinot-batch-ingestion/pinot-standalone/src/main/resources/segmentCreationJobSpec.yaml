@@ -25,7 +25,7 @@ outputDirURI: 'file:///path/to/output'
 overwriteOutput: true
 pinotFSSpecs:
   - scheme: file
-    className: org.apache.pinot.filesystem.LocalPinotFS
+    className: org.apache.pinot.spi.filesystem.LocalPinotFS
 recordReaderSpec:
   dataFormat: 'parquet'
   className: 'org.apache.pinot.parquet.data.readers.ParquetRecordReader'

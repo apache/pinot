@@ -16,14 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.filesystem;
+package org.apache.pinot.spi.filesystem;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,8 +47,9 @@ public class PinotFSFactory {
     try {
       LOGGER.info("Initializing PinotFS for scheme {}, classname {}", scheme, fsClassName);
       PinotFS pinotFS = PluginManager.get().createInstance(fsClassName);
-      pinotFS.init(configuration);
-      _fileSystemMap.put(scheme, pinotFS);
+      PinotFSDelegator delegator = new PinotFSDelegator(pinotFS);
+      delegator.init(configuration);
+      _fileSystemMap.put(scheme, delegator);
     } catch (Exception e) {
       LOGGER.error("Could not instantiate file system for class {} with scheme {}", fsClassName, scheme, e);
       throw new RuntimeException(e);

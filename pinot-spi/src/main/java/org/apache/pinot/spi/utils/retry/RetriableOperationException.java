@@ -16,19 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils.retry;
+package org.apache.pinot.spi.utils.retry;
 
 /**
- * Retry policy without delay between attempts.
+ * The <code>RetriableOperationException</code> indicates that the retriable operation threw an exception.
  */
-public class NoDelayRetryPolicy extends BaseRetryPolicy {
+public class RetriableOperationException extends AttemptFailureException {
 
-  public NoDelayRetryPolicy(int maxNumAttempts) {
-    super(maxNumAttempts);
-  }
-
-  @Override
-  protected long getDelayMs(int currentAttempt) {
-    return 0L;
+  public RetriableOperationException(Throwable cause) {
+    super(cause);
   }
 }

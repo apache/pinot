@@ -16,22 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils.retry;
-
-import java.util.concurrent.Callable;
-
+package org.apache.pinot.spi.utils.retry;
 
 /**
- * The <code>AttemptFailureException</code> indicates that the {@link RetryPolicy#attempt(Callable)} failed because of
- * either operation throwing an exception or running out of attempts.
+ * The <code>AttemptsExceededException</code> indicates that the operation did not succeed within maximum number of
+ * attempts.
  */
-public class AttemptFailureException extends Exception {
+public class AttemptsExceededException extends AttemptFailureException {
 
-  public AttemptFailureException(String message) {
+  public AttemptsExceededException(String message) {
     super(message);
-  }
-
-  public AttemptFailureException(Throwable cause) {
-    super(cause);
   }
 }

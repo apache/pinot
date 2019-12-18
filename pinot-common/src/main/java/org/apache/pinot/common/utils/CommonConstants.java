@@ -370,24 +370,4 @@ public class CommonConstants {
     @Deprecated
     public static final String TABLE_NAME = "segment.table.name";
   }
-
-  public static class SegmentOperations {
-    public static class HadoopSegmentOperations {
-      public static final String PRINCIPAL = "hadoop.kerberos.principle";
-      public static final String KEYTAB = "hadoop.kerberos.keytab";
-      public static final String HADOOP_CONF_PATH = "hadoop.conf.path";
-    }
-
-    public static class AzureSegmentOperations {
-      public static final String ACCOUNT_ID = "accountId";
-      public static final String AUTH_ENDPOINT = "authEndpoint";
-      public static final String CLIENT_ID = "clientId";
-      public static final String CLIENT_SECRET = "clientSecret";
-    }
-
-    public static final String RETRY = "retry.count";
-    public static final int RETRY_DEFAULT = 3;
-    public static final String RETRY_WAITIME_MS = "retry.wait.ms";
-    public static final int RETRY_WAITIME_MS_DEFAULT = 100;
-  }
 }

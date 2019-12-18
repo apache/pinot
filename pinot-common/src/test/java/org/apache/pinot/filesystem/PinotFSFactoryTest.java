@@ -25,7 +25,10 @@ import java.lang.reflect.Constructor;
 import java.net.URI;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSDelegator;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -46,7 +49,9 @@ public class PinotFSFactoryTest {
   @Test
   public void testDefaultPinotFSFactory() {
     _pinotFSFactory.init(new PropertiesConfiguration());
-    Assert.assertTrue(_pinotFSFactory.create("file") instanceof LocalPinotFS);
+    PinotFS pinotFS = _pinotFSFactory.create("file");
+    Assert.assertTrue(pinotFS instanceof PinotFSDelegator);
+    Assert.assertTrue(((PinotFSDelegator)pinotFS).getUnderlyingPinotFS() instanceof LocalPinotFS);
   }
 
   @Test
@@ -57,10 +62,15 @@ public class PinotFSFactoryTest {
     PinotFSFactory.init(config);
     PinotFS testPinotFS = PinotFSFactory.create("test");
 
-    Assert.assertTrue(testPinotFS instanceof TestPinotFS);
-    Assert.assertEquals(((TestPinotFS) testPinotFS).getInitCalled(), 1);
+    Assert.assertTrue(testPinotFS instanceof PinotFSDelegator);
+    PinotFS actualFS = ((PinotFSDelegator)testPinotFS).getUnderlyingPinotFS();
+    Assert.assertTrue( actualFS instanceof TestPinotFS);
+    Assert.assertEquals(((TestPinotFS) actualFS).getInitCalled(), 1);
 
-    Assert.assertTrue(PinotFSFactory.create("file") instanceof LocalPinotFS);
+    PinotFS fileFS = PinotFSFactory.create("file");
+    Assert.assertTrue(fileFS instanceof PinotFSDelegator);
+    actualFS = ((PinotFSDelegator)fileFS).getUnderlyingPinotFS();
+    Assert.assertTrue(actualFS instanceof LocalPinotFS);
   }
 
   public static class TestPinotFS extends PinotFS {

@@ -16,15 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils.retry;
+package org.apache.pinot.spi.utils.retry;
 
 /**
- * The <code>AttemptsExceededException</code> indicates that the operation did not succeed within maximum number of
- * attempts.
+ * Retry policy without delay between attempts.
  */
-public class AttemptsExceededException extends AttemptFailureException {
+public class NoDelayRetryPolicy extends BaseRetryPolicy {
 
-  public AttemptsExceededException(String message) {
-    super(message);
+  public NoDelayRetryPolicy(int maxNumAttempts) {
+    super(maxNumAttempts);
+  }
+
+  @Override
+  protected long getDelayMs(int currentAttempt) {
+    return 0L;
   }
 }

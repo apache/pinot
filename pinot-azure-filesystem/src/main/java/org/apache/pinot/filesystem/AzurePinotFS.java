@@ -41,7 +41,6 @@ import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,6 +55,10 @@ public class AzurePinotFS extends PinotFS {
   private static final int BUFFER_SIZE = 4096;
   private ADLStoreClient _adlStoreClient;
   private static final String[] EMPTY_ARR = new String[0];
+  public static final String ACCOUNT_ID = "accountId";
+  public static final String AUTH_ENDPOINT = "authEndpoint";
+  public static final String CLIENT_ID = "clientId";
+  public static final String CLIENT_SECRET = "clientSecret";
 
   public AzurePinotFS() {
 
@@ -69,14 +72,14 @@ public class AzurePinotFS extends PinotFS {
   @Override
   public void init(Configuration config) {
     // The ADL account id. Example: {@code mystore.azuredatalakestore.net}.
-    String account = config.getString(CommonConstants.SegmentOperations.AzureSegmentOperations.ACCOUNT_ID);
+    String account = config.getString(ACCOUNT_ID);
     // The endpoint that should be used for authentication.
     // Usually of the form {@code https://login.microsoftonline.com/<tenant-id>/oauth2/token}.
-    String authEndpoint = config.getString(CommonConstants.SegmentOperations.AzureSegmentOperations.AUTH_ENDPOINT);
+    String authEndpoint = config.getString(AUTH_ENDPOINT);
     // The clientId used to authenticate this application
-    String clientId = config.getString(CommonConstants.SegmentOperations.AzureSegmentOperations.CLIENT_ID);
+    String clientId = config.getString(CLIENT_ID);
     // The secret key used to authenticate this application
-    String clientSecret = config.getString(CommonConstants.SegmentOperations.AzureSegmentOperations.CLIENT_SECRET);
+    String clientSecret = config.getString(CLIENT_SECRET);
 
     AccessTokenProvider tokenProvider = new ClientCredsTokenProvider(authEndpoint, clientId, clientSecret);
     _adlStoreClient = ADLStoreClient.createClient(account, tokenProvider);
@@ -99,7 +102,7 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  protected boolean doMove(URI srcUri, URI dstUri)
+  public boolean doMove(URI srcUri, URI dstUri)
       throws IOException {
     return _adlStoreClient.rename(srcUri.getPath(), dstUri.getPath());
   }

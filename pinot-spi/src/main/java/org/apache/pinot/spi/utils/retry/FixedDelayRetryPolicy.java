@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils.retry;
+package org.apache.pinot.spi.utils.retry;
 
 /**
  * Delay policy with fixed delay between attempts.

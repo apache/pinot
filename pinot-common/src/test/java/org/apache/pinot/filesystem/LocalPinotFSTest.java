@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
