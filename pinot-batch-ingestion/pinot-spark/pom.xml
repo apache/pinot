@@ -124,6 +124,10 @@
           <groupId>org.apache.pinot</groupId>
           <artifactId>pinot-core</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>com.thoughtworks.paranamer</groupId>
+          <artifactId>paranamer</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>

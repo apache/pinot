@@ -36,7 +36,6 @@ import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.avro.data.readers.AvroUtils;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
@@ -620,36 +619,7 @@ public class SegmentGeneratorConfig {
     return getQualifyingFields(FieldType.METRIC, true);
   }
 
-  /**
-   * @deprecated Load outside the class and use the setter for schema setting.
-   * @throws IOException
-   */
-  @Deprecated
-  public void loadConfigFiles()
-      throws IOException {
-    Schema schema;
-    if (_schemaFile != null) {
-      schema = Schema.fromFile(new File(_schemaFile));
-      setSchema(schema);
-    } else if (_format == FileFormat.AVRO) {
-      schema = AvroUtils.getPinotSchemaFromAvroDataFile(new File(_inputFilePath));
-      setSchema(schema);
-    } else {
-      throw new RuntimeException("Input format " + _format + " requires schema.");
-    }
-
-    if (_readerConfigFile != null) {
-      try {
-        setReaderConfig(RecordReaderFactory.getRecordReaderConfig(FileFormat.CSV, _readerConfigFile));
-      } catch (IOException e) {
-        throw e;
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }
-  }
-
-  @JsonIgnore
+   @JsonIgnore
   public String getDimensions() {
     return getQualifyingFields(FieldType.DIMENSION, true);
   }
