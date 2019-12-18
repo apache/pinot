@@ -57,15 +57,16 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    SegmentCompletionProtocol.Response segmentCommitUploadResponse =
-        _protocolHandler.segmentCommitUpload(_params, segmentTarFile, _controllerVipUrl);
-    if (!segmentCommitUploadResponse.getStatus()
-        .equals(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS)) {
-      _segmentLogger.warn("Segment upload failed with response {}", segmentCommitUploadResponse.toJsonString());
-      return SegmentCompletionProtocol.RESP_FAILED;
-    }
+    if (_indexLoadingConfig.isEnableSegmentUploadToController()) {
+      SegmentCompletionProtocol.Response segmentCommitUploadResponse =
+          _protocolHandler.segmentCommitUpload(_params, segmentTarFile, _controllerVipUrl);
+      if (!segmentCommitUploadResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS)) {
+        _segmentLogger.warn("Segment upload failed with response {}", segmentCommitUploadResponse.toJsonString());
+        return SegmentCompletionProtocol.RESP_FAILED;
+      }
 
-    _params.withSegmentLocation(segmentCommitUploadResponse.getSegmentLocation());
+      _params.withSegmentLocation(segmentCommitUploadResponse.getSegmentLocation());
+    }
 
     SegmentCompletionProtocol.Response commitEndResponse;
     if (_indexLoadingConfig.isEnableSplitCommitEndWithMetadata()) {

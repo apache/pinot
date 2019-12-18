@@ -24,7 +24,6 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import com.yammer.metrics.core.Meter;
 import java.io.File;
 import java.io.IOException;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -37,6 +36,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -45,8 +46,6 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.NetUtil;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
 import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
@@ -65,7 +64,6 @@ import org.apache.pinot.spi.config.CompletionConfig;
 import org.apache.pinot.spi.config.IndexingConfig;
 import org.apache.pinot.spi.config.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.TableConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
@@ -806,13 +804,19 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (!segTarFile.exists()) {
       throw new RuntimeException("Segment file does not exist:" + segTarFileName);
     }
+    // Set the flag to true to prevent the server delete the segment for upload after receiving OFFLINE->ONLINE
+    // message from helix.
+    _waitingForUploadToSegmentStore = true;
     SegmentCompletionProtocol.Response commitResponse = commit(controllerVipUrl, isSplitCommit);
 
     if (!commitResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
       return false;
     }
-    // Asynchronously upload the segment file to Pinot FS for backup.
-    uploadSegmentToSegmentStore(segTarFile);
+    // Asynchronously upload the segment file to Pinot FS for backup. The upload result does not change the segment
+    // completion protocol flow.
+    if (!_indexLoadingConfig.isEnableSegmentUploadToController()) {
+      uploadSegmentToSegmentStore(segTarFile);
+    }
     // Reset the flag regardless of the upload results and this means the tar file is free to be removed.
     _waitingForUploadToSegmentStore = false;
     _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
@@ -826,7 +830,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     params.withSegmentName(_segmentNameStr).withOffset(_currentOffset).withNumRows(_numRowsConsumed)
         .withInstanceId(_instanceId).withBuildTimeMillis(_segmentBuildDescriptor.getBuildTimeMillis())
         .withSegmentSizeBytes(_segmentBuildDescriptor.getSegmentSizeBytes())
-        .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis());
+        .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis())
+        .withSegmentUploadToController(_indexLoadingConfig.isEnableSegmentUploadToController());
+
+    // When the server does not upload the segment to controller, it will upload the segment tar file to a predefined
+    // segment store location. Thus there is no need to wait for the segment upload to finish.
+    if (!_indexLoadingConfig.isEnableSegmentUploadToController()) {
+      params.withSegmentLocation(StringUtil.join(File.separator,
+          _realtimeTableDataManager.getTableSegmentStoreRootDir(), _tableNameWithType,
+          new File(_segmentBuildDescriptor.getSegmentTarFilePath()).getName()));
+    }
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
