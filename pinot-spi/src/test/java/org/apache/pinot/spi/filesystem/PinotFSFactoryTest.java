@@ -16,61 +16,38 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.filesystem;
+package org.apache.pinot.spi.filesystem;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Constructor;
 import java.net.URI;
+import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.pinot.spi.filesystem.LocalPinotFS;
-import org.apache.pinot.spi.filesystem.PinotFS;
-import org.apache.pinot.spi.filesystem.PinotFSDelegator;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.testng.Assert;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
 public class PinotFSFactoryTest {
-  private PinotFSFactory _pinotFSFactory;
-
-  @BeforeMethod
-  public void setUp()
-      throws Exception {
-    // Use reflection to get a new segment fetcher factory
-    Constructor<PinotFSFactory> constructor = PinotFSFactory.class.getDeclaredConstructor();
-    constructor.setAccessible(true);
-    _pinotFSFactory = constructor.newInstance();
-  }
 
   @Test
   public void testDefaultPinotFSFactory() {
-    _pinotFSFactory.init(new PropertiesConfiguration());
-    PinotFS pinotFS = _pinotFSFactory.create("file");
-    Assert.assertTrue(pinotFS instanceof PinotFSDelegator);
-    Assert.assertTrue(((PinotFSDelegator)pinotFS).getUnderlyingPinotFS() instanceof LocalPinotFS);
+    PinotFSFactory.init(new BaseConfiguration());
+    Assert.assertTrue(PinotFSFactory.create("file") instanceof LocalPinotFS);
   }
 
   @Test
   public void testCustomizedSegmentFetcherFactory() {
-    Configuration config = new PropertiesConfiguration();
+    Configuration config = new BaseConfiguration();
     config.addProperty("class.file", LocalPinotFS.class.getName());
     config.addProperty("class.test", TestPinotFS.class.getName());
     PinotFSFactory.init(config);
+
     PinotFS testPinotFS = PinotFSFactory.create("test");
+    Assert.assertTrue(testPinotFS instanceof TestPinotFS);
+    Assert.assertEquals(((TestPinotFS) testPinotFS).getInitCalled(), 1);
 
-    Assert.assertTrue(testPinotFS instanceof PinotFSDelegator);
-    PinotFS actualFS = ((PinotFSDelegator)testPinotFS).getUnderlyingPinotFS();
-    Assert.assertTrue( actualFS instanceof TestPinotFS);
-    Assert.assertEquals(((TestPinotFS) actualFS).getInitCalled(), 1);
-
-    PinotFS fileFS = PinotFSFactory.create("file");
-    Assert.assertTrue(fileFS instanceof PinotFSDelegator);
-    actualFS = ((PinotFSDelegator)fileFS).getUnderlyingPinotFS();
-    Assert.assertTrue(actualFS instanceof LocalPinotFS);
+    Assert.assertTrue(PinotFSFactory.create("file") instanceof LocalPinotFS);
   }
 
   public static class TestPinotFS extends PinotFS {

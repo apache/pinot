@@ -37,9 +37,7 @@ import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.spi.utils.DataSize;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.ingestion.common.Constants;
 import org.apache.pinot.ingestion.common.PinotClusterSpec;
 import org.apache.pinot.ingestion.common.PinotFSSpec;
@@ -48,6 +46,8 @@ import org.apache.pinot.ingestion.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.ingestion.common.SegmentGenerationTaskSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.utils.DataSize;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

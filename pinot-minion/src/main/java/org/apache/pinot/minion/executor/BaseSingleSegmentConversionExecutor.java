@@ -33,10 +33,9 @@ import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.common.config.PinotTaskConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
-import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.slf4j.Logger;
@@ -92,8 +91,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       // Download the tarred segment file
       File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile");
       LOGGER.info("Downloading segment from {} to {}", downloadURL, tarredSegmentFile.getAbsolutePath());
-      SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(downloadURL)
-          .fetchSegmentToLocal(downloadURL, tarredSegmentFile);
+      SegmentFetcherFactory.fetchSegmentToLocal(downloadURL, tarredSegmentFile);
 
       // Un-tar the segment file
       File segmentDir = new File(tempDataDir, "segmentDir");
@@ -136,8 +134,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
           new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
               segmentZKMetadataCustomMapModifier.toJsonString());
 
-      List<Header> httpHeaders =
-          Arrays.asList(ifMatchHeader, segmentZKMetadataCustomMapModifierHeader);
+      List<Header> httpHeaders = Arrays.asList(ifMatchHeader, segmentZKMetadataCustomMapModifierHeader);
 
       // Set parameters for upload request.
       NameValuePair enableParallelPushProtectionParameter =

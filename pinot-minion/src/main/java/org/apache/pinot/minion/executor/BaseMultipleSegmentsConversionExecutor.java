@@ -31,9 +31,9 @@ import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.common.config.PinotTaskConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.slf4j.Logger;
@@ -87,8 +87,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         // Download the segment file
         File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile_" + i);
         LOGGER.info("Downloading segment from {} to {}", downloadURLs[i], tarredSegmentFile.getAbsolutePath());
-        SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(downloadURLs[i])
-            .fetchSegmentToLocal(downloadURLs[i], tarredSegmentFile);
+        SegmentFetcherFactory.fetchSegmentToLocal(downloadURLs[i], tarredSegmentFile);
 
         // Un-tar the segment file
         File segmentDir = new File(tempDataDir, "segmentDir_" + i);
@@ -139,9 +138,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             TableNameBuilder.extractRawTableName(tableNameWithType));
         List<NameValuePair> parameters = Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter);
 
-        SegmentConversionUtils
-            .uploadSegment(configs, null, parameters, tableNameWithType, resultSegmentName, uploadURL,
-                convertedTarredSegmentFile);
+        SegmentConversionUtils.uploadSegment(configs, null, parameters, tableNameWithType, resultSegmentName, uploadURL,
+            convertedTarredSegmentFile);
       }
 
       String outputSegmentNames = segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName)

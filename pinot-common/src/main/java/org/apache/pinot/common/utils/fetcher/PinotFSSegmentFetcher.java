@@ -16,42 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.segment.fetcher;
+package org.apache.pinot.common.utils.fetcher;
 
 import java.io.File;
 import java.net.URI;
-import java.util.Collections;
-import java.util.Set;
-import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 
 
-public class PinotFSSegmentFetcher implements SegmentFetcher {
-  private PinotFS _pinotFS;
+public class PinotFSSegmentFetcher extends BaseSegmentFetcher {
 
   @Override
-  public void init(Configuration config) {
-
-  }
-
-  @Override
-  public void fetchSegmentToLocal(String uriString, File tempFile)
+  protected void fetchSegmentToLocalWithoutRetry(URI uri, File dest)
       throws Exception {
-    URI uri = new URI(uriString);
-
-    // TODO: move _pinotFS creation to init, however, it needs the right config passed in into init.
-    _pinotFS = PinotFSFactory.create(uri.getScheme());
-    _pinotFS.copyToLocalFile(uri, tempFile);
-  }
-
-  /**
-   * Returns a list of config keys whose value should not be logged.
-   *
-   * @return List of protected config keys
-   */
-  @Override
-  public Set<String> getProtectedConfigKeys() {
-    return Collections.emptySet();
+    PinotFSFactory.create(uri.getScheme()).copyToLocalFile(uri, dest);
   }
 }

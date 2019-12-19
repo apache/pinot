@@ -28,16 +28,16 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.segment.SegmentMetadata;
-import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
 import org.apache.pinot.core.segment.index.loader.V3RemoveIndexException;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +60,7 @@ public class SegmentFetcherAndLoader {
     Configuration pinotCrypterConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
 
     PinotFSFactory.init(pinotFSConfig);
-    SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig);
+    SegmentFetcherFactory.init(segmentFetcherFactoryConfig);
     PinotCrypterFactory.init(pinotCrypterConfig);
   }
 
@@ -187,7 +187,7 @@ public class SegmentFetcherAndLoader {
     File tempTarFile = new File(tempDir, segmentName + TAR_GZ_SUFFIX);
     File tempSegmentDir = new File(tempDir, segmentName);
     try {
-      SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempDownloadFile);
+      SegmentFetcherFactory.fetchSegmentToLocal(uri, tempDownloadFile);
       if (crypter != null) {
         crypter.decrypt(tempDownloadFile, tempTarFile);
       } else {

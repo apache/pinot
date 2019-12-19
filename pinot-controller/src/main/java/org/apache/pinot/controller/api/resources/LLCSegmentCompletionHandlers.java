@@ -42,13 +42,14 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.slf4j.Logger;
@@ -493,7 +494,7 @@ public class LLCSegmentCompletionHandlers {
     File localTempFile =
         new File(ControllerFilePathProvider.getInstance().getFileUploadTempDir(), getTempSegmentFileName(segmentName));
     try {
-      PinotFSFactory.create(segmentFileURI.getScheme()).copyToLocalFile(segmentFileURI, localTempFile);
+      SegmentFetcherFactory.fetchSegmentToLocal(segmentFileURI, localTempFile);
       return extractMetadataFromLocalSegmentFile(localTempFile);
     } finally {
       FileUtils.deleteQuietly(localTempFile);

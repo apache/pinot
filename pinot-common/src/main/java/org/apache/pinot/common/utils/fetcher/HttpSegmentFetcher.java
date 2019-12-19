@@ -16,69 +16,51 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.segment.fetcher;
+package org.apache.pinot.common.utils.fetcher;
 
 import java.io.File;
 import java.net.URI;
-import java.util.Collections;
-import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
-
-public class HttpSegmentFetcher implements SegmentFetcher {
-  protected final Logger _logger = LoggerFactory.getLogger(getClass().getSimpleName());
-
+public class HttpSegmentFetcher extends BaseSegmentFetcher {
   protected FileUploadDownloadClient _httpClient;
-  protected int _retryCount;
-  protected int _retryWaitMs;
 
   @Override
-  public void init(Configuration configs) {
-    initHttpClient(configs);
-    _retryCount = configs.getInt(PinotFS.Constants.RETRY, PinotFS.Constants.RETRY_DEFAULT);
-    _retryWaitMs = configs.getInt(PinotFS.Constants.RETRY_WAITIME_MS, PinotFS.Constants.RETRY_WAITIME_MS_DEFAULT);
-  }
-
-  protected void initHttpClient(Configuration configs) {
+  protected void doInit(Configuration config) {
     _httpClient = new FileUploadDownloadClient();
   }
 
   @Override
-  public void fetchSegmentToLocal(final String uri, final File tempFile)
+  public void fetchSegmentToLocal(URI uri, File dest)
       throws Exception {
-    RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, 5).attempt(() -> {
+    RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
       try {
-        int statusCode = _httpClient.downloadFile(new URI(uri), tempFile);
-        _logger.info("Downloaded file from: {} to: {}; Length of downloaded file: {}; Response status code: {}", uri,
-            tempFile, tempFile.length(), statusCode);
+        int statusCode = _httpClient.downloadFile(uri, dest);
+        _logger
+            .info("Downloaded segment from: {} to: {} of size: {}; Response status code: {}", uri, dest, dest.length(),
+                statusCode);
         return true;
       } catch (HttpErrorStatusException e) {
         int statusCode = e.getStatusCode();
         if (statusCode >= 500) {
           // Temporary exception
-          _logger.warn("Caught temporary exception while downloading file from: {}, will retry", uri, e);
+          _logger.warn("Got temporary error status code: {} while downloading segment from: {} to: {}", statusCode, uri,
+              dest, e);
           return false;
         } else {
           // Permanent exception
-          _logger.error("Caught permanent exception while downloading file from: {}, won't retry", uri, e);
+          _logger.error("Got permanent error status code: {} while downloading segment from: {} to: {}, won't retry",
+              statusCode, uri, dest, e);
           throw e;
         }
       } catch (Exception e) {
-        _logger.warn("Caught temporary exception while downloading file from: {}, will retry", uri, e);
+        _logger.warn("Caught exception while downloading segment from: {} to: {}", uri, dest, e);
         return false;
       }
     });
-  }
-
-  @Override
-  public Set<String> getProtectedConfigKeys() {
-    return Collections.emptySet();
   }
 }
