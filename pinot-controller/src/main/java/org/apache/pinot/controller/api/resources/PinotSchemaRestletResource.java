@@ -245,9 +245,13 @@ public class PinotSchemaRestletResource {
       LOGGER.info("Notifying metadata event for updating schema: {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.UPDATE);
       return new SuccessResponse(schema.getSchemaName() + " successfully added");
-    } catch (SchemaNotFoundException | TableNotFoundException e) {
+    } catch (SchemaNotFoundException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      throw new ControllerApplicationException(LOGGER, String.format("Failed to update schema %s", schemaName),
+      throw new ControllerApplicationException(LOGGER, String.format("Failed to find schema %s", schemaName),
+          Response.Status.NOT_FOUND, e);
+    } catch (TableNotFoundException e) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
+      throw new ControllerApplicationException(LOGGER, String.format("Failed to find table %s to reload", schemaName),
           Response.Status.NOT_FOUND, e);
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
