@@ -80,6 +80,7 @@ public class PinotFSFactory {
     if (pinotFS == null) {
       throw new RuntimeException("Pinot file system not configured for scheme: " + scheme);
     }
+    LOGGER.info("PinotFS for schema {} initialized: {}", scheme, pinotFS.getClass());
     return pinotFS;
   }
 
