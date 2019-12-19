@@ -986,12 +986,8 @@ public class PinotHelixResourceManager {
     } else if (reload) {
       LOGGER.info("Reloading tables with name: {}", schemaName);
       List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
-      if (tableNamesWithType.isEmpty()) {
-        LOGGER.warn("Found no tables with name {}", schemaName);
-      } else {
-        for (String tableNameWithType : tableNamesWithType) {
-          reloadAllSegments(tableNameWithType);
-        }
+      for (String tableNameWithType : tableNamesWithType) {
+        reloadAllSegments(tableNameWithType);
       }
     }
   }

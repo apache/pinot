@@ -43,6 +43,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
@@ -244,7 +245,7 @@ public class PinotSchemaRestletResource {
       LOGGER.info("Notifying metadata event for updating schema: {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.UPDATE);
       return new SuccessResponse(schema.getSchemaName() + " successfully added");
-    } catch (SchemaNotFoundException e) {
+    } catch (SchemaNotFoundException | TableNotFoundException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER, String.format("Failed to update schema %s", schemaName),
           Response.Status.NOT_FOUND, e);
