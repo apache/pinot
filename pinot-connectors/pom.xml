@@ -46,6 +46,12 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-spi</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <!--
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
       <scope>provided</scope>
       <exclusions>
@@ -66,6 +72,7 @@
         </exclusion>
       </exclusions>
     </dependency>
+    -->
 
     <!-- test -->
     <dependency>
