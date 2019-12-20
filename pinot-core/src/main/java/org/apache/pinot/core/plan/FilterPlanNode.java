@@ -119,7 +119,7 @@ public class FilterPlanNode implements PlanNode {
         DataSource dataSource = segment.getDataSource(filterQueryTree.getColumn());
         ImmutableRoaringBitmap nullBitmap = dataSource.getNullValueVector().getNullBitmap();
         boolean exclusive = (type == Predicate.Type.IS_NOT_NULL);
-        return new BitmapBasedFilterOperator(new ImmutableRoaringBitmap[]{nullBitmap}, 0, numDocs-1, exclusive);
+        return new BitmapBasedFilterOperator(new ImmutableRoaringBitmap[]{nullBitmap}, 0, numDocs - 1, exclusive);
       }
 
       TransformExpressionTree expression = filterQueryTree.getExpression();
