@@ -50,10 +50,9 @@ public class IsNullPredicateAstNode extends PredicateAstNode {
       throw new Pql2CompilationException("Function not supported in IS predicate");
     } else if (childNode instanceof LiteralAstNode) {
       throw new Pql2CompilationException("Constants not supported in IS predicate");
+    } else {
+      super.addChild(childNode);
     }
-
-    // Add the child nonetheless
-    super.addChild(childNode);
   }
 
   @Override

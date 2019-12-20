@@ -16,34 +16,39 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.impl.nullvalue;
+package org.apache.pinot.core.realtime.impl;
 
-import org.apache.pinot.core.realtime.impl.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
- * Defines a real-time null value vector to be used in realtime ingestion.
+ * Helper wrapper class for {@link MutableRoaringBitmap} to make it thread-safe.
  */
-public class RealtimeNullValueVectorReaderWriter implements NullValueVectorReader {
-  private final ThreadSafeMutableRoaringBitmap _nullBitmap;
+public class ThreadSafeMutableRoaringBitmap {
+  private MutableRoaringBitmap _mutableRoaringBitmap;
 
-  public RealtimeNullValueVectorReaderWriter() {
-    _nullBitmap = new ThreadSafeMutableRoaringBitmap();
+  public ThreadSafeMutableRoaringBitmap() {
+    _mutableRoaringBitmap = new MutableRoaringBitmap();
   }
 
-  public void setNull(int docId) {
-    _nullBitmap.checkAndAdd(docId);
+  public ThreadSafeMutableRoaringBitmap(int firstDocId) {
+    _mutableRoaringBitmap = new MutableRoaringBitmap();
+    _mutableRoaringBitmap.add(firstDocId);
   }
 
-  public boolean isNull(int docId) {
-    return _nullBitmap.contains(docId);
+  public void checkAndAdd(int docId) {
+    if (!_mutableRoaringBitmap.contains(docId)) {
+      synchronized (this) {
+        _mutableRoaringBitmap.add(docId);
+      }
+    }
   }
 
-  @Override
-  public ImmutableRoaringBitmap getNullBitmap() {
-    return _nullBitmap.getMutableRoaringBitmap();
+  public boolean contains(int docId) {
+    return _mutableRoaringBitmap.contains(docId);
+  }
+
+  public synchronized MutableRoaringBitmap getMutableRoaringBitmap() {
+    return _mutableRoaringBitmap.clone();
   }
 }

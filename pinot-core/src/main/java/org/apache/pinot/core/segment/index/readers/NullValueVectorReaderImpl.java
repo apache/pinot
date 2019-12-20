@@ -38,6 +38,6 @@ public class NullValueVectorReaderImpl implements NullValueVectorReader {
 
   @Override
   public ImmutableRoaringBitmap getNullBitmap() {
-    return _nullBitmap.clone();
+    return _nullBitmap;
   }
 }

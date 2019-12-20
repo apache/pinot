@@ -118,7 +118,7 @@ public class FilterPlanNode implements PlanNode {
       if (type.equals(Predicate.Type.IS_NULL) || type.equals(Predicate.Type.IS_NOT_NULL)) {
         DataSource dataSource = segment.getDataSource(filterQueryTree.getColumn());
         ImmutableRoaringBitmap nullBitmap = dataSource.getNullValueVector().getNullBitmap();
-        boolean exclusive = (type == Predicate.Type.IS_NULL) ? false : true;
+        boolean exclusive = (type == Predicate.Type.IS_NOT_NULL);
         return new BitmapBasedFilterOperator(new ImmutableRoaringBitmap[]{nullBitmap}, 0, numDocs-1, exclusive);
       }
 
