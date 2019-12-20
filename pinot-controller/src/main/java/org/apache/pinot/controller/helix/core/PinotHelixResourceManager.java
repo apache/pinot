@@ -71,8 +71,8 @@ import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.config.Tenant;
 import org.apache.pinot.common.config.TenantConfig;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfigUtils;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
@@ -91,9 +91,8 @@ import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
-import org.apache.pinot.spi.utils.retry.RetryPolicies;
-import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.resources.ControllerApplicationException;
 import org.apache.pinot.controller.api.resources.StateType;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -104,7 +103,10 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -940,12 +942,54 @@ public class PinotHelixResourceManager {
   /**
    * Schema APIs
    */
-  public void addOrUpdateSchema(Schema schema) {
+  public void addSchema(Schema schema, boolean override) {
     ZNRecord record = SchemaUtils.toZNRecord(schema);
-    String name = schema.getSchemaName();
+    String schemaName = schema.getSchemaName();
+    Schema oldSchema = ZKMetadataProvider.getSchema(_propertyStore, schemaName);
+
+    if (oldSchema != null && !override) {
+      throw new RuntimeException(String.format("Schema %s exists. Not overriding it as requested.", schemaName));
+    }
+
+    if (schema.equals(oldSchema)) {
+      LOGGER.info("New schema is the same with the existing schema. Not updating schema " + schemaName);
+      return;
+    }
+
     PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
         PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore);
-    propertyStoreHelper.set(name, record);
+    propertyStoreHelper.set(schemaName, record);
+  }
+
+  public void updateSchema(Schema schema, boolean reload)
+      throws TableNotFoundException, SchemaNotFoundException {
+    ZNRecord record = SchemaUtils.toZNRecord(schema);
+    String schemaName = schema.getSchemaName();
+    Schema oldSchema = ZKMetadataProvider.getSchema(_propertyStore, schemaName);
+
+    if (oldSchema == null) {
+      throw new SchemaNotFoundException(String.format("Schema %s did not exist.", schemaName));
+    }
+
+    if (schema.equals(oldSchema)) {
+      LOGGER.info("New schema is the same with the existing schema. Not updating schema " + schemaName);
+      return;
+    }
+
+    PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
+        PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore);
+    propertyStoreHelper.set(schemaName, record);
+
+    boolean isNewSchemaBackwardCompatible = schema.isBackwardCompatibleWith(oldSchema);
+    if (!isNewSchemaBackwardCompatible) {
+      LOGGER.warn(String.format("New schema %s is not backward compatible", schemaName));
+    } else if (reload) {
+      LOGGER.info("Reloading tables with name: {}", schemaName);
+      List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
+      for (String tableNameWithType : tableNamesWithType) {
+        reloadAllSegments(tableNameWithType);
+      }
+    }
   }
 
   /**
@@ -2177,6 +2221,54 @@ public class PinotHelixResourceManager {
       endpointToInstance.put(instance, instanceAdminEndpoint);
     }
     return endpointToInstance;
+  }
+
+  /**
+   * Helper method to return a list of tables that exists and matches the given table name and type, or throws
+   * {@link ControllerApplicationException} if no table found.
+   * <p>When table type is <code>null</code>, try to match both OFFLINE and REALTIME table.
+   *
+   * @param tableName Table name with or without type suffix
+   * @param tableType Table type
+   * @return List of existing table names with type suffix
+   */
+  public List<String> getExistingTableNamesWithType(String tableName, @Nullable TableType tableType)
+      throws TableNotFoundException {
+    List<String> tableNamesWithType = new ArrayList<>(2);
+
+    TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
+    if (tableTypeFromTableName != null) {
+      // Table name has type suffix
+
+      if (tableType != null && tableType != tableTypeFromTableName) {
+        throw new IllegalArgumentException("Table name: " + tableName + " does not match table type: " + tableType);
+      }
+
+      if (getTableConfig(tableName) != null) {
+        tableNamesWithType.add(tableName);
+      }
+    } else {
+      // Raw table name
+
+      if (tableType == null || tableType == TableType.OFFLINE) {
+        String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+        if (getTableConfig(offlineTableName) != null) {
+          tableNamesWithType.add(offlineTableName);
+        }
+      }
+      if (tableType == null || tableType == TableType.REALTIME) {
+        String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+        if (getTableConfig(realtimeTableName) != null) {
+          tableNamesWithType.add(realtimeTableName);
+        }
+      }
+    }
+
+    if (tableNamesWithType.isEmpty()) {
+      throw new TableNotFoundException(tableNamesWithType + " not found.");
+    }
+
+    return tableNamesWithType;
   }
 
   /*

@@ -617,6 +617,30 @@ public final class Schema {
         .isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs);
   }
 
+  /**
+   * Check whether the current schema is backward compatible with oldSchema.
+   * Backward compatibility requires all columns and fieldSpec in oldSchema should be retained.
+   *
+   * @param oldSchema old schema
+   * @return
+   */
+
+  public boolean isBackwardCompatibleWith(Schema oldSchema) {
+    if (!EqualityUtils.isEqual(_timeFieldSpec, oldSchema.getTimeFieldSpec()) || !EqualityUtils
+        .isEqual(_dateTimeFieldSpecs, oldSchema.getDateTimeFieldSpecs())) {
+      return false;
+    }
+    for (Map.Entry<String, FieldSpec> entry : oldSchema.getFieldSpecMap().entrySet()) {
+      if (!getColumnNames().contains(entry.getKey())) {
+        return false;
+      }
+      if (!getFieldSpecFor(entry.getKey()).equals(entry.getValue())) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   @Override
   public int hashCode() {
     int result = EqualityUtils.hashCodeOf(_schemaName);
