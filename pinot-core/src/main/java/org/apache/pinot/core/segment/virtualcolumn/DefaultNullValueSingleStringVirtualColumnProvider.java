@@ -19,11 +19,10 @@
 package org.apache.pinot.core.segment.virtualcolumn;
 
 /**
- * Virtual column provider that contains the current segment name.
+ * Provide the default null value as a single string.
  */
-public class SegmentNameVirtualColumnProvider extends SingleStringVirtualColumnProvider {
-  @Override
+public class DefaultNullValueSingleStringVirtualColumnProvider extends SingleStringVirtualColumnProvider {
   protected String getValue(VirtualColumnContext context) {
-    return context.getSegmentName();
+    return context.getFieldSpec().getDefaultNullValue().toString();
   }
 }
