@@ -16,28 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.index.readers;
+package org.apache.pinot.core.common.predicate;
 
-import java.io.IOException;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.apache.pinot.core.common.Predicate;
 
 
-public class NullValueVectorReaderImpl implements NullValueVectorReader {
-
-  private final ImmutableRoaringBitmap _nullBitmap;
-
-  public NullValueVectorReaderImpl(PinotDataBuffer nullValueVectorBuffer) throws IOException {
-    _nullBitmap = new ImmutableRoaringBitmap(nullValueVectorBuffer.toDirectByteBuffer(0,
-        (int) nullValueVectorBuffer.size()));
-  }
-
-  public boolean isNull(int docId) {
-    return _nullBitmap.contains(docId);
+public class IsNotNullPredicate extends Predicate {
+  public IsNotNullPredicate(String column) {
+    super(column, Type.IS_NOT_NULL, null);
   }
 
   @Override
-  public ImmutableRoaringBitmap getNullBitmap() {
-    return _nullBitmap.clone();
+  public String toString() {
+    return "Predicate: type: " + getType() + ", left : " + getLhs() + "\n";
   }
 }

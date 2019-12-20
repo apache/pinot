@@ -16,16 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.pql.parsers.pql2.ast;
+package org.apache.pinot.core.common.predicate;
 
-import org.apache.pinot.pql.parsers.Pql2CompilationException;
+import org.apache.pinot.core.common.Predicate;
 
 
-/**
- * AST node for IS predicates (foo IS NULL, foo IS NOT NULL).
- */
-public class IsPredicateAstNode extends BaseAstNode {
-  public IsPredicateAstNode() {
-    throw new Pql2CompilationException("IS predicate is not supported");
+public class IsNullPredicate extends Predicate {
+  public IsNullPredicate(String column) {
+    super(column, Type.IS_NULL, null);
+  }
+
+  @Override
+  public String toString() {
+    return "Predicate: type: " + getType() + ", left : " + getLhs() + "\n";
   }
 }

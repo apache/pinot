@@ -19,6 +19,7 @@
 package org.apache.pinot.core.realtime.impl.nullvalue;
 
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -38,5 +39,10 @@ public class RealtimeNullValueVectorReaderWriter implements NullValueVectorReade
 
   public boolean isNull(int docId) {
     return _nullBitmap.contains(docId);
+  }
+
+  @Override
+  public ImmutableRoaringBitmap getNullBitmap() {
+    return _nullBitmap.clone();
   }
 }
