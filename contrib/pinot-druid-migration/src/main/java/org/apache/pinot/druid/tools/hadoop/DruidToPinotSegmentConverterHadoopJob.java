@@ -19,27 +19,19 @@
 package org.apache.pinot.druid.tools.hadoop;
 
 import com.google.common.base.Preconditions;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.net.HttpURLConnection;
 import java.net.URI;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.filefilter.DirectoryFileFilter;
@@ -62,13 +54,9 @@ import org.apache.pinot.common.config.ColumnPartitionConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableTaskConfig;
 import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.druid.tools.DruidSegmentUtils;
 import org.apache.pinot.hadoop.job.BaseSegmentJob;
 import org.apache.pinot.hadoop.job.ControllerRestApi;
 import org.apache.pinot.hadoop.job.DefaultControllerRestApi;
@@ -78,6 +66,7 @@ import org.apache.pinot.hadoop.utils.PushLocation;
 
 
 public class DruidToPinotSegmentConverterHadoopJob extends BaseSegmentJob {
+  // Always assume APPEND because Druid segments will always have a timeSpec
   protected static final String APPEND = "APPEND";
 
   protected final Path _inputPattern;
@@ -125,52 +114,44 @@ public class DruidToPinotSegmentConverterHadoopJob extends BaseSegmentJob {
     _logger.info("*********************************************************************");
   }
 
-  protected boolean isDataFile(URI s) {
-    if (_properties.getProperty(JobConfigConstants.RECORD_READER_PATH) != null) {
-      return true;
-    }
+  public static boolean isDataFileHelper(String s) {
+    // TODO: Allow uncompressed segments (directories with all the expected Druid segment components)
     // Check that the Druid segment directory has all the expected components/files
-    File file = new File(s);
-    FileFileFilter fileFilter = new FileFileFilter()
-    {
-      @Override
-      public boolean accept(File pathname)
-      {
-        return pathname.exists()
-            && pathname.isFile();
-      }
-    };
-    DirectoryFileFilter dirFilter = new DirectoryFileFilter() {
-      @Override
-      public boolean accept(File pathname)
-      {
-        return pathname.exists()
-            && pathname.isDirectory();
-      }
-    };
-
-    if (file.getAbsoluteFile().exists()) {
-      File untaredInput = new File(file.getParentFile().getPath(), "untaredInput");
-      untaredInput.mkdir();
-      List<File> untaredFileList = new ArrayList<>();
-      try {
-        untaredFileList = TarGzCompressionUtils.unTar(file, untaredInput);
-      } catch (Exception e) {
-        e.printStackTrace();
-      }
-      File untaredInputFile = untaredFileList.get(0);
-
-      Collection<File> fileList = FileUtils.listFiles(untaredInputFile, fileFilter, dirFilter);
-
-      return fileList.stream().anyMatch(o -> o.getName().equals("meta.smoosh"))
-          && fileList.stream().anyMatch(o -> o.getName().equals("version.bin"));
-    }
-    return false;
+    // TODO: Implement this with file handling methods that can be run on Hadoop
+    //    An attempt is commented out below
+//    File file = new File(s);
+//    FileFileFilter fileFilter = new FileFileFilter()
+//    {
+//      @Override
+//      public boolean accept(File pathname)
+//      {
+//        return pathname.exists()
+//            && pathname.isFile();
+//      }
+//    };
+//    DirectoryFileFilter dirFilter = new DirectoryFileFilter() {
+//      @Override
+//      public boolean accept(File pathname)
+//      {
+//        return pathname.exists()
+//            && pathname.isDirectory();
+//      }
+//    };
+//
+//    if (file.getAbsoluteFile().exists()) {
+//      File uncompressedInputFile = DruidSegmentUtils.uncompressSegmentFile(file);
+//      Collection<File> fileList = FileUtils.listFiles(uncompressedInputFile, fileFilter, dirFilter);
+//
+//      return fileList.stream().anyMatch(o -> o.getName().equals("meta.smoosh"))
+//          && fileList.stream().anyMatch(o -> o.getName().equals("version.bin"));
+//    }
+    return true;
   }
 
   public void run()
       throws Exception {
     _logger.info("Starting {}", getClass().getSimpleName());
+
     // Initialize all directories
     _outputDirFileSystem = FileSystem.get(_outputDir.toUri(), _conf);
     JobPreparationHelper.mkdirs(_outputDirFileSystem, _outputDir, _defaultPermissionsMask);
@@ -213,15 +194,7 @@ public class DruidToPinotSegmentConverterHadoopJob extends BaseSegmentJob {
     columnPartitionConfigMap.put("longnum", columnPartitionConfig);
     SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(columnPartitionConfigMap);
 
-    // Create the table
-    TimeUnit timeUnit = getSchema().getOutgoingTimeUnit();
-    String timeUnitString = null;
-    if (timeUnit != null) {
-      timeUnitString = timeUnit.toString();
-    }
-    addOfflineTable(_rawTableName, getSchema().getTimeColumnName(), timeUnitString, null, null,
-        null, SegmentVersion.v3, null, null, null, segmentPartitionConfig, null);
-
+    // Set the table config
     TableConfig tableConfig = getTableConfig();
     if (tableConfig != null) {
       validateTableConfig(tableConfig);
@@ -269,86 +242,6 @@ public class DruidToPinotSegmentConverterHadoopJob extends BaseSegmentJob {
     return _pushLocations != null ? new DefaultControllerRestApi(_pushLocations, _rawTableName) : null;
   }
 
-  protected void addOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
-      String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
-      List<String> bloomFilterColumns, TableTaskConfig taskConfig, SegmentPartitionConfig segmentPartitionConfig,
-      String sortedColumn)
-      throws Exception {
-
-    // TODO: So far this only works if one host is specified in job.properties; does not handle comma-separated hosts
-    String controllerBaseApiUrl = "http://" +  _properties.get(JobConfigConstants.PUSH_TO_HOSTS) + ":"
-        + _properties.get(JobConfigConstants.PUSH_TO_PORT);
-
-    ControllerRequestURLBuilder controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(controllerBaseApiUrl);
-
-    TableConfig tableConfig = getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant,
-        loadMode, segmentVersion, invertedIndexColumns, bloomFilterColumns, taskConfig, segmentPartitionConfig,
-        sortedColumn, "daily");
-
-    sendPostRequest(controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
-  }
-
-  public static String sendPostRequest(String urlString, String payload)
-      throws IOException {
-    return sendPostRequest(urlString, payload, Collections.EMPTY_MAP);
-  }
-
-  public static String sendPostRequest(String urlString, String payload, Map<String, String> headers)
-      throws IOException {
-    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
-    httpConnection.setRequestMethod("POST");
-    if (headers != null) {
-      for (String key : headers.keySet()) {
-        httpConnection.setRequestProperty(key, headers.get(key));
-      }
-    }
-
-    if (payload != null && !payload.isEmpty()) {
-      httpConnection.setDoOutput(true);
-      try (BufferedWriter writer = new BufferedWriter(
-          new OutputStreamWriter(httpConnection.getOutputStream(), StandardCharsets.UTF_8))) {
-        writer.write(payload, 0, payload.length());
-        writer.flush();
-      }
-    }
-
-    return constructResponse(httpConnection.getInputStream());
-  }
-
-  private static String constructResponse(InputStream inputStream)
-      throws IOException {
-    try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-      StringBuilder responseBuilder = new StringBuilder();
-      String line;
-      while ((line = reader.readLine()) != null) {
-        responseBuilder.append(line);
-      }
-      return responseBuilder.toString();
-    }
-  }
-
-  private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,
-      String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
-      List<String> invertedIndexColumns, List<String> bloomFilterColumns, TableTaskConfig taskConfig,
-      SegmentPartitionConfig segmentPartitionConfig, String sortedColumn, String segmentPushFrequency) {
-    return new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE)
-        .setTableName(tableName)
-        .setTimeColumnName(timeColumnName)
-        .setTimeType(timeType)
-        .setSegmentPushFrequency(segmentPushFrequency)
-        .setNumReplicas(1)
-        .setBrokerTenant(brokerTenant)
-        .setServerTenant(serverTenant)
-        .setLoadMode(loadMode)
-        .setSegmentVersion(segmentVersion.toString())
-        .setInvertedIndexColumns(invertedIndexColumns)
-        .setBloomFilterColumns(bloomFilterColumns)
-        .setTaskConfig(taskConfig)
-        .setSegmentPartitionConfig(segmentPartitionConfig)
-        .build();
-  }
-
-
   protected Schema getSchema()
       throws IOException {
     try (InputStream inputStream = FileSystem.get(_schemaFile.toUri(), getConf()).open(_schemaFile)) {
@@ -383,7 +276,7 @@ public class DruidToPinotSegmentConverterHadoopJob extends BaseSegmentJob {
         if (path.getName().startsWith("_") || path.getName().startsWith(".")) {
           continue;
         }
-        if (isDataFile(path.toUri())) {
+        if (isDataFile(path.toString())) {
           tarFilePaths.add(path);
         }
       }
@@ -393,7 +286,7 @@ public class DruidToPinotSegmentConverterHadoopJob extends BaseSegmentJob {
   // Unused
   @Override
   protected boolean isDataFile(String fileName) {
-    return false;
+    return isDataFileHelper(fileName);
   }
 
   @Nullable
@@ -434,5 +327,26 @@ public class DruidToPinotSegmentConverterHadoopJob extends BaseSegmentJob {
 
   protected Class<? extends Mapper<LongWritable, Text, LongWritable, Text>> getMapperClass() {
     return DruidToPinotSegmentConverterMapper.class;
+  }
+
+  private static void printUsage() {
+    System.out.println("Usage: <job_properties_file> <OPTIONAL_path_to_table_config>");
+  }
+
+  public static void main(String[] args) {
+    if (args.length != 1) {
+      printUsage();
+    }
+    Properties jobConf;
+    try {
+      jobConf = new Properties();
+      jobConf.load(new FileInputStream(args[0]));
+      DruidToPinotSegmentConverterHadoopJob job = new DruidToPinotSegmentConverterHadoopJob(jobConf);
+      job.run();
+    } catch (Exception e) {
+      e.printStackTrace();
+      printUsage();
+      System.exit(1);
+    }
   }
 }

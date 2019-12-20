@@ -23,18 +23,18 @@
 This project, which can run both locally and on Hadoop, takes a Druid segment and uses it to generate a corresponding 
 Pinot segment.
 
-## Build
+##ConvertSegment Command Line Tool
+
+### Build
 To build the project:
 
 ```
 mvn clean install -DskipTests
 ```
 
+###Usage
+
 This will create `druid-to-pinot-migration-tool-jar-with-dependencies.jar` inside the `target` directory.
-
-##Tools
-
-###ConvertSegment
 
 Keep in mind that a Druid segment is comprised of multiple file components (`meta.smoosh`, `version.bin`, etc.) rather 
 than a single file. This tool works with both Druid segment directories and compressed Druid segment files (`.zip` and 
@@ -55,9 +55,11 @@ java -jar druid-to-pinot-segment-converter-jar-with-dependencies.jar ConvertSegm
 -outputPath <segment_output_path>
 ```
 
-###Segment Converter Hadoop Job _(Section unfinished)_
+*Backslashes and newlines are used for readability and ease of use; These commands can also be written all on one line.
 
-The `SegmentConverterHadoopJob` converts a Druid segment into a Pinot segment on Hadoop.
+##Segment Converter Hadoop Job
+
+The `SegmentConverterHadoopJob` converts Druid segments into Pinot segments on Hadoop.
 
 The Hadoop job for converting segments can only validate data in single files, and will do a recursive search for single
 data files if a directory path is given. 
@@ -70,20 +72,20 @@ Druid segments in storage are typically already compressed, but compression to a
 following command:
 
 ```
-tar -czvf name-of-newly-compressed-directory.tar.gz /path/to/directory-to-be-compressed
+$ tar -czvf name-of-newly-compressed-directory.tar.gz /path/to/directory-to-be-compressed
 ```
 
 The `ConvertSegmentHadoop` command also requires a job properties configuration file, such as one below:
 
 ```
-# path.to.input: Input path to the compressed Druid segment, or a directory containing multiple compressed Druid segments.
+# path.to.input: Input Hadoop path to the compressed Druid segment, or a directory containing multiple compressed Druid segments.
 path.to.input=/user/druid/segment/input/data.tar.gz
 
-# path.to.output: Output directory for the resulting Pinot segment
+# path.to.output: Output Hadoop directory for the resulting Pinot segment
 path.to.output=/user/druid/segment/output
 
 # path.to.schema: Pinot schema file for the table, stored locally
-path.to.schema=/user/pinot/schema.json
+path.to.schema=/User/pinot/schema.json
 
 # segment.table.name: Name of the table for which to generate segments
 segment.table.name=segment_name
@@ -101,14 +103,35 @@ push.to.port=9000
 ****Before running this command, please also make sure that the Pinot cluster is running on the host and port specified in 
 the job properties file, _AND_ make sure that a Pinot TableConfig has already been pushed to the cluster.**
 
-Finally, the  `ConvertSegmentHadoop` command is used as follows*:
+Finally, the  `ConvertSegmentHadoop` command is built and used as follows*:
 
+####Build
+
+The segment converter for Hadoop is built separately from the command line tool.
 
 ```
-java -jar druid-to-pinot-migration-tool-jar-with-dependencies.jar ConvertSegmentHadoop \
--jobProperties <path_to_job_properties_file> \
--pinotTableConfigPath <path_to_pinot_table_config>
+mvn clean install -DskipTests -Pbuild-shaded-jar
 ```
 
+This will create `druid-to-pinot-migration-HADOOP-JOB.jar` inside the `target` directory.
 
-*Backslashes and newlines are used for readability and ease of use; These commands can also be written all on one line.
+####Usage
+
+After building the tool, please run the following commands to ensure that `META-INF/license` and  `license` will not
+cause any issues:
+
+```
+zip -d druid-to-pinot-migration-HADOOP-JOB.jar META-INF/license/*
+zip -d druid-to-pinot-migration-HADOOP-JOB.jar license/*
+
+```
+
+Finally, with Hadoop running, the jar can be executed as follows:
+
+```
+hadoop jar druid-to-pinot-migration-HADOOP-JOB.jar job.properties
+```
+
+Once the Pinot segment has been created and moved to the output directory, you can use the 
+Pinot SegmentTarPush command located in `pinot-hadoop` to push the segment to the cluster using the
+same job properties file.

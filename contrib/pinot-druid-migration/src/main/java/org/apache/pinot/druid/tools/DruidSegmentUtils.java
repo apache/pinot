@@ -74,7 +74,7 @@ public class DruidSegmentUtils {
       } catch (IOException e) {
         e.printStackTrace();
       }
-    } else if (druidSegment.getName().endsWith("tar.gz")) {
+    } else if (druidSegment.getName().endsWith(".tar.gz")) {
       try {
         return TarGzCompressionUtils.unTar(druidSegment, uncompressedInput).get(0);
       } catch (Exception e) {

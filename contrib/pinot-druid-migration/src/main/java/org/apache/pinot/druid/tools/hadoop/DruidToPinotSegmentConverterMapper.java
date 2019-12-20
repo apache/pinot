@@ -21,10 +21,7 @@ package org.apache.pinot.druid.tools.hadoop;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
-import org.apache.commons.compress.archivers.ArchiveException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -46,6 +43,7 @@ import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.druid.data.readers.DruidSegmentRecordReader;
+import org.apache.pinot.druid.tools.DruidSegmentUtils;
 import org.apache.pinot.hadoop.job.JobConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -197,19 +195,12 @@ public class DruidToPinotSegmentConverterMapper extends Mapper<LongWritable, Tex
     FileSystem.get(hdfsInputFile.toUri(), _jobConf)
         .copyToLocalFile(hdfsInputFile, new Path(localInputFile.getAbsolutePath()));
 
-    File untaredInput = new File(_localInputDir, "untaredInput");
-    untaredInput.mkdir();
-    List<File> untaredFileList = new ArrayList<>();
-    try {
-      untaredFileList = TarGzCompressionUtils.unTar(localInputFile, untaredInput);
-    } catch (ArchiveException e) {
-      e.printStackTrace();
-    }
-    File untaredInputFile = untaredFileList.get(0);
+    // TODO: Allow uncompressed segments (directories with all the expected Druid segment components)
+    File uncompressedInputFile = DruidSegmentUtils.uncompressSegmentFile(localInputFile);
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, _schema);
     segmentGeneratorConfig.setTableName(_rawTableName);
-    segmentGeneratorConfig.setDataDir(untaredInputFile.getPath());
+    segmentGeneratorConfig.setDataDir(uncompressedInputFile.getPath());
     segmentGeneratorConfig.setOutDir(_localSegmentDir.getPath());
     segmentGeneratorConfig.setSegmentNameGenerator(_segmentNameGenerator);
     segmentGeneratorConfig.setSequenceId(sequenceId);
@@ -223,7 +214,7 @@ public class DruidToPinotSegmentConverterMapper extends Mapper<LongWritable, Tex
     progressReporterThread.setName(PROGRESS_REPORTER_THREAD_NAME);
     progressReporterThread.start();
     try {
-      driver.init(segmentGeneratorConfig, new DruidSegmentRecordReader(untaredInputFile, _schema));
+      driver.init(segmentGeneratorConfig, new DruidSegmentRecordReader(uncompressedInputFile, _schema));
       driver.build();
     } catch (Exception e) {
       _logger.error("Caught exception while creating segment with HDFS input file: {}, sequence id: {}", hdfsInputFile,

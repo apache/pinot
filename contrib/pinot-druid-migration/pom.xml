@@ -30,16 +30,77 @@
 
   <name>Pinot Druid Migration</name>
   <url>https://pinot.apache.org/</url>
+  <profiles>
+    <profile>
+      <id>build-shaded-jar</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <finalName>druid-to-pinot-migration-HADOOP-JOB</finalName>
+        <plugins>
+          <plugin>
+            <artifactId>maven-shade-plugin</artifactId>
+            <version>3.2.1</version>
+            <executions>
+              <execution>
+                <phase>package</phase>
+                <goals>
+                  <goal>shade</goal>
+                </goals>
+                <configuration>
+                  <!--
+                  Usually in hadoop environment, there are multiple jars with different versions.
+                  Most of the NoSuchMethodExceptions are caused by class loading conflicts.
+                  Class relocation ensures the reference of certain packages/classes in Pinot code to
+                  shaded libs, e.g. jackson or guava.
+                  Ref: https://maven.apache.org/plugins/maven-shade-plugin/examples/class-relocation.html
+                  -->
+                  <relocations>
+                    <relocation>
+                      <pattern>com.google.common.base</pattern>
+                      <shadedPattern>shaded.com.google.common.base</shadedPattern>
+                    </relocation>
+                    <relocation>
+                      <pattern>com.fasterxml.jackson</pattern>
+                      <shadedPattern>shaded.com.fasterxml.jackson</shadedPattern>
+                    </relocation>
+                  </relocations>
+                  <transformers>
+                    <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                    <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                      <mainClass>org.apache.pinot.druid.tools.hadoop.DruidToPinotSegmentConverterHadoopJob</mainClass>
+                    </transformer>
+                  </transformers>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
-      <version>0.2.0</version>
+      <version>${project.version}</version>
+      <classifier>shaded</classifier>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>
-      <version>0.2.0</version>
+      <version>${project.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>commons-lang</groupId>
+          <artifactId>commons-lang</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-common</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -52,11 +113,6 @@
       <version>0.2.0</version>
     </dependency>
     <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-integration-tests</artifactId>
-      <version>0.2.0</version>
-    </dependency>
-    <dependency>
       <groupId>org.apache.druid</groupId>
       <artifactId>druid-processing</artifactId>
       <version>0.17.0-incubating-SNAPSHOT</version>
@@ -65,6 +121,14 @@
       <groupId>org.apache.druid</groupId>
       <artifactId>druid-indexing-service</artifactId>
       <version>0.17.0-incubating-SNAPSHOT</version>
+    </dependency>
+    <!-- TODO: Change Hadoop to Hadoop 3. It had to be an older version to work on my computer.
+           Please verify that it works on later Hadoop versions.-->
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-client</artifactId>
+      <scope>provided</scope>
+      <version>2.7.0</version>
     </dependency>
     <dependency>
       <groupId>io.netty</groupId>
@@ -117,30 +181,30 @@
               <goal>single</goal>
             </goals>
           </execution>
-          <execution>
-            <id>build-pinot-druid-hadoop-job</id>
-            <configuration>
-              <descriptorRefs>
-                <descriptorRef>jar-with-dependencies</descriptorRef>
-              </descriptorRefs>
-              <archive>
-                <manifest>
-                  <mainClass>org.apache.pinot.druid.tools.hadoop.DruidToPinotSegmentConverterHadoopJob</mainClass>
-                </manifest>
-              </archive>
-              <finalName>druid-to-pinot-migration-HADOOP-JOB</finalName>
-            </configuration>
-            <phase>package</phase>
-            <goals>
-              <goal>single</goal>
-            </goals>
-          </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>2.3</version>
+        <configuration>
+          <createDependencyReducedPom>false</createDependencyReducedPom>
+          <filters>
+            <filter>
+              <artifact>*:*</artifact>
+              <excludes>
+                <exclude>META-INF/*.SF</exclude>
+                <exclude>META-INF/*.DSA</exclude>
+                <exclude>META-INF/*.RSA</exclude>
+              </excludes>
+            </filter>
+          </filters>
+        </configuration>
       </plugin>
     </plugins>
   </build>
 
-  <!-- dependencyManagement section added to resolve dependency convergence issues with Druid -->
+  <!-- dependencyManagement section added to resolve dependency convergence issues -->
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -157,6 +221,21 @@
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-core</artifactId>
         <version>2.9.8</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpclient</artifactId>
+        <version>4.2.5</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpcore</artifactId>
+        <version>4.4.6</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpmime</artifactId>
+        <version>4.5.3</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

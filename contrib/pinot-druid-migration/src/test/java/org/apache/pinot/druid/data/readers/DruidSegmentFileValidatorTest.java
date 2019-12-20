@@ -24,6 +24,8 @@ import org.apache.pinot.druid.tools.hadoop.DruidToPinotSegmentConverterHadoopJob
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+// TODO: Restructure these tests once isDataFile is properly implemented.
+//       The tests currently fail.
 public class DruidSegmentFileValidatorTest {
   private static final File TEST_TAR_GZ = new File(Preconditions
       .checkNotNull(DruidSegmentRecordReaderTest.class.getClassLoader().getResource("test_druid_all_types.tar.gz"))
@@ -41,19 +43,19 @@ public class DruidSegmentFileValidatorTest {
 
   @Test
   public void testTarGZValidation() {
-    boolean result = DruidToPinotSegmentConverterHadoopJob.isDataFile(TEST_TAR_GZ.toURI());
+    boolean result = DruidToPinotSegmentConverterHadoopJob.isDataFileHelper(TEST_TAR_GZ.getPath());
     Assert.assertTrue(result);
   }
 
   @Test
   public void testZipValidation() {
-    boolean result = DruidToPinotSegmentConverterHadoopJob.isDataFile(TEST_ZIP.toURI());
+    boolean result = DruidToPinotSegmentConverterHadoopJob.isDataFileHelper(TEST_ZIP.getPath());
     Assert.assertTrue(result);
   }
 
   @Test
   public void testValidationFalse() {
-    boolean result = DruidToPinotSegmentConverterHadoopJob.isDataFile(TEST_TAR_GZ_MISSING_FILE.toURI());
+    boolean result = DruidToPinotSegmentConverterHadoopJob.isDataFileHelper(TEST_TAR_GZ_MISSING_FILE.getPath());
     Assert.assertFalse(result);
   }
 }
