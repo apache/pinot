@@ -45,17 +45,12 @@
     <module>pinot-server</module>
     <module>pinot-core</module>
     <module>pinot-controller</module>
-    <module>pinot-batch-ingestion</module>
+    <module>pinot-minion</module>
+    <module>pinot-plugins</module>
     <module>pinot-tools</module>
     <module>pinot-perf</module>
     <module>pinot-integration-tests</module>
     <module>pinot-distribution</module>
-    <module>pinot-minion</module>
-    <module>pinot-hadoop-filesystem</module>
-    <module>pinot-azure-filesystem</module>
-    <module>pinot-record-readers</module>
-    <module>pinot-connectors</module>
-    <module>pinot-gcs-filesystem</module>
   </modules>
 
   <licenses>

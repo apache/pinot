@@ -60,13 +60,13 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-controller</artifactId>
     </dependency>
-    <dependency>
+    <!--<dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-hadoop</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-hadoop-filesystem</artifactId>
+      <artifactId>pinot-hdfs</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -84,6 +84,7 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-orc</artifactId>
     </dependency>
+  -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-tools</artifactId>
