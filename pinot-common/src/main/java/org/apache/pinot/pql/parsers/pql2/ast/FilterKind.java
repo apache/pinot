@@ -30,5 +30,7 @@ public enum FilterKind {
   BETWEEN,
   IN,
   NOT_IN,
-  REGEXP_LIKE
+  REGEXP_LIKE,
+  IS_NULL,
+  IS_NOT_NULL
 }

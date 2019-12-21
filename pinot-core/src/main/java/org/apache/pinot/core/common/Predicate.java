@@ -23,6 +23,8 @@ import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.core.common.predicate.EqPredicate;
 import org.apache.pinot.core.common.predicate.InPredicate;
+import org.apache.pinot.core.common.predicate.IsNotNullPredicate;
+import org.apache.pinot.core.common.predicate.IsNullPredicate;
 import org.apache.pinot.core.common.predicate.NEqPredicate;
 import org.apache.pinot.core.common.predicate.NotInPredicate;
 import org.apache.pinot.core.common.predicate.RangePredicate;
@@ -32,7 +34,7 @@ import org.apache.pinot.core.common.predicate.RegexpLikePredicate;
 public abstract class Predicate {
 
   public enum Type {
-    EQ, NEQ, REGEXP_LIKE, RANGE, IN, NOT_IN;
+    EQ, NEQ, REGEXP_LIKE, RANGE, IN, NOT_IN, IS_NULL, IS_NOT_NULL;
 
     public boolean isExclusive() {
       return this == NEQ || this == NOT_IN;
@@ -91,6 +93,12 @@ public abstract class Predicate {
         break;
       case IN:
         predicate = new InPredicate(column, value);
+        break;
+      case IS_NULL:
+        predicate = new IsNullPredicate(column);
+        break;
+      case IS_NOT_NULL:
+        predicate = new IsNotNullPredicate(column);
         break;
       default:
         throw new UnsupportedOperationException("Unsupported filterType:" + filterType);
