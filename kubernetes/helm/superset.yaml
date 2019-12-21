@@ -2302,7 +2302,7 @@ spec:
       spec:
         accessModes:
           - ReadWriteOnce
-        storageClassName: "default"
+        storageClassName: "default"   # "pd-ssd" or "standard" for GKE
         resources:
           requests:
             storage: 1Gi
