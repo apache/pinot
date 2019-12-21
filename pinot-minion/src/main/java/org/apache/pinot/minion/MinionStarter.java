@@ -34,13 +34,11 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.task.TaskStateModelFactory;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metrics.MetricsHelper;
-import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
-import org.apache.pinot.spi.crypt.PinotCrypterFactory;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.minion.events.EventObserverFactoryRegistry;
 import org.apache.pinot.minion.events.MinionEventObserverFactory;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
@@ -48,6 +46,8 @@ import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
 import org.apache.pinot.minion.metrics.MinionMeter;
 import org.apache.pinot.minion.metrics.MinionMetrics;
 import org.apache.pinot.minion.taskfactory.TaskFactoryRegistry;
+import org.apache.pinot.spi.crypt.PinotCrypterFactory;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -158,7 +158,7 @@ public class MinionStarter {
     LOGGER.info("Initializing segment fetchers for all protocols");
     Configuration segmentFetcherFactoryConfig =
         _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
-    SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig);
+    SegmentFetcherFactory.init(segmentFetcherFactoryConfig);
 
     LOGGER.info("Initializing pinot crypter");
     Configuration pinotCrypterConfig = _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);

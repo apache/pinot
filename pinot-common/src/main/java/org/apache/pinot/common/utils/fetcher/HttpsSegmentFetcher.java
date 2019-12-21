@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.segment.fetcher;
+package org.apache.pinot.common.utils.fetcher;
 
+import java.util.Iterator;
 import java.util.Set;
-import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
@@ -56,15 +56,21 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 public class HttpsSegmentFetcher extends HttpSegmentFetcher {
 
   @Override
-  protected void initHttpClient(Configuration configs) {
-    SSLContext sslContext =
-        new ClientSSLContextGenerator(configs.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
+  protected void doInit(Configuration config) {
+    Configuration sslConfig = config.subset(CommonConstants.PREFIX_OF_SSL_SUBSET);
+    _logger.info("Initializing with the following ssl config:");
+    Set<String> protectedConfigKeys = ClientSSLContextGenerator.getProtectedConfigKeys();
+    @SuppressWarnings("unchecked")
+    Iterator<String> iterator = sslConfig.getKeys();
+    while (iterator.hasNext()) {
+      String configKey = iterator.next();
+      if (protectedConfigKeys.contains(configKey)) {
+        _logger.info("{}: {}", configKey, "********");
+      } else {
+        _logger.info("{}: {}", configKey, config.getString(configKey));
+      }
+    }
+    SSLContext sslContext = new ClientSSLContextGenerator(sslConfig).generate();
     _httpClient = new FileUploadDownloadClient(sslContext);
-  }
-
-  @Override
-  public Set<String> getProtectedConfigKeys() {
-    return ClientSSLContextGenerator.getProtectedConfigKeys().stream()
-        .map(s -> CommonConstants.PREFIX_OF_SSL_SUBSET + "." + s).collect(Collectors.toSet());
   }
 }

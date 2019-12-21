@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.filesystem;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -32,24 +33,21 @@ import org.slf4j.LoggerFactory;
  * This factory class initializes the PinotFS class. It creates a PinotFS object based on the URI found.
  */
 public class PinotFSFactory {
+  private PinotFSFactory() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFSFactory.class);
-  private static final String DEFAULT_FS_SCHEME = "file";
+  private static final String LOCAL_PINOT_FS_SCHEME = "file";
   private static final String CLASS = "class";
 
-  private static Map<String, PinotFS> _fileSystemMap = new HashMap<>();
-
-  // Prevent factory from being instantiated.
-  private PinotFSFactory() {
-
-  }
+  private static Map<String, PinotFS> PINOT_FS_MAP = new HashMap<>();
 
   public static void register(String scheme, String fsClassName, Configuration configuration) {
     try {
       LOGGER.info("Initializing PinotFS for scheme {}, classname {}", scheme, fsClassName);
       PinotFS pinotFS = PluginManager.get().createInstance(fsClassName);
-      PinotFSDelegator delegator = new PinotFSDelegator(pinotFS);
-      delegator.init(configuration);
-      _fileSystemMap.put(scheme, delegator);
+      pinotFS.init(configuration);
+      PINOT_FS_MAP.put(scheme, pinotFS);
     } catch (Exception e) {
       LOGGER.error("Could not instantiate file system for class {} with scheme {}", fsClassName, scheme, e);
       throw new RuntimeException(e);
@@ -69,28 +67,25 @@ public class PinotFSFactory {
       register(key, fsClassName, fsConfig.subset(key));
     }
 
-    if (!_fileSystemMap.containsKey(DEFAULT_FS_SCHEME)) {
+    if (!PINOT_FS_MAP.containsKey(LOCAL_PINOT_FS_SCHEME)) {
       LOGGER.info("LocalPinotFS not configured, adding as default");
-      _fileSystemMap.put(DEFAULT_FS_SCHEME, new LocalPinotFS());
+      PINOT_FS_MAP.put(LOCAL_PINOT_FS_SCHEME, new LocalPinotFS());
     }
   }
 
   public static PinotFS create(String scheme) {
-    PinotFS pinotFS = _fileSystemMap.get(scheme);
-    if (pinotFS == null) {
-      throw new RuntimeException("Pinot file system not configured for scheme: " + scheme);
-    }
-    LOGGER.info("PinotFS for schema {} initialized: {}", scheme, pinotFS.getClass());
+    PinotFS pinotFS = PINOT_FS_MAP.get(scheme);
+    Preconditions.checkState(pinotFS != null, "PinotFS for scheme: %s has not been initialized", scheme);
     return pinotFS;
   }
 
   public static boolean isSchemeSupported(String scheme) {
-    return _fileSystemMap.containsKey(scheme);
+    return PINOT_FS_MAP.containsKey(scheme);
   }
 
   public static void shutdown()
       throws IOException {
-    for (PinotFS pinotFS : _fileSystemMap.values()) {
+    for (PinotFS pinotFS : PINOT_FS_MAP.values()) {
       pinotFS.close();
     }
   }

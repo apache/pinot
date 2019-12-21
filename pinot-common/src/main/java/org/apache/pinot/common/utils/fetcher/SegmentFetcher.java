@@ -16,33 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.segment.fetcher;
+package org.apache.pinot.common.utils.fetcher;
 
 import java.io.File;
-import java.util.Collections;
-import java.util.Set;
+import java.net.URI;
 import org.apache.commons.configuration.Configuration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
-// This class is provided as a means to override any standard fetchers that will not be used
-// in a given Pinot installation.
-public class NoOpFetcher implements SegmentFetcher {
-  public static Logger LOGGER = LoggerFactory.getLogger(NoOpFetcher.class);
+public interface SegmentFetcher {
 
-  @Override
-  public void init(Configuration configs) {
-    LOGGER.info("NoOpFetcher initialized.");
-  }
+  /**
+   * Initializes the segment fetcher.
+   */
+  void init(Configuration config);
 
-  @Override
-  public void fetchSegmentToLocal(String uri, File tempFile) {
-    throw new RuntimeException("NoOpFetcher cannot fetch any segments");
-  }
-
-  @Override
-  public Set<String> getProtectedConfigKeys() {
-    return Collections.emptySet();
-  }
+  /**
+   * Fetches a segment from URI location to local.
+   */
+  void fetchSegmentToLocal(URI uri, File dest)
+      throws Exception;
 }
