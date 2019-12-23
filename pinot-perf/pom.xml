@@ -52,7 +52,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-connector-kafka-${kafka.version}</artifactId>
+      <artifactId>pinot-kafka-${kafka.version}</artifactId>
       <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
