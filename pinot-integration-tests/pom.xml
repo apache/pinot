@@ -119,7 +119,7 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-api</artifactId>
+      <artifactId>pinot-java-client</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
