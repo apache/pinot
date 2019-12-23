@@ -41,7 +41,7 @@
     <module>pinot-spi</module>
     <module>pinot-broker</module>
     <module>pinot-common</module>
-    <module>pinot-api</module>
+    <module>pinot-clients</module>
     <module>pinot-server</module>
     <module>pinot-core</module>
     <module>pinot-controller</module>
@@ -234,7 +234,7 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-api</artifactId>
+        <artifactId>pinot-java-client</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -279,12 +279,12 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-hadoop-filesystem</artifactId>
+        <artifactId>pinot-hdfs</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-azure-filesystem</artifactId>
+        <artifactId>pinot-azure</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -295,11 +295,6 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-perf</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-gcs-filesystem</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
