@@ -23,8 +23,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import org.apache.avro.Schema;
-import org.apache.pinot.avro.data.readers.AvroSchemaUtil;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -64,15 +62,6 @@ public class FieldSpecTest {
     Assert.assertEquals(LONG.size(), Long.BYTES);
     Assert.assertEquals(FLOAT.size(), Float.BYTES);
     Assert.assertEquals(DOUBLE.size(), Double.BYTES);
-
-    Assert.assertEquals(AvroSchemaUtil.valueOf(Schema.Type.INT), INT);
-    Assert.assertEquals(AvroSchemaUtil.valueOf(Schema.Type.LONG), LONG);
-    Assert.assertEquals(AvroSchemaUtil.valueOf(Schema.Type.FLOAT), FLOAT);
-    Assert.assertEquals(AvroSchemaUtil.valueOf(Schema.Type.DOUBLE), DOUBLE);
-    Assert.assertEquals(AvroSchemaUtil.valueOf(Schema.Type.BOOLEAN), STRING);
-    Assert.assertEquals(AvroSchemaUtil.valueOf(Schema.Type.STRING), STRING);
-    Assert.assertEquals(AvroSchemaUtil.valueOf(Schema.Type.ENUM), STRING);
-    Assert.assertEquals(AvroSchemaUtil.valueOf(Schema.Type.BYTES), BYTES);
   }
 
   /**
