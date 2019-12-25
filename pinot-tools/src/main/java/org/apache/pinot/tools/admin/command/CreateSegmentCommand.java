@@ -406,17 +406,19 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
               dataDirPath.getFileSystem(new Configuration()).copyToLocalFile(dataFilePath, localFilePath);
               config.setInputFilePath(localFile);
               config.setSegmentName(_segmentName + "_" + segCnt);
+              Schema schema = Schema.fromFile(new File(_schemaFile));
+              config.setSchema(schema);
 
               final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
               switch (config.getFormat()) {
                 case PARQUET:
                   RecordReader parquetRecordReader = new ParquetRecordReader();
-                  parquetRecordReader.init(new File(localFile), Schema.fromFile(new File(_schemaFile)), null);
+                  parquetRecordReader.init(new File(localFile), schema, null);
                   driver.init(config, parquetRecordReader);
                   break;
                 case ORC:
                   RecordReader orcRecordReader = new ORCRecordReader();
-                  orcRecordReader.init(new File(localFile), Schema.fromFile(new File(_schemaFile)), null);
+                  orcRecordReader.init(new File(localFile), schema, null);
                   driver.init(config, orcRecordReader);
                   break;
                 case CSV:
@@ -425,7 +427,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
                   if (_readerConfigFile != null) {
                     readerConfig = JsonUtils.fileToObject(new File(_readerConfigFile), CSVRecordReaderConfig.class);
                   }
-                  csvRecordReader.init(new File(localFile), Schema.fromFile(new File(_schemaFile)), readerConfig);
+                  csvRecordReader.init(new File(localFile), schema, readerConfig);
                   driver.init(config, csvRecordReader);
                   break;
                 default:
