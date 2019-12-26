@@ -154,7 +154,6 @@
       <groupId>net.sf.jopt-simple</groupId>
       <artifactId>jopt-simple</artifactId>
     </dependency>
-
     <!-- test -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
