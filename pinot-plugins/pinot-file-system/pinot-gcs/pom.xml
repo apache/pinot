@@ -44,9 +44,81 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
     </dependency>
+    <!-- google cloud storage -->
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-storage</artifactId>
+      <version>1.101.0</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.google.guava</groupId>
+          <artifactId>guava</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.google.protobuf</groupId>
+      <artifactId>protobuf-java</artifactId>
+      <version>3.10.0</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.api-client</groupId>
+      <artifactId>google-api-client</artifactId>
+      <version>1.30.4</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.http-client</groupId>
+      <artifactId>google-http-client</artifactId>
+      <version>1.32.1</version>
+    </dependency>
+    <!-- Due to dependency convergence issues with google cloud storage: https://github.com/googleapis/google-cloud-java/issues/4175 -->
+    <dependency>
+      <groupId>com.google.api.grpc</groupId>
+      <artifactId>proto-google-common-protos</artifactId>
+      <version>1.17.0</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.google.protobuf</groupId>
+          <artifactId>protobuf-java</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.google.api.grpc</groupId>
+      <artifactId>proto-google-iam-v1</artifactId>
+      <version>0.13.0</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.google.protobuf</groupId>
+          <artifactId>protobuf-java</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.google.api.grpc</groupId>
+          <artifactId>proto-google-common-protos</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.google.apis</groupId>
+      <artifactId>google-api-services-storage</artifactId>
+      <version>v1-rev20190910-1.30.3</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.google.api-client</groupId>
+          <artifactId>google-api-client</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.google.api</groupId>
+      <artifactId>gax-httpjson</artifactId>
+      <version>0.66.1</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.google.http-client</groupId>
+          <artifactId>google-http-client</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.testng</groupId>
