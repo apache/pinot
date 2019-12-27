@@ -35,56 +35,6 @@
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
   </properties>
-  <profiles>
-    <profile>
-      <id>build-shaded-jar</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <artifactId>maven-shade-plugin</artifactId>
-            <version>3.2.1</version>
-            <executions>
-              <execution>
-                <phase>package</phase>
-                <goals>
-                  <goal>shade</goal>
-                </goals>
-                <configuration>
-                  <!--
-                  Usually in hadoop environment, there are multiple jars with different versions.
-                  Most of the NoSuchMethodExceptions are caused by class loading conflicts.
-                  Class relocation ensures the reference of certain packages/classes in Pinot code to
-                  shaded libs, e.g. jackson or guava.
-                  Ref: https://maven.apache.org/plugins/maven-shade-plugin/examples/class-relocation.html
-                  -->
-                  <relocations>
-                    <relocation>
-                      <pattern>com.google.common.base</pattern>
-                      <shadedPattern>shaded.com.google.common.base</shadedPattern>
-                    </relocation>
-                    <relocation>
-                      <pattern>com.fasterxml.jackson</pattern>
-                      <shadedPattern>shaded.com.fasterxml.jackson</shadedPattern>
-                    </relocation>
-                  </relocations>
-                  <transformers>
-                    <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-                    <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                      <mainClass>org.apache.pinot.ingestion.standalone.StandaloneIngestionJobLauncher</mainClass>
-                    </transformer>
-                  </transformers>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-  </profiles>
-
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
