@@ -29,9 +29,15 @@ import org.apache.pinot.spi.data.Schema;
  * Factory for virtual column providers.
  */
 public class VirtualColumnProviderFactory {
-  public static VirtualColumnProvider buildProvider(String virtualColumnProvider) {
+  public static VirtualColumnProvider buildProvider(VirtualColumnContext virtualColumnContext) {
+    String virtualColumnProvider = virtualColumnContext.getFieldSpec().getVirtualColumnProvider();
     try {
-      return (VirtualColumnProvider) Class.forName(virtualColumnProvider).newInstance();
+      // Use the preset virtualColumnProvider if available
+      if (virtualColumnProvider != null) {
+        return (VirtualColumnProvider) Class.forName(virtualColumnProvider).newInstance();
+      }
+      // Create the virtualColumnProvider that returns default null values based on the virtualColumnContext
+      return (VirtualColumnProvider) Class.forName(DefaultNullValueVirtualColumnProvider.class.getName()).newInstance();
     } catch (ReflectiveOperationException e) {
       throw new IllegalStateException("Caught exception while creating instance of: " + virtualColumnProvider, e);
     }
@@ -45,12 +51,12 @@ public class VirtualColumnProviderFactory {
 
     if (!schema.hasColumn(BuiltInVirtualColumn.HOSTNAME)) {
       schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.HOSTNAME, FieldSpec.DataType.STRING, true,
-          DefaultNullValueSingleStringVirtualColumnProvider.class, NetUtil.getHostnameOrAddress()));
+          DefaultNullValueVirtualColumnProvider.class, NetUtil.getHostnameOrAddress()));
     }
 
     if (!schema.hasColumn(BuiltInVirtualColumn.SEGMENTNAME)) {
       schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.SEGMENTNAME, FieldSpec.DataType.STRING, true,
-          DefaultNullValueSingleStringVirtualColumnProvider.class, segmentName));
+          DefaultNullValueVirtualColumnProvider.class, segmentName));
     }
   }
 }

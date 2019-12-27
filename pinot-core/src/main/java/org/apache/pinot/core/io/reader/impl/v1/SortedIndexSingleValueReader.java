@@ -16,30 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.pruner;
+package org.apache.pinot.core.io.reader.impl.v1;
 
-import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.query.request.ServerQueryRequest;
+import java.io.IOException;
+import org.apache.pinot.common.utils.Pairs;
+import org.apache.pinot.core.io.reader.ReaderContext;
+import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
+import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 
 
 /**
- * The <code>DataSchemaSegmentPruner</code> class prunes segment based on whether the all the querying columns exist in
- * the segment schema.
+ * Interface for sorted index readers.
  */
-public class DataSchemaSegmentPruner implements SegmentPruner {
+public interface SortedIndexSingleValueReader<T extends ReaderContext> extends SingleColumnSingleValueReader<T>, InvertedIndexReader<Pairs.IntPair> {
+  @Override
+  int getInt(int row);
 
   @Override
-  public void init(Configuration config) {
-  }
+  int getInt(int row, T context);
 
   @Override
-  public boolean prune(IndexSegment segment, ServerQueryRequest queryRequest) {
-    return !segment.getColumnNames().containsAll(queryRequest.getAllColumns());
-  }
+  void readValues(int[] rows, int rowsStartIndex, int rowSize, int[] values, int valuesStartIndex);
 
   @Override
-  public String toString() {
-    return "DataSchemaSegmentPruner";
-  }
+  T createContext();
+
+  @Override
+  Pairs.IntPair getDocIds(int dictId);
+
+  @Override
+  void close()
+      throws IOException;
 }

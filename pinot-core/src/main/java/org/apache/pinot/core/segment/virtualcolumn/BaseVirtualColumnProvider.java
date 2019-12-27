@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.core.segment.virtualcolumn;
 
+import org.apache.pinot.core.io.reader.DataFileReader;
+import org.apache.pinot.core.io.reader.impl.SameMultiValueInvertedIndex;
+import org.apache.pinot.core.io.reader.impl.SameSingleValueInvertedIndex;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
+import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -28,11 +32,27 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 public abstract class BaseVirtualColumnProvider implements VirtualColumnProvider {
 
+  public DataFileReader buildReader(VirtualColumnContext context) {
+    if (context.getFieldSpec().isSingleValueField()) {
+      return new SameSingleValueInvertedIndex(0);
+    } else {
+      return new SameMultiValueInvertedIndex(0);
+    }
+  }
+
   protected ColumnMetadata.Builder getColumnMetadataBuilder(VirtualColumnContext context) {
     FieldSpec fieldSpec = context.getFieldSpec();
     return new ColumnMetadata.Builder().setVirtual(true).setColumnName(fieldSpec.getName())
         .setFieldType(fieldSpec.getFieldType()).setDataType(fieldSpec.getDataType())
-        .setTotalDocs(context.getTotalDocCount());
+        .setTotalDocs(context.getTotalDocCount()).setSingleValue(fieldSpec.isSingleValueField());
+  }
+
+  public InvertedIndexReader buildInvertedIndex(VirtualColumnContext context) {
+    if (context.getFieldSpec().isSingleValueField()) {
+      return new SameSingleValueInvertedIndex(context.getTotalDocCount());
+    } else {
+      return new SameMultiValueInvertedIndex(context.getTotalDocCount());
+    }
   }
 
   @Override

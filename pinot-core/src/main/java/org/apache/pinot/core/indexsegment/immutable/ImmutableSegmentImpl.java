@@ -23,9 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.indexsegment.IndexSegmentUtils;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
@@ -36,6 +33,9 @@ import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.apache.pinot.core.startree.v2.store.StarTreeIndexContainer;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,6 +100,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Override
   public Set<String> getPhysicalColumnNames() {
     return _segmentMetadata.getSchema().getPhysicalColumnNames();
+  }
+
+  @Override
+  public Set<String> getColumnNamesForSelectStar() {
+    return getPhysicalColumnNames();
   }
 
   @Override

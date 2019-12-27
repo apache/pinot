@@ -28,11 +28,11 @@ import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
-public class SortedIndexReaderImpl extends BaseSingleColumnSingleValueReader<SortedIndexReaderImpl.Context> implements SortedIndexReader<SortedIndexReaderImpl.Context> {
+public class SortedIndexSingleValueReaderImpl extends BaseSingleColumnSingleValueReader<SortedIndexSingleValueReaderImpl.Context> implements SortedIndexSingleValueReader<SortedIndexSingleValueReaderImpl.Context> {
   private final FixedByteValueReaderWriter _reader;
   private final int _cardinality;
 
-  public SortedIndexReaderImpl(PinotDataBuffer dataBuffer, int cardinality) {
+  public SortedIndexSingleValueReaderImpl(PinotDataBuffer dataBuffer, int cardinality) {
     // 2 values per dictionary id
     Preconditions.checkState(dataBuffer.size() == 2 * cardinality * Integer.BYTES);
     _reader = new FixedByteValueReaderWriter(dataBuffer);

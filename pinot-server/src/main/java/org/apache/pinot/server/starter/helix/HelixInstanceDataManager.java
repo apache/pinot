@@ -23,6 +23,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
@@ -46,8 +47,11 @@ import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
+import org.apache.pinot.core.segment.index.loader.defaultcolumn.BaseDefaultColumnHandler;
 import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -197,7 +201,17 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
     File indexDir = segmentMetadata.getIndexDir();
     if (indexDir == null) {
-      LOGGER.info("Skip reloading REALTIME consuming segment: {} in table: {}", segmentName, tableNameWithType);
+      if (!_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
+        LOGGER.info("Skip reloading REALTIME consuming segment: {} in table: {}", segmentName, tableNameWithType);
+        return;
+      }
+      LOGGER.info("Try reloading REALTIME consuming segment: {} in table: {}", segmentName, tableNameWithType);
+      SegmentMetadataImpl segmentMetadataImpl = (SegmentMetadataImpl) segmentMetadata;
+      Map<String, BaseDefaultColumnHandler.DefaultColumnAction> defaultColumnActionMap =
+          BaseDefaultColumnHandler.computeDefaultColumnActionMap(schema, segmentMetadataImpl);
+      MutableSegmentImpl mutableSegment = (MutableSegmentImpl) (_tableDataManagerMap.get(tableNameWithType)
+          .acquireSegment(segmentMetadataImpl.getName()).getSegment());
+      mutableSegment.addExtraColumns(schema, defaultColumnActionMap);
       return;
     }
     Preconditions.checkState(indexDir.isDirectory(), "Index directory: %s is not a directory", indexDir);

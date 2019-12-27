@@ -16,30 +16,52 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.pruner;
-
-import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.query.request.ServerQueryRequest;
-
+package org.apache.pinot.core.segment.index.readers;
 
 /**
- * The <code>DataSchemaSegmentPruner</code> class prunes segment based on whether the all the querying columns exist in
- * the segment schema.
+ * Dictionary for single-value string
  */
-public class DataSchemaSegmentPruner implements SegmentPruner {
 
-  @Override
-  public void init(Configuration config) {
+public class SingleStringDictionary extends BaseImmutableDictionary {
+  final String _value;
+
+  public SingleStringDictionary(String value) {
+    super(1);
+    _value = value;
   }
 
   @Override
-  public boolean prune(IndexSegment segment, ServerQueryRequest queryRequest) {
-    return !segment.getColumnNames().containsAll(queryRequest.getAllColumns());
+  public int insertionIndexOf(String stringValue) {
+    return 0;
   }
 
   @Override
-  public String toString() {
-    return "DataSchemaSegmentPruner";
+  public String get(int dictId) {
+    return _value;
+  }
+
+  @Override
+  public int getIntValue(int dictId) {
+    return Integer.parseInt(_value);
+  }
+
+  @Override
+  public long getLongValue(int dictId) {
+    return Long.parseLong(_value);
+  }
+
+  @Override
+  public float getFloatValue(int dictId) {
+    return Float.parseFloat(_value);
+  }
+
+  @Override
+  public double getDoubleValue(int dictId) {
+    return Double.parseDouble(_value);
+  }
+
+  @Override
+  public String getStringValue(int dictId) {
+    return _value;
   }
 }

@@ -16,13 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.virtualcolumn;
+package org.apache.pinot.core.io.reader.impl;
 
 import java.io.IOException;
 import java.util.Arrays;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.DataFileReader;
-import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
 
 
 /**

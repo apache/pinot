@@ -24,11 +24,11 @@ import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
+import org.apache.pinot.core.io.reader.impl.v1.SortedIndexSingleValueReader;
+import org.apache.pinot.core.io.reader.impl.v1.SortedIndexSingleValueReaderImpl;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.DocIdDictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -99,7 +99,7 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
     }
   }
 
-  private class DocIdInvertedIndex extends BaseSingleColumnSingleValueReader<SortedIndexReaderImpl.Context> implements SortedIndexReader<SortedIndexReaderImpl.Context> {
+  private class DocIdInvertedIndex extends BaseSingleColumnSingleValueReader<SortedIndexSingleValueReaderImpl.Context> implements SortedIndexSingleValueReader<SortedIndexSingleValueReaderImpl.Context> {
     @Override
     public Pairs.IntPair getDocIds(int dictId) {
       return new Pairs.IntPair(dictId, dictId);
@@ -118,7 +118,7 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
     }
 
     @Override
-    public SortedIndexReaderImpl.Context createContext() {
+    public SortedIndexSingleValueReaderImpl.Context createContext() {
       return null;
     }
 
@@ -128,59 +128,8 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
     }
 
     @Override
-    public int getInt(int rowId, SortedIndexReaderImpl.Context context) {
+    public int getInt(int rowId, SortedIndexSingleValueReaderImpl.Context context) {
       return rowId;
-    }
-  }
-
-  private class DocIdDictionary extends BaseImmutableDictionary {
-    final int _numDocs;
-
-    DocIdDictionary(int numDocs) {
-      super(numDocs);
-      _numDocs = numDocs;
-    }
-
-    @Override
-    public int insertionIndexOf(String stringValue) {
-      int intValue = Integer.parseInt(stringValue);
-      if (intValue < 0) {
-        return -1;
-      } else if (intValue >= _numDocs) {
-        return -(_numDocs + 1);
-      } else {
-        return intValue;
-      }
-    }
-
-    @Override
-    public Integer get(int dictId) {
-      return dictId;
-    }
-
-    @Override
-    public int getIntValue(int dictId) {
-      return dictId;
-    }
-
-    @Override
-    public long getLongValue(int dictId) {
-      return dictId;
-    }
-
-    @Override
-    public float getFloatValue(int dictId) {
-      return dictId;
-    }
-
-    @Override
-    public double getDoubleValue(int dictId) {
-      return dictId;
-    }
-
-    @Override
-    public String getStringValue(int dictId) {
-      return Integer.toString(dictId);
     }
   }
 }

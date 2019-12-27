@@ -114,7 +114,7 @@ class SegmentQueryProcessor {
       if (brokerRequest.isSetSelections()) {
         List<String> columns = brokerRequest.getSelections().getSelectionColumns();
         if (columns.contains("*")) {
-          columns = new ArrayList<>(_immutableSegment.getPhysicalColumnNames());
+          columns = new ArrayList<>(_immutableSegment.getColumnNamesForSelectStar());
         }
         List<Pair> selectionColumns = new ArrayList<>();
         Set<String> columSet = new HashSet<>();

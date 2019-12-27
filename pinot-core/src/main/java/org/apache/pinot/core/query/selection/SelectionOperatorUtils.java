@@ -36,13 +36,13 @@ import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.response.broker.SelectionResults;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.util.ArrayCopyUtils;
 import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
@@ -94,7 +94,7 @@ public class SelectionOperatorUtils {
       IndexSegment indexSegment) {
     if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
       // For 'SELECT *', sort all physical columns so that the order is deterministic
-      selectionColumns = new ArrayList<>(indexSegment.getPhysicalColumnNames());
+      selectionColumns = new ArrayList<>(indexSegment.getColumnNamesForSelectStar());
       selectionColumns.sort(null);
 
       List<TransformExpressionTree> expressions = new ArrayList<>(selectionColumns.size());
@@ -135,7 +135,7 @@ public class SelectionOperatorUtils {
 
     if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
       // For 'SELECT *', sort all physical columns so that the order is deterministic
-      selectionColumns = new ArrayList<>(indexSegment.getPhysicalColumnNames());
+      selectionColumns = new ArrayList<>(indexSegment.getColumnNamesForSelectStar());
       selectionColumns.sort(null);
 
       for (String selectionColumn : selectionColumns) {

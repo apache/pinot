@@ -16,27 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.io.reader.impl.v1;
+package org.apache.pinot.core.io.reader.impl;
 
 import java.io.IOException;
 import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.core.io.reader.ReaderContext;
-import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
+import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 
 
 /**
- * Interface for sorted index readers.
+ * Interface for sorted index multi-value readers.
  */
-public interface SortedIndexReader<T extends ReaderContext> extends SingleColumnSingleValueReader<T>, InvertedIndexReader<Pairs.IntPair> {
+public interface SortedIndexMultiValueReader<T extends ReaderContext> extends SingleColumnMultiValueReader<T>, InvertedIndexReader<Pairs.IntPair> {
   @Override
-  int getInt(int row);
+  int getIntArray(int row, int[] intArray);
 
   @Override
-  int getInt(int row, T context);
-
-  @Override
-  void readValues(int[] rows, int rowsStartIndex, int rowSize, int[] values, int valuesStartIndex);
+  int getIntArray(int row, int[] intArray, T context);
 
   @Override
   T createContext();

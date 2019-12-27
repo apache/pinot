@@ -19,9 +19,6 @@
 package org.apache.pinot.core.segment.index.data.source;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneTextIndexReader;
-import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.common.DataSource;
@@ -29,16 +26,20 @@ import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
 import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
+import org.apache.pinot.core.io.reader.impl.SortedIndexMultiValueReader;
+import org.apache.pinot.core.io.reader.impl.v1.SortedIndexSingleValueReader;
 import org.apache.pinot.core.operator.blocks.MultiValueBlock;
 import org.apache.pinot.core.operator.blocks.SingleValueBlock;
 import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
+import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeLuceneTextIndexReader;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
+import org.apache.pinot.core.segment.index.readers.text.LuceneTextIndexReader;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 public final class ColumnDataSource extends DataSource {
@@ -90,7 +91,11 @@ public final class ColumnDataSource extends DataSource {
     if (dictionary != null) {
       // Dictionary-based index
       if (isSorted) {
-        Preconditions.checkState(invertedIndex instanceof SortedIndexReader);
+        if (isSingleValue) {
+          Preconditions.checkState(invertedIndex instanceof SortedIndexSingleValueReader);
+        } else {
+          Preconditions.checkState(invertedIndex instanceof SortedIndexMultiValueReader);
+        }
       }
     } else {
       // Raw index

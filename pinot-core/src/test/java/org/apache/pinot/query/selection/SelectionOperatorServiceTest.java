@@ -89,7 +89,7 @@ public class SelectionOperatorServiceTest {
     // For non 'SELECT *' select only queries, should return deduplicated selection expressions
     List<String> selectionColumns = Arrays.asList("add(foo,'1')", "foo", "sub(bar,'2')", "bar", "foo", "foobar", "bar");
     IndexSegment indexSegment = mock(IndexSegment.class);
-    when(indexSegment.getPhysicalColumnNames()).thenReturn(new HashSet<>(Arrays.asList("foo", "bar", "foobar")));
+    when(indexSegment.getColumnNamesForSelectStar()).thenReturn(new HashSet<>(Arrays.asList("foo", "bar", "foobar")));
     List<TransformExpressionTree> expressions =
         SelectionOperatorUtils.extractExpressions(selectionColumns, indexSegment);
     assertEquals(expressions.size(), 5);
