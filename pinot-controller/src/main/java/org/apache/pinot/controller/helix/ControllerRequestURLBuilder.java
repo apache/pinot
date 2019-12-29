@@ -61,6 +61,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "instances");
   }
 
+  public String forInstanceTags(String instanceName) {
+    return StringUtil.join("/", _baseUrl, "instances", instanceName, "tags");
+  }
+
   public String forTablesFromTenant(String tenantName) {
     return StringUtil.join("/", _baseUrl, "tenants", tenantName, "tables");
   }

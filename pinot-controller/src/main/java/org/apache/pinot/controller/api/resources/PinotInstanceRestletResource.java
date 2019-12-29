@@ -36,6 +36,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -176,5 +177,69 @@ public class PinotInstanceRestletResource {
           "Failed to drop instance " + instanceName + " - " + response.getMessage(), Response.Status.CONFLICT);
     }
     return new SuccessResponse("Successfully dropped instance");
+  }
+
+  @GET
+  @Path("/instances/{instanceName}/tags")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get all the tags for the specified instance", produces = MediaType.APPLICATION_JSON)
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Instance not found"), @ApiResponse(code = 500, message = "Internal error")})
+  public String getInstanceTags(
+      @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000") @PathParam("instanceName") String instanceName) {
+    InstanceConfig instanceConfig = pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
+    if (instanceConfig == null) {
+      throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " not found",
+          Response.Status.NOT_FOUND);
+    }
+    ObjectNode response = JsonUtils.newObjectNode();
+    response.set("tags", JsonUtils.objectToJsonNode(instanceConfig.getTags()));
+    return response.toString();
+  }
+
+  /**
+   * This API is used to tag a previously untagged instance. This is used when allocating a new
+   * instance to a particular tenant. See https://github.com/apache/incubator-pinot/issues/4082
+   */
+  @POST
+  @Path("/instances/{instanceName}/tags")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Add a tag to an untagged instance", notes = "Add a tag to an untagged instance")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 400, message = "Bad Request"), @ApiResponse(code = 404, message = "Instance not found"), @ApiResponse(code = 409, message = "Instance cannot be dropped"), @ApiResponse(code = 500, message = "Internal error")})
+  public SuccessResponse addInstanceTag(
+      @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000") @PathParam("instanceName") String instanceName,
+      String newTag) {
+    InstanceConfig instanceConfig = pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
+    if (instanceConfig == null) {
+      throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " not found",
+          Response.Status.NOT_FOUND);
+    }
+
+    // Check if the instance has other tags
+    String oldInstanceTag = null;
+    List<String> tagList = instanceConfig.getTags();
+    if (tagList != null && tagList.size() >= 1) {
+      if (tagList.size() > 1) {
+        throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " is not untagged",
+            Response.Status.BAD_REQUEST);
+      }
+
+      // A single tag ending with "_untagged" is still a valid case for retagging
+      // This assumes a new instance is initialized in this manner.
+      oldInstanceTag = tagList.get(0);
+      if (!oldInstanceTag.endsWith("_untagged")) {
+        throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " is not untagged",
+            Response.Status.BAD_REQUEST);
+      }
+    }
+
+    // Retag instance
+    HelixAdmin helixAdmin = pinotHelixResourceManager.getHelixAdmin();
+    String helixClusterName = pinotHelixResourceManager.getHelixClusterName();
+    if (oldInstanceTag != null) {
+      helixAdmin.removeInstanceTag(helixClusterName, instanceName, oldInstanceTag);
+    }
+    helixAdmin.addInstanceTag(helixClusterName, instanceName, newTag);
+    return new SuccessResponse("Successfully tagged instance");
   }
 }

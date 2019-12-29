@@ -23,6 +23,7 @@ import com.google.common.base.Function;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
@@ -36,6 +37,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.common.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
 import static org.testng.Assert.fail;
 
 
@@ -173,6 +175,64 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
         throw new RuntimeException(e);
       }
     }, GET_CALL_TIMEOUT_MS, "Expected " + numInstances + " instances after creation of tagged instances");
+  }
+
+  private void checkNumTagsForInstance(String listInstanceTagsUrl, int numTags) {
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        String getResponse = sendGetRequest(listInstanceTagsUrl);
+        JsonNode jsonNode = JsonUtils.stringToJsonNode(getResponse);
+        return jsonNode != null && jsonNode.get("tags") != null
+            && jsonNode.get("tags").size() == numTags;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, GET_CALL_TIMEOUT_MS, "Expected " + numTags + " tags after creation of instance");
+  }
+
+  private void checkTagForInstance(String instanceTagsUrl, String tagToCheck) {
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        String getResponse = sendGetRequest(instanceTagsUrl);
+        JsonNode jsonNode = JsonUtils.stringToJsonNode(getResponse);
+        return jsonNode != null && jsonNode.get("tags") != null
+            && jsonNode.get("tags").size() > 0 && jsonNode.get("tags").get(0).asText().equals(tagToCheck);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, GET_CALL_TIMEOUT_MS, "Expected " + tagToCheck + " tag on instance");
+  }
+
+  @Test
+  public void testGetAndSetTags()
+      throws IOException {
+    // Create untagged broker and server instances
+    String createInstanceUrl = _controllerRequestURLBuilder.forInstanceCreate();
+    Instance brokerInstance = new Instance("1.2.3.4", 1234, InstanceType.BROKER, null, null);
+    sendPostRequest(createInstanceUrl, brokerInstance.toJsonString());
+    String brokerTagsUrl = _controllerRequestURLBuilder.forInstanceTags(brokerInstance.getInstanceId());
+
+    List<String> serverTags = Arrays.asList(UNTAGGED_SERVER_INSTANCE);
+    Instance serverInstance = new Instance("1.2.3.4", 2345, InstanceType.SERVER, serverTags, null);
+    sendPostRequest(createInstanceUrl, serverInstance.toJsonString());
+    String serverTagsUrl = _controllerRequestURLBuilder.forInstanceTags(serverInstance.getInstanceId());
+
+    checkNumTagsForInstance(brokerTagsUrl, 0);
+    checkNumTagsForInstance(serverTagsUrl, 1);
+
+    String newBrokerTag = "new-broker-tag";
+    sendPostRequest(brokerTagsUrl, newBrokerTag);
+    checkTagForInstance(brokerTagsUrl, newBrokerTag);
+
+    String newServerTag = "new-server-tag";
+    sendPostRequest(serverTagsUrl, newServerTag);
+    checkTagForInstance(serverTagsUrl, newServerTag);
+
+    // Cleanup
+    String deleteBrokerInstanceUrl = _controllerRequestURLBuilder.forInstanceDelete(brokerInstance.getInstanceId());
+    sendDeleteRequest(deleteBrokerInstanceUrl);
+    String deleteServerInstanceUrl = _controllerRequestURLBuilder.forInstanceDelete(serverInstance.getInstanceId());
+    sendDeleteRequest(deleteServerInstanceUrl);
   }
 
   @AfterClass
