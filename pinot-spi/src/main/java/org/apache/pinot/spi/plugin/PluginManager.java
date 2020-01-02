@@ -28,19 +28,59 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class PluginManager {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(PluginManager.class);
+  public static final String PLUGINS_ROOT_DIR_ENV_VAR = "plugins.root.directory";
+  public static final String PLUGINS_LOADING_ENV_VAR = "plugins.loading";
   public static final String DEFAULT_PLUGIN_NAME = "DEFAULT";
+  private static final String JAR_FILE_EXTENSION = "jar";
   static PluginManager PLUGIN_MANAGER = new PluginManager();
 
   Map<Plugin, PluginClassLoader> _registry = new HashMap<>();
+  String pluginsRootDir;
+  String pluginsLoading;
 
   private PluginManager() {
     _registry.put(new Plugin(DEFAULT_PLUGIN_NAME), createClassLoader(Collections.emptyList()));
+    pluginsRootDir = System.getenv(PLUGINS_ROOT_DIR_ENV_VAR);
+    pluginsLoading = System.getenv(PLUGINS_LOADING_ENV_VAR);
+    init(pluginsRootDir, pluginsLoading);
+  }
+
+  private void init(String pluginsRootDir, String pluginsLoading) {
+    if (StringUtils.isEmpty(pluginsRootDir)) {
+      LOGGER.info("No plugins root dir specified from environment variable");
+      return;
+    } else {
+      LOGGER.info("Plugins root dir is [{}]", pluginsRootDir);
+    }
+    Collection<File> jarFiles = FileUtils.listFiles(new File(pluginsRootDir), new String[]{JAR_FILE_EXTENSION}, true);
+    List<String> pluginsToLoad = null;
+    if (!StringUtils.isEmpty(pluginsLoading)) {
+      pluginsToLoad = Arrays.asList(pluginsLoading.split(","));
+      LOGGER.info("Trying to load plugins: [{}]", Arrays.toString(pluginsToLoad.toArray()));
+    } else {
+      LOGGER.info("No pluginsLoading specified, trying to load all plugins: [{}]", Arrays.toString(jarFiles.toArray()));
+    }
+    for (File jarFile : jarFiles) {
+      File pluginDir = jarFile.getParentFile();
+      String pluginName = pluginDir.getName();
+      if (pluginsToLoad != null) {
+        if (!pluginsToLoad.contains(pluginName)) {
+          continue;
+        }
+      }
+      load(pluginName, pluginDir);
+    }
   }
 
   /**
@@ -49,6 +89,7 @@ public class PluginManager {
    * @param directory
    */
   public void load(String pluginName, File directory) {
+    LOGGER.info("Trying to load plugin [{}] from location [{}]", pluginName, directory);
     Collection<File> jarFiles = FileUtils.listFiles(directory, new String[]{"jar"}, true);
     Collection<URL> urlList = new ArrayList<>();
     for (File jarFile : jarFiles) {
