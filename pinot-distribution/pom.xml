@@ -63,6 +63,16 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-tools</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-csv</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-kafka-${kafka.version}</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
   <build>
