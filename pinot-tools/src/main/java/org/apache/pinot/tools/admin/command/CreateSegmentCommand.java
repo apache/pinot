@@ -46,8 +46,6 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.orc.data.readers.ORCRecordReader;
-import org.apache.pinot.parquet.data.readers.ParquetRecordReader;
 import org.apache.pinot.startree.hll.HllConfig;
 import org.apache.pinot.startree.hll.HllConstants;
 import org.apache.pinot.tools.Command;
@@ -412,14 +410,12 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
               final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
               switch (config.getFormat()) {
                 case PARQUET:
-                  RecordReader parquetRecordReader = new ParquetRecordReader();
-                  parquetRecordReader.init(new File(localFile), schema, null);
-                  driver.init(config, parquetRecordReader);
+                  config.setRecordReaderPath("org.apache.pinot.parquet.data.readers.ParquetRecordReader");
+                  driver.init(config);
                   break;
                 case ORC:
-                  RecordReader orcRecordReader = new ORCRecordReader();
-                  orcRecordReader.init(new File(localFile), schema, null);
-                  driver.init(config, orcRecordReader);
+                  config.setRecordReaderPath("org.apache.pinot.orc.data.readers.ORCRecordReader");
+                  driver.init(config);
                   break;
                 case CSV:
                   RecordReader csvRecordReader = new CSVRecordReader();

@@ -102,5 +102,10 @@
       <outputDirectory>bin</outputDirectory>
       <fileMode>0755</fileMode>
     </fileSet>
+    <fileSet>
+      <useDefaultExcludes>false</useDefaultExcludes>
+      <directory>${pinot.root}/pinot-plugins/target/plugins/</directory>
+      <outputDirectory>plugins</outputDirectory>
+    </fileSet>
   </fileSets>
 </assembly>
