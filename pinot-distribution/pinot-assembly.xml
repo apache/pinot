@@ -106,6 +106,16 @@
       <useDefaultExcludes>false</useDefaultExcludes>
       <directory>${pinot.root}/pinot-plugins/target/plugins/</directory>
       <outputDirectory>plugins</outputDirectory>
+      <excludes>
+        <exclude>**/pinot-file-system/pinot-file-system/**</exclude>
+        <exclude>**/pinot-input-format/pinot-input-format/**</exclude>
+        <exclude>**/pinot-stream-ingestion/pinot-stream-ingestion/**</exclude>
+        <exclude>**/pinot-stream-ingestion/pinot-kafka-base/**</exclude>
+        <exclude>**/pinot-batch-ingestion/pinot-batch-ingestion/**</exclude>
+        <exclude>**/pinot-batch-ingestion/pinot-batch-ingestion-base/**</exclude>
+        <exclude>**/pinot-batch-ingestion/pinot-ingestion-common/**</exclude>
+        <exclude>**/pinot-batch-ingestion/v0_deprecated/**</exclude>
+      </excludes>
     </fileSet>
   </fileSets>
 </assembly>
