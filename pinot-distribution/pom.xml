@@ -66,11 +66,23 @@
       <exclusions>
         <exclusion>
           <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-avro</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
           <artifactId>pinot-csv</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-kafka-base</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
           <artifactId>pinot-kafka-${kafka.version}</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-common</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
