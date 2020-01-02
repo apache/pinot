@@ -107,6 +107,8 @@
       <directory>${pinot.root}/pinot-plugins/target/plugins/</directory>
       <outputDirectory>plugins</outputDirectory>
       <excludes>
+        <exclude>**/*.pom</exclude>
+        <exclude>**/pinot-plugins/**</exclude>
         <exclude>**/pinot-file-system/pinot-file-system/**</exclude>
         <exclude>**/pinot-input-format/pinot-input-format/**</exclude>
         <exclude>**/pinot-stream-ingestion/pinot-stream-ingestion/**</exclude>
