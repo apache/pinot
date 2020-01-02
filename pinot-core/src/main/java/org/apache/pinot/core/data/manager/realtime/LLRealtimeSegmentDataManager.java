@@ -1102,7 +1102,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // Create message decoder
     _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, _schema);
-    _clientId = _streamTopic +  "-" + _streamPartitionId;
+    _clientId = _streamTopic + "-" + _streamPartitionId;
 
     // Create record transformer
     _recordTransformer = CompositeTransformer.getDefaultTransformer(schema);
