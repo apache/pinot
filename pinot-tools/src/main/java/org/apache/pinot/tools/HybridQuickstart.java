@@ -27,12 +27,13 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.data.readers.FileFormat;
-import org.apache.pinot.plugin.stream.kafka.KafkaStarterUtils;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.streams.AirlineDataStream;
+import org.apache.pinot.tools.utils.KafkaStarterUtils;
 
 import static org.apache.pinot.tools.Quickstart.printStatus;
 
@@ -50,6 +51,7 @@ public class HybridQuickstart {
 
   public static void main(String[] args)
       throws Exception {
+    PluginManager.get().init();
     new HybridQuickstart().execute();
   }
 

@@ -25,6 +25,7 @@ import java.io.File;
 import java.net.URL;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.data.readers.FileFormat;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 
@@ -206,6 +207,7 @@ public class Quickstart {
 
   public static void main(String[] args)
       throws Exception {
+    PluginManager.get().init();
     new Quickstart().execute();
   }
 }

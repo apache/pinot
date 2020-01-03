@@ -33,7 +33,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.plugin.stream.kafka.KafkaStarterUtils;
+import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;

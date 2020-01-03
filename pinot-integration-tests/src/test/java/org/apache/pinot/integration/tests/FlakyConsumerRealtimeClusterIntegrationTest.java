@@ -27,7 +27,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
-import org.apache.pinot.plugin.stream.kafka.KafkaStarterUtils;
+import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.testng.annotations.BeforeClass;
 
 

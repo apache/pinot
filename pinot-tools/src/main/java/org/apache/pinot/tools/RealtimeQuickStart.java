@@ -24,12 +24,13 @@ import java.io.File;
 import java.net.URL;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.plugin.stream.kafka.KafkaStarterUtils;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.streams.MeetupRsvpStream;
+import org.apache.pinot.tools.utils.KafkaStarterUtils;
 
 import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 import static org.apache.pinot.tools.Quickstart.printStatus;
@@ -43,6 +44,7 @@ public class RealtimeQuickStart {
 
   public static void main(String[] args)
       throws Exception {
+    PluginManager.get().init();
     new RealtimeQuickStart().execute();
   }
 

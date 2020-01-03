@@ -39,8 +39,8 @@ import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.plugin.stream.kafka.KafkaStarterUtils;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
+import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 

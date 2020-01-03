@@ -41,7 +41,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.query.comparison.QueryComparison;
-import org.apache.pinot.plugin.stream.kafka.KafkaStarterUtils;
+import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.ITestResult;

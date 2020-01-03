@@ -19,6 +19,7 @@
 package org.apache.pinot.tools.admin;
 
 import java.lang.reflect.Field;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.admin.command.AddSchemaCommand;
 import org.apache.pinot.tools.admin.command.AddTableCommand;
@@ -150,6 +151,7 @@ public class PinotAdministrator {
   }
 
   public static void main(String[] args) {
+    PluginManager.get().init();
     PinotAdministrator pinotAdministrator = new PinotAdministrator();
     pinotAdministrator.execute(args);
     if (System.getProperties().getProperty("pinot.admin.system.exit", "false").equalsIgnoreCase("true")) {
