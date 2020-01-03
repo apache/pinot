@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.impl.kafka;
+package org.apache.pinot.plugin.stream.kafka09;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
@@ -38,9 +38,6 @@ import kafka.javaapi.message.ByteBufferMessageSet;
 import kafka.message.Message;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
-import org.apache.pinot.plugin.stream.kafka09.KafkaPartitionLevelConsumer;
-import org.apache.pinot.plugin.stream.kafka09.KafkaSimpleConsumerFactory;
-import org.apache.pinot.plugin.stream.kafka09.KafkaStreamMetadataProvider;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.testng.Assert;
