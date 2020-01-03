@@ -16,17 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.impl.kafka;
-
-import kafka.javaapi.consumer.SimpleConsumer;
-
+package org.apache.pinot.plugin.stream.kafka09;
 
 /**
- * Implementation of the Kafka SimpleConsumer factory.
+ * This class is deprecated, and is kept for backward compatibility. Use {@link KafkaConsumerFactory} instead
+ * Usages of org.apache.pinot.plugin.stream.kafka09.SimpleConsumerFactory in the table configs,
+ * should be changed to org.apache.pinot.plugin.stream.kafka09.KafkaConsumerFactory, as SimpleConsumerFactory will be deleted eventually
  */
-public class KafkaSimpleConsumerFactoryImpl implements KafkaSimpleConsumerFactory {
-  @Override
-  public SimpleConsumer buildSimpleConsumer(String host, int port, int soTimeout, int bufferSize, String clientId) {
-    return new SimpleConsumer(host, port, soTimeout, bufferSize, clientId);
-  }
+@Deprecated
+public class SimpleConsumerFactory extends KafkaConsumerFactory {
+
 }

@@ -234,7 +234,7 @@ Upgrade from Kafka 0.9 connector to Kafka 2.x connector
 -------------------------------------------------------
 
 * Update table config for both high level and low level consumer:
-  Update config: ``stream.kafka.consumer.factory.class.name`` from ``org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory`` to ``org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory``.
+  Update config: ``stream.kafka.consumer.factory.class.name`` from ``org.apache.pinot.plugin.stream.kafka09.KafkaConsumerFactory`` to ``org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory``.
 
 * If using Stream(High) level consumer:
   Please also add config ``stream.kafka.hlc.bootstrap.server`` into ``tableIndexConfig.streamConfigs``.

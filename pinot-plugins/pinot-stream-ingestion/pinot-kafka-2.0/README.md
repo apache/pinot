@@ -47,7 +47,7 @@ Below is a sample `streamConfigs` used to create a realtime table with Kafka Str
 * Upgrade from Kafka 0.9 connector to Kafka 2.x connector:
 
   1. Update  table config:
- `stream.kafka.consumer.factory.class.name` from `org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory` to `org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory`.
+ `stream.kafka.consumer.factory.class.name` from `org.apache.pinot.plugin.stream.kafka09.KafkaConsumerFactory` to `org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory`.
 
   1. If using Stream(High) level consumer, please also add config `stream.kafka.hlc.bootstrap.server` into `tableIndexConfig.streamConfigs`.
 This config should be the URI of Kafka broker lists, e.g. `localhost:9092`.

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.impl.kafka;
+package org.apache.pinot.plugin.stream.kafka09;
 
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;

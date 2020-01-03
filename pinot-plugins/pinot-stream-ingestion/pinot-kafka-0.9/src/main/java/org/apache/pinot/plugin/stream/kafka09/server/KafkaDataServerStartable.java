@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.impl.kafka.server;
+package org.apache.pinot.plugin.stream.kafka09.server;
 
 import java.io.File;
 import java.security.Permission;

@@ -16,15 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.impl.kafka;
+package org.apache.pinot.plugin.stream.kafka09;
 
 import kafka.javaapi.consumer.SimpleConsumer;
 
 
 /**
- * Factory for Kafka SimpleConsumer instances, so that we can create mock instances of the Kafka SimpleConsumer for
- * unit tests.
+ * Implementation of the Kafka SimpleConsumer factory.
  */
-public interface KafkaSimpleConsumerFactory {
-  SimpleConsumer buildSimpleConsumer(String host, int port, int soTimeout, int bufferSize, String clientId);
+public class KafkaSimpleConsumerFactoryImpl implements KafkaSimpleConsumerFactory {
+  @Override
+  public SimpleConsumer buildSimpleConsumer(String host, int port, int soTimeout, int bufferSize, String clientId) {
+    return new SimpleConsumer(host, port, soTimeout, bufferSize, clientId);
+  }
 }
