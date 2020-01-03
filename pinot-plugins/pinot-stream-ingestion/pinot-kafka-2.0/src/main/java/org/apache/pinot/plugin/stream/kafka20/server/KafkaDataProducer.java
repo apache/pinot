@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.impl.kafka2.server;
+package org.apache.pinot.plugin.stream.kafka20.server;
 
 import java.util.Properties;
 import org.apache.kafka.clients.producer.KafkaProducer;

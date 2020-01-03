@@ -172,7 +172,7 @@ How to use Kafka 2.x connector
 
 Below is a sample ``streamConfigs`` used to create a realtime table with Kafka Stream(High) level consumer.
 
-Kafka 2.x HLC consumer uses ``org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory`` in config ``stream.kafka.consumer.factory.class.name``.
+Kafka 2.x HLC consumer uses ``org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory`` in config ``stream.kafka.consumer.factory.class.name``.
 
 .. code-block:: none
 
@@ -182,7 +182,7 @@ Kafka 2.x HLC consumer uses ``org.apache.pinot.core.realtime.impl.kafka2.KafkaCo
     "stream.kafka.topic.name": "meetupRSVPEvents",
     "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
     "stream.kafka.hlc.zk.connect.string": "localhost:2191/kafka",
-    "stream.kafka.consumer.factory.class.name": "org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory",
+    "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
     "stream.kafka.zk.broker.url": "localhost:2191/kafka",
     "stream.kafka.hlc.bootstrap.server": "localhost:19092"
   }
@@ -214,7 +214,7 @@ Below is a sample table config used to create a realtime table with Kafka Partit
         "stream.kafka.consumer.type": "LowLevel",
         "stream.kafka.topic.name": "meetupRSVPEvents",
         "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
-        "stream.kafka.consumer.factory.class.name": "org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory",
+        "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
         "stream.kafka.zk.broker.url": "localhost:2191/kafka",
         "stream.kafka.broker.list": "localhost:19092"
       }
@@ -234,7 +234,7 @@ Upgrade from Kafka 0.9 connector to Kafka 2.x connector
 -------------------------------------------------------
 
 * Update table config for both high level and low level consumer:
-  Update config: ``stream.kafka.consumer.factory.class.name`` from ``org.apache.pinot.plugin.stream.kafka09.KafkaConsumerFactory`` to ``org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory``.
+  Update config: ``stream.kafka.consumer.factory.class.name`` from ``org.apache.pinot.plugin.stream.kafka09.KafkaConsumerFactory`` to ``org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory``.
 
 * If using Stream(High) level consumer:
   Please also add config ``stream.kafka.hlc.bootstrap.server`` into ``tableIndexConfig.streamConfigs``.
