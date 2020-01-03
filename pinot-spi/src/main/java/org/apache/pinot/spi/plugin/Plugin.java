@@ -45,4 +45,9 @@ public class Plugin {
   public int hashCode() {
     return Objects.hash(_name);
   }
+
+  @Override
+  public String toString() {
+    return _name;
+  }
 }

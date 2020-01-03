@@ -39,26 +39,45 @@ import org.slf4j.LoggerFactory;
 public class PluginManager {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PluginManager.class);
-  public static final String PLUGINS_ROOT_DIR_ENV_VAR = "plugins.root.directory";
-  public static final String PLUGINS_LOADING_ENV_VAR = "plugins.loading";
+  public static final String PLUGINS_DIR_ENV_VAR = "plugins.dir";
+  public static final String PLUGINS_INCLUDE_ENV_VAR = "plugins.include";
   public static final String DEFAULT_PLUGIN_NAME = "DEFAULT";
   private static final String JAR_FILE_EXTENSION = "jar";
   static PluginManager PLUGIN_MANAGER = new PluginManager();
 
   Map<Plugin, PluginClassLoader> _registry = new HashMap<>();
   String pluginsRootDir;
-  String pluginsLoading;
+  String pluginsInclude;
 
   private PluginManager() {
     _registry.put(new Plugin(DEFAULT_PLUGIN_NAME), createClassLoader(Collections.emptyList()));
-    pluginsRootDir = System.getenv(PLUGINS_ROOT_DIR_ENV_VAR);
-    pluginsLoading = System.getenv(PLUGINS_LOADING_ENV_VAR);
-    init(pluginsRootDir, pluginsLoading);
+    try {
+      pluginsRootDir = System.getProperty(PLUGINS_DIR_ENV_VAR);
+    } catch (Exception e) {
+      LOGGER.error("Failed to load env variable {}", PLUGINS_DIR_ENV_VAR, e);
+      pluginsRootDir = null;
+    }
+    try {
+      pluginsInclude = System.getProperty(PLUGINS_INCLUDE_ENV_VAR);
+    } catch (Exception e) {
+      LOGGER.error("Failed to load env variable {}", PLUGINS_INCLUDE_ENV_VAR, e);
+      pluginsInclude = null;
+    }
+    init(pluginsRootDir, pluginsInclude);
+    printLoadedPlugins();
+  }
+
+  public void printLoadedPlugins() {
+    for (Plugin plugin : _registry.keySet()) {
+      PluginClassLoader pluginClassLoader = _registry.get(plugin);
+      LOGGER.info("Loaded plugin : {}, with classloader: {}", plugin, pluginClassLoader);
+    }
   }
 
   private void init(String pluginsRootDir, String pluginsLoading) {
     if (StringUtils.isEmpty(pluginsRootDir)) {
-      LOGGER.info("No plugins root dir specified from environment variable");
+      LOGGER.info("Env variable '{}' is not specified. Set this env variable to load additional plugins.",
+          PLUGINS_DIR_ENV_VAR);
       return;
     } else {
       LOGGER.info("Plugins root dir is [{}]", pluginsRootDir);
@@ -69,7 +88,7 @@ public class PluginManager {
       pluginsToLoad = Arrays.asList(pluginsLoading.split(","));
       LOGGER.info("Trying to load plugins: [{}]", Arrays.toString(pluginsToLoad.toArray()));
     } else {
-      LOGGER.info("No pluginsLoading specified, trying to load all plugins: [{}]", Arrays.toString(jarFiles.toArray()));
+      LOGGER.info("Loading all plugins. Please use env variable '{}' to customize.", PLUGINS_INCLUDE_ENV_VAR, Arrays.toString(jarFiles.toArray()));
     }
     for (File jarFile : jarFiles) {
       File pluginDir = jarFile.getParentFile();
@@ -79,7 +98,12 @@ public class PluginManager {
           continue;
         }
       }
-      load(pluginName, pluginDir);
+      try {
+        load(pluginName, pluginDir);
+        LOGGER.info("Successfully Loaded plugin [{}] from dir [{}]",pluginName , pluginDir);
+      } catch (Exception e) {
+        LOGGER.error("Failed to load plugin [{}] from dir [{}]",pluginName , pluginDir, e);
+      }
     }
   }
 
