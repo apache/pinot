@@ -16,4 +16,4 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory
+org.apache.pinot.plugin.stream.kafka09.KafkaConsumerFactory

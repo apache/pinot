@@ -33,7 +33,7 @@ import org.apache.avro.io.DatumWriter;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.pinot.avro.data.readers.AvroUtils;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
+import org.apache.pinot.plugin.stream.kafka.KafkaStarterUtils;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.tools.Command;
@@ -88,7 +88,7 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
   @Override
   public String description() {
     return "Stream the specified Avro file into a Kafka topic, which can be read by Pinot\n"
-        + "by using org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder as the\n"
+        + "by using org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder as the\n"
         + "message decoder class name (stream.kafka.decoder.class.name).";
   }
 
