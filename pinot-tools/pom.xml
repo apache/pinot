@@ -129,7 +129,7 @@
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
-                  <extraArgument>-Dplugins.dir=plugins</extraArgument>
+                  <extraJvmArguments>-Dplugins.dir=@BASEDIR@/plugins</extraJvmArguments>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -142,7 +142,7 @@
                 <extraArguments>
                   <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
                   <extraArgument>-Dlog4j2.configurationFile=conf/pinot-admin-log4j2.xml</extraArgument>
-                  <extraArgument>-Dplugins.dir=plugins</extraArgument>
+                  <extraJvmArguments>-Dplugins.dir=@BASEDIR@/plugins</extraJvmArguments>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -155,7 +155,7 @@
                 <extraArguments>
                   <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
                   <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
-                  <extraArgument>-Dplugins.dir=plugins</extraArgument>
+                  <extraJvmArguments>-Dplugins.dir=@BASEDIR@/plugins</extraJvmArguments>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -168,7 +168,7 @@
                 <extraArguments>
                   <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
                   <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
-                  <extraArgument>-Dplugins.dir=plugins</extraArgument>
+                  <extraJvmArguments>-Dplugins.dir=@BASEDIR@/plugins</extraJvmArguments>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -181,7 +181,7 @@
                 <extraArguments>
                   <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
                   <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
-                  <extraArgument>-Dplugins.dir=plugins</extraArgument>
+                  <extraJvmArguments>-Dplugins.dir=@BASEDIR@/plugins</extraJvmArguments>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -193,7 +193,7 @@
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
-                  <extraArgument>-Dplugins.dir=plugins</extraArgument>
+                  <extraJvmArguments>-Dplugins.dir=@BASEDIR@/plugins</extraJvmArguments>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -205,7 +205,7 @@
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
-                  <extraArgument>-Dplugins.dir=plugins</extraArgument>
+                  <extraJvmArguments>-Dplugins.dir=@BASEDIR@/plugins</extraJvmArguments>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -217,7 +217,7 @@
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/pinot-controller-log4j2.xml</extraArgument>
-                  <extraArgument>-Dplugins.dir=plugins</extraArgument>
+                  <extraJvmArguments>-Dplugins.dir=@BASEDIR@/plugins</extraJvmArguments>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -229,7 +229,7 @@
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/pinot-broker-log4j2.xml</extraArgument>
-                  <extraArgument>-Dplugins.dir=plugins</extraArgument>
+                  <extraJvmArguments>-Dplugins.dir=@BASEDIR@/plugins</extraJvmArguments>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -241,7 +241,7 @@
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/pinot-server-log4j2.xml</extraArgument>
-                  <extraArgument>-Dplugins.dir=plugins</extraArgument>
+                  <extraJvmArguments>-Dplugins.dir=@BASEDIR@/plugins</extraJvmArguments>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -253,7 +253,7 @@
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
-                  <extraArgument>-Dplugins.dir=plugins</extraArgument>
+                  <extraJvmArguments>-Dplugins.dir=@BASEDIR@/plugins</extraJvmArguments>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -266,7 +266,7 @@
                 <extraArguments>
                   <extraArgument>-XX:MaxDirectMemorySize=6g</extraArgument>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
-                  <extraArgument>-Dplugins.dir=plugins</extraArgument>
+                  <extraJvmArguments>-Dplugins.dir=@BASEDIR@/plugins</extraJvmArguments>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -278,7 +278,7 @@
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
-                  <extraArgument>-Dplugins.dir=plugins</extraArgument>
+                  <extraJvmArguments>-Dplugins.dir=@BASEDIR@/plugins</extraJvmArguments>
                 </extraArguments>
               </jvmSettings>
             </program>

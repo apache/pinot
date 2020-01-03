@@ -38,8 +38,8 @@ import org.slf4j.LoggerFactory;
 
 public class PluginManager {
 
-  public static final String PLUGINS_DIR_ENV_VAR = "plugins.dir";
-  public static final String PLUGINS_INCLUDE_ENV_VAR = "plugins.include";
+  public static final String PLUGINS_DIR_PROPERTY_NAME = "plugins.dir";
+  public static final String PLUGINS_INCLUDE_PROPERTY_NAME = "plugins.include";
   public static final String DEFAULT_PLUGIN_NAME = "DEFAULT";
   private static final Logger LOGGER = LoggerFactory.getLogger(PluginManager.class);
   private static final String JAR_FILE_EXTENSION = "jar";
@@ -60,25 +60,25 @@ public class PluginManager {
       return;
     }
     try {
-      _pluginsRootDir = System.getProperty(PLUGINS_DIR_ENV_VAR);
+      _pluginsRootDir = System.getProperty(PLUGINS_DIR_PROPERTY_NAME);
     } catch (Exception e) {
-      LOGGER.error("Failed to load env variable {}", PLUGINS_DIR_ENV_VAR, e);
+      LOGGER.error("Failed to load env variable {}", PLUGINS_DIR_PROPERTY_NAME, e);
       _pluginsRootDir = null;
     }
     try {
-      _pluginsInclude = System.getProperty(PLUGINS_INCLUDE_ENV_VAR);
+      _pluginsInclude = System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME);
     } catch (Exception e) {
-      LOGGER.error("Failed to load env variable {}", PLUGINS_INCLUDE_ENV_VAR, e);
+      LOGGER.error("Failed to load env variable {}", PLUGINS_INCLUDE_PROPERTY_NAME, e);
       _pluginsInclude = null;
     }
     init(_pluginsRootDir, _pluginsInclude);
     _initialized = true;
   }
 
-  private void init(String pluginsRootDir, String pluginsLoading) {
+  private void init(String pluginsRootDir, String pluginsInclude) {
     if (StringUtils.isEmpty(pluginsRootDir)) {
       LOGGER.info("Env variable '{}' is not specified. Set this env variable to load additional plugins.",
-          PLUGINS_DIR_ENV_VAR);
+          PLUGINS_DIR_PROPERTY_NAME);
       return;
     } else {
       if (!new File(pluginsRootDir).exists()) {
@@ -89,11 +89,11 @@ public class PluginManager {
     }
     Collection<File> jarFiles = FileUtils.listFiles(new File(pluginsRootDir), new String[]{JAR_FILE_EXTENSION}, true);
     List<String> pluginsToLoad = null;
-    if (!StringUtils.isEmpty(pluginsLoading)) {
-      pluginsToLoad = Arrays.asList(pluginsLoading.split(","));
+    if (!StringUtils.isEmpty(pluginsInclude)) {
+      pluginsToLoad = Arrays.asList(pluginsInclude.split(","));
       LOGGER.info("Trying to load plugins: [{}]", Arrays.toString(pluginsToLoad.toArray()));
     } else {
-      LOGGER.info("Loading all plugins. Please use env variable '{}' to customize.", PLUGINS_INCLUDE_ENV_VAR,
+      LOGGER.info("Loading all plugins. Please use env variable '{}' to customize.", PLUGINS_INCLUDE_PROPERTY_NAME,
           Arrays.toString(jarFiles.toArray()));
     }
     for (File jarFile : jarFiles) {

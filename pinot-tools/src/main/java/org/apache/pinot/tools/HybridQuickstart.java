@@ -51,6 +51,8 @@ public class HybridQuickstart {
 
   public static void main(String[] args)
       throws Exception {
+    // TODO: Explicitly call below method to load dependencies from pinot-plugins libs which are excluded from pinot-tools packaging.
+    // E.g. Kafka related libs are coming from pinot-kafka-* lib, avro libs are coming from pinot-avro lib.
     PluginManager.get().init();
     new HybridQuickstart().execute();
   }
