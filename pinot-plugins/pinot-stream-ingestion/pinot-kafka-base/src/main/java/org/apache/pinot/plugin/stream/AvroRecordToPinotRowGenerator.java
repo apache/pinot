@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.stream;
+package org.apache.pinot.plugin.stream;
 
 import com.google.common.base.Preconditions;
 import org.apache.avro.generic.GenericData;

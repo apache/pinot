@@ -64,7 +64,7 @@ import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
-import org.apache.pinot.core.realtime.stream.AvroRecordToPinotRowGenerator;
+import org.apache.pinot.plugin.stream.AvroRecordToPinotRowGenerator;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
