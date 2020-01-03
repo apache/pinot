@@ -316,7 +316,7 @@ to consume from, using a table definition such as this one:
          "streamType": "kafka",
          "stream.kafka.consumer.type": "highLevel",
          "stream.kafka.topic.name": "flights-realtime",
-         "stream.kafka.decoder.class.name": "org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder",
+         "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
          "stream.kafka.zk.broker.url": "localhost:2181",
          "stream.kafka.hlc.zk.connect.string": "localhost:2181"
        }

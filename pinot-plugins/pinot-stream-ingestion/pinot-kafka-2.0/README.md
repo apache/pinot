@@ -36,7 +36,7 @@ Below is a sample `streamConfigs` used to create a realtime table with Kafka Str
   "streamType": "kafka",
   "stream.kafka.consumer.type": "highLevel",
   "stream.kafka.topic.name": "meetupRSVPEvents",
-  "stream.kafka.decoder.class.name": "org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder",
+  "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
   "stream.kafka.hlc.zk.connect.string": "localhost:2191/kafka",
   "stream.kafka.consumer.factory.class.name": "org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory",
   "stream.kafka.zk.broker.url": "localhost:2191/kafka",

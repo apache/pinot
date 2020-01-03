@@ -20,6 +20,8 @@ package org.apache.pinot.core.realtime.impl.kafka;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.plugin.stream.kafka.KafkaAvroMessageDecoder;
+import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.testng.Assert;

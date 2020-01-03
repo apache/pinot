@@ -180,7 +180,7 @@ Kafka 2.x HLC consumer uses ``org.apache.pinot.core.realtime.impl.kafka2.KafkaCo
     "streamType": "kafka",
     "stream.kafka.consumer.type": "highLevel",
     "stream.kafka.topic.name": "meetupRSVPEvents",
-    "stream.kafka.decoder.class.name": "org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder",
+    "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
     "stream.kafka.hlc.zk.connect.string": "localhost:2191/kafka",
     "stream.kafka.consumer.factory.class.name": "org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory",
     "stream.kafka.zk.broker.url": "localhost:2191/kafka",
@@ -213,7 +213,7 @@ Below is a sample table config used to create a realtime table with Kafka Partit
         "streamType": "kafka",
         "stream.kafka.consumer.type": "LowLevel",
         "stream.kafka.topic.name": "meetupRSVPEvents",
-        "stream.kafka.decoder.class.name": "org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder",
+        "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
         "stream.kafka.consumer.factory.class.name": "org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory",
         "stream.kafka.zk.broker.url": "localhost:2191/kafka",
         "stream.kafka.broker.list": "localhost:19092"

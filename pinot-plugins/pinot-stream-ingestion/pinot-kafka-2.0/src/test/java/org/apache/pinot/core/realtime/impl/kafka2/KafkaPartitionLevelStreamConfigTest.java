@@ -20,7 +20,7 @@ package org.apache.pinot.core.realtime.impl.kafka2;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
+import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.testng.Assert;
@@ -40,7 +40,7 @@ public class KafkaPartitionLevelStreamConfigTest {
     String streamType = "kafka";
     String consumerType = StreamConfig.ConsumerType.LOWLEVEL.toString();
     String consumerFactoryClassName = KafkaConsumerFactory.class.getName();
-    String decoderClass = "org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder";
+    String decoderClass = "org.apache.pinot.plugin.stream.kafka.KafkaAvroMessageDecoder";
     String tableNameWithType = "tableName_REALTIME";
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
     streamConfigMap

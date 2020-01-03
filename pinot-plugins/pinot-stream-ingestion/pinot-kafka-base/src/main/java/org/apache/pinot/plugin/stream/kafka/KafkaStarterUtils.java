@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.impl.kafka;
+package org.apache.pinot.plugin.stream.kafka;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -52,7 +52,7 @@ public class KafkaStarterUtils {
   }
 
   public static final String KAFKA_JSON_MESSAGE_DECODER_CLASS_NAME =
-      "org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder";
+      "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder";
 
   public static Properties getDefaultKafkaConfiguration() {
     final Properties configuration = new Properties();
