@@ -369,6 +369,18 @@ Alternatively a YAML file that specifies the values for the parameters can be pr
 helm install --name pinot -f values.yaml .
 ```
 
+If you are using GKE, Create a storageClass:
+
+```
+kubectl apply -f gke-ssd.yaml
+```
+
+or If you want to use pd-standard storageClass:
+
+```bash
+kubectl apply -f gke-pd.yaml
+```
+
 ## Use superset to query Pinot
 
 ### Bring up Superset
