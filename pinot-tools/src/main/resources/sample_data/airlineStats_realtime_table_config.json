@@ -22,7 +22,7 @@
       "streamType": "kafka",
       "stream.kafka.consumer.type": "simple",
       "stream.kafka.topic.name": "flights-realtime",
-      "stream.kafka.decoder.class.name": "org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder",
+      "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
       "stream.kafka.hlc.zk.connect.string": "localhost:2191/kafka",
       "stream.kafka.zk.broker.url": "localhost:2191/kafka",
       "stream.kafka.broker.list": "localhost:19092",
