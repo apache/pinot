@@ -34,6 +34,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
+    <plugin.type>pinot-stream-ingestion</plugin.type>
   </properties>
 
   <modules>
@@ -80,5 +81,4 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
-
 </project>

@@ -19,6 +19,7 @@
 package org.apache.pinot.tools;
 
 import java.lang.reflect.Field;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.perf.PerfBenchmarkRunner;
 import org.apache.pinot.tools.perf.QueryRunner;
 import org.kohsuke.args4j.Argument;
@@ -66,6 +67,7 @@ public class PinotToolLauncher {
 
   public static void main(String[] args)
       throws Exception {
+    PluginManager.get().init();
     new PinotToolLauncher().execute(args);
   }
 

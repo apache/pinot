@@ -34,6 +34,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
+    <plugin.type></plugin.type>
   </properties>
 
   <modules>
@@ -69,12 +70,12 @@
             <version>3.2.1</version>
             <executions>
               <execution>
-                <phase>package</phase>
+                <phase>install</phase>
                 <goals>
                   <goal>shade</goal>
                 </goals>
                 <configuration>
-                  <outputDirectory>target/plugins/${artifactId}</outputDirectory>
+                  <outputDirectory>${pinot.root}/pinot-plugins/target/plugins/${plugin.type}/${artifactId}</outputDirectory>
                 </configuration>
               </execution>
             </executions>

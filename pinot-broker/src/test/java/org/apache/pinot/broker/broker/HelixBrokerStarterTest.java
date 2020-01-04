@@ -113,7 +113,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
     streamConfigs.put("stream.kafka.consumer.type", "highLevel");
     streamConfigs.put("stream.kafka.topic.name", "kafkaTopic");
     streamConfigs
-        .put("stream.kafka.decoder.class.name", "org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder");
+        .put("stream.kafka.decoder.class.name", "org.apache.pinot.plugin.stream.kafka.KafkaAvroMessageDecoder");
     return streamConfigs;
   }
 
