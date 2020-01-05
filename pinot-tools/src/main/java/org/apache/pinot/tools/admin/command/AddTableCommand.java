@@ -72,7 +72,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
 
   @Override
   public String description() {
-    return "Create Pinot table with table config and schema.";
+    return "Create a Pinot table";
   }
 
   @Override
