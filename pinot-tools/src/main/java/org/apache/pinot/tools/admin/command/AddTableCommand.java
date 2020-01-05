@@ -139,7 +139,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     if (_schemaFile != null) {
       File schemaFile = new File(_schemaFile);
       if (!schemaFile.exists()) {
-        throw new FileNotFoundException("schema file does not exist: " + _schemaFile);
+        throw new FileNotFoundException("Schema file does not exist: " + _schemaFile);
       }
 
       Schema schema = Schema.fromFile(schemaFile);
