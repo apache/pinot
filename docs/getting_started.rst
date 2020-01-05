@@ -200,17 +200,6 @@ In order to set up a table, we need to specify the schema of this transcript in 
     ]
   }
 
-To upload the schema, we can navigate to the directory in ``pinot-distribution`` that contains
-``pinot-admin.sh``, and use the command below:
-
-.. code-block:: none
-
-  $ VERSION=0.2.0
-  $ cd ./pinot-distribution/target/apache-pinot-incubating-$VERSION-SNAPSHOT-bin/apache-pinot-incubating-$VERSION-SNAPSHOT-bin/bin
-  $ ./pinot-admin.sh AddSchema -schemaFile $WORKING_DIR/config/transcript-schema.json -exec
-  Executing command: AddSchema -controllerHost [controller_host] -controllerPort 9000 -schemaFilePath /Users/host1/Desktop/getting-started/config/transcript-schema.json -exec
-  Sending request: http://[controller_host]:9000/schemas to controller: [controller_host], version: 0.2.0-SNAPSHOT-68092ab9eb83af173d725ec685c22ba4eb5bacf9
-
 Then, we need to specify the table config in another JSON file (also stored in ``config``), which links the schema to the table:
 
 .. code-block:: none
@@ -241,12 +230,14 @@ Then, we need to specify the table config in another JSON file (also stored in `
     "metadata": {}
   }
 
-And upload the table config to Pinot cluster:
+
+To create pinot table, we can navigate to the directory in ``pinot-distribution`` that contains
+``pinot-admin.sh``, and use the command below:
 
 .. code-block:: none
 
-  $ ./pinot-admin.sh AddTable -filePath $WORKING_DIR/config/transcript-table-config.json -exec
-  Executing command: AddTable -filePath /Users/host1/Desktop/getting-started/config/transcript-table-config.json -controllerHost [controller_host] -controllerPort 9000 -exec
+  $ ./pinot-admin.sh AddTable -schemaFile $WORKING_DIR/config/transcript-schema.json -tableConfigFile $WORKING_DIR/config/transcript-table-config.json -exec
+  Executing command: AddTable -tableConfigFile /Users/host1/Desktop/getting-started/config/transcript-table-config.json -schemaFile /Users/host1/Desktop/getting-started/config/transcript-schema.json -controllerHost [controller_host] -controllerPort 9000 -exec
   {"status":"Table transcript_OFFLINE successfully added"}
 
 At this point, the directory tree for our ``getting-started`` should look like this:
@@ -260,6 +251,7 @@ At this point, the directory tree for our ``getting-started`` should look like t
              |-- csv-record-reader-config.json
              |-- transcript-schema.json
              |-- transcript-table-config.json
+
 
 In order to upload our data to the Pinot cluster, we need to convert our CSV file into a Pinot Segment, which will be put in a new directory $WORKING_DIR/test2:
 

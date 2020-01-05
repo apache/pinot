@@ -72,8 +72,9 @@ import org.slf4j.LoggerFactory;
  *
  * Sample Usage in Commandline:
  *  JAVA_OPTS="-Xms4G -Xmx4G -Dpinot.admin.system.exit=true" \
- *  bin/pinot-admin.sh AddSchema \
- *    -schemaFile /my/path/to/schema/schema.json \
+ *  bin/pinot-admin.sh AddTable \
+ *    -schemaFile /my/path/to/table/schema.json \
+ *    -tableConfigFile /my/path/to/table/tableConfig.json \
  *    -controllerHost localhost \
  *    -controllerPort 9000 \
  *    -exec

@@ -20,7 +20,6 @@ package org.apache.pinot.tools.admin.command;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.NetUtil;
@@ -112,6 +111,27 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     return this;
   }
 
+  public void uploadSchema()
+      throws Exception {
+    File schemaFile;
+    Schema schema;
+    try {
+      schemaFile = new File(_schemaFile);
+      schema = Schema.fromFile(schemaFile);
+    } catch (Exception e) {
+      LOGGER.error("Got exception while reading Pinot schema from file: [" + _schemaFile + "]");
+      throw e;
+    }
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      fileUploadDownloadClient.addSchema(
+          FileUploadDownloadClient.getUploadSchemaHttpURI(_controllerHost, Integer.parseInt(_controllerPort)),
+          schema.getSchemaName(), schemaFile);
+    } catch (Exception e) {
+      LOGGER.error("Got Exception to upload Pinot Schema: " + schema.getSchemaName(), e);
+      throw e;
+    }
+  }
+
   public boolean sendTableCreationRequest(JsonNode node)
       throws IOException {
     String res = AbstractBaseAdminCommand
@@ -135,28 +155,11 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     _controllerAddress = "http://" + _controllerHost + ":" + _controllerPort;
 
     LOGGER.info("Executing command: " + toString());
+
     // Backward compatible
     if (_schemaFile != null) {
-      File schemaFile = new File(_schemaFile);
-      if (!schemaFile.exists()) {
-        throw new FileNotFoundException("Schema file does not exist: " + _schemaFile);
-      }
-
-      Schema schema = Schema.fromFile(schemaFile);
-      try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-        fileUploadDownloadClient.addSchema(
-            FileUploadDownloadClient.getUploadSchemaHttpURI(_controllerHost, Integer.parseInt(_controllerPort)),
-            schema.getSchemaName(), schemaFile);
-      } catch (Exception e) {
-        LOGGER.error("Got Exception to upload Pinot Schema: " + schema.getSchemaName(), e);
-        throw e;
-      }
+      uploadSchema();
     }
-    File tableConfigFile = new File(_tableConfigFile);
-    if (!tableConfigFile.exists()) {
-      throw new FileNotFoundException("table config file does not exist: " + _tableConfigFile);
-    }
-
-    return sendTableCreationRequest(JsonUtils.fileToJsonNode(tableConfigFile));
+    return sendTableCreationRequest(JsonUtils.fileToJsonNode(new File(_tableConfigFile)));
   }
 }
