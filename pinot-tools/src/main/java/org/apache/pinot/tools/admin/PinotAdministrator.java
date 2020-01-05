@@ -97,6 +97,7 @@ public class PinotAdministrator {
       @SubCommand(name = "ChangeTableState", impl = ChangeTableState.class),
       @SubCommand(name = "AddTenant", impl = AddTenantCommand.class),
       @SubCommand(name = "AddSchema", impl = AddSchemaCommand.class),
+      @SubCommand(name = "UpdateSchema", impl = AddSchemaCommand.class),
       @SubCommand(name = "UploadSegment", impl = UploadSegmentCommand.class),
       @SubCommand(name = "PostQuery", impl = PostQueryCommand.class),
       @SubCommand(name = "StopProcess", impl = StopProcessCommand.class),

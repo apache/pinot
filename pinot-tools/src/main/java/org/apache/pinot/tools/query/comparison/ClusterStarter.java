@@ -192,7 +192,8 @@ public class ClusterStarter {
       throws Exception {
     if (_tableConfigFile != null) {
       AddTableCommand addTableCommand =
-          new AddTableCommand().setControllerPort(_controllerPort).setFilePath(_tableConfigFile).setExecute(true);
+          new AddTableCommand().setControllerPort(_controllerPort)
+              .setSchemaFile(_schemaFileName).setTableConfigFile(_tableConfigFile).setExecute(true);
       addTableCommand.execute();
       return;
     }

@@ -84,8 +84,6 @@ public class RealtimeQuickStart {
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, server and broker *****");
     runner.startAll();
-    printStatus(Color.CYAN, "***** Adding meetupRSVP schema *****");
-    runner.addSchema();
     printStatus(Color.CYAN, "***** Adding meetupRSVP table *****");
     runner.addTable();
     printStatus(Color.CYAN, "***** Starting meetup data stream and publishing to Kafka *****");
