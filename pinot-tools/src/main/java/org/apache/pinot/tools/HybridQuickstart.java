@@ -130,8 +130,6 @@ public class HybridQuickstart {
     runner.createServerTenantWith(1, 1, "airline");
     printStatus(Color.YELLOW, "***** Creating a broker tenant with name 'airline_broker' *****");
     runner.createBrokerTenantWith(2, "airline_broker");
-    printStatus(Color.YELLOW, "***** Adding airlineStats schema *****");
-    runner.addSchema();
     printStatus(Color.YELLOW, "***** Adding airlineStats offline and realtime table *****");
     runner.addTable();
     printStatus(Color.YELLOW, "***** Building index segment for airlineStats *****");

@@ -153,18 +153,11 @@ public class QuickstartRunner {
         .setInstances(number).setRole(TenantRole.BROKER).setExecute(true).execute();
   }
 
-  public void addSchema()
-      throws Exception {
-    for (QuickstartTableRequest request : _tableRequests) {
-      new AddSchemaCommand().setControllerPort(String.valueOf(_controllerPorts.get(0)))
-          .setSchemaFilePath(request.getSchemaFile().getAbsolutePath()).setExecute(true).execute();
-    }
-  }
-
   public void addTable()
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
-      new AddTableCommand().setFilePath(request.getTableRequestFile().getAbsolutePath())
+      new AddTableCommand().setSchemaFile(request.getSchemaFile().getAbsolutePath())
+          .setTableConfigFile(request.getTableRequestFile().getAbsolutePath())
           .setControllerPort(String.valueOf(_controllerPorts.get(0))).setExecute(true).execute();
     }
   }

@@ -341,7 +341,7 @@ will start consuming from the Kafka topic.
 
 .. code-block:: bash
 
-   bin/pinot-admin.sh AddTable -filePath flights-definition-realtime.json
+   bin/pinot-admin.sh AddTable -schemaFile flights-schema.json -tableConfigFile flights-definition-realtime.json -exec
 
 We can then query the table with the following query to see the events stream in:
 

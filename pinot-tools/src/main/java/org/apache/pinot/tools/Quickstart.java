@@ -146,8 +146,6 @@ public class Quickstart {
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
     runner.startAll();
-    printStatus(Color.CYAN, "***** Adding baseballStats schema *****");
-    runner.addSchema();
     printStatus(Color.CYAN, "***** Adding baseballStats table *****");
     runner.addTable();
     printStatus(Color.CYAN, "***** Building index segment for baseballStats *****");

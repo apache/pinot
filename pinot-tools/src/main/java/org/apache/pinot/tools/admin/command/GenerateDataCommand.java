@@ -101,7 +101,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
 
   @Override
   public String description() {
-    return "Generate random data as per the provided scema";
+    return "Generate random data as per the provided schema";
   }
 
   @Override

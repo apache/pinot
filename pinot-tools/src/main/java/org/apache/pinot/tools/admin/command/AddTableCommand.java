@@ -21,9 +21,11 @@ package org.apache.pinot.tools.admin.command;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
-import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -37,8 +39,11 @@ import org.slf4j.LoggerFactory;
 public class AddTableCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddTableCommand.class);
 
-  @Option(name = "-filePath", required = true, metaVar = "<string>", usage = "Path to the request.json file")
-  private String _filePath;
+  @Option(name = "-tableConfigFile", required = true, metaVar = "<string>", aliases = {"-tableConf", "-tableConfig", "-filePath"}, usage = "Path to table config file.")
+  private String _tableConfigFile;
+
+  @Option(name = "-schemaFile", required = false, metaVar = "<string>", aliases = {"-schema"}, usage = "Path to table schema file.")
+  private String _schemaFile = null;
 
   @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
   private String _controllerHost;
@@ -66,24 +71,28 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
 
   @Override
   public String description() {
-    return "Add table specified in the json file, to the controller.";
+    return "Create a Pinot table";
   }
 
   @Override
   public String toString() {
-    String retString = ("AddTable -filePath " + _filePath + " -controllerHost " + _controllerHost + " -controllerPort "
-        + _controllerPort);
-
+    String retString =
+        ("AddTable -tableConfigFile " + _tableConfigFile + " -schemaFile " + _schemaFile + " -controllerHost "
+            + _controllerHost + " -controllerPort " + _controllerPort);
     return ((_exec) ? (retString + " -exec") : retString);
   }
 
   @Override
   public void cleanup() {
-
   }
 
-  public AddTableCommand setFilePath(String filePath) {
-    _filePath = filePath;
+  public AddTableCommand setTableConfigFile(String tableConfigFile) {
+    _tableConfigFile = tableConfigFile;
+    return this;
+  }
+
+  public AddTableCommand setSchemaFile(String schemaFile) {
+    _schemaFile = schemaFile;
     return this;
   }
 
@@ -102,33 +111,55 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     return this;
   }
 
-  public boolean execute(JsonNode node)
-      throws IOException {
-    if (_controllerHost == null) {
-      _controllerHost = NetUtil.getHostAddress();
+  public void uploadSchema()
+      throws Exception {
+    File schemaFile;
+    Schema schema;
+    try {
+      schemaFile = new File(_schemaFile);
+      schema = Schema.fromFile(schemaFile);
+    } catch (Exception e) {
+      LOGGER.error("Got exception while reading Pinot schema from file: [" + _schemaFile + "]");
+      throw e;
     }
-    _controllerAddress = "http://" + _controllerHost + ":" + _controllerPort;
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      fileUploadDownloadClient.addSchema(
+          FileUploadDownloadClient.getUploadSchemaHttpURI(_controllerHost, Integer.parseInt(_controllerPort)),
+          schema.getSchemaName(), schemaFile);
+    } catch (Exception e) {
+      LOGGER.error("Got Exception to upload Pinot Schema: " + schema.getSchemaName(), e);
+      throw e;
+    }
+  }
 
+  public boolean sendTableCreationRequest(JsonNode node)
+      throws IOException {
+    String res = AbstractBaseAdminCommand
+        .sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableCreate(), node.toString());
+    LOGGER.info(res);
+    return res.contains("succesfully added");
+  }
+
+  @Override
+  public boolean execute()
+      throws Exception {
     if (!_exec) {
       LOGGER.warn("Dry Running Command: " + toString());
       LOGGER.warn("Use the -exec option to actually execute the command.");
       return true;
     }
 
-    LOGGER.info("Executing command: " + toString());
-    String res = AbstractBaseAdminCommand
-        .sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableCreate(), node.toString());
-
-    LOGGER.info(res);
-    if (res.contains("succesfully added")) {
-      return true;
+    if (_controllerHost == null) {
+      _controllerHost = NetUtil.getHostAddress();
     }
-    return false;
-  }
+    _controllerAddress = "http://" + _controllerHost + ":" + _controllerPort;
 
-  @Override
-  public boolean execute()
-      throws Exception {
-    return execute(JsonUtils.fileToJsonNode(new File(_filePath)));
+    LOGGER.info("Executing command: " + toString());
+
+    // Backward compatible
+    if (_schemaFile != null) {
+      uploadSchema();
+    }
+    return sendTableCreationRequest(JsonUtils.fileToJsonNode(new File(_tableConfigFile)));
   }
 }
