@@ -50,7 +50,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
-import org.apache.pinot.avro.data.readers.AvroUtils;
+import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.broker.requesthandler.PinotQueryParserFactory;
 import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
 import org.apache.pinot.client.Request;

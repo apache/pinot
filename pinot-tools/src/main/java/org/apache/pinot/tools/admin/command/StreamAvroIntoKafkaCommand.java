@@ -31,7 +31,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DatumWriter;
 import org.apache.avro.io.EncoderFactory;
-import org.apache.pinot.avro.data.readers.AvroUtils;
+import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;

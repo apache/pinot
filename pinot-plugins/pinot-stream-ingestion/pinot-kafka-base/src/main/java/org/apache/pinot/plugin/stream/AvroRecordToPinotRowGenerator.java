@@ -20,7 +20,7 @@ package org.apache.pinot.plugin.stream;
 
 import com.google.common.base.Preconditions;
 import org.apache.avro.generic.GenericData;
-import org.apache.pinot.avro.data.readers.AvroUtils;
+import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;

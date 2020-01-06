@@ -43,7 +43,7 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpStatus;
-import org.apache.pinot.avro.data.readers.AvroUtils;
+import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
 import org.apache.pinot.common.config.IndexingConfig;

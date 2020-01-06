@@ -24,7 +24,7 @@ import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.avro.data.readers.AvroUtils;
+import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;

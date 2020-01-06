@@ -34,20 +34,20 @@ public class RecordReaderSpec {
   /**
    * Corresponding RecordReader class name.
    * E.g.
-   *    org.apache.pinot.avro.data.readers.AvroRecordReader
-   *    org.apache.pinot.csv.data.readers.CSVRecordReader
-   *    org.apache.pinot.parquet.data.readers.ParquetRecordReader
-   *    org.apache.pinot.json.data.readers.JsonRecordReader
-   *    org.apache.pinot.orc.data.readers.OrcRecordReader
-   *    org.apache.pinot.thrift.data.readers.ThriftRecordReader
+   *    org.apache.pinot.plugin.inputformat.avro.AvroRecordReader
+   *    org.apache.pinot.plugin.inputformat.csv.CSVRecordReader
+   *    org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader
+   *    org.apache.pinot.plugin.inputformat.json.JsonRecordReader
+   *    org.apache.pinot.plugin.inputformat.orc.OrcRecordReader
+   *    org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader
    */
   private String _className;
 
   /**
    * Corresponding RecordReaderConfig class name, it's mandatory for CSV and Thrift file format.
    * E.g.
-   *    org.apache.pinot.csv.data.readers.CSVRecordReaderConfig
-   *    org.apache.pinot.thrift.data.readers.ThriftRecordReaderConfig
+   *    org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig
+   *    org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig
    */
   private String _configClassName;
 
@@ -75,12 +75,12 @@ public class RecordReaderSpec {
   /**
    * Corresponding RecordReader class name.
    * E.g.
-   *    org.apache.pinot.avro.data.readers.AvroRecordReader
-   *    org.apache.pinot.csv.data.readers.CSVRecordReader
-   *    org.apache.pinot.parquet.data.readers.ParquetRecordReader
-   *    org.apache.pinot.json.data.readers.JsonRecordReader
-   *    org.apache.pinot.orc.data.readers.OrcRecordReader
-   *    org.apache.pinot.thrift.data.readers.ThriftRecordReader
+   *    org.apache.pinot.plugin.inputformat.avro.AvroRecordReader
+   *    org.apache.pinot.plugin.inputformat.csv.CSVRecordReader
+   *    org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader
+   *    org.apache.pinot.plugin.inputformat.json.JsonRecordReader
+   *    org.apache.pinot.plugin.inputformat.orc.OrcRecordReader
+   *    org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader
    *
    * @param className
    */
@@ -108,8 +108,8 @@ public class RecordReaderSpec {
   /**
    * Corresponding RecordReaderConfig class name, it's mandatory for CSV and Thrift file format.
    * E.g.
-   *    org.apache.pinot.csv.data.readers.CSVRecordReaderConfig
-   *    org.apache.pinot.thrift.data.readers.ThriftRecordReaderConfig
+   *    org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig
+   *    org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig
    *
    * @param configClassName
    */

@@ -46,7 +46,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.avro.data.readers.AvroSchemaUtil;
+import org.apache.pinot.plugin.inputformat.avro.AvroSchemaUtil;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;

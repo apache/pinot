@@ -33,18 +33,18 @@ public class RecordReaderFactory {
   private static final Map<String, String> DEFAULT_RECORD_READER_CONFIG_CLASS_MAP = new HashMap<>();
 
   // TODO: This could be removed once we have dynamic loading plugins supports.
-  private static final String DEFAULT_AVRO_RECORD_READER_CLASS = "org.apache.pinot.avro.data.readers.AvroRecordReader";
-  private static final String DEFAULT_CSV_RECORD_READER_CLASS = "org.apache.pinot.csv.data.readers.CSVRecordReader";
+  private static final String DEFAULT_AVRO_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader";
+  private static final String DEFAULT_CSV_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.csv.CSVRecordReader";
   private static final String DEFAULT_CSV_RECORD_READER_CONFIG_CLASS =
       "org.apache.pinot.csv.data.readers.CSVRecordReaderConfig";
-  private static final String DEFAULT_JSON_RECORD_READER_CLASS = "org.apache.pinot.json.data.readers.JSONRecordReader";
+  private static final String DEFAULT_JSON_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.json.JSONRecordReader";
   private static final String DEFAULT_THRIFT_RECORD_READER_CLASS =
-      "org.apache.pinot.thrift.data.readers.ThriftRecordReader";
+      "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader";
   private static final String DEFAULT_THRIFT_RECORD_READER_CONFIG_CLASS =
-      "org.apache.pinot.thrift.data.readers.ThriftRecordReaderConfig";
-  private static final String DEFAULT_ORC_RECORD_READER_CLASS = "org.apache.pinot.orc.data.readers.ORCRecordReader";
+      "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig";
+  private static final String DEFAULT_ORC_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.orc.ORCRecordReader";
   private static final String DEFAULT_PARQUET_RECORD_READER_CLASS =
-      "org.apache.pinot.parquet.data.readers.ParquetRecordReader";
+      "org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader";
 
   private RecordReaderFactory() {
   }
