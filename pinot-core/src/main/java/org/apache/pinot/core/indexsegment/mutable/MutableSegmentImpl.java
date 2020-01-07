@@ -78,7 +78,6 @@ import org.slf4j.LoggerFactory;
 
 
 public class MutableSegmentImpl implements MutableSegment {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MutableSegmentImpl.class);
   // For multi-valued column, forward-index.
   // Maximum number of multi-values per row. We assert on this.
   private static final int MAX_MULTI_VALUES_PER_ROW = 1000;
@@ -336,7 +335,7 @@ public class MutableSegmentImpl implements MutableSegment {
         _newlyAddedColumnsFieldMap.put(columnName, schema.getFieldSpecFor(columnName));
       }
     }));
-    LOGGER.debug("Newly added columns: " + _newlyAddedColumnsFieldMap.toString());
+    _logger.debug("Newly added columns: " + _newlyAddedColumnsFieldMap.toString());
   }
 
   @Override
