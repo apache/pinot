@@ -27,6 +27,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 class BrokerResponse {
   private JsonNode _aggregationResults;
   private JsonNode _selectionResults;
+  private JsonNode _resultTable;
   private JsonNode _exceptions;
 
   private BrokerResponse() {
@@ -36,6 +37,7 @@ class BrokerResponse {
     _aggregationResults = brokerResponse.get("aggregationResults");
     _exceptions = brokerResponse.get("exceptions");
     _selectionResults = brokerResponse.get("selectionResults");
+    _resultTable = brokerResponse.get("resultTable");
   }
 
   boolean hasExceptions() {
@@ -52,6 +54,10 @@ class BrokerResponse {
 
   JsonNode getSelectionResults() {
     return _selectionResults;
+  }
+
+  JsonNode getResultTable() {
+    return _resultTable;
   }
 
   int getAggregationResultsSize() {

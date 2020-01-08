@@ -67,9 +67,16 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   public Future<BrokerResponse> executePinotQueryAsync(String brokerAddress, final Request request) {
     try {
       ObjectNode json = JsonNodeFactory.instance.objectNode();
-      json.put(request.getQueryFormat(), request.getQuery());
+      String queryFormat = request.getQueryFormat();
+      json.put(queryFormat, request.getQuery());
 
-      final String url = "http://" + brokerAddress + "/query";
+      final String url;
+      if (queryFormat.equalsIgnoreCase("sql")) {
+        url = "http://" + brokerAddress + "/sql";
+        json.put("queryOptions", "groupByMode=sql;responseFormat=sql");
+      } else {
+        url = "http://" + brokerAddress + "/query";
+      }
 
       AsyncHttpClient.BoundRequestBuilder requestBuilder = _httpClient.preparePost(url);
 

@@ -104,7 +104,7 @@ public class PinotClientRequest {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("sql")
-  @ApiOperation(value = "Querying pinot in sql")
+  @ApiOperation(value = "Querying pinot using sql")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
   public String processSqlQueryGet(@ApiParam(value = "Query", required = true) @QueryParam("sql") String query,
       @ApiParam(value = "Trace enabled") @QueryParam(Request.TRACE) String traceEnabled,
@@ -132,7 +132,7 @@ public class PinotClientRequest {
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("sql")
-  @ApiOperation(value = "Querying pinot")
+  @ApiOperation(value = "Querying pinot using sql")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
   public String processSqlQueryPost(String query) {
     try {
