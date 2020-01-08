@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.ingestion.standalone;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -67,6 +68,9 @@ public class SegmentUriPushJobRunner {
     URI outputDirURI;
     try {
       outputDirURI = new URI(_spec.getOutputDirURI());
+      if (outputDirURI.getScheme() == null) {
+        outputDirURI = new File(_spec.getOutputDirURI()).toURI();
+      }
     } catch (URISyntaxException e) {
       throw new RuntimeException("outputDirURI is not valid - '" + _spec.getOutputDirURI() + "'");
     }

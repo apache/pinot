@@ -30,7 +30,6 @@
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>pinot-batch-ingestion-base</artifactId>
-  <packaging>pom</packaging>
   <name>Pinot Batch Ingestion Base</name>
   <url>https://pinot.apache.org/</url>
   <properties>

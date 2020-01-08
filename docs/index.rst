@@ -48,6 +48,7 @@ Pinot
    tableconfig_schema
    schema
    in_production
+   batch_data_ingestion
    pinot_hadoop
    customizations
    tuning_pinot

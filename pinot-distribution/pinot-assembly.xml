@@ -98,6 +98,11 @@
     </fileSet>
     <fileSet>
       <useDefaultExcludes>false</useDefaultExcludes>
+      <directory>${pinot.root}/pinot-tools/src/main/resources/examples</directory>
+      <outputDirectory>examples/</outputDirectory>
+    </fileSet>
+    <fileSet>
+      <useDefaultExcludes>false</useDefaultExcludes>
       <directory>${pinot.root}/pinot-tools/target/pinot-tools-pkg/bin</directory>
       <outputDirectory>bin</outputDirectory>
       <fileMode>0755</fileMode>

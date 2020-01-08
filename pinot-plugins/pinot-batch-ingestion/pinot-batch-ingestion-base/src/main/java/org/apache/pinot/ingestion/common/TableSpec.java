@@ -29,7 +29,7 @@ public class TableSpec {
   String _tableName;
 
   /**
-   * schemaURI defines where to reade the table schema.
+   * schemaURI defines where to read the table schema.
    * Supports using PinotFS or HTTP.
    * E.g. hdfs://path/to/table_schema.json
    *      http://localhost:9000/tables/myTable/schema
