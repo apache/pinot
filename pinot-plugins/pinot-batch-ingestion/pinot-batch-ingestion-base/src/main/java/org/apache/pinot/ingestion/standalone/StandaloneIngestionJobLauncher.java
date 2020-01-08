@@ -33,7 +33,7 @@ public class StandaloneIngestionJobLauncher {
 
   public static final Logger LOGGER = LoggerFactory.getLogger(StandaloneIngestionJobLauncher.class);
 
-  private static final String USAGE = "usage: [job-launcher] [jobSpec.yaml]";
+  private static final String USAGE = "usage: [jobSpec.yaml]";
 
   private static void usage() {
     System.err.println(USAGE);

@@ -32,6 +32,7 @@ import org.apache.pinot.tools.admin.command.ChangeTableState;
 import org.apache.pinot.tools.admin.command.CreateSegmentCommand;
 import org.apache.pinot.tools.admin.command.DeleteClusterCommand;
 import org.apache.pinot.tools.admin.command.GenerateDataCommand;
+import org.apache.pinot.tools.admin.command.LaunchDataIngestionJobCommand;
 import org.apache.pinot.tools.admin.command.MoveReplicaGroup;
 import org.apache.pinot.tools.admin.command.OfflineSegmentIntervalCheckerCommand;
 import org.apache.pinot.tools.admin.command.PostQueryCommand;
@@ -87,6 +88,7 @@ public class PinotAdministrator {
   @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
   @SubCommands({
       @SubCommand(name = "GenerateData", impl = GenerateDataCommand.class),
+      @SubCommand(name = "LaunchDataIngestionJob", impl = LaunchDataIngestionJobCommand.class),
       @SubCommand(name = "CreateSegment", impl = CreateSegmentCommand.class),
       @SubCommand(name = "StartZookeeper", impl = StartZookeeperCommand.class),
       @SubCommand(name = "StartKafka", impl = StartKafkaCommand.class),

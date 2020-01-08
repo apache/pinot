@@ -59,12 +59,12 @@ public class SegmentGenerationJobSpec {
   private String _excludeFileNamePattern;
 
   /**
-   * Root directory of output data, expected to have scheme configured in PinotFS.
+   * Root directory of output segments, expected to have scheme configured in PinotFS.
    */
   private String _outputDirURI;
 
   /**
-   * Should orverwrite output segments if existed.
+   * Should overwrite output segments if existed.
    */
   private boolean _overwriteOutput;
 

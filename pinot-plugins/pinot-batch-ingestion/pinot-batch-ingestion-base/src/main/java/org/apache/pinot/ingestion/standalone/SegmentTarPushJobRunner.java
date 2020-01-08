@@ -67,6 +67,9 @@ public class SegmentTarPushJobRunner {
     URI outputDirURI;
     try {
       outputDirURI = new URI(_spec.getOutputDirURI());
+      if (outputDirURI.getScheme() == null) {
+        outputDirURI = new File(_spec.getOutputDirURI()).toURI();
+      }
     } catch (URISyntaxException e) {
       throw new RuntimeException("outputDirURI is not valid - '" + _spec.getOutputDirURI() + "'");
     }

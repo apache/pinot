@@ -56,6 +56,7 @@ public class SegmentGenerationJobRunner {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerationJobRunner.class);
   private static final String OFFLINE = "OFFLINE";
+  private static final String LOCAL_PINOT_FS_SCHEME = "file";
 
   private SegmentGenerationJobSpec _spec;
 
@@ -134,10 +135,16 @@ public class SegmentGenerationJobRunner {
 
     //Get pinotFS for input
     URI inputDirURI = new URI(_spec.getInputDirURI());
+    if (inputDirURI.getScheme() == null) {
+      inputDirURI = new File(_spec.getInputDirURI()).toURI();
+    }
     PinotFS inputDirFS = PinotFSFactory.create(inputDirURI.getScheme());
 
     //Get outputFS for writing output pinot segments
     URI outputDirURI = new URI(_spec.getOutputDirURI());
+    if (outputDirURI.getScheme() == null) {
+      outputDirURI = new File(_spec.getOutputDirURI()).toURI();
+    }
     PinotFS outputDirFS = PinotFSFactory.create(outputDirURI.getScheme());
     outputDirFS.mkdir(outputDirURI);
 
@@ -187,8 +194,7 @@ public class SegmentGenerationJobRunner {
       for (int i = 0; i < filteredFiles.size(); i++) {
         URI inputFileURI = URI.create(filteredFiles.get(i));
         if (inputFileURI.getScheme() == null) {
-          inputFileURI =
-              new URI(inputDirURI.getScheme(), inputFileURI.getSchemeSpecificPart(), inputFileURI.getFragment());
+          inputFileURI = new URI(inputDirURI.getScheme(), inputFileURI.getSchemeSpecificPart(), inputFileURI.getFragment());
         }
         //copy input path to local
         File localInputDataFile = new File(localInputTempDir, new File(inputFileURI).getName());

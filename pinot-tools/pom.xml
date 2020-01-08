@@ -66,6 +66,11 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-batch-ingestion-base</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-kafka-${kafka.version}</artifactId>
       <version>${project.version}</version>
       <scope>runtime</scope>
@@ -287,6 +292,18 @@
                 </extraArguments>
               </jvmSettings>
             </program>
+            <program>
+              <mainClass>org.apache.pinot.ingestion.standalone.StandaloneIngestionJobLauncher</mainClass>
+              <name>pinot-ingestion-job</name>
+              <jvmSettings>
+                <initialMemorySize>1G</initialMemorySize>
+                <maxMemorySize>1G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-ingestion-job-log4j2.xml</extraArgument>
+                  <extraJvmArguments>-Dplugins.dir=@BASEDIR@/plugins</extraJvmArguments>
+                </extraArguments>
+              </jvmSettings>
+            </program>
           </programs>
           <binFileExtensions>
             <unix>.sh</unix>
@@ -372,6 +389,25 @@
                 <resource>
                   <!-- source -->
                   <directory>src/main/resources/sample_data/kafka_${kafka.version}</directory>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+          <execution>
+            <id>copy-batch-ingestion-resources</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <!-- this is important -->
+              <overwrite>true</overwrite>
+              <!-- target -->
+              <outputDirectory>${basedir}/target/classes/examples/</outputDirectory>
+              <resources>
+                <resource>
+                  <!-- source -->
+                  <directory>src/main/resources/examples</directory>
                 </resource>
               </resources>
             </configuration>
