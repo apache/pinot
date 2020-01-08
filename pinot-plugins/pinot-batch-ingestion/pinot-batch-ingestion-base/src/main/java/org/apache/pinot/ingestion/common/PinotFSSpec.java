@@ -37,8 +37,8 @@ public class PinotFSSpec {
    * Class name used to create the PinotFS instance.
    * E.g.
    *    org.apache.pinot.spi.filesystem.LocalPinotFS is used for local filesystem
-   *    org.apache.pinot.filesystem.AzurePinotFS is used for Azure Data Lake
-   *    org.apache.pinot.filesystem.HadoopPinotFS is used for HDFS
+   *    org.apache.pinot.plugin.filesystem.AzurePinotFS is used for Azure Data Lake
+   *    org.apache.pinot.plugin.filesystem.HadoopPinotFS is used for HDFS
    */
   private String _className;
 
@@ -69,8 +69,8 @@ public class PinotFSSpec {
    * Class name used to create the PinotFS instance.
    * E.g.
    *    org.apache.pinot.spi.filesystem.LocalPinotFS is used for local filesystem
-   *    org.apache.pinot.filesystem.AzurePinotFS is used for Azure Data Lake
-   *    org.apache.pinot.filesystem.HadoopPinotFS is used for HDFS
+   *    org.apache.pinot.plugin.filesystem.AzurePinotFS is used for Azure Data Lake
+   *    org.apache.pinot.plugin.filesystem.HadoopPinotFS is used for HDFS
    *
    * @param className
    */

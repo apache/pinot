@@ -86,8 +86,8 @@ pinotFSSpecs:
     # className: Class name used to create the PinotFS instance.
     # E.g.
     #   org.apache.pinot.spi.filesystem.LocalPinotFS is used for local filesystem
-    #   org.apache.pinot.filesystem.AzurePinotFS is used for Azure Data Lake
-    #   org.apache.pinot.filesystem.HadoopPinotFS is used for HDFS
+    #   org.apache.pinot.plugin.filesystem.AzurePinotFS is used for Azure Data Lake
+    #   org.apache.pinot.plugin.filesystem.HadoopPinotFS is used for HDFS
     className: org.apache.pinot.spi.filesystem.LocalPinotFS
 
 # recordReaderSpec: defines all record reader
@@ -98,13 +98,13 @@ recordReaderSpec:
 
   # className: Corresponding RecordReader class name.
   # E.g.
-  #   org.apache.pinot.avro.data.readers.AvroRecordReader
-  #   org.apache.pinot.csv.data.readers.CSVRecordReader
-  #   org.apache.pinot.parquet.data.readers.ParquetRecordReader
-  #   org.apache.pinot.json.data.readers.JsonRecordReader
-  #   org.apache.pinot.orc.data.readers.OrcRecordReader
-  #   org.apache.pinot.thrift.data.readers.ThriftRecordReader
-  className: 'org.apache.pinot.avro.data.readers.AvroRecordReader'
+  #   org.apache.pinot.plugin.inputformat.avro.AvroRecordReader
+  #   org.apache.pinot.plugin.inputformat.csv.CSVRecordReader
+  #   org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader
+  #   org.apache.pinot.plugin.inputformat.json.JsonRecordReader
+  #   org.apache.pinot.plugin.inputformat.orc.OrcRecordReader
+  #   org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader
+  className: 'org.apache.pinot.plugin.inputformat.avro.AvroRecordReader'
 
 # tableSpec: defines table name and where to fetch corresponding table config and table schema.
 tableSpec:
