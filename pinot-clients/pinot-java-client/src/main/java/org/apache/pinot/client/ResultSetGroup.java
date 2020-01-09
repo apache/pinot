@@ -32,19 +32,24 @@ public class ResultSetGroup {
   ResultSetGroup(BrokerResponse brokerResponse) {
     _resultSets = new ArrayList<>();
 
-    if (brokerResponse.getSelectionResults() != null) {
-      _resultSets.add(new SelectionResultSet(brokerResponse.getSelectionResults()));
-    }
+    if (brokerResponse.getResultTable() != null) {
+      _resultSets.add(new ResultTableResultSet(brokerResponse.getResultTable()));
+    } else {
 
-    int aggregationResultCount = brokerResponse.getAggregationResultsSize();
-    for (int i = 0; i < aggregationResultCount; i++) {
-      JsonNode aggregationResult = brokerResponse.getAggregationResults().get(i);
-      if (aggregationResult.has("value")) {
-        _resultSets.add(new AggregationResultSet(aggregationResult));
-      } else if (aggregationResult.has("groupByResult")) {
-        _resultSets.add(new GroupByResultSet(aggregationResult));
-      } else {
-        throw new PinotClientException("Unrecognized result group, neither a value nor group by result");
+      if (brokerResponse.getSelectionResults() != null) {
+        _resultSets.add(new SelectionResultSet(brokerResponse.getSelectionResults()));
+      }
+
+      int aggregationResultCount = brokerResponse.getAggregationResultsSize();
+      for (int i = 0; i < aggregationResultCount; i++) {
+        JsonNode aggregationResult = brokerResponse.getAggregationResults().get(i);
+        if (aggregationResult.has("value")) {
+          _resultSets.add(new AggregationResultSet(aggregationResult));
+        } else if (aggregationResult.has("groupByResult")) {
+          _resultSets.add(new GroupByResultSet(aggregationResult));
+        } else {
+          throw new PinotClientException("Unrecognized result group, neither a value nor group by result");
+        }
       }
     }
   }

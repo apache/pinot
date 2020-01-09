@@ -146,40 +146,32 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *     Eg. <code>SELECT a FROM table LIMIT 15 -> [SELECT a FROM table LIMIT 10000]</code>
    *   </li>
    * </ul>
-   * <p>For queries with multiple aggregation functions, need to split each of them into a separate H2 SQL query.
-   * <ul>
-   *   <li>
-   *     Eg. <code>SELECT SUM(a), MAX(b) FROM table -> [SELECT SUM(a) FROM table, SELECT MAX(b) FROM table]</code>
-   *   </li>
-   * </ul>
    * <p>For group-by queries, need to add group-by columns to the select clause for H2 SQL query.
    * <ul>
    *   <li>
    *     Eg. <code>SELECT SUM(a) FROM table GROUP BY b -> [SELECT b, SUM(a) FROM table GROUP BY b]</code>
    *   </li>
    * </ul>
-   *
-   * @throws Exception
+   * TODO: Selection queries, Aggregation Group By queries, Order By, Distinct
+   *  This list is very basic right now (aggregations only) and needs to be enriched
    */
   public void testHardcodedSqlQueries()
       throws Exception {
-    // Here are some sample queries.
     String query;
     query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16312 AND Carrier = 'DL'";
     testSqlQuery(query, Collections.singletonList(query));
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL'";
+    query = "SELECT SUM(ArrTime) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL'";
     testSqlQuery(query, Collections.singletonList(query));
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch > 16312 AND Carrier = 'DL'";
+    query = "SELECT MAX(ArrTime) FROM mytable WHERE DaysSinceEpoch > 16312 AND Carrier = 'DL'";
     testSqlQuery(query, Collections.singletonList(query));
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch >= 16312 AND Carrier = 'DL'";
+    query = "SELECT MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 16312 AND Carrier = 'DL'";
     testSqlQuery(query, Collections.singletonList(query));
     query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch < 16312 AND Carrier = 'DL'";
     testSqlQuery(query, Collections.singletonList(query));
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
+    query = "SELECT MAX(ArrTime), MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
     testSqlQuery(query, Collections.singletonList(query));
-    query = "SELECT MAX(ArrTime), MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 16312";
-    testSqlQuery(query, Arrays.asList("SELECT MAX(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 15312",
-        "SELECT MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 15312"));
+    query = "SELECT COUNT(*), MAX(ArrTime), MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 16312";
+    testSqlQuery(query, Collections.singletonList(query));
   }
 
   /**

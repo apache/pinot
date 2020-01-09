@@ -486,16 +486,25 @@ public abstract class ClusterTest extends ControllerTest {
     return JsonUtils.stringToJsonNode(sendGetRequest(_brokerBaseApiUrl + "/" + uri));
   }
 
+  /**
+   * Queries the broker's pql query endpoint (/query)
+   */
   protected JsonNode postQuery(String query)
       throws Exception {
     return postQuery(new PinotQueryRequest("pql", query), _brokerBaseApiUrl);
   }
 
+  /**
+   * Queries the broker's pql query endpoint (/query)
+   */
   public static JsonNode postQuery(PinotQueryRequest r, String brokerBaseApiUrl)
       throws Exception {
     return postQuery(r.getQuery(), brokerBaseApiUrl, false, r.getQueryFormat());
   }
 
+  /**
+   * Queries the broker's pql query endpoint (/query)
+   */
   public static JsonNode postQuery(String query, String brokerBaseApiUrl, boolean enableTrace, String queryType)
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
@@ -504,4 +513,16 @@ public abstract class ClusterTest extends ControllerTest {
 
     return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query", payload.toString()));
   }
+
+  /**
+   * Queries the broker's sql query endpoint (/sql)
+   */
+  static JsonNode postSqlQuery(String query, String brokerBaseApiUrl) throws Exception {
+    ObjectNode payload = JsonUtils.newObjectNode();
+    payload.put("sql", query);
+    payload.put("queryOptions", "groupByMode=sql;responseFormat=sql");
+
+    return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString()));
+  }
+
 }

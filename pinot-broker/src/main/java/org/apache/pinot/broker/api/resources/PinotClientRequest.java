@@ -42,10 +42,7 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.DEBUG_OPTIONS;
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.PQL;
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.TRACE;
+import org.apache.pinot.common.utils.CommonConstants.Broker.Request;
 
 
 @Api(tags = "Query")
@@ -67,16 +64,16 @@ public class PinotClientRequest {
   public String processQueryGet(
       // Query param "bql" is for backward compatibility
       @ApiParam(value = "Query", required = true) @QueryParam("bql") String query,
-      @ApiParam(value = "Trace enabled") @QueryParam(TRACE) String traceEnabled,
-      @ApiParam(value = "Debug options") @QueryParam(DEBUG_OPTIONS) String debugOptions) {
+      @ApiParam(value = "Trace enabled") @QueryParam(Request.TRACE) String traceEnabled,
+      @ApiParam(value = "Debug options") @QueryParam(Request.DEBUG_OPTIONS) String debugOptions) {
     try {
       ObjectNode requestJson = JsonUtils.newObjectNode();
-      requestJson.put(PQL, query);
+      requestJson.put(Request.PQL, query);
       if (traceEnabled != null) {
-        requestJson.put(TRACE, traceEnabled);
+        requestJson.put(Request.TRACE, traceEnabled);
       }
       if (debugOptions != null) {
-        requestJson.put(DEBUG_OPTIONS, debugOptions);
+        requestJson.put(Request.DEBUG_OPTIONS, debugOptions);
       }
       BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson, null, new RequestStatistics());
       return brokerResponse.toJsonString();
@@ -102,5 +99,61 @@ public class PinotClientRequest {
       brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
       throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("query/sql")
+  @ApiOperation(value = "Querying pinot using sql")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
+  public String processSqlQueryGet(@ApiParam(value = "Query", required = true) @QueryParam("sql") String query,
+      @ApiParam(value = "Trace enabled") @QueryParam(Request.TRACE) String traceEnabled,
+      @ApiParam(value = "Debug options") @QueryParam(Request.DEBUG_OPTIONS) String debugOptions) {
+    try {
+      ObjectNode requestJson = JsonUtils.newObjectNode();
+      requestJson.put(Request.SQL, query);
+      String queryOptions = constructSqlQueryOptions();
+      requestJson.put(Request.QUERY_OPTIONS, queryOptions);
+      if (traceEnabled != null) {
+        requestJson.put(Request.TRACE, traceEnabled);
+      }
+      if (debugOptions != null) {
+        requestJson.put(Request.DEBUG_OPTIONS, debugOptions);
+      }
+      BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson, null, new RequestStatistics());
+      return brokerResponse.toJsonString();
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while processing GET request", e);
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1L);
+      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("query/sql")
+  @ApiOperation(value = "Querying pinot using sql")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
+  public String processSqlQueryPost(String query) {
+    try {
+      JsonNode requestJson = JsonUtils.stringToJsonNode(query);
+      if (!requestJson.has(Request.SQL)) {
+        throw new IllegalStateException("Payload is missing the query string field 'sql'");
+      }
+      String queryOptions = constructSqlQueryOptions();
+      // the only query options as of now are sql related. do not allow any custom query options in sql endpoint
+      ObjectNode sqlRequestJson = ((ObjectNode) requestJson).put(Request.QUERY_OPTIONS, queryOptions);
+      BrokerResponse brokerResponse = requestHandler.handleRequest(sqlRequestJson, null, new RequestStatistics());
+      return brokerResponse.toJsonString();
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while processing POST request", e);
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  private String constructSqlQueryOptions() {
+    return Request.QueryOptionKey.GROUP_BY_MODE + "=" + Request.SQL + ";" + Request.QueryOptionKey.RESPONSE_FORMAT + "="
+        + Request.SQL;
   }
 }

@@ -379,16 +379,16 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   /**
-   * Run equivalent Pinot and H2 query and compare the results.
+   * Run equivalent Pinot SQL and H2 query and compare the results.
    *
-   * @param sqlQuery Pinot query
+   * @param pinotQuery Pinot query
    * @param sqlQueries H2 query
    * @throws Exception
    */
-  protected void testSqlQuery(String sqlQuery, @Nullable List<String> sqlQueries)
+  protected void testSqlQuery(String pinotQuery, @Nullable List<String> sqlQueries)
       throws Exception {
     ClusterIntegrationTestUtils
-        .testQuery(sqlQuery, "sql", _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
+        .testSqlQuery(pinotQuery, _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
   }
 
   protected void setUpRealtimeTable(File avroFile, int numReplicas, boolean useLLC, String tableName)
