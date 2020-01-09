@@ -38,7 +38,7 @@
   </properties>
 
   <modules>
-    <module>pinot-batch-ingestion-base</module>
+    <module>pinot-batch-ingestion-standalone</module>
     <module>v0_deprecated</module>
   </modules>
 

@@ -46,6 +46,21 @@ Below is an example (also located at `examples/batch/airlineStats/ingestionJobSp
 
 .. code-block:: none
 
+# executionFrameworkSpec: Defines ingestion jobs to be running.
+executionFrameworkSpec:
+
+  # name: execution framework name
+  name: 'standalone'
+
+  # segmentGenerationJobRunnerClassName: class name implements org.apache.pinot.spi.ingestion.runner.SegmentGenerationJobRunner interface.
+  segmentGenerationJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.standalone.SegmentGenerationJobRunner'
+
+  # segmentTarPushJobRunnerClassName: class name implements org.apache.pinot.spi.ingestion.runner.SegmentTarPushJobRunner interface.
+  segmentTarPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.standalone.SegmentTarPushJobRunner'
+
+  # segmentUriPushJobRunnerClassName: class name implements org.apache.pinot.spi.ingestion.runner.SegmentUriPushJobRunner interface.
+  segmentUriPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.standalone.SegmentUriPushJobRunner'
+
 # jobType: Pinot ingestion job type.
 # Supported job types are:
 #   'SegmentCreation'

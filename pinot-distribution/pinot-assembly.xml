@@ -119,7 +119,6 @@
         <exclude>**/pinot-stream-ingestion/pinot-stream-ingestion/**</exclude>
         <exclude>**/pinot-stream-ingestion/pinot-kafka-base/**</exclude>
         <exclude>**/pinot-batch-ingestion/pinot-batch-ingestion/**</exclude>
-        <exclude>**/pinot-batch-ingestion/pinot-batch-ingestion-base/**</exclude>
         <exclude>**/pinot-batch-ingestion/pinot-ingestion-common/**</exclude>
         <exclude>**/pinot-batch-ingestion/v0_deprecated/**</exclude>
       </excludes>
