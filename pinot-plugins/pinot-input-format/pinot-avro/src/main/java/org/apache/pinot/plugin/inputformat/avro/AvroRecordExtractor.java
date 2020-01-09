@@ -16,34 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream;
+package org.apache.pinot.plugin.inputformat.avro;
 
-import com.google.common.base.Preconditions;
 import org.apache.avro.generic.GenericData;
-import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
-
-public class AvroRecordToPinotRowGenerator {
-  private final Schema _schema;
-  private final FieldSpec _incomingTimeFieldSpec;
-
-  public AvroRecordToPinotRowGenerator(Schema schema) {
-    _schema = schema;
-
-    // For time field, we use the incoming time field spec
-    TimeFieldSpec timeFieldSpec = schema.getTimeFieldSpec();
-    Preconditions.checkNotNull(timeFieldSpec);
-    _incomingTimeFieldSpec = new TimeFieldSpec(timeFieldSpec.getIncomingGranularitySpec());
-  }
-
-  public GenericRow transform(GenericData.Record from, GenericRow to) {
-    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
-      FieldSpec incomingFieldSpec =
-          fieldSpec.getFieldType() == FieldSpec.FieldType.TIME ? _incomingTimeFieldSpec : fieldSpec;
+public class AvroRecordExtractor extends RecordExtractor<GenericData.Record> {
+  @Override
+  public GenericRow extract(Schema schema, GenericData.Record from, GenericRow to) {
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      FieldSpec incomingFieldSpec = getFieldSpecToUse(schema, fieldSpec);
       AvroUtils.extractField(incomingFieldSpec, from, to);
     }
     return to;

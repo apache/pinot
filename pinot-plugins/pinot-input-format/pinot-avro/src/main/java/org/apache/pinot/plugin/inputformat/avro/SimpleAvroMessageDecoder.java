@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream;
+package org.apache.pinot.plugin.inputformat.avro;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
@@ -28,7 +28,9 @@ import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,17 +44,24 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
 
   private org.apache.avro.Schema _avroSchema;
   private DatumReader<GenericData.Record> _datumReader;
-  private AvroRecordToPinotRowGenerator _avroRecordConverter;
+  private RecordExtractor _avroRecordExtractor;
   private BinaryDecoder _binaryDecoderToReuse;
   private GenericData.Record _avroRecordToReuse;
+  private Schema _pinotSchema;
 
   @Override
   public void init(Map<String, String> props, Schema indexingSchema, String topicName)
       throws Exception {
     Preconditions.checkState(props.containsKey(SCHEMA), "Avro schema must be provided");
+    _pinotSchema = indexingSchema;
     _avroSchema = new org.apache.avro.Schema.Parser().parse(props.get(SCHEMA));
     _datumReader = new GenericDatumReader<>(_avroSchema);
-    _avroRecordConverter = new AvroRecordToPinotRowGenerator(indexingSchema);
+    String recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
+    // Backward compatibility to support Avro by default
+    if (recordExtractorClass == null) {
+      recordExtractorClass = AvroRecordExtractor.class.getName();
+    }
+    _avroRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
   }
 
   /**
@@ -79,6 +88,6 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
       LOGGER.error("Caught exception while reading message using schema: {}", _avroSchema, e);
       return null;
     }
-    return _avroRecordConverter.transform(_avroRecordToReuse, destination);
+    return _avroRecordExtractor.extract(_pinotSchema, _avroRecordToReuse, destination);
   }
 }

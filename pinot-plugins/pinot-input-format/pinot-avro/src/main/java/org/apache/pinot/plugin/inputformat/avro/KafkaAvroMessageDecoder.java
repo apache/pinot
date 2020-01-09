@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka;
+package org.apache.pinot.plugin.inputformat.avro;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -38,10 +38,11 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.retry.RetryPolicies;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.plugin.stream.AvroRecordToPinotRowGenerator;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +54,7 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
   private static final String SCHEMA_REGISTRY_SCHEMA_NAME = "schema.registry.schema.name";
   private org.apache.avro.Schema defaultAvroSchema;
+  private Schema pinotSchema;
   private MD5AvroSchemaMap md5ToAvroSchemaMap;
 
   // A global cache for schemas across all threads.
@@ -64,7 +66,7 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private final byte[] reusableMD5Bytes = new byte[SCHEMA_HASH_LENGTH];
 
   private DecoderFactory decoderFactory;
-  private AvroRecordToPinotRowGenerator avroRecordConvetrer;
+  private RecordExtractor avroRecordExtractor;
 
   private static final int MAGIC_BYTE_LENGTH = 1;
   private static final int SCHEMA_HASH_LENGTH = 16;
@@ -103,7 +105,13 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
         LOGGER.info("Populated schema cache with schema for {}", hashKey);
       }
     }
-    this.avroRecordConvetrer = new AvroRecordToPinotRowGenerator(indexingSchema);
+    pinotSchema = indexingSchema;
+    String recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
+    // Backward compatibility to support Avro by default
+    if (recordExtractorClass == null) {
+      recordExtractorClass = AvroRecordExtractor.class.getName();
+    }
+    this.avroRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
     this.decoderFactory = new DecoderFactory();
     md5ToAvroSchemaMap = new MD5AvroSchemaMap();
   }
@@ -154,7 +162,7 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     try {
       GenericData.Record avroRecord = reader.read(null,
           decoderFactory.createBinaryDecoder(payload, HEADER_LENGTH + offset, length - HEADER_LENGTH, null));
-      return avroRecordConvetrer.transform(avroRecord, destination);
+      return avroRecordExtractor.extract(pinotSchema, avroRecord, destination);
     } catch (IOException e) {
       LOGGER.error("Caught exception while reading message using schema {}{}",
           (schema == null ? "null" : schema.getName()),
