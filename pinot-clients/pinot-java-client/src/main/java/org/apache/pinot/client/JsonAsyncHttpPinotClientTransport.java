@@ -72,7 +72,7 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
 
       final String url;
       if (queryFormat.equalsIgnoreCase("sql")) {
-        url = "http://" + brokerAddress + "/sql";
+        url = "http://" + brokerAddress + "/query/sql";
         json.put("queryOptions", "groupByMode=sql;responseFormat=sql");
       } else {
         url = "http://" + brokerAddress + "/query";

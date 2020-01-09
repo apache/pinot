@@ -25,9 +25,9 @@ import com.fasterxml.jackson.databind.JsonNode;
  * ResultSet which contains the ResultTable from the broker response of a sql query.
  */
 class ResultTableResultSet extends AbstractResultSet {
-  private JsonNode _rowsArray;
-  private JsonNode _columnNamesArray;
-  private JsonNode _columnDataTypesArray;
+  private final JsonNode _rowsArray;
+  private final JsonNode _columnNamesArray;
+  private final JsonNode _columnDataTypesArray;
 
   public ResultTableResultSet(JsonNode resultTable) {
     _rowsArray = resultTable.get("rows");

@@ -522,7 +522,7 @@ public abstract class ClusterTest extends ControllerTest {
     payload.put("sql", query);
     payload.put("queryOptions", "groupByMode=sql;responseFormat=sql");
 
-    return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/sql", payload.toString()));
+    return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString()));
   }
 
 }
