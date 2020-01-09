@@ -46,10 +46,10 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.Tenant;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.TenantRole;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -259,19 +259,21 @@ public class PinotTenantRestletResource {
 
   private String listInstancesForTenant(String tenantName, String tenantType) {
     ObjectNode resourceGetRet = JsonUtils.newObjectNode();
+    Set<String> allServerInstances = pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName);
+    Set<String> allBrokerInstances = pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName);
+    if (allServerInstances.isEmpty() && allBrokerInstances.isEmpty()) {
+      throw new ControllerApplicationException(LOGGER, "Failed to find any instances for tenant: " + tenantName,
+          Response.Status.NOT_FOUND);
+    }
     if (tenantType == null) {
-      resourceGetRet.set("ServerInstances",
-          JsonUtils.objectToJsonNode(pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName)));
-      resourceGetRet.set("BrokerInstances",
-          JsonUtils.objectToJsonNode(pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName)));
+      resourceGetRet.set("ServerInstances", JsonUtils.objectToJsonNode(allServerInstances));
+      resourceGetRet.set("BrokerInstances", JsonUtils.objectToJsonNode(allBrokerInstances));
     } else {
       if (tenantType.equalsIgnoreCase("server")) {
-        resourceGetRet.set("ServerInstances",
-            JsonUtils.objectToJsonNode(pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName)));
+        resourceGetRet.set("ServerInstances", JsonUtils.objectToJsonNode(allServerInstances));
       }
       if (tenantType.equalsIgnoreCase("broker")) {
-        resourceGetRet.set("BrokerInstances",
-            JsonUtils.objectToJsonNode(pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName)));
+        resourceGetRet.set("BrokerInstances", JsonUtils.objectToJsonNode(allBrokerInstances));
       }
     }
     resourceGetRet.put(TENANT_NAME, tenantName);

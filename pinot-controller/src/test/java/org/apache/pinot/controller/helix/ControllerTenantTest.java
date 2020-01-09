@@ -106,6 +106,16 @@ public class ControllerTenantTest extends ControllerTest {
   }
 
   @Test
+  public void testEmptyServerTenant() {
+    try {
+      sendGetRequest(_controllerRequestURLBuilder.forServerTenantGet("doesn't_exist"));
+      Assert.fail();
+    } catch (Exception e) {
+
+    }
+  }
+
+  @Test
   public void testServerTenant()
       throws IOException {
     // Create server tenants
