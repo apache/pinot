@@ -52,14 +52,14 @@ executionFrameworkSpec:
   # name: execution framework name
   name: 'standalone'
 
-  # segmentGenerationJobRunnerClassName: class name implements org.apache.pinot.spi.ingestion.runner.SegmentGenerationJobRunner interface.
-  segmentGenerationJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.standalone.SegmentGenerationJobRunner'
+  # segmentGenerationJobRunnerClassName: class name implements org.apache.pinot.spi.batch.ingestion.runner.SegmentGenerationJobRunner interface.
+  segmentGenerationJobRunnerClassName: 'org.apache.pinot.plugin.batch.ingestion.standalone.SegmentGenerationJobRunner'
 
-  # segmentTarPushJobRunnerClassName: class name implements org.apache.pinot.spi.ingestion.runner.SegmentTarPushJobRunner interface.
-  segmentTarPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.standalone.SegmentTarPushJobRunner'
+  # segmentTarPushJobRunnerClassName: class name implements org.apache.pinot.spi.batch.ingestion.runner.SegmentTarPushJobRunner interface.
+  segmentTarPushJobRunnerClassName: 'org.apache.pinot.plugin.batch.ingestion.standalone.SegmentTarPushJobRunner'
 
-  # segmentUriPushJobRunnerClassName: class name implements org.apache.pinot.spi.ingestion.runner.SegmentUriPushJobRunner interface.
-  segmentUriPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.standalone.SegmentUriPushJobRunner'
+  # segmentUriPushJobRunnerClassName: class name implements org.apache.pinot.spi.batch.ingestion.runner.SegmentUriPushJobRunner interface.
+  segmentUriPushJobRunnerClassName: 'org.apache.pinot.plugin.batch.ingestion.standalone.SegmentUriPushJobRunner'
 
 # jobType: Pinot ingestion job type.
 # Supported job types are:

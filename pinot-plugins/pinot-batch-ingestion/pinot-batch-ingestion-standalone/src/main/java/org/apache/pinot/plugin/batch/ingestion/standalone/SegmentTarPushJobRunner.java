@@ -16,10 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.ingestion.standalone;
+package org.apache.pinot.plugin.batch.ingestion.standalone;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -32,11 +34,11 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
-import org.apache.pinot.spi.ingestion.runner.IngestionJobRunner;
-import org.apache.pinot.spi.ingestion.spec.Constants;
-import org.apache.pinot.spi.ingestion.spec.PinotClusterSpec;
-import org.apache.pinot.spi.ingestion.spec.PinotFSSpec;
-import org.apache.pinot.spi.ingestion.spec.SegmentGenerationJobSpec;
+import org.apache.pinot.spi.batch.ingestion.runner.IngestionJobRunner;
+import org.apache.pinot.spi.batch.ingestion.spec.Constants;
+import org.apache.pinot.spi.batch.ingestion.spec.PinotClusterSpec;
+import org.apache.pinot.spi.batch.ingestion.spec.PinotFSSpec;
+import org.apache.pinot.spi.batch.ingestion.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -44,25 +46,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SegmentUriPushJobRunner implements IngestionJobRunner {
+public class SegmentTarPushJobRunner implements IngestionJobRunner {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentUriPushJobRunner.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentTarPushJobRunner.class);
 
   private SegmentGenerationJobSpec _spec;
 
-  public SegmentUriPushJobRunner() {
+  public SegmentTarPushJobRunner() {
   }
 
-  public SegmentUriPushJobRunner(SegmentGenerationJobSpec spec) {
+  public SegmentTarPushJobRunner(SegmentGenerationJobSpec spec) {
     init(spec);
   }
 
   @Override
   public void init(SegmentGenerationJobSpec spec) {
     _spec = spec;
-    if (_spec.getPushJobSpec() == null) {
-      throw new RuntimeException("Missing PushJobSpec");
-    }
   }
 
   @Override
@@ -74,7 +73,7 @@ public class SegmentUriPushJobRunner implements IngestionJobRunner {
       PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), config);
     }
 
-    //Get outputFS for writing output Pinot segments
+    //Get outputFS for writing output pinot segments
     URI outputDirURI;
     try {
       outputDirURI = new URI(_spec.getOutputDirURI());
@@ -85,7 +84,6 @@ public class SegmentUriPushJobRunner implements IngestionJobRunner {
       throw new RuntimeException("outputDirURI is not valid - '" + _spec.getOutputDirURI() + "'");
     }
     PinotFS outputDirFS = PinotFSFactory.create(outputDirURI.getScheme());
-
     //Get list of files to process
     String[] files;
     try {
@@ -93,29 +91,33 @@ public class SegmentUriPushJobRunner implements IngestionJobRunner {
     } catch (IOException e) {
       throw new RuntimeException("Unable to list all files under outputDirURI - '" + outputDirURI + "'");
     }
-    List<String> segmentUris = new ArrayList<>();
+
+    List<String> segmentsToPush = new ArrayList<>();
     for (String file : files) {
-      URI uri = URI.create(file);
-      if (uri.getPath().endsWith(Constants.TAR_GZ_FILE_EXT)) {
-        segmentUris.add(_spec.getPushJobSpec().getSegmentUriPrefix() + uri.getRawPath() + _spec.getPushJobSpec()
-            .getSegmentUriSuffix());
+      if (file.endsWith(Constants.TAR_GZ_FILE_EXT)) {
+        segmentsToPush.add(file);
       }
     }
     try {
-      sendSegmentUris(segmentUris);
+      pushSegments(outputDirFS, segmentsToPush);
     } catch (RetriableOperationException | AttemptsExceededException e) {
       throw new RuntimeException(e);
     }
   }
 
-  public void sendSegmentUris(List<String> segmentUris)
+  public void pushSegments(PinotFS fileSystem, List<String> tarFilePaths)
       throws RetriableOperationException, AttemptsExceededException {
     String tableName = _spec.getTableSpec().getTableName();
-    LOGGER.info("Start sending table {} segment URIs: {} to locations: {}", tableName,
-        Arrays.toString(segmentUris.subList(0, Math.min(5, segmentUris.size())).toArray()),
-        Arrays.toString(_spec.getPinotClusterSpecs()));
+    LOGGER.info("Start pushing segments: {}... to locations: {} for table {}",
+        Arrays.toString(tarFilePaths.subList(0, Math.min(5, tarFilePaths.size())).toArray()),
+        Arrays.toString(_spec.getPinotClusterSpecs()), tableName);
     FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient();
-    for (String segmentUri : segmentUris) {
+    for (String tarFilePath : tarFilePaths) {
+      URI tarFileURI = URI.create(tarFilePath);
+      File tarFile = new File(tarFilePath);
+      String fileName = tarFile.getName();
+      Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
+      String segmentName = fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length());
       for (PinotClusterSpec pinotClusterSpec : _spec.getPinotClusterSpecs()) {
         URI controllerURI;
         try {
@@ -123,7 +125,7 @@ public class SegmentUriPushJobRunner implements IngestionJobRunner {
         } catch (URISyntaxException e) {
           throw new RuntimeException("Got invalid controller uri - '" + pinotClusterSpec.getControllerURI() + "'");
         }
-        LOGGER.info("Sending table {} segment URI: {} to location: {} for ", tableName, segmentUri, controllerURI);
+        LOGGER.info("Pushing segment: {} to location: {} for table {}", segmentName, controllerURI, tableName);
         int attempts = 1;
         if (_spec.getPushJobSpec() != null && _spec.getPushJobSpec().getPushAttempts() > 0) {
           _spec.getPushJobSpec().getPushAttempts();
@@ -133,23 +135,25 @@ public class SegmentUriPushJobRunner implements IngestionJobRunner {
           retryWaitMs = _spec.getPushJobSpec().getPushRetryIntervalMillis();
         }
         RetryPolicies.exponentialBackoffRetryPolicy(attempts, retryWaitMs, 5).attempt(() -> {
-          try {
+          try (InputStream inputStream = fileSystem.open(tarFileURI)) {
             SimpleHttpResponse response = fileUploadDownloadClient
-                .sendSegmentUri(FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentUri, tableName);
-            LOGGER.info("Response for pushing table {} segment uri {} to location {} - {}: {}", tableName, segmentUri,
+                .uploadSegment(FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentName, inputStream,
+                    tableName);
+            LOGGER.info("Response for pushing table {} segment {} to location {} - {}: {}", tableName, segmentName,
                 controllerURI, response.getStatusCode(), response.getResponse());
             return true;
           } catch (HttpErrorStatusException e) {
             int statusCode = e.getStatusCode();
             if (statusCode >= 500) {
               // Temporary exception
-              LOGGER.warn("Caught temporary exception while pushing table: {} segment uri: {} to {}, will retry",
-                  tableName, segmentUri, controllerURI, e);
+              LOGGER.warn("Caught temporary exception while pushing table: {} segment: {} to {}, will retry", tableName,
+                  segmentName, controllerURI, e);
               return false;
             } else {
               // Permanent exception
-              LOGGER.error("Caught permanent exception while pushing table: {} segment uri: {} to {}, won't retry",
-                  tableName, segmentUri, controllerURI, e);
+              LOGGER
+                  .error("Caught permanent exception while pushing table: {} segment: {} to {}, won't retry", tableName,
+                      segmentName, controllerURI, e);
               throw e;
             }
           }

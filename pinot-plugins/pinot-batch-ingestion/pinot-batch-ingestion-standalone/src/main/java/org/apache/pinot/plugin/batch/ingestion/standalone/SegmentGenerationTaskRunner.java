@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.ingestion.standalone;
+package org.apache.pinot.plugin.batch.ingestion.standalone;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,8 +32,8 @@ import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl
 import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
-import org.apache.pinot.spi.ingestion.spec.SegmentGenerationTaskSpec;
-import org.apache.pinot.spi.ingestion.spec.SegmentNameGeneratorSpec;
+import org.apache.pinot.spi.batch.ingestion.spec.SegmentGenerationTaskSpec;
+import org.apache.pinot.spi.batch.ingestion.spec.SegmentNameGeneratorSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.readers.RecordReader;

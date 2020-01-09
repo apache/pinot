@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.ingestion.spec;
+package org.apache.pinot.spi.batch.ingestion.spec;
 
 /**
  * TableSpec defines table name and where to fetch corresponding table config and table schema.

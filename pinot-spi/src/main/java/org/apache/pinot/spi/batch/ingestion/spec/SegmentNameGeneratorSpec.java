@@ -16,30 +16,40 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.ingestion.spec;
+package org.apache.pinot.spi.batch.ingestion.spec;
+
+import java.util.HashMap;
+import java.util.Map;
+
 
 /**
- * PinotClusterSpec defines the Pinot Cluster Access Point.
+ * SegmentNameGeneratorSpec defines how to init a SegmentNameGenerator.
  */
-public class PinotClusterSpec {
+public class SegmentNameGeneratorSpec {
 
   /**
-   * Controller URI is used to fetch table/schema information and data push.
-   * E.g. http://localhost:9000
+   * Current supported type is 'simple' and 'normalizedDate'.
    */
-  private String _controllerURI;
+  private String _type = null;
 
-  public String getControllerURI() {
-    return _controllerURI;
+  /**
+   * Configs to init SegmentNameGenerator.
+   */
+  private Map<String, String> _configs = new HashMap<>();
+
+  public String getType() {
+    return _type;
   }
 
-  /**
-   * Controller URI is used to fetch table/schema information and data push.
-   * E.g. http://localhost:9000
-   *
-   * @param controllerURI
-   */
-  public void setControllerURI(String controllerURI) {
-    _controllerURI = controllerURI;
+  public void setType(String type) {
+    _type = type;
+  }
+
+  public Map<String, String> getConfigs() {
+    return _configs;
+  }
+
+  public void setConfigs(Map<String, String> configs) {
+    _configs = configs;
   }
 }

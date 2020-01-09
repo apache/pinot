@@ -16,15 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.ingestion.runner;
+package org.apache.pinot.spi.batch.ingestion.spec;
 
-import org.apache.pinot.spi.ingestion.spec.SegmentGenerationJobSpec;
-
-
-public interface IngestionJobRunner {
-
-  void init(SegmentGenerationJobSpec jobSpec);
-
-  void run()
-      throws Exception;
+public class Constants {
+  /**
+   * By default Pinot segments are compressed in 'tar.gz' format then pushed to controller.
+   */
+  public static final String TAR_GZ_FILE_EXT = ".tar.gz";
 }

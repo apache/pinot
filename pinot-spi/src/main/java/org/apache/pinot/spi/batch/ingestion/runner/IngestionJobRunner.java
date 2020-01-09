@@ -16,11 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.ingestion.spec;
+package org.apache.pinot.spi.batch.ingestion.runner;
 
-public class Constants {
+import org.apache.pinot.spi.batch.ingestion.spec.SegmentGenerationJobSpec;
+
+
+/**
+ * IngestionJobRunner is the interface of ingestion job runner.
+ *
+ * For batch ingestion jobs, there are three types:
+ *    SegmentGenerationJobRunner
+ *    SegmentTarPushJobRunner
+ *    SegmentUriPushJobRunner
+ *
+ */
+public interface IngestionJobRunner {
+
   /**
-   * By default Pinot segments are compressed in 'tar.gz' format then pushed to controller.
+   * Initialize IngestionJobRunner with SegmentGenerationJobSpec
+   *
+   * @param jobSpec
    */
-  public static final String TAR_GZ_FILE_EXT = ".tar.gz";
+  void init(SegmentGenerationJobSpec jobSpec);
+
+  /**
+   * Run IngestionJobRunner
+   *
+   * @throws Exception
+   */
+  void run()
+      throws Exception;
 }

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.ingestion.spec;
+package org.apache.pinot.spi.batch.ingestion.spec;
 
 import java.util.Map;
 

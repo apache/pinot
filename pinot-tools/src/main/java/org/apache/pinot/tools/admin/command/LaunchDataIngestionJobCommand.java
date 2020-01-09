@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.pinot.spi.ingestion.IngestionJobLauncher;
+import org.apache.pinot.spi.batch.ingestion.IngestionJobLauncher;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;

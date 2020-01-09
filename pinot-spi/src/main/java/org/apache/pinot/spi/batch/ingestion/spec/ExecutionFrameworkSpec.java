@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.ingestion.spec;
+package org.apache.pinot.spi.batch.ingestion.spec;
 
 /**
  * ExecutionFrameworkSpec defines which ingestion jobs to be running.
@@ -28,17 +28,17 @@ public class ExecutionFrameworkSpec {
   private String _name;
 
   /**
-   * The class implements org.apache.pinot.spi.ingestion.runner.SegmentGenerationJobRunner interface.
+   * The class implements org.apache.pinot.spi.batch.ingestion.runner.SegmentGenerationJobRunner interface.
    */
   private String _segmentGenerationJobRunnerClassName;
 
   /**
-   * The class implements org.apache.pinot.spi.ingestion.runner.SegmentTarPushJobRunner interface.
+   * The class implements org.apache.pinot.spi.batch.ingestion.runner.SegmentTarPushJobRunner interface.
    */
   private String _segmentTarPushJobRunnerClassName;
 
   /**
-   * The class implements org.apache.pinot.spi.ingestion.runner.SegmentUriPushJobRunner interface.
+   * The class implements org.apache.pinot.spi.batch.ingestion.runner.SegmentUriPushJobRunner interface.
    */
   private String _segmentUriPushJobRunnerClassName;
 
