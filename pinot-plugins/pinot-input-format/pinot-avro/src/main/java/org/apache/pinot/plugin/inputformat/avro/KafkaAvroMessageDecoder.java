@@ -53,20 +53,20 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
 
   private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
   private static final String SCHEMA_REGISTRY_SCHEMA_NAME = "schema.registry.schema.name";
-  private org.apache.avro.Schema defaultAvroSchema;
-  private Schema pinotSchema;
-  private MD5AvroSchemaMap md5ToAvroSchemaMap;
+  private org.apache.avro.Schema _defaultAvroSchema;
+  private Schema _pinotSchema;
+  private MD5AvroSchemaMap _md5ToAvroSchemaMap;
 
   // A global cache for schemas across all threads.
-  private static final Map<String, org.apache.avro.Schema> globalSchemaCache = new HashMap<>();
+  private static final Map<String, org.apache.avro.Schema> GLOBAL_SCHEMA_CACHE = new HashMap<>();
   // Suffix for getting the latest schema
   private static final String LATEST = "-latest";
 
   // Reusable byte[] to read MD5 from payload. This is OK as this class is used only by a single thread.
-  private final byte[] reusableMD5Bytes = new byte[SCHEMA_HASH_LENGTH];
+  private final byte[] _reusableMD5Bytes = new byte[SCHEMA_HASH_LENGTH];
 
-  private DecoderFactory decoderFactory;
-  private RecordExtractor avroRecordExtractor;
+  private DecoderFactory _decoderFactory;
+  private RecordExtractor _avroRecordExtractor;
 
   private static final int MAGIC_BYTE_LENGTH = 1;
   private static final int SCHEMA_HASH_LENGTH = 16;
@@ -78,12 +78,12 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final int MINIMUM_SCHEMA_FETCH_RETRY_TIME_MILLIS = 500;
   private static final float SCHEMA_FETCH_RETRY_EXPONENTIAL_BACKOFF_FACTOR = 2.0f;
 
-  private String[] schemaRegistryUrls;
+  private String[] _schemaRegistryUrls;
 
   @Override
   public void init(Map<String, String> props, Schema indexingSchema, String topicName)
       throws Exception {
-    schemaRegistryUrls = parseSchemaRegistryUrls(props.get(SCHEMA_REGISTRY_REST_URL));
+    _schemaRegistryUrls = parseSchemaRegistryUrls(props.get(SCHEMA_REGISTRY_REST_URL));
 
     String avroSchemaName = topicName;
     if (props.containsKey(SCHEMA_REGISTRY_SCHEMA_NAME) && props.get(SCHEMA_REGISTRY_SCHEMA_NAME) != null && !props
@@ -96,24 +96,24 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     // But then we always pay attention to the exact MD5 hash and attempt to fetch the schema for that particular hash
     // before decoding an incoming kafka event. We use defaultAvroSchema only if the fetch for the particular MD5 fails,
     // but then we will retry that fetch on every event in case of failure.
-    synchronized (globalSchemaCache) {
+    synchronized (GLOBAL_SCHEMA_CACHE) {
       final String hashKey = avroSchemaName + LATEST;
-      defaultAvroSchema = globalSchemaCache.get(hashKey);
-      if (defaultAvroSchema == null) {
-        defaultAvroSchema = fetchSchema("/latest_with_type=" + avroSchemaName);
-        globalSchemaCache.put(hashKey, defaultAvroSchema);
+      _defaultAvroSchema = GLOBAL_SCHEMA_CACHE.get(hashKey);
+      if (_defaultAvroSchema == null) {
+        _defaultAvroSchema = fetchSchema("/latest_with_type=" + avroSchemaName);
+        GLOBAL_SCHEMA_CACHE.put(hashKey, _defaultAvroSchema);
         LOGGER.info("Populated schema cache with schema for {}", hashKey);
       }
     }
-    pinotSchema = indexingSchema;
+    _pinotSchema = indexingSchema;
     String recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
     // Backward compatibility to support Avro by default
     if (recordExtractorClass == null) {
       recordExtractorClass = AvroRecordExtractor.class.getName();
     }
-    this.avroRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
-    this.decoderFactory = new DecoderFactory();
-    md5ToAvroSchemaMap = new MD5AvroSchemaMap();
+    this._avroRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
+    this._decoderFactory = new DecoderFactory();
+    _md5ToAvroSchemaMap = new MD5AvroSchemaMap();
   }
 
   @Override
@@ -127,42 +127,42 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
       return null;
     }
 
-    System.arraycopy(payload, SCHEMA_HASH_START_OFFSET + offset, reusableMD5Bytes, 0, SCHEMA_HASH_LENGTH);
+    System.arraycopy(payload, SCHEMA_HASH_START_OFFSET + offset, _reusableMD5Bytes, 0, SCHEMA_HASH_LENGTH);
 
     boolean schemaUpdateFailed = false;
-    org.apache.avro.Schema schema = md5ToAvroSchemaMap.getSchema(reusableMD5Bytes);
+    org.apache.avro.Schema schema = _md5ToAvroSchemaMap.getSchema(_reusableMD5Bytes);
     if (schema == null) {
       // We will get here for the first row consumed in the segment, and every row that has a schema ID that is
       // not yet in md5ToAvroSchemaMap.
-      synchronized (globalSchemaCache) {
-        final String hashKey = hex(reusableMD5Bytes);
-        schema = globalSchemaCache.get(hashKey);
+      synchronized (GLOBAL_SCHEMA_CACHE) {
+        final String hashKey = hex(_reusableMD5Bytes);
+        schema = GLOBAL_SCHEMA_CACHE.get(hashKey);
         if (schema == null) {
           // We will get here only if no partition of the table has populated the global schema cache.
           // In that case, one of the consumers will fetch the schema and populate the cache, and the others
           // should find it in the cache and po
-          final String schemaUri = "/id=" + hex(reusableMD5Bytes);
+          final String schemaUri = "/id=" + hex(_reusableMD5Bytes);
           try {
             schema = fetchSchema(schemaUri);
-            globalSchemaCache.put(hashKey, schema);
-            md5ToAvroSchemaMap.addSchema(reusableMD5Bytes, schema);
+            GLOBAL_SCHEMA_CACHE.put(hashKey, schema);
+            _md5ToAvroSchemaMap.addSchema(_reusableMD5Bytes, schema);
           } catch (Exception e) {
-            schema = defaultAvroSchema;
+            schema = _defaultAvroSchema;
             LOGGER
                 .error("Error fetching schema using url {}. Attempting to continue with previous schema", schemaUri, e);
             schemaUpdateFailed = true;
           }
         } else {
           LOGGER.info("Found schema for {} in cache", hashKey);
-          md5ToAvroSchemaMap.addSchema(reusableMD5Bytes, schema);
+          _md5ToAvroSchemaMap.addSchema(_reusableMD5Bytes, schema);
         }
       }
     }
     DatumReader<Record> reader = new GenericDatumReader<Record>(schema);
     try {
       GenericData.Record avroRecord = reader.read(null,
-          decoderFactory.createBinaryDecoder(payload, HEADER_LENGTH + offset, length - HEADER_LENGTH, null));
-      return avroRecordExtractor.extract(pinotSchema, avroRecord, destination);
+          _decoderFactory.createBinaryDecoder(payload, HEADER_LENGTH + offset, length - HEADER_LENGTH, null));
+      return _avroRecordExtractor.extract(_pinotSchema, avroRecord, destination);
     } catch (IOException e) {
       LOGGER.error("Caught exception while reading message using schema {}{}",
           (schema == null ? "null" : schema.getName()),
@@ -282,8 +282,8 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   protected URL makeRandomUrl(String reference)
       throws MalformedURLException {
     Random rand = new Random();
-    int randomInteger = rand.nextInt(schemaRegistryUrls.length);
-    return new URL(schemaRegistryUrls[randomInteger] + reference);
+    int randomInteger = rand.nextInt(_schemaRegistryUrls.length);
+    return new URL(_schemaRegistryUrls[randomInteger] + reference);
   }
 
   protected String[] parseSchemaRegistryUrls(String schemaConfig) {
