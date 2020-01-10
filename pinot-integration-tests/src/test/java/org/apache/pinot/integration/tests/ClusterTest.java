@@ -344,7 +344,7 @@ public abstract class ClusterTest extends ControllerTest {
     public static File avroFile;
     private org.apache.avro.Schema _avroSchema;
     private Schema _pinotSchema;
-    private RecordExtractor _recordExtractor;
+    private RecordExtractor<GenericData.Record> _recordExtractor;
     private DecoderFactory _decoderFactory = new DecoderFactory();
     private DatumReader<GenericData.Record> _reader;
 

@@ -16,21 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.inputformat.avro;
+package org.apache.pinot.spi.data.readers;
 
-import org.apache.avro.generic.GenericData;
+import com.google.common.base.Preconditions;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.AbstractBaseRecordExtractor;
-import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.TimeFieldSpec;
 
-public class AvroRecordExtractor extends AbstractBaseRecordExtractor<GenericData.Record> {
-  @Override
-  public GenericRow extract(Schema schema, GenericData.Record from, GenericRow to) {
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      FieldSpec incomingFieldSpec = getFieldSpecToUse(schema, fieldSpec);
-      AvroUtils.extractField(incomingFieldSpec, from, to);
+
+public abstract class AbstractBaseRecordExtractor<T> implements RecordExtractor<T> {
+
+  protected FieldSpec getFieldSpecToUse(Schema schema, FieldSpec incomingFieldSpec) {
+    if (incomingFieldSpec.getFieldType() == FieldSpec.FieldType.TIME) {
+      TimeFieldSpec timeFieldSpec = schema.getTimeFieldSpec();
+      Preconditions.checkNotNull(timeFieldSpec);
+      return new TimeFieldSpec(timeFieldSpec.getIncomingGranularitySpec());
     }
-    return to;
+
+    return incomingFieldSpec;
   }
+
+  abstract public GenericRow extract(Schema schema, T from, GenericRow to);
 }

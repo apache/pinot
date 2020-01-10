@@ -28,8 +28,8 @@ import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.slf4j.Logger;
@@ -44,7 +44,7 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
 
   private org.apache.avro.Schema _avroSchema;
   private DatumReader<GenericData.Record> _datumReader;
-  private RecordExtractor _avroRecordExtractor;
+  private RecordExtractor<GenericData.Record> _avroRecordExtractor;
   private BinaryDecoder _binaryDecoderToReuse;
   private GenericData.Record _avroRecordToReuse;
   private Schema _pinotSchema;

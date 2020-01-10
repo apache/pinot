@@ -46,7 +46,7 @@ public class AvroRecordToPinotRowGeneratorTest {
             .addTime("incomingTime", TimeUnit.MILLISECONDS, FieldSpec.DataType.LONG, "outgoingTime", TimeUnit.DAYS,
                 FieldSpec.DataType.INT).build();
 
-    RecordExtractor avroRecordToPinotRowGenerator = new AvroRecordExtractor();
+    RecordExtractor<GenericData.Record> avroRecordToPinotRowGenerator = new AvroRecordExtractor();
     GenericRow genericRow = new GenericRow();
     avroRecordToPinotRowGenerator.extract(pinotSchema, avroRecord, genericRow);
 

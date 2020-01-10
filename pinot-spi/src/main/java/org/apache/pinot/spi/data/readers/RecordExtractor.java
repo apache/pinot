@@ -18,23 +18,16 @@
  */
 package org.apache.pinot.spi.data.readers;
 
-import com.google.common.base.Preconditions;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
 
-
-public abstract class RecordExtractor<T> {
-
-  protected FieldSpec getFieldSpecToUse(Schema schema, FieldSpec incomingFieldSpec) {
-    if (incomingFieldSpec.getFieldType() == FieldSpec.FieldType.TIME) {
-      TimeFieldSpec timeFieldSpec = schema.getTimeFieldSpec();
-      Preconditions.checkNotNull(timeFieldSpec);
-      return new TimeFieldSpec(timeFieldSpec.getIncomingGranularitySpec());
-    }
-
-    return incomingFieldSpec;
-  }
-
-  abstract public GenericRow extract(Schema schema, T from, GenericRow to);
+public interface RecordExtractor<T> {
+  /**
+   * TODO Add text to this javadoc
+   *
+   * @param schema
+   * @param from
+   * @param to
+   * @return
+   */
+  GenericRow extract(Schema schema, T from, GenericRow to);
 }

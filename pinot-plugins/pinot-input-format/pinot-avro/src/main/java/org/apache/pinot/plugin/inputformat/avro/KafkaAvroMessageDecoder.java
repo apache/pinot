@@ -38,8 +38,8 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -66,7 +66,7 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private final byte[] _reusableMD5Bytes = new byte[SCHEMA_HASH_LENGTH];
 
   private DecoderFactory _decoderFactory;
-  private RecordExtractor _avroRecordExtractor;
+  private RecordExtractor<GenericData.Record> _avroRecordExtractor;
 
   private static final int MAGIC_BYTE_LENGTH = 1;
   private static final int SCHEMA_HASH_LENGTH = 16;
