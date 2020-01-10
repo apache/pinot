@@ -66,11 +66,6 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-batch-ingestion-base</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-kafka-${kafka.version}</artifactId>
       <version>${project.version}</version>
       <scope>runtime</scope>
@@ -293,7 +288,7 @@
               </jvmSettings>
             </program>
             <program>
-              <mainClass>org.apache.pinot.ingestion.standalone.StandaloneIngestionJobLauncher</mainClass>
+              <mainClass>org.apache.pinot.spi.batch.ingestion.IngestionJobLauncher</mainClass>
               <name>pinot-ingestion-job</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>

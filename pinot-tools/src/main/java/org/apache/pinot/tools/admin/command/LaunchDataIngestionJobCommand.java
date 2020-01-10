@@ -18,8 +18,7 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.pinot.ingestion.standalone.StandaloneIngestionJobLauncher;
-import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.batch.ingestion.IngestionJobLauncher;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -48,7 +47,7 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
   public boolean execute()
       throws Exception {
     try {
-      StandaloneIngestionJobLauncher.main(new String[]{_jobSpecFile});
+      IngestionJobLauncher.main(new String[]{_jobSpecFile});
     } catch (Exception e) {
       LOGGER.error("Got exception to kick off standalone data ingestion job -", e);
       throw e;
