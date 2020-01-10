@@ -27,6 +27,7 @@ import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -42,6 +43,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.Tenant;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -259,20 +261,36 @@ public class PinotTenantRestletResource {
 
   private String listInstancesForTenant(String tenantName, String tenantType) {
     ObjectNode resourceGetRet = JsonUtils.newObjectNode();
-    Set<String> allServerInstances = pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName);
-    Set<String> allBrokerInstances = pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName);
-    if (allServerInstances.isEmpty() && allBrokerInstances.isEmpty()) {
-      throw new ControllerApplicationException(LOGGER, "Failed to find any instances for tenant: " + tenantName,
-          Response.Status.NOT_FOUND);
-    }
+
+    List<InstanceConfig> instanceConfigList = pinotHelixResourceManager.getAllHelixInstanceConfigs();
+
     if (tenantType == null) {
+      Set<String> allServerInstances = pinotHelixResourceManager.getAllInstancesForServerTenant(instanceConfigList, tenantName);
+      Set<String> allBrokerInstances = pinotHelixResourceManager.getAllInstancesForBrokerTenant(instanceConfigList, tenantName);
+
+      if (allServerInstances.isEmpty() && allBrokerInstances.isEmpty()) {
+        throw new ControllerApplicationException(LOGGER, "Failed to find any instances for broker and server tenants: " + tenantName,
+            Response.Status.NOT_FOUND);
+      }
       resourceGetRet.set("ServerInstances", JsonUtils.objectToJsonNode(allServerInstances));
       resourceGetRet.set("BrokerInstances", JsonUtils.objectToJsonNode(allBrokerInstances));
     } else {
       if (tenantType.equalsIgnoreCase("server")) {
+        Set<String> allServerInstances = pinotHelixResourceManager.getAllInstancesForServerTenant(instanceConfigList, tenantName);
+
+        if (allServerInstances.isEmpty()) {
+          throw new ControllerApplicationException(LOGGER, "Failed to find any instances for server tenant: " + tenantName,
+              Response.Status.NOT_FOUND);
+        }
         resourceGetRet.set("ServerInstances", JsonUtils.objectToJsonNode(allServerInstances));
       }
       if (tenantType.equalsIgnoreCase("broker")) {
+        Set<String> allBrokerInstances = pinotHelixResourceManager.getAllInstancesForBrokerTenant(instanceConfigList, tenantName);
+
+        if (allBrokerInstances.isEmpty()) {
+          throw new ControllerApplicationException(LOGGER, "Failed to find any instances for broker tenant: " + tenantName,
+              Response.Status.NOT_FOUND);
+        }
         resourceGetRet.set("BrokerInstances", JsonUtils.objectToJsonNode(allBrokerInstances));
       }
     }
