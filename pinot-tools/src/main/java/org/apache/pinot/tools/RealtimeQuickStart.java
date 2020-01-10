@@ -60,10 +60,10 @@ public class RealtimeQuickStart {
     File tableConfigFile = new File(quickStartDataDir, "meetupRsvp_realtime_table_config.json");
 
     ClassLoader classLoader = Quickstart.class.getClassLoader();
-    URL resource = classLoader.getResource("sample_data/meetupRsvp_schema.json");
+    URL resource = classLoader.getResource("examples/stream/meetupRsvp/meetupRsvp_schema.json");
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, schemaFile);
-    resource = classLoader.getResource("sample_data/meetupRsvp_realtime_table_config.json");
+    resource = classLoader.getResource("examples/stream/meetupRsvp/meetupRsvp_realtime_table_config.json");
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 

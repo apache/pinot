@@ -131,12 +131,12 @@ docker-compose -f docker-compose.yml up
 
 Below is the script to create airlineStats table
 ```SHELL
-docker run --network=docker_default winedepot/pinot:0.3.0-SNAPSHOT AddTable -schemaFile sample_data/airlineStats_schema.json -tableConfigFile sample_data/docker/airlineStats_realtime_table_config.json -controllerHost pinot-controller -controllerPort 9000 -exec
+docker run --network=docker_default winedepot/pinot:0.3.0-SNAPSHOT AddTable -schemaFile examples/stream/airlineStats/airlineStats_schema.json -tableConfigFile examples/stream/airlineStats/docker/airlineStats_realtime_table_config.json -controllerHost pinot-controller -controllerPort 9000 -exec
 ```
 
 Below is the script to ingest airplane stats data to Kafka
 ```SHELL
-docker run --network=docker_default winedepot/pinot:0.3.0-SNAPSHOT StreamAvroIntoKafka -avroFile sample_data/airlineStats_data.avro -kafkaTopic flights-realtime -kafkaBrokerList kafka:9092 -zkAddress zookeeper:2181
+docker run --network=docker_default winedepot/pinot:0.3.0-SNAPSHOT StreamAvroIntoKafka -avroFile examples/stream/airlineStats/sample_data/airlineStats_data.avro -kafkaTopic flights-realtime -kafkaBrokerList kafka:9092 -zkAddress zookeeper:2181
 ```
 
 In order to query pinot, try to open `localhost:9000/query` from your browser.

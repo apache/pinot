@@ -83,18 +83,13 @@
     </fileSet>
     <fileSet>
       <useDefaultExcludes>false</useDefaultExcludes>
-      <directory>${pinot.root}/pinot-tools/src/main/resources/sample_data/kafka_${kafka.version}</directory>
-      <outputDirectory>sample_data/</outputDirectory>
+      <directory>${pinot.root}/pinot-tools/src/main/resources/examples/stream/meetupRsvp/kafka_${kafka.version}</directory>
+      <outputDirectory>examples/stream/meetupRsvp/</outputDirectory>
     </fileSet>
     <fileSet>
       <useDefaultExcludes>false</useDefaultExcludes>
-      <directory>${pinot.root}/pinot-tools/src/main/resources/sample_data</directory>
-      <outputDirectory>sample_data/</outputDirectory>
-    </fileSet>
-    <fileSet>
-      <useDefaultExcludes>false</useDefaultExcludes>
-      <directory>${pinot.root}/pinot-tools/src/main/resources/sample_data_realtime</directory>
-      <outputDirectory>sample_data</outputDirectory>
+      <directory>${pinot.root}/pinot-tools/src/main/resources/examples/stream/airlineStats/kafka_${kafka.version}</directory>
+      <outputDirectory>examples/stream/airlineStats/</outputDirectory>
     </fileSet>
     <fileSet>
       <useDefaultExcludes>false</useDefaultExcludes>
@@ -117,11 +112,16 @@
         <exclude>**/pinot-file-system/pinot-file-system/**</exclude>
         <exclude>**/pinot-input-format/pinot-input-format/**</exclude>
         <exclude>**/pinot-stream-ingestion/pinot-stream-ingestion/**</exclude>
-        <exclude>**/pinot-stream-ingestion/pinot-kafka-base/**</exclude>
+        <exclude>**/pinot-stream-ingestion/pinot-kafka-*/**</exclude>
         <exclude>**/pinot-batch-ingestion/pinot-batch-ingestion/**</exclude>
         <exclude>**/pinot-batch-ingestion/pinot-ingestion-common/**</exclude>
         <exclude>**/pinot-batch-ingestion/v0_deprecated/**</exclude>
       </excludes>
+    </fileSet>
+    <fileSet>
+      <useDefaultExcludes>false</useDefaultExcludes>
+      <directory>${pinot.root}/pinot-plugins/target/plugins/pinot-stream-ingestion/pinot-kafka-${kafka.version}</directory>
+      <outputDirectory>plugins/pinot-stream-ingestion/pinot-kafka-${kafka.version}</outputDirectory>
     </fileSet>
   </fileSets>
 </assembly>

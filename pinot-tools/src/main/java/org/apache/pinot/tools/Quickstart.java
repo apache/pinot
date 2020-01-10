@@ -128,13 +128,13 @@ public class Quickstart {
     File tableConfigFile = new File(quickStartDataDir, "baseballStats_offline_table_config.json");
 
     ClassLoader classLoader = Quickstart.class.getClassLoader();
-    URL resource = classLoader.getResource("sample_data/baseballStats_schema.json");
+    URL resource = classLoader.getResource("examples/batch/baseballStats/baseballStats_schema.json");
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, schemaFile);
-    resource = classLoader.getResource("sample_data/baseballStats_data.csv");
+    resource = classLoader.getResource("examples/batch/baseballStats/rawdata/baseballStats_data.csv");
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, dataFile);
-    resource = classLoader.getResource("sample_data/baseballStats_offline_table_config.json");
+    resource = classLoader.getResource("examples/batch/baseballStats/baseballStats_offline_table_config.json");
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 

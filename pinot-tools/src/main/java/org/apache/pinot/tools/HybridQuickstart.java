@@ -70,13 +70,13 @@ public class HybridQuickstart {
     File tableConfigFile = new File(_offlineQuickStartDataDir, "airlineStats_offline_table_config.json");
 
     ClassLoader classLoader = Quickstart.class.getClassLoader();
-    URL resource = classLoader.getResource("sample_data/airlineStats_schema.json");
+    URL resource = classLoader.getResource("examples/batch/airlineStats/airlineStats_schema.json");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, _schemaFile);
-    resource = classLoader.getResource("sample_data/airlineStats_data.avro");
+    resource = classLoader.getResource("examples/stream/airlineStats/sample_data/airlineStats_data.avro");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, _dataFile);
-    resource = classLoader.getResource("sample_data/airlineStats_offline_table_config.json");
+    resource = classLoader.getResource("examples/batch/airlineStats/airlineStats_offline_table_config.json");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
@@ -95,7 +95,7 @@ public class HybridQuickstart {
     File tableConfigFile = new File(_realtimeQuickStartDataDir, "airlineStats_realtime_table_config.json");
 
     URL resource = Quickstart.class.getClassLoader().getResource(
-        "sample_data/airlineStats_realtime_table_config.json");
+        "examples/stream/airlineStats/airlineStats_realtime_table_config.json");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
 
