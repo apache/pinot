@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.batch.ingestion.standalone;
+package org.apache.pinot.plugin.ingestion.batch.standalone;
 
 import java.io.File;
 import java.io.IOException;
@@ -30,13 +30,13 @@ import org.apache.commons.configuration.MapConfiguration;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.spi.filesystem.PinotFS;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.batch.ingestion.runner.IngestionJobRunner;
 import org.apache.pinot.spi.batch.ingestion.spec.Constants;
 import org.apache.pinot.spi.batch.ingestion.spec.PinotClusterSpec;
 import org.apache.pinot.spi.batch.ingestion.spec.PinotFSSpec;
 import org.apache.pinot.spi.batch.ingestion.spec.SegmentGenerationJobSpec;
+import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;

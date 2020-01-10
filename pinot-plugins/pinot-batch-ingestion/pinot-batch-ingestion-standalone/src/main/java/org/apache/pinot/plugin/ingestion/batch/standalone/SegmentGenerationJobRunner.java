@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.batch.ingestion.standalone;
+package org.apache.pinot.plugin.ingestion.batch.standalone;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,15 +38,15 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.filesystem.PinotFS;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.batch.ingestion.runner.IngestionJobRunner;
 import org.apache.pinot.spi.batch.ingestion.spec.Constants;
 import org.apache.pinot.spi.batch.ingestion.spec.PinotClusterSpec;
 import org.apache.pinot.spi.batch.ingestion.spec.PinotFSSpec;
 import org.apache.pinot.spi.batch.ingestion.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.batch.ingestion.spec.SegmentGenerationTaskSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.DataSize;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

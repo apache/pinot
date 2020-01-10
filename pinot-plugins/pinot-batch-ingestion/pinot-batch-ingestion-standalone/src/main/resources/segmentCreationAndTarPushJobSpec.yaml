@@ -19,9 +19,9 @@
 
 executionFrameworkSpec:
   name: 'standalone'
-  segmentGenerationJobRunnerClassName: 'org.apache.pinot.plugin.batch.ingestion.standalone.SegmentGenerationJobRunner'
-  segmentTarPushJobRunnerClassName: 'org.apache.pinot.plugin.batch.ingestion.standalone.SegmentTarPushJobRunner'
-  segmentUriPushJobRunnerClassName: 'org.apache.pinot.plugin.batch.ingestion.standalone.SegmentUriPushJobRunner'
+  segmentGenerationJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.standalone.SegmentGenerationJobRunner'
+  segmentTarPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.standalone.SegmentTarPushJobRunner'
+  segmentUriPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.standalone.SegmentUriPushJobRunner'
 jobType: SegmentCreationAndTarPush
 inputDirURI: 'file:///path/to/input'
 includeFileNamePattern: 'glob:**/*.parquet'
