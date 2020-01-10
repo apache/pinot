@@ -33,6 +33,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 @InterfaceStability.Stable
 public interface StreamMessageDecoder<T> {
 
+  static final String RECORD_EXTRACTOR_CONFIG_KEY = "recordExtractorClass";
+
   /**
    * Initialize the decoder with decoder properties map, the stream topic name and stream schema
    * @param props

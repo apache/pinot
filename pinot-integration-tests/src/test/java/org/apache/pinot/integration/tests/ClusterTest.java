@@ -43,7 +43,6 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpStatus;
-import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
 import org.apache.pinot.common.config.IndexingConfig;
@@ -52,27 +51,29 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.TableTaskConfig;
 import org.apache.pinot.common.config.TenantConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.common.utils.CommonConstants.Broker;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Minion;
 import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
-import org.apache.pinot.plugin.stream.AvroRecordToPinotRowGenerator;
-import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.StreamConfigProperties;
-import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.minion.MinionStarter;
 import org.apache.pinot.minion.events.MinionEventObserverFactory;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
+import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
+import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -342,7 +343,8 @@ public abstract class ClusterTest extends ControllerTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(AvroFileSchemaKafkaAvroMessageDecoder.class);
     public static File avroFile;
     private org.apache.avro.Schema _avroSchema;
-    private AvroRecordToPinotRowGenerator _rowGenerator;
+    private Schema _pinotSchema;
+    private RecordExtractor<GenericData.Record> _recordExtractor;
     private DecoderFactory _decoderFactory = new DecoderFactory();
     private DatumReader<GenericData.Record> _reader;
 
@@ -353,7 +355,8 @@ public abstract class ClusterTest extends ControllerTest {
       DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile);
       _avroSchema = reader.getSchema();
       reader.close();
-      _rowGenerator = new AvroRecordToPinotRowGenerator(indexingSchema);
+      _recordExtractor = new AvroRecordExtractor();
+      _pinotSchema = indexingSchema;
       _reader = new GenericDatumReader<>(_avroSchema);
     }
 
@@ -367,7 +370,7 @@ public abstract class ClusterTest extends ControllerTest {
       try {
         GenericData.Record avroRecord =
             _reader.read(null, _decoderFactory.binaryDecoder(payload, offset, length, null));
-        return _rowGenerator.transform(avroRecord, destination);
+        return _recordExtractor.extract(_pinotSchema, avroRecord, destination);
       } catch (Exception e) {
         LOGGER.error("Caught exception", e);
         throw new RuntimeException(e);

@@ -28,6 +28,8 @@ import org.testng.annotations.Test;
 
 
 public class KafkaPartitionLevelStreamConfigTest {
+  private static final String KAFKA_DECODER_CLASS_NAME =
+      "org.apache.pinot.plugin.inputformat.avro.KafkaAvroMessageDecoder";
 
   private KafkaPartitionLevelStreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer,
       String socketTimeout) {
@@ -40,7 +42,6 @@ public class KafkaPartitionLevelStreamConfigTest {
     String streamType = "kafka";
     String consumerType = StreamConfig.ConsumerType.LOWLEVEL.toString();
     String consumerFactoryClassName = KafkaConsumerFactory.class.getName();
-    String decoderClass = "org.apache.pinot.plugin.stream.kafka.KafkaAvroMessageDecoder";
     String tableNameWithType = "tableName_REALTIME";
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
     streamConfigMap
@@ -54,7 +55,7 @@ public class KafkaPartitionLevelStreamConfigTest {
         consumerFactoryClassName);
     streamConfigMap
         .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-            decoderClass);
+            KAFKA_DECODER_CLASS_NAME);
     streamConfigMap.put("stream.kafka.broker.list", bootstrapHosts);
     if (buffer != null) {
       streamConfigMap.put("stream.kafka.buffer.size", buffer);

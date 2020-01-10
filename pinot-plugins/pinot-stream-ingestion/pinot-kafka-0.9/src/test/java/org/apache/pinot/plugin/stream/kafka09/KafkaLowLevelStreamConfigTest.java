@@ -20,10 +20,7 @@ package org.apache.pinot.plugin.stream.kafka09;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.plugin.stream.kafka.KafkaAvroMessageDecoder;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
-import org.apache.pinot.plugin.stream.kafka09.KafkaConsumerFactory;
-import org.apache.pinot.plugin.stream.kafka09.KafkaLowLevelStreamConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.testng.Assert;
@@ -31,6 +28,8 @@ import org.testng.annotations.Test;
 
 
 public class KafkaLowLevelStreamConfigTest {
+  private static final String KAFKA_DECODER_CLASS_NAME =
+      "org.apache.pinot.plugin.inputformat.avro.KafkaAvroMessageDecoder";
 
   private KafkaLowLevelStreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer,
                                                     String socketTimeout) {
@@ -43,7 +42,6 @@ public class KafkaLowLevelStreamConfigTest {
     String streamType = "kafka";
     String consumerType = StreamConfig.ConsumerType.LOWLEVEL.toString();
     String consumerFactoryClassName = KafkaConsumerFactory.class.getName();
-    String decoderClass = KafkaAvroMessageDecoder.class.getName();
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
     streamConfigMap
         .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
@@ -56,7 +54,7 @@ public class KafkaLowLevelStreamConfigTest {
         consumerFactoryClassName);
     streamConfigMap
         .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-            decoderClass);
+            KAFKA_DECODER_CLASS_NAME);
     streamConfigMap.put("stream.kafka.broker.list", bootstrapHosts);
     if (buffer != null) {
       streamConfigMap.put("stream.kafka.buffer.size", buffer);

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream;
+package org.apache.pinot.plugin.inputformat.avro;
 
 import java.util.Collections;
 import java.util.List;
@@ -25,6 +25,7 @@ import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -45,9 +46,9 @@ public class AvroRecordToPinotRowGeneratorTest {
             .addTime("incomingTime", TimeUnit.MILLISECONDS, FieldSpec.DataType.LONG, "outgoingTime", TimeUnit.DAYS,
                 FieldSpec.DataType.INT).build();
 
-    AvroRecordToPinotRowGenerator avroRecordToPinotRowGenerator = new AvroRecordToPinotRowGenerator(pinotSchema);
+    RecordExtractor<GenericData.Record> avroRecordToPinotRowGenerator = new AvroRecordExtractor();
     GenericRow genericRow = new GenericRow();
-    avroRecordToPinotRowGenerator.transform(avroRecord, genericRow);
+    avroRecordToPinotRowGenerator.extract(pinotSchema, avroRecord, genericRow);
 
     Assert.assertEquals(genericRow.getFieldNames(), new String[]{"incomingTime"});
     Assert.assertEquals(genericRow.getValue("incomingTime"), 12345L);
