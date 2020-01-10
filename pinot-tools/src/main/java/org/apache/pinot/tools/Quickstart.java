@@ -126,6 +126,7 @@ public class Quickstart {
     File schemaFile = new File(quickStartDataDir, "baseballStats_schema.json");
     File dataFile = new File(quickStartDataDir, "baseballStats_data.csv");
     File tableConfigFile = new File(quickStartDataDir, "baseballStats_offline_table_config.json");
+    File ingestionJobSpecFile = new File(quickStartDataDir, "ingestionJobSpec.yaml");
 
     ClassLoader classLoader = Quickstart.class.getClassLoader();
     URL resource = classLoader.getResource("examples/batch/baseballStats/baseballStats_schema.json");
@@ -134,6 +135,9 @@ public class Quickstart {
     resource = classLoader.getResource("examples/batch/baseballStats/rawdata/baseballStats_data.csv");
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, dataFile);
+    resource = classLoader.getResource("examples/batch/baseballStats/ingestionJobSpec.yaml");
+    com.google.common.base.Preconditions.checkNotNull(resource);
+    FileUtils.copyURLToFile(resource, ingestionJobSpecFile);
     resource = classLoader.getResource("examples/batch/baseballStats/baseballStats_offline_table_config.json");
     com.google.common.base.Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, tableConfigFile);
@@ -141,17 +145,15 @@ public class Quickstart {
     File tempDir = new File("/tmp", String.valueOf(System.currentTimeMillis()));
     Preconditions.checkState(tempDir.mkdirs());
     QuickstartTableRequest request =
-        new QuickstartTableRequest("baseballStats", schemaFile, tableConfigFile, quickStartDataDir, FileFormat.CSV);
+        new QuickstartTableRequest("baseballStats", schemaFile, tableConfigFile, ingestionJobSpecFile, quickStartDataDir, FileFormat.CSV);
     final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, tempDir);
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
     runner.startAll();
     printStatus(Color.CYAN, "***** Adding baseballStats table *****");
     runner.addTable();
-    printStatus(Color.CYAN, "***** Building index segment for baseballStats *****");
-    runner.buildSegment();
-    printStatus(Color.CYAN, "***** Pushing segment to the controller *****");
-    runner.pushSegment();
+    printStatus(Color.CYAN, "***** Launch data ingestion job to build index segment for baseballStats and push to controller *****");
+    runner.launchDataIngestionJob();
     printStatus(Color.CYAN, "***** Waiting for 5 seconds for the server to fetch the assigned segment *****");
     Thread.sleep(5000);
 

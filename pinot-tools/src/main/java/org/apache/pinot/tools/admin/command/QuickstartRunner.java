@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.spi.batch.ingestion.IngestionJobLauncher;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.TenantRole;
 import org.apache.pinot.tools.QuickstartTableRequest;
@@ -162,26 +163,12 @@ public class QuickstartRunner {
     }
   }
 
-  public void buildSegment()
+  public void launchDataIngestionJob()
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
       if (request.getTableType() == TableType.OFFLINE) {
-        File tempDir = new File(_tempDir, request.getTableName() + "_segment");
-        new CreateSegmentCommand().setDataDir(request.getDataDir().getAbsolutePath())
-            .setFormat(request.getSegmentFileFormat()).setSchemaFile(request.getSchemaFile().getAbsolutePath())
-            .setTableName(request.getTableName())
-            .setSegmentName(request.getTableName() + "_" + System.currentTimeMillis())
-            .setOutDir(tempDir.getAbsolutePath()).execute();
-        _segmentDirs.add(tempDir.getAbsolutePath());
+        IngestionJobLauncher.main(new String[]{request.getIngestionJobFile().getAbsolutePath()});
       }
-    }
-  }
-
-  public void pushSegment()
-      throws Exception {
-    for (String segmentDir : _segmentDirs) {
-      new UploadSegmentCommand().setControllerPort(String.valueOf(_controllerPorts.get(0))).setSegmentDir(segmentDir)
-          .execute();
     }
   }
 

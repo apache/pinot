@@ -96,7 +96,7 @@ public class AirlineDataStream {
       avroDataStream = null;
       return;
     }
-    producer.produce("airlineStatsEvents", message.toString().getBytes("UTF-8"));
+    producer.produce("flights-realtime", message.toString().getBytes("UTF-8"));
   }
 
   public void run() {
