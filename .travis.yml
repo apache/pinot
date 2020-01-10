@@ -7,13 +7,13 @@ env:
     - JOBS=1
   matrix:
     - RUN_INTEGRATION_TESTS=true
-      KAFKA_VERSION=0.9
+      KAFKA_VERSION=2.0
     - RUN_INTEGRATION_TESTS=false
-      KAFKA_VERSION=0.9
+      KAFKA_VERSION=2.0
     - RUN_INTEGRATION_TESTS=true
-      KAFKA_VERSION=2.0
+      KAFKA_VERSION=0.9
     - RUN_INTEGRATION_TESTS=false
-      KAFKA_VERSION=2.0
+      KAFKA_VERSION=0.9
 
 jdk:
   - oraclejdk8
