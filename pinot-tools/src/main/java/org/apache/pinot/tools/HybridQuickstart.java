@@ -142,6 +142,7 @@ public class HybridQuickstart {
     runner.launchDataIngestionJob();
 
     printStatus(Color.YELLOW, "***** Starting airline data stream and publishing to Kafka *****");
+
     final AirlineDataStream stream = new AirlineDataStream(Schema.fromFile(_schemaFile), _dataFile);
     stream.run();
 

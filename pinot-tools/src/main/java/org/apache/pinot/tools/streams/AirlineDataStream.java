@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.tools.streams;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -28,12 +26,13 @@ import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.tools.Quickstart;
@@ -42,6 +41,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * This is used in Hybrid Quickstart.
+ */
 public class AirlineDataStream {
   private static final Logger logger = LoggerFactory.getLogger(AirlineDataStream.class);
 
@@ -89,7 +91,7 @@ public class AirlineDataStream {
     avroDataStream = null;
   }
 
-  private void publish(JsonNode message)
+  private void publish(GenericRecord message)
       throws IOException {
     if (!keepIndexing) {
       avroDataStream.close();
@@ -112,14 +114,15 @@ public class AirlineDataStream {
             }
 
             GenericRecord record = avroDataStream.next();
-            ObjectNode message = JsonUtils.newObjectNode();
+
+            GenericRecord message = new GenericData.Record(AvroUtils.getAvroSchemaFromPinotSchema(pinotSchema));
 
             for (FieldSpec spec : pinotSchema.getDimensionFieldSpecs()) {
-              message.set(spec.getName(), JsonUtils.objectToJsonNode(record.get(spec.getName())));
+              message.put(spec.getName(), record.get(spec.getName()));
             }
 
             for (FieldSpec spec : pinotSchema.getDimensionFieldSpecs()) {
-              message.set(spec.getName(), JsonUtils.objectToJsonNode(record.get(spec.getName())));
+              message.put(spec.getName(), record.get(spec.getName()));
             }
 
             TimeFieldSpec spec = pinotSchema.getTimeFieldSpec();
