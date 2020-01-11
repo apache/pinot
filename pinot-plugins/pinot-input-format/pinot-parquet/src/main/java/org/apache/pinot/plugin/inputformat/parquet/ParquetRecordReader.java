@@ -25,7 +25,6 @@ import javax.annotation.Nullable;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.ParquetReader;
-import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -49,7 +48,7 @@ public class ParquetRecordReader implements RecordReader {
       throws IOException {
     _dataFilePath = new Path(dataFile.getAbsolutePath());
     _schema = schema;
-    AvroUtils.validateSchema(_schema, ParquetUtils.getParquetSchema(_dataFilePath));
+    ParquetUtils.validateSchema(_schema, ParquetUtils.getParquetSchema(_dataFilePath));
 
     _fieldSpecs = RecordReaderUtils.extractFieldSpecs(_schema);
     _reader = ParquetUtils.getParquetReader(_dataFilePath);

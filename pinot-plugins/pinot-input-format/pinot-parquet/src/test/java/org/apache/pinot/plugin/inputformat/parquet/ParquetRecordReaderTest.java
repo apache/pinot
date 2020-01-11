@@ -27,7 +27,6 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.ParquetWriter;
-import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
 import org.apache.pinot.spi.data.readers.RecordReader;
@@ -47,7 +46,7 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
   @Override
   protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
       throws Exception {
-    Schema schema = AvroUtils.getAvroSchemaFromPinotSchema(getPinotSchema());
+    Schema schema = ParquetUtils.getAvroSchemaFromPinotSchema(getPinotSchema());
     List<GenericRecord> records = new ArrayList<>();
     for (Map<String, Object> r : recordsToWrite) {
       GenericRecord record = new GenericData.Record(schema);
