@@ -190,4 +190,8 @@ public final class ColumnDataSource extends DataSource {
   public String getOperatorName() {
     return _operatorName;
   }
+
+  public DataFileReader getForwardIndex() {
+    return _forwardIndex;
+  }
 }

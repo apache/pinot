@@ -92,7 +92,7 @@ public abstract class BaseSingleColumnSingleValueReaderWriter<T extends ReaderCo
 
   @Override
   public byte[] getBytes(int row, ReaderContext context) {
-    throw new UnsupportedOperationException();
+    return getBytes(row);
   }
 
   @Override
@@ -142,6 +142,14 @@ public abstract class BaseSingleColumnSingleValueReaderWriter<T extends ReaderCo
 
   @Override
   public void setBytes(int row, byte[] bytes) {
+    throw new UnsupportedOperationException();
+  }
+
+  public int getLengthOfShortestElement() {
+    throw new UnsupportedOperationException();
+  }
+
+  public int getLengthOfLongestElement() {
     throw new UnsupportedOperationException();
   }
 }
