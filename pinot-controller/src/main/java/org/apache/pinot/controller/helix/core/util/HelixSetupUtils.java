@@ -26,6 +26,7 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.controller.HelixControllerMain;
+import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.helix.controller.rebalancer.strategy.CrushEdRebalanceStrategy;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZKHelixDataAccessor;
@@ -156,7 +157,7 @@ public class HelixSetupUtils {
       // FULL-AUTO Master-Slave state model with CrushED rebalance strategy
       FullAutoModeISBuilder idealStateBuilder = new FullAutoModeISBuilder(LEAD_CONTROLLER_RESOURCE_NAME);
       idealStateBuilder.setStateModel(MasterSlaveSMD.name)
-          .setRebalanceStrategy(CrushEdRebalanceStrategy.class.getName());
+          .setRebalanceStrategy(AutoRebalanceStrategy.class.getName());
       // Initialize partitions and replicas
       idealStateBuilder.setNumPartitions(NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
       for (int i = 0; i < NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
