@@ -28,10 +28,10 @@ spec:
       containers:
         - name: loading-data-to-kafka
           image: winedepot/pinot:0.3.0-SNAPSHOT
-          args: [ "StreamAvroIntoKafka", "-avroFile", "sample_data/airlineStats_data.avro", "-kafkaTopic", "flights-realtime", "-kafkaBrokerList", "kafka:9092", "-zkAddress", "zookeeper:2181" ]
+          args: [ "StreamAvroIntoKafka", "-avroFile", "examples/stream/airlineStats/sample_data/airlineStats_data.avro", "-kafkaTopic", "flights-realtime", "-kafkaBrokerList", "kafka:9092", "-zkAddress", "zookeeper:2181" ]
         - name: pinot-add-example-realtime-table
           image: winedepot/pinot:0.3.0-SNAPSHOT
-          args: [ "AddTable", "-schemaFile", "sample_data/airlineStats_schema.json", "-tableConfigFile", "sample_data/docker/airlineStats_realtime_table_config.json", "-controllerHost", "pinot-controller", "-controllerPort", "9000", "-exec" ]
+          args: [ "AddTable", "-schemaFile", "examples/stream/airlineStats/airlineStats_schema.json", "-tableConfigFile", "examples/stream/airlineStats/docker/airlineStats_realtime_table_config.json", "-controllerHost", "pinot-controller", "-controllerPort", "9000", "-exec" ]
       restartPolicy: OnFailure
       nodeSelector:
         cloud.google.com/gke-nodepool: default-pool

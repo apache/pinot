@@ -39,7 +39,7 @@ if [ $noThirdEyeChange -eq 0 ]; then
 fi
 
 KAFKA_BUILD_OPTS=""
-if [ "$KAFKA_VERSION" != '0.9' ]; then
+if [ "$KAFKA_VERSION" != '2.0' ]; then
   KAFKA_BUILD_OPTS="-Dkafka.version=${KAFKA_VERSION}"
 fi
 

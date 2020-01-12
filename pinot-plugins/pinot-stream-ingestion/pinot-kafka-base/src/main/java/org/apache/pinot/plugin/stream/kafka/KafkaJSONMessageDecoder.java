@@ -61,7 +61,7 @@ public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
       }
       return destination;
     } catch (Exception e) {
-      LOGGER.error("Caught exception while decoding row, discarding row.", e);
+      LOGGER.error("Caught exception while decoding row, discarding row. Payload is {}", new String(payload), e);
       return null;
     }
   }

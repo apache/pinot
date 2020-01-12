@@ -497,10 +497,10 @@ spec:
       containers:
         - name: loading-json-data-to-kafka
           image: fx19880617/pinot:0.2.0-SNAPSHOT
-          args: [ "StreamAvroIntoKafka", "-avroFile", "sample_data/airlineStats_data.avro", "-kafkaTopic", "flights-realtime", "-kafkaBrokerList", "kafka:9092", "-zkAddress", "kafka-zookeeper:2181" ]
+          args: [ "StreamAvroIntoKafka", "-avroFile", "examples/stream/airlineStats/sample_data/airlineStats_data.avro", "-kafkaTopic", "flights-realtime", "-kafkaBrokerList", "kafka:9092", "-zkAddress", "kafka-zookeeper:2181" ]
         - name: loading-avro-data-to-kafka
           image: fx19880617/pinot:0.2.0-SNAPSHOT
-          args: [ "StreamAvroIntoKafka", "-avroFile", "sample_data/airlineStats_data.avro", "-kafkaTopic", "flights-realtime-avro", "-kafkaBrokerList", "kafka:9092", "-zkAddress", "kafka-zookeeper:2181", "-outputFormat", "avro" ]
+          args: [ "StreamAvroIntoKafka", "-avroFile", "examples/stream/airlineStats/sample_data/airlineStats_data.avro", "-kafkaTopic", "flights-realtime-avro", "-kafkaBrokerList", "kafka:9092", "-zkAddress", "kafka-zookeeper:2181", "-outputFormat", "avro" ]
       restartPolicy: OnFailure
   backoffLimit: 3
 
