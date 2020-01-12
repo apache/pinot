@@ -16,8 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.batch.ingestion.spec;
+package org.apache.pinot.spi.ingestion.batch.spec;
 
+import java.io.Serializable;
 import java.util.List;
 
 
@@ -25,7 +26,7 @@ import java.util.List;
  * SegmentGenerationJobSpec defines all the required information in order to kick off a Pinot data ingestion job.
  *
  */
-public class SegmentGenerationJobSpec {
+public class SegmentGenerationJobSpec implements Serializable {
 
   /**
    * Execution framework which this job will be running.
@@ -231,7 +232,6 @@ public class SegmentGenerationJobSpec {
   public void setPushJobSpec(PushJobSpec pushJobSpec) {
     _pushJobSpec = pushJobSpec;
   }
-
 }
 
 

@@ -16,11 +16,41 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.batch.ingestion.spec;
+package org.apache.pinot.spi.ingestion.batch.spec;
 
-public class Constants {
+import java.io.Serializable;
+import java.util.HashMap;
+import java.util.Map;
+
+
+/**
+ * SegmentNameGeneratorSpec defines how to init a SegmentNameGenerator.
+ */
+public class SegmentNameGeneratorSpec implements Serializable {
+
   /**
-   * By default Pinot segments are compressed in 'tar.gz' format then pushed to controller.
+   * Current supported type is 'simple' and 'normalizedDate'.
    */
-  public static final String TAR_GZ_FILE_EXT = ".tar.gz";
+  private String _type = null;
+
+  /**
+   * Configs to init SegmentNameGenerator.
+   */
+  private Map<String, String> _configs = new HashMap<>();
+
+  public String getType() {
+    return _type;
+  }
+
+  public void setType(String type) {
+    _type = type;
+  }
+
+  public Map<String, String> getConfigs() {
+    return _configs;
+  }
+
+  public void setConfigs(Map<String, String> configs) {
+    _configs = configs;
+  }
 }

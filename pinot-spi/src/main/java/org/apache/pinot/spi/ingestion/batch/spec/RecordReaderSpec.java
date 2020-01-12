@@ -16,15 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.batch.ingestion.spec;
+package org.apache.pinot.spi.ingestion.batch.spec;
 
+import java.io.Serializable;
 import java.util.Map;
 
 
 /**
  * RecordReaderSpec defines how to initialize a RecordReader.
  */
-public class RecordReaderSpec {
+public class RecordReaderSpec implements Serializable {
 
   /**
    * Record data format, e.g. 'avro', 'parquet', 'orc', 'csv', 'json', 'thrift' etc.
