@@ -100,8 +100,14 @@ public class ServerInstance {
     LOGGER.info("Finish initializing server instance");
   }
 
-  public void start() {
-    Preconditions.checkState(!_started, "Server instance is already started");
+  public synchronized void start() {
+    // This method is called when Helix starts a new ZK session, and can be called multiple times. We only need to start
+    // the server instance once, and simply ignore the following invocations.
+    if (_started) {
+      LOGGER.info("Server instance is already running, skipping the start");
+      return;
+    }
+
     LOGGER.info("Starting server instance");
 
     LOGGER.info("Starting instance data manager");
@@ -117,7 +123,7 @@ public class ServerInstance {
     LOGGER.info("Finish starting server instance");
   }
 
-  public void shutDown() {
+  public synchronized void shutDown() {
     Preconditions.checkState(_started, "Server instance is not running");
     LOGGER.info("Shutting down server instance");
 
