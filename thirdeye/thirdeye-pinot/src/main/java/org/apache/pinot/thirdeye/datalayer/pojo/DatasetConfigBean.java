@@ -97,6 +97,9 @@ public class DatasetConfigBean extends AbstractBean {
   private double expectedCompleteness = Wo4WAvgDataCompletenessAlgorithm.DEFAULT_EXPECTED_COMPLETENESS;
   // latest timestamp of the dataset updated by external events
   private long lastRefreshTime;
+  // timestamp of receiving the last update event
+  private long lastRefreshEventTime = 0;
+
 
   private Map<String, String> properties = new HashMap<>();
 
@@ -303,6 +306,14 @@ public class DatasetConfigBean extends AbstractBean {
 
   public void setLastRefreshTime(long lastRefreshTime) {
     this.lastRefreshTime = lastRefreshTime;
+  }
+
+  public long getLastRefreshEventTime() {
+    return lastRefreshEventTime;
+  }
+
+  public void setLastRefreshEventTime(long lastRefreshEventTime) {
+    this.lastRefreshEventTime = lastRefreshEventTime;
   }
 
   @Override

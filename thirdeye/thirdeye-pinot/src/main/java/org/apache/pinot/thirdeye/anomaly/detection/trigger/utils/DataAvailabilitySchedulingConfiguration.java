@@ -37,9 +37,11 @@ public class DataAvailabilitySchedulingConfiguration {
   private List<String> dataSourceWhitelist;
   private List<String> filterClassList;
   // delay time after each run for the scheduler to reduce DB polling
-  private long schedulerDelayInSec = 300; // 5 minute
+  private long schedulerDelayInSec = 300; // 5 minutes
   // default threshold if detection level threshold is not set
   private long taskTriggerFallBackTimeInSec = 24 * 60 * 60; // 1 day
+  // scheduling window for data availability scheduling
+  private long schedulingWindowInSec = 15 * 60; // 15 minutes
 
   public String getConsumerClass() {
     return consumerClass;
@@ -143,5 +145,13 @@ public class DataAvailabilitySchedulingConfiguration {
 
   public void setTaskTriggerFallBackTimeInSec(long taskTriggerFallBackTimeInSec) {
     this.taskTriggerFallBackTimeInSec = taskTriggerFallBackTimeInSec;
+  }
+
+  public long getSchedulingWindowInSec() {
+    return schedulingWindowInSec;
+  }
+
+  public void setSchedulingWindowInSec(long schedulingWindowInSec) {
+    this.schedulingWindowInSec = schedulingWindowInSec;
   }
 }
