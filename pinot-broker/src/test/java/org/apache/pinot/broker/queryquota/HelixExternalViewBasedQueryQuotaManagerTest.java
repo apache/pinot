@@ -117,6 +117,8 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
       throws Exception {
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
+    ZKMetadataProvider
+        .setOfflineTableConfig(_testPropertyStore, OFFLINE_TABLE_NAME, tableConfig.toZNRecord());
     setQps(tableConfig);
     _queryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
@@ -224,6 +226,25 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
       throws Exception {
     ExternalView brokerResource = generateBrokerResource(REALTIME_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(REALTIME_TABLE_NAME);
+    ZKMetadataProvider
+        .setRealtimeTableConfig(_testPropertyStore, REALTIME_TABLE_NAME, tableConfig.toZNRecord());
+    setQps(tableConfig);
+    _queryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
+
+    runQueries(70, 10L);
+
+    _queryQuotaManager.dropTableQueryQuota(REALTIME_TABLE_NAME);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
+  }
+
+  @Test
+  public void testRealtimeTableNotnullQuotaStat()
+      throws Exception {
+    ExternalView brokerResource = generateBrokerResource(REALTIME_TABLE_NAME);
+    TableConfig tableConfig = generateDefaultTableConfig(REALTIME_TABLE_NAME);
+    ZKMetadataProvider
+        .setRealtimeTableConfig(_testPropertyStore, REALTIME_TABLE_NAME, tableConfig.toZNRecord());
     setQps(tableConfig);
     _queryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
@@ -313,6 +334,8 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
       throws Exception {
     ExternalView brokerResource = new ExternalView(BROKER_RESOURCE_INSTANCE);
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
+    ZKMetadataProvider
+        .setOfflineTableConfig(_testPropertyStore, OFFLINE_TABLE_NAME, tableConfig.toZNRecord());
     setQps(tableConfig);
     _queryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
@@ -324,6 +347,8 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     ExternalView brokerResource = new ExternalView(BROKER_RESOURCE_INSTANCE);
     brokerResource.setState(OFFLINE_TABLE_NAME, "broker_instance_2", "OFFLINE");
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
+    ZKMetadataProvider
+        .setOfflineTableConfig(_testPropertyStore, OFFLINE_TABLE_NAME, tableConfig.toZNRecord());
     setQps(tableConfig);
     _queryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
 
