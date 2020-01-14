@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.configuration.Configuration;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
@@ -49,6 +51,7 @@ public class BrokerServerBuilder {
   private final long _delayedShutdownTimeMs;
   private final RoutingTable _routingTable;
   private final TimeBoundaryService _timeBoundaryService;
+  private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final AccessControlFactory _accessControlFactory;
   private final MetricsRegistry _metricsRegistry;
   private final BrokerMetrics _brokerMetrics;
@@ -56,12 +59,13 @@ public class BrokerServerBuilder {
   private final BrokerAdminApiApplication _brokerAdminApplication;
 
   public BrokerServerBuilder(Configuration config, RoutingTable routingTable, TimeBoundaryService timeBoundaryService,
-      QueryQuotaManager queryQuotaManager) {
+      QueryQuotaManager queryQuotaManager, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _config = config;
     _delayedShutdownTimeMs =
         config.getLong(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, Broker.DEFAULT_DELAY_SHUTDOWN_TIME_MS);
     _routingTable = routingTable;
     _timeBoundaryService = timeBoundaryService;
+    _propertyStore = propertyStore;
     _accessControlFactory = AccessControlFactory.loadFactory(_config.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX));
     _metricsRegistry = new MetricsRegistry();
     MetricsHelper.initializeMetrics(config.subset(Broker.METRICS_CONFIG_PREFIX));
@@ -73,7 +77,7 @@ public class BrokerServerBuilder {
     _brokerMetrics.initializeGlobalMeters();
     _brokerRequestHandler =
         new SingleConnectionBrokerRequestHandler(_config, _routingTable, _timeBoundaryService, _accessControlFactory,
-            queryQuotaManager, _brokerMetrics);
+            queryQuotaManager, _brokerMetrics, _propertyStore);
     _brokerAdminApplication = new BrokerAdminApiApplication(this);
   }
 
