@@ -28,26 +28,6 @@
     <format>dir</format>
   </formats>
   <includeBaseDirectory>true</includeBaseDirectory>
-  <dependencySets>
-    <dependencySet>
-      <useProjectArtifact>false</useProjectArtifact>
-      <useTransitiveDependencies>true</useTransitiveDependencies>
-      <outputDirectory>lib</outputDirectory>
-      <unpack>false</unpack>
-      <excludes>
-        <exclude>${project.groupId}:*:*</exclude>
-      </excludes>
-    </dependencySet>
-    <dependencySet>
-      <useProjectArtifact>false</useProjectArtifact>
-      <useTransitiveDependencies>true</useTransitiveDependencies>
-      <outputDirectory>lib</outputDirectory>
-      <unpack>false</unpack>
-      <includes>
-        <include>${project.groupId}:*:*</include>
-      </includes>
-    </dependencySet>
-  </dependencySets>
 
   <files>
     <!-- Rename LICENSE-binary, NOTICE-binary to LICENSE, NOTICE and include them to a distribution tarbell -->
@@ -62,6 +42,10 @@
     <!-- Include DISCLAIMER -->
     <file>
       <source>${pinot.root}/DISCLAIMER</source>
+    </file>
+    <file>
+      <source>${pinot.root}/pinot-distribution/target/pinot-all-${project.version}-jar-with-dependencies.jar</source>
+      <destName>lib/pinot-all-${project.version}-jar-with-dependencies.jar</destName>
     </file>
   </files>
   <fileSets>
