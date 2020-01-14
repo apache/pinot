@@ -117,7 +117,7 @@ public class ServerInstance {
     LOGGER.info("Starting query scheduler");
     _queryScheduler.start();
     LOGGER.info("Starting query server");
-    new Thread(_queryServer).start();
+    _queryServer.start();
 
     _started = true;
     LOGGER.info("Finish starting server instance");
