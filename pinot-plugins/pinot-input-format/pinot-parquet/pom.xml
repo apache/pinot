@@ -63,13 +63,5 @@
         </exclusion>
       </exclusions>
     </dependency>
-    <!-- test dependencies -->
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-spi</artifactId>
-      <version>${project.version}</version>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
   </dependencies>
 </project>

@@ -44,8 +44,8 @@
       <source>${pinot.root}/DISCLAIMER</source>
     </file>
     <file>
-      <source>${pinot.root}/pinot-distribution/target/pinot-all-in-one-${project.version}-jar-with-dependencies.jar</source>
-      <destName>lib/pinot-all-in-one-${project.version}-jar-with-dependencies.jar</destName>
+      <source>${pinot.root}/pinot-distribution/target/pinot-all-${project.version}-jar-with-dependencies.jar</source>
+      <destName>lib/pinot-all-${project.version}-jar-with-dependencies.jar</destName>
     </file>
   </files>
   <fileSets>

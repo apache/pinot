@@ -120,12 +120,12 @@
         <artifactId>maven-assembly-plugin</artifactId>
         <executions>
           <execution>
-            <id>build-pinot-all-in-one-jar</id>
+            <id>build-pinot-all-jar</id>
             <configuration>
               <descriptorRefs>
                 <descriptorRef>jar-with-dependencies</descriptorRef>
               </descriptorRefs>
-              <finalName>pinot-all-in-one-${project.version}</finalName>
+              <finalName>pinot-all-${project.version}</finalName>
             </configuration>
             <phase>package</phase>
             <goals>
