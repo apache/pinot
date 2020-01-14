@@ -25,6 +25,7 @@ import java.util.Random;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
@@ -55,6 +56,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String CONSOLE_WEBAPP_USE_HTTPS = "controller.query.console.useHttps";
   private static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
   private static final String CONTROLLER_MODE = "controller.mode";
+  private static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
 
   public enum ControllerMode {
     DUAL, PINOT_ONLY, HELIX_ONLY
@@ -155,6 +157,8 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = false;
   private static final boolean DEFAULT_ALLOW_HLC_TABLES = true;
   private static final String DEFAULT_CONTROLLER_MODE = ControllerMode.DUAL.name();
+  private static final String DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY =
+      AutoRebalanceStrategy.class.getName();
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
 
@@ -592,6 +596,14 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public ControllerMode getControllerMode() {
     return ControllerMode.valueOf(getString(CONTROLLER_MODE, DEFAULT_CONTROLLER_MODE).toUpperCase());
+  }
+
+  public void setLeadControllerResourceRebalanceStrategy(String rebalanceStrategy) {
+    setProperty(LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY, rebalanceStrategy);
+  }
+
+  public String getLeadControllerResourceRebalanceStrategy() {
+    return getString(LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY, DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY);
   }
 
   public boolean getHLCTablesAllowed() {

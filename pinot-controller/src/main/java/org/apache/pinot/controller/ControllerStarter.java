@@ -263,7 +263,8 @@ public class ControllerStarter {
 
   private void setUpPinotController() {
     // Set up Pinot cluster in Helix if needed
-    HelixSetupUtils.setupPinotCluster(_helixClusterName, _helixZkURL, _isUpdateStateModel, _enableBatchMessageMode);
+    HelixSetupUtils.setupPinotCluster(_helixClusterName, _helixZkURL, _isUpdateStateModel, _enableBatchMessageMode,
+        _config.getLeadControllerResourceRebalanceStrategy());
 
     // Start all components
     initPinotFSFactory();
