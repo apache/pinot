@@ -358,8 +358,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       Collection<FilterQuery> values = brokerRequest.getFilterSubQueryMap().getFilterQueryMap().values();
       for (FilterQuery filterQuery : values) {
         if (filterQuery.getNestedFilterQueryIdsSize() == 0) {
-          String actualColumnName = _tableCache.getActualColumnName(actualTableName, filterQuery.getColumn());
-          filterQuery.setColumn(actualColumnName);
+          String expression = filterQuery.getColumn();
+          filterQuery.setColumn(fixColumnNameCase(actualTableName, expression));
         }
       }
     }
@@ -389,7 +389,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       List<String> selectionColumns = selection.getSelectionColumns();
       for (int i = 0; i < selectionColumns.size(); i++) {
         String expression = selectionColumns.get(i);
-        if (expression.trim().equalsIgnoreCase("*")) {
+        if (!expression.trim().equalsIgnoreCase("*")) {
           selectionColumns.set(i, fixColumnNameCase(actualTableName, expression));
         }
       }
