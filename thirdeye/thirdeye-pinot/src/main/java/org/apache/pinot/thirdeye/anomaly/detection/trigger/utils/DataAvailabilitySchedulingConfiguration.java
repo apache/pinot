@@ -20,6 +20,8 @@
 package org.apache.pinot.thirdeye.anomaly.detection.trigger.utils;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+
 
 /**
  * Configuration class for DataAvailabilityListener.
@@ -37,11 +39,11 @@ public class DataAvailabilitySchedulingConfiguration {
   private List<String> dataSourceWhitelist;
   private List<String> filterClassList;
   // delay time after each run for the scheduler to reduce DB polling
-  private long schedulerDelayInSec = 300; // 5 minutes
+  private long schedulerDelayInSec = TimeUnit.MINUTES.toSeconds(5);
   // default threshold if detection level threshold is not set
-  private long taskTriggerFallBackTimeInSec = 24 * 60 * 60; // 1 day
-  // scheduling window for data availability scheduling
-  private long schedulingWindowInSec = 15 * 60; // 15 minutes
+  private long taskTriggerFallBackTimeInSec = TimeUnit.DAYS.toSeconds(1);
+  // scheduling window for data availability scheduling to avoid over-scheduling if watermarks do not move forward
+  private long schedulingWindowInSec = TimeUnit.MINUTES.toSeconds(15);
 
   public String getConsumerClass() {
     return consumerClass;

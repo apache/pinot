@@ -79,7 +79,8 @@ public class DataAvailabilityTaskSchedulerTest {
     metric1.setDerived(false);
     metric2.setAlias("");
     metricId2 = metricConfigManager.save(metric2);
-    dataAvailabilityTaskScheduler = new DataAvailabilityTaskScheduler(60, 24 * 60 * 60, 15 * 60);
+    dataAvailabilityTaskScheduler = new DataAvailabilityTaskScheduler(60,
+        TimeUnit.DAYS.toSeconds(1), TimeUnit.MINUTES.toSeconds(15));
   }
 
   @AfterMethod
