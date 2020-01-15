@@ -300,7 +300,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
         LOG.info("can't generate moving monitoring windows, calling with single detection window", e);
       }
     }
-    return Collections.singletonList(new Interval(startTime, endTime));
+    return Collections.singletonList(new Interval(startTime, endTime, DateTimeZone.forID(dataset.getTimezone())));
   }
 
   // get the list of monitoring window end times

@@ -128,7 +128,7 @@ public class ThresholdRuleDetectorTest {
     List<MergedAnomalyResultDTO> anomalies = thresholdRule.runDetection(new Interval(1546214400000L, 1551398400000L), "thirdeye:metric:123").getAnomalies();
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 1551312000000L);
-    Assert.assertEquals(anomalies.get(0).getEndTime(), 1551398400000L);
+    Assert.assertEquals(anomalies.get(0).getEndTime(), 1553731200000L);
   }
 
 }

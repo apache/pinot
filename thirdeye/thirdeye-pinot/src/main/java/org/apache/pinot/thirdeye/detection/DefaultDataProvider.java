@@ -26,6 +26,7 @@ import com.google.common.cache.Weigher;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
+import com.ibm.icu.util.TimeZone;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -62,6 +63,7 @@ import org.apache.pinot.thirdeye.detection.cache.CacheConfig;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EvaluationSlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
+import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -370,9 +372,10 @@ public class DefaultDataProvider implements DataProvider {
     // align to time buckets and request time zone
     // if granularity is more than 1 day, align to the daily boundary
     // this alignment is required by the Pinot datasource, otherwise, it may return wrong results
+    long offset = DateTimeZone.forID(dataset.getTimezone()).getOffset(slice.getStart());
     long timeGranularity = Math.min(granularity.toMillis(), TimeUnit.DAYS.toMillis(1));
-    long start = (slice.getStart() / timeGranularity) * timeGranularity;
-    long end = ((slice.getEnd() + timeGranularity - 1) / timeGranularity) * timeGranularity;
+    long start = ((slice.getStart() + offset)/ timeGranularity) * timeGranularity - offset;
+    long end = ((slice.getEnd() + offset + timeGranularity - 1) / timeGranularity) * timeGranularity - offset;
 
     return slice.withStart(start).withEnd(end).withGranularity(granularity);
   }
