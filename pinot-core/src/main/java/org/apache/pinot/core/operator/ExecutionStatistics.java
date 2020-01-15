@@ -22,8 +22,12 @@ package org.apache.pinot.core.operator;
  * The <code>ExecutionStatistics</code> class contains the operator statistics during execution time.
  */
 public class ExecutionStatistics {
+  // The number of documents scanned post filtering.
   private long _numDocsScanned;
+  // The number of doc ids scanned in the filtering phase of the query execution: could be larger than the total doc num
+  // because of multiple filtering predicates.
   private long _numEntriesScannedInFilter;
+  // Equal to _numDocsScanned * number_of_projected_columns
   private long _numEntriesScannedPostFilter;
   private long _numTotalRawDocs;
   private long _numSegmentsProcessed;

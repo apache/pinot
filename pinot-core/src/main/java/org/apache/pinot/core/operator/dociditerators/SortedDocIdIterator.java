@@ -24,14 +24,12 @@ import org.apache.pinot.core.common.Constants;
 
 
 public final class SortedDocIdIterator implements IndexBasedDocIdIterator {
-  /**
-   *
-   */
   private List<IntPair> pairs;
   private String datasourceName;
 
   /**
-   * @param sortedDocIdSet
+   * @param datasourceName
+   * @param pairs
    */
   public SortedDocIdIterator(String datasourceName, List<IntPair> pairs) {
     this.datasourceName = datasourceName;

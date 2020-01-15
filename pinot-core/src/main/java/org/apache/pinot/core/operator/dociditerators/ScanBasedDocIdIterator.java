@@ -23,7 +23,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
- * All scan based filter iterators must implement this interface. This allows interesection to be
+ * All scan based filter iterators must implement this interface. This allows intersection to be
  * optimized.
  * For example, if the we have two iterators one index based and another scan based, instead of
  * iterating on both iterators while doing intersection, we iterate of index based and simply look

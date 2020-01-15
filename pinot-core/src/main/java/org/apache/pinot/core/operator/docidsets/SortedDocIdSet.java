@@ -77,6 +77,7 @@ public class SortedDocIdSet implements FilterBlockDocIdSet {
 
   @Override
   public long getNumEntriesScannedInFilter() {
+    // TODO: explain return 0.
     return 0L;
   }
 
