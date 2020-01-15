@@ -40,7 +40,6 @@ import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.model.ResourceConfig;
 import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.CustomModeISBuilder;
-import org.apache.helix.model.builder.FullAutoModeISBuilder;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixBrokerResourceOnlineOfflineStateModelGenerator;
@@ -154,7 +153,7 @@ public class HelixSetupUtils {
       LOGGER.info("Adding resource: {}", LEAD_CONTROLLER_RESOURCE_NAME);
 
       // FULL-AUTO Master-Slave state model with a rebalance strategy, auto-rebalance by default
-      FullAutoModeISBuilder idealStateBuilder = new FullAutoModeISBuilder(LEAD_CONTROLLER_RESOURCE_NAME);
+      CustomModeISBuilder idealStateBuilder = new CustomModeISBuilder(LEAD_CONTROLLER_RESOURCE_NAME);
       idealStateBuilder.setStateModel(MasterSlaveSMD.name)
           .setRebalanceStrategy(leadControllerResourceRebalanceStrategy);
       // Initialize partitions and replicas
@@ -175,10 +174,10 @@ public class HelixSetupUtils {
       idealState.setInstanceGroupTag(CONTROLLER_INSTANCE);
       // Set batch message mode
       idealState.setBatchMessageMode(enableBatchMessageMode);
+
       // Explicitly disable this resource when creating this new resource.
       // When all the controllers are running the code with the logic to handle this resource, it can be enabled for backward compatibility.
       // In the next major release, we can enable this resource by default, so that all the controller logic can be separated.
-
       helixAdmin.addResource(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, idealState);
     } else if (!idealState.isEnabled()) {
       // Enable lead controller resource and let resource config be the only switch for enabling logic of lead controller resource.

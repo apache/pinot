@@ -36,11 +36,14 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.api.listeners.ControllerChangeListener;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.task.TaskDriver;
 import org.apache.pinot.common.Utils;
@@ -77,6 +80,7 @@ import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -384,6 +388,8 @@ public class ControllerStarter {
     });
 
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixParticipantManager));
+
+    enableFullAutoRebalanceModeForLeadControllerResource();
   }
 
   private ServiceStatus.ServiceStatusCallback generateServiceStatusCallback(HelixManager helixManager) {
@@ -525,6 +531,41 @@ public class ControllerStarter {
     periodicTasks.add(_realtimeSegmentRelocator);
 
     return periodicTasks;
+  }
+
+  /**
+   * This is the workaround for https://github.com/apache/helix/issues/680.
+   * Before the first Pinot controller is fully prepared, FULL-AUTO rebalance shouldn't be turned on.
+   * Otherwise some of the rebalance algorithms would blindly throw exception.
+   */
+  private void enableFullAutoRebalanceModeForLeadControllerResource() {
+    try {
+      int maxNumAttempts = 10;
+      long delayMs = 5_000L;
+      RetryPolicies.fixedDelayRetryPolicy(maxNumAttempts, delayMs).attempt(() -> {
+        LiveInstance liveInstance = _helixResourceManager.getLiveInstance(_helixParticipantInstanceId);
+        if (liveInstance == null) {
+          return false;
+        }
+        IdealState idealState =
+            _helixResourceManager.getTableIdealState(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+        if (idealState == null) {
+          return false;
+        }
+        // Change the rebalance mode from custom mode to FULL-AUTO mode.
+        if (idealState.getRebalanceMode() != IdealState.RebalanceMode.FULL_AUTO) {
+          idealState.setRebalanceMode(IdealState.RebalanceMode.FULL_AUTO);
+          HelixAdmin helixAdmin = _helixResourceManager.getHelixAdmin();
+          helixAdmin
+              .updateIdealState(_helixClusterName, CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME, idealState);
+          helixAdmin.rebalance(_helixClusterName, CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME,
+              CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT);
+        }
+        return true;
+      });
+    } catch (Exception e) {
+      throw new RuntimeException("Exception when trying to enable auto rebalance for lead controller resource", e);
+    }
   }
 
   public void stop() {
