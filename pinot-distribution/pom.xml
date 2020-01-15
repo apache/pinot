@@ -131,6 +131,9 @@
               <goal>shade</goal>
             </goals>
             <configuration>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
+              </transformers>
               <!--
               Usually in hadoop environment, there are multiple jars with different versions.
               Most of the NoSuchMethodExceptions are caused by class loading conflicts.
@@ -146,6 +149,10 @@
                 <relocation>
                   <pattern>com.fasterxml.jackson</pattern>
                   <shadedPattern>shaded.com.fasterxml.jackson</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>org.apache.http</pattern>
+                  <shadedPattern>shaded.org.apache.http</shadedPattern>
                 </relocation>
               </relocations>
             </configuration>

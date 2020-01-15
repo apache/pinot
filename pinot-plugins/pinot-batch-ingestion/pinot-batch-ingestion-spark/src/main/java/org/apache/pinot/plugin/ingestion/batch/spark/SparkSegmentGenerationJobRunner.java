@@ -42,12 +42,18 @@ import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationTaskSpec;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.DataSize;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.PINOT_PLUGINS_DIR;
+import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.PINOT_PLUGINS_TAR_GZ;
+import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_DIR_PROPERTY_NAME;
+import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_INCLUDE_PROPERTY_NAME;
 
 
 public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Serializable {
@@ -178,10 +184,12 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
 
     try {
       JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
+      packPluginsToDistributedCache(sparkContext);
       if (_spec.getExecutionFrameworkSpec().getExtraConfigs().containsKey(DEPS_JAR_DIR)) {
         addDepsJarToDistributedCache(sparkContext,
             _spec.getExecutionFrameworkSpec().getExtraConfigs().get(DEPS_JAR_DIR));
       }
+
       List<String> pathAndIdxList = new ArrayList<>();
       for (int i = 0; i < filteredFiles.size(); i++) {
         pathAndIdxList.add(String.format("%s %d", filteredFiles.get(i), i));
@@ -190,10 +198,26 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
 
       final URI finalInputDirURI = inputDirURI;
       final URI finalOutputDirURI = (stagingDirURI == null) ? outputDirURI : stagingDirURI;
+      final String pluginsIncludes = System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME);
       pathRDD.foreach(pathAndIdx -> {
         String[] splits = pathAndIdx.split(" ");
         String path = splits[0];
         int idx = Integer.valueOf(splits[1]);
+
+        File pluginsDirFile = new File(PINOT_PLUGINS_DIR + "-" + idx);
+        try {
+          TarGzCompressionUtils.unTar(new File(PINOT_PLUGINS_TAR_GZ), pluginsDirFile);
+        } catch (Exception e) {
+          LOGGER.error("Failed to untar pinot plugins tarball", e);
+          throw new RuntimeException(e);
+        }
+        System.setProperty(PLUGINS_DIR_PROPERTY_NAME, pluginsDirFile.toString());
+        if (pluginsIncludes != null) {
+          System.setProperty(PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
+        }
+        LOGGER.info("Pinot plugins are set at [{}], plugins includes [{}]", pluginsDirFile.getAbsolutePath(),
+            pluginsIncludes);
+
         URI inputFileURI = URI.create(path);
         if (inputFileURI.getScheme() == null) {
           inputFileURI =
@@ -281,5 +305,16 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         }
       }
     }
+  }
+
+  protected void packPluginsToDistributedCache(JavaSparkContext sparkContext) {
+    String pluginsRootDir = PluginManager.get().getPluginsRootDir();
+    File pluginsTarGzFile = new File(PINOT_PLUGINS_TAR_GZ);
+    try {
+      TarGzCompressionUtils.createTarGzOfDirectory(pluginsRootDir, pluginsTarGzFile.getPath());
+    } catch (IOException e) {
+      LOGGER.error("Failed to tar plugins directory", e);
+    }
+    sparkContext.addFile(pluginsTarGzFile.toString());
   }
 }

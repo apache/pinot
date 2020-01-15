@@ -90,6 +90,7 @@ public class IngestionJobLauncher {
 
   private static void kickoffIngestionJob(SegmentGenerationJobSpec spec, String ingestionJobRunnerClassName)
       throws Exception {
+    LOGGER.info("Trying to create instance for class {}", ingestionJobRunnerClassName);
     IngestionJobRunner ingestionJobRunner = PluginManager.get().createInstance(ingestionJobRunnerClassName);
     ingestionJobRunner.init(spec);
     ingestionJobRunner.run();

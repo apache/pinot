@@ -36,6 +36,8 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 public class SegmentGenerationUtils {
 
   private static final String OFFLINE = "OFFLINE";
+  public static final String PINOT_PLUGINS_TAR_GZ = "pinot-plugins.tar.gz";
+  public static final String PINOT_PLUGINS_DIR = "pinot-plugins-dir";
 
   public static String generateSchemaURI(String controllerUri, String table) {
     return String.format("%s/tables/%s/schema", controllerUri, table);
@@ -144,4 +146,5 @@ public class SegmentGenerationUtils {
     URI relativeOutputURI = outputDir.resolve(relativePath).resolve(".");
     return relativeOutputURI;
   }
+
 }

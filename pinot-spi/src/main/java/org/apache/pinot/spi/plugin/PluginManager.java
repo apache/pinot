@@ -125,8 +125,9 @@ public class PluginManager {
     for (File jarFile : jarFiles) {
       try {
         urlList.add(jarFile.toURI().toURL());
+        LOGGER.info("Successfully loaded plugin [{}] from jar file [{}]", pluginName, jarFile);
       } catch (MalformedURLException e) {
-        //ignore
+        LOGGER.error("Unable to load plugin [{}] jar file [{}]", pluginName, jarFile, e);
       }
     }
     PluginClassLoader classLoader = createClassLoader(urlList);
@@ -238,6 +239,10 @@ public class PluginManager {
     } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException | ClassNotFoundException e) {
       throw e;
     }
+  }
+
+  public String getPluginsRootDir() {
+    return _pluginsRootDir;
   }
 
   public static PluginManager get() {
