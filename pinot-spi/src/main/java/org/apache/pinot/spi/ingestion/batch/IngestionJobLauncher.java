@@ -51,44 +51,46 @@ public class IngestionJobLauncher {
     String jobSpecFilePath = args[0];
 
     try (Reader reader = new BufferedReader(new FileReader(jobSpecFilePath))) {
-      Yaml yaml = new Yaml();
-      SegmentGenerationJobSpec spec = yaml.loadAs(reader, SegmentGenerationJobSpec.class);
-      StringWriter sw = new StringWriter();
-      yaml.dump(spec, sw);
-      LOGGER.info("SegmentGenerationJobSpec: \n{}", sw.toString());
+      SegmentGenerationJobSpec spec = new Yaml().loadAs(reader, SegmentGenerationJobSpec.class);
+      runIngestionJob(spec);
+    }
+  }
 
-      ExecutionFrameworkSpec executionFramework = spec.getExecutionFrameworkSpec();
-      PinotIngestionJobType jobType = PinotIngestionJobType.valueOf(spec.getJobType());
-      switch (jobType) {
-        case SegmentCreation:
-          kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassName());
-          break;
-        case SegmentTarPush:
-          kickoffIngestionJob(spec, executionFramework.getSegmentTarPushJobRunnerClassName());
-          break;
-        case SegmentUriPush:
-          kickoffIngestionJob(spec, executionFramework.getSegmentUriPushJobRunnerClassName());
-          break;
-        case SegmentCreationAndTarPush:
-          kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassName());
-          kickoffIngestionJob(spec, executionFramework.getSegmentTarPushJobRunnerClassName());
-          break;
-        case SegmentCreationAndUriPush:
-          kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassName());
-          kickoffIngestionJob(spec, executionFramework.getSegmentUriPushJobRunnerClassName());
-          break;
-        default:
-          LOGGER.error("Unsupported job type - {}. Support job types: {}", spec.getJobType(),
-              Arrays.toString(PinotIngestionJobType.values()));
-          throw new RuntimeException("Unsupported job type - " + spec.getJobType());
-      }
+  public static void runIngestionJob(SegmentGenerationJobSpec spec)
+      throws Exception {
+    StringWriter sw = new StringWriter();
+    new Yaml().dump(spec, sw);
+    LOGGER.info("SegmentGenerationJobSpec: \n{}", sw.toString());
+    ExecutionFrameworkSpec executionFramework = spec.getExecutionFrameworkSpec();
+    PinotIngestionJobType jobType = PinotIngestionJobType.valueOf(spec.getJobType());
+    switch (jobType) {
+      case SegmentCreation:
+        kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassName());
+        break;
+      case SegmentTarPush:
+        kickoffIngestionJob(spec, executionFramework.getSegmentTarPushJobRunnerClassName());
+        break;
+      case SegmentUriPush:
+        kickoffIngestionJob(spec, executionFramework.getSegmentUriPushJobRunnerClassName());
+        break;
+      case SegmentCreationAndTarPush:
+        kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassName());
+        kickoffIngestionJob(spec, executionFramework.getSegmentTarPushJobRunnerClassName());
+        break;
+      case SegmentCreationAndUriPush:
+        kickoffIngestionJob(spec, executionFramework.getSegmentGenerationJobRunnerClassName());
+        kickoffIngestionJob(spec, executionFramework.getSegmentUriPushJobRunnerClassName());
+        break;
+      default:
+        LOGGER.error("Unsupported job type - {}. Support job types: {}", spec.getJobType(),
+            Arrays.toString(PinotIngestionJobType.values()));
+        throw new RuntimeException("Unsupported job type - " + spec.getJobType());
     }
   }
 
   private static void kickoffIngestionJob(SegmentGenerationJobSpec spec, String ingestionJobRunnerClassName)
       throws Exception {
-    IngestionJobRunner ingestionJobRunner =
-        PluginManager.get().createInstance(ingestionJobRunnerClassName);
+    IngestionJobRunner ingestionJobRunner = PluginManager.get().createInstance(ingestionJobRunnerClassName);
     ingestionJobRunner.init(spec);
     ingestionJobRunner.run();
   }

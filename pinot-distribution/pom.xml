@@ -84,6 +84,10 @@
           <artifactId>pinot-kafka-${kafka.version}</artifactId>
         </exclusion>
         <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-batch-ingestion-standalone</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-common</artifactId>
         </exclusion>

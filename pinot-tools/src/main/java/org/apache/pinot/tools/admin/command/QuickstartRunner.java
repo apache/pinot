@@ -19,17 +19,23 @@
 package org.apache.pinot.tools.admin.command;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
+import java.io.Reader;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
-import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.common.utils.TenantRole;
+import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
+import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.QuickstartTableRequest;
+import org.yaml.snakeyaml.Yaml;
 
 
 public class QuickstartRunner {
@@ -167,7 +173,15 @@ public class QuickstartRunner {
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
       if (request.getTableType() == TableType.OFFLINE) {
-        IngestionJobLauncher.main(new String[]{request.getIngestionJobFile().getAbsolutePath()});
+        try (Reader reader = new BufferedReader(new FileReader(request.getIngestionJobFile().getAbsolutePath()))) {
+          SegmentGenerationJobSpec spec = new Yaml().loadAs(reader, SegmentGenerationJobSpec.class);
+          String inputDirURI = spec.getInputDirURI();
+          if (!new File(inputDirURI).exists()) {
+            URL resolvedInputDirURI = QuickstartRunner.class.getClassLoader().getResource(inputDirURI);
+            spec.setInputDirURI(resolvedInputDirURI.toURI().toString());
+          }
+          IngestionJobLauncher.runIngestionJob(spec);
+        }
       }
     }
   }
