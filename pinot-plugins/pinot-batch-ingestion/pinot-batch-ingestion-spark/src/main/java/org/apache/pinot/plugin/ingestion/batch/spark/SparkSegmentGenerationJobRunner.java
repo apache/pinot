@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.ingestion.batch.standalone;
+package org.apache.pinot.plugin.ingestion.batch.spark;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Serializable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -31,6 +32,7 @@ import java.nio.file.FileSystems;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.MapConfiguration;
@@ -49,21 +51,26 @@ import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationTaskSpec;
 import org.apache.pinot.spi.utils.DataSize;
+import org.apache.spark.SparkContext;
+import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.api.java.JavaSparkContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SegmentGenerationJobRunner implements IngestionJobRunner {
+public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Serializable {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerationJobRunner.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SparkSegmentGenerationJobRunner.class);
   private static final String OFFLINE = "OFFLINE";
+  private static final String DEPS_JAR_DIR = "dependencyJarDir";
+  private static final String STAGING_DIR = "stagingDir";
 
   private SegmentGenerationJobSpec _spec;
 
-  public SegmentGenerationJobRunner() {
+  public SparkSegmentGenerationJobRunner() {
   }
 
-  public SegmentGenerationJobRunner(SegmentGenerationJobSpec spec) {
+  public SparkSegmentGenerationJobRunner(SegmentGenerationJobSpec spec) {
     init(spec);
   }
 
@@ -130,6 +137,9 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
           generateTableConfigURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setTableConfigURI(tableConfigURI);
     }
+    if (_spec.getExecutionFrameworkSpec().getExtraConfigs() == null) {
+      _spec.getExecutionFrameworkSpec().setExtraConfigs(new HashMap<>());
+    }
   }
 
   @Override
@@ -157,6 +167,21 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     PinotFS outputDirFS = PinotFSFactory.create(outputDirURI.getScheme());
     outputDirFS.mkdir(outputDirURI);
 
+    //Get staging directory for temporary output pinot segments
+    String stagingDir = _spec.getExecutionFrameworkSpec().getExtraConfigs().get(STAGING_DIR);
+    URI stagingDirURI = null;
+    if (stagingDir != null) {
+      stagingDirURI = URI.create(stagingDir);
+      if (stagingDirURI.getScheme() == null) {
+        stagingDirURI = new File(stagingDir).toURI();
+      }
+      if (!outputDirURI.getScheme().equals(stagingDirURI.getScheme())) {
+        throw new RuntimeException(String
+            .format("The scheme of staging directory URI [%s] and output directory URI [%s] has to be same.",
+                stagingDirURI, outputDirURI));
+      }
+      outputDirFS.mkdir(stagingDirURI);
+    }
     //Get list of files to process
     String[] files = inputDirFS.listFiles(inputDirURI, true);
 
@@ -187,40 +212,51 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
       }
     }
 
-    File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + System.currentTimeMillis());
     try {
-      //create localTempDir for input and output
-      File localInputTempDir = new File(localTempDir, "input");
-      FileUtils.forceMkdir(localInputTempDir);
-      File localOutputTempDir = new File(localTempDir, "output");
-      FileUtils.forceMkdir(localOutputTempDir);
-
-      //Read TableConfig, Schema
-      Schema schema = getSchema();
-      TableConfig tableConfig = getTableConfig();
-
-      //iterate on the file list, for each
+      JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
+      if (_spec.getExecutionFrameworkSpec().getExtraConfigs().containsKey(DEPS_JAR_DIR)) {
+        addDepsJarToDistributedCache(sparkContext,
+            _spec.getExecutionFrameworkSpec().getExtraConfigs().get(DEPS_JAR_DIR));
+      }
+      List<String> pathAndIdxList = new ArrayList<>();
       for (int i = 0; i < filteredFiles.size(); i++) {
-        URI inputFileURI = URI.create(filteredFiles.get(i));
+        pathAndIdxList.add(String.format("%s %d", filteredFiles.get(i), i));
+      }
+      JavaRDD<String> pathRDD = sparkContext.parallelize(pathAndIdxList, pathAndIdxList.size());
+
+      final URI finalInputDirURI = inputDirURI;
+      final URI finalOutputDirURI = (stagingDirURI == null) ? outputDirURI : stagingDirURI;
+      pathRDD.foreach(pathAndIdx -> {
+        String[] splits = pathAndIdx.split(" ");
+        String path = splits[0];
+        int idx = Integer.valueOf(splits[1]);
+        URI inputFileURI = URI.create(path);
         if (inputFileURI.getScheme() == null) {
           inputFileURI =
-              new URI(inputDirURI.getScheme(), inputFileURI.getSchemeSpecificPart(), inputFileURI.getFragment());
+              new URI(finalInputDirURI.getScheme(), inputFileURI.getSchemeSpecificPart(), inputFileURI.getFragment());
         }
+
+        //create localTempDir for input and output
+        File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + System.currentTimeMillis());
+        File localInputTempDir = new File(localTempDir, "input");
+        FileUtils.forceMkdir(localInputTempDir);
+        File localOutputTempDir = new File(localTempDir, "output");
+        FileUtils.forceMkdir(localOutputTempDir);
+
         //copy input path to local
         File localInputDataFile = new File(localInputTempDir, new File(inputFileURI).getName());
-        inputDirFS.copyToLocalFile(inputFileURI, localInputDataFile);
+        PinotFSFactory.create(inputFileURI.getScheme()).copyToLocalFile(inputFileURI, localInputDataFile);
 
         //create task spec
         SegmentGenerationTaskSpec taskSpec = new SegmentGenerationTaskSpec();
         taskSpec.setInputFilePath(localInputDataFile.getAbsolutePath());
         taskSpec.setOutputDirectoryPath(localOutputTempDir.getAbsolutePath());
         taskSpec.setRecordReaderSpec(_spec.getRecordReaderSpec());
-        taskSpec.setSchema(schema);
-        taskSpec.setTableConfig(tableConfig.toJsonNode());
-        taskSpec.setSequenceId(i);
+        taskSpec.setSchema(getSchema());
+        taskSpec.setTableConfig(getTableConfig().toJsonNode());
+        taskSpec.setSequenceId(idx);
         taskSpec.setSegmentNameGeneratorSpec(_spec.getSegmentNameGeneratorSpec());
 
-        //invoke segmentGenerationTask
         SegmentGenerationTaskRunner taskRunner = new SegmentGenerationTaskRunner(taskSpec);
         String segmentName = taskRunner.run();
 
@@ -236,8 +272,10 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
             DataSize.fromBytes(uncompressedSegmentSize), DataSize.fromBytes(compressedSegmentSize));
         //move segment to output PinotFS
         URI outputSegmentTarURI =
-            getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI).resolve(segmentTarFileName);
-        if (!_spec.isOverwriteOutput() && outputDirFS.exists(outputSegmentTarURI)) {
+            getRelativeOutputPath(finalInputDirURI, inputFileURI, finalOutputDirURI).resolve(segmentTarFileName);
+        LOGGER.info("Trying to move segment tar file from: [{}] to [{}]", localSegmentTarFile, outputSegmentTarURI);
+        if (!_spec.isOverwriteOutput() && PinotFSFactory.create(outputSegmentTarURI.getScheme())
+            .exists(outputSegmentTarURI)) {
           LOGGER.warn("Not overwrite existing output segment tar file: {}", outputDirFS.exists(outputSegmentTarURI));
         } else {
           outputDirFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
@@ -245,10 +283,17 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         FileUtils.deleteQuietly(localSegmentDir);
         FileUtils.deleteQuietly(localSegmentTarFile);
         FileUtils.deleteQuietly(localInputDataFile);
+      });
+      if (stagingDirURI != null) {
+        LOGGER.info("Trying to copy segment tars from staging directory: [{}] to output directory [{}]", stagingDirURI,
+            outputDirURI);
+        outputDirFS.copy(stagingDirURI, outputDirURI);
       }
     } finally {
-      //clean up
-      FileUtils.deleteDirectory(localTempDir);
+      if (stagingDirURI != null) {
+        LOGGER.info("Trying to clean up staging directory: [{}]", stagingDirURI);
+        outputDirFS.delete(stagingDirURI, true);
+      }
     }
   }
 
@@ -330,6 +375,26 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
       return TableConfig.fromJsonConfig(tableJsonNode);
     } catch (IOException e) {
       throw new RuntimeException("Failed to decode table config from JSON - '" + tableJsonNode + "'", e);
+    }
+  }
+
+  protected void addDepsJarToDistributedCache(JavaSparkContext sparkContext, String depsJarDir)
+      throws IOException {
+    if (depsJarDir != null) {
+      URI depsJarDirURI = URI.create(depsJarDir);
+      if (depsJarDirURI.getScheme() == null) {
+        depsJarDirURI = new File(depsJarDir).toURI();
+      }
+      PinotFS pinotFS = PinotFSFactory.create(depsJarDirURI.getScheme());
+      String[] files = pinotFS.listFiles(depsJarDirURI, true);
+      for (String file : files) {
+        if (!pinotFS.isDirectory(URI.create(file))) {
+          if (file.endsWith(".jar")) {
+            LOGGER.info("Adding deps jar: {} to distributed cache", file);
+            sparkContext.addJar(file);
+          }
+        }
+      }
     }
   }
 }

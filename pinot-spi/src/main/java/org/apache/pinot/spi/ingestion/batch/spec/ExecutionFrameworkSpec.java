@@ -16,12 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.batch.ingestion.spec;
+package org.apache.pinot.spi.ingestion.batch.spec;
+
+import java.io.Serializable;
+import java.util.Map;
+
 
 /**
  * ExecutionFrameworkSpec defines which ingestion jobs to be running.
  */
-public class ExecutionFrameworkSpec {
+public class ExecutionFrameworkSpec implements Serializable {
   /**
    * The name of the execution framework, currently supports: Standalone.
    */
@@ -41,6 +45,11 @@ public class ExecutionFrameworkSpec {
    * The class implements org.apache.pinot.spi.batch.ingestion.runner.SegmentUriPushJobRunner interface.
    */
   private String _segmentUriPushJobRunnerClassName;
+
+  /**
+   * Extra configs for execution framework.
+   */
+  private Map<String, String> _extraConfigs;
 
   public String getName() {
     return _name;
@@ -72,5 +81,13 @@ public class ExecutionFrameworkSpec {
 
   public void setSegmentUriPushJobRunnerClassName(String segmentUriPushJobRunnerClassName) {
     _segmentUriPushJobRunnerClassName = segmentUriPushJobRunnerClassName;
+  }
+
+  public Map<String, String> getExtraConfigs() {
+    return _extraConfigs;
+  }
+
+  public void setExtraConfigs(Map<String, String> extraConfigs) {
+    _extraConfigs = extraConfigs;
   }
 }

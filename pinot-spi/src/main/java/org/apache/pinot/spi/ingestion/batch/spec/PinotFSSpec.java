@@ -16,8 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.batch.ingestion.spec;
+package org.apache.pinot.spi.ingestion.batch.spec;
 
+import java.io.Serializable;
 import java.util.Map;
 
 
@@ -25,7 +26,7 @@ import java.util.Map;
  * PinotFSSpec defines how to initialize a PinotFS for given scheme.
  *
  */
-public class PinotFSSpec {
+public class PinotFSSpec implements Serializable {
 
   /**
    * Scheme used to identify a PinotFS.

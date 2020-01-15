@@ -70,12 +70,29 @@
             <version>3.2.1</version>
             <executions>
               <execution>
-                <phase>install</phase>
+                <phase>package</phase>
                 <goals>
                   <goal>shade</goal>
                 </goals>
                 <configuration>
-                  <outputDirectory>${pinot.root}/pinot-plugins/target/plugins/${plugin.type}/${artifactId}</outputDirectory>
+                  <!--
+                  Usually in hadoop environment, there are multiple jars with different versions.
+                  Most of the NoSuchMethodExceptions are caused by class loading conflicts.
+                  Class relocation ensures the reference of certain packages/classes in Pinot code to
+                  shaded libs, e.g. jackson or guava.
+                  Ref: https://maven.apache.org/plugins/maven-shade-plugin/examples/class-relocation.html
+                  -->
+                  <relocations>
+                    <relocation>
+                      <pattern>com.google.common</pattern>
+                      <shadedPattern>shaded.com.google.common</shadedPattern>
+                    </relocation>
+                    <relocation>
+                      <pattern>com.fasterxml.jackson</pattern>
+                      <shadedPattern>shaded.com.fasterxml.jackson</shadedPattern>
+                    </relocation>
+                  </relocations>
+                  <outputDirectory>${pinot.root}/pinot-plugins/target/plugins/${plugin.type}/${project.artifactId}</outputDirectory>
                 </configuration>
               </execution>
             </executions>

@@ -22,7 +22,6 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <packaging>pom</packaging>
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
@@ -36,6 +35,10 @@
     <maven.build.timestamp.format>yyyy-MM-dd'T'HHmmss'Z'</maven.build.timestamp.format>
   </properties>
   <dependencies>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-spi</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
@@ -117,20 +120,31 @@
         </configuration>
       </plugin>
       <plugin>
-        <artifactId>maven-assembly-plugin</artifactId>
+        <artifactId>maven-shade-plugin</artifactId>
         <executions>
           <execution>
-            <id>build-pinot-all-jar</id>
-            <configuration>
-              <descriptorRefs>
-                <descriptorRef>jar-with-dependencies</descriptorRef>
-              </descriptorRefs>
-              <finalName>pinot-all-${project.version}</finalName>
-            </configuration>
-            <phase>package</phase>
             <goals>
-              <goal>single</goal>
+              <goal>shade</goal>
             </goals>
+            <configuration>
+              <!--
+              Usually in hadoop environment, there are multiple jars with different versions.
+              Most of the NoSuchMethodExceptions are caused by class loading conflicts.
+              Class relocation ensures the reference of certain packages/classes in Pinot code to
+              shaded libs, e.g. jackson or guava.
+              Ref: https://maven.apache.org/plugins/maven-shade-plugin/examples/class-relocation.html
+              -->
+              <relocations>
+                <relocation>
+                  <pattern>com.google.common</pattern>
+                  <shadedPattern>shaded.com.google.common</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>com.fasterxml.jackson</pattern>
+                  <shadedPattern>shaded.com.fasterxml.jackson</shadedPattern>
+                </relocation>
+              </relocations>
+            </configuration>
           </execution>
         </executions>
       </plugin>

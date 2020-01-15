@@ -16,9 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.batch.ingestion.spec;
+package org.apache.pinot.spi.ingestion.batch.spec;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.Serializable;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -26,7 +27,7 @@ import org.apache.pinot.spi.data.Schema;
  * SegmentGenerationTaskSpec defines all the required information in order to generate Pinot Segment.
  * Note that this task creates a segment directory, not tar file.
  */
-public class SegmentGenerationTaskSpec {
+public class SegmentGenerationTaskSpec implements Serializable {
 
   /**
    * Table config to create segment

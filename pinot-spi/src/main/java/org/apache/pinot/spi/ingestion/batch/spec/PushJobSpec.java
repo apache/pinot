@@ -16,17 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.batch.ingestion.spec;
+package org.apache.pinot.spi.ingestion.batch.spec;
+
+import java.io.Serializable;
+
 
 /**
  * PushJobSpec defines segment push job related configuration
  */
-public class PushJobSpec {
+public class PushJobSpec implements Serializable {
 
   /**
    * number of attempts for push job, default is 1, which means no retry.
    */
   private int _pushAttempts = 1;
+
+  /**
+   * push job parallelism, default is 1.
+   */
+  private int _pushParallelism = 1;
 
   /**
    * retry wait Ms, default to 1 second.
@@ -88,5 +96,13 @@ public class PushJobSpec {
    */
   public void setPushRetryIntervalMillis(long pushRetryIntervalMillis) {
     _pushRetryIntervalMillis = pushRetryIntervalMillis;
+  }
+
+  public int getPushParallelism() {
+    return _pushParallelism;
+  }
+
+  public void setPushParallelism(int pushParallelism) {
+    _pushParallelism = pushParallelism;
   }
 }

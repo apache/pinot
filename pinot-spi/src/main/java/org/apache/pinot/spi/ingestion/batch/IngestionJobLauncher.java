@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.batch.ingestion;
+package org.apache.pinot.spi.ingestion.batch;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.util.Arrays;
-import org.apache.pinot.spi.batch.ingestion.runner.IngestionJobRunner;
-import org.apache.pinot.spi.batch.ingestion.spec.ExecutionFrameworkSpec;
-import org.apache.pinot.spi.batch.ingestion.spec.SegmentGenerationJobSpec;
+import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
+import org.apache.pinot.spi.ingestion.batch.spec.ExecutionFrameworkSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

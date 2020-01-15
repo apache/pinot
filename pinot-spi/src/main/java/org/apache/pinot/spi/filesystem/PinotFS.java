@@ -22,6 +22,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Serializable;
 import java.net.URI;
 import java.nio.file.Paths;
 import org.apache.commons.configuration.Configuration;
@@ -43,7 +44,7 @@ import org.slf4j.LoggerFactory;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
-public abstract class PinotFS implements Closeable {
+public abstract class PinotFS implements Closeable, Serializable {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFS.class);
 
   /**

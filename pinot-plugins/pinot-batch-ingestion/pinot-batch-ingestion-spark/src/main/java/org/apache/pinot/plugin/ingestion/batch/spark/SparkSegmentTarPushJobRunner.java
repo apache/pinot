@@ -16,13 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.ingestion.batch.standalone;
+package org.apache.pinot.plugin.ingestion.batch.spark;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.Serializable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.MapConfiguration;
@@ -35,29 +37,29 @@ import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
+import org.apache.spark.SparkContext;
+import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.api.java.JavaSparkContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SegmentUriPushJobRunner implements IngestionJobRunner {
+public class SparkSegmentTarPushJobRunner implements IngestionJobRunner, Serializable {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentUriPushJobRunner.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SparkSegmentTarPushJobRunner.class);
 
   private SegmentGenerationJobSpec _spec;
 
-  public SegmentUriPushJobRunner() {
+  public SparkSegmentTarPushJobRunner() {
   }
 
-  public SegmentUriPushJobRunner(SegmentGenerationJobSpec spec) {
+  public SparkSegmentTarPushJobRunner(SegmentGenerationJobSpec spec) {
     init(spec);
   }
 
   @Override
   public void init(SegmentGenerationJobSpec spec) {
     _spec = spec;
-    if (_spec.getPushJobSpec() == null) {
-      throw new RuntimeException("Missing PushJobSpec");
-    }
   }
 
   @Override
@@ -69,7 +71,7 @@ public class SegmentUriPushJobRunner implements IngestionJobRunner {
       PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), config);
     }
 
-    //Get outputFS for writing output Pinot segments
+    //Get outputFS for writing output pinot segments
     URI outputDirURI;
     try {
       outputDirURI = new URI(_spec.getOutputDirURI());
@@ -80,7 +82,6 @@ public class SegmentUriPushJobRunner implements IngestionJobRunner {
       throw new RuntimeException("outputDirURI is not valid - '" + _spec.getOutputDirURI() + "'");
     }
     PinotFS outputDirFS = PinotFSFactory.create(outputDirURI.getScheme());
-
     //Get list of files to process
     String[] files;
     try {
@@ -88,18 +89,35 @@ public class SegmentUriPushJobRunner implements IngestionJobRunner {
     } catch (IOException e) {
       throw new RuntimeException("Unable to list all files under outputDirURI - '" + outputDirURI + "'");
     }
-    List<String> segmentUris = new ArrayList<>();
+
+    List<String> segmentsToPush = new ArrayList<>();
     for (String file : files) {
-      URI uri = URI.create(file);
-      if (uri.getPath().endsWith(Constants.TAR_GZ_FILE_EXT)) {
-        segmentUris.add(_spec.getPushJobSpec().getSegmentUriPrefix() + uri.getRawPath() + _spec.getPushJobSpec()
-            .getSegmentUriSuffix());
+      if (file.endsWith(Constants.TAR_GZ_FILE_EXT)) {
+        segmentsToPush.add(file);
       }
     }
-    try {
-      SegmentPushUtils.sendSegmentUris(_spec, segmentUris);
-    } catch (RetriableOperationException | AttemptsExceededException e) {
-      throw new RuntimeException(e);
+
+    int pushParallelism = _spec.getPushJobSpec().getPushParallelism();
+    if (pushParallelism < 1) {
+      pushParallelism = segmentsToPush.size();
+    }
+    if (pushParallelism == 1) {
+      // Push from driver
+      try {
+        SegmentPushUtils.pushSegments(_spec, outputDirFS, segmentsToPush);
+      } catch (RetriableOperationException | AttemptsExceededException e) {
+        throw new RuntimeException(e);
+      }
+    } else {
+      JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
+      JavaRDD<String> pathRDD = sparkContext.parallelize(segmentsToPush, pushParallelism);
+      pathRDD.foreach(segmentTarPath -> {
+        try {
+          SegmentPushUtils.pushSegments(_spec, outputDirFS, Arrays.asList(segmentTarPath));
+        } catch (RetriableOperationException | AttemptsExceededException e) {
+          throw new RuntimeException(e);
+        }
+      });
     }
   }
 }

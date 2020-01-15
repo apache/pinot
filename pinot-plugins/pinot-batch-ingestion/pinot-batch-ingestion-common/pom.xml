@@ -29,19 +29,12 @@
     <relativePath>..</relativePath>
   </parent>
   <modelVersion>4.0.0</modelVersion>
-  <artifactId>pinot-batch-ingestion-standalone</artifactId>
-  <name>Pinot Batch Ingestion Standalone</name>
+  <artifactId>pinot-batch-ingestion-common</artifactId>
+  <name>Pinot Batch Ingestion Common</name>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
   </properties>
-  <dependencies>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-batch-ingestion-common</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-  </dependencies>
 
   <build>
     <plugins>
@@ -52,10 +45,6 @@
         <configuration>
           <forceCreation>true</forceCreation>
         </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
       </plugin>
     </plugins>
   </build>

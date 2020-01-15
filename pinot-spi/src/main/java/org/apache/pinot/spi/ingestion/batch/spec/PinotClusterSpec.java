@@ -16,34 +16,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.batch.ingestion.runner;
+package org.apache.pinot.spi.ingestion.batch.spec;
 
-import org.apache.pinot.spi.batch.ingestion.spec.SegmentGenerationJobSpec;
+import java.io.Serializable;
 
 
 /**
- * IngestionJobRunner is the interface of ingestion job runner.
- *
- * For batch ingestion jobs, there are three types:
- *    SegmentGenerationJobRunner
- *    SegmentTarPushJobRunner
- *    SegmentUriPushJobRunner
- *
+ * PinotClusterSpec defines the Pinot Cluster Access Point.
  */
-public interface IngestionJobRunner {
+public class PinotClusterSpec implements Serializable {
 
   /**
-   * Initialize IngestionJobRunner with SegmentGenerationJobSpec
-   *
-   * @param jobSpec
+   * Controller URI is used to fetch table/schema information and data push.
+   * E.g. http://localhost:9000
    */
-  void init(SegmentGenerationJobSpec jobSpec);
+  private String _controllerURI;
+
+  public String getControllerURI() {
+    return _controllerURI;
+  }
 
   /**
-   * Run IngestionJobRunner
+   * Controller URI is used to fetch table/schema information and data push.
+   * E.g. http://localhost:9000
    *
-   * @throws Exception
+   * @param controllerURI
    */
-  void run()
-      throws Exception;
+  public void setControllerURI(String controllerURI) {
+    _controllerURI = controllerURI;
+  }
 }

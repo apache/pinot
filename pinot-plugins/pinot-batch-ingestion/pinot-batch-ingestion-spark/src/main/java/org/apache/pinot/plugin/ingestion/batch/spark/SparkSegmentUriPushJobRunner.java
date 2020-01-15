@@ -16,13 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.ingestion.batch.standalone;
+package org.apache.pinot.plugin.ingestion.batch.spark;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.Serializable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.MapConfiguration;
@@ -35,20 +37,23 @@ import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
+import org.apache.spark.SparkContext;
+import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.api.java.JavaSparkContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SegmentUriPushJobRunner implements IngestionJobRunner {
+public class SparkSegmentUriPushJobRunner implements IngestionJobRunner, Serializable {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentUriPushJobRunner.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SparkSegmentUriPushJobRunner.class);
 
   private SegmentGenerationJobSpec _spec;
 
-  public SegmentUriPushJobRunner() {
+  public SparkSegmentUriPushJobRunner() {
   }
 
-  public SegmentUriPushJobRunner(SegmentGenerationJobSpec spec) {
+  public SparkSegmentUriPushJobRunner(SegmentGenerationJobSpec spec) {
     init(spec);
   }
 
@@ -96,10 +101,28 @@ public class SegmentUriPushJobRunner implements IngestionJobRunner {
             .getSegmentUriSuffix());
       }
     }
-    try {
-      SegmentPushUtils.sendSegmentUris(_spec, segmentUris);
-    } catch (RetriableOperationException | AttemptsExceededException e) {
-      throw new RuntimeException(e);
+
+    int pushParallelism = _spec.getPushJobSpec().getPushParallelism();
+    if (pushParallelism < 1) {
+      pushParallelism = segmentUris.size();
+    }
+    if (pushParallelism == 1) {
+      // Push from driver
+      try {
+        SegmentPushUtils.sendSegmentUris(_spec, segmentUris);
+      } catch (RetriableOperationException | AttemptsExceededException e) {
+        throw new RuntimeException(e);
+      }
+    } else {
+      JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
+      JavaRDD<String> pathRDD = sparkContext.parallelize(segmentUris, pushParallelism);
+      pathRDD.foreach(segmentUri -> {
+        try {
+          SegmentPushUtils.sendSegmentUris(_spec, Arrays.asList(segmentUri));
+        } catch (RetriableOperationException | AttemptsExceededException e) {
+          throw new RuntimeException(e);
+        }
+      });
     }
   }
 }

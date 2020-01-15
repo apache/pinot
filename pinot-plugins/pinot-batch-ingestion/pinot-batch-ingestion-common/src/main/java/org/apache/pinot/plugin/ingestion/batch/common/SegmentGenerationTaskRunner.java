@@ -16,13 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.ingestion.batch.standalone;
+package org.apache.pinot.plugin.ingestion.batch.common;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
@@ -32,17 +33,17 @@ import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl
 import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
-import org.apache.pinot.spi.batch.ingestion.spec.SegmentGenerationTaskSpec;
-import org.apache.pinot.spi.batch.ingestion.spec.SegmentNameGeneratorSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationTaskSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-public class SegmentGenerationTaskRunner {
+public class SegmentGenerationTaskRunner implements Serializable {
 
   public static final String SIMPLE_SEGMENT_NAME_GENERATOR = "simple";
   public static final String NORMALIZED_DATE_SEGMENT_NAME_GENERATOR = "normalizedDate";
@@ -118,6 +119,9 @@ public class SegmentGenerationTaskRunner {
       segmentNameGeneratorType = SIMPLE_SEGMENT_NAME_GENERATOR;
     }
     Map<String, String> segmentNameGeneratorConfigs = segmentNameGeneratorSpec.getConfigs();
+    if (segmentNameGeneratorConfigs == null) {
+      segmentNameGeneratorConfigs = new HashMap<>();
+    }
     switch (segmentNameGeneratorType) {
       case SIMPLE_SEGMENT_NAME_GENERATOR:
         return new SimpleSegmentNameGenerator(tableName, segmentNameGeneratorConfigs.get(SEGMENT_NAME_POSTFIX));
