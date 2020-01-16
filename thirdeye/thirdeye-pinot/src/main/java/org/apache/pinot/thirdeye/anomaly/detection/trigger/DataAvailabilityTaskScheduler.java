@@ -65,14 +65,6 @@ public class DataAvailabilityTaskScheduler implements Runnable {
   private DetectionConfigManager detectionConfigDAO;
   private DatasetConfigManager datasetConfigDAO;
 
-  private class DatasetUpdateStatus {
-    long lastDataTs;
-    long lastUpdateEventTs;
-    public DatasetUpdateStatus(long lastDataTs, long lastUpdateEventTs) {
-      this.lastDataTs = lastDataTs;
-      this.lastUpdateEventTs = lastUpdateEventTs;
-    }
-  }
   /**
    * Construct an instance of {@link DataAvailabilityTaskScheduler}
    * @param delayInSec delay after each run to avoid polling the database too often
@@ -92,16 +84,16 @@ public class DataAvailabilityTaskScheduler implements Runnable {
   @Override
   public void run() {
     Map<DetectionConfigDTO, Set<String>> detection2DatasetMap = new HashMap<>();
-    Map<String, DatasetUpdateStatus> dataset2RefreshTimeMap = new HashMap<>();
-    populateDetectionMapAndDataset2RefreshTimeMap(detection2DatasetMap, dataset2RefreshTimeMap);
+    Map<String, DatasetConfigDTO> datasetConfigMap = new HashMap<>();
+    populateDetectionMapAndDatasetConfigMap(detection2DatasetMap, datasetConfigMap);
     Map<Long, TaskDTO> runningDetection = retrieveRunningDetectionTasks();
     int taskCount = 0;
     for (DetectionConfigDTO detectionConfig : detection2DatasetMap.keySet()) {
       try {
         long detectionConfigId = detectionConfig.getId();
         if (!runningDetection.containsKey(detectionConfigId)) {
-          if (isAllDatasetUpdated(detectionConfig, detection2DatasetMap.get(detectionConfig), dataset2RefreshTimeMap)) {
-            if (isWithinSchedulingWindow(detection2DatasetMap.get(detectionConfig), dataset2RefreshTimeMap)) {
+          if (isAllDatasetUpdated(detectionConfig, detection2DatasetMap.get(detectionConfig), datasetConfigMap)) {
+            if (isWithinSchedulingWindow(detection2DatasetMap.get(detectionConfig), datasetConfigMap)) {
               //TODO: additional check is required if detection is based on aggregated value across multiple data points
               createDetectionTask(detectionConfig);
               ThirdeyeMetricsUtil.eventScheduledTaskCounter.inc();
@@ -134,9 +126,9 @@ public class DataAvailabilityTaskScheduler implements Runnable {
     executorService.shutdownNow();
   }
 
-  private void populateDetectionMapAndDataset2RefreshTimeMap(
+  private void populateDetectionMapAndDatasetConfigMap(
       Map<DetectionConfigDTO, Set<String>> dataset2DetectionMap,
-      Map<String, DatasetUpdateStatus> dataset2RefreshTimeMap) {
+      Map<String, DatasetConfigDTO> datasetConfigMap) {
     Map<Long, Set<String>> metricCache = new HashMap<>();
     List<DetectionConfigDTO> detectionConfigs = detectionConfigDAO.findAllActive()
         .stream().filter(DetectionConfigBean::isDataAvailabilitySchedule).collect(Collectors.toList());
@@ -162,10 +154,9 @@ public class DataAvailabilityTaskScheduler implements Runnable {
       }
       dataset2DetectionMap.put(detectionConfig, datasets);
       for (String dataset : datasets) {
-        if (!dataset2RefreshTimeMap.containsKey(dataset)) {
+        if (!datasetConfigMap.containsKey(dataset)) {
           DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
-          dataset2RefreshTimeMap.put(dataset,
-              new DatasetUpdateStatus(datasetConfig.getLastRefreshTime(), datasetConfig.getLastRefreshEventTime()));
+          datasetConfigMap.put(dataset, datasetConfig);
         }
       }
     }
@@ -217,9 +208,9 @@ public class DataAvailabilityTaskScheduler implements Runnable {
   }
 
   private boolean isAllDatasetUpdated(DetectionConfigDTO detectionConfig, Set<String> datasets,
-      Map<String, DatasetUpdateStatus> dataset2RefreshTimeMap) {
+      Map<String, DatasetConfigDTO> datasetConfigMap) {
     long lastTimestamp = detectionConfig.getLastTimestamp();
-    return datasets.stream().allMatch(d -> dataset2RefreshTimeMap.get(d).lastDataTs > lastTimestamp);
+    return datasets.stream().allMatch(d -> datasetConfigMap.get(d).getLastRefreshTime() > lastTimestamp);
   }
 
   /* check if the fallback cron need to be triggered if the detection has not been run for long time */
@@ -238,9 +229,9 @@ public class DataAvailabilityTaskScheduler implements Runnable {
   check if the current time is within scheduling window to avoid repeating scheduling the same task if
   detection watermark is not moving forward */
   private boolean isWithinSchedulingWindow(Set<String> datasets,
-      Map<String, DatasetUpdateStatus> dataset2RefreshTimeMap) {
+      Map<String, DatasetConfigDTO> datasetConfigMap) {
     long maxEventTime = datasets.stream()
-        .map(dataset -> dataset2RefreshTimeMap.get(dataset).lastUpdateEventTs)
+        .map(dataset -> datasetConfigMap.get(dataset).getLastRefreshEventTime())
         .max(Comparator.naturalOrder()).orElse(0L);
     return System.currentTimeMillis() <= maxEventTime + schedulingWindowInSec * 1000;
   }
