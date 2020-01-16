@@ -107,14 +107,26 @@ public abstract class Grouping {
 
   GroupingDataFrame sum(DataFrame source, String groupBySeriesName, String sumSeriesName) {
     Series.Builder builder = source.get(sumSeriesName).getBuilder();
-    Series groupBySeries = source.get(groupBySeriesName);
     for (int i = 0; i < this.size(); i++) {
-      Series group = this.apply(groupBySeries, i);
+      Series group = this.apply(source.get(groupBySeriesName), i);
       builder.addSeries(
           source.filter((LongConditional) values -> group.getLongs().contains(values[0]), groupBySeriesName)
               .dropNull(groupBySeriesName)
               .get(sumSeriesName)
               .sum());
+    }
+    return makeResult(builder.build(), groupBySeriesName);
+  }
+
+  GroupingDataFrame mean(DataFrame source, String groupBySeriesName, String meanSeriesName) {
+    Series.Builder builder = source.get(meanSeriesName).getBuilder();
+    for (int i = 0; i < this.size(); i++) {
+      Series group = this.apply(source.get(groupBySeriesName), i);
+      builder.addSeries(
+          source.filter((LongConditional) values -> group.getLongs().contains(values[0]), groupBySeriesName)
+              .dropNull(groupBySeriesName)
+              .get(meanSeriesName)
+              .mean());
     }
     return makeResult(builder.build(), groupBySeriesName);
   }
@@ -510,6 +522,16 @@ public abstract class Grouping {
      */
     public GroupingDataFrame sum(String groupBySeriesName, String sumSeriesName) {
       return this.grouping.sum(source, groupBySeriesName, sumSeriesName);
+    }
+
+    /**
+     * Averages the value in a given series for each group and returns the result as a new DataFrame
+     * @param groupBySeriesName the group-by series name
+     * @param meanSeriesName the series name for sum
+     * @return a new data frame with the sums
+     */
+    public GroupingDataFrame mean(String groupBySeriesName, String meanSeriesName) {
+      return this.grouping.mean(source, groupBySeriesName, meanSeriesName);
     }
 
     public GroupingDataFrame product(String seriesName) {

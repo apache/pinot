@@ -33,6 +33,7 @@ import org.apache.pinot.thirdeye.dataframe.Series;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.InputDataFetcher;
 import org.apache.pinot.thirdeye.detection.Pattern;
@@ -93,18 +94,20 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
     slices.add(slice);
 
     InputData data = this.dataFetcher.fetchData(new InputDataSpec().withTimeseriesSlices(slices)
-        .withMetricIdsForDataset(Collections.singletonList(slice.getMetricId())));
+        .withMetricIdsForDataset(Collections.singletonList(slice.getMetricId()))
+        .withMetricIds(Collections.singletonList(me.getId())));
     DataFrame dfBase = this.baseline.gather(slice, data.getTimeseries());
     DataFrame dfCurr = data.getTimeseries().get(slice);
     DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
+    MetricConfigDTO metricConfig = data.getMetrics().get(me.getId());
 
     // aggregate data to specified weekly granularity
     if (this.monitoringGranularity.endsWith("WEEKS")) {
       Period monitoringGranularityPeriod = DetectionUtils.getMonitoringGranularityPeriod(this.monitoringGranularity, datasetConfig);
       long latestDataTimeStamp = dfCurr.getLong(COL_TIME, dfCurr.size() - 1);
-      dfCurr = DetectionUtils.aggregateByPeriod(dfCurr, startMillis, monitoringGranularityPeriod);
-      dfCurr = DetectionUtils.checkIncompleteAggregation(dfCurr, latestDataTimeStamp, datasetConfig.bucketTimeGranularity(), monitoringGranularityPeriod);
-      dfBase = DetectionUtils.aggregateByPeriod(dfBase, startMillis, monitoringGranularityPeriod);
+      dfCurr = DetectionUtils.aggregateByPeriod(dfCurr, startMillis, monitoringGranularityPeriod, metricConfig.getDefaultAggFunction());
+      dfCurr = DetectionUtils.filterIncompleteAggregation(dfCurr, latestDataTimeStamp, datasetConfig.bucketTimeGranularity(), monitoringGranularityPeriod);
+      dfBase = DetectionUtils.aggregateByPeriod(dfBase, startMillis, monitoringGranularityPeriod, metricConfig.getDefaultAggFunction());
     }
 
     dfCurr = dfCurr.renameSeries(COL_VALUE, COL_CURR);

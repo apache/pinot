@@ -28,9 +28,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
+import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
@@ -294,10 +295,18 @@ public class DetectionUtils {
    * @param df the data frame
    * @param origin the aggregation origin time stamp
    * @param granularityPeriod the aggregation granularity in period
+   * @param aggregationFunction the metric's aggregation function
    * @return the aggregated time series data frame
    */
-  public static DataFrame aggregateByPeriod(DataFrame df, long origin, Period granularityPeriod) {
-    return df.groupByPeriod(df.getLongs(COL_TIME), new DateTime(origin), granularityPeriod).sum(COL_TIME, COL_VALUE);
+  public static DataFrame aggregateByPeriod(DataFrame df, long origin, Period granularityPeriod, MetricAggFunction aggregationFunction) {
+    switch (aggregationFunction) {
+      case SUM:
+        return df.groupByPeriod(df.getLongs(COL_TIME), new DateTime(origin), granularityPeriod).sum(COL_TIME, COL_VALUE);
+      case AVG:
+        return df.groupByPeriod(df.getLongs(COL_TIME), new DateTime(origin), granularityPeriod).mean(COL_TIME, COL_VALUE);
+      default:
+        throw new NotImplementedException(String.format("The aggregate by period for %s is not supported in DataFrame.", aggregationFunction));
+    }
   }
 
   /**
@@ -314,7 +323,7 @@ public class DetectionUtils {
    * @param aggregationGranularityPeriod the granularity after aggregation
    * @return the filtered data frame
    */
-  public static DataFrame checkIncompleteAggregation(DataFrame df, long latestDataTimeStamp,
+  public static DataFrame filterIncompleteAggregation(DataFrame df, long latestDataTimeStamp,
       TimeGranularity bucketTimeGranularity, Period aggregationGranularityPeriod) {
     long latestAggregationStartTimeStamp = df.getLong(COL_TIME, df.size() - 1);
     if (latestDataTimeStamp + bucketTimeGranularity.toMillis()
