@@ -120,12 +120,12 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
     this.sensitivity = spec.getSensitivity();
     this.monitoringGranularity = spec.getMonitoringGranularity();
 
-    if (this.monitoringGranularity.endsWith("MONTHS") || this.monitoringGranularity.endsWith("WEEKS")) {
+    if (this.monitoringGranularity.endsWith(TimeGranularity.MONTHS) || this.monitoringGranularity.endsWith(TimeGranularity.WEEKS)) {
       this.timeGranularity = MetricSlice.NATIVE_GRANULARITY;
     } else {
       this.timeGranularity = TimeGranularity.fromString(this.monitoringGranularity);
     }
-    if (this.monitoringGranularity.endsWith("WEEKS")) {
+    if (this.monitoringGranularity.endsWith(TimeGranularity.WEEKS)) {
       this.weekStart = DayOfWeek.valueOf(spec.getWeekStart());
     }
   }
@@ -156,9 +156,9 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
     DateTime trainStart;
     if (isMultiDayGranularity()) {
       trainStart = window.getStart().minusDays(timeGranularity.getSize() * LOOKBACK);
-    } else if (this.monitoringGranularity.endsWith("MONTHS")) {
+    } else if (this.monitoringGranularity.endsWith(TimeGranularity.MONTHS)) {
       trainStart = window.getStart().minusMonths(LOOKBACK);
-    } else if (this.monitoringGranularity.endsWith("WEEKS")) {
+    } else if (this.monitoringGranularity.endsWith(TimeGranularity.WEEKS)) {
       trainStart = window.getStart().withDayOfWeek(weekStart.getValue()).minusWeeks(LOOKBACK);
     } else {
       trainStart = window.getStart().minusDays(LOOKBACK);
@@ -240,7 +240,7 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
     DataFrame df = data.getTimeseries().get(sliceData);
 
     // aggregate data to specified weekly granularity
-    if (this.monitoringGranularity.endsWith("WEEKS")) {
+    if (this.monitoringGranularity.endsWith(TimeGranularity.WEEKS)) {
       Period monitoringGranularityPeriod = DetectionUtils.getMonitoringGranularityPeriod(this.monitoringGranularity, datasetConfig);
       long latestDataTimeStamp = df.getLong(COL_TIME, df.size() - 1);
       df = DetectionUtils.aggregateByPeriod(df, start, monitoringGranularityPeriod, metricConfig.getDefaultAggFunction());
@@ -457,7 +457,8 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
 
     for (int k = 0; k < size; k++) {
       DataFrame trainingDF;
-      if (timeGranularity.equals(MetricSlice.NATIVE_GRANULARITY) && !this.monitoringGranularity.endsWith("MONTHS") && !this.monitoringGranularity.endsWith("WEEKS")) {
+      if (timeGranularity.equals(MetricSlice.NATIVE_GRANULARITY) && !this.monitoringGranularity.endsWith(
+          TimeGranularity.MONTHS) && !this.monitoringGranularity.endsWith(TimeGranularity.WEEKS)) {
         trainingDF = getDailyDF(inputDF, forecastDF.getLong(COL_TIME, k), timezone);
       } else {
         trainingDF = getLookbackDF(inputDF, forecastDF.getLong(COL_TIME, k));

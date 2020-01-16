@@ -102,7 +102,7 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
     MetricConfigDTO metricConfig = data.getMetrics().get(me.getId());
 
     // aggregate data to specified weekly granularity
-    if (this.monitoringGranularity.endsWith("WEEKS")) {
+    if (this.monitoringGranularity.endsWith(TimeGranularity.WEEKS)) {
       Period monitoringGranularityPeriod = DetectionUtils.getMonitoringGranularityPeriod(this.monitoringGranularity, datasetConfig);
       long latestDataTimeStamp = dfCurr.getLong(COL_TIME, dfCurr.size() - 1);
       dfCurr = DetectionUtils.aggregateByPeriod(dfCurr, startMillis, monitoringGranularityPeriod, metricConfig.getDefaultAggFunction());
@@ -185,12 +185,12 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
     this.pattern = Pattern.valueOf(spec.getPattern().toUpperCase());
 
     this.monitoringGranularity = spec.getMonitoringGranularity();
-    if (this.monitoringGranularity.endsWith("MONTHS") || this.monitoringGranularity.endsWith("WEEKS")) {
+    if (this.monitoringGranularity.endsWith(TimeGranularity.MONTHS) || this.monitoringGranularity.endsWith(TimeGranularity.WEEKS)) {
       this.timeGranularity = MetricSlice.NATIVE_GRANULARITY;
     } else {
       this.timeGranularity = TimeGranularity.fromString(spec.getMonitoringGranularity());
     }
-    if (this.monitoringGranularity.endsWith("WEEKS")) {
+    if (this.monitoringGranularity.endsWith(TimeGranularity.WEEKS)) {
       this.weekStart = DayOfWeek.valueOf(spec.getWeekStart());
     }
   }
