@@ -102,6 +102,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   private final RateLimiter _numDroppedLogRateLimiter;
   private final AtomicInteger _numDroppedLog;
+
+  private final boolean _enableCaseInsensitivePql;
   private final TableCache _tableCache;
 
   public BaseBrokerRequestHandler(Configuration config, RoutingTable routingTable,
@@ -113,7 +115,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _accessControlFactory = accessControlFactory;
     _queryQuotaManager = queryQuotaManager;
     _brokerMetrics = brokerMetrics;
-    _tableCache = new TableCache(propertyStore);
+
+    _enableCaseInsensitivePql = _config.getBoolean(CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_PQL_KEY, false);
+    if (_enableCaseInsensitivePql) {
+      _tableCache = new TableCache(propertyStore);
+    } else {
+      _tableCache = null;
+    }
     _brokerId = config.getString(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     _brokerTimeoutMs = config.getLong(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _queryResponseLimit =
@@ -121,8 +129,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _queryLogLength = config.getInt(Broker.CONFIG_OF_BROKER_QUERY_LOG_LENGTH, Broker.DEFAULT_BROKER_QUERY_LOG_LENGTH);
     _queryLogRateLimiter = RateLimiter.create(config.getDouble(Broker.CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND,
         Broker.DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND));
-//    _propertyStore = propertyStore;
-
     _numDroppedLog = new AtomicInteger(0);
     _numDroppedLogRateLimiter = RateLimiter.create(1.0);
 
@@ -160,8 +166,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     BrokerRequest brokerRequest;
     try {
       brokerRequest = PinotQueryParserFactory.get(pinotQueryRequest.getQueryFormat()).compileToBrokerRequest(query);
-      //fix table names and column (to make pinot case insensitive)
-      handleCaseSensitivity(brokerRequest);
+      if (_enableCaseInsensitivePql) {
+        //fix table names and column names in the query to match(case sensitive) the table name and column names as define in TableConfig and Schema
+        try {
+          handleCaseSensitivity(brokerRequest, _tableCache);
+        } catch (Exception e) {
+          LOGGER.info("Caught exception while rewriting PQL to make it case-insensitive {}: {}, {}", requestId, query,
+              e.getMessage());
+        }
+      }
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling request {}: {}, {}", requestId, query, e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
@@ -349,9 +362,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return brokerResponse;
   }
 
-  private void handleCaseSensitivity(BrokerRequest brokerRequest) {
+  /**
+   * Given the tableCache and broker request, it fixes the pql
+   * @param brokerRequest
+   */
+  private void handleCaseSensitivity(BrokerRequest brokerRequest, TableCache tableCache) {
     String inputTableName = brokerRequest.getQuerySource().getTableName();
-    String actualTableName = _tableCache.getActualTableName(inputTableName);
+    String actualTableName = tableCache.getActualTableName(inputTableName);
     brokerRequest.getQuerySource().setTableName(actualTableName);
     //fix columns
     if (brokerRequest.getFilterSubQueryMap() != null) {
@@ -359,7 +376,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       for (FilterQuery filterQuery : values) {
         if (filterQuery.getNestedFilterQueryIdsSize() == 0) {
           String expression = filterQuery.getColumn();
-          filterQuery.setColumn(fixColumnNameCase(actualTableName, expression));
+          filterQuery.setColumn(fixColumnNameCase(tableCache, actualTableName, expression));
         }
       }
     }
@@ -372,7 +389,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           String[] newExpressions = new String[expressions.length];
           for (int i = 0; i < expressions.length; i++) {
             String expression = expressions[i];
-            newExpressions[i] = fixColumnNameCase(actualTableName, expression);
+            newExpressions[i] = fixColumnNameCase(tableCache, actualTableName, expression);
           }
           String newColumns = StringUtil.join(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR, newExpressions);
           info.getAggregationParams().put(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO, newColumns);
@@ -381,7 +398,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       if (brokerRequest.isSetGroupBy()) {
         List<String> expressions = brokerRequest.getGroupBy().getExpressions();
         for (int i = 0; i < expressions.size(); i++) {
-          expressions.set(i, fixColumnNameCase(actualTableName, expressions.get(i)));
+          expressions.set(i, fixColumnNameCase(tableCache, actualTableName, expressions.get(i)));
         }
       }
     } else {
@@ -390,13 +407,20 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       for (int i = 0; i < selectionColumns.size(); i++) {
         String expression = selectionColumns.get(i);
         if (!expression.trim().equalsIgnoreCase("*")) {
-          selectionColumns.set(i, fixColumnNameCase(actualTableName, expression));
+          selectionColumns.set(i, fixColumnNameCase(tableCache, actualTableName, expression));
         }
+      }
+    }
+    if (brokerRequest.isSetOrderBy()) {
+      List<SelectionSort> orderBy = brokerRequest.getOrderBy();
+      for (SelectionSort selectionSort : orderBy) {
+        String expression = selectionSort.getColumn();
+        selectionSort.setColumn(fixColumnNameCase(tableCache, actualTableName, expression));
       }
     }
   }
 
-  private String fixColumnNameCase(String actualTableName, String expression) {
+  private String fixColumnNameCase(TableCache tableCache, String actualTableName, String expression) {
     TransformExpressionTree rootExpression = TransformExpressionTree.compileToExpressionTree(expression);
     LinkedList<TransformExpressionTree> q = new LinkedList<>();
     q.add(rootExpression);

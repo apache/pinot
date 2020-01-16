@@ -34,9 +34,21 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
+/**
+ *  Caches table config and schema of a table.
+ *  At the start - loads all the table configs and schemas in map.
+ *  sets up a zookeeper listener that watches for any change and updates the cache.
+ *  TODO: optimize to load only changed table configs/schema on a callback.
+ *  TODO: Table deletes are not handled as of now
+ *  Goal is to eventually grow this into a PinotClusterDataAccessor
+ */
 public class TableCache {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableCache.class);
+
   private static final String PROPERTYSTORE_SCHEMAS_PREFIX = "/SCHEMAS";
   private static final String PROPERTYSTORE_TABLE_CONFIGS_PREFIX = "/CONFIGS/TABLE";
 
@@ -90,14 +102,14 @@ public class TableCache {
               //create case insensitive mapping between table name and schemaName
               _table2SchemaConfigMap.put(tableNameWithType.toLowerCase(), rawTableName);
               _table2SchemaConfigMap.put(rawTableName.toLowerCase(), rawTableName);
-            } catch (IOException e) {
-              e.printStackTrace();
+            } catch (Exception e) {
+              LOGGER.warn("Exception loading table config for: {}: {}", znRecord.getId(), e.getMessage());
               //ignore
             }
           }
         }
       } catch (Exception e) {
-        e.printStackTrace();
+        LOGGER.warn("Exception subscribing/reading tableconfigs", e);
         //ignore
       }
     }
@@ -144,19 +156,16 @@ public class TableCache {
               for (FieldSpec fieldSpec : allFieldSpecs) {
                 columnNameMap.put(fieldSpec.getName().toLowerCase(), fieldSpec.getName());
               }
-            } catch (IOException e) {
+            } catch (Exception e) {
+              LOGGER.warn("Exception loading schema for: {}: {}", znRecord.getId(), e.getMessage());
               //ignore
             }
           }
         }
       } catch (Exception e) {
-        e.printStackTrace();
+        LOGGER.warn("Exception subscribing/reading schemas", e);
         //ignore
       }
-    }
-
-    Schema getSchema(String schemaName) {
-      return _schemaMap.get(schemaName.toLowerCase());
     }
 
     String getColumnName(String schemaName, String columnName) {
