@@ -64,7 +64,7 @@ $ mvn clean install -DskipTests -Pbin-dist
 
 # Run the Quick Demo
 $ cd pinot-distribution/target/apache-pinot-incubating-<version>-SNAPSHOT-bin
-$ bin/quick-start-offline.sh
+$ bin/quick-start-batch.sh
 ```
 
 ## Deploy Pinot on Kubernetes

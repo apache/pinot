@@ -47,11 +47,11 @@ Pinot requires JDK 8 or later and Apache Maven 3.
 
   cd pinot-distribution/target/apache-pinot-incubating-<version>-SNAPSHOT-bin/apache-pinot-incubating-<version>-SNAPSHOT-bin; chmod +x bin/*.sh
 
-Trying out Offline quickstart demo
+Trying out Batch quickstart demo
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To run the demo with compiled code:
-  ``bin/quick-start-offline.sh``
+  ``bin/quick-start-batch.sh``
 
 Once the Pinot cluster is running, you can query it by going to http://localhost:9000/query/
 
@@ -79,13 +79,13 @@ Pinot uses PQL, a SQL-like query language, to query data. Here are some sample q
 
 The full reference for the PQL query language is present in the :ref:`pql` section of the Pinot documentation.
 
-Trying out Realtime quickstart demo
+Trying out Streaming quickstart demo
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Pinot can ingest data from streaming sources such as Kafka.
 
 To run the demo with compiled code:
-  ``bin/quick-start-realtime.sh``
+  ``bin/quick-start-streaming.sh``
 
 Once started, the demo will start Kafka, create a Kafka topic, and create a realtime Pinot table. Once created, Pinot
 will start ingesting events from the Kafka topic into the table. The demo also starts a consumer that consumes events

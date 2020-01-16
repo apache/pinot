@@ -258,7 +258,7 @@
             </program>
             <program>
               <mainClass>org.apache.pinot.tools.Quickstart</mainClass>
-              <name>quick-start-offline</name>
+              <name>quick-start-batch</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
@@ -283,7 +283,7 @@
             </program>
             <program>
               <mainClass>org.apache.pinot.tools.RealtimeQuickStart</mainClass>
-              <name>quick-start-realtime</name>
+              <name>quick-start-streaming</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
