@@ -71,6 +71,8 @@ public class DetectionTaskRunner implements TaskRunner {
 
   private static final double DIMENSION_ERROR_THRESHOLD = 0.3; // 3 0%
   private static final int MAX_ERROR_MESSAGE_WORD_COUNT = 10_000; // 10k bytes
+  // This is used to throttle MySQL write.
+  private static final int ANOMALY_BATCH_WRITE_SIZE = 20;
 
   private List<DateTime> windowStarts;
   private List<DateTime> windowEnds;
@@ -174,11 +176,16 @@ public class DetectionTaskRunner implements TaskRunner {
     storeData(adOutputContext);
   }
 
-  private void storeData(AnomalyDetectionOutputContext anomalyDetectionOutputContext) {
+  private void storeData(AnomalyDetectionOutputContext anomalyDetectionOutputContext) throws InterruptedException {
     MergedAnomalyResultManager mergedAmomalyDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
 
+    int savedAnomalies = 0;
     for (MergedAnomalyResultDTO mergedAnomalyResultDTO : anomalyDetectionOutputContext.getMergedAnomalies().values()) {
       mergedAmomalyDAO.update(mergedAnomalyResultDTO);
+      // Add additional delay when storing anomalies.
+      if (++savedAnomalies % ANOMALY_BATCH_WRITE_SIZE == 0) {
+        Thread.sleep(100);
+      }
     }
   }
 
