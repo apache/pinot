@@ -184,7 +184,14 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
 
     try {
       JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
+
+      // Pinot plugins are necessary to launch Pinot ingestion job from every mapper.
+      // In order to ensure pinot plugins would be loaded to each worker, this method
+      // tars entire plugins directory and set this file into Distributed cache.
+      // Then each executor job will untar the plugin tarball, and set system properties accordingly.
       packPluginsToDistributedCache(sparkContext);
+
+      // Add dependency jars
       if (_spec.getExecutionFrameworkSpec().getExtraConfigs().containsKey(DEPS_JAR_DIR)) {
         addDepsJarToDistributedCache(sparkContext,
             _spec.getExecutionFrameworkSpec().getExtraConfigs().get(DEPS_JAR_DIR));
@@ -198,26 +205,35 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
 
       final URI finalInputDirURI = inputDirURI;
       final URI finalOutputDirURI = (stagingDirURI == null) ? outputDirURI : stagingDirURI;
-      final String pluginsIncludes = System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME);
       pathRDD.foreach(pathAndIdx -> {
         String[] splits = pathAndIdx.split(" ");
         String path = splits[0];
         int idx = Integer.valueOf(splits[1]);
 
-        File pluginsDirFile = new File(PINOT_PLUGINS_DIR + "-" + idx);
-        try {
-          TarGzCompressionUtils.unTar(new File(PINOT_PLUGINS_TAR_GZ), pluginsDirFile);
-        } catch (Exception e) {
-          LOGGER.error("Failed to untar pinot plugins tarball", e);
-          throw new RuntimeException(e);
-        }
-        System.setProperty(PLUGINS_DIR_PROPERTY_NAME, pluginsDirFile.toString());
-        if (pluginsIncludes != null) {
-          System.setProperty(PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
-        }
-        LOGGER.info("Pinot plugins are set at [{}], plugins includes [{}]", pluginsDirFile.getAbsolutePath(),
-            pluginsIncludes);
+        // Load Pinot Plugins copied from Distributed cache.
+        File localPluginsTarFile = new File(PINOT_PLUGINS_TAR_GZ);
+        if (localPluginsTarFile.exists()) {
+          File pluginsDirFile = new File(PINOT_PLUGINS_DIR + "-" + idx);
+          try {
+            TarGzCompressionUtils.unTar(localPluginsTarFile, pluginsDirFile);
+          } catch (Exception e) {
+            LOGGER.error("Failed to untar local Pinot plugins tarball file [{}]", localPluginsTarFile, e);
+            throw new RuntimeException(e);
+          }
+          LOGGER.info("Trying to set System Property: [{}={}]", PLUGINS_DIR_PROPERTY_NAME,
+              pluginsDirFile.getAbsolutePath());
+          System.setProperty(PLUGINS_DIR_PROPERTY_NAME, pluginsDirFile.getAbsolutePath());
 
+          final String pluginsIncludes = sparkContext.getConf().get(PLUGINS_INCLUDE_PROPERTY_NAME);
+          if (pluginsIncludes != null) {
+            LOGGER.info("Trying to set System Property: [{}={}]", PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
+            System.setProperty(PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
+          }
+          LOGGER.info("Pinot plugins System Properties are set at [{}], plugins includes [{}]",
+              System.getProperty(PLUGINS_DIR_PROPERTY_NAME), System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME));
+        } else {
+          LOGGER.warn("Cannot find local Pinot plugins tar file at [{}]", localPluginsTarFile.getAbsolutePath());
+        }
         URI inputFileURI = URI.create(path);
         if (inputFileURI.getScheme() == null) {
           inputFileURI =
@@ -309,12 +325,20 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
 
   protected void packPluginsToDistributedCache(JavaSparkContext sparkContext) {
     String pluginsRootDir = PluginManager.get().getPluginsRootDir();
-    File pluginsTarGzFile = new File(PINOT_PLUGINS_TAR_GZ);
-    try {
-      TarGzCompressionUtils.createTarGzOfDirectory(pluginsRootDir, pluginsTarGzFile.getPath());
-    } catch (IOException e) {
-      LOGGER.error("Failed to tar plugins directory", e);
+    if (new File(pluginsRootDir).exists()) {
+      File pluginsTarGzFile = new File(PINOT_PLUGINS_TAR_GZ);
+      try {
+        TarGzCompressionUtils.createTarGzOfDirectory(pluginsRootDir, pluginsTarGzFile.getPath());
+      } catch (IOException e) {
+        LOGGER.error("Failed to tar plugins directory", e);
+      }
+      sparkContext.addFile(pluginsTarGzFile.getAbsolutePath());
+      String pluginsIncludes = System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME);
+      if (pluginsIncludes != null) {
+        sparkContext.getConf().set(PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
+      }
+    } else {
+      LOGGER.warn("Cannot find local Pinot plugins directory at [{}]", pluginsRootDir);
     }
-    sparkContext.addFile(pluginsTarGzFile.toString());
   }
 }

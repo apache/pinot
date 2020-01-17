@@ -230,7 +230,12 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
       }
       jobConf.setInt(JobContext.NUM_MAPS, numDataFiles);
 
+      // Pinot plugins are necessary to launch Pinot ingestion job from every mapper.
+      // In order to ensure pinot plugins would be loaded to each worker, this method
+      // tars entire plugins directory and set this file into Distributed cache.
+      // Then each mapper job will untar the plugin tarball, and set system properties accordingly.
       packPluginsToDistributedCache(job);
+
       // Add dependency jars
       if (_spec.getExecutionFrameworkSpec().getExtraConfigs().containsKey(DEPS_JAR_DIR)) {
         addDepsJarToDistributedCache(job, _spec.getExecutionFrameworkSpec().getExtraConfigs().get(DEPS_JAR_DIR));
@@ -276,17 +281,22 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
 
   protected void packPluginsToDistributedCache(Job job) {
     String pluginsRootDir = PluginManager.get().getPluginsRootDir();
-    File pluginsTarGzFile = new File(PINOT_PLUGINS_TAR_GZ);
-    try {
-      TarGzCompressionUtils.createTarGzOfDirectory(pluginsRootDir, pluginsTarGzFile.getPath());
-    } catch (IOException e) {
-      LOGGER.error("Failed to tar plugins directory", e);
-    }
-    job.addCacheArchive(pluginsTarGzFile.toURI());
+    if (new File(pluginsRootDir).exists()) {
+      File pluginsTarGzFile = new File(PINOT_PLUGINS_TAR_GZ);
+      try {
+        TarGzCompressionUtils.createTarGzOfDirectory(pluginsRootDir, pluginsTarGzFile.getPath());
+      } catch (IOException e) {
+        LOGGER.error("Failed to tar plugins directory", e);
+        throw new RuntimeException(e);
+      }
+      job.addCacheArchive(pluginsTarGzFile.toURI());
 
-    String pluginsIncludes = System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME);
-    if (pluginsIncludes != null) {
-      job.getConfiguration().set(PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
+      String pluginsIncludes = System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME);
+      if (pluginsIncludes != null) {
+        job.getConfiguration().set(PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
+      }
+    } else {
+      LOGGER.warn("Cannot find local Pinot plugins directory at [{}]", pluginsRootDir);
     }
   }
 

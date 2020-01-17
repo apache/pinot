@@ -20,9 +20,7 @@ package org.apache.pinot.plugin.ingestion.batch.hadoop;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.IOException;
 import java.net.URI;
-import org.apache.commons.compress.archivers.ArchiveException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -67,19 +65,29 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
     _spec = yaml.loadAs(segmentGenerationJobSpecStr, SegmentGenerationJobSpec.class);
     LOGGER.info("Segment generation job spec : {}", segmentGenerationJobSpecStr);
     _localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + System.currentTimeMillis());
-    File pluginsDirFile = new File(PINOT_PLUGINS_DIR);
-    try {
-      TarGzCompressionUtils.unTar(new File(PINOT_PLUGINS_TAR_GZ), pluginsDirFile);
-    } catch (Exception e) {
-      LOGGER.error("Failed to untar pinot plugins tarball", e);
-      throw new RuntimeException(e);
+
+    // Load Pinot Plugins copied from Distributed cache.
+    File localPluginsTarFile = new File(PINOT_PLUGINS_TAR_GZ);
+    if (localPluginsTarFile.exists()) {
+      File pluginsDirFile = new File(PINOT_PLUGINS_DIR);
+      try {
+        TarGzCompressionUtils.unTar(localPluginsTarFile, pluginsDirFile);
+      } catch (Exception e) {
+        LOGGER.error("Failed to untar local Pinot plugins tarball file [{}]", localPluginsTarFile, e);
+        throw new RuntimeException(e);
+      }
+      LOGGER.info("Trying to set System Property: {}={}", PLUGINS_DIR_PROPERTY_NAME, pluginsDirFile.getAbsolutePath());
+      System.setProperty(PLUGINS_DIR_PROPERTY_NAME, pluginsDirFile.getAbsolutePath());
+      String pluginsIncludes = _jobConf.get(PLUGINS_INCLUDE_PROPERTY_NAME);
+      if (pluginsIncludes != null) {
+        LOGGER.info("Trying to set System Property: {}={}", PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
+        System.setProperty(PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
+      }
+      LOGGER.info("Pinot plugins System Properties are set at [{}], plugins includes [{}]",
+          System.getProperty(PLUGINS_DIR_PROPERTY_NAME), System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME));
+    } else {
+      LOGGER.warn("Cannot find local Pinot plugins directory at [{}]", localPluginsTarFile.getAbsolutePath());
     }
-    System.setProperty(PLUGINS_DIR_PROPERTY_NAME, pluginsDirFile.toString());
-    String pluginsIncludes = _jobConf.get(PLUGINS_INCLUDE_PROPERTY_NAME);
-    if (pluginsIncludes != null) {
-      System.setProperty(PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
-    }
-    LOGGER.info("Pinot plugins are set at [{}], plugins includes [{}]", pluginsDirFile.getAbsolutePath(), pluginsIncludes);
   }
 
   @Override
