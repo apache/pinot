@@ -134,12 +134,11 @@ public class TableCache {
   }
 
   class SchemaChangeListener implements IZkChildListener, IZkDataListener {
-    Map<String, Schema> _schemaMap = new ConcurrentHashMap<>();
     Map<String, Map<String, String>> _schemaColumnMap = new ConcurrentHashMap<>();
 
     public synchronized void refresh() {
       try {
-        //always subscribe first before reading, so that we dont miss any changes
+        //always subscribe first before reading, so that we dont miss any changes between reading and setting the watcher again
         _propertyStore.subscribeChildChanges(PROPERTYSTORE_SCHEMAS_PREFIX, _schemaChangeListener);
         _propertyStore.subscribeDataChanges(PROPERTYSTORE_SCHEMAS_PREFIX, _schemaChangeListener);
         List<ZNRecord> children =
@@ -149,7 +148,6 @@ public class TableCache {
             try {
               Schema schema = SchemaUtils.fromZNRecord(znRecord);
               String schemaNameLowerCase = schema.getSchemaName().toLowerCase();
-              _schemaMap.put(schemaNameLowerCase, schema);
               Collection<FieldSpec> allFieldSpecs = schema.getAllFieldSpecs();
               ConcurrentHashMap<String, String> columnNameMap = new ConcurrentHashMap<>();
               _schemaColumnMap.put(schemaNameLowerCase, columnNameMap);
