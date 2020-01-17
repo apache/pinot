@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.integration.tests;
 
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.HelixManager;
@@ -40,8 +39,8 @@ import static org.testng.Assert.assertEquals;
 
 
 public class ServerStarterIntegrationTest extends ControllerTest {
-  public static final String DEFAULT_SERVER_ID = "Server_127.0.0.1_8098";
   public static final String SERVER1 = "Server1";
+
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -56,27 +55,33 @@ public class ServerStarterIntegrationTest extends ControllerTest {
     stopZk();
   }
 
+  private void verifyZkConfigData(HelixServerStarter helixServerStarter, String expectedInstanceName,
+      String expectedHostname, String expectedPort) {
+    // Verify the serverId, host and port are set correctly in Zk.
+    HelixManager helixManager = helixServerStarter.getHelixManager();
+    PropertyKey.Builder keyBuilder = helixManager.getHelixDataAccessor().keyBuilder();
+    InstanceConfig config = helixManager.getHelixDataAccessor().
+        getProperty(keyBuilder.instanceConfig(helixServerStarter.getHelixManager().getInstanceName()));
+    helixServerStarter.stop();
+
+    assertEquals(config.getInstanceName(), expectedInstanceName);
+    // By default (auto joined instances), server instance name is of format: {@code Server_<hostname>_<port>}, e.g.
+    // {@code Server_localhost_12345}, hostname is of format: {@code Server_<hostname>}, e.g. {@code Server_localhost}.
+    // More details refer to the class ServerInstance.
+    assertEquals(config.getHostName(), expectedHostname);
+    assertEquals(config.getPort(), expectedPort);
+  }
+
   @Test
   public void testWithNoInstanceIdNoHostnamePort()
       throws Exception {
     // Test the behavior when no instance id nor hostname/port is specified in server conf.
     Configuration serverConf = new PropertiesConfiguration();
-    // Start the server
+    // Start the server.
     HelixServerStarter helixServerStarter =
         new HelixServerStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, serverConf);
-
-    // Verify the serverId, host and port are set correctly in Zk.
-    HelixManager helixManager = helixServerStarter.getHelixManager();
-    PropertyKey.Builder keyBuilder = helixManager.getHelixDataAccessor().keyBuilder();
-    InstanceConfig config =  helixManager.getHelixDataAccessor().getProperty(keyBuilder.instanceConfig(DEFAULT_SERVER_ID));
-    helixServerStarter.stop();
-
-    assertEquals(config.getInstanceName(), DEFAULT_SERVER_ID);
-    // By default (auto joined instances), server instance name is of format: {@code Server_<hostname>_<port>}, e.g.
-    // {@code Server_localhost_12345}, hostname is of format: {@code Server_<hostname>}, e.g. {@code Server_localhost}.
-    // More details refer to the class ServerInstance.
-    assertEquals(config.getHostName(), "Server_127.0.0.1");
-    assertEquals(config.getPort(), "8098");
+    verifyZkConfigData(helixServerStarter, helixServerStarter.getHelixManager().getInstanceName(), "Server_127.0.0.1",
+        "8098");
   }
 
   @Test
@@ -91,14 +96,7 @@ public class ServerStarterIntegrationTest extends ControllerTest {
         new HelixServerStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, serverConf);
 
     // Verify the serverId, host and port are set correctly in Zk.
-    HelixManager helixManager = helixServerStarter.getHelixManager();
-    PropertyKey.Builder keyBuilder = helixManager.getHelixDataAccessor().keyBuilder();
-    InstanceConfig config =  helixManager.getHelixDataAccessor().getProperty(keyBuilder.instanceConfig("Server_host1_10001"));
-    helixServerStarter.stop();
-
-    assertEquals(config.getInstanceName(), "Server_host1_10001");
-    assertEquals(config.getHostName(), "Server_host1");
-    assertEquals(config.getPort(), "10001");
+    verifyZkConfigData(helixServerStarter, "Server_host1_10001", "Server_host1", "10001");
   }
 
   @Test
@@ -117,14 +115,7 @@ public class ServerStarterIntegrationTest extends ControllerTest {
         new HelixServerStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, serverConf);
 
     // Verify the serverId, host and port are set correctly in Zk.
-    HelixManager helixManager = helixServerStarter.getHelixManager();
-    PropertyKey.Builder keyBuilder = helixManager.getHelixDataAccessor().keyBuilder();
-    InstanceConfig config =  helixManager.getHelixDataAccessor().getProperty(keyBuilder.instanceConfig(SERVER1));
-    helixServerStarter.stop();
-
-    assertEquals(config.getInstanceName(), SERVER1);
-    assertEquals(config.getHostName(), "host1");
-    assertEquals(config.getPort(), "10001");
+    verifyZkConfigData(helixServerStarter, SERVER1, "host1", "10001");
   }
 
   @Test
@@ -140,15 +131,8 @@ public class ServerStarterIntegrationTest extends ControllerTest {
         new HelixServerStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, serverConf);
 
     // Verify the serverId, host and port are set correctly in Zk.
-    HelixManager helixManager = helixServerStarter.getHelixManager();
-    PropertyKey.Builder keyBuilder = helixManager.getHelixDataAccessor().keyBuilder();
-    InstanceConfig config =  helixManager.getHelixDataAccessor().getProperty(keyBuilder.instanceConfig(SERVER1));
-    helixServerStarter.stop();
-
-    assertEquals(config.getInstanceName(), SERVER1);
     // Note that helix will use INSTANCE_ID to extract the hostname instead of using netty host/port in config.
-    assertEquals(config.getHostName(), SERVER1);
-    assertEquals(config.getPort(), "");
+    verifyZkConfigData(helixServerStarter, SERVER1, SERVER1, "");
   }
 
   @Test
@@ -164,16 +148,6 @@ public class ServerStarterIntegrationTest extends ControllerTest {
         new HelixServerStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, serverConf);
 
     // Verify the serverId, host and port are set correctly in Zk.
-    HelixManager helixManager = helixServerStarter.getHelixManager();
-    PropertyKey.Builder keyBuilder = helixManager.getHelixDataAccessor().keyBuilder();
-    InstanceConfig config =  helixManager.getHelixDataAccessor().getProperty(keyBuilder.instanceConfig("Server_localhost_8098"));
-    helixServerStarter.stop();
-
-    assertEquals(config.getInstanceName(), "Server_localhost_8098");
-    // By default (auto joined instances), server instance name is of format: {@code Server_<hostname>_<port>}, e.g.
-    // {@code Server_localhost_12345}, hostname is of format: {@code Server_<hostname>}, e.g. {@code Server_localhost}.
-    // More details refer to the class ServerInstance.
-    assertEquals(config.getHostName(), "Server_localhost");
-    assertEquals(config.getPort(), "8098");
+    verifyZkConfigData(helixServerStarter, "Server_localhost_8098", "Server_localhost", "8098");
   }
 }
