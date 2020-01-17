@@ -40,6 +40,7 @@
   <modules>
     <module>pinot-batch-ingestion-common</module>
     <module>pinot-batch-ingestion-spark</module>
+    <module>pinot-batch-ingestion-hadoop</module>
     <module>pinot-batch-ingestion-standalone</module>
     <module>v0_deprecated</module>
   </modules>
@@ -62,5 +63,4 @@
       <artifactId>slf4j-api</artifactId>
     </dependency>
   </dependencies>
-
 </project>

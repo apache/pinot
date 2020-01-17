@@ -18,16 +18,10 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.spark;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.Serializable;
 import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
@@ -37,11 +31,9 @@ import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
-import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
-import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
@@ -50,6 +42,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationTaskSpec;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.DataSize;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaRDD;
@@ -57,11 +50,15 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.PINOT_PLUGINS_DIR;
+import static org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationUtils.PINOT_PLUGINS_TAR_GZ;
+import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_DIR_PROPERTY_NAME;
+import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_INCLUDE_PROPERTY_NAME;
+
 
 public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Serializable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SparkSegmentGenerationJobRunner.class);
-  private static final String OFFLINE = "OFFLINE";
   private static final String DEPS_JAR_DIR = "dependencyJarDir";
   private static final String STAGING_DIR = "stagingDir";
 
@@ -72,34 +69,6 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
 
   public SparkSegmentGenerationJobRunner(SegmentGenerationJobSpec spec) {
     init(spec);
-  }
-
-  private static String generateSchemaURI(String controllerUri, String table) {
-    return String.format("%s/tables/%s/schema", controllerUri, table);
-  }
-
-  private static String generateTableConfigURI(String controllerUri, String table) {
-    return String.format("%s/tables/%s", controllerUri, table);
-  }
-
-  /**
-   * Generate a relative output directory path when `useRelativePath` flag is on.
-   * This method will compute the relative path based on `inputFile` and `baseInputDir`,
-   * then apply only the directory part of relative path to `outputDir`.
-   * E.g.
-   *    baseInputDir = "/path/to/input"
-   *    inputFile = "/path/to/input/a/b/c/d.avro"
-   *    outputDir = "/path/to/output"
-   *    getRelativeOutputPath(baseInputDir, inputFile, outputDir) = /path/to/output/a/b/c
-   */
-  public static URI getRelativeOutputPath(URI baseInputDir, URI inputFile, URI outputDir) {
-    URI relativePath = baseInputDir.relativize(inputFile);
-    Preconditions.checkState(relativePath.getPath().length() > 0 && !relativePath.equals(inputFile),
-        "Unable to extract out the relative path based on base input path: " + baseInputDir);
-    String outputDirStr = outputDir.toString();
-    outputDir = !outputDirStr.endsWith("/") ? URI.create(outputDirStr.concat("/")) : outputDir;
-    URI relativeOutputURI = outputDir.resolve(relativePath).resolve(".");
-    return relativeOutputURI;
   }
 
   @Override
@@ -125,7 +94,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         throw new RuntimeException("Missing property 'schemaURI' in 'tableSpec'");
       }
       PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
-      String schemaURI = generateSchemaURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
+      String schemaURI = SegmentGenerationUtils
+          .generateSchemaURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setSchemaURI(schemaURI);
     }
     if (_spec.getTableSpec().getTableConfigURI() == null) {
@@ -133,8 +103,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         throw new RuntimeException("Missing property 'tableConfigURI' in 'tableSpec'");
       }
       PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
-      String tableConfigURI =
-          generateTableConfigURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
+      String tableConfigURI = SegmentGenerationUtils
+          .generateTableConfigURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setTableConfigURI(tableConfigURI);
     }
     if (_spec.getExecutionFrameworkSpec().getExtraConfigs() == null) {
@@ -214,10 +184,19 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
 
     try {
       JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
+
+      // Pinot plugins are necessary to launch Pinot ingestion job from every mapper.
+      // In order to ensure pinot plugins would be loaded to each worker, this method
+      // tars entire plugins directory and set this file into Distributed cache.
+      // Then each executor job will untar the plugin tarball, and set system properties accordingly.
+      packPluginsToDistributedCache(sparkContext);
+
+      // Add dependency jars
       if (_spec.getExecutionFrameworkSpec().getExtraConfigs().containsKey(DEPS_JAR_DIR)) {
         addDepsJarToDistributedCache(sparkContext,
             _spec.getExecutionFrameworkSpec().getExtraConfigs().get(DEPS_JAR_DIR));
       }
+
       List<String> pathAndIdxList = new ArrayList<>();
       for (int i = 0; i < filteredFiles.size(); i++) {
         pathAndIdxList.add(String.format("%s %d", filteredFiles.get(i), i));
@@ -230,6 +209,31 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         String[] splits = pathAndIdx.split(" ");
         String path = splits[0];
         int idx = Integer.valueOf(splits[1]);
+
+        // Load Pinot Plugins copied from Distributed cache.
+        File localPluginsTarFile = new File(PINOT_PLUGINS_TAR_GZ);
+        if (localPluginsTarFile.exists()) {
+          File pluginsDirFile = new File(PINOT_PLUGINS_DIR + "-" + idx);
+          try {
+            TarGzCompressionUtils.unTar(localPluginsTarFile, pluginsDirFile);
+          } catch (Exception e) {
+            LOGGER.error("Failed to untar local Pinot plugins tarball file [{}]", localPluginsTarFile, e);
+            throw new RuntimeException(e);
+          }
+          LOGGER.info("Trying to set System Property: [{}={}]", PLUGINS_DIR_PROPERTY_NAME,
+              pluginsDirFile.getAbsolutePath());
+          System.setProperty(PLUGINS_DIR_PROPERTY_NAME, pluginsDirFile.getAbsolutePath());
+
+          final String pluginsIncludes = sparkContext.getConf().get(PLUGINS_INCLUDE_PROPERTY_NAME);
+          if (pluginsIncludes != null) {
+            LOGGER.info("Trying to set System Property: [{}={}]", PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
+            System.setProperty(PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
+          }
+          LOGGER.info("Pinot plugins System Properties are set at [{}], plugins includes [{}]",
+              System.getProperty(PLUGINS_DIR_PROPERTY_NAME), System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME));
+        } else {
+          LOGGER.warn("Cannot find local Pinot plugins tar file at [{}]", localPluginsTarFile.getAbsolutePath());
+        }
         URI inputFileURI = URI.create(path);
         if (inputFileURI.getScheme() == null) {
           inputFileURI =
@@ -252,8 +256,9 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         taskSpec.setInputFilePath(localInputDataFile.getAbsolutePath());
         taskSpec.setOutputDirectoryPath(localOutputTempDir.getAbsolutePath());
         taskSpec.setRecordReaderSpec(_spec.getRecordReaderSpec());
-        taskSpec.setSchema(getSchema());
-        taskSpec.setTableConfig(getTableConfig().toJsonNode());
+        taskSpec.setSchema(SegmentGenerationUtils.getSchema(_spec.getTableSpec().getSchemaURI()));
+        taskSpec.setTableConfig(
+            SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI()).toJsonNode());
         taskSpec.setSequenceId(idx);
         taskSpec.setSegmentNameGeneratorSpec(_spec.getSegmentNameGeneratorSpec());
 
@@ -272,7 +277,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
             DataSize.fromBytes(uncompressedSegmentSize), DataSize.fromBytes(compressedSegmentSize));
         //move segment to output PinotFS
         URI outputSegmentTarURI =
-            getRelativeOutputPath(finalInputDirURI, inputFileURI, finalOutputDirURI).resolve(segmentTarFileName);
+            SegmentGenerationUtils.getRelativeOutputPath(finalInputDirURI, inputFileURI, finalOutputDirURI)
+                .resolve(segmentTarFileName);
         LOGGER.info("Trying to move segment tar file from: [{}] to [{}]", localSegmentTarFile, outputSegmentTarURI);
         if (!_spec.isOverwriteOutput() && PinotFSFactory.create(outputSegmentTarURI.getScheme())
             .exists(outputSegmentTarURI)) {
@@ -297,87 +303,6 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
     }
   }
 
-  private Schema getSchema() {
-    URI schemaURI;
-    try {
-      schemaURI = new URI(_spec.getTableSpec().getSchemaURI());
-    } catch (URISyntaxException e) {
-      throw new RuntimeException("Schema URI is not valid - '" + _spec.getTableSpec().getSchemaURI() + "'", e);
-    }
-    String scheme = schemaURI.getScheme();
-    String schemaJson;
-    if (PinotFSFactory.isSchemeSupported(scheme)) {
-      // Try to use PinotFS to read schema URI
-      PinotFS pinotFS = PinotFSFactory.create(scheme);
-      InputStream schemaStream;
-      try {
-        schemaStream = pinotFS.open(schemaURI);
-      } catch (IOException e) {
-        throw new RuntimeException("Failed to fetch schema from PinotFS - '" + schemaURI + "'", e);
-      }
-      try {
-        schemaJson = IOUtils.toString(schemaStream, StandardCharsets.UTF_8);
-      } catch (IOException e) {
-        throw new RuntimeException("Failed to read from schema file data stream on Pinot fs - '" + schemaURI + "'", e);
-      }
-    } else {
-      // Try to directly read from URI.
-      try {
-        schemaJson = IOUtils.toString(schemaURI, StandardCharsets.UTF_8);
-      } catch (IOException e) {
-        throw new RuntimeException("Failed to read from Schema URI - '" + schemaURI + "'", e);
-      }
-    }
-    try {
-      return Schema.fromString(schemaJson);
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to decode Pinot schema from json string - '" + schemaJson + "'", e);
-    }
-  }
-
-  private TableConfig getTableConfig() {
-    URI tableConfigURI;
-    try {
-      tableConfigURI = new URI(_spec.getTableSpec().getTableConfigURI());
-    } catch (URISyntaxException e) {
-      throw new RuntimeException("Table config URI is not valid - '" + _spec.getTableSpec().getTableConfigURI() + "'",
-          e);
-    }
-    String scheme = tableConfigURI.getScheme();
-    String tableConfigJson;
-    if (PinotFSFactory.isSchemeSupported(scheme)) {
-      // Try to use PinotFS to read table config URI
-      PinotFS pinotFS = PinotFSFactory.create(scheme);
-      try {
-        tableConfigJson = IOUtils.toString(pinotFS.open(tableConfigURI), StandardCharsets.UTF_8);
-      } catch (IOException e) {
-        throw new RuntimeException("Failed to open table config file stream on Pinot fs - '" + tableConfigURI + "'", e);
-      }
-    } else {
-      try {
-        tableConfigJson = IOUtils.toString(tableConfigURI, StandardCharsets.UTF_8);
-      } catch (IOException e) {
-        throw new RuntimeException(
-            "Failed to read from table config file data stream on Pinot fs - '" + tableConfigURI + "'", e);
-      }
-    }
-    // Controller API returns a wrapper of table config.
-    JsonNode tableJsonNode;
-    try {
-      tableJsonNode = new ObjectMapper().readTree(tableConfigJson);
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to decode table config into JSON from String - '" + tableConfigJson + "'", e);
-    }
-    if (tableJsonNode.has(OFFLINE)) {
-      tableJsonNode = tableJsonNode.get(OFFLINE);
-    }
-    try {
-      return TableConfig.fromJsonConfig(tableJsonNode);
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to decode table config from JSON - '" + tableJsonNode + "'", e);
-    }
-  }
-
   protected void addDepsJarToDistributedCache(JavaSparkContext sparkContext, String depsJarDir)
       throws IOException {
     if (depsJarDir != null) {
@@ -395,6 +320,25 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
           }
         }
       }
+    }
+  }
+
+  protected void packPluginsToDistributedCache(JavaSparkContext sparkContext) {
+    String pluginsRootDir = PluginManager.get().getPluginsRootDir();
+    if (new File(pluginsRootDir).exists()) {
+      File pluginsTarGzFile = new File(PINOT_PLUGINS_TAR_GZ);
+      try {
+        TarGzCompressionUtils.createTarGzOfDirectory(pluginsRootDir, pluginsTarGzFile.getPath());
+      } catch (IOException e) {
+        LOGGER.error("Failed to tar plugins directory", e);
+      }
+      sparkContext.addFile(pluginsTarGzFile.getAbsolutePath());
+      String pluginsIncludes = System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME);
+      if (pluginsIncludes != null) {
+        sparkContext.getConf().set(PLUGINS_INCLUDE_PROPERTY_NAME, pluginsIncludes);
+      }
+    } else {
+      LOGGER.warn("Cannot find local Pinot plugins directory at [{}]", pluginsRootDir);
     }
   }
 }

@@ -100,6 +100,8 @@
         <exclude>**/pinot-batch-ingestion/pinot-batch-ingestion/**</exclude>
         <exclude>**/pinot-batch-ingestion/pinot-batch-ingestion-common/**</exclude>
         <exclude>**/pinot-batch-ingestion/pinot-ingestion-common/**</exclude>
+        <exclude>**/pinot-batch-ingestion/pinot-hadoop/**</exclude>
+        <exclude>**/pinot-batch-ingestion/pinot-spark/**</exclude>
         <exclude>**/pinot-batch-ingestion/v0_deprecated/**</exclude>
       </excludes>
     </fileSet>

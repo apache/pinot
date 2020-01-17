@@ -31,12 +31,11 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 
 public class PluginClassLoader extends URLClassLoader {
 
-  private final ClassLoader sysClzLoader;
+  private final ClassLoader classLoader;
 
   public PluginClassLoader(URL[] urls, ClassLoader parent) {
     super(urls, parent);
-    sysClzLoader = getSystemClassLoader();
-    URLClassLoader classLoader = (URLClassLoader) ClassLoader.getSystemClassLoader();
+    classLoader = PluginClassLoader.class.getClassLoader();
     Method method = null;
     try {
       method = URLClassLoader.class.getDeclaredMethod("addURL", URL.class);
@@ -62,8 +61,8 @@ public class PluginClassLoader extends URLClassLoader {
     Class<?> loadedClass = findLoadedClass(name);
     if (loadedClass == null) {
       try {
-        if (sysClzLoader != null) {
-          loadedClass = sysClzLoader.loadClass(name);
+        if (classLoader != null) {
+          loadedClass = classLoader.loadClass(name);
         }
       } catch (ClassNotFoundException ex) {
         // class not found in system class loader... silently skipping
@@ -94,7 +93,7 @@ public class PluginClassLoader extends URLClassLoader {
     List<URL> allRes = new LinkedList<>();
 
     // load resources from sys class loader
-    Enumeration<URL> sysResources = sysClzLoader.getResources(name);
+    Enumeration<URL> sysResources = classLoader.getResources(name);
     if (sysResources != null) {
       while (sysResources.hasMoreElements()) {
         allRes.add(sysResources.nextElement());
@@ -135,8 +134,8 @@ public class PluginClassLoader extends URLClassLoader {
   @Override
   public URL getResource(String name) {
     URL res = null;
-    if (sysClzLoader != null) {
-      res = sysClzLoader.getResource(name);
+    if (classLoader != null) {
+      res = classLoader.getResource(name);
     }
     if (res == null) {
       res = findResource(name);

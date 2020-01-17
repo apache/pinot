@@ -34,14 +34,6 @@
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
   </properties>
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-      </plugin>
-    </plugins>
-  </build>
   <dependencies>
     <dependency>
       <groupId>org.apache.parquet</groupId>

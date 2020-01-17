@@ -44,13 +44,14 @@ public class SegmentPushUtils implements Serializable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPushUtils.class);
 
+  private static final FileUploadDownloadClient FILE_UPLOAD_DOWNLOAD_CLIENT = new FileUploadDownloadClient();
+
   public static void pushSegments(SegmentGenerationJobSpec spec, PinotFS fileSystem, List<String> tarFilePaths)
       throws RetriableOperationException, AttemptsExceededException {
     String tableName = spec.getTableSpec().getTableName();
     LOGGER.info("Start pushing segments: {}... to locations: {} for table {}",
         Arrays.toString(tarFilePaths.subList(0, Math.min(5, tarFilePaths.size())).toArray()),
         Arrays.toString(spec.getPinotClusterSpecs()), tableName);
-    FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient();
     for (String tarFilePath : tarFilePaths) {
       URI tarFileURI = URI.create(tarFilePath);
       File tarFile = new File(tarFilePath);
@@ -75,7 +76,7 @@ public class SegmentPushUtils implements Serializable {
         }
         RetryPolicies.exponentialBackoffRetryPolicy(attempts, retryWaitMs, 5).attempt(() -> {
           try (InputStream inputStream = fileSystem.open(tarFileURI)) {
-            SimpleHttpResponse response = fileUploadDownloadClient
+            SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT
                 .uploadSegment(FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentName, inputStream,
                     tableName);
             LOGGER.info("Response for pushing table {} segment {} to location {} - {}: {}", tableName, segmentName,
@@ -107,7 +108,6 @@ public class SegmentPushUtils implements Serializable {
     LOGGER.info("Start sending table {} segment URIs: {} to locations: {}", tableName,
         Arrays.toString(segmentUris.subList(0, Math.min(5, segmentUris.size())).toArray()),
         Arrays.toString(spec.getPinotClusterSpecs()));
-    FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient();
     for (String segmentUri : segmentUris) {
       for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
         URI controllerURI;
@@ -127,7 +127,7 @@ public class SegmentPushUtils implements Serializable {
         }
         RetryPolicies.exponentialBackoffRetryPolicy(attempts, retryWaitMs, 5).attempt(() -> {
           try {
-            SimpleHttpResponse response = fileUploadDownloadClient
+            SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT
                 .sendSegmentUri(FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentUri, tableName);
             LOGGER.info("Response for pushing table {} segment uri {} to location {} - {}: {}", tableName, segmentUri,
                 controllerURI, response.getStatusCode(), response.getResponse());

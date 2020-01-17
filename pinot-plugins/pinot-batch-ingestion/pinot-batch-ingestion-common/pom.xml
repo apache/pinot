@@ -35,17 +35,4 @@
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
   </properties>
-
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-jar-plugin</artifactId>
-        <version>2.5</version>
-        <configuration>
-          <forceCreation>true</forceCreation>
-        </configuration>
-      </plugin>
-    </plugins>
-  </build>
 </project>
