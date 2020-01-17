@@ -79,7 +79,8 @@ public class DataAvailabilityTaskSchedulerTest {
     metric1.setDerived(false);
     metric2.setAlias("");
     metricId2 = metricConfigManager.save(metric2);
-    dataAvailabilityTaskScheduler = new DataAvailabilityTaskScheduler(60, 24 * 60 * 60);
+    dataAvailabilityTaskScheduler = new DataAvailabilityTaskScheduler(60,
+        TimeUnit.DAYS.toSeconds(1), TimeUnit.MINUTES.toSeconds(15));
   }
 
   @AfterMethod
@@ -91,8 +92,8 @@ public class DataAvailabilityTaskSchedulerTest {
   public void testCreateOneTask() {
     List<Long> metrics = Arrays.asList(metricId1, metricId2);
     long detectionId = createDetection(1, metrics, TEST_TIME - TimeUnit.DAYS.toMillis(1),0);
-    createDataset(1, TEST_TIME);
-    createDataset(2, TEST_TIME);
+    createDataset(1, TEST_TIME, TEST_TIME);
+    createDataset(2, TEST_TIME, TEST_TIME);
     dataAvailabilityTaskScheduler.run();
     TaskManager taskManager = DAORegistry.getInstance().getTaskDAO();
     List<TaskDTO> tasks = taskManager.findAll();
@@ -110,8 +111,8 @@ public class DataAvailabilityTaskSchedulerTest {
     long detection2 = createDetection(2, metrics1, oneDayAgo, 0);
     List<Long> singleMetric = Collections.singletonList(metricId2);
     long detection3 = createDetection(3, singleMetric, oneDayAgo, 0);
-    createDataset(1, TEST_TIME);
-    createDataset(2, TEST_TIME);
+    createDataset(1, TEST_TIME, TEST_TIME);
+    createDataset(2, TEST_TIME, TEST_TIME);
     dataAvailabilityTaskScheduler.run();
     TaskManager taskManager = DAORegistry.getInstance().getTaskDAO();
     List<TaskDTO> tasks = taskManager.findAll();
@@ -131,8 +132,8 @@ public class DataAvailabilityTaskSchedulerTest {
     List<Long> metrics1 = Arrays.asList(metricId1, metricId2);
     long detection1 = createDetection(1, metrics1, TEST_TIME, 0);
     long detection2 = createDetection(2, Collections.singletonList(metricId2), TEST_TIME, 0);
-    createDataset(1, TEST_TIME + TimeUnit.HOURS.toMillis(1)); // updated dataset
-    createDataset(2, TEST_TIME - TimeUnit.HOURS.toMillis(1)); // not updated dataset
+    createDataset(1, TEST_TIME + TimeUnit.HOURS.toMillis(1), TEST_TIME); // updated dataset
+    createDataset(2, TEST_TIME - TimeUnit.HOURS.toMillis(1), TEST_TIME); // not updated dataset
     createDetectionTask(detection1, TEST_TIME - 60_000, TaskConstants.TaskStatus.COMPLETED);
     createDetectionTask(detection2, TEST_TIME - 60_000, TaskConstants.TaskStatus.COMPLETED);
     DetectionConfigManager detectionConfigManager = DAORegistry.getInstance().getDetectionConfigManager();
@@ -151,8 +152,8 @@ public class DataAvailabilityTaskSchedulerTest {
     long detection1 = createDetection(1, metrics1, oneDayAgo, 0);
     long detection2 = createDetection(2, Collections.singletonList(metricId2), oneDayAgo, 0);
     long detection3 = createDetection(3, Collections.singletonList(metricId2), oneDayAgo, 2 * 24 * 60 * 60);
-    createDataset(1, oneDayAgo - 60_000); // not updated dataset
-    createDataset(2, oneDayAgo - 60_000); // not updated dataset
+    createDataset(1, oneDayAgo - 60_000, TEST_TIME); // not updated dataset
+    createDataset(2, oneDayAgo - 60_000, TEST_TIME); // not updated dataset
     createDetectionTask(detection1, oneDayAgo - 60_000, TaskConstants.TaskStatus.COMPLETED);
     createDetectionTask(detection2, oneDayAgo - 60_000, TaskConstants.TaskStatus.COMPLETED);
     createDetectionTask(detection3, oneDayAgo - 60_000, TaskConstants.TaskStatus.COMPLETED);
@@ -172,8 +173,8 @@ public class DataAvailabilityTaskSchedulerTest {
     long detection2 = createDetection(2, metrics1, oneDayAgo, 0);
     List<Long> singleMetric = Collections.singletonList(metricId2);
     long detection3 = createDetection(3, singleMetric, oneDayAgo, 0);
-    createDataset(1, TEST_TIME);
-    createDataset(2, TEST_TIME);
+    createDataset(1, TEST_TIME, TEST_TIME);
+    createDataset(2, TEST_TIME, TEST_TIME);
     createDetectionTask(detection1, oneDayAgo, TaskConstants.TaskStatus.RUNNING);
     dataAvailabilityTaskScheduler.run();
     TaskManager taskManager = DAORegistry.getInstance().getTaskDAO();
@@ -190,11 +191,31 @@ public class DataAvailabilityTaskSchedulerTest {
         new HashSet<>(Arrays.asList(tasks.get(1).getJobName(), tasks.get(2).getJobName())));
   }
 
-  private long createDataset(int intSuffix, long refreshTime) {
+  @Test
+  public void testScheduleOutOfSchedulingWindow() {
+    List<Long> metrics1 = Collections.singletonList(metricId1);
+    long oneDayAgo = TEST_TIME - TimeUnit.DAYS.toMillis(1);
+    long detection1 = createDetection(1, metrics1, oneDayAgo, 0);
+    long halfHourAgo = TEST_TIME - TimeUnit.MINUTES.toMillis(30);
+    List<Long> metrics2 = Arrays.asList(metricId1, metricId2);
+    long detection2 = createDetection(2, metrics2, oneDayAgo, 0);
+    createDataset(1, TEST_TIME, halfHourAgo);
+    createDataset(2, TEST_TIME, TEST_TIME);
+    TaskManager taskManager = DAORegistry.getInstance().getTaskDAO();
+    Assert.assertEquals(taskManager.findAll().size(), 0);
+    dataAvailabilityTaskScheduler.run();
+    List<TaskDTO> tasks = taskManager.findAll();
+    Assert.assertEquals(tasks.size(), 1);
+    Assert.assertEquals(TaskConstants.TaskType.DETECTION.toString() + "_" + detection2,
+        tasks.get(0).getJobName());
+  }
+
+  private long createDataset(int intSuffix, long refreshTime, long refreshEventTime) {
     DatasetConfigManager datasetConfigDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     DatasetConfigDTO ds1 = new DatasetConfigDTO();
     ds1.setDataset(TEST_DATASET_PREFIX + intSuffix);
     ds1.setLastRefreshTime(refreshTime);
+    ds1.setLastRefreshEventTime(refreshEventTime);
     return datasetConfigDAO.save(ds1);
   }
 

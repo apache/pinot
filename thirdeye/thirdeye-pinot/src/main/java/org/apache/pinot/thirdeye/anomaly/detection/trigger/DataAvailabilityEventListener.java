@@ -79,8 +79,8 @@ public class DataAvailabilityEventListener implements Runnable {
           LOG.info("Processing event: " + event.getDatasetName() + " with watermark " + event.getHighWatermark());
           String dataset = event.getDatasetName();
           datasetTriggerInfoRepo.setLastUpdateTimestamp(dataset, event.getHighWatermark());
-          //Note: Batch update the timestamps of dataset if the event traffic spike
-          datasetConfigManager.updateLastRefreshTime(dataset, event.getHighWatermark());
+          //Note: Batch update the timestamps of dataset if the event traffic spikes
+          datasetConfigManager.updateLastRefreshTime(dataset, event.getHighWatermark(), System.currentTimeMillis());
           ThirdeyeMetricsUtil.processedTriggerEventCounter.inc();
           LOG.debug("Finished processing event: " + event.getDatasetName());
         } catch (Exception e) {

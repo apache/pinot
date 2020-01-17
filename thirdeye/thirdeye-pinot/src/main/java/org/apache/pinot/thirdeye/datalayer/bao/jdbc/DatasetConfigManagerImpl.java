@@ -62,9 +62,10 @@ public class DatasetConfigManagerImpl extends AbstractManagerImpl<DatasetConfigD
   }
 
   @Override
-  public void updateLastRefreshTime(String dataset, long refreshTime) {
+  public void updateLastRefreshTime(String dataset, long refreshTime, long eventTime) {
     DatasetConfigDTO datasetConfigDTO = findByDataset(dataset);
     datasetConfigDTO.setLastRefreshTime(refreshTime);
+    datasetConfigDTO.setLastRefreshEventTime(eventTime);
     update(datasetConfigDTO);
   }
 }

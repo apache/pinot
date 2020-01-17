@@ -84,7 +84,7 @@ public class MockDatasetConfigManager extends AbstractMockManager<DatasetConfigD
   }
 
   @Override
-  public void updateLastRefreshTime(String dataset, long lastRefreshTime) {
+  public void updateLastRefreshTime(String dataset, long lastRefreshTime, long lastEventTime) {
     throw new AssertionError("not implemented");
   }
 }
