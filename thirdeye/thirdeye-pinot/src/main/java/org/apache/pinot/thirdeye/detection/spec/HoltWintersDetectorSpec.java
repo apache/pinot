@@ -32,6 +32,7 @@ public class HoltWintersDetectorSpec  extends AbstractSpec  {
   private Pattern pattern = Pattern.UP_OR_DOWN;
   private boolean smoothing = true;
   private String monitoringGranularity = MetricSlice.NATIVE_GRANULARITY.toAggregationGranularityString(); // use native granularity by default
+  private String weekStart = "WEDNESDAY";
 
   public boolean getSmoothing() {
     return smoothing;
@@ -95,5 +96,13 @@ public class HoltWintersDetectorSpec  extends AbstractSpec  {
 
   public void setMonitoringGranularity(String monitoringGranularity) {
     this.monitoringGranularity = monitoringGranularity;
+  }
+
+  public String getWeekStart() {
+    return weekStart;
+  }
+
+  public void setWeekStart(String weekStart) {
+    this.weekStart = weekStart;
   }
 }

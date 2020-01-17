@@ -37,6 +37,9 @@ import org.joda.time.LocalDateTime;
 import org.joda.time.Period;
 import org.joda.time.PeriodType;
 
+import static org.apache.pinot.thirdeye.dataframe.DoubleSeries.*;
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
+
 
 public abstract class Grouping {
   public static final String GROUP_KEY = "key";
@@ -100,6 +103,32 @@ public abstract class Grouping {
       builder.addSeries(this.apply(s, i).sum());
     }
     return makeResult(builder.build());
+  }
+
+  GroupingDataFrame sum(DataFrame source, String groupBySeriesName, String sumSeriesName) {
+    Series.Builder builder = source.get(sumSeriesName).getBuilder();
+    for (int i = 0; i < this.size(); i++) {
+      Series group = this.apply(source.get(groupBySeriesName), i);
+      builder.addSeries(
+          source.filter((LongConditional) values -> group.getLongs().contains(values[0]), groupBySeriesName)
+              .dropNull(groupBySeriesName)
+              .get(sumSeriesName)
+              .sum());
+    }
+    return makeResult(builder.build(), groupBySeriesName);
+  }
+
+  GroupingDataFrame mean(DataFrame source, String groupBySeriesName, String meanSeriesName) {
+    Series.Builder builder = source.get(meanSeriesName).getBuilder();
+    for (int i = 0; i < this.size(); i++) {
+      Series group = this.apply(source.get(groupBySeriesName), i);
+      builder.addSeries(
+          source.filter((LongConditional) values -> group.getLongs().contains(values[0]), groupBySeriesName)
+              .dropNull(groupBySeriesName)
+              .get(meanSeriesName)
+              .mean());
+    }
+    return makeResult(builder.build(), groupBySeriesName);
   }
 
   GroupingDataFrame product(Series s) {
@@ -207,6 +236,10 @@ public abstract class Grouping {
 
   private GroupingDataFrame makeResult(Series s) {
     return new GroupingDataFrame(GROUP_KEY, GROUP_VALUE, this.keys, s);
+  }
+
+  private GroupingDataFrame makeResult(Series s, String keyName) {
+    return new GroupingDataFrame(keyName, GROUP_VALUE, this.keys, s);
   }
 
   /**
@@ -479,6 +512,26 @@ public abstract class Grouping {
 
     public GroupingDataFrame sum(String seriesName) {
       return this.grouping.sum(this.source.get(seriesName));
+    }
+
+    /**
+     * Sums the value in a given series for each group and returns the result as a new DataFrame
+     * @param groupBySeriesName the group-by series name
+     * @param sumSeriesName the series name for sum
+     * @return a new data frame with the sums
+     */
+    public GroupingDataFrame sum(String groupBySeriesName, String sumSeriesName) {
+      return this.grouping.sum(source, groupBySeriesName, sumSeriesName);
+    }
+
+    /**
+     * Averages the value in a given series for each group and returns the result as a new DataFrame
+     * @param groupBySeriesName the group-by series name
+     * @param meanSeriesName the series name for sum
+     * @return a new data frame with the sums
+     */
+    public GroupingDataFrame mean(String groupBySeriesName, String meanSeriesName) {
+      return this.grouping.mean(source, groupBySeriesName, meanSeriesName);
     }
 
     public GroupingDataFrame product(String seriesName) {

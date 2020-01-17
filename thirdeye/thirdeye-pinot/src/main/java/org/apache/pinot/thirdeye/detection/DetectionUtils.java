@@ -28,9 +28,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
+import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
@@ -150,10 +151,6 @@ public class DetectionUtils {
 
         end = new DateTime(lastTimestamp, timezone).plus(monitoringGranularityPeriod).getMillis();
       }
-
-      // truncate at analysis end time
-      end = Math.min(end, endTime);
-
       anomalies.add(makeAnomaly(slice.withStart(start).withEnd(end)));
     }
 
@@ -266,8 +263,12 @@ public class DetectionUtils {
     if (monitoringGranularity.equals(MetricSlice.NATIVE_GRANULARITY.toAggregationGranularityString())) {
       return datasetConfigDTO.bucketTimeGranularity().toPeriod();
     }
-    if (monitoringGranularity.equals("1_MONTHS")) {
-      return new Period(0,1,0,0,0,0,0,0, PeriodType.months());
+    String[] split = monitoringGranularity.split("_");
+    if (split[1].equals("MONTHS")) {
+      return new Period(0,Integer.parseInt(split[0]),0,0,0,0,0,0, PeriodType.months());
+    }
+    if (split[1].equals("WEEKS")) {
+      return new Period(0,0,Integer.parseInt(split[0]),0,0,0,0,0, PeriodType.weeks());
     }
     return TimeGranularity.fromString(monitoringGranularity).toPeriod();
   }
@@ -287,5 +288,48 @@ public class DetectionUtils {
       default:
         return new Period(TimeUnit.MILLISECONDS.convert(size, unit));
     }
+  }
+
+  /**
+   * Aggregate the time series data frame's value to specified granularity
+   * @param df the data frame
+   * @param origin the aggregation origin time stamp
+   * @param granularityPeriod the aggregation granularity in period
+   * @param aggregationFunction the metric's aggregation function
+   * @return the aggregated time series data frame
+   */
+  public static DataFrame aggregateByPeriod(DataFrame df, long origin, Period granularityPeriod, MetricAggFunction aggregationFunction) {
+    switch (aggregationFunction) {
+      case SUM:
+        return df.groupByPeriod(df.getLongs(COL_TIME), new DateTime(origin), granularityPeriod).sum(COL_TIME, COL_VALUE);
+      case AVG:
+        return df.groupByPeriod(df.getLongs(COL_TIME), new DateTime(origin), granularityPeriod).mean(COL_TIME, COL_VALUE);
+      default:
+        throw new NotImplementedException(String.format("The aggregate by period for %s is not supported in DataFrame.", aggregationFunction));
+    }
+  }
+
+  /**
+   * Check if the aggregation result is complete or not, if not, remove it from the aggregated result.
+   *
+   * For example, say the weekStart is Monday and current data is available through Jan 8, Wednesday.
+   * the latest data time stamp will be Jan 8. The latest aggregation start time stamp should be Jan 6, Monday.
+   * In such case, the latest data point is incomplete and should be filtered. If the latest data time stamp is
+   * Jan 12, Sunday instead, the data is complete and good to use because the week's data is complete.
+   *
+   * @param df the aggregated data frame to check
+   * @param latestDataTimeStamp the latest data time stamp
+   * @param bucketTimeGranularity the metric's original granularity
+   * @param aggregationGranularityPeriod the granularity after aggregation
+   * @return the filtered data frame
+   */
+  public static DataFrame filterIncompleteAggregation(DataFrame df, long latestDataTimeStamp,
+      TimeGranularity bucketTimeGranularity, Period aggregationGranularityPeriod) {
+    long latestAggregationStartTimeStamp = df.getLong(COL_TIME, df.size() - 1);
+    if (latestDataTimeStamp + bucketTimeGranularity.toMillis()
+        < latestAggregationStartTimeStamp + aggregationGranularityPeriod.toStandardDuration().getMillis()) {
+      df = df.filter(df.getLongs(COL_TIME).neq(latestAggregationStartTimeStamp)).dropNull();
+    }
+    return df;
   }
 }
