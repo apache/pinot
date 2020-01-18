@@ -71,7 +71,12 @@ public class TableCache {
   public String getActualColumnName(String tableName, String columnName) {
     String schemaName = _tableConfigChangeListener._table2SchemaConfigMap.get(tableName.toLowerCase());
     if (schemaName != null) {
-      return _schemaChangeListener.getColumnName(schemaName, columnName);
+      String actualColumnName = _schemaChangeListener.getColumnName(schemaName, columnName);
+      // If actual column name doesn't exist in schema, then return the origin column name.
+      if (actualColumnName == null) {
+        return columnName;
+      }
+      return actualColumnName;
     }
     return columnName;
   }

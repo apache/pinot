@@ -37,7 +37,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -141,8 +140,6 @@ public class PinotHelixResourceManager {
   private Builder _keyBuilder;
   private SegmentDeletionManager _segmentDeletionManager;
   private PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
-  Map<String, String> _tableNameCaseInsensitiveMap = new ConcurrentHashMap<>();
-  Map<String, String> _columnNameCaseInsensitiveMap = new ConcurrentHashMap<>();
   private TableCache _tableCache;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
