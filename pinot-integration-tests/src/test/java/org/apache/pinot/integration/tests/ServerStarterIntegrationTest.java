@@ -80,8 +80,9 @@ public class ServerStarterIntegrationTest extends ControllerTest {
     // Start the server.
     HelixServerStarter helixServerStarter =
         new HelixServerStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, serverConf);
-    verifyZkConfigData(helixServerStarter, helixServerStarter.getHelixManager().getInstanceName(),
-        helixServerStarter.getHelixManager().getInstanceName(), "8098");
+    String expectedInstanceName = helixServerStarter.getHelixManager().getInstanceName();
+    String expectedHostname = expectedInstanceName.substring(0, expectedInstanceName.lastIndexOf('_'));
+    verifyZkConfigData(helixServerStarter, expectedInstanceName, expectedHostname, "8098");
   }
 
   @Test
