@@ -63,6 +63,9 @@ RUN git clone ${PINOT_GIT_URL} ${PINOT_BUILD_DIR} && \
 
 VOLUME ["${PINOT_HOME}/configs", "${PINOT_HOME}/data"]
 
+COPY ingestion-job-specs ${PINOT_HOME}/examples/docker/ingestion-job-specs
+COPY table-configs ${PINOT_HOME}/examples/docker/table-configs
+
 # expose ports for controller/broker/server/admin
 EXPOSE 9000 8099 8098 8097 8096
 
