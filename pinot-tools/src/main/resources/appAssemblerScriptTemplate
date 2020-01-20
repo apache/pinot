@@ -107,6 +107,37 @@ if [ -n "$CLASSPATH_PREFIX" ] ; then
   CLASSPATH=$CLASSPATH_PREFIX:$CLASSPATH
 fi
 
+if [ -z "$PLUGINS_DIR" ] ; then
+  PLUGINS_DIR="$BASEDIR"/plugins
+fi
+
+if [[ -d "$PLUGINS_DIR" ]] ; then
+  if [ -n "$PLUGINS_INCLUDE" ] ; then
+    IFS=';' read -ra PLUGINS_ARR <<< "$PLUGINS_INCLUDE"
+    for PLUGIN_JAR in "${PLUGINS_ARR[@]}"; do
+        PLUGIN_JAR_PATH=$(find "$PLUGINS_DIR" -name "$PLUGIN_JAR.jar")
+        if [ -n "$PLUGINS_CLASSPATH" ] ; then
+          PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR_PATH
+        else
+          PLUGINS_CLASSPATH=$PLUGIN_JAR_PATH
+        fi
+    done
+  else
+    PLUGIN_JARS=$(find "$PLUGINS_DIR" -name \*.jar)
+    for PLUGIN_JAR in $PLUGIN_JARS ; do
+      if [ -n "$PLUGINS_CLASSPATH" ] ; then
+        PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR
+      else
+        PLUGINS_CLASSPATH=$PLUGIN_JAR
+      fi
+    done
+  fi
+fi
+
+if [ -n "$PLUGINS_CLASSPATH" ] ; then
+  CLASSPATH=$CLASSPATH:$PLUGINS_CLASSPATH
+fi
+
 # For Cygwin, switch paths to Windows format before running java
 if $cygwin; then
   [ -n "$CLASSPATH" ] && CLASSPATH=`cygpath --path --windows "$CLASSPATH"`
@@ -117,7 +148,7 @@ if $cygwin; then
 fi
 
 if [ -z "$JAVA_OPTS" ] ; then
-  ALL_JAVA_OPTS="@EXTRA_JVM_ARGUMENTS@"
+  ALL_JAVA_OPTS="--add-exports java.base/jdk.internal.ref=ALL-UNNAMED @EXTRA_JVM_ARGUMENTS@"
 else
   ALL_JAVA_OPTS=$JAVA_OPTS
 fi
