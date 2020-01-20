@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nonnull;
-import org.apache.pinot.pql.parsers.pql2.ast.StarExpressionAstNode;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
@@ -100,10 +99,6 @@ public class TransformExpressionTree {
     } else if (root instanceof LiteralAstNode) {
       _expressionType = ExpressionType.LITERAL;
       _value = ((LiteralAstNode) root).getValueAsString();
-      _children = null;
-    } else if (root instanceof StarExpressionAstNode) {
-      _expressionType = ExpressionType.LITERAL;
-      _value = "*";
       _children = null;
     } else {
       throw new IllegalArgumentException(
