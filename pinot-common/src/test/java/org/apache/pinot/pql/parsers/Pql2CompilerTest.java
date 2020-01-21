@@ -183,6 +183,25 @@ public class Pql2CompilerTest {
   }
 
   @Test
+  public void testGroupByTopLimitBehavior() {
+    boolean previousFailOnConversionErrorValue = Pql2Compiler.FAIL_ON_CONVERSION_ERROR;
+    Pql2Compiler.FAIL_ON_CONVERSION_ERROR = false;
+    BrokerRequest brokerRequest =
+        COMPILER.compileToBrokerRequest("select count(*) from myTable group by dimA top 200");
+    Assert.assertEquals(brokerRequest.getGroupBy().getTopN(), 200);
+    brokerRequest =
+        COMPILER.compileToBrokerRequest("select count(*) from myTable group by dimA limit 300");
+    Assert.assertEquals(brokerRequest.getGroupBy().getTopN(), 300);
+    brokerRequest =
+        COMPILER.compileToBrokerRequest("select count(*) from myTable group by dimA");
+    Assert.assertEquals(brokerRequest.getGroupBy().getTopN(), 10);
+    brokerRequest =
+        COMPILER.compileToBrokerRequest("select count(*) from myTable group by dimA top 200 LIMIT 300");
+    Assert.assertEquals(brokerRequest.getGroupBy().getTopN(), 200);
+    Pql2Compiler.FAIL_ON_CONVERSION_ERROR = previousFailOnConversionErrorValue;
+  }
+
+  @Test
   public void testRejectInvalidLexerToken() {
     assertCompilationFails("select foo from bar where baz ?= 2");
     assertCompilationFails("select foo from bar where baz =! 2");
