@@ -18,6 +18,33 @@
 # under the License.
 #
 
+jdk_version() {
+  local result
+  local java_cmd='java'
+  local IFS=$'\n'
+  # remove \r for Cygwin
+  local lines=$("$java_cmd" -Xms32M -Xmx32M -version 2>&1 | tr '\r' '\n')
+  if [[ -z $java_cmd ]]
+  then
+    result=no_java
+  else
+    for line in $lines; do
+      if [[ (-z $result) && ($line = *"version \""*) ]]
+      then
+        local ver=$(echo $line | sed -e 's/.*version "\(.*\)"\(.*\)/\1/; 1q')
+        # on macOS, sed doesn't support '?'
+        if [[ $ver = "1."* ]]
+        then
+          result=$(echo $ver | sed -e 's/1\.\([0-9]*\)\(.*\)/\1/; 1q')
+        else
+          result=$(echo $ver | sed -e 's/\([0-9]*\)\(.*\)/\1/; 1q')
+        fi
+      fi
+    done
+  fi
+  echo "$result"
+}
+
 # resolve links - $0 may be a softlink
 PRG="$0"
 
@@ -107,6 +134,48 @@ if [ -n "$CLASSPATH_PREFIX" ] ; then
   CLASSPATH=$CLASSPATH_PREFIX:$CLASSPATH
 fi
 
+
+JAVA_VER="$(jdk_version)"
+
+# For java 9 and later version, we need to explicitly set Pinot Plugins directory into classpath.
+if [[ "$JAVA_VER" -gt 8 ]] ; then
+  # Set $PLUGINS_CLASSPATH for plugin jars to be put into classpath.
+  # $PLUGINS_DIR and $PLUGINS_INCLUDE are used if $PLUGINS_CLASSPATH is not set.
+  # $PLUGINS_DIR is the root directory of plugins directory, default to '"$BASEDIR"/plugins' if not set.
+  # $PLUGINS_INCLUDE is semi-colon separated plugins name, e.g. pinot-avro;pinot-batch-ingestion-standalone. Default is not set, which means load all the plugin jars.
+  if [ -z "$PLUGINS_CLASSPATH" ] ; then
+    if [ -z "$PLUGINS_DIR" ] ; then
+      PLUGINS_DIR="$BASEDIR"/plugins
+    fi
+    if [[ -d "$PLUGINS_DIR" ]] ; then
+      if [ -n "$PLUGINS_INCLUDE" ] ; then
+        IFS=';' read -ra PLUGINS_ARR <<< "$PLUGINS_INCLUDE"
+        for PLUGIN_JAR in "${PLUGINS_ARR[@]}"; do
+            PLUGIN_JAR_PATH=$(find "$PLUGINS_DIR" -path \*/"$PLUGIN_JAR"/"$PLUGIN_JAR"-\*.jar)
+            if [ -n "$PLUGINS_CLASSPATH" ] ; then
+              PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR_PATH
+            else
+              PLUGINS_CLASSPATH=$PLUGIN_JAR_PATH
+            fi
+        done
+      else
+        PLUGIN_JARS=$(find "$PLUGINS_DIR" -name \*.jar)
+        for PLUGIN_JAR in $PLUGIN_JARS ; do
+          if [ -n "$PLUGINS_CLASSPATH" ] ; then
+            PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR
+          else
+            PLUGINS_CLASSPATH=$PLUGIN_JAR
+          fi
+        done
+      fi
+    fi
+  fi
+
+  if [ -n "$PLUGINS_CLASSPATH" ] ; then
+    CLASSPATH=$CLASSPATH:$PLUGINS_CLASSPATH
+  fi
+fi
+
 # For Cygwin, switch paths to Windows format before running java
 if $cygwin; then
   [ -n "$CLASSPATH" ] && CLASSPATH=`cygpath --path --windows "$CLASSPATH"`
@@ -120,6 +189,11 @@ if [ -z "$JAVA_OPTS" ] ; then
   ALL_JAVA_OPTS="@EXTRA_JVM_ARGUMENTS@"
 else
   ALL_JAVA_OPTS=$JAVA_OPTS
+fi
+
+# For java 9 and later, we need to set extra java options to access JDK’s internal APIs.
+if [[ "$JAVA_VER" -gt 8 ]] ; then
+  ALL_JAVA_OPTS="--add-exports java.base/jdk.internal.ref=ALL-UNNAMED $ALL_JAVA_OPTS"
 fi
 
 exec "$JAVACMD" $ALL_JAVA_OPTS \
