@@ -25,9 +25,11 @@ import com.google.common.util.concurrent.RateLimiter;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +40,8 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
@@ -56,11 +60,16 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.request.FilterQueryMap;
+import org.apache.pinot.common.request.GroupBy;
+import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Broker;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.helix.TableCache;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.QueryOptions;
@@ -90,12 +99,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final int _queryLogLength;
 
   private final RateLimiter _queryLogRateLimiter;
+
   private final RateLimiter _numDroppedLogRateLimiter;
   private final AtomicInteger _numDroppedLog;
 
+  private final boolean _enableCaseInsensitivePql;
+  private final TableCache _tableCache;
+
   public BaseBrokerRequestHandler(Configuration config, RoutingTable routingTable,
       TimeBoundaryService timeBoundaryService, AccessControlFactory accessControlFactory,
-      QueryQuotaManager queryQuotaManager, BrokerMetrics brokerMetrics) {
+      QueryQuotaManager queryQuotaManager, BrokerMetrics brokerMetrics, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _config = config;
     _routingTable = routingTable;
     _timeBoundaryService = timeBoundaryService;
@@ -103,6 +116,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _queryQuotaManager = queryQuotaManager;
     _brokerMetrics = brokerMetrics;
 
+    _enableCaseInsensitivePql = _config.getBoolean(CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_PQL_KEY, false);
+    if (_enableCaseInsensitivePql) {
+      _tableCache = new TableCache(propertyStore);
+    } else {
+      _tableCache = null;
+    }
     _brokerId = config.getString(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     _brokerTimeoutMs = config.getLong(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _queryResponseLimit =
@@ -110,7 +129,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _queryLogLength = config.getInt(Broker.CONFIG_OF_BROKER_QUERY_LOG_LENGTH, Broker.DEFAULT_BROKER_QUERY_LOG_LENGTH);
     _queryLogRateLimiter = RateLimiter.create(config.getDouble(Broker.CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND,
         Broker.DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND));
-
     _numDroppedLog = new AtomicInteger(0);
     _numDroppedLogRateLimiter = RateLimiter.create(1.0);
 
@@ -148,6 +166,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     BrokerRequest brokerRequest;
     try {
       brokerRequest = PinotQueryParserFactory.get(pinotQueryRequest.getQueryFormat()).compileToBrokerRequest(query);
+      if (_enableCaseInsensitivePql) {
+        //fix table names and column names in the query to match(case sensitive) the table name and column names as define in TableConfig and Schema
+        try {
+          handleCaseSensitivity(brokerRequest, _tableCache);
+        } catch (Exception e) {
+          LOGGER.info("Caught exception while rewriting PQL to make it case-insensitive {}: {}, {}", requestId, query,
+              e.getMessage());
+        }
+      }
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling request {}: {}, {}", requestId, query, e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
@@ -335,6 +362,85 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return brokerResponse;
   }
 
+  /**
+   * Given the tableCache and broker request, it fixes the pql
+   * @param brokerRequest
+   */
+  private void handleCaseSensitivity(BrokerRequest brokerRequest, TableCache tableCache) {
+    String inputTableName = brokerRequest.getQuerySource().getTableName();
+    String actualTableName = tableCache.getActualTableName(inputTableName);
+    brokerRequest.getQuerySource().setTableName(actualTableName);
+    //fix columns
+    if (brokerRequest.getFilterSubQueryMap() != null) {
+      Collection<FilterQuery> values = brokerRequest.getFilterSubQueryMap().getFilterQueryMap().values();
+      for (FilterQuery filterQuery : values) {
+        if (filterQuery.getNestedFilterQueryIdsSize() == 0) {
+          String expression = filterQuery.getColumn();
+          filterQuery.setColumn(fixColumnNameCase(tableCache, actualTableName, expression));
+        }
+      }
+    }
+    if (brokerRequest.isSetAggregationsInfo()) {
+      for (AggregationInfo info : brokerRequest.getAggregationsInfo()) {
+        if (info.getAggregationParams() != null && !info.getAggregationType()
+            .equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
+          String column = info.getAggregationParams().get(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO);
+          String[] expressions = column.split(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR);
+          String[] newExpressions = new String[expressions.length];
+          for (int i = 0; i < expressions.length; i++) {
+            String expression = expressions[i];
+            newExpressions[i] = fixColumnNameCase(tableCache, actualTableName, expression);
+          }
+          String newColumns = StringUtil.join(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR, newExpressions);
+          info.getAggregationParams().put(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO, newColumns);
+        }
+      }
+      if (brokerRequest.isSetGroupBy()) {
+        List<String> expressions = brokerRequest.getGroupBy().getExpressions();
+        for (int i = 0; i < expressions.size(); i++) {
+          expressions.set(i, fixColumnNameCase(tableCache, actualTableName, expressions.get(i)));
+        }
+      }
+    } else {
+      Selection selection = brokerRequest.getSelections();
+      List<String> selectionColumns = selection.getSelectionColumns();
+      for (int i = 0; i < selectionColumns.size(); i++) {
+        String expression = selectionColumns.get(i);
+        if (!expression.trim().equalsIgnoreCase("*")) {
+          selectionColumns.set(i, fixColumnNameCase(tableCache, actualTableName, expression));
+        }
+      }
+    }
+    if (brokerRequest.isSetOrderBy()) {
+      List<SelectionSort> orderBy = brokerRequest.getOrderBy();
+      for (SelectionSort selectionSort : orderBy) {
+        String expression = selectionSort.getColumn();
+        selectionSort.setColumn(fixColumnNameCase(tableCache, actualTableName, expression));
+      }
+    }
+  }
+
+  private String fixColumnNameCase(TableCache tableCache, String actualTableName, String expression) {
+    TransformExpressionTree rootExpression = TransformExpressionTree.compileToExpressionTree(expression);
+    LinkedList<TransformExpressionTree> q = new LinkedList<>();
+    q.add(rootExpression);
+    while (!q.isEmpty()) {
+      TransformExpressionTree expressionTree = q.pop();
+      switch (expressionTree.getExpressionType()) {
+        case FUNCTION:
+          q.addAll(expressionTree.getChildren());
+          break;
+        case IDENTIFIER:
+          expressionTree.setValue(_tableCache.getActualColumnName(actualTableName, expressionTree.getValue()));
+          break;
+        case LITERAL:
+          //do nothing
+          break;
+      }
+    }
+    return rootExpression.toString();
+  }
+
   private static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
     return Splitter.on(';').omitEmptyStrings().trimResults().withKeyValueSeparator('=')
         .split(request.get(optionsKey).asText());
@@ -512,13 +618,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             throw new UnsupportedOperationException("DISTINCT with GROUP BY is currently not supported");
           }
           if (brokerRequest.isSetOrderBy()) {
-            String column = aggregationInfo.getAggregationParams().get(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO);
+            String column =
+                aggregationInfo.getAggregationParams().get(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO);
             String[] columns = column.split(FunctionCallAstNode.DISTINCT_MULTI_COLUMN_SEPARATOR);
             Set<String> set = new HashSet<>(Arrays.asList(columns));
             List<SelectionSort> orderByColumns = brokerRequest.getOrderBy();
             for (SelectionSort selectionSort : orderByColumns) {
               if (!set.contains(selectionSort.getColumn())) {
-                throw new UnsupportedOperationException("ORDER By should be only on some/all of the columns passed as arguments to DISTINCT");
+                throw new UnsupportedOperationException(
+                    "ORDER By should be only on some/all of the columns passed as arguments to DISTINCT");
               }
             }
           }

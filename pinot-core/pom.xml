@@ -98,7 +98,7 @@
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
     </dependency>
-    <dependency>
+    <!--<dependency>
       <groupId>org.apache.helix</groupId>
       <artifactId>helix-core</artifactId>
       <exclusions>
@@ -107,7 +107,7 @@
           <artifactId>netty</artifactId>
         </exclusion>
       </exclusions>
-    </dependency>
+    </dependency>-->
     <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty</artifactId>

@@ -91,6 +91,7 @@ import org.apache.pinot.common.utils.CommonConstants.Server;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
+import org.apache.pinot.common.utils.helix.TableCache;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.resources.ControllerApplicationException;
 import org.apache.pinot.controller.api.resources.StateType;
@@ -139,6 +140,7 @@ public class PinotHelixResourceManager {
   private Builder _keyBuilder;
   private SegmentDeletionManager _segmentDeletionManager;
   private PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
+  private TableCache _tableCache;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       long externalViewOnlineToOfflineTimeoutMillis, boolean isSingleTenantCluster, boolean enableBatchMessageMode,
@@ -192,6 +194,7 @@ public class PinotHelixResourceManager {
 
     _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
+    _tableCache = new TableCache(_propertyStore);
   }
 
   /**
@@ -433,6 +436,25 @@ public class PinotHelixResourceManager {
     return new ArrayList<>(rawTableNames);
   }
 
+  /**
+   * Given a table name in any case, returns the table name as defined in Helix/Segment/Schema
+   * @param tableName tableName in any case.
+   * @return tableName actually defined in Pinot (matches case) and exists ,else, return the input value
+   */
+  public String getActualTableName(String tableName) {
+    return _tableCache.getActualTableName(tableName);
+  }
+
+  /**
+   *  Given a column name in any case, returns the column name as defined in Schema
+   *  If table has no schema, it just returns the input value
+   * @param tableName
+   * @param columnName
+   * @return
+   */
+  public String getActualColumnName(String tableName, String columnName) {
+    return _tableCache.getActualColumnName(tableName, columnName);
+  }
   /**
    * Table related APIs
    */

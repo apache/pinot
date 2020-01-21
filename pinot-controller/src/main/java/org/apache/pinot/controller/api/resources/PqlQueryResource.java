@@ -108,6 +108,8 @@ public class PqlQueryResource {
     BrokerRequest brokerRequest;
     try {
       brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(pqlQuery);
+      String inputTableName = brokerRequest.getQuerySource().getTableName();
+      brokerRequest.getQuerySource().setTableName(_pinotHelixResourceManager.getActualTableName(inputTableName));
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling PQL query: {}, {}", pqlQuery, e.getMessage());
       return QueryException.getException(QueryException.PQL_PARSING_ERROR, e).toString();

@@ -27,6 +27,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
+import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixConstants.ChangeType;
 import org.apache.helix.HelixDataAccessor;
@@ -35,9 +36,12 @@ import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.model.ClusterConfig;
+import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.Message;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -163,6 +167,7 @@ public class HelixBrokerStarter {
     _helixAdmin = _spectatorHelixManager.getClusterManagmentTool();
     _propertyStore = _spectatorHelixManager.getHelixPropertyStore();
     _helixDataAccessor = _spectatorHelixManager.getHelixDataAccessor();
+    ConfigAccessor configAccessor = _spectatorHelixManager.getConfigAccessor();
 
     // Set up the broker server builder
     LOGGER.info("Setting up broker server builder");
@@ -171,8 +176,15 @@ public class HelixBrokerStarter {
     _helixExternalViewBasedRouting.init(_spectatorHelixManager);
     _helixExternalViewBasedQueryQuotaManager = new HelixExternalViewBasedQueryQuotaManager();
     _helixExternalViewBasedQueryQuotaManager.init(_spectatorHelixManager);
+
+    //should we enable case_insensitive_pql
+    HelixConfigScope helixConfigScope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(_clusterName).build();
+    String enableCaseInsensitivePql = configAccessor.get(helixConfigScope, Helix.ENABLE_CASE_INSENSITIVE_PQL_KEY);
+    _brokerConf.setProperty(Helix.ENABLE_CASE_INSENSITIVE_PQL_KEY, Boolean.valueOf(enableCaseInsensitivePql));
+
     _brokerServerBuilder = new BrokerServerBuilder(_brokerConf, _helixExternalViewBasedRouting,
-        _helixExternalViewBasedRouting.getTimeBoundaryService(), _helixExternalViewBasedQueryQuotaManager);
+        _helixExternalViewBasedRouting.getTimeBoundaryService(), _helixExternalViewBasedQueryQuotaManager, _propertyStore);
     BrokerRequestHandler brokerRequestHandler = _brokerServerBuilder.getBrokerRequestHandler();
     BrokerMetrics brokerMetrics = _brokerServerBuilder.getBrokerMetrics();
     _helixExternalViewBasedRouting.setBrokerMetrics(brokerMetrics);

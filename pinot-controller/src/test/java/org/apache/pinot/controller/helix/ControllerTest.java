@@ -61,6 +61,7 @@ import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.config.Tenant;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -157,8 +158,11 @@ public abstract class ControllerTest {
     _helixResourceManager = _controllerStarter.getHelixResourceManager();
     _helixManager = _controllerStarter.getHelixControllerManager();
     _helixDataAccessor = _helixManager.getHelixDataAccessor();
-
+    ConfigAccessor configAccessor = _helixManager.getConfigAccessor();
     // HelixResourceManager is null in Helix only mode, while HelixManager is null in Pinot only mode.
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
     switch (_controllerStarter.getControllerMode()) {
       case DUAL:
       case PINOT_ONLY:
@@ -167,16 +171,15 @@ public abstract class ControllerTest {
 
         // TODO: Enable periodic rebalance per 10 seconds as a temporary work-around for the Helix issue:
         //       https://github.com/apache/helix/issues/331. Remove this after Helix fixing the issue.
-        _helixAdmin.setConfig(
-            new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
-                .build(),
-            Collections.singletonMap(ClusterConfig.ClusterConfigProperty.REBALANCE_TIMER_PERIOD.name(), "10000"));
+        configAccessor.set(scope, ClusterConfig.ClusterConfigProperty.REBALANCE_TIMER_PERIOD.name(), "10000");
         break;
       case HELIX_ONLY:
         _helixAdmin = _helixManager.getClusterManagmentTool();
         _propertyStore = _helixManager.getHelixPropertyStore();
         break;
     }
+    //enable case insensitive pql for test cases.
+    configAccessor.set(scope, CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_PQL_KEY, Boolean.TRUE.toString());
   }
 
   protected ControllerStarter getControllerStarter(ControllerConf config) {

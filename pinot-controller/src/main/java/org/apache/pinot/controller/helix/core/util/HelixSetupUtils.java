@@ -42,6 +42,7 @@ import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.helix.model.builder.FullAutoModeISBuilder;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixBrokerResourceOnlineOfflineStateModelGenerator;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
@@ -74,6 +75,7 @@ public class HelixSetupUtils {
       HelixConfigScope configScope =
           new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(helixClusterName).build();
       admin.setConfig(configScope, Collections.singletonMap(ZKHelixManager.ALLOW_PARTICIPANT_AUTO_JOIN, "true"));
+      admin.setConfig(configScope, Collections.singletonMap(ENABLE_CASE_INSENSITIVE_PQL_KEY, Boolean.FALSE.toString()));
       LOGGER.info("New Helix cluster: {} created", helixClusterName);
     }
   }
