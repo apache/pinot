@@ -192,9 +192,6 @@ public class CommonConstants {
     public static final String CONFIG_OF_REQUEST_HANDLER_FACTORY_CLASS = "pinot.server.requestHandlerFactory.class";
     public static final String CONFIG_OF_NETTY_PORT = "pinot.server.netty.port";
     public static final String CONFIG_OF_ADMIN_API_PORT = "pinot.server.adminapi.port";
-    // A logical instance id is one which does not contain server host name and/or port info. E.g., server1.
-    // It is by default disabled.
-    public static final String CONFIG_OF_USE_LOGICAL_INSTANCE_ID = "pinot.server.logical.instance.id.enabled";
 
     public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION = "pinot.server.instance.segment.format.version";
     public static final String CONFIG_OF_ENABLE_SPLIT_COMMIT = "pinot.server.instance.enable.split.commit";

@@ -146,8 +146,10 @@ public class HelixServerStarter {
 
     LOGGER.info("Connecting Helix manager");
     _helixManager.connect();
-    // Overwrite the server netty host and port.
-    if (_serverConf.getBoolean(CONFIG_OF_USE_LOGICAL_INSTANCE_ID, false)) {
+    // If the server config has both instance_id and host/port info, overwrite the host/port info in zk. Without the
+    // overwrite, Helix will extract host/port from the instance_id instead of use those in config.
+    // Use serverConf instead of _serverConf as the latter has been modified.
+    if (serverConf.containsKey(CONFIG_OF_INSTANCE_ID) && serverConf.containsKey(KEY_OF_SERVER_NETTY_HOST)) {
       overwriteServerHostInfo();
     }
 

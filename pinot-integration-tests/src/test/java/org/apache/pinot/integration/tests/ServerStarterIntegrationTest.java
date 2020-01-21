@@ -34,7 +34,6 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.common.utils.CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST;
 import static org.apache.pinot.common.utils.CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT;
 import static org.apache.pinot.common.utils.CommonConstants.Server.CONFIG_OF_INSTANCE_ID;
-import static org.apache.pinot.common.utils.CommonConstants.Server.CONFIG_OF_USE_LOGICAL_INSTANCE_ID;
 import static org.testng.Assert.assertEquals;
 
 
@@ -101,13 +100,11 @@ public class ServerStarterIntegrationTest extends ControllerTest {
   }
 
   @Test
-  public void testUsingLogicalServerID()
+  public void testInstanceIdWithHostPortInfo()
       throws Exception {
     // Test the behavior when logical server id and hostname/port are all specified in server conf.
-    // Note that we need to turn on the CONFIG_OF_USE_LOGICAL_INSTANCE_ID flag to overwrite the host port info.
+    // Unlike testInstanceIdOnly(), the host and port info will be overwritten with those in config.
     Configuration serverConf = new PropertiesConfiguration();
-    // Need to explicitly turn this flag on.
-    serverConf.setProperty(CONFIG_OF_USE_LOGICAL_INSTANCE_ID, true);
     serverConf.setProperty(CONFIG_OF_INSTANCE_ID, SERVER1);
     serverConf.setProperty(KEY_OF_SERVER_NETTY_HOST, "host1");
     serverConf.setProperty(KEY_OF_SERVER_NETTY_PORT, 10001);
@@ -120,13 +117,11 @@ public class ServerStarterIntegrationTest extends ControllerTest {
   }
 
   @Test
-  public void testDisableLogicalServerID()
+  public void testInstanceIdOnly()
       throws Exception {
     // If the CONFIG_OF_USE_LOGICAL_INSTANCE_ID flag is NOT on, no server host/port info overwrite will happen.
     Configuration serverConf = new PropertiesConfiguration();
     serverConf.setProperty(CONFIG_OF_INSTANCE_ID, SERVER1);
-    serverConf.setProperty(KEY_OF_SERVER_NETTY_HOST, "host1");
-    serverConf.setProperty(KEY_OF_SERVER_NETTY_PORT, 10001);
     // Start the server
     HelixServerStarter helixServerStarter =
         new HelixServerStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, serverConf);
