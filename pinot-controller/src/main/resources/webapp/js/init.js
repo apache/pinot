@@ -124,16 +124,21 @@ var HELPERS = {
   },
 
   executeQuery: function(query, querySyntaxPQL, traceEnabled, callback) {
-    var url = "/pql";
-    var queryOptions = undefined;
-    if (querySyntaxPQL !== true) {
-      queryOptions = "groupByMode=sql;responseFormat=sql";
+    var url = undefined;
+    var params = undefined;
+    if (querySyntaxPQL === true) {
+      url = "/pql";
+      params = JSON.stringify({
+        "pql": query,
+        "trace": traceEnabled
+      });
+    } else {
+      url = "/sql";
+      params = JSON.stringify({
+        "sql": query,
+        "trace": traceEnabled
+      });
     }
-    var params = JSON.stringify({
-      "pql": query,
-      "trace": traceEnabled,
-      "queryOptions" : queryOptions
-    });
     $.ajax({
       type: 'POST',
       url: url,
