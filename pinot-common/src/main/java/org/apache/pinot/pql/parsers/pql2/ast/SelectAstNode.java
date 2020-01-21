@@ -136,10 +136,14 @@ public class SelectAstNode extends BaseAstNode {
     }
 
     // If there is a topN clause, set it on the group by
+    // if topN is not present, set it with LIMIT;
+    // if Limit is not present, set it with DEFAULT.
     GroupBy groupBy = brokerRequest.getGroupBy();
     if (groupBy != null) {
       if (_topN != -1) {
         groupBy.setTopN(_topN);
+      } else if (_recordLimit != -1) {
+        groupBy.setTopN(_recordLimit);
       } else {
         // Pinot quirk: default to top 10
         groupBy.setTopN(DEFAULT_RECORD_LIMIT);
