@@ -43,5 +43,6 @@
     <AsyncLogger name="org.apache.pinot.server.starter.helix.HelixServerStarter" level="info" additivity="false">
       <AppenderRef ref="console"/>
     </AsyncLogger>
+    <AsyncLogger name="org.reflections" level="error" additivity="false"/>
   </Loggers>
 </Configuration>

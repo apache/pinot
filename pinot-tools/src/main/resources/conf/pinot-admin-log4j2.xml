@@ -48,5 +48,9 @@
     <AsyncLogger name="org.apache.pinot.tools.admin" level="info" additivity="false">
       <AppenderRef ref="console"/>
     </AsyncLogger>
+    <AsyncLogger name="org.reflections" level="error" additivity="false"/>
+    <AsyncLogger name="org.apache.pinot.spi.plugin" level="error" additivity="false">
+      <AppenderRef ref="console"/>
+    </AsyncLogger>
   </Loggers>
 </Configuration>
