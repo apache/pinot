@@ -61,6 +61,7 @@ public class PinotQueryResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotQueryResource.class);
   private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
   private static final Random RANDOM = new Random();
+  private static final String DEFAULT_SQL_QUERY_OPTIONS = "groupByMode=sql;responseFormat=sql";
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -79,8 +80,12 @@ public class PinotQueryResource {
       if (requestJson.has("trace")) {
         traceEnabled = requestJson.get("trace").toString();
       }
+      String queryOptions = null;
+      if (requestJson.has("queryOptions")) {
+        queryOptions = requestJson.get("queryOptions").asText();
+      }
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, pqlQuery);
-      return getQueryResponse(pqlQuery, traceEnabled, httpHeaders, CommonConstants.Broker.Request.PQL);
+      return getQueryResponse(pqlQuery, traceEnabled, queryOptions, httpHeaders, CommonConstants.Broker.Request.PQL);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing post request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -94,13 +99,20 @@ public class PinotQueryResource {
       @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
     try {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, pqlQuery);
-      return getQueryResponse(pqlQuery, traceEnabled, httpHeaders, CommonConstants.Broker.Request.PQL);
+      return getQueryResponse(pqlQuery, traceEnabled, queryOptions, httpHeaders, CommonConstants.Broker.Request.PQL);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
     }
   }
 
+  /**
+   * Current handlePostSql method internally still use pql compiler to parse query.
+   *
+   * @param requestJsonStr
+   * @param httpHeaders
+   * @return
+   */
   @POST
   @Path("sql")
   public String handlePostSql(String requestJsonStr, @Context HttpHeaders httpHeaders) {
@@ -111,8 +123,14 @@ public class PinotQueryResource {
       if (requestJson.has("trace")) {
         traceEnabled = requestJson.get("trace").toString();
       }
+      String queryOptions = null;
+      if (requestJson.has("queryOptions")) {
+        queryOptions = requestJson.get("queryOptions").asText();
+      } else {
+        queryOptions = DEFAULT_SQL_QUERY_OPTIONS;
+      }
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
-      return getQueryResponse(sqlQuery, traceEnabled, httpHeaders, CommonConstants.Broker.Request.SQL);
+      return getQueryResponse(sqlQuery, traceEnabled, queryOptions, httpHeaders, CommonConstants.Broker.Request.SQL);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing post request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -122,17 +140,18 @@ public class PinotQueryResource {
   @GET
   @Path("sql")
   public String handleGetSql(@QueryParam("sql") String sqlQuery, @QueryParam("trace") String traceEnabled,
-      @Context HttpHeaders httpHeaders) {
+      @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
     try {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
-      return getQueryResponse(sqlQuery, traceEnabled, httpHeaders, CommonConstants.Broker.Request.SQL);
+      return getQueryResponse(sqlQuery, traceEnabled, queryOptions, httpHeaders, CommonConstants.Broker.Request.SQL);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
     }
   }
 
-  public String getQueryResponse(String query, String traceEnabled, HttpHeaders httpHeaders, String querySyntax) {
+  public String getQueryResponse(String query, String traceEnabled, String queryOptions, HttpHeaders httpHeaders,
+      String querySyntax) {
     // Get resource table name.
     BrokerRequest brokerRequest;
     try {
@@ -174,13 +193,25 @@ public class PinotQueryResource {
     String url =
         getQueryURL(hostNameWithPrefix.substring(hostNameWithPrefix.indexOf("_") + 1), instanceConfig.getPort(),
             querySyntax);
-    return sendQueryRaw(url, query, traceEnabled);
+    ObjectNode requestJson = getRequestJson(query, traceEnabled, queryOptions, querySyntax);
+    return sendRequestRaw(url, query, requestJson);
+  }
+
+  private ObjectNode getRequestJson(String query, String traceEnabled, String queryOptions, String querySyntax) {
+    // Currently the request is still processed by PQL parser.
+    ObjectNode requestJson = JsonUtils.newObjectNode().put("pql", query);
+    if (traceEnabled != null && !traceEnabled.isEmpty()) {
+      requestJson.put("trace", traceEnabled);
+    }
+    if (queryOptions != null && !queryOptions.isEmpty()) {
+      requestJson.put("queryOptions", queryOptions);
+    }
+    return requestJson;
   }
 
   private String getQueryURL(String hostName, String port, String querySyntax) {
     switch (querySyntax) {
       case CommonConstants.Broker.Request.SQL:
-        return String.format("http://%s:%s/query/sql", hostName, port);
       case CommonConstants.Broker.Request.PQL:
         return String.format("http://%s:%s/query", hostName, port);
       default:
@@ -267,18 +298,13 @@ public class PinotQueryResource {
     }
   }
 
-  public String sendQueryRaw(String url, String queryRequest, String traceEnabled) {
+  public String sendRequestRaw(String url, String query, ObjectNode requestJson) {
     try {
       final long startTime = System.currentTimeMillis();
-      ObjectNode queryJson = JsonUtils.newObjectNode().put("sql", queryRequest);
-      if (traceEnabled != null && !traceEnabled.isEmpty()) {
-        queryJson.put("trace", traceEnabled);
-      }
-
-      final String pinotResultString = sendPostRaw(url, queryJson.toString(), null);
+      final String pinotResultString = sendPostRaw(url, requestJson.toString(), null);
 
       final long queryTime = System.currentTimeMillis() - startTime;
-      LOGGER.info("Query: " + queryRequest + " Time: " + queryTime);
+      LOGGER.info("Query: " + query + " Time: " + queryTime);
 
       return pinotResultString;
     } catch (final Exception ex) {
