@@ -159,7 +159,7 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
     } else if (this.monitoringGranularity.endsWith(TimeGranularity.MONTHS)) {
       trainStart = window.getStart().minusMonths(LOOKBACK);
     } else if (this.monitoringGranularity.endsWith(TimeGranularity.WEEKS)) {
-      trainStart = window.getStart().withDayOfWeek(weekStart.getValue()).minusWeeks(LOOKBACK);
+      trainStart = window.getStart().withTimeAtStartOfDay().withDayOfWeek(weekStart.getValue()).minusWeeks(LOOKBACK);
     } else {
       trainStart = window.getStart().minusDays(LOOKBACK);
     }
@@ -209,10 +209,9 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
     df.mapInPlace(BooleanSeries.ALL_TRUE, COL_ANOMALY, COL_PATTERN, COL_DIFF_VIOLATION);
 
     // Anomalies
-    List<MergedAnomalyResultDTO> anomalyResults = DetectionUtils.makeAnomalies(sliceData, df, COL_ANOMALY,
-        window.getEndMillis(),
-        DetectionUtils.getMonitoringGranularityPeriod(timeGranularity.toAggregationGranularityString(),
-            datasetConfig), datasetConfig);
+    List<MergedAnomalyResultDTO> anomalyResults =
+        DetectionUtils.makeAnomalies(sliceData, df, COL_ANOMALY, window.getEndMillis(),
+            DetectionUtils.getMonitoringGranularityPeriod(this.monitoringGranularity, datasetConfig), datasetConfig);
     dfBase = dfBase.joinRight(df.retainSeries(COL_TIME, COL_CURR), COL_TIME);
     return DetectionResult.from(anomalyResults, TimeSeries.fromDataFrame(dfBase));
   }
@@ -241,10 +240,13 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
 
     // aggregate data to specified weekly granularity
     if (this.monitoringGranularity.endsWith(TimeGranularity.WEEKS)) {
-      Period monitoringGranularityPeriod = DetectionUtils.getMonitoringGranularityPeriod(this.monitoringGranularity, datasetConfig);
+      Period monitoringGranularityPeriod =
+          DetectionUtils.getMonitoringGranularityPeriod(this.monitoringGranularity, datasetConfig);
       long latestDataTimeStamp = df.getLong(COL_TIME, df.size() - 1);
-      df = DetectionUtils.aggregateByPeriod(df, start, monitoringGranularityPeriod, metricConfig.getDefaultAggFunction());
-      df = DetectionUtils.filterIncompleteAggregation(df, latestDataTimeStamp, datasetConfig.bucketTimeGranularity(), monitoringGranularityPeriod);
+      df = DetectionUtils.aggregateByPeriod(df, new DateTime(start, DateTimeZone.forID(datasetConfig.getTimezone())),
+          monitoringGranularityPeriod, metricConfig.getDefaultAggFunction());
+      df = DetectionUtils.filterIncompleteAggregation(df, latestDataTimeStamp, datasetConfig.bucketTimeGranularity(),
+          monitoringGranularityPeriod);
     }
     return df;
   }

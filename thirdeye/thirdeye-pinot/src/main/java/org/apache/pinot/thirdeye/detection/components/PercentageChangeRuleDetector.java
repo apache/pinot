@@ -50,6 +50,7 @@ import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.rootcause.timeseries.Baseline;
+import org.joda.time.DateTime;
 import org.joda.time.Interval;
 import org.joda.time.Period;
 
@@ -81,15 +82,15 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
 
   @Override
   public DetectionResult runDetection(Interval window, String metricUrn) {
-    long startMillis = window.getStartMillis();
+    DateTime windowStart = window.getStart();
 
     // align start day to the user specified week start
     if (Objects.nonNull(this.weekStart)) {
-      startMillis = window.getStart().withDayOfWeek(weekStart.getValue()).minusWeeks(1).getMillis();
+      windowStart = window.getStart().withTimeAtStartOfDay().withDayOfWeek(weekStart.getValue()).minusWeeks(1);
     }
 
     MetricEntity me = MetricEntity.fromURN(metricUrn);
-    MetricSlice slice = MetricSlice.from(me.getId(), startMillis, window.getEndMillis(), me.getFilters(), timeGranularity);
+    MetricSlice slice = MetricSlice.from(me.getId(), windowStart.getMillis(), window.getEndMillis(), me.getFilters(), timeGranularity);
     List<MetricSlice> slices = new ArrayList<>(this.baseline.scatter(slice));
     slices.add(slice);
 
@@ -105,9 +106,9 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
     if (this.monitoringGranularity.endsWith(TimeGranularity.WEEKS)) {
       Period monitoringGranularityPeriod = DetectionUtils.getMonitoringGranularityPeriod(this.monitoringGranularity, datasetConfig);
       long latestDataTimeStamp = dfCurr.getLong(COL_TIME, dfCurr.size() - 1);
-      dfCurr = DetectionUtils.aggregateByPeriod(dfCurr, startMillis, monitoringGranularityPeriod, metricConfig.getDefaultAggFunction());
+      dfCurr = DetectionUtils.aggregateByPeriod(dfCurr, windowStart, monitoringGranularityPeriod, metricConfig.getDefaultAggFunction());
       dfCurr = DetectionUtils.filterIncompleteAggregation(dfCurr, latestDataTimeStamp, datasetConfig.bucketTimeGranularity(), monitoringGranularityPeriod);
-      dfBase = DetectionUtils.aggregateByPeriod(dfBase, startMillis, monitoringGranularityPeriod, metricConfig.getDefaultAggFunction());
+      dfBase = DetectionUtils.aggregateByPeriod(dfBase, windowStart, monitoringGranularityPeriod, metricConfig.getDefaultAggFunction());
     }
 
     dfCurr = dfCurr.renameSeries(COL_VALUE, COL_CURR);

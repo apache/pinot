@@ -298,12 +298,12 @@ public class DetectionUtils {
    * @param aggregationFunction the metric's aggregation function
    * @return the aggregated time series data frame
    */
-  public static DataFrame aggregateByPeriod(DataFrame df, long origin, Period granularityPeriod, MetricAggFunction aggregationFunction) {
+  public static DataFrame aggregateByPeriod(DataFrame df, DateTime origin, Period granularityPeriod, MetricAggFunction aggregationFunction) {
     switch (aggregationFunction) {
       case SUM:
-        return df.groupByPeriod(df.getLongs(COL_TIME), new DateTime(origin), granularityPeriod).sum(COL_TIME, COL_VALUE);
+        return df.groupByPeriod(df.getLongs(COL_TIME), origin, granularityPeriod).sum(COL_TIME, COL_VALUE);
       case AVG:
-        return df.groupByPeriod(df.getLongs(COL_TIME), new DateTime(origin), granularityPeriod).mean(COL_TIME, COL_VALUE);
+        return df.groupByPeriod(df.getLongs(COL_TIME), origin, granularityPeriod).mean(COL_TIME, COL_VALUE);
       default:
         throw new NotImplementedException(String.format("The aggregate by period for %s is not supported in DataFrame.", aggregationFunction));
     }
