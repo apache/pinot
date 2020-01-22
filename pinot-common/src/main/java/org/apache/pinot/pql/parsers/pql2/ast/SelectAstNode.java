@@ -142,7 +142,7 @@ public class SelectAstNode extends BaseAstNode {
     if (groupBy != null) {
       if (_topN != -1) {
         groupBy.setTopN(_topN);
-      } else if (_recordLimit != -1) {
+      } else if (_recordLimit > 0) {
         groupBy.setTopN(_recordLimit);
       } else {
         // Pinot quirk: default to top 10
