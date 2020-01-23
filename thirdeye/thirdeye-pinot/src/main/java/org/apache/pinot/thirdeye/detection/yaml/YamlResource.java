@@ -34,7 +34,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -904,15 +903,88 @@ public class YamlResource {
     return Response.ok(responseMessage).build();
   }
 
+  /**
+   * Implements filter for detection config.
+   * Client can filter by dataset or metric or both.  It only filters if they are not null in params and config
+   *
+   * @param detectionConfig The detection configuration after being enhanced by DetectionConfigFormatter::format.
+   * @param dataset The dataset param passed by the client in the REST API call.
+   * @param metric The metric param passed by the client in the REST API call.
+   * @return true if the config matches query params that are passed by client.
+   */
+  private boolean filterConfigsBy(Map<String, Object> detectionConfig, String dataset, String metric) {
+    List datasetList = (List) detectionConfig.get("datasetNames");
+    String metricString = (String) detectionConfig.get("metric");
+    // defaults are true so we filter only if the params are passed
+    boolean metricMatch = true;
+    boolean datasetMatch = true;
+    // check metric only if it was passed
+    if (metric != null ) {
+      // equals method should not be called on null
+      metricMatch = metricString != null && metricString.equals(metric);
+    }
+    // check dataset only if it was passed
+    if (dataset != null) {
+      // contains method should not be called on null
+      datasetMatch = datasetList != null && datasetList.contains(dataset);
+    }
+    // config should satisfy both filters
+    return metricMatch && datasetMatch;
+  }
+
+  /**
+   * Query all detection yaml configurations and optionally filter, then format as JSON and enhance with
+   * detection config id, isActive, and createdBy information
+   *
+   * @param dataset The dataset param passed by the client in the REST API call.
+   * @param metric The metric param passed by the client in the REST API call.
+   * @return the yaml configuration converted in to JSON, with enhanced information from detection config DTO.
+   */
+  private List<Map<String, Object>> queryDetectionConfigurations(String dataset, String metric) {
+    List<Map<String, Object>> yamls;
+    if (dataset == null && metric == null) {
+      yamls = this.detectionConfigDAO
+          .findAll()
+          .parallelStream()
+          .map(this.detectionConfigFormatter::format)
+          .collect(Collectors.toList());
+    } else {
+      yamls = this.detectionConfigDAO
+          .findAll()
+          .parallelStream()
+          .map(this.detectionConfigFormatter::format)
+          .filter(y -> filterConfigsBy(y, dataset, metric))
+          .collect(Collectors.toList());
+    }
+    return yamls;
+  }
+
 
   /**
    * List all yaml configurations as JSON enhanced with detection config id, isActive and createBy information.
+   * @param dataset the dataset to filter results by (optional)
+   * @param metric the metric to filter results by (optional)
    * @return the yaml configuration converted in to JSON, with enhanced information from detection config DTO.
    */
   @GET
   @Path("/list")
+  @ApiOperation("Get the list of all detection YAML configurations as JSON enhanced with additional information, optionally filtered.")
   @Produces(MediaType.APPLICATION_JSON)
-  public List<Map<String, Object>> listYamls() throws ExecutionException {
-    return this.detectionConfigDAO.findAll().parallelStream().map(this.detectionConfigFormatter::format).collect(Collectors.toList());
+  public Response listYamls(
+      @ApiParam("Dataset the detection configurations should be filtered by") @QueryParam("dataset") String dataset,
+      @ApiParam("Metric the detection configurations should be filtered by") @QueryParam("metric") String metric){
+    Map<String, String> responseMessage = new HashMap<>();
+    List<Map<String, Object>> yamls;
+    try {
+      yamls = queryDetectionConfigurations(dataset, metric);
+    } catch (Exception e) {
+      LOG.warn("Error while fetching detection yaml configs.", e.getMessage());
+      responseMessage.put("message", "Failed to fetch all the detection configurations.");
+      responseMessage.put("more-info", "Error = " + e.getMessage());
+      return Response.serverError().entity(responseMessage).build();
+    }
+
+    LOG.info("Successfully returned " + yamls.size() + " detection configs.");
+    return Response.ok(yamls).build();
   }
 }
