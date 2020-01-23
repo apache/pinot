@@ -58,24 +58,24 @@ Script `docker-push.sh` publishes a given docker image to your docker registry.
 
 In order to push to your own repo, the image needs to be explicitly tagged with the repo name.
 
-* Example of publishing a image to [winedepot/pinot](https://cloud.docker.com/u/winedepot/repository/docker/winedepot/pinot) dockerHub repo.
+* Example of publishing a image to [apachepinot/pinot](https://cloud.docker.com/u/apachepinot/repository/docker/apachepinot/pinot) dockerHub repo.
 
 ```SHELL
-./docker-push.sh winedepot/pinot:latest
+./docker-push.sh apachepinot/pinot:latest
 ```
 
 * Tag a built image, then push.
 ````SHELL
-docker tag pinot:release-0.1.0 winedepot/pinot:release-0.1.0
-docker push winedepot/pinot:release-0.1.0
+docker tag pinot:release-0.1.0 apachepinot/pinot:release-0.1.0
+docker push apachepinot/pinot:release-0.1.0
 ````
 
 Script `docker-build-and-push.sh` builds and publishes this docker image to your docker registry after build.
 
-* Example of building and publishing a image to [winedepot/pinot](https://cloud.docker.com/u/winedepot/repository/docker/winedepot/pinot) dockerHub repo.
+* Example of building and publishing a image to [apachepinot/pinot](https://cloud.docker.com/u/apachepinot/repository/docker/apachepinot/pinot) dockerHub repo.
 
 ```SHELL
-./docker-build-and-push.sh winedepot/pinot:latest master https://github.com/apache/incubator-pinot.git
+./docker-build-and-push.sh apachepinot/pinot:latest master https://github.com/apache/incubator-pinot.git
 ```
 
 ## How to Run it
@@ -131,12 +131,12 @@ docker-compose -f docker-compose.yml up
 
 Below is the script to create airlineStats table
 ```SHELL
-docker run --network=docker_default winedepot/pinot:0.3.0-SNAPSHOT AddTable -schemaFile examples/stream/airlineStats/airlineStats_schema.json -tableConfigFile examples/stream/airlineStats/docker/airlineStats_realtime_table_config.json -controllerHost pinot-controller -controllerPort 9000 -exec
+docker run --network=docker_default apachepinot/pinot:0.3.0-SNAPSHOT AddTable -schemaFile examples/stream/airlineStats/airlineStats_schema.json -tableConfigFile examples/stream/airlineStats/docker/airlineStats_realtime_table_config.json -controllerHost pinot-controller -controllerPort 9000 -exec
 ```
 
 Below is the script to ingest airplane stats data to Kafka
 ```SHELL
-docker run --network=docker_default winedepot/pinot:0.3.0-SNAPSHOT StreamAvroIntoKafka -avroFile examples/stream/airlineStats/sample_data/airlineStats_data.avro -kafkaTopic flights-realtime -kafkaBrokerList kafka:9092 -zkAddress zookeeper:2181
+docker run --network=docker_default apachepinot/pinot:0.3.0-SNAPSHOT StreamAvroIntoKafka -avroFile examples/stream/airlineStats/sample_data/airlineStats_data.avro -kafkaTopic flights-realtime -kafkaBrokerList kafka:9092 -zkAddress zookeeper:2181
 ```
 
 In order to query pinot, try to open `localhost:9000/query` from your browser.

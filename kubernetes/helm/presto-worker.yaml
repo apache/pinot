@@ -74,7 +74,7 @@ spec:
         fsGroup: 1000
         runAsUser: 1000
       containers:
-        - image: fx19880617/pinot-presto:latest
+        - image: apachepinot/pinot-presto:latest
           imagePullPolicy: Always
           name: presto-worker
           args: [ "run" ]

@@ -20,8 +20,8 @@
 # Default values for Pinot.
 
 image:
-  repository: winedepot/pinot
-  tag: 0.1.13-SNAPSHOT
+  repository: apachepinot/pinot
+  tag: 0.3.0-SNAPSHOT
   pullPolicy: IfNotPresent
 
 cluster:
@@ -50,6 +50,7 @@ controller:
   jvmOpts: "-Xms4G -Xmx4G"
 
   log4j2ConfFile: /opt/pinot/conf/pinot-controller-log4j2.xml
+  pluginsDir: /opt/pinot/plugins
 
   service:
     annotations: {}
@@ -89,6 +90,7 @@ broker:
   jvmOpts: "-Xms4G -Xmx4G"
 
   log4j2ConfFile: /opt/pinot/conf/pinot-broker-log4j2.xml
+  pluginsDir: /opt/pinot/plugins
 
   routingTable:
     builderClass: random
@@ -144,6 +146,7 @@ server:
   jvmOpts: "-Xms4G -Xmx4G -XX:MaxDirectMemorySize=10g"
 
   log4j2ConfFile: /opt/pinot/conf/pinot-server-log4j2.xml
+  pluginsDir: /opt/pinot/plugins
 
   service:
     annotations: {}

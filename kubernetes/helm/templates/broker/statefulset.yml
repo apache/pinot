@@ -65,7 +65,7 @@ spec:
         ]
         env:
           - name: JAVA_OPTS
-            value: "{{ .Values.broker.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.broker.log4j2ConfFile }}"
+            value: "{{ .Values.broker.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.broker.log4j2ConfFile }} -Dplugins.dir={{ .Values.broker.pluginsDir }}"
         ports:
           - containerPort: {{ .Values.broker.port }}
             protocol: TCP
