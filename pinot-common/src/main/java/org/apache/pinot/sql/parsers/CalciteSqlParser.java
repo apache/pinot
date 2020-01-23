@@ -38,6 +38,7 @@ import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlSelectKeyword;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.function.FunctionDefinitionRegistry;
 import org.apache.pinot.common.request.DataSource;
@@ -111,6 +112,7 @@ public class CalciteSqlParser {
   private static PinotQuery compileCalciteSqlToPinotQuery(String sql) {
     SqlParser.ConfigBuilder parserBuilder = SqlParser.configBuilder();
     parserBuilder.setLex(PINOT_LEX);
+    parserBuilder.setConformance(SqlConformanceEnum.LENIENT);
     SqlParser sqlParser = SqlParser.create(sql, parserBuilder.build());
     final SqlNode sqlNode;
     try {
