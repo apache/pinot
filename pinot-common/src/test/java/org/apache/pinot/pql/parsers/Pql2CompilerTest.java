@@ -205,6 +205,19 @@ public class Pql2CompilerTest {
   }
 
   @Test
+  public void testGroupbyOrderBy() {
+    Pql2Compiler.ENABLE_PINOT_QUERY=true;
+    Pql2Compiler.VALIDATE_CONVERTER=true;
+    BrokerRequest brokerRequest =
+        COMPILER.compileToBrokerRequest("select sum(rsvp_count), count(*) from meetupRsvp group by group_city order by sum(rsvp_count) DESC limit 200");
+    Assert.assertEquals(brokerRequest.getGroupBy().getTopN(), 200);
+    Assert.assertEquals(brokerRequest.getGroupBy().getExpressions().get(0), "group_city");
+    Assert.assertEquals(brokerRequest.getPinotQuery().getGroupByList().get(0).getIdentifier().getName(), "group_city");
+    Assert.assertEquals(brokerRequest.getOrderBy().get(0).getColumn(), "sum(rsvp_count)");
+    Assert.assertEquals(brokerRequest.getPinotQuery().getOrderByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "sum(rsvp_count)");
+  }
+
+  @Test
   public void testRejectInvalidLexerToken() {
     assertCompilationFails("select foo from bar where baz ?= 2");
     assertCompilationFails("select foo from bar where baz =! 2");
@@ -347,6 +360,7 @@ public class Pql2CompilerTest {
 
   @Test
   public void testStringLiteral() {
+    Pql2Compiler.ENABLE_PINOT_QUERY = true;
     // Do not allow string literal column in selection query
     assertCompilationFails("SELECT 'foo' FROM table");
 

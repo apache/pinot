@@ -185,6 +185,40 @@ public class CalciteSqlCompilerTest {
     testTopZeroFor("select count(*) from someTable where c = 5 group by X ORDER BY $1 LIMIT -1", -1, true);
   }
 
+
+  @Test
+  public void testGroupbys() {
+    PinotQuery pinotQuery;
+    try {
+      pinotQuery = CalciteSqlParser.compileToPinotQuery("select sum(rsvp_count), count(*) from meetupRsvp group by group_city order by sum(rsvp_count) limit 10");
+    } catch (SqlCompilationException e) {
+      throw e;
+    }
+    // Test PinotQuery
+    Assert.assertTrue(pinotQuery.isSetGroupByList());
+    Assert.assertTrue(pinotQuery.isSetLimit());
+    Assert.assertTrue(pinotQuery.isSetOrderByList());
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getType(), ExpressionType.FUNCTION);
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "SUM");
+    Assert.assertEquals(10, pinotQuery.getLimit());
+
+    try {
+      pinotQuery = CalciteSqlParser.compileToPinotQuery("select group_city, sum(rsvp_count), count(*) from meetupRsvp group by group_city order by sum(rsvp_count), count(*) limit 10");
+    } catch (SqlCompilationException e) {
+      throw e;
+    }
+    // Test PinotQuery
+    Assert.assertTrue(pinotQuery.isSetGroupByList());
+    Assert.assertTrue(pinotQuery.isSetLimit());
+    Assert.assertTrue(pinotQuery.isSetOrderByList());
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getType(), ExpressionType.FUNCTION);
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "SUM");
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "rsvp_count");
+    Assert.assertEquals(pinotQuery.getOrderByList().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "COUNT");
+    Assert.assertEquals(pinotQuery.getOrderByList().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "*");
+    Assert.assertEquals(10, pinotQuery.getLimit());
+  }
+
   private void assertCompilationFails(String query) {
     try {
       CalciteSqlParser.compileToPinotQuery(query);

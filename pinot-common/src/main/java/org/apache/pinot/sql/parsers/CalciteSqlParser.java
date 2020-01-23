@@ -224,17 +224,16 @@ public class CalciteSqlParser {
     final SqlKind kind = node.getKind();
     Expression expression;
     switch (kind) {
-      case IDENTIFIER:
-        expression = RequestUtils.getFunctionExpression("ASC");
-        expression.getFunctionCall().addToOperands(toExpression(node));
-        break;
       case DESCENDING:
         SqlBasicCall basicCall = (SqlBasicCall) node;
         expression = RequestUtils.getFunctionExpression("DESC");
         expression.getFunctionCall().addToOperands(toExpression(basicCall.getOperands()[0]));
         break;
+      case IDENTIFIER:
       default:
-        throw new RuntimeException("Unknown node type: " + node.getKind());
+        expression = RequestUtils.getFunctionExpression("ASC");
+        expression.getFunctionCall().addToOperands(toExpression(node));
+        break;
     }
     return expression;
   }

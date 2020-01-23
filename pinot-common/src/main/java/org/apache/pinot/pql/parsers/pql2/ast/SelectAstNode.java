@@ -31,12 +31,12 @@ import org.apache.pinot.pql.parsers.Pql2CompilationException;
  * AST node for a SELECT statement.
  */
 public class SelectAstNode extends BaseAstNode {
+  public static final int DEFAULT_RECORD_LIMIT = 10;
   private String _tableName;
   private String _resourceName;
   private int _recordLimit = -1;
   private int _offset = -1;
   private int _topN = -1;
-
   // Optional clauses can be given in any order, so we keep track of whether we've already seen one
   private boolean _hasWhereClause = false;
   private boolean _hasGroupByClause = false;
@@ -44,8 +44,6 @@ public class SelectAstNode extends BaseAstNode {
   private boolean _hasOrderByClause = false;
   private boolean _hasTopClause = false;
   private boolean _hasLimitClause = false;
-
-  public static final int DEFAULT_RECORD_LIMIT = 10;
 
   public SelectAstNode() {
   }
@@ -182,20 +180,24 @@ public class SelectAstNode extends BaseAstNode {
     dataSource.setTableName(_resourceName);
     pinotQuery.setDataSource(dataSource);
     sendPinotQueryUpdateToChildren(pinotQuery);
-    if (_recordLimit != -1) {
-      pinotQuery.setLimit(_recordLimit);
-    } else {
-      // Pinot quirk: default to top 10
-      pinotQuery.setLimit(10);
-    }
     if (_offset != -1) {
       pinotQuery.setOffset(_offset);
     }
     if (pinotQuery.getGroupByListSize() > 0) {
+      // Handle GroupBy
       if (_topN != -1) {
         pinotQuery.setLimit(_topN);
+      } else if (_recordLimit > 0) {
+        pinotQuery.setLimit(_recordLimit);
       } else {
         // Pinot quirk: default to top 10
+        pinotQuery.setLimit(10);
+      }
+    } else {
+      // Handle Selection
+      if (_recordLimit != -1) {
+        pinotQuery.setLimit(_recordLimit);
+      } else {
         pinotQuery.setLimit(10);
       }
     }
