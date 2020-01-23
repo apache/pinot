@@ -207,11 +207,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       }
       LOGGER.info("Try reloading REALTIME consuming segment: {} in table: {}", segmentName, tableNameWithType);
       SegmentMetadataImpl segmentMetadataImpl = (SegmentMetadataImpl) segmentMetadata;
-      Map<String, BaseDefaultColumnHandler.DefaultColumnAction> defaultColumnActionMap =
-          BaseDefaultColumnHandler.computeDefaultColumnActionMap(schema, segmentMetadataImpl);
       MutableSegmentImpl mutableSegment = (MutableSegmentImpl) (_tableDataManagerMap.get(tableNameWithType)
           .acquireSegment(segmentMetadataImpl.getName()).getSegment());
-      mutableSegment.addExtraColumns(schema, defaultColumnActionMap);
+      mutableSegment.addExtraColumns(schema);
       return;
     }
     Preconditions.checkState(indexDir.isDirectory(), "Index directory: %s is not a directory", indexDir);

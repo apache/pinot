@@ -328,14 +328,24 @@ public class MutableSegmentImpl implements MutableSegment {
     return _maxTime;
   }
 
-  public void addExtraColumns(Schema newSchema,
-      Map<String, BaseDefaultColumnHandler.DefaultColumnAction> defaultColumnActionMap) {
+  public void addExtraColumns(Schema newSchema) {
+    Map<String, BaseDefaultColumnHandler.DefaultColumnAction> defaultColumnActionMap =
+        BaseDefaultColumnHandler.computeDefaultColumnActionMap(newSchema, (SegmentMetadataImpl) getSegmentMetadata());
     defaultColumnActionMap.forEach(((columnName, defaultColumnAction) -> {
-      if (defaultColumnAction.isAddAction() && !newSchema.getFieldSpecFor(columnName).isVirtualColumn()) {
+      if (newSchema.getFieldSpecFor(columnName).isVirtualColumn()) {
+        _logger.info("Skipped virtual column {}", columnName);
+      }
+      else if (defaultColumnAction.isAddAction()) {
         _newlyAddedColumnsFieldMap.put(columnName, newSchema.getFieldSpecFor(columnName));
       }
+      else if (defaultColumnAction.isUpdateAction()) {
+        _logger.warn("New schema is backward incompatible. Column {} is updated.", columnName);
+      }
+      else if (defaultColumnAction.isRemoveAction()) {
+        _logger.warn("New schema is backward incompatible. Column {} is removed.", columnName);
+      }
     }));
-    _logger.debug("Newly added columns: " + _newlyAddedColumnsFieldMap.toString());
+    _logger.info("Newly added columns: " + _newlyAddedColumnsFieldMap.toString());
   }
 
   @Override
@@ -573,11 +583,12 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public ColumnDataSource getDataSource(String columnName) {
     FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
-    if ((fieldSpec == null && _newlyAddedColumnsFieldMap.containsKey(columnName)) || fieldSpec.isVirtualColumn()) {
+    if (fieldSpec == null || fieldSpec.isVirtualColumn()) {
       // Column is either added during ingestion, or was initiated with a virtual column provider
       if (fieldSpec == null) {
         // If the column was added during ingestion, we will construct the virtual column provider based on its fieldSpec
         fieldSpec = _newlyAddedColumnsFieldMap.get(columnName);
+        Preconditions.checkNotNull(fieldSpec, "FieldSpec for " + columnName + " should not be null");
       }
       VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, _numDocsIndexed);
       VirtualColumnProvider virtualColumnProvider = VirtualColumnProviderFactory.buildProvider(virtualColumnContext);

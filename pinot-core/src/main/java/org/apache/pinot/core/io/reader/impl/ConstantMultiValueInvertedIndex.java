@@ -19,21 +19,18 @@
 package org.apache.pinot.core.io.reader.impl;
 
 import java.io.IOException;
-import java.util.Arrays;
 import org.apache.pinot.common.utils.Pairs;
-import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexSingleValueReader;
-import org.apache.pinot.core.io.reader.impl.v1.SortedIndexSingleValueReaderImpl;
+import org.apache.pinot.core.io.reader.BaseSingleColumnMultiValueReader;
+import org.apache.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
 
 
 /**
- * Reader for the single-value column with the same value
+ * Reader for the multi-value column with the constant value
  */
-public class SameSingleValueInvertedIndex extends BaseSingleColumnSingleValueReader<SortedIndexSingleValueReaderImpl.Context> implements SortedIndexSingleValueReader<SortedIndexSingleValueReaderImpl.Context> {
-
+public class ConstantMultiValueInvertedIndex extends BaseSingleColumnMultiValueReader<FixedBitMultiValueReader.Context> implements SortedIndexMultiValueReader<FixedBitMultiValueReader.Context> {
   private int _length;
 
-  public SameSingleValueInvertedIndex(int length) {
+  public ConstantMultiValueInvertedIndex(int length) {
     _length = length;
   }
 
@@ -47,12 +44,12 @@ public class SameSingleValueInvertedIndex extends BaseSingleColumnSingleValueRea
   }
 
   @Override
-  public int getInt(int row) {
+  public int getIntArray(int row, int[] intArray) {
     return 0;
   }
 
   @Override
-  public int getInt(int rowId, SortedIndexSingleValueReaderImpl.Context context) {
+  public int getIntArray(int row, int[] intArray, FixedBitMultiValueReader.Context context) {
     return 0;
   }
 
@@ -62,12 +59,7 @@ public class SameSingleValueInvertedIndex extends BaseSingleColumnSingleValueRea
   }
 
   @Override
-  public SortedIndexSingleValueReaderImpl.Context createContext() {
+  public FixedBitMultiValueReader.Context createContext() {
     return null;
-  }
-
-  @Override
-  public void readValues(int[] rows, int rowStartPos, int rowSize, int[] values, int valuesStartPos) {
-    Arrays.fill(values, valuesStartPos, rowSize, 0);
   }
 }
