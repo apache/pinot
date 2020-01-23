@@ -52,6 +52,7 @@ import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,10 +60,9 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class PinotQueryResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotQueryResource.class);
-  private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
+  private static final Pql2Compiler PQL_QUERY_COMPILER = new Pql2Compiler();
+  private static final CalciteSqlCompiler SQL_QUERY_COMPILER = new CalciteSqlCompiler();
   private static final Random RANDOM = new Random();
-  private static final String DEFAULT_SQL_QUERY_OPTIONS = "groupByMode=sql;responseFormat=sql";
-
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
 
@@ -126,8 +126,6 @@ public class PinotQueryResource {
       String queryOptions = null;
       if (requestJson.has("queryOptions")) {
         queryOptions = requestJson.get("queryOptions").asText();
-      } else {
-        queryOptions = DEFAULT_SQL_QUERY_OPTIONS;
       }
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
       return getQueryResponse(sqlQuery, traceEnabled, queryOptions, httpHeaders, CommonConstants.Broker.Request.SQL);
@@ -155,11 +153,20 @@ public class PinotQueryResource {
     // Get resource table name.
     BrokerRequest brokerRequest;
     try {
-      brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(query);
+      switch (querySyntax) {
+        case CommonConstants.Broker.Request.SQL:
+          brokerRequest = SQL_QUERY_COMPILER.compileToBrokerRequest(query);
+          break;
+        case CommonConstants.Broker.Request.PQL:
+          brokerRequest = PQL_QUERY_COMPILER.compileToBrokerRequest(query);
+          break;
+        default:
+          throw new UnsupportedOperationException("Unsupported query syntax - " + querySyntax);
+      }
       String inputTableName = brokerRequest.getQuerySource().getTableName();
       brokerRequest.getQuerySource().setTableName(_pinotHelixResourceManager.getActualTableName(inputTableName));
     } catch (Exception e) {
-      LOGGER.error("Caught exception while compiling PQL query: {}", query, e);
+      LOGGER.error("Caught exception while compiling {} query: {}", querySyntax.toUpperCase(), query, e);
       return QueryException.getException(QueryException.PQL_PARSING_ERROR, e).toString();
     }
     String tableName = TableNameBuilder.extractRawTableName(brokerRequest.getQuerySource().getTableName());
@@ -199,7 +206,17 @@ public class PinotQueryResource {
 
   private ObjectNode getRequestJson(String query, String traceEnabled, String queryOptions, String querySyntax) {
     // Currently the request is still processed by PQL parser.
-    ObjectNode requestJson = JsonUtils.newObjectNode().put("pql", query);
+    ObjectNode requestJson = JsonUtils.newObjectNode();
+    switch (querySyntax) {
+      case CommonConstants.Broker.Request.SQL:
+        requestJson.put("sql", query);
+        break;
+      case CommonConstants.Broker.Request.PQL:
+        requestJson.put("pql", query);
+        break;
+      default:
+        throw new UnsupportedOperationException("Unsupported query syntax - " + querySyntax);
+    }
     if (traceEnabled != null && !traceEnabled.isEmpty()) {
       requestJson.put("trace", traceEnabled);
     }
@@ -212,6 +229,7 @@ public class PinotQueryResource {
   private String getQueryURL(String hostName, String port, String querySyntax) {
     switch (querySyntax) {
       case CommonConstants.Broker.Request.SQL:
+        return String.format("http://%s:%s/query/sql", hostName, port);
       case CommonConstants.Broker.Request.PQL:
         return String.format("http://%s:%s/query", hostName, port);
       default:
