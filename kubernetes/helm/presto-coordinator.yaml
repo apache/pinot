@@ -88,7 +88,7 @@ spec:
         runAsGroup: 1000
         fsGroup: 1000
       containers:
-        - image: fx19880617/pinot-presto:latest
+        - image: apachepinot/pinot-presto:latest
           imagePullPolicy: Always
           name: presto-coordinator
           args: [ "run" ]

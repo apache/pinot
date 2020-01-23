@@ -60,7 +60,7 @@ spec:
         args: [ "StartController", "-configFileName", "/var/pinot/controller/config/pinot-controller.conf" ]
         env:
           - name: JAVA_OPTS
-            value: "{{ .Values.controller.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.controller.log4j2ConfFile }}"
+            value: "{{ .Values.controller.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.controller.log4j2ConfFile }} -Dplugins.dir={{ .Values.controller.pluginsDir }}"
         ports:
           - containerPort: {{ .Values.controller.port }}
             protocol: TCP

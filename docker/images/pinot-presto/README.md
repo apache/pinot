@@ -35,13 +35,13 @@ You can also build directly with `docker build` command by setting arguments:
 ```bash
 docker build \
 	--build-arg PRESTO_BRANCH=master \
-	--tag fx19880617/pinot-presto:0.1 \
+	--tag apachepinot/pinot-presto:latest \
 	--target build .
 ```
 ## How to push
 
 ```bash
-docker push  fx19880617/pinot-presto:0.1
+docker push apachepinot/pinot-presto:latest
 ```
 
 ## Configuration

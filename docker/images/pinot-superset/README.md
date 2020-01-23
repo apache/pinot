@@ -41,7 +41,7 @@ docker build \
 	--build-arg NODE_VERSION=latest \
 	--build-arg PYTHON_VERSION=3.6 \
 	--build-arg SUPERSET_VERSION=0.34.1 \
-	--tag fx19880617/pinot-superset:0.34.1 \
+	--tag apachepinot/pinot-superset:0.34.1 \
 	--target build .
 ```
 ## How to push
