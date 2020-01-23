@@ -24,10 +24,11 @@ package org.apache.pinot.core.operator;
 public class ExecutionStatistics {
   // The number of documents scanned post filtering.
   private long _numDocsScanned;
-  // The number of doc ids scanned in the filtering phase of the query execution: could be larger than the total doc num
-  // because of multiple filtering predicates.
+  // The number of entries (single value entry contains 1 entry, multi-value entry may contain multiple entries) in the
+  // filtering phase of the query execution: could be larger than the total scanned doc num because of multiple
+  // filtering predicates and multi-value entry.
   private long _numEntriesScannedInFilter;
-  // Equal to _numDocsScanned * number_of_projected_columns
+  // Equal to numDocsScanned * numberProjectedColumns.
   private long _numEntriesScannedPostFilter;
   private long _numTotalRawDocs;
   private long _numSegmentsProcessed;

@@ -21,7 +21,7 @@ package org.apache.pinot.core.operator.docidsets;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SizeBasedDocIdIterator;
 
-// TODO: javadoc this class.
+// Rename this class to MatchAllDocIdSet.
 public final class SizeBasedDocIdSet implements FilterBlockDocIdSet {
   private final int _maxDocId;
 
@@ -49,7 +49,7 @@ public final class SizeBasedDocIdSet implements FilterBlockDocIdSet {
 
   @Override
   public long getNumEntriesScannedInFilter() {
-    // TODO explain why return 0.
+    // No value scanned because all docs are matches and will be returned.
     return 0L;
   }
 

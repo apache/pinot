@@ -27,10 +27,6 @@ public final class SortedDocIdIterator implements IndexBasedDocIdIterator {
   private List<IntPair> pairs;
   private String datasourceName;
 
-  /**
-   * @param datasourceName
-   * @param pairs
-   */
   public SortedDocIdIterator(String datasourceName, List<IntPair> pairs) {
     this.datasourceName = datasourceName;
     this.pairs = pairs;

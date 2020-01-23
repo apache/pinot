@@ -79,7 +79,7 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
 
   @Override
   public long getNumEntriesScannedInFilter() {
-    // TODO: explain why there is no entries scanned in this filter.
+    // No value scanned when filtering with bitmap inverted index.
     return 0L;
   }
 
