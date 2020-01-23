@@ -8,6 +8,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
@@ -61,6 +62,7 @@ public class DetectionConfigTranslatorTest {
     datasetConfigDTO.setDataset("test_dataset");
     datasetConfigDTO.setTimeUnit(TimeUnit.DAYS);
     datasetConfigDTO.setTimeDuration(1);
+    datasetConfigDTO.setDataSource(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
     daoRegistry.getDatasetConfigDAO().save(datasetConfigDTO);
 
     this.yaml = new Yaml();
@@ -78,6 +80,7 @@ public class DetectionConfigTranslatorTest {
     DetectionConfigDTO result = translator.translate();
     YamlTranslationResult expected = OBJECT_MAPPER.readValue(this.getClass().getResourceAsStream("compositePipelineTranslatorTestResult-1.json"), YamlTranslationResult.class);
     Assert.assertEquals(result.getProperties(), expected.getProperties());
+    Assert.assertTrue(result.isDataAvailabilitySchedule());
   }
 
   @Test
@@ -87,6 +90,7 @@ public class DetectionConfigTranslatorTest {
     DetectionConfigDTO result = translator.translate();
     YamlTranslationResult expected = OBJECT_MAPPER.readValue(this.getClass().getResourceAsStream("compositePipelineTranslatorTestResult-2.json"), YamlTranslationResult.class);
     Assert.assertEquals(result.getProperties(), expected.getProperties());
+    Assert.assertTrue(result.isDataAvailabilitySchedule());
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -112,6 +116,7 @@ public class DetectionConfigTranslatorTest {
     DetectionConfigDTO result = translator.translate();
     YamlTranslationResult expected = OBJECT_MAPPER.readValue(this.getClass().getResourceAsStream("compositePipelineTranslatorTestResult-4.json"), YamlTranslationResult.class);
     Assert.assertEquals(result.getProperties(), expected.getProperties());
+    Assert.assertFalse(result.isDataAvailabilitySchedule());
   }
 
   @Test
@@ -121,5 +126,6 @@ public class DetectionConfigTranslatorTest {
     DetectionConfigDTO result = translator.translate();
     YamlTranslationResult expected = OBJECT_MAPPER.readValue(this.getClass().getResourceAsStream("compositePipelineTranslatorTestResult-5.json"), YamlTranslationResult.class);
     Assert.assertEquals(result.getProperties(), expected.getProperties());
+    Assert.assertFalse(result.isDataAvailabilitySchedule());
   }
 }
