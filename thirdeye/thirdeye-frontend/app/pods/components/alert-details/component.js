@@ -236,7 +236,7 @@ export default Component.extend({
         granularity,
         dimensionExploration
       } = this.getProperties('isPreviewMode', 'granularity', 'dimensionExploration');
-      return (isPreviewMode || (!dimensionExploration && ((granularity || '').includes('DAYS'))));
+      return (isPreviewMode || (!dimensionExploration && ((granularity || '').includes('MINUTES') || (granularity || '').includes('DAYS'))));
     }
   ),
 
@@ -922,10 +922,9 @@ export default Component.extend({
       notifications,
       showRules,
       alertId,
-      granularity,
       stateOfAnomaliesAndTimeSeries
     } = this.getProperties('analysisRange', 'anomaliesRange', 'notifications',
-      'showRules', 'alertId', 'granularity', 'stateOfAnomaliesAndTimeSeries');
+      'showRules', 'alertId', 'stateOfAnomaliesAndTimeSeries');
     //detection alert fetch
     const start = analysisRange[0];
     const end = analysisRange[1];
@@ -939,7 +938,7 @@ export default Component.extend({
     try {
       // case 4 is anomaliesOld for Edit Alert Preview, so we only need the real anomalies without time series
       if(showRules && stateOfAnomaliesAndTimeSeries !== 4){
-        applicationAnomalies = ((granularity || '').includes('DAYS')) ? yield getBounds(alertId, startAnomalies, endAnomalies) : yield getYamlPreviewAnomalies(alertYaml, startAnomalies, endAnomalies, alertId);
+        applicationAnomalies = (!this.get('isPreviewMode')) ? yield getBounds(alertId, startAnomalies, endAnomalies) : yield getYamlPreviewAnomalies(alertYaml, startAnomalies, endAnomalies, alertId);
         if (applicationAnomalies && applicationAnomalies.diagnostics && applicationAnomalies.diagnostics['0']) {
           metricUrnList = Object.keys(applicationAnomalies.diagnostics['0']);
           set(this, 'metricUrnList', metricUrnList);
@@ -1006,8 +1005,8 @@ export default Component.extend({
         analysisRange: [moment().subtract(timeWindowSize, 'milliseconds').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
         duration: (timeWindowSize === 172800000) ? '48h' : 'custom',
         selectedDimension: 'Choose a dimension',
-        // For now, we will only show predicted and bounds on daily metrics with no dimensions, for the Alert Overview page
-        selectedBaseline: ((granularity || '').includes('DAYS') && !dimensionExploration) ? 'predicted' : 'wo1w',
+        // For now, we will only show predicted and bounds on daily and minutely metrics with no dimensions, for the Alert Overview page
+        selectedBaseline: (!dimensionExploration && ((granularity || '').includes('MINUTES') || (granularity || '').includes('DAYS'))) ? 'predicted' : 'wo1w',
         // We distinguish these because it only needs the route's info on init.  After that, component manages state
         metricUrnList: this.get('metricUrnListRoute'),
         metricUrn: this.get('metricUrnRoute')
