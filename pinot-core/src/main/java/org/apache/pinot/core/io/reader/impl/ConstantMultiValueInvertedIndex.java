@@ -62,4 +62,8 @@ public class ConstantMultiValueInvertedIndex extends BaseSingleColumnMultiValueR
   public FixedBitMultiValueReader.Context createContext() {
     return null;
   }
+
+  public void setLength(int length) {
+    _length = length;
+  }
 }

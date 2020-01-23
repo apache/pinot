@@ -59,6 +59,7 @@ import org.apache.pinot.core.segment.index.loader.defaultcolumn.BaseDefaultColum
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.apache.pinot.core.segment.index.readers.NullValueVectorReader;
+import org.apache.pinot.core.segment.virtualcolumn.DefaultNullValueVirtualColumnProvider;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
@@ -130,6 +131,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private RealtimeLuceneReaders _realtimeLuceneReaders;
   // If the table schema is changed before the consuming segment is committed, newly added columns would appear in _newlyAddedColumnsFieldMap.
   private volatile Map<String, FieldSpec> _newlyAddedColumnsFieldMap = new ConcurrentHashMap();
+  private volatile Map<String, VirtualColumnProvider> _virtualColumnProviderMap = new ConcurrentHashMap<>();
 
   public MutableSegmentImpl(RealtimeSegmentConfig config) {
     _segmentName = config.getSegmentName();
@@ -311,9 +313,15 @@ public class MutableSegmentImpl implements MutableSegment {
    * @return true if column is no-dictionary, false if dictionary encoded
    */
   private boolean isNoDictionaryColumn(Set<String> noDictionaryColumns, Set<String> invertedIndexColumns,
+<<<<<<< HEAD
       Set<String> textIndexColumns, FieldSpec fieldSpec, String column) {
     return textIndexColumns.contains(column) || (noDictionaryColumns.contains(column) && fieldSpec.isSingleValueField()
         && !invertedIndexColumns.contains(column));
+=======
+      FieldSpec fieldSpec, String column) {
+    return noDictionaryColumns.contains(column) && fieldSpec.isSingleValueField() && !invertedIndexColumns
+        .contains(column);
+>>>>>>> cache virtual column provider
   }
 
   public SegmentPartitionConfig getSegmentPartitionConfig() {
@@ -334,14 +342,11 @@ public class MutableSegmentImpl implements MutableSegment {
     defaultColumnActionMap.forEach(((columnName, defaultColumnAction) -> {
       if (newSchema.getFieldSpecFor(columnName).isVirtualColumn()) {
         _logger.info("Skipped virtual column {}", columnName);
-      }
-      else if (defaultColumnAction.isAddAction()) {
+      } else if (defaultColumnAction.isAddAction()) {
         _newlyAddedColumnsFieldMap.put(columnName, newSchema.getFieldSpecFor(columnName));
-      }
-      else if (defaultColumnAction.isUpdateAction()) {
+      } else if (defaultColumnAction.isUpdateAction()) {
         _logger.warn("New schema is backward incompatible. Column {} is updated.", columnName);
-      }
-      else if (defaultColumnAction.isRemoveAction()) {
+      } else if (defaultColumnAction.isRemoveAction()) {
         _logger.warn("New schema is backward incompatible. Column {} is removed.", columnName);
       }
     }));
@@ -591,9 +596,22 @@ public class MutableSegmentImpl implements MutableSegment {
         Preconditions.checkNotNull(fieldSpec, "FieldSpec for " + columnName + " should not be null");
       }
       VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, _numDocsIndexed);
-      VirtualColumnProvider virtualColumnProvider = VirtualColumnProviderFactory.buildProvider(virtualColumnContext);
-      return new ColumnDataSource(virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext),
-          virtualColumnProvider.buildMetadata(virtualColumnContext));
+
+      _virtualColumnProviderMap
+          .putIfAbsent(columnName, VirtualColumnProviderFactory.buildProvider(virtualColumnContext));
+      VirtualColumnProvider virtualColumnProvider = _virtualColumnProviderMap.get(columnName);
+      if (virtualColumnProvider instanceof DefaultNullValueVirtualColumnProvider) {
+        _logger.debug("Updating number of rows for {}", columnName);
+        // We just need to update _numDocsIndexed, and return default values
+        ((DefaultNullValueVirtualColumnProvider) virtualColumnProvider)
+            .updateInvertedIndex(columnName, virtualColumnContext);
+        return new ColumnDataSource(
+            ((DefaultNullValueVirtualColumnProvider) virtualColumnProvider).getColumnIndexContainer(),
+            ((DefaultNullValueVirtualColumnProvider) virtualColumnProvider).getColumnMetadata());
+      } else {
+        return new ColumnDataSource(virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext),
+            virtualColumnProvider.buildMetadata(virtualColumnContext));
+      }
     } else {
       return new ColumnDataSource(fieldSpec, _numDocsIndexed, _maxNumValuesMap.get(columnName),
           _indexReaderWriterMap.get(columnName), _invertedIndexMap.get(columnName), _dictionaryMap.get(columnName),

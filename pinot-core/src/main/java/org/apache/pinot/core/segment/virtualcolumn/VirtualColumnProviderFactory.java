@@ -34,10 +34,16 @@ public class VirtualColumnProviderFactory {
     try {
       // Use the preset virtualColumnProvider if available
       if (virtualColumnProvider != null) {
-        return (VirtualColumnProvider) Class.forName(virtualColumnProvider).newInstance();
+        if (DefaultNullValueVirtualColumnProvider.class.getName().equals(virtualColumnProvider)) {
+          return DefaultNullValueVirtualColumnProvider.class.getDeclaredConstructor(VirtualColumnContext.class)
+              .newInstance(virtualColumnContext);
+        } else {
+          return (VirtualColumnProvider) Class.forName(virtualColumnProvider).newInstance();
+        }
       }
       // Create the virtualColumnProvider that returns default null values based on the virtualColumnContext
-      return (VirtualColumnProvider) Class.forName(DefaultNullValueVirtualColumnProvider.class.getName()).newInstance();
+      return DefaultNullValueVirtualColumnProvider.class.getDeclaredConstructor(VirtualColumnContext.class)
+          .newInstance(virtualColumnContext);
     } catch (ReflectiveOperationException e) {
       throw new IllegalStateException("Caught exception while creating instance of: " + virtualColumnProvider, e);
     }

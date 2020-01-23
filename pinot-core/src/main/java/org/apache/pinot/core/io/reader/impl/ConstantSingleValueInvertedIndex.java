@@ -66,6 +66,10 @@ public class ConstantSingleValueInvertedIndex extends BaseSingleColumnSingleValu
     return null;
   }
 
+  public void setLength(int length) {
+    _length = length;
+  }
+
   @Override
   public void readValues(int[] rows, int rowStartPos, int rowSize, int[] values, int valuesStartPos) {
     Arrays.fill(values, valuesStartPos, rowSize, 0);

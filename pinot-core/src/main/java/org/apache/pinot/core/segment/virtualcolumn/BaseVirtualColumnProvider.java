@@ -32,6 +32,9 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 public abstract class BaseVirtualColumnProvider implements VirtualColumnProvider {
 
+  ColumnIndexContainer _columnIndexContainer;
+  InvertedIndexReader _invertedIndexReader;
+
   public DataFileReader buildReader(VirtualColumnContext context) {
     if (context.getFieldSpec().isSingleValueField()) {
       return new ConstantSingleValueInvertedIndex(0);
@@ -49,14 +52,21 @@ public abstract class BaseVirtualColumnProvider implements VirtualColumnProvider
 
   public InvertedIndexReader buildInvertedIndex(VirtualColumnContext context) {
     if (context.getFieldSpec().isSingleValueField()) {
-      return new ConstantSingleValueInvertedIndex(context.getTotalDocCount());
+      _invertedIndexReader = new ConstantSingleValueInvertedIndex(context.getTotalDocCount());
     } else {
-      return new ConstantMultiValueInvertedIndex(context.getTotalDocCount());
+      _invertedIndexReader = new ConstantMultiValueInvertedIndex(context.getTotalDocCount());
     }
+    return _invertedIndexReader;
   }
 
   @Override
   public ColumnIndexContainer buildColumnIndexContainer(VirtualColumnContext context) {
-    return new VirtualColumnIndexContainer(buildReader(context), buildInvertedIndex(context), buildDictionary(context));
+    _columnIndexContainer =
+        new VirtualColumnIndexContainer(buildReader(context), buildInvertedIndex(context), buildDictionary(context));
+    return _columnIndexContainer;
+  }
+
+  public ColumnIndexContainer getColumnIndexContainer() {
+    return _columnIndexContainer;
   }
 }
