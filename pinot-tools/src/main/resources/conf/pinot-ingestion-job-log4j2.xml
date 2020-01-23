@@ -41,5 +41,6 @@
       <AppenderRef ref="console"/>
       <AppenderRef ref="ingestionJobLog"/>
     </AsyncLogger>
+    <AsyncLogger name="org.reflections" level="error" additivity="false"/>
   </Loggers>
 </Configuration>

@@ -43,5 +43,6 @@
     <AsyncLogger name="org.apache.pinot.broker.broker.helix.HelixBrokerStarter" level="info" additivity="false">
       <AppenderRef ref="console"/>
     </AsyncLogger>
+    <AsyncLogger name="org.reflections" level="error" additivity="false"/>
   </Loggers>
 </Configuration>
