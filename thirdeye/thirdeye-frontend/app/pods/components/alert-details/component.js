@@ -538,119 +538,24 @@ export default Component.extend({
       buildBounds(series, baseline, timeseries, showRules);
 
       // build set of anomalous values (newer of 2 sets of anomalies)
-      if (!_.isEmpty(filteredAnomaliesCurrent) && timeseries && !_.isEmpty(series.Current)) {
-        const valuesCurrent = [];
-        // needed because anomalies with startTime before time window are possible
-        let currentAnomaly = filteredAnomaliesCurrent.find(anomaly => {
-          return anomaly.startTime <= series.Current.timestamps[0];
-        });
-        let inAnomalyRange = currentAnomaly ? true : false;
-        let anomalyEdgeValues = [];
-        let anomalyEdgeTimestamps = [];
-        for (let i = 0; i < series.Current.timestamps.length; ++i) {
-          if (!inAnomalyRange) {
-            currentAnomaly = filteredAnomaliesCurrent.find(anomaly => {
-              return anomaly.startTime === series.Current.timestamps[i];
-            });
-            if (currentAnomaly) {
-              inAnomalyRange = true;
-              valuesCurrent.push(series.Current.values[i]);
-              anomalyEdgeValues.push(series.Current.values[i]);
-              anomalyEdgeTimestamps.push(series.Current.timestamps[i]);
-            } else {
-              valuesCurrent.push(null);
-            }
-          } else if (currentAnomaly.endTime === series.Current.timestamps[i]) {
-            inAnomalyRange = false;
-            // we don't want to include the endTime in anomaly range
-            currentAnomaly = filteredAnomaliesCurrent.find(anomaly => {
-              return anomaly.startTime === series.Current.timestamps[i];
-            });
-            if (currentAnomaly) {
-              inAnomalyRange = true;
-              valuesCurrent.push(series.Current.values[i]);
-              anomalyEdgeValues.push(series.Current.values[i]);
-              anomalyEdgeTimestamps.push(series.Current.timestamps[i]);
-            } else if (i > 0) {
-              anomalyEdgeValues.push(series.Current.values[i-1]);
-              anomalyEdgeTimestamps.push(series.Current.timestamps[i-1]);
-              valuesCurrent.push(null);
-            }
-          } else {
-            valuesCurrent.push(series.Current.values[i]);
-          }
-        }
-        series[anomaliesCurrentLabel] = {
-          timestamps: series.Current.timestamps,
-          values: valuesCurrent,
-          type: 'line',
-          color: 'red'
-        };
-        series['new-anomaly-edges'] = {
-          timestamps: anomalyEdgeTimestamps,
-          values: anomalyEdgeValues,
-          type: 'scatter',
-          color: 'red'
-        };
-      }
-      // build set of new anomalies
-      if (!_.isEmpty(filteredAnomaliesOld) && timeseries && !_.isEmpty(series.Current)) {
-        const valuesOld = [];
-        // needed because anomalies with startTime before time window are possible
-        let currentAnomaly = filteredAnomaliesOld.find(anomaly => {
-          return anomaly.startTime <= series.Current.timestamps[0];
-        });
-        let inAnomalyRange = currentAnomaly ? true : false;
-        let anomalyEdgeValues = [];
-        let anomalyEdgeTimestamps = [];
-        for (let i = 0; i < series.Current.timestamps.length; ++i) {
-          if (!inAnomalyRange) {
-            currentAnomaly = filteredAnomaliesOld.find(anomaly => {
-              return anomaly.startTime === series.Current.timestamps[i];
-            });
-            if (currentAnomaly) {
-              inAnomalyRange = true;
-              valuesOld.push(1.0);
-              anomalyEdgeValues.push(1.0);
-              anomalyEdgeTimestamps.push(series.Current.timestamps[i]);
-            } else {
-              valuesOld.push(null);
-            }
-          } else if (currentAnomaly.endTime === series.Current.timestamps[i]) {
-            inAnomalyRange = false;
-            // we don't want to include the endTime in anomaly range
-            currentAnomaly = filteredAnomaliesOld.find(anomaly => {
-              return anomaly.startTime === series.Current.timestamps[i];
-            });
-            if (currentAnomaly) {
-              inAnomalyRange = true;
-              valuesOld.push(1.0);
-              anomalyEdgeValues.push(1.0);
-              anomalyEdgeTimestamps.push(series.Current.timestamps[i]);
-            } else if (i > 0) {
-              anomalyEdgeValues.push(1.0);
-              anomalyEdgeTimestamps.push(series.Current.timestamps[i-1]);
-              valuesOld.push(null);
-            }
-          } else {
-            valuesOld.push(1.0);
-          }
-        }
-        series[anomaliesOldLabel] = {
-          timestamps: series.Current.timestamps,
-          values: valuesOld,
-          type: 'line',
-          color: 'grey',
-          axis: 'y2'
-        };
-        series['old-anomaly-edges'] = {
-          timestamps: anomalyEdgeTimestamps,
-          values: anomalyEdgeValues,
-          type: 'scatter',
-          color: 'grey',
-          axis: 'y2'
-        };
-      }
+      this._mapAnomaliesToTimeSeries(
+        filteredAnomaliesCurrent,
+        timeseries,
+        series,
+        anomaliesCurrentLabel,
+        'new-anomaly-edges',
+        'red',
+        true);
+
+      // build set of previous anomalies
+      this._mapAnomaliesToTimeSeries(
+        filteredAnomaliesOld,
+        timeseries,
+        series,
+        anomaliesOldLabel,
+        'old-anomaly-edges',
+        'grey',
+        false);
       return series;
     }
   ),
@@ -1026,6 +931,89 @@ export default Component.extend({
         metricUrnList: this.get('metricUrnListRoute'),
         metricUrn: this.get('metricUrnRoute')
       });
+    }
+  },
+
+  /**
+   * Helper to map anomalies and start/endpoints over current timestamps
+   * @method _mapAnomaliesToTimeSeries
+   * @param {Array} filteredAnomalies - The results object from _getAnomalies method
+   * @param {Object} timeseries - The object holding timeseries response data
+   * @param {Object} series - The object being built to pass to c3js graph
+   * @param {String} anomaliesLabel - Name to use as key for anomaly data
+   * @param {String} edgesLabel - Name to use as key for anomaly edge points
+   * @param {String} color - The color for the anomaly data in the graph
+   * @param {Boolean} useValues - Whether to use the current values for anomaly values or not
+   * @return {undefined}
+   */
+  _mapAnomaliesToTimeSeries(
+    filteredAnomalies,
+    timeseries,
+    series,
+    anomaliesLabel,
+    edgesLabel,
+    color,
+    useValue) {
+    // build set of anomalous values (newer of 2 sets of anomalies)
+    if (!_.isEmpty(filteredAnomalies) && timeseries && !_.isEmpty(series.Current)) {
+      const valuesCurrent = [];
+      // needed because anomalies with startTime before time window are possible
+      let currentAnomaly = filteredAnomalies.find(anomaly => {
+        return anomaly.startTime <= series.Current.timestamps[0];
+      });
+      let inAnomalyRange = currentAnomaly ? true : false;
+      let anomalyEdgeValues = [];
+      let anomalyEdgeTimestamps = [];
+      for (let i = 0; i < series.Current.timestamps.length; ++i) {
+        const anomalyValue = useValue ? series.Current.values[i] : 1.0;
+        if (!inAnomalyRange) {
+          currentAnomaly = filteredAnomalies.find(anomaly => {
+            return anomaly.startTime === series.Current.timestamps[i];
+          });
+          if (currentAnomaly) {
+            inAnomalyRange = true;
+            valuesCurrent.push(anomalyValue);
+            anomalyEdgeValues.push(anomalyValue);
+            anomalyEdgeTimestamps.push(series.Current.timestamps[i]);
+          } else {
+            valuesCurrent.push(null);
+          }
+        } else if (currentAnomaly.endTime <= series.Current.timestamps[i]) {
+          inAnomalyRange = false;
+          // we don't want to include the endTime in anomaly range
+          currentAnomaly = filteredAnomalies.find(anomaly => {
+            return anomaly.startTime === series.Current.timestamps[i];
+          });
+          if (currentAnomaly) {
+            inAnomalyRange = true;
+            valuesCurrent.push(anomalyValue);
+            anomalyEdgeValues.push(anomalyValue);
+            anomalyEdgeTimestamps.push(series.Current.timestamps[i]);
+          } else if (i > 0) {
+            anomalyEdgeValues.push(series.Current.values[i-1]);
+            anomalyEdgeTimestamps.push(series.Current.timestamps[i-1]);
+            valuesCurrent.push(null);
+          }
+        } else {
+          valuesCurrent.push(anomalyValue);
+        }
+      }
+      series[anomaliesLabel] = {
+        timestamps: series.Current.timestamps,
+        values: valuesCurrent,
+        type: 'line',
+        color
+      };
+      series[edgesLabel] = {
+        timestamps: anomalyEdgeTimestamps,
+        values: anomalyEdgeValues,
+        type: 'scatter',
+        color
+      };
+      if (!useValue) {
+        series[anomaliesLabel].axis = 'y2';
+        series[edgesLabel].axis = 'y2';
+      }
     }
   },
 
