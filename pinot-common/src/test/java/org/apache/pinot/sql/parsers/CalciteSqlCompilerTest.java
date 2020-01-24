@@ -218,6 +218,22 @@ public class CalciteSqlCompilerTest {
     PinotQuery pinotQuery;
     try {
       pinotQuery = CalciteSqlParser.compileToPinotQuery(
+          "select sum(rsvp_count), count(*), group_city from meetupRsvp group by group_city order by sum(rsvp_count) limit 10");
+    } catch (SqlCompilationException e) {
+      throw e;
+    }
+    // Test PinotQuery
+    Assert.assertTrue(pinotQuery.isSetGroupByList());
+    Assert.assertTrue(pinotQuery.isSetLimit());
+    Assert.assertTrue(pinotQuery.isSetOrderByList());
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getType(), ExpressionType.FUNCTION);
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "SUM");
+    Assert.assertEquals(10, pinotQuery.getLimit());
+
+    try {
+      pinotQuery = CalciteSqlParser.compileToPinotQuery(
           "select sum(rsvp_count), count(*) from meetupRsvp group by group_city order by sum(rsvp_count) limit 10");
     } catch (SqlCompilationException e) {
       throw e;
@@ -831,5 +847,44 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(aggregationInfo.getAggregationType(), AggregationFunctionType.DISTINCT.getName());
     Assert.assertEquals(aggregationInfo.getAggregationParams().get(FunctionCallAstNode.COLUMN_KEY_IN_AGGREGATION_INFO),
         "add(div(col1,col2),mul(col3,col4)):sub(col3,col4):col5:col6");
+  }
+
+  @Test
+  public void testQueryValidation() {
+    // Valid: Selection fields are part of group by identifiers.
+    String sql =
+        "select group_country, sum(rsvp_count), count(*) from meetupRsvp group by group_city, group_country ORDER BY sum(rsvp_count), count(*) limit 50";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getGroupByListSize(), 2);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
+
+    // Invalid: Selection field 'group_city' is not part of group by identifiers.
+    try {
+      sql =
+          "select group_city, group_country, sum(rsvp_count), count(*) from meetupRsvp group by group_country ORDER BY sum(rsvp_count), count(*) limit 50";
+      CalciteSqlParser.compileToPinotQuery(sql);
+      Assert.fail("Query should have failed compilation");
+    } catch (Exception e) {
+      Assert.assertTrue(e instanceof SqlCompilationException);
+      Assert.assertTrue(e.getMessage().contains("'group_city' should appear in GROUP BY clause."));
+    }
+
+    // Valid groupBy non-aggregate function should pass.
+    sql =
+        "select secondsSinceEpoch, sum(rsvp_count), count(*) from meetupRsvp group by dateConvert(secondsSinceEpoch) limit 50";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getGroupByListSize(), 1);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
+
+    // Invalid groupBy clause shouldn't contain aggregate expression, like sum(rsvp_count), count(*).
+    try {
+      sql =
+          "select  sum(rsvp_count), count(*) from meetupRsvp group by group_country, sum(rsvp_count), count(*) limit 50";
+      CalciteSqlParser.compileToPinotQuery(sql);
+      Assert.fail("Query should have failed compilation");
+    } catch (Exception e) {
+      Assert.assertTrue(e instanceof SqlCompilationException);
+      Assert.assertTrue(e.getMessage().contains("is not allowed in GROUP BY clause."));
+    }
   }
 }

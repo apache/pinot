@@ -60,6 +60,10 @@ public class BrokerRequestComparisonUtils {
           LOGGER.error("FilterSubQueryMap did not match after conversion. {}", sb);
           return false;
         }
+      } else if (br2.getFilterQuery() != null) {
+        LOGGER.error("Filter did not match, br1.getFilterQuery() = null, br2.getFilterQuery() = {}",
+            br2.getFilterQuery());
+        return false;
       }
       if (br1.getSelections() != null) {
         if (!validateSelections(br1.getSelections(), br2.getSelections())) {
@@ -68,6 +72,10 @@ public class BrokerRequestComparisonUtils {
           LOGGER.error("Selection did not match after conversion:{}", sb);
           return false;
         }
+      } else if (br2.getSelections() != null) {
+        LOGGER.error("Selection did not match, br1.getSelections() = null, br2.getSelections() = {}",
+            br2.getSelections());
+        return false;
       }
       if (br1.getGroupBy() != null) {
         if (!validateGroupBy(br1.getGroupBy(), br2.getGroupBy())) {
@@ -76,6 +84,10 @@ public class BrokerRequestComparisonUtils {
           LOGGER.error("Group By did not match conversion:{}", sb);
           return false;
         }
+      } else if (br2.getGroupBy() != null) {
+        LOGGER.error("tGroupBy did not match, br1.getGroupBy() = null, br2.getGroupBy() = {}",
+            br2.getGroupBy());
+        return false;
       }
       if (br1.getAggregationsInfo() != null) {
         if (!validateAggregations(br1.getAggregationsInfo(), br2.getAggregationsInfo())) {
@@ -84,6 +96,10 @@ public class BrokerRequestComparisonUtils {
           LOGGER.error("Group By did not match conversion:{}", sb);
           return false;
         }
+      } else if (br2.getAggregationsInfo() != null) {
+        LOGGER.error("AggregationsInfo did not match, br1.getAggregationsInfo() = null, br2.getAggregationsInfo() = {}",
+            br2.getAggregationsInfo());
+        return false;
       }
       if (br1.getOrderBy() != null) {
         if (!validateOrderBys(br1.getOrderBy(), br2.getOrderBy())) {
@@ -92,6 +108,10 @@ public class BrokerRequestComparisonUtils {
           LOGGER.error("Order By did not match conversion:{}", sb);
           return false;
         }
+      } else if (br2.getOrderBy() != null) {
+        LOGGER.error("OrderBy did not match, br1.getOrderBy() = null, br2.getOrderBy() = {}",
+            br2.getOrderBy());
+        return false;
       }
     }
     return true;

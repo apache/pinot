@@ -20,9 +20,11 @@ package org.apache.pinot.sql.parsers;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.calcite.config.Lex;
@@ -90,6 +92,64 @@ public class CalciteSqlParser {
     // Set Option statements to PinotQuery.
     setOptions(pinotQuery, options);
     return pinotQuery;
+  }
+
+  static void validate(PinotQuery pinotQuery)
+      throws SqlCompilationException {
+    validateGroupByClause(pinotQuery);
+  }
+
+  private static void validateGroupByClause(PinotQuery pinotQuery)
+      throws SqlCompilationException {
+    if(pinotQuery.getGroupByList() == null) {
+      return;
+    }
+    // Sanity check group by query: All identifiers in selection list should be also included in group by list.
+    Set<String> groupByIdentifiers = extractIdentifiers(pinotQuery.getGroupByList());
+    for (Expression selectExpression : pinotQuery.getSelectList()) {
+      if (selectExpression.getIdentifier() != null) {
+        String identifier = selectExpression.getIdentifier().getName();
+        if (!groupByIdentifiers.contains(identifier)) {
+          throw new SqlCompilationException("'" + identifier + "' should appear in GROUP BY clause.");
+        }
+      }
+    }
+    // Sanity check on group by clause shouldn't contain aggregate expression.
+    for (Expression selectExpression : pinotQuery.getGroupByList()) {
+      if (isAggregateExpression(selectExpression)) {
+        throw new SqlCompilationException(
+            "Aggregate expression '" + selectExpression + "' is not allowed in GROUP BY clause.");
+      }
+    }
+  }
+
+  private static boolean isAggregateExpression(Expression expression) {
+    if (expression.getFunctionCall() != null) {
+      String operator = expression.getFunctionCall().getOperator();
+      try {
+        AggregationFunctionType.getAggregationFunctionType(operator);
+        return true;
+      } catch (IllegalArgumentException e) {
+      }
+      for (Expression operand : expression.getFunctionCall().getOperands()) {
+        if (isAggregateExpression(operand)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private static Set<String> extractIdentifiers(List<Expression> expressions) {
+    Set<String> identifiers = new HashSet<>();
+    for (Expression expression : expressions) {
+      if (expression.getIdentifier() != null) {
+        identifiers.add(expression.getIdentifier().getName());
+      } else if (expression.getFunctionCall() != null) {
+        identifiers.addAll(extractIdentifiers(expression.getFunctionCall().getOperands()));
+      }
+    }
+    return identifiers;
   }
 
   private static void setOptions(PinotQuery pinotQuery, List<String> optionsStatements) {
@@ -174,6 +234,7 @@ public class CalciteSqlParser {
         throw new RuntimeException(
             "Unable to convert SqlNode: " + sqlNode + " to PinotQuery. Unknown node type: " + sqlNode.getKind());
     }
+    validate(pinotQuery);
     return pinotQuery;
   }
 
