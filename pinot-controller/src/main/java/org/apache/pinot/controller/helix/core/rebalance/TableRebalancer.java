@@ -163,7 +163,8 @@ public class TableRebalancer {
           null, null);
     }
 
-    LOGGER.info("Fetching/calculating instance partitions for table: {}", tableNameWithType);
+    LOGGER.info("Fetching/computing instance partitions, reassigning instances if configured for table: {}",
+        tableNameWithType);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
     try {
       if (tableConfig.getTableType() == TableType.OFFLINE) {
@@ -172,8 +173,24 @@ public class TableRebalancer {
       } else {
         instancePartitionsMap.put(InstancePartitionsType.CONSUMING,
             getInstancePartitions(tableConfig, InstancePartitionsType.CONSUMING, reassignInstances, dryRun));
-        instancePartitionsMap.put(InstancePartitionsType.COMPLETED,
-            getInstancePartitions(tableConfig, InstancePartitionsType.COMPLETED, reassignInstances, dryRun));
+        if (InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
+          LOGGER.info(
+              "COMPLETED segments should be relocated, fetching/computing COMPLETED instance partitions for table: {}",
+              tableNameWithType);
+          instancePartitionsMap.put(InstancePartitionsType.COMPLETED,
+              getInstancePartitions(tableConfig, InstancePartitionsType.COMPLETED, reassignInstances, dryRun));
+        } else {
+          LOGGER.info(
+              "COMPLETED segments should not be relocated, skipping fetching/computing COMPLETED instance partitions for table: {}",
+              tableNameWithType);
+          if (!dryRun) {
+            String instancePartitionsName =
+                InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, InstancePartitionsType.COMPLETED);
+            LOGGER.info("Removing instance partitions: {} from ZK if it exists", instancePartitionsName);
+            InstancePartitionsUtils
+                .removeInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitionsName);
+          }
+        }
       }
     } catch (Exception e) {
       LOGGER
@@ -368,34 +385,38 @@ public class TableRebalancer {
   private InstancePartitions getInstancePartitions(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType, boolean reassignInstances, boolean dryRun) {
     String tableNameWithType = tableConfig.getTableName();
-    if (reassignInstances) {
-      if (InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, instancePartitionsType)) {
+    if (InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, instancePartitionsType)) {
+      if (reassignInstances) {
         LOGGER.info("Reassigning {} instances for table: {}", instancePartitionsType, tableNameWithType);
         InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
         InstancePartitions instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType,
             _helixDataAccessor.getChildValues(_helixDataAccessor.keyBuilder().instanceConfigs()));
         if (!dryRun) {
-          LOGGER.info("Persisting instance partitions: {}", instancePartitions);
+          LOGGER.info("Persisting instance partitions: {} to ZK", instancePartitions);
           InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitions);
         }
         return instancePartitions;
       } else {
-        // Use default instance partitions if reassign is enabled and instance assignment is not allowed
-        InstancePartitions instancePartitions = InstancePartitionsUtils
-            .computeDefaultInstancePartitions(_helixManager, tableConfig, instancePartitionsType);
-        LOGGER.warn("Cannot assign {} instances for table: {}, using default instance partitions: {}",
-            instancePartitionsType, tableNameWithType, instancePartitions);
-        if (!dryRun) {
-          String instancePartitionsName = instancePartitions.getInstancePartitionsName();
-          LOGGER.info("Removing instance partitions: {}", instancePartitionsName);
-          InstancePartitionsUtils
-              .removeInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitionsName);
-        }
-        return instancePartitions;
+        LOGGER
+            .info("Fetching/computing {} instance partitions for table: {}", instancePartitionsType, tableNameWithType);
+        return InstancePartitionsUtils
+            .fetchOrComputeInstancePartitions(_helixManager, tableConfig, instancePartitionsType);
       }
     } else {
-      return InstancePartitionsUtils
-          .fetchOrComputeInstancePartitions(_helixManager, tableConfig, instancePartitionsType);
+      LOGGER.info("{} instance assignment is not allowed, using default instance partitions for table: {}",
+          instancePartitionsType, tableNameWithType);
+      if (reassignInstances) {
+        LOGGER.warn("Cannot reassign {} instances (instance assignment is not allowed) for table: {}",
+            instancePartitionsType, tableNameWithType);
+      }
+      InstancePartitions instancePartitions =
+          InstancePartitionsUtils.computeDefaultInstancePartitions(_helixManager, tableConfig, instancePartitionsType);
+      if (!dryRun) {
+        String instancePartitionsName = instancePartitions.getInstancePartitionsName();
+        LOGGER.info("Removing instance partitions: {} from ZK if it exists", instancePartitionsName);
+        InstancePartitionsUtils.removeInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitionsName);
+      }
+      return instancePartitions;
     }
   }
 

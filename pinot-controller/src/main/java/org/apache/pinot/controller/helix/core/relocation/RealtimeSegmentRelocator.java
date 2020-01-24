@@ -19,17 +19,13 @@
 package org.apache.pinot.controller.helix.core.relocation;
 
 import com.google.common.base.Preconditions;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.TagNameUtils;
-import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
+import org.apache.pinot.common.config.instance.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -38,6 +34,7 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,40 +69,34 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask<Void> {
         .hasHighLevelConsumerType()) {
       return;
     }
-
-    // Relocate COMPLETED segments if the instance assignment is configured or (for backward-compatibility) server tag
-    // is overridden
-    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap =
-        tableConfig.getInstanceAssignmentConfigMap();
-    if ((instanceAssignmentConfigMap != null && instanceAssignmentConfigMap
-        .containsKey(InstancePartitionsType.COMPLETED)) || TagNameUtils
-        .isRelocateCompletedSegments(tableConfig.getTenantConfig())) {
-      LOGGER.info("Relocating COMPLETED segments for table: {}", tableNameWithType);
-
-      // Allow at most one replica unavailable during relocation
-      Configuration rebalanceConfig = new BaseConfiguration();
-      rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME, -1);
-
-      // Run rebalance asynchronously
-      _executorService.submit(() -> {
-        try {
-          RebalanceResult rebalance = new TableRebalancer(_pinotHelixResourceManager.getHelixZkManager())
-              .rebalance(tableConfig, rebalanceConfig);
-          switch (rebalance.getStatus()) {
-            case NO_OP:
-              LOGGER.info("All COMPLETED segments are already relocated for table: {}", tableNameWithType);
-              break;
-            case DONE:
-              LOGGER.info("Finished relocating COMPLETED segments for table: {}", tableNameWithType);
-              break;
-            default:
-              LOGGER.error("Relocation failed for table: {}", tableNameWithType);
-          }
-        } catch (Throwable t) {
-          LOGGER.error("Caught exception/error while rebalancing table: {}", tableNameWithType, t);
-        }
-      });
+    if (!InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
+      LOGGER.debug("No need to relocate COMPLETED segments for table: {}", tableNameWithType);
+      return;
     }
+
+    LOGGER.info("Relocating COMPLETED segments for table: {}", tableNameWithType);
+    // Allow at most one replica unavailable during relocation
+    Configuration rebalanceConfig = new BaseConfiguration();
+    rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME, -1);
+    // Run rebalance asynchronously
+    _executorService.submit(() -> {
+      try {
+        RebalanceResult rebalance =
+            new TableRebalancer(_pinotHelixResourceManager.getHelixZkManager()).rebalance(tableConfig, rebalanceConfig);
+        switch (rebalance.getStatus()) {
+          case NO_OP:
+            LOGGER.info("All COMPLETED segments are already relocated for table: {}", tableNameWithType);
+            break;
+          case DONE:
+            LOGGER.info("Finished relocating COMPLETED segments for table: {}", tableNameWithType);
+            break;
+          default:
+            LOGGER.error("Relocation failed for table: {}", tableNameWithType);
+        }
+      } catch (Throwable t) {
+        LOGGER.error("Caught exception/error while rebalancing table: {}", tableNameWithType, t);
+      }
+    });
   }
 
   private static long getRunFrequencySeconds(String timeStr) {
