@@ -96,18 +96,48 @@ public class CalciteSqlParser {
 
   static void validate(PinotQuery pinotQuery)
       throws SqlCompilationException {
+    validateGroupByClause(pinotQuery);
+  }
+
+  private static void validateGroupByClause(PinotQuery pinotQuery)
+      throws SqlCompilationException {
+    if(pinotQuery.getGroupByList() == null) {
+      return;
+    }
     // Sanity check group by query: All identifiers in selection list should be also included in group by list.
-    if (pinotQuery.getGroupByList() != null) {
-      Set<String> groupbyIdentifier = extractIdentifiers(pinotQuery.getGroupByList());
-      for (Expression selectExpresion : pinotQuery.getSelectList()) {
-        if (selectExpresion.getIdentifier() != null) {
-          String identifier = selectExpresion.getIdentifier().getName();
-          if (!groupbyIdentifier.contains(identifier)) {
-            throw new SqlCompilationException("'" + identifier + "' should appear in GROUP BY clause.");
-          }
+    Set<String> groupByIdentifiers = extractIdentifiers(pinotQuery.getGroupByList());
+    for (Expression selectExpression : pinotQuery.getSelectList()) {
+      if (selectExpression.getIdentifier() != null) {
+        String identifier = selectExpression.getIdentifier().getName();
+        if (!groupByIdentifiers.contains(identifier)) {
+          throw new SqlCompilationException("'" + identifier + "' should appear in GROUP BY clause.");
         }
       }
     }
+    // Sanity check on group by clause shouldn't contain aggregate expression.
+    for (Expression selectExpression : pinotQuery.getGroupByList()) {
+      if (isAggregateExpression(selectExpression)) {
+        throw new SqlCompilationException(
+            "Aggregate expression '" + selectExpression + "' is not allowed in GROUP BY clause.");
+      }
+    }
+  }
+
+  private static boolean isAggregateExpression(Expression expression) {
+    if (expression.getFunctionCall() != null) {
+      String operator = expression.getFunctionCall().getOperator();
+      try {
+        AggregationFunctionType.getAggregationFunctionType(operator);
+        return true;
+      } catch (IllegalArgumentException e) {
+      }
+      for (Expression operand : expression.getFunctionCall().getOperands()) {
+        if (isAggregateExpression(operand)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private static Set<String> extractIdentifiers(List<Expression> expressions) {
