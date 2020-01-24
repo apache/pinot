@@ -154,7 +154,9 @@ public class PinotQuery2BrokerRequestConverter {
       }
     }
 
-    if (selection != null) {
+    if (aggregationInfoList != null && aggregationInfoList.size() > 0) {
+      brokerRequest.setAggregationsInfo(aggregationInfoList);
+    } else if (selection != null) {
       if (pinotQuery.isSetOffset()) {
         selection.setOffset(pinotQuery.getOffset());
       }
@@ -162,10 +164,6 @@ public class PinotQuery2BrokerRequestConverter {
         selection.setSize(pinotQuery.getLimit());
       }
       brokerRequest.setSelections(selection);
-    }
-
-    if (aggregationInfoList != null && aggregationInfoList.size() > 0) {
-      brokerRequest.setAggregationsInfo(aggregationInfoList);
     }
   }
 
