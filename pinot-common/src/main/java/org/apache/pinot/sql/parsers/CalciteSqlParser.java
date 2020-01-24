@@ -38,6 +38,7 @@ import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlSelectKeyword;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.function.FunctionDefinitionRegistry;
 import org.apache.pinot.common.request.DataSource;
@@ -111,6 +112,7 @@ public class CalciteSqlParser {
   private static PinotQuery compileCalciteSqlToPinotQuery(String sql) {
     SqlParser.ConfigBuilder parserBuilder = SqlParser.configBuilder();
     parserBuilder.setLex(PINOT_LEX);
+    parserBuilder.setConformance(SqlConformanceEnum.LENIENT);
     SqlParser sqlParser = SqlParser.create(sql, parserBuilder.build());
     final SqlNode sqlNode;
     try {
@@ -224,17 +226,16 @@ public class CalciteSqlParser {
     final SqlKind kind = node.getKind();
     Expression expression;
     switch (kind) {
-      case IDENTIFIER:
-        expression = RequestUtils.getFunctionExpression("ASC");
-        expression.getFunctionCall().addToOperands(toExpression(node));
-        break;
       case DESCENDING:
         SqlBasicCall basicCall = (SqlBasicCall) node;
         expression = RequestUtils.getFunctionExpression("DESC");
         expression.getFunctionCall().addToOperands(toExpression(basicCall.getOperands()[0]));
         break;
+      case IDENTIFIER:
       default:
-        throw new RuntimeException("Unknown node type: " + node.getKind());
+        expression = RequestUtils.getFunctionExpression("ASC");
+        expression.getFunctionCall().addToOperands(toExpression(node));
+        break;
     }
     return expression;
   }

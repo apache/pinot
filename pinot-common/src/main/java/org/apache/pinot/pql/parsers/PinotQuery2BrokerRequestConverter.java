@@ -80,7 +80,7 @@ public class PinotQuery2BrokerRequestConverter {
   }
 
   private void convertOrderBy(PinotQuery pinotQuery, BrokerRequest brokerRequest) {
-    if (brokerRequest.getSelections() == null || pinotQuery.getOrderByList() == null) {
+    if (pinotQuery.getOrderByList() == null) {
       return;
     }
     List<SelectionSort> sortSequenceList = new ArrayList<>();
@@ -94,7 +94,10 @@ public class PinotQuery2BrokerRequestConverter {
       sortSequenceList.add(selectionSort);
     }
     if (!sortSequenceList.isEmpty()) {
-      brokerRequest.getSelections().setSelectionSortSequence(sortSequenceList);
+      if (brokerRequest.getSelections() != null) {
+        brokerRequest.getSelections().setSelectionSortSequence(sortSequenceList);
+      }
+      brokerRequest.setOrderBy(sortSequenceList);
     }
   }
 

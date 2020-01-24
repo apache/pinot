@@ -185,6 +185,79 @@ public class CalciteSqlCompilerTest {
     testTopZeroFor("select count(*) from someTable where c = 5 group by X ORDER BY $1 LIMIT -1", -1, true);
   }
 
+  @Test
+  public void testLimitOffsets() {
+    PinotQuery pinotQuery;
+    try {
+      pinotQuery =
+          CalciteSqlParser.compileToPinotQuery("select a, b, c from meetupRsvp order by a, b, c limit 100 offset 200");
+    } catch (SqlCompilationException e) {
+      throw e;
+    }
+    // Test PinotQuery
+    Assert.assertTrue(pinotQuery.isSetLimit());
+    Assert.assertEquals(100, pinotQuery.getLimit());
+    Assert.assertTrue(pinotQuery.isSetOffset());
+    Assert.assertEquals(200, pinotQuery.getOffset());
+
+    try {
+      pinotQuery =
+          CalciteSqlParser.compileToPinotQuery("select a, b, c from meetupRsvp order by a, b, c limit 200,100");
+    } catch (SqlCompilationException e) {
+      throw e;
+    }
+    // Test PinotQuery
+    Assert.assertTrue(pinotQuery.isSetLimit());
+    Assert.assertEquals(100, pinotQuery.getLimit());
+    Assert.assertTrue(pinotQuery.isSetOffset());
+    Assert.assertEquals(200, pinotQuery.getOffset());
+  }
+
+  @Test
+  public void testGroupbys() {
+    PinotQuery pinotQuery;
+    try {
+      pinotQuery = CalciteSqlParser.compileToPinotQuery(
+          "select sum(rsvp_count), count(*) from meetupRsvp group by group_city order by sum(rsvp_count) limit 10");
+    } catch (SqlCompilationException e) {
+      throw e;
+    }
+    // Test PinotQuery
+    Assert.assertTrue(pinotQuery.isSetGroupByList());
+    Assert.assertTrue(pinotQuery.isSetLimit());
+    Assert.assertTrue(pinotQuery.isSetOrderByList());
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getType(), ExpressionType.FUNCTION);
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "SUM");
+    Assert.assertEquals(10, pinotQuery.getLimit());
+
+    try {
+      pinotQuery = CalciteSqlParser.compileToPinotQuery(
+          "select group_city, sum(rsvp_count), count(*) from meetupRsvp group by group_city order by sum(rsvp_count), count(*) limit 10");
+    } catch (SqlCompilationException e) {
+      throw e;
+    }
+    // Test PinotQuery
+    Assert.assertTrue(pinotQuery.isSetGroupByList());
+    Assert.assertTrue(pinotQuery.isSetLimit());
+    Assert.assertTrue(pinotQuery.isSetOrderByList());
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getType(), ExpressionType.FUNCTION);
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "SUM");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "rsvp_count");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "COUNT");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "*");
+    Assert.assertEquals(10, pinotQuery.getLimit());
+  }
+
   private void assertCompilationFails(String query) {
     try {
       CalciteSqlParser.compileToPinotQuery(query);
@@ -248,8 +321,8 @@ public class CalciteSqlCompilerTest {
         CalciteSqlParser.compileToPinotQuery("select * from vegetables where name <> 'Brussels sprouts'");
     Assert.assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperator(), "NOT_EQUALS");
 
-    // Bang equal '!=' is not allowed under the current SQL conformance level
-    assertCompilationFails("select * from vegetables where name != 'Brussels sprouts'");
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where name != 'Brussels sprouts'");
+    Assert.assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperator(), "NOT_EQUALS");
   }
 
   @Test

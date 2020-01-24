@@ -83,6 +83,34 @@ public class PqlAndCalciteSqlCompatibilityTest {
   }
 
   @Test
+  public void testSinglePqlAndSqlGroupByOrderByCompatible() {
+    final String sql =
+        "select group_city, sum(rsvp_count), count(*) from meetupRsvp group by group_city order by sum(rsvp_count), group_city DESC limit 100";
+    final String pql =
+        "select group_city, sum(rsvp_count), count(*) from meetupRsvp group by group_city order by sum(rsvp_count), group_city DESC limit 100";
+
+    // PQL
+    LOGGER.info("Trying to compile PQL: {}", pql);
+    // NOTE: SQL is always using upper cases, so we need to make the string to upper case in order to match the parsed identifier name.
+    final BrokerRequest unOptimizedBrokerRequestFromPQL = COMPILER.compileToBrokerRequest(pql);
+    final BrokerRequest brokerRequestFromPQL = OPTIMIZER.optimize(unOptimizedBrokerRequestFromPQL, null);
+    LOGGER.debug("Compiled PQL: PQL: {}, BrokerRequest: {}", pql, brokerRequestFromPQL);
+    brokerRequestFromPQL.unsetPinotQuery();
+
+    //SQL
+    LOGGER.info("Trying to compile SQL: {}", sql);
+    final PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    final BrokerRequest brokerRequestFromSQL =
+        OPTIMIZER.optimize(new PinotQuery2BrokerRequestConverter().convert(pinotQuery), null);
+    LOGGER.debug("Compiled SQL: SQL: {}, PinotQuery: {}, BrokerRequest: {}", sql, pinotQuery, brokerRequestFromSQL);
+
+    // Compare
+    LOGGER.info("Trying to compare BrokerRequest -\nFrom PQL: {}\nFrom SQL: {}", brokerRequestFromPQL,
+        brokerRequestFromSQL);
+    Assert.assertTrue(BrokerRequestComparisonUtils.validate(brokerRequestFromPQL, brokerRequestFromSQL));
+  }
+
+  @Test
   public void testPqlAndSqlCompatible()
       throws Exception {
     final BufferedReader brPql = new BufferedReader(new InputStreamReader(

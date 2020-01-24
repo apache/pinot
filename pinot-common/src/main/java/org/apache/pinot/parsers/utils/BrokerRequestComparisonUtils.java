@@ -25,6 +25,7 @@ import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.request.FilterQueryMap;
 import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.SelectionSort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,6 +85,50 @@ public class BrokerRequestComparisonUtils {
           return false;
         }
       }
+      if (br1.getOrderBy() != null) {
+        if (!validateOrderBys(br1.getOrderBy(), br2.getOrderBy())) {
+          sb.append("br1.getOrderBy() = ").append(br1.getOrderBy()).append("\n").append("br2.getOrderBy() = ")
+              .append(br2.getOrderBy());
+          LOGGER.error("Order By did not match conversion:{}", sb);
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  private static boolean validateOrderBys(List<SelectionSort> orderBy1, List<SelectionSort> orderBy2) {
+    if (orderBy1 == null && orderBy2 == null) {
+      return true;
+    }
+    if (orderBy1 == null || orderBy2 == null) {
+      LOGGER.error("Failed to validate OrderBys: value doesn't match.\n\t{}\n\t{}", orderBy1, orderBy2);
+      return false;
+    }
+    if (orderBy1.size() != orderBy2.size()) {
+      LOGGER.error("Failed to validate OrderBys: size doesn't match.\n\t{}\n\t{}", orderBy1, orderBy2);
+      return false;
+    }
+    for (int i = 0; i < orderBy1.size(); i++) {
+      if (!validateOrderBy(orderBy1.get(i), orderBy2.get(i))) {
+        LOGGER.error("Failed to validate OrderBys at idx {} doesn't match.\n\t{}\n\t{}", i, orderBy1.get(i),
+            orderBy2.get(i));
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static boolean validateOrderBy(SelectionSort orderBy1, SelectionSort orderBy2) {
+    if (orderBy1.isIsAsc() != orderBy2.isIsAsc()) {
+      LOGGER.error("Failed to validate OrderBy at field: `isAsc` {} doesn't match.\n\t{}\n\t{}", orderBy1.isIsAsc(),
+          orderBy2.isIsAsc());
+      return false;
+    }
+    if (!orderBy1.getColumn().equalsIgnoreCase(orderBy2.getColumn())) {
+      LOGGER.error("Failed to validate OrderBy at field: `column` {} doesn't match.\n\t{}\n\t{}", orderBy1.getColumn(),
+          orderBy2.getColumn());
+      return false;
     }
     return true;
   }
@@ -103,7 +148,7 @@ public class BrokerRequestComparisonUtils {
   }
 
   private static boolean validateAggregation(AggregationInfo agg1, AggregationInfo agg2) {
-    if (!agg1.getAggregationType().equals(agg2.getAggregationType())) {
+    if (!agg1.getAggregationType().equalsIgnoreCase(agg2.getAggregationType())) {
       LOGGER.error("Failed to validate AggregationInfo: AggregationType doesn't match.\n\t{}\n\t{}", agg1, agg2);
       return false;
     }
