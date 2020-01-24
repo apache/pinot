@@ -418,7 +418,7 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     pqlQuery = "SELECT MAX(ArrTime) FROM " + DEFAULT_TABLE_NAME + " where DaysSinceEpoch > 16100";
     response = postQuery(pqlQuery);
     assertTrue(response.get("numEntriesScannedPostFilter").asLong() > 0);
-    assertTrue(response.get("numEntriesScannedInFilter").asLong() > 0);
+    assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
   }
 
   @Test
@@ -469,7 +469,7 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     pqlQuery = "SELECT COUNT(*) FROM " + DEFAULT_TABLE_NAME + " WHERE DaysSinceEpoch > 16100";
     response = postQuery(pqlQuery);
     assertEquals(response.get("numEntriesScannedPostFilter").asLong(), 0);
-    assertTrue(response.get("numEntriesScannedInFilter").asLong() > 0);
+    assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
 
     // mixed aggregation functions in query: not answered by MetadataBasedAggregationOperator
     pqlQuery = "SELECT COUNT(*),MAX(ArrTime) FROM " + DEFAULT_TABLE_NAME;

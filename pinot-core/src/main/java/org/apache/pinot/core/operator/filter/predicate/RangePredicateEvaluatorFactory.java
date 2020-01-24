@@ -79,7 +79,7 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  private static final class OfflineDictionaryBasedRangePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
+  public static final class OfflineDictionaryBasedRangePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
     final int _startDictId;
     // Exclusive
     final int _endDictId;
@@ -127,6 +127,14 @@ public class RangePredicateEvaluatorFactory {
       } else if (dictionary.length() == _numMatchingDictIds) {
         _alwaysTrue = true;
       }
+    }
+
+    public int getStartDictId() {
+      return _startDictId;
+    }
+
+    public int getEndDictId() {
+      return _endDictId;
     }
 
     @Override
