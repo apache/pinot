@@ -350,28 +350,7 @@ public class CalciteSqlParser {
         return RequestUtils.getIdentifierExpression(node.toString());
       case LITERAL:
         return RequestUtils.getLiteralExpression((SqlLiteral) node);
-      case AS:
-        // Aggregation
-      case COUNT:
-      case SUM:
-      case AVG:
-      case MAX:
-      case MIN:
-      case HOP:
-      case OTHER_FUNCTION:
-        // Filtering
-      case OR:
-      case AND:
-      case EQUALS:
-      case NOT_EQUALS:
-      case BETWEEN:
-      case GREATER_THAN:
-      case GREATER_THAN_OR_EQUAL:
-      case LESS_THAN:
-      case LESS_THAN_OR_EQUAL:
-      case IN:
-      case NOT_IN:
-      case LIKE:
+      default:
         SqlBasicCall funcSqlNode = (SqlBasicCall) node;
         String funcName = funcSqlNode.getOperator().getKind().name();
         if (funcSqlNode.getOperator().getKind() == SqlKind.OTHER_FUNCTION) {
@@ -390,8 +369,6 @@ public class CalciteSqlParser {
           }
         }
         return funcExpr;
-      default:
-        throw new RuntimeException("Unknown node type: " + node.getKind());
     }
   }
 }
