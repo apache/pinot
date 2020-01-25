@@ -47,6 +47,7 @@ import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
@@ -57,6 +58,7 @@ import org.slf4j.LoggerFactory;
 public class CalciteSqlParser {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
+
 
   /** Lexical policy similar to MySQL with ANSI_QUOTES option enabled. (To be
    * precise: MySQL on Windows; MySQL on Linux uses case-sensitive matching,
@@ -239,8 +241,58 @@ public class CalciteSqlParser {
         throw new RuntimeException(
             "Unable to convert SqlNode: " + sqlNode + " to PinotQuery. Unknown node type: " + sqlNode.getKind());
     }
+    Map<Identifier, Expression> aliasMap = extractAlias(pinotQuery.getSelectList());
+    applyAlias(aliasMap, pinotQuery);
     validate(pinotQuery);
     return pinotQuery;
+  }
+
+  private static void applyAlias(Map<Identifier, Expression> aliasMap, PinotQuery pinotQuery) {
+    if (pinotQuery.isSetFilterExpression()) {
+      applyAlias(aliasMap, pinotQuery.getFilterExpression());
+    }
+    if (pinotQuery.isSetGroupByList()) {
+      for (Expression groupByExpr : pinotQuery.getGroupByList()) {
+        applyAlias(aliasMap, groupByExpr);
+      }
+    }
+    if (pinotQuery.isSetOrderByList()) {
+      for (Expression orderByExpr : pinotQuery.getOrderByList()) {
+        applyAlias(aliasMap, orderByExpr);
+      }
+    }
+  }
+
+  private static void applyAlias(Map<Identifier, Expression> aliasMap, Expression expression) {
+    if (expression == null) {
+      return;
+    }
+    Identifier identifierKey = expression.getIdentifier();
+    if ((identifierKey != null) && (aliasMap.containsKey(identifierKey))) {
+      Expression aliasExpression = aliasMap.get(identifierKey);
+      expression.setType(aliasExpression.getType()).setIdentifier(aliasExpression.getIdentifier())
+          .setFunctionCall(aliasExpression.getFunctionCall()).setLiteral(aliasExpression.getLiteral());
+    }
+    if (expression.getFunctionCall() != null) {
+      for (Expression operand : expression.getFunctionCall().getOperands()) {
+        applyAlias(aliasMap, operand);
+      }
+    }
+  }
+
+  private static Map<Identifier, Expression> extractAlias(List<Expression> expressions) {
+    Map<Identifier, Expression> aliasMap = new HashMap<>();
+    for (Expression expression : expressions) {
+      Function functionCall = expression.getFunctionCall();
+      if (functionCall == null) {
+        continue;
+      }
+      if (functionCall.getOperator().equalsIgnoreCase("AS")) {
+        Expression identifierExpr = functionCall.getOperands().get(1);
+        aliasMap.put(identifierExpr.getIdentifier(), functionCall.getOperands().get(0));
+      }
+    }
+    return aliasMap;
   }
 
   private static List<String> extractOptionsFromSql(String sql) {
