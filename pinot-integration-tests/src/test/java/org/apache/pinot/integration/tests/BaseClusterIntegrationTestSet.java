@@ -176,6 +176,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     testSqlQuery(query, Collections.singletonList(query));
     query = "SELECT DaysSinceEpoch, COUNT(*), MAX(ArrTime), MIN(ArrTime) FROM mytable GROUP BY DaysSinceEpoch";
     testSqlQuery(query, Collections.singletonList(query));
+    query = "SELECT ArrTime, ArrTime * 10 FROM mytable WHERE DaysSinceEpoch >= 16312";
+    testSqlQuery(query, Collections.singletonList(query));
   }
 
   /**
