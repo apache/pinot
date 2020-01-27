@@ -28,6 +28,7 @@ import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.DataSourceMetadata;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.realtime.impl.dictionary.BaseMutableDictionary;
 
 
 public class FilterOperatorUtils {
@@ -56,16 +57,15 @@ public class FilterOperatorUtils {
     // Use inverted index if the predicate type is not RANGE or REGEXP_LIKE for efficiency
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     Predicate.Type predicateType = predicateEvaluator.getPredicateType();
-    if (dataSourceMetadata.hasInvertedIndex() && (predicateType != Predicate.Type.RANGE) && (predicateType
-        != Predicate.Type.REGEXP_LIKE)) {
-      if (dataSourceMetadata.isSorted()) {
+    if (dataSourceMetadata.hasInvertedIndex() && (predicateType != Predicate.Type.REGEXP_LIKE)) {
+      if (dataSource.getDataSourceMetadata().isSorted()) {
         return new SortedInvertedIndexBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
-      } else {
+      } else if (predicateType != Predicate.Type.RANGE) {
+        // TODO: add support for bitmap inverted index operator can be used for RANGE predicate
         return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
       }
-    } else {
-      return new ScanBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
     }
+    return new ScanBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
   }
 
   /**
