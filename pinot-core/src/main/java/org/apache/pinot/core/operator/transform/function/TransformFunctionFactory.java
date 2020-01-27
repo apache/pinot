@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.DataSource;
@@ -51,6 +50,7 @@ public class TransformFunctionFactory {
           put(TransformFunctionType.SUB.getName().toLowerCase(), SubtractionTransformFunction.class);
           put(TransformFunctionType.MULT.getName().toLowerCase(), MultiplicationTransformFunction.class);
           put(TransformFunctionType.DIV.getName().toLowerCase(), DivisionTransformFunction.class);
+          put(TransformFunctionType.MOD.getName().toLowerCase(), ModuloTransformFunction.class);
 
           put(TransformFunctionType.PLUS.getName().toLowerCase(), AdditionTransformFunction.class);
           put(TransformFunctionType.MINUS.getName().toLowerCase(), SubtractionTransformFunction.class);

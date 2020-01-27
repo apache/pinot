@@ -24,6 +24,8 @@ public enum TransformFunctionType {
   SUB("sub"),
   MULT("mult"),
   DIV("div"),
+  MOD("mod"),
+
   PLUS("plus"),
   MINUS("minus"),
   TIMES("times"),
