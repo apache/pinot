@@ -36,7 +36,7 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 /**
  * Aggregation operator that utilizes dictionary for serving aggregation queries.
- * The dictionary operator is selected in the plan maker, if the query if of aggregation type min, max, minmaxrange
+ * The dictionary operator is selected in the plan maker, if the query is of aggregation type min, max, minmaxrange
  * and the column has a dictionary.
  * We don't use this operator if the segment has star tree,
  * as the dictionary will have aggregated values for the metrics, and dimensions will have star node value

@@ -22,8 +22,17 @@ package org.apache.pinot.core.operator;
  * The <code>ExecutionStatistics</code> class contains the operator statistics during execution time.
  */
 public class ExecutionStatistics {
+  // The number of documents scanned post filtering.
   private long _numDocsScanned;
+  // The number of entries (single value entry contains 1 value, multi-value entry may contain multiple values) scanned
+  // in the filtering phase of the query execution: could be larger than the total scanned doc num because of multiple
+  // filtering predicates and multi-value entry.
+  // TODO: make the semantic of entry the same in _numEntriesScannedInFilter and _numEntriesScannedPostFilter. Currently
+  // _numEntriesScannedInFilter counts values in a multi-value entry multiple times whereas in
+  // _numEntriesScannedPostFilter counts all values in a multi-value entry only once. We can add a new stats
+  // _numValuesScannedInFilter to replace _numEntriesScannedInFilter.
   private long _numEntriesScannedInFilter;
+  // Equal to numDocsScanned * numberProjectedColumns.
   private long _numEntriesScannedPostFilter;
   private long _numTotalRawDocs;
   private long _numSegmentsProcessed;
