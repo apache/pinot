@@ -195,7 +195,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
 
     int[] finalSchemaMapIdx = null;
     if (_sqlSelectionList != null) {
-      finalSchemaMapIdx = getFinalSchemaMapIdx(dataSchema);
+      finalSchemaMapIdx = getFinalSchemaMapIdx();
     }
     List<Object[]> rows = new ArrayList<>();
     Iterator<Record> sortedIterator = indexedTable.iterator();
@@ -213,11 +213,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
       if (_sqlSelectionList != null) {
         Object[] finalValues = new Object[_sqlSelectionList.size()];
         for (int i = 0; i < finalSchemaMapIdx.length; i++) {
-          if (finalSchemaMapIdx[i] == -1) {
-            finalValues[i] = null;
-          } else {
-            finalValues[i] = values[finalSchemaMapIdx[i]];
-          }
+          finalValues[i] = values[finalSchemaMapIdx[i]];
         }
         rows.add(finalValues);
       } else {
@@ -232,13 +228,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
       String[] columns = new String[columnSize];
       DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[columnSize];
       for (int i = 0; i < columnSize; i++) {
-        if (finalSchemaMapIdx[i] == -1) {
-          columns[i] = RequestUtils.prettyPrint(_sqlSelectionList.get(i));
-          columnDataTypes[i] = DataSchema.ColumnDataType.STRING;
-        } else {
-          columns[i] = finalDataSchema.getColumnName(finalSchemaMapIdx[i]);
-          columnDataTypes[i] = finalDataSchema.getColumnDataType(finalSchemaMapIdx[i]);
-        }
+        columns[i] = finalDataSchema.getColumnName(finalSchemaMapIdx[i]);
+        columnDataTypes[i] = finalDataSchema.getColumnDataType(finalSchemaMapIdx[i]);
       }
       finalDataSchema = new DataSchema(columns, columnDataTypes);
     }
@@ -248,15 +239,14 @@ public class GroupByDataTableReducer implements DataTableReducer {
   /**
    * Generate index mapping based on selection expression to DataTable schema, which is groupBy columns,
    * then aggregation functions.
-   * @param dataSchema
    *
    * @return a mapping from final schema idx to corresponding idx in data table schema.
    */
-  private int[] getFinalSchemaMapIdx(DataSchema dataSchema) {
+  private int[] getFinalSchemaMapIdx() {
     int[] finalSchemaMapIdx = new int[_sqlSelectionList.size()];
     int nextAggregationIdx = _numGroupBy;
     for (int i = 0; i < _sqlSelectionList.size(); i++) {
-      finalSchemaMapIdx[i] = getExpressionMapIdx(dataSchema, _sqlSelectionList.get(i), nextAggregationIdx);
+      finalSchemaMapIdx[i] = getExpressionMapIdx(_sqlSelectionList.get(i), nextAggregationIdx);
       if (finalSchemaMapIdx[i] == nextAggregationIdx) {
         nextAggregationIdx++;
       }
@@ -264,7 +254,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     return finalSchemaMapIdx;
   }
 
-  private int getExpressionMapIdx(DataSchema dataSchema, Expression expression, int nextAggregationIdx) {
+  private int getExpressionMapIdx(Expression expression, int nextAggregationIdx) {
     // Check if expression matches groupBy list.
     int idxFromGroupByList = getGroupByIdx(_groupByList, expression);
     if (idxFromGroupByList != -1) {
@@ -274,21 +264,14 @@ public class GroupByDataTableReducer implements DataTableReducer {
     if (expression.getFunctionCall() != null) {
       // handle AS
       if (expression.getFunctionCall().getOperator().equalsIgnoreCase("AS")) {
-        return getExpressionMapIdx(dataSchema, expression.getFunctionCall().getOperands().get(0), nextAggregationIdx);
+        return getExpressionMapIdx(expression.getFunctionCall().getOperands().get(0), nextAggregationIdx);
       }
       // Return next aggregation idx.
       return nextAggregationIdx;
     }
-    // Handle identifier, which is a column.
-    if (expression.getIdentifier() != null) {
-      String columnName = expression.getIdentifier().getName();
-      for (int i = 0; i < dataSchema.size(); i++) {
-        if (columnName.equalsIgnoreCase(dataSchema.getColumnName(i))) {
-          return i;
-        }
-      }
-    }
-    return -1;
+    // Shouldn't reach here.
+    throw new IllegalArgumentException(
+        "Failed to get index from GroupBy Clause for selected expression - " + RequestUtils.prettyPrint(expression));
   }
 
   /**
