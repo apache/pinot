@@ -71,10 +71,11 @@ public class PinotQuery2BrokerRequestConverter {
 
     //TODO: these should not be part of the query?
     //brokerRequest.setEnableTrace();
-    //brokerRequest.setDebugOptions();
+    brokerRequest.setDebugOptions(pinotQuery.getDebugOptions());
     brokerRequest.setQueryOptions(pinotQuery.getQueryOptions());
     //brokerRequest.setBucketHashKey();
     //brokerRequest.setDuration();
+    brokerRequest.setPinotQuery(pinotQuery);
 
     return brokerRequest;
   }

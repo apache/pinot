@@ -321,4 +321,33 @@ public class RequestUtils {
       throw new IllegalStateException("Cannot get expression from " + astNode.getClass().getSimpleName());
     }
   }
+
+  public static String prettyPrint(Expression expression) {
+    if (expression == null) {
+      return "null";
+    }
+    if (expression.getIdentifier() != null) {
+      return expression.getIdentifier().getName();
+    }
+    if (expression.getLiteral() != null) {
+      if (expression.getLiteral().isSetLongValue()) {
+        return Long.toString(expression.getLiteral().getLongValue());
+      }
+    }
+    if (expression.getFunctionCall() != null) {
+      String res = expression.getFunctionCall().getOperator() + "(";
+      boolean isFirstParam = true;
+      for (Expression operand : expression.getFunctionCall().getOperands()) {
+        res += prettyPrint(operand);
+        if (!isFirstParam) {
+          res += ", ";
+        } else {
+          isFirstParam = false;
+        }
+      }
+      res += ")";
+      return res;
+    }
+    return null;
+  }
 }
