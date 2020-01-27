@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -45,18 +46,33 @@ import org.slf4j.LoggerFactory;
  *     differences:
  *     <ul>
  *       <li>
- *         1. Within a replica-group, all segments of the same partition (steam partition) are always assigned to the
- *         same exactly one instance, and because of that we can directly assign or rebalance the CONSUMING segments to
- *         the instances based on the partition id
+ *         1. Within a replica-group, all segments of the same stream partition are always assigned to the same exactly
+ *         one instance, and because of that we can directly assign or rebalance the CONSUMING segments to the instances
+ *         based on the partition id
  *       </li>
  *       <li>
  *         2. Partition id for an instance is derived from the index of the instance (within the replica-group for
  *         replica-group based assignment), instead of explicitly stored in the instance partitions
  *       </li>
+ *       <li>
+ *         TODO: Support explicit partition configuration in instance partitions
+ *       </li>
  *     </ul>
  *   </li>
  *   <li>
- *     For the COMPLETED segments, rebalance segments the same way as OfflineSegmentAssignment.
+ *     For the COMPLETED segments:
+ *     <ul>
+ *       <li>
+ *         If COMPLETED instance partitions are provided, reassign COMPLETED segments the same way as
+ *         OfflineSegmentAssignment to relocate COMPLETED segments and offload them from CONSUMING instances to
+ *         COMPLETED instances
+ *       </li>
+ *       <li>
+ *         If COMPLETED instance partitions are not provided, reassign COMPLETED segments the same way as CONSUMING
+ *         segments with CONSUMING instance partitions to ensure COMPLETED segments are served by the correct instances
+ *         when instances for the table has been changed.
+ *       </li>
+ *     </ul>
  *   </li>
  * </ul>
  */
@@ -143,62 +159,81 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
   @Override
   public Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, Configuration config) {
+    InstancePartitions completedInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.COMPLETED);
+    InstancePartitions consumingInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.CONSUMING);
+    Preconditions.checkState(consumingInstancePartitions != null,
+        "Failed to find COMPLETED or CONSUMING instance partitions for table: %s", _realtimeTableName);
+    Preconditions.checkState(consumingInstancePartitions.getNumPartitions() == 1,
+        "Instance partitions: %s should contain 1 partition", consumingInstancePartitions.getInstancePartitionsName());
+    boolean includeConsuming = config
+        .getBoolean(RebalanceConfigConstants.INCLUDE_CONSUMING, RebalanceConfigConstants.DEFAULT_INCLUDE_CONSUMING);
+    LOGGER.info(
+        "Rebalancing table: {} with COMPLETED instance partitions: {}, CONSUMING instance partitions: {}, includeConsuming: {}",
+        _realtimeTableName, completedInstancePartitions, consumingInstancePartitions, includeConsuming);
+
     SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment completedConsumingOfflineSegmentAssignment =
         new SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment(currentAssignment);
+    Map<String, Map<String, String>> newAssignment;
 
-    // Rebalance COMPLETED segments first
+    // Reassign COMPLETED segments first
     Map<String, Map<String, String>> completedSegmentAssignment =
         completedConsumingOfflineSegmentAssignment.getCompletedSegmentAssignment();
-    InstancePartitions completedInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.COMPLETED);
-    Preconditions
-        .checkState(completedInstancePartitions != null, "Failed to find COMPLETED instance partitions for table: %s",
-            _realtimeTableName);
-    LOGGER.info("Rebalancing COMPLETED segments for table: {} with instance partitions: {}", _realtimeTableName,
-        completedInstancePartitions);
+    if (completedInstancePartitions != null) {
+      // When COMPLETED instance partitions are provided, reassign COMPLETED segments in a balanced way (relocate
+      // COMPLETED segments to offload them from CONSUMING instances to COMPLETED instances)
+      LOGGER
+          .info("Reassigning COMPLETED segments with COMPLETED instance partitions for table: {}", _realtimeTableName);
 
-    Map<String, Map<String, String>> newAssignment;
-    if (completedInstancePartitions.getNumReplicaGroups() == 1) {
-      // Non-replica-group based assignment
+      if (completedInstancePartitions.getNumReplicaGroups() == 1) {
+        // Non-replica-group based assignment
 
-      List<String> instances = SegmentAssignmentUtils
-          .getInstancesForNonReplicaGroupBasedAssignment(completedInstancePartitions, _replication);
-      newAssignment = SegmentAssignmentUtils
-          .rebalanceTableWithHelixAutoRebalanceStrategy(completedSegmentAssignment, instances, _replication);
+        List<String> instances = SegmentAssignmentUtils
+            .getInstancesForNonReplicaGroupBasedAssignment(completedInstancePartitions, _replication);
+        newAssignment = SegmentAssignmentUtils
+            .rebalanceTableWithHelixAutoRebalanceStrategy(completedSegmentAssignment, instances, _replication);
+      } else {
+        // Replica-group based assignment
+
+        int numReplicaGroups = completedInstancePartitions.getNumReplicaGroups();
+        if (numReplicaGroups != _replication) {
+          LOGGER.warn(
+              "Number of replica-groups in instance partitions {}: {} does not match replication in table config: {} for table: {}, use: {}",
+              completedInstancePartitions.getInstancePartitionsName(), numReplicaGroups, _replication,
+              _realtimeTableName, numReplicaGroups);
+        }
+
+        Map<Integer, Set<String>> partitionIdToSegmentsMap = new HashMap<>();
+        for (String segmentName : completedSegmentAssignment.keySet()) {
+          int partitionId = new LLCSegmentName(segmentName).getPartitionId();
+          partitionIdToSegmentsMap.computeIfAbsent(partitionId, k -> new HashSet<>()).add(segmentName);
+        }
+        newAssignment = SegmentAssignmentUtils
+            .rebalanceReplicaGroupBasedTable(completedSegmentAssignment, completedInstancePartitions,
+                partitionIdToSegmentsMap);
+      }
     } else {
-      // Replica-group based assignment
+      // When COMPLETED instance partitions are not provided, reassign COMPLETED segments the same way as CONSUMING
+      // segments with CONSUMING instance partitions (ensure COMPLETED segments are served by the correct instances when
+      // instances for the table has been changed)
+      LOGGER.info(
+          "No COMPLETED instance partitions found, reassigning COMPLETED segments the same way as CONSUMING segments with CONSUMING instance partitions for table: {}",
+          _realtimeTableName);
 
-      int numReplicaGroups = completedInstancePartitions.getNumReplicaGroups();
-      if (numReplicaGroups != _replication) {
-        LOGGER.warn(
-            "Number of replica-groups in instance partitions {}: {} does not match replication in table config: {} for table: {}, use: {}",
-            completedInstancePartitions.getInstancePartitionsName(), numReplicaGroups, _replication, _realtimeTableName,
-            numReplicaGroups);
-      }
-
-      Map<Integer, Set<String>> partitionIdToSegmentsMap = new HashMap<>();
+      newAssignment = new TreeMap<>();
       for (String segmentName : completedSegmentAssignment.keySet()) {
-        int partitionId = new LLCSegmentName(segmentName).getPartitionId();
-        partitionIdToSegmentsMap.computeIfAbsent(partitionId, k -> new HashSet<>()).add(segmentName);
+        List<String> instancesAssigned = assignSegment(segmentName, consumingInstancePartitions);
+        Map<String, String> instanceStateMap = SegmentAssignmentUtils
+            .getInstanceStateMap(instancesAssigned, RealtimeSegmentOnlineOfflineStateModel.ONLINE);
+        newAssignment.put(segmentName, instanceStateMap);
       }
-      newAssignment = SegmentAssignmentUtils
-          .rebalanceReplicaGroupBasedTable(completedSegmentAssignment, completedInstancePartitions,
-              partitionIdToSegmentsMap);
     }
 
-    // Rebalance CONSUMING segments if configured
+    // Reassign CONSUMING segments if configured
     Map<String, Map<String, String>> consumingSegmentAssignment =
         completedConsumingOfflineSegmentAssignment.getConsumingSegmentAssignment();
-    if (config
-        .getBoolean(RebalanceConfigConstants.INCLUDE_CONSUMING, RebalanceConfigConstants.DEFAULT_INCLUDE_CONSUMING)) {
-      InstancePartitions consumingInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.CONSUMING);
-      Preconditions
-          .checkState(consumingInstancePartitions != null, "Failed to find CONSUMING instance partitions for table: %s",
-              _realtimeTableName);
-      Preconditions.checkState(consumingInstancePartitions.getNumPartitions() == 1,
-          "Instance partitions: %s should contain 1 partition",
-          consumingInstancePartitions.getInstancePartitionsName());
-      LOGGER.info("Rebalancing CONSUMING segments for table: {} with instance partitions: {}", _realtimeTableName,
-          consumingInstancePartitions);
+    if (includeConsuming) {
+      LOGGER
+          .info("Reassigning CONSUMING segments with CONSUMING instance partitions for table: {}", _realtimeTableName);
 
       for (String segmentName : consumingSegmentAssignment.keySet()) {
         List<String> instancesAssigned = assignSegment(segmentName, consumingInstancePartitions);

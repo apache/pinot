@@ -39,6 +39,11 @@ import org.apache.pinot.spi.utils.JsonUtils;
  *   <li>
  *     Partition: a set of instances that contains the segments of the same partition (value partition for offline
  *     table, or stream partition for real-time table)
+ *     <p>NOTE: For real-time table CONSUMING instance partitions, partition cannot be explicitly configured (number of
+ *     partitions must be 1), but has to be derived from the index of the instance. Each instance will contain all the
+ *     segments from a stream partition before them getting relocated to the COMPLETED instance partitions. The stream
+ *     partitions will be evenly spread over all instances (within each replica-group if replica-group is configured).
+ *     <p>TODO: Support explicit partition configuration for CONSUMING instance partitions
  *   </li>
  *   <li>
  *     Replica-group: a set of instances that contains one replica of all the segments

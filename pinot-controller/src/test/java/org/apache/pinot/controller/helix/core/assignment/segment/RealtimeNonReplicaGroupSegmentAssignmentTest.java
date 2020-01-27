@@ -140,8 +140,17 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
       assertEquals(instanceStateMap.size(), NUM_REPLICAS);
     }
 
-    // Rebalance should relocate all COMPLETED (ONLINE) segments to the COMPLETED instances
-    Map<String, Map<String, String>> newAssignment =
+    // Rebalance without COMPLETED instance partitions should not change the segment assignment
+    Map<InstancePartitionsType, InstancePartitions> noRelocationInstancePartitionsMap = new TreeMap<>();
+    noRelocationInstancePartitionsMap
+        .put(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
+    Map<String, Map<String, String>> newAssignment = _segmentAssignment
+        .rebalanceTable(currentAssignment, noRelocationInstancePartitionsMap, new BaseConfiguration());
+    assertEquals(newAssignment, currentAssignment);
+
+    // Rebalance with COMPLETED instance partitions should relocate all COMPLETED (ONLINE) segments to the COMPLETED
+    // instances
+    newAssignment =
         _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, new BaseConfiguration());
     assertEquals(newAssignment.size(), NUM_SEGMENTS);
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
@@ -170,10 +179,15 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
       assertTrue(numSegmentsAssignedPerInstance[i] >= expectedMinNumSegmentsPerInstance);
     }
 
-    // Rebalance all segments (including CONSUMING) should give the same assignment
+    // Rebalance with COMPLETED instance partitions including CONSUMING segments should give the same assignment
     BaseConfiguration config = new BaseConfiguration();
     config.setProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, true);
     assertEquals(_segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, config), newAssignment);
+
+    // Rebalance without COMPLETED instance partitions again should change the segment assignment back
+    assertEquals(
+        _segmentAssignment.rebalanceTable(newAssignment, noRelocationInstancePartitionsMap, new BaseConfiguration()),
+        currentAssignment);
 
     // Rebalance should not change the assignment for the OFFLINE segments
     String offlineSegmentName = "offlineSegment";
