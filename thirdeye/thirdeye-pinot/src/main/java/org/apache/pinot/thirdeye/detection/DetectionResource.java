@@ -72,6 +72,8 @@ import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
+import org.apache.pinot.thirdeye.detection.cache.builder.AnomaliesCacheBuilder;
+import org.apache.pinot.thirdeye.detection.cache.builder.TimeSeriesCacheBuilder;
 import org.apache.pinot.thirdeye.detection.finetune.GridSearchTuningAlgorithm;
 import org.apache.pinot.thirdeye.detection.finetune.TuningAlgorithm;
 import org.apache.pinot.thirdeye.detection.health.DetectionHealth;
@@ -133,7 +135,9 @@ public class DetectionResource {
 
     this.loader = new DetectionPipelineLoader();
 
-    this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, evaluationDAO, timeseriesLoader, aggregationLoader, loader);
+    this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, evaluationDAO,
+        timeseriesLoader, aggregationLoader, loader, TimeSeriesCacheBuilder.getInstance(),
+        AnomaliesCacheBuilder.getInstance());
     this.detectionConfigFormatter = new DetectionConfigFormatter(metricDAO, datasetDAO);
     this.subscriptionConfigFormatter = new DetectionAlertConfigFormatter();
   }
@@ -248,7 +252,7 @@ public class DetectionResource {
 
     LinkedHashMap<String, List<Number>> parameters = (LinkedHashMap<String, List<Number>>) json.get("parameters");
 
-    AnomalySlice slice = new AnomalySlice().withStart(start).withEnd(end);
+    AnomalySlice slice = new AnomalySlice().withDetectionId(configId).withStart(start).withEnd(end);
 
     TuningAlgorithm gridSearch = new GridSearchTuningAlgorithm(OBJECT_MAPPER.writeValueAsString(json.get("properties")), parameters);
     gridSearch.fit(slice, configId);
@@ -446,6 +450,7 @@ public class DetectionResource {
       @QueryParam("end") long end,
       @QueryParam("deleteExistingAnomaly") @DefaultValue("false") boolean deleteExistingAnomaly) throws Exception {
     Map<String, String> responseMessage = new HashMap<>();
+    long ts = System.currentTimeMillis();
     DetectionPipelineResult result;
     try {
       DetectionConfigDTO config = this.configDAO.findById(detectionId);
@@ -486,7 +491,9 @@ public class DetectionResource {
       return Response.serverError().entity(responseMessage).build();
     }
 
-    LOG.info("Replay detection pipeline {} generated {} anomalies.", detectionId, result.getAnomalies().size());
+    long duration = System.currentTimeMillis() - ts;
+    LOG.info("Replay detection pipeline {} generated {} anomalies and took {} millis.",
+        detectionId, result.getAnomalies().size(), duration);
     return Response.ok(result).build();
   }
 

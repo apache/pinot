@@ -119,8 +119,12 @@ public class AlertUtils {
 
   public static Map<Long, Long> mergeVectorClock(Map<Long, Long> a, Map<Long, Long> b) {
     Set<Long> keySet = new HashSet<>();
-    keySet.addAll(a.keySet());
-    keySet.addAll(b.keySet());
+    if (a != null) {
+      keySet.addAll(a.keySet());
+    }
+    if (b != null) {
+      keySet.addAll(b.keySet());
+    }
 
     Map<Long, Long> result = new HashMap<>();
     for (Long detectionId : keySet) {

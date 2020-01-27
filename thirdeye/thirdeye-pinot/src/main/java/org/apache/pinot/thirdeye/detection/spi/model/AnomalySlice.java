@@ -27,7 +27,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import org.apache.pinot.thirdeye.datalayer.pojo.TaskBean;
 
 import static org.apache.pinot.thirdeye.detection.wrapper.GrouperWrapper.*;
 
@@ -120,8 +119,43 @@ public class AnomalySlice {
     return new AnomalySlice(this.detectionId, this.start, this.end, this.filters, this.detectionComponentNames, isTaggedAsChild);
   }
 
+  /**
+   * Check if current anomaly slice contains another anomaly slice
+   *
+   * We will say one slice (current) contains another slice(request) when
+   *   a. Slices are fetching anomalies for the same detection
+   *   b. The time range of the request slice falls within the current slice
+   *   c. current filters are empty or exactly match request filters.
+   *   d. current detectionComponentNames are empty or contains request detectionComponentNames
+   *
+   * Note: Empty filters will fetch all the anomalies regardless of the anomalous dimension.
+   * Similarly, empty detectionComponentNames will fetch all the anomalies.
+   */
+  public boolean containSlice(AnomalySlice requestSlice) {
+    if (requestSlice.getDetectionId() != this.detectionId
+        || requestSlice.getStart() < this.getStart()
+        || requestSlice.getEnd() > this.getEnd()) {
+      return false;
+    }
+
+    if (!this.detectionComponentNames.isEmpty()) {
+      return !this.detectionComponentNames.containsAll(requestSlice.getDetectionCompNames());
+    }
+
+    if (!this.filters.isEmpty()) {
+      return !this.filters.equals(requestSlice.getFilters());
+    }
+
+    return true;
+  }
+
   public boolean match(MergedAnomalyResultDTO anomaly) {
     if (anomaly == null) {
+      return false;
+    }
+
+    if (this.detectionId >= 0 &&
+        (anomaly.getDetectionConfigId() == null || anomaly.getDetectionConfigId() != this.detectionId)) {
       return false;
     }
 
@@ -150,7 +184,7 @@ public class AnomalySlice {
     // Entity Anomalies with detectorComponentName can act as both child (sub-entity) and non-child
     // (root entity) anomaly. Therefore, when matching based on detectionComponentNames, we will not consider
     // isTaggedAsChild filter as it can take either of the values (true or false).
-    if (this.detectionComponentNames != null && !this.detectionComponentNames.isEmpty()) {
+    if (!this.detectionComponentNames.isEmpty()) {
       return anomaly.getProperties().containsKey(PROP_DETECTOR_COMPONENT_NAME) &&
           this.detectionComponentNames.contains(anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_NAME));
     } else {

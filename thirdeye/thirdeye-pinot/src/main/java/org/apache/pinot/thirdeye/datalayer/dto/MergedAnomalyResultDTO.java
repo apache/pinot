@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.datalayer.dto;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import java.io.Serializable;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 
@@ -33,12 +34,11 @@ import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements AnomalyResult {
+public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements AnomalyResult, Serializable {
 
   private AnomalyFeedbackDTO feedback;
 
   private AnomalyFunctionDTO function;
-  private DetectionConfigDTO detectionConfig;
 
   private Set<MergedAnomalyResultDTO> children = new HashSet<>();
 
@@ -87,10 +87,12 @@ public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements A
     return this.feedback;
   }
 
+  @Deprecated
   public AnomalyFunctionDTO getFunction() {
     return function;
   }
 
+  @Deprecated
   public void setFunction(AnomalyFunctionDTO function) {
     this.function = function;
   }

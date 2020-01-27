@@ -120,7 +120,6 @@ public class MockThirdEyeDataSourceIntegrationTest {
     this.timestamp = System.currentTimeMillis();
     ThirdEyeConfiguration thirdEyeConfiguration = new ThirdEyeConfiguration();
     thirdEyeConfiguration.setDataSources(dataSourcesConfig.toString());
-    thirdEyeConfiguration.setCacheDataSource("");
 
     ThirdEyeCacheRegistry.initializeCaches(thirdEyeConfiguration);
     this.cacheRegistry = ThirdEyeCacheRegistry.getInstance();
