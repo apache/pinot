@@ -101,24 +101,29 @@ public class CalciteSqlParser {
 
   private static void validateGroupByClause(PinotQuery pinotQuery)
       throws SqlCompilationException {
-    if(pinotQuery.getGroupByList() == null) {
+    if (pinotQuery.getGroupByList() == null) {
       return;
     }
-    // Sanity check group by query: All identifiers in selection list should be also included in group by list.
-    Set<String> groupByIdentifiers = extractIdentifiers(pinotQuery.getGroupByList());
+    // Sanity check group by query: All non-aggregate expression in selection list should be also included in group by list.
     for (Expression selectExpression : pinotQuery.getSelectList()) {
-      if (selectExpression.getIdentifier() != null) {
-        String identifier = selectExpression.getIdentifier().getName();
-        if (!groupByIdentifiers.contains(identifier)) {
-          throw new SqlCompilationException("'" + identifier + "' should appear in GROUP BY clause.");
+      if (!isAggregateExpression(selectExpression)) {
+        boolean foundInGroupByClause = false;
+        for (Expression groupByExpression : pinotQuery.getGroupByList()) {
+          if (groupByExpression.equals(selectExpression)) {
+            foundInGroupByClause = true;
+          }
+        }
+        if (!foundInGroupByClause) {
+          throw new SqlCompilationException(
+              "'" + RequestUtils.prettyPrint(selectExpression) + "' should appear in GROUP BY clause.");
         }
       }
     }
     // Sanity check on group by clause shouldn't contain aggregate expression.
-    for (Expression selectExpression : pinotQuery.getGroupByList()) {
-      if (isAggregateExpression(selectExpression)) {
-        throw new SqlCompilationException(
-            "Aggregate expression '" + selectExpression + "' is not allowed in GROUP BY clause.");
+    for (Expression groupByExpression : pinotQuery.getGroupByList()) {
+      if (isAggregateExpression(groupByExpression)) {
+        throw new SqlCompilationException("Aggregate expression '" + RequestUtils.prettyPrint(groupByExpression)
+            + "' is not allowed in GROUP BY clause.");
       }
     }
   }

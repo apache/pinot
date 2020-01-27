@@ -871,10 +871,21 @@ public class CalciteSqlCompilerTest {
 
     // Valid groupBy non-aggregate function should pass.
     sql =
-        "select secondsSinceEpoch, sum(rsvp_count), count(*) from meetupRsvp group by dateConvert(secondsSinceEpoch) limit 50";
+        "select dateConvert(secondsSinceEpoch), sum(rsvp_count), count(*) from meetupRsvp group by dateConvert(secondsSinceEpoch) limit 50";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     Assert.assertEquals(pinotQuery.getGroupByListSize(), 1);
     Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
+
+    // Invalid: secondsSinceEpoch should be in groupBy clause.
+    try {
+      sql =
+          "select secondsSinceEpoch, dateConvert(secondsSinceEpoch), sum(rsvp_count), count(*) from meetupRsvp group by dateConvert(secondsSinceEpoch) limit 50";
+      CalciteSqlParser.compileToPinotQuery(sql);
+      Assert.fail("Query should have failed compilation");
+    } catch (Exception e) {
+      Assert.assertTrue(e instanceof SqlCompilationException);
+      Assert.assertTrue(e.getMessage().contains("'secondsSinceEpoch' should appear in GROUP BY clause."));
+    }
 
     // Invalid groupBy clause shouldn't contain aggregate expression, like sum(rsvp_count), count(*).
     try {
