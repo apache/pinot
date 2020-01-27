@@ -441,23 +441,32 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
-  private void disableAllActiveFunction() {
-    disableAllActiveFunction(null);
+  private void disableAllActiveDetections() {
+    disableAllActiveDetections(null);
   }
 
-  private void disableAllActiveFunction(Collection<Long> excludeIds){
-    List<AnomalyFunctionDTO> functionSpecs = anomalyFunctionDAO.findAllActiveFunctions();
-    for (AnomalyFunctionDTO functionSpec : functionSpecs) {
-      if (functionSpec.getIsActive() && (CollectionUtils.isEmpty(excludeIds) || !excludeIds
-          .contains(functionSpec.getId()))) {
-        functionSpec.setActive(false);
-        anomalyFunctionDAO.update(functionSpec);
+  /**
+   * Disable all detections and activate the exclusion list
+   */
+  private void disableAllActiveDetections(Collection<Long> excludeIds){
+    List<DetectionConfigDTO> detections = detectionConfigDAO.findAll();
+    for (DetectionConfigDTO detection : detections) {
+      // Activate the whitelisted detections
+      if (excludeIds.contains(detection.getId())) {
+        detection.setActive(true);
+        detectionConfigDAO.update(detection);
+      } else {
+        // Disable other configs
+        if (detection.isActive()) {
+          detection.setActive(false);
+          detectionConfigDAO.update(detection);
+        }
       }
     }
   }
 
   /**
-   * Disable all subscription groups except groups with id in excludeIds
+   * Disable all subscription groups and activate the exclusion list
    */
   private void disableAllActiveSubsGroups(Collection<Long> excludeIds){
     List<DetectionAlertConfigDTO> subsConfigs = detectionAlertConfigDAO.findAll();
@@ -618,7 +627,7 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
-    dq.disableAllActiveSubsGroups(Collections.singleton(142644400L));
+    dq.disableAllActiveDetections(Collections.singleton(142644400L));
     LOG.info("DONE");
   }
 
