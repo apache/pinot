@@ -535,8 +535,9 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     config.setActive(MapUtils.getBooleanValue(yamlConfigMap, PROP_ACTIVE, true));
     config.setYaml(yamlConfig);
 
-    //TODO: data-availability trigger is only enabled for detections running on PINOT only
+    //TODO: data-availability trigger is only enabled for detections running on PINOT daily dataset only
     if (MapUtils.getString(yamlConfigMap, PROP_CRON) == null
+        && datasetConfigs.stream().allMatch(c -> c.bucketTimeGranularity().getUnit().equals(TimeUnit.DAYS))
         && datasetConfigs.stream().allMatch(c -> c.getDataSource().equals(PinotThirdEyeDataSource.DATA_SOURCE_NAME))) {
       config.setDataAvailabilitySchedule(true);
     }
