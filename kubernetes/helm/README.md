@@ -435,7 +435,7 @@ kubectl apply -f presto-coordinator.yaml
 ### Presto UI
 Please use below script to do local port-forwarding and open Presto UI on your web browser.
 ```bash
-./presto.sh
+./launch-presto-ui.sh
 ```
 
 ### Query Presto using Presto CLI
