@@ -31,6 +31,7 @@ import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationUtils;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
@@ -294,7 +295,7 @@ public class HelixServerStarter {
       } else {
         LOGGER.error("Failed to update hostname/port for instance: {}", instanceName);
         // Treat this is as a fatal error.
-        System.exit(1);
+        throw new HelixException("Failed to update hostname/port for instance " + instanceName);
       }
     }
   }
