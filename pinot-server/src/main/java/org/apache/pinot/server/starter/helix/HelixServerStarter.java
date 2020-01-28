@@ -288,8 +288,10 @@ public class HelixServerStarter {
       instanceConfig.setPort(Integer.toString(_serverConf.getInt(KEY_OF_SERVER_NETTY_PORT, DEFAULT_SERVER_NETTY_PORT)));
       // Use setProperty instead of _helixAdmin.setInstanceConfig because the latter explicitly forbids instance host
       // port modification.
-      if(!_helixManager.getHelixDataAccessor().setProperty(
+      if(_helixManager.getHelixDataAccessor().setProperty(
           _helixManager.getHelixDataAccessor().keyBuilder().instanceConfig(instanceName), instanceConfig)) {
+        LOGGER.info("Updated server hostname/port successfully for server id {} to {}:", instanceName, instanceConfig);
+      } else {
         LOGGER.error("Failed to update hostname/port for instance: {}", instanceName);
         // Treat this is as a fatal error.
         System.exit(1);
