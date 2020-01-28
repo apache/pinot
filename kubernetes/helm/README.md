@@ -432,6 +432,12 @@ You can run below command to deploy a customized Presto with Pinot plugin.
 kubectl apply -f presto-coordinator.yaml
 ```
 
+### Presto UI
+Please use below script to do local port-forwarding and open Presto UI on your web browser.
+```bash
+./launch-presto-ui.sh
+```
+
 ### Query Presto using Presto CLI
 
 Once Presto is deployed, you could run below command.
