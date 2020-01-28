@@ -59,7 +59,6 @@ public class CalciteSqlParser {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
 
-
   /** Lexical policy similar to MySQL with ANSI_QUOTES option enabled. (To be
    * precise: MySQL on Windows; MySQL on Linux uses case-sensitive matching,
    * like the Linux file system.) The case of identifiers is preserved whether
@@ -96,9 +95,41 @@ public class CalciteSqlParser {
     return pinotQuery;
   }
 
-  static void validate(PinotQuery pinotQuery)
+  static void validate(Map<Identifier, Expression> aliasMap, PinotQuery pinotQuery)
       throws SqlCompilationException {
+    validateSelectionClause(aliasMap, pinotQuery);
     validateGroupByClause(pinotQuery);
+  }
+
+  private static void validateSelectionClause(Map<Identifier, Expression> aliasMap, PinotQuery pinotQuery)
+      throws SqlCompilationException {
+    // Sanity check on selection expression shouldn't use alias reference.
+    Set<String> aliasKeys = new HashSet<>();
+    for (Identifier identifier : aliasMap.keySet()) {
+      aliasKeys.add(identifier.getName().toLowerCase());
+    }
+    for (Expression selectExpr : pinotQuery.getSelectList()) {
+      matchIdentifierInAliasMap(selectExpr, aliasKeys);
+    }
+  }
+
+  private static void matchIdentifierInAliasMap(Expression selectExpr, Set<String> aliasKeys)
+      throws SqlCompilationException {
+    if (selectExpr.getFunctionCall() != null) {
+      if (selectExpr.getFunctionCall().getOperator().equalsIgnoreCase("AS")) {
+        matchIdentifierInAliasMap(selectExpr.getFunctionCall().getOperands().get(0), aliasKeys);
+      } else {
+        for (Expression operand : selectExpr.getFunctionCall().getOperands()) {
+          matchIdentifierInAliasMap(operand, aliasKeys);
+        }
+      }
+    }
+    if (selectExpr.getIdentifier() != null) {
+      if (aliasKeys.contains(selectExpr.getIdentifier().getName().toLowerCase())) {
+        throw new SqlCompilationException(
+            "Alias " + selectExpr.getIdentifier().getName() + " cannot be referred in SELECT Clause");
+      }
+    }
   }
 
   private static void validateGroupByClause(PinotQuery pinotQuery)
@@ -110,14 +141,21 @@ public class CalciteSqlParser {
     for (Expression selectExpression : pinotQuery.getSelectList()) {
       if (!isAggregateExpression(selectExpression)) {
         boolean foundInGroupByClause = false;
+        Expression selectionToCheck;
+        if (selectExpression.getFunctionCall() != null && selectExpression.getFunctionCall().getOperator()
+            .equalsIgnoreCase("AS")) {
+          selectionToCheck = selectExpression.getFunctionCall().getOperands().get(0);
+        } else {
+          selectionToCheck = selectExpression;
+        }
         for (Expression groupByExpression : pinotQuery.getGroupByList()) {
-          if (groupByExpression.equals(selectExpression)) {
+          if (groupByExpression.equals(selectionToCheck)) {
             foundInGroupByClause = true;
           }
         }
         if (!foundInGroupByClause) {
           throw new SqlCompilationException(
-              "'" + RequestUtils.prettyPrint(selectExpression) + "' should appear in GROUP BY clause.");
+              "'" + RequestUtils.prettyPrint(selectionToCheck) + "' should appear in GROUP BY clause.");
         }
       }
     }
@@ -243,7 +281,7 @@ public class CalciteSqlParser {
     }
     Map<Identifier, Expression> aliasMap = extractAlias(pinotQuery.getSelectList());
     applyAlias(aliasMap, pinotQuery);
-    validate(pinotQuery);
+    validate(aliasMap, pinotQuery);
     return pinotQuery;
   }
 

@@ -338,12 +338,12 @@ public class RequestUtils {
       String res = expression.getFunctionCall().getOperator() + "(";
       boolean isFirstParam = true;
       for (Expression operand : expression.getFunctionCall().getOperands()) {
-        res += prettyPrint(operand);
         if (!isFirstParam) {
           res += ", ";
         } else {
           isFirstParam = false;
         }
+        res += prettyPrint(operand);
       }
       res += ")";
       return res;
