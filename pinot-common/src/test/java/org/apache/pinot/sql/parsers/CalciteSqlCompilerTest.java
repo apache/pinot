@@ -898,4 +898,124 @@ public class CalciteSqlCompilerTest {
       Assert.assertTrue(e.getMessage().contains("is not allowed in GROUP BY clause."));
     }
   }
+
+  @Test
+  public void testAliasQuery() {
+    String sql;
+    PinotQuery pinotQuery;
+    // Valid alias in query.
+    sql =
+        "select secondsSinceEpoch, sum(rsvp_count) as sum_rsvp_count, count(*) as cnt from meetupRsvp group by secondsSinceEpoch order by cnt, sum_rsvp_count DESC limit 50";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
+    Assert.assertEquals(pinotQuery.getGroupByListSize(), 1);
+    Assert.assertEquals(pinotQuery.getOrderByListSize(), 2);
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getFunctionCall().getOperator(), "ASC");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "COUNT");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "*");
+    Assert.assertEquals(pinotQuery.getOrderByList().get(1).getFunctionCall().getOperator(), "DESC");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "SUM");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "rsvp_count");
+
+    // Valid mixed alias expressions in query.
+    sql =
+        "select secondsSinceEpoch, sum(rsvp_count), count(*) as cnt from meetupRsvp group by secondsSinceEpoch order by cnt, sum(rsvp_count) DESC limit 50";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
+    Assert.assertEquals(pinotQuery.getGroupByListSize(), 1);
+    Assert.assertEquals(pinotQuery.getOrderByListSize(), 2);
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getFunctionCall().getOperator(), "ASC");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "COUNT");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "*");
+    Assert.assertEquals(pinotQuery.getOrderByList().get(1).getFunctionCall().getOperator(), "DESC");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "SUM");
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "rsvp_count");
+
+    sql =
+        "select secondsSinceEpoch/86400 AS daysSinceEpoch, sum(rsvp_count) as sum_rsvp_count, count(*) as cnt from meetupRsvp where daysSinceEpoch = 18523 group by daysSinceEpoch order by cnt, sum_rsvp_count DESC limit 50";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
+    Assert.assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperator(), "EQUALS");
+    Assert.assertEquals(
+        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "DIVIDE");
+    Assert.assertEquals(
+        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "secondsSinceEpoch");
+    Assert.assertEquals(
+        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1)
+            .getLiteral().getLongValue(), 86400);
+    Assert.assertEquals(
+        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral().getLongValue(), 18523);
+    Assert.assertEquals(pinotQuery.getGroupByListSize(), 1);
+    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getFunctionCall().getOperator(), "DIVIDE");
+    Assert.assertEquals(
+        pinotQuery.getGroupByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "secondsSinceEpoch");
+    Assert.assertEquals(
+        pinotQuery.getGroupByList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getLongValue(), 86400);
+    Assert.assertEquals(pinotQuery.getOrderByListSize(), 2);
+
+    // Invalid groupBy clause shouldn't contain aggregate expression, like sum(rsvp_count), count(*).
+    try {
+      sql = "select  sum(rsvp_count), count(*) as cnt from meetupRsvp group by group_country, cnt limit 50";
+      CalciteSqlParser.compileToPinotQuery(sql);
+      Assert.fail("Query should have failed compilation");
+    } catch (Exception e) {
+      Assert.assertTrue(e instanceof SqlCompilationException);
+      Assert.assertTrue(e.getMessage().contains("is not allowed in GROUP BY clause."));
+    }
+  }
+
+  @Test
+  public void testAliasInSelection() {
+    String sql;
+    PinotQuery pinotQuery;
+    sql = "SELECT C1 AS ALIAS_C1, C2 AS ALIAS_C2, ADD(C1, C2) FROM Foo";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "AS");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "C1");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "ALIAS_C1");
+
+    Assert.assertEquals(pinotQuery.getSelectList().get(1).getFunctionCall().getOperator(), "AS");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "C2");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(1).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "ALIAS_C2");
+
+    Assert.assertEquals(pinotQuery.getSelectList().get(2).getFunctionCall().getOperator(), "ADD");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(2).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "C1");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(2).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "C2");
+
+    // Invalid groupBy clause shouldn't contain aggregate expression, like sum(rsvp_count), count(*).
+    try {
+      sql = "SELECT C1 AS ALIAS_C1, C2 AS ALIAS_C2, ADD(alias_c1, alias_c2) FROM Foo";
+      CalciteSqlParser.compileToPinotQuery(sql);
+      Assert.fail("Query should have failed compilation");
+    } catch (Exception e) {
+      Assert.assertTrue(e instanceof SqlCompilationException);
+      Assert.assertTrue(e.getMessage().contains("cannot be referred in SELECT Clause"));
+    }
+  }
 }
