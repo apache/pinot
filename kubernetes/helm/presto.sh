@@ -6,4 +6,4 @@ open http://localhost:8080/
 
 # Just for blocking
 tail -f /dev/null
-pkill -f "kubectl port-forward sservice/presto-coordinator 8080:8080 -n pinot-quickstart"
+pkill -f "kubectl port-forward service/presto-coordinator 8080:8080 -n pinot-quickstart"
