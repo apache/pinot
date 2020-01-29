@@ -31,6 +31,7 @@ import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationUtils;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
@@ -146,7 +147,7 @@ public class HelixServerStarter {
     LOGGER.info("Connecting Helix manager");
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
-    addInstanceTagIfNeeded(helixClusterName, _instanceId);
+    updateInstanceConfigIfNeeded(helixClusterName, _instanceId, serverConf);
 
     // Start restlet server for admin API endpoint
     int adminApiPort = _serverConf.getInt(CONFIG_OF_ADMIN_API_PORT, DEFAULT_ADMIN_API_PORT);
@@ -266,16 +267,52 @@ public class HelixServerStarter {
     _helixAdmin.setConfig(scope, props);
   }
 
-  private void addInstanceTagIfNeeded(String clusterName, String instanceName) {
+  private void updateInstanceConfigIfNeeded(String clusterName, String instanceName, Configuration serverConf) {
     InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(clusterName, instanceName);
     List<String> instanceTags = instanceConfig.getTags();
+    boolean toUpdateHelixRecord = false;
     if (instanceTags == null || instanceTags.size() == 0) {
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
-        _helixAdmin.addInstanceTag(clusterName, instanceName, TagNameUtils.getOfflineTagForTenant(null));
-        _helixAdmin.addInstanceTag(clusterName, instanceName, TagNameUtils.getRealtimeTagForTenant(null));
+        instanceConfig.addTag(TagNameUtils.getOfflineTagForTenant(null));
+        instanceConfig.addTag(TagNameUtils.getRealtimeTagForTenant(null));
       } else {
-        _helixAdmin.addInstanceTag(clusterName, instanceName, UNTAGGED_SERVER_INSTANCE);
+        instanceConfig.addTag(UNTAGGED_SERVER_INSTANCE);
       }
+      toUpdateHelixRecord = true;
+    }
+
+    // If the server config has both instance_id and host/port info, overwrite the host/port info in zk. Without the
+    // overwrite, Helix will extract host/port from the instance_id instead of use those in config.
+    // Use serverConf instead of _serverConf as the latter has been modified.
+    if (serverConf.containsKey(CONFIG_OF_INSTANCE_ID)) {
+      // Internally, Helix use instanceId to derive Hostname and Port. To decouple them, explicitly set the hostname/port
+      // field in zk.
+      String hostName = serverConf.getString(KEY_OF_SERVER_NETTY_HOST);
+      if (hostName != null && !hostName.equals(instanceConfig.getHostName())) {
+        instanceConfig.setHostName(hostName);
+        toUpdateHelixRecord = true;
+      }
+
+      if (serverConf.containsKey(KEY_OF_SERVER_NETTY_PORT)) {
+        String portStr = Integer.toString(serverConf.getInt(KEY_OF_SERVER_NETTY_PORT));
+        if (portStr != null && !portStr.equals(instanceConfig.getPort())) {
+          instanceConfig.setPort(portStr);
+          toUpdateHelixRecord = true;
+        }
+      }
+    }
+    if (!toUpdateHelixRecord) {
+      return;
+    }
+    // Use setProperty instead of _helixAdmin.setInstanceConfig because the latter explicitly forbids instance host
+    // port modification.
+    if(_helixManager.getHelixDataAccessor().setProperty(
+        _helixManager.getHelixDataAccessor().keyBuilder().instanceConfig(instanceName), instanceConfig)) {
+      LOGGER.info("Updated server hostname/port successfully for server id {} to {}:", instanceName, instanceConfig);
+    } else {
+      LOGGER.error("Failed to update hostname/port for instance: {}", instanceName);
+      // Treat this is as a fatal error.
+      throw new HelixException("Failed to update hostname/port for instance " + instanceName);
     }
   }
 
@@ -507,6 +544,10 @@ public class HelixServerStarter {
       }
     }
     return true;
+  }
+
+  public HelixManager getHelixManager() {
+    return _helixManager;
   }
 
   /**
