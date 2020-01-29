@@ -195,8 +195,8 @@ public class DataAvailabilityTaskSchedulerTest {
   public void testScheduleOutOfSchedulingWindow() {
     List<Long> metrics1 = Collections.singletonList(metricId1);
     long oneDayAgo = TEST_TIME - TimeUnit.DAYS.toMillis(1);
-    long detection1 = createDetection(1, metrics1, oneDayAgo, 0);
     long halfHourAgo = TEST_TIME - TimeUnit.MINUTES.toMillis(30);
+    long detection1 = createDetection(1, metrics1, halfHourAgo, 0);
     List<Long> metrics2 = Arrays.asList(metricId1, metricId2);
     long detection2 = createDetection(2, metrics2, oneDayAgo, 0);
     createDataset(1, TEST_TIME, halfHourAgo);
@@ -208,6 +208,24 @@ public class DataAvailabilityTaskSchedulerTest {
     Assert.assertEquals(tasks.size(), 1);
     Assert.assertEquals(TaskConstants.TaskType.DETECTION.toString() + "_" + detection2,
         tasks.get(0).getJobName());
+  }
+
+  @Test
+  public void testFallbackOutOfSchedulingWindow() {
+    List<Long> metrics1 = Collections.singletonList(metricId1);
+    long oneDayAgo = TEST_TIME - TimeUnit.DAYS.toMillis(1);
+    long detection1 = createDetection(1, metrics1, oneDayAgo, 0);
+    long halfHourAgo = TEST_TIME - TimeUnit.MINUTES.toMillis(30);
+    createDataset(1, TEST_TIME, halfHourAgo);
+    createDetectionTask(detection1, oneDayAgo - 60_000, TaskConstants.TaskStatus.COMPLETED);
+    TaskManager taskManager = DAORegistry.getInstance().getTaskDAO();
+    dataAvailabilityTaskScheduler.run();
+    List<TaskDTO> tasks = taskManager.findAll();
+    List<TaskDTO> waitingTasks = tasks.stream().filter(t -> t.getStatus() == TaskConstants.TaskStatus.WAITING).collect(
+        Collectors.toList());
+    Assert.assertEquals(waitingTasks.size(), 1);
+    Assert.assertEquals(TaskConstants.TaskType.DETECTION.toString() + "_" + detection1,
+        waitingTasks.get(0).getJobName());
   }
 
   private long createDataset(int intSuffix, long refreshTime, long refreshEventTime) {
