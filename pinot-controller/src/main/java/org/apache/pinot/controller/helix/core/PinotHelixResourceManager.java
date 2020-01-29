@@ -362,6 +362,19 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Update a given instance for the specified Instance ID
+   */
+  public synchronized PinotResourceManagerResponse updateInstance(String instanceIdToUpdate, Instance newInstance) {
+    List<String> instances = getAllInstances();
+    if (!instances.contains(instanceIdToUpdate)) {
+      return PinotResourceManagerResponse.failure("Instance " + instanceIdToUpdate + " does not exists");
+    } else {
+      _helixAdmin.setInstanceConfig(_helixClusterName, instanceIdToUpdate, newInstance.toInstanceConfig());
+      return PinotResourceManagerResponse.SUCCESS;
+    }
+  }
+
+  /**
    * Tenant related APIs
    */
   // TODO: move tenant related APIs here

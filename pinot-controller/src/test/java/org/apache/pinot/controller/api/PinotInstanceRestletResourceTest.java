@@ -177,62 +177,43 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     }, GET_CALL_TIMEOUT_MS, "Expected " + numInstances + " instances after creation of tagged instances");
   }
 
-  private void checkNumTagsForInstance(String listInstanceTagsUrl, int numTags) {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        String getResponse = sendGetRequest(listInstanceTagsUrl);
-        JsonNode jsonNode = JsonUtils.stringToJsonNode(getResponse);
-        return jsonNode != null && jsonNode.get("tags") != null
-            && jsonNode.get("tags").size() == numTags;
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }, GET_CALL_TIMEOUT_MS, "Expected " + numTags + " tags after creation of instance");
-  }
-
-  private void checkTagForInstance(String instanceTagsUrl, String tagToCheck) {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        String getResponse = sendGetRequest(instanceTagsUrl);
-        JsonNode jsonNode = JsonUtils.stringToJsonNode(getResponse);
-        return jsonNode != null && jsonNode.get("tags") != null
-            && jsonNode.get("tags").size() > 0 && jsonNode.get("tags").get(0).asText().equals(tagToCheck);
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }, GET_CALL_TIMEOUT_MS, "Expected " + tagToCheck + " tag on instance");
-  }
-
   @Test
-  public void testGetAndSetTags()
+  public void testPutInstance()
       throws IOException {
+    // Check that there is only one CONTROLLER instance in the cluster
+    String listInstancesUrl = _controllerRequestURLBuilder.forInstanceList();
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        String getResponse = sendGetRequest(listInstancesUrl);
+        JsonNode jsonNode = JsonUtils.stringToJsonNode(getResponse);
+        return (jsonNode != null) && (jsonNode.get("instances") != null) && (jsonNode.get("instances").size() == 1)
+            && (jsonNode.get("instances").get(0).asText().startsWith(Helix.PREFIX_OF_CONTROLLER_INSTANCE));
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, GET_CALL_TIMEOUT_MS, "Expected one controller instance");
+
     // Create untagged broker and server instances
     String createInstanceUrl = _controllerRequestURLBuilder.forInstanceCreate();
-    Instance brokerInstance = new Instance("1.2.3.4", 1234, InstanceType.BROKER, null, null);
+    Instance brokerInstance = new Instance("a.b.c.d", 1234, InstanceType.BROKER, null, null);
     sendPostRequest(createInstanceUrl, brokerInstance.toJsonString());
-    String brokerTagsUrl = _controllerRequestURLBuilder.forInstanceTags(brokerInstance.getInstanceId());
+    String brokerInstanceUrl = _controllerRequestURLBuilder.forInstance(brokerInstance.getInstanceId());
 
-    List<String> serverTags = Arrays.asList(UNTAGGED_SERVER_INSTANCE);
-    Instance serverInstance = new Instance("1.2.3.4", 2345, InstanceType.SERVER, serverTags, null);
+    Instance serverInstance = new Instance("e.f.g.h", 2345, InstanceType.SERVER, Arrays.asList(UNTAGGED_SERVER_INSTANCE), null);
     sendPostRequest(createInstanceUrl, serverInstance.toJsonString());
-    String serverTagsUrl = _controllerRequestURLBuilder.forInstanceTags(serverInstance.getInstanceId());
-
-    checkNumTagsForInstance(brokerTagsUrl, 0);
-    checkNumTagsForInstance(serverTagsUrl, 1);
+    String serverInstanceUrl = _controllerRequestURLBuilder.forInstance(serverInstance.getInstanceId());
 
     String newBrokerTag = "new-broker-tag";
-    sendPostRequest(brokerTagsUrl, newBrokerTag);
-    checkTagForInstance(brokerTagsUrl, newBrokerTag);
+    Instance newBrokerInstance = new Instance("a.b.c.d", 1234, InstanceType.BROKER, Arrays.asList(newBrokerTag), null);
+    sendPutRequest(brokerInstanceUrl, newBrokerInstance.toJsonString());
 
     String newServerTag = "new-server-tag";
-    sendPostRequest(serverTagsUrl, newServerTag);
-    checkTagForInstance(serverTagsUrl, newServerTag);
+    Instance newServerInstance = new Instance("e.f.g.h", 2345, InstanceType.SERVER, Arrays.asList(newServerTag), null);
+    sendPutRequest(serverInstanceUrl, newServerInstance.toJsonString());
 
-    // Cleanup
-    String deleteBrokerInstanceUrl = _controllerRequestURLBuilder.forInstanceDelete(brokerInstance.getInstanceId());
-    sendDeleteRequest(deleteBrokerInstanceUrl);
-    String deleteServerInstanceUrl = _controllerRequestURLBuilder.forInstanceDelete(serverInstance.getInstanceId());
-    sendDeleteRequest(deleteServerInstanceUrl);
+    checkInstanceInfo("Broker_a.b.c.d_1234", "Broker_a.b.c.d", 1234, new String[]{newBrokerTag}, null, null);
+    checkInstanceInfo("Server_e.f.g.h_2345", "Server_e.f.g.h", 2345, new String[]{newServerTag}, null, null);
   }
 
   @AfterClass

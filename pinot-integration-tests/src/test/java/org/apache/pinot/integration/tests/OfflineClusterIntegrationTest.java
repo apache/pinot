@@ -942,7 +942,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(numInstances, getNumBrokers() + getNumServers() + 1);
 
     // Try to delete a server that does not exist
-    String deleteInstanceRequest = _controllerRequestURLBuilder.forInstanceDelete("potato");
+    String deleteInstanceRequest = _controllerRequestURLBuilder.forInstance("potato");
     try {
       sendDeleteRequest(deleteInstanceRequest);
       fail("Delete should have returned a failure status (404)");
@@ -963,7 +963,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
 
     // Try to delete a live server
-    deleteInstanceRequest = _controllerRequestURLBuilder.forInstanceDelete(serverName);
+    deleteInstanceRequest = _controllerRequestURLBuilder.forInstance(serverName);
     try {
       sendDeleteRequest(deleteInstanceRequest);
       fail("Delete should have returned a failure status (409)");
@@ -991,7 +991,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Try to delete a broker whose information is still live
     try {
-      deleteInstanceRequest = _controllerRequestURLBuilder.forInstanceDelete(brokerName);
+      deleteInstanceRequest = _controllerRequestURLBuilder.forInstance(brokerName);
       sendDeleteRequest(deleteInstanceRequest);
       fail("Delete should have returned a failure status (409)");
     } catch (IOException e) {

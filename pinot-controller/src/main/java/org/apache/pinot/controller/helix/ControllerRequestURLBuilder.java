@@ -45,24 +45,16 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "instances");
   }
 
-  public String forInstanceDelete(String instanceName) {
-    return StringUtil.join("/", _baseUrl, "instances", instanceName);
-  }
-
   public String forInstanceState(String instanceName) {
     return StringUtil.join("/", _baseUrl, "instances", instanceName, "state");
   }
 
-  public String forInstanceInformation(String instanceName) {
+  public String forInstance(String instanceName) {
     return StringUtil.join("/", _baseUrl, "instances", instanceName);
   }
 
   public String forInstanceList() {
     return StringUtil.join("/", _baseUrl, "instances");
-  }
-
-  public String forInstanceTags(String instanceName) {
-    return StringUtil.join("/", _baseUrl, "instances", instanceName, "tags");
   }
 
   public String forTablesFromTenant(String tenantName) {
