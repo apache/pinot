@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.AbsTransformFunction;
@@ -45,22 +46,29 @@ public class TransformFunctionFactory {
       new HashMap<String, Class<? extends TransformFunction>>() {
         {
           // NOTE: add all built-in transform functions here
-          put(AdditionTransformFunction.FUNCTION_NAME.toLowerCase(), AdditionTransformFunction.class);
-          put(SubtractionTransformFunction.FUNCTION_NAME.toLowerCase(), SubtractionTransformFunction.class);
-          put(MultiplicationTransformFunction.FUNCTION_NAME.toLowerCase(), MultiplicationTransformFunction.class);
-          put(DivisionTransformFunction.FUNCTION_NAME.toLowerCase(), DivisionTransformFunction.class);
-          put(AbsTransformFunction.FUNCTION_NAME.toLowerCase(), AbsTransformFunction.class);
-          put(CeilTransformFunction.FUNCTION_NAME.toLowerCase(), CeilTransformFunction.class);
-          put(ExpTransformFunction.FUNCTION_NAME.toLowerCase(), ExpTransformFunction.class);
-          put(FloorTransformFunction.FUNCTION_NAME.toLowerCase(), FloorTransformFunction.class);
-          put(LnTransformFunction.FUNCTION_NAME.toLowerCase(), LnTransformFunction.class);
-          put(SqrtTransformFunction.FUNCTION_NAME.toLowerCase(), SqrtTransformFunction.class);
-          put(TimeConversionTransformFunction.FUNCTION_NAME.toLowerCase(), TimeConversionTransformFunction.class);
-          put(DateTimeConversionTransformFunction.FUNCTION_NAME.toLowerCase(),
-              DateTimeConversionTransformFunction.class);
-          put(DateTruncTransformFunction.FUNCTION_NAME.toLowerCase(), DateTruncTransformFunction.class);
-          put(ValueInTransformFunction.FUNCTION_NAME.toLowerCase(), ValueInTransformFunction.class);
-          put(MapValueTransformFunction.FUNCTION_NAME.toLowerCase(), MapValueTransformFunction.class);
+          put(TransformFunctionType.ADD.getName().toLowerCase(), AdditionTransformFunction.class);
+          put(TransformFunctionType.SUB.getName().toLowerCase(), SubtractionTransformFunction.class);
+          put(TransformFunctionType.MULT.getName().toLowerCase(), MultiplicationTransformFunction.class);
+          put(TransformFunctionType.DIV.getName().toLowerCase(), DivisionTransformFunction.class);
+          put(TransformFunctionType.MOD.getName().toLowerCase(), ModuloTransformFunction.class);
+
+          put(TransformFunctionType.PLUS.getName().toLowerCase(), AdditionTransformFunction.class);
+          put(TransformFunctionType.MINUS.getName().toLowerCase(), SubtractionTransformFunction.class);
+          put(TransformFunctionType.TIMES.getName().toLowerCase(), MultiplicationTransformFunction.class);
+          put(TransformFunctionType.DIVIDE.getName().toLowerCase(), DivisionTransformFunction.class);
+
+          put(TransformFunctionType.ABS.getName().toLowerCase(), AbsTransformFunction.class);
+          put(TransformFunctionType.CEIL.getName().toLowerCase(), CeilTransformFunction.class);
+          put(TransformFunctionType.EXP.getName().toLowerCase(), ExpTransformFunction.class);
+          put(TransformFunctionType.FLOOR.getName().toLowerCase(), FloorTransformFunction.class);
+          put(TransformFunctionType.LN.getName().toLowerCase(), LnTransformFunction.class);
+          put(TransformFunctionType.SQRT.getName().toLowerCase(), SqrtTransformFunction.class);
+
+          put(TransformFunctionType.TIMECONVERT.getName().toLowerCase(), TimeConversionTransformFunction.class);
+          put(TransformFunctionType.DATETIMECONVERT.getName().toLowerCase(), DateTimeConversionTransformFunction.class);
+          put(TransformFunctionType.DATETRUNC.getName().toLowerCase(), DateTruncTransformFunction.class);
+          put(TransformFunctionType.VALUEIN.getName().toLowerCase(), ValueInTransformFunction.class);
+          put(TransformFunctionType.MAPVALUE.getName().toLowerCase(), MapValueTransformFunction.class);
         }
       };
 

@@ -1018,4 +1018,54 @@ public class CalciteSqlCompilerTest {
       Assert.assertTrue(e.getMessage().contains("cannot be referred in SELECT Clause"));
     }
   }
+
+  @Test
+  public void testArithmeticOperator() {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("select a,b+2,c*5,(d+5)*2 from myTable");
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 4);
+    Assert.assertEquals(pinotQuery.getSelectList().get(1).getFunctionCall().getOperator(), "PLUS");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "b");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(1).getFunctionCall().getOperands().get(1).getLiteral().getLongValue(), 2);
+    Assert.assertEquals(pinotQuery.getSelectList().get(2).getFunctionCall().getOperator(), "TIMES");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(2).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "c");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(2).getFunctionCall().getOperands().get(1).getLiteral().getLongValue(), 5);
+    Assert.assertEquals(pinotQuery.getSelectList().get(3).getFunctionCall().getOperator(), "TIMES");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(3).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "PLUS");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(3).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "d");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(3).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1)
+            .getLiteral().getLongValue(), 5);
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(3).getFunctionCall().getOperands().get(1).getLiteral().getLongValue(), 2);
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("select a % 200 + b * 5  from myTable");
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "PLUS");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "MOD");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "a");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1)
+            .getLiteral().getLongValue(), 200);
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperator(),
+        "TIMES");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "b");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(1)
+            .getLiteral().getLongValue(), 5);
+  }
 }
