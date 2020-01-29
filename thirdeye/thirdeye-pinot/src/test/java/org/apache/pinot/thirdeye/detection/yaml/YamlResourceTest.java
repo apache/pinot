@@ -11,6 +11,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
 import java.io.IOException;
@@ -80,6 +81,7 @@ public class YamlResourceTest {
     datasetConfigDTO.setDataset("test_dataset");
     datasetConfigDTO.setTimeUnit(TimeUnit.DAYS);
     datasetConfigDTO.setTimeDuration(1);
+    datasetConfigDTO.setDataSource(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
     daoRegistry.getDatasetConfigDAO().save(datasetConfigDTO);
 
     // Create a new detection
@@ -90,7 +92,7 @@ public class YamlResourceTest {
       Assert.assertNotNull(detection);
       Assert.assertEquals(detection.getName(), "testPipeline");
     } catch (Exception e) {
-      Assert.fail("Exception should not be thrown for valid yaml. Message: " + e + " Cause: " + e.getCause());
+      Assert.fail("Exception should not be thrown for valid yaml. Message: " + e + " Cause: " + e.getCause(), e);
     }
 
     // Update above created detection

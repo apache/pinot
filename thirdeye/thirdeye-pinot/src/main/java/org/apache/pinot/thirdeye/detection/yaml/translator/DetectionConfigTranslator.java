@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,6 +35,7 @@ import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
@@ -172,6 +174,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
   private final Map<String, Object> components = new HashMap<>();
   private DataProvider dataProvider;
   private DetectionMetricAttributeHolder metricAttributesMap;
+  private Set<DatasetConfigDTO> datasetConfigs;
 
   public DetectionConfigTranslator(String yamlConfig, DataProvider provider) {
     this(yamlConfig, provider, new DetectionConfigValidator(provider));
@@ -181,12 +184,14 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     super(yamlConfig, validator);
     this.dataProvider = provider;
     this.metricAttributesMap = new DetectionMetricAttributeHolder(provider);
+    this.datasetConfigs = new HashSet<>();
   }
 
   private Map<String, Object> translateMetricAlert(Map<String, Object> metricAlertConfigMap) {
     String subEntityName = MapUtils.getString(metricAlertConfigMap, PROP_NAME);
 
     DatasetConfigDTO datasetConfigDTO = metricAttributesMap.fetchDataset(metricAlertConfigMap);
+    datasetConfigs.add(datasetConfigDTO);
     Map<String, Collection<String>> dimensionFiltersMap = ConfigUtils.getMap(metricAlertConfigMap.get(PROP_FILTERS));
     String metricUrn = MetricEntity.fromMetric(dimensionFiltersMap, metricAttributesMap.fetchMetric(metricAlertConfigMap).getId()).getUrn();
     Map<String, Object> mergerProperties = ConfigUtils.getMap(metricAlertConfigMap.get(PROP_MERGER));
@@ -530,6 +535,12 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     config.setActive(MapUtils.getBooleanValue(yamlConfigMap, PROP_ACTIVE, true));
     config.setYaml(yamlConfig);
 
+    //TODO: data-availability trigger is only enabled for detections running on PINOT daily dataset only
+    if (MapUtils.getString(yamlConfigMap, PROP_CRON) == null
+        && datasetConfigs.stream().allMatch(c -> c.bucketTimeGranularity().getUnit().equals(TimeUnit.DAYS))
+        && datasetConfigs.stream().allMatch(c -> c.getDataSource().equals(PinotThirdEyeDataSource.DATA_SOURCE_NAME))) {
+      config.setDataAvailabilitySchedule(true);
+    }
     return config;
   }
 }

@@ -73,11 +73,11 @@ public class DetectionPipelineScheduler implements Runnable {
       for (DetectionConfigDTO config : configs) {
         JobKey key = new JobKey(getJobKey(config.getId()), TaskConstants.TaskType.DETECTION.toString());
         if (!config.isActive()) {
-          LOG.info("Detection config " + key + " is inactive. Skipping.");
+          LOG.debug("Detection config " + key + " is inactive. Skipping.");
           continue;
         }
         if (config.isDataAvailabilitySchedule()) {
-          LOG.info("Detection config " + key + " is enabled for data availability scheduling. Skipping.");
+          LOG.debug("Detection config " + key + " is enabled for data availability scheduling. Skipping.");
           continue;
         }
         try {

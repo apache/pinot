@@ -43,7 +43,7 @@ public class DataAvailabilitySchedulingConfiguration {
   // default threshold if detection level threshold is not set
   private long taskTriggerFallBackTimeInSec = TimeUnit.DAYS.toSeconds(1);
   // scheduling window for data availability scheduling to avoid over-scheduling if watermarks do not move forward
-  private long schedulingWindowInSec = TimeUnit.MINUTES.toSeconds(15);
+  private long schedulingWindowInSec = TimeUnit.MINUTES.toSeconds(30);
 
   public String getConsumerClass() {
     return consumerClass;
