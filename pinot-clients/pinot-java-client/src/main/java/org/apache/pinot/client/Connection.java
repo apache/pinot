@@ -32,6 +32,9 @@ import org.slf4j.LoggerFactory;
  */
 public class Connection {
   private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
+  private static final String SQL = "sql";
+  private static final String PQL = "pql";
+
   private final PinotClientTransport _transport;
   private BrokerSelector _brokerSelector;
   private List<String> _brokerList;
@@ -59,14 +62,25 @@ public class Connection {
   }
 
   /**
-   * Executes a PQL statement.
+   * Executes a SQL statement.
    * @param statement The statement to execute
    * @return The result of the query
    * @throws PinotClientException If an exception occurs while processing the query
    */
   public ResultSetGroup execute(String statement)
       throws PinotClientException {
-    return execute(null, new Request("pql", statement));
+    return execute(null, new Request(SQL, statement));
+  }
+
+  /**
+   * Executes a PQL statement.
+   * @param statement The statement to execute
+   * @return The result of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public ResultSetGroup executePql(String statement)
+      throws PinotClientException {
+    return execute(null, new Request(PQL, statement));
   }
 
   /**
@@ -81,7 +95,7 @@ public class Connection {
   }
 
   /**
-   * Executes a PQL statement.
+   * Executes a SQL statement.
    *
    * @param statement The statement to execute
    * @return The result of the query
@@ -89,7 +103,19 @@ public class Connection {
    */
   public ResultSetGroup execute(String tableName, String statement)
       throws PinotClientException {
-    return execute(tableName, new Request("pql", statement));
+    return execute(tableName, new Request(SQL, statement));
+  }
+
+  /**
+   * Executes a PQL statement.
+   *
+   * @param statement The statement to execute
+   * @return The result of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public ResultSetGroup executePql(String tableName, String statement)
+      throws PinotClientException {
+    return execute(tableName, new Request(PQL, statement));
   }
 
   /**
@@ -114,7 +140,7 @@ public class Connection {
   }
 
   /**
-   * Executes a PQL statement asynchronously.
+   * Executes a SQL statement asynchronously.
    *
    * @param statement The statement to execute
    * @return A future containing the result of the query
@@ -122,7 +148,19 @@ public class Connection {
    */
   public Future<ResultSetGroup> executeAsync(String statement)
       throws PinotClientException {
-    return executeAsync(new Request("pql", statement));
+    return executeAsync(new Request(SQL, statement));
+  }
+
+  /**
+   * Executes a PQL statement asynchronously.
+   *
+   * @param statement The statement to execute
+   * @return A future containing the result of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public Future<ResultSetGroup> executePqlAsync(String statement)
+      throws PinotClientException {
+    return executeAsync(new Request(PQL, statement));
   }
 
   /**

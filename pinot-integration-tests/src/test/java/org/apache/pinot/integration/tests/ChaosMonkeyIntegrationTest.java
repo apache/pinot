@@ -151,7 +151,7 @@ public class ChaosMonkeyIntegrationTest {
 
   private int countRecords() {
     Connection connection = ConnectionFactory.fromHostList("localhost:8099");
-    return connection.execute("select count(*) from myTable").getResultSet(0).getInt(0);
+    return connection.executePql("select count(*) from myTable").getResultSet(0).getInt(0);
   }
 
   @Test(enabled = false)
