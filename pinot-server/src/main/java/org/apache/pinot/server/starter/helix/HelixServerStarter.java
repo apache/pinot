@@ -284,12 +284,19 @@ public class HelixServerStarter {
     // If the server config has both instance_id and host/port info, overwrite the host/port info in zk. Without the
     // overwrite, Helix will extract host/port from the instance_id instead of use those in config.
     // Use serverConf instead of _serverConf as the latter has been modified.
-    if (serverConf.containsKey(CONFIG_OF_INSTANCE_ID) && serverConf.containsKey(KEY_OF_SERVER_NETTY_HOST)) {
-      toUpdateHelixRecord = true;
+    if (serverConf.containsKey(CONFIG_OF_INSTANCE_ID)) {
       // Internally, Helix use instanceId to derive Hostname and Port. To decouple them, explicitly set the hostname/port
       // field in zk.
-      instanceConfig.setHostName(_serverConf.getString(KEY_OF_SERVER_NETTY_HOST));
-      instanceConfig.setPort(Integer.toString(_serverConf.getInt(KEY_OF_SERVER_NETTY_PORT, DEFAULT_SERVER_NETTY_PORT)));
+      String hostName = _serverConf.getString(KEY_OF_SERVER_NETTY_HOST);
+      if (hostName != null && !hostName.equals(instanceConfig.getHostName())) {
+        instanceConfig.setHostName(hostName);
+        toUpdateHelixRecord = true;
+      }
+      String port = _serverConf.getString(KEY_OF_SERVER_NETTY_PORT);
+      if (port != null && !port.equals(instanceConfig.getPort())) {
+        instanceConfig.setPort(port);
+        toUpdateHelixRecord = true;
+      }
     }
     if (!toUpdateHelixRecord) {
       return;
