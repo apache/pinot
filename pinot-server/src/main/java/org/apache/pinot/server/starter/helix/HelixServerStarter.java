@@ -287,15 +287,18 @@ public class HelixServerStarter {
     if (serverConf.containsKey(CONFIG_OF_INSTANCE_ID)) {
       // Internally, Helix use instanceId to derive Hostname and Port. To decouple them, explicitly set the hostname/port
       // field in zk.
-      String hostName = _serverConf.getString(KEY_OF_SERVER_NETTY_HOST);
+      String hostName = serverConf.getString(KEY_OF_SERVER_NETTY_HOST);
       if (hostName != null && !hostName.equals(instanceConfig.getHostName())) {
         instanceConfig.setHostName(hostName);
         toUpdateHelixRecord = true;
       }
-      String portStr = Integer.toString(_serverConf.getInt(KEY_OF_SERVER_NETTY_PORT, DEFAULT_SERVER_NETTY_PORT));
-      if (portStr!= null && !portStr.equals(instanceConfig.getPort())) {
-        instanceConfig.setPort(portStr);
-        toUpdateHelixRecord = true;
+
+      if (serverConf.containsKey(KEY_OF_SERVER_NETTY_PORT)) {
+        String portStr = Integer.toString(serverConf.getInt(KEY_OF_SERVER_NETTY_PORT));
+        if (portStr != null && !portStr.equals(instanceConfig.getPort())) {
+          instanceConfig.setPort(portStr);
+          toUpdateHelixRecord = true;
+        }
       }
     }
     if (!toUpdateHelixRecord) {

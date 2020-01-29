@@ -119,7 +119,6 @@ public class ServerStarterIntegrationTest extends ControllerTest {
   @Test
   public void testInstanceIdOnly()
       throws Exception {
-    // If the CONFIG_OF_USE_LOGICAL_INSTANCE_ID flag is NOT on, no server host/port info overwrite will happen.
     Configuration serverConf = new PropertiesConfiguration();
     serverConf.setProperty(CONFIG_OF_INSTANCE_ID, SERVER1);
     // Start the server
