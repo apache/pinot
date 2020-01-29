@@ -285,10 +285,13 @@ public class DefaultDataProvider implements DataProvider {
     return dataset;
   }
 
-  public static void cleanCache() {
-    if (DETECTION_TIME_SERIES_CACHE != null) {
-      DETECTION_TIME_SERIES_CACHE.cleanUp();
-      DETECTION_TIME_SERIES_CACHE = null;
+  public void cleanCache() {
+    if (timeseriesCache != null) {
+      timeseriesCache.cleanCache();
+    }
+
+    if (anomaliesCache != null) {
+      anomaliesCache.cleanCache();
     }
   }
 }

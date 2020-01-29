@@ -167,4 +167,10 @@ public class AnomaliesCacheBuilder {
 
     return output;
   }
+
+  public void cleanCache() {
+    if (this.cache != null) {
+      this.cache.cleanUp();
+    }
+  }
 }
