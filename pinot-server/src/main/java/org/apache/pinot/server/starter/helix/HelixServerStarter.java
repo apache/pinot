@@ -270,33 +270,39 @@ public class HelixServerStarter {
   private void updateInstanceConfigIfNeeded(String clusterName, String instanceName, Configuration serverConf) {
     InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(clusterName, instanceName);
     List<String> instanceTags = instanceConfig.getTags();
+    boolean toUpdateHelixRecord = false;
     if (instanceTags == null || instanceTags.size() == 0) {
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
-        _helixAdmin.addInstanceTag(clusterName, instanceName, TagNameUtils.getOfflineTagForTenant(null));
-        _helixAdmin.addInstanceTag(clusterName, instanceName, TagNameUtils.getRealtimeTagForTenant(null));
+        instanceConfig.addTag(TagNameUtils.getOfflineTagForTenant(null));
+        instanceConfig.addTag(TagNameUtils.getRealtimeTagForTenant(null));
       } else {
-        _helixAdmin.addInstanceTag(clusterName, instanceName, UNTAGGED_SERVER_INSTANCE);
+        instanceConfig.addTag(UNTAGGED_SERVER_INSTANCE);
       }
+      toUpdateHelixRecord = true;
     }
 
     // If the server config has both instance_id and host/port info, overwrite the host/port info in zk. Without the
     // overwrite, Helix will extract host/port from the instance_id instead of use those in config.
     // Use serverConf instead of _serverConf as the latter has been modified.
     if (serverConf.containsKey(CONFIG_OF_INSTANCE_ID) && serverConf.containsKey(KEY_OF_SERVER_NETTY_HOST)) {
+      toUpdateHelixRecord = true;
       // Internally, Helix use instanceId to derive Hostname and Port. To decouple them, explicitly set the hostname/port
       // field in zk.
       instanceConfig.setHostName(_serverConf.getString(KEY_OF_SERVER_NETTY_HOST));
       instanceConfig.setPort(Integer.toString(_serverConf.getInt(KEY_OF_SERVER_NETTY_PORT, DEFAULT_SERVER_NETTY_PORT)));
-      // Use setProperty instead of _helixAdmin.setInstanceConfig because the latter explicitly forbids instance host
-      // port modification.
-      if(_helixManager.getHelixDataAccessor().setProperty(
-          _helixManager.getHelixDataAccessor().keyBuilder().instanceConfig(instanceName), instanceConfig)) {
-        LOGGER.info("Updated server hostname/port successfully for server id {} to {}:", instanceName, instanceConfig);
-      } else {
-        LOGGER.error("Failed to update hostname/port for instance: {}", instanceName);
-        // Treat this is as a fatal error.
-        throw new HelixException("Failed to update hostname/port for instance " + instanceName);
-      }
+    }
+    if (!toUpdateHelixRecord) {
+      return;
+    }
+    // Use setProperty instead of _helixAdmin.setInstanceConfig because the latter explicitly forbids instance host
+    // port modification.
+    if(_helixManager.getHelixDataAccessor().setProperty(
+        _helixManager.getHelixDataAccessor().keyBuilder().instanceConfig(instanceName), instanceConfig)) {
+      LOGGER.info("Updated server hostname/port successfully for server id {} to {}:", instanceName, instanceConfig);
+    } else {
+      LOGGER.error("Failed to update hostname/port for instance: {}", instanceName);
+      // Treat this is as a fatal error.
+      throw new HelixException("Failed to update hostname/port for instance " + instanceName);
     }
   }
 
