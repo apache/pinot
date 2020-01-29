@@ -292,9 +292,9 @@ public class HelixServerStarter {
         instanceConfig.setHostName(hostName);
         toUpdateHelixRecord = true;
       }
-      String port = _serverConf.getString(KEY_OF_SERVER_NETTY_PORT);
-      if (port != null && !port.equals(instanceConfig.getPort())) {
-        instanceConfig.setPort(port);
+      String portStr = Integer.toString(_serverConf.getInt(KEY_OF_SERVER_NETTY_PORT, DEFAULT_SERVER_NETTY_PORT));
+      if (portStr!= null && !portStr.equals(instanceConfig.getPort())) {
+        instanceConfig.setPort(portStr);
         toUpdateHelixRecord = true;
       }
     }
