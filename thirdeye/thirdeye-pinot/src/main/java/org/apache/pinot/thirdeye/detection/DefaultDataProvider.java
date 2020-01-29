@@ -284,4 +284,11 @@ public class DefaultDataProvider implements DataProvider {
     List<DatasetConfigDTO> dataset = this.datasetDAO.findByPredicate(Predicate.EQ("displayName", datasetDisplayName));
     return dataset;
   }
+
+  public static void cleanCache() {
+    if (DETECTION_TIME_SERIES_CACHE != null) {
+      DETECTION_TIME_SERIES_CACHE.cleanUp();
+      DETECTION_TIME_SERIES_CACHE = null;
+    }
+  }
 }
