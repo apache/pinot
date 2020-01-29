@@ -101,7 +101,8 @@ public class DataAvailabilityTaskScheduler implements Runnable {
             } else {
               LOG.warn("Unable to schedule a task for {}, because it is out of scheduling window.", detectionConfigId);
             }
-          } else if (needFallback(detectionConfig)) {
+          }
+          if (needFallback(detectionConfig)) {
             LOG.info("Scheduling a task for detection {} due to the fallback mechanism.", detectionConfigId);
             createDetectionTask(detectionConfig);
             ThirdeyeMetricsUtil.eventScheduledTaskFallbackCounter.inc();
@@ -199,7 +200,7 @@ public class DataAvailabilityTaskScheduler implements Runnable {
     List<TaskDTO> tasks = taskDAO.findByNameOrderByCreateTime(TaskConstants.TaskType.DETECTION.toString() +
         "_" + detectionConfigId, 1,false);
     if (tasks.size() == 0) {
-      taskLastCreateTimeMap.put(detectionConfigId, 0L);
+      taskLastCreateTimeMap.put(detectionConfigId, detectionConfig.getLastTimestamp());
     } else {
       DetectionPipelineTaskInfo taskInfo = (DetectionPipelineTaskInfo) TaskInfoFactory.getTaskInfoFromTaskType(
           TaskConstants.TaskType.DETECTION, tasks.get(0).getTaskInfo());
