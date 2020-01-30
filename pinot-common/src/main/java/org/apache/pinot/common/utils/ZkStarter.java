@@ -22,7 +22,10 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.TimeUnit;
-import org.I0Itec.zkclient.ZkClient;
+
+import org.apache.helix.manager.zk.client.DedicatedZkClientFactory;
+import org.apache.helix.manager.zk.client.HelixZkClient;
+import org.apache.helix.zookeeper.api.zkclient.ZkClient;
 import org.apache.zookeeper.server.ServerConfig;
 import org.apache.zookeeper.server.ZooKeeperServerMain;
 import org.apache.zookeeper.server.quorum.QuorumPeerConfig;
@@ -163,7 +166,10 @@ public class ZkStarter {
       }.start();
 
       // Wait until the ZK server is started
-      ZkClient client = new ZkClient("localhost:" + port, 10000);
+      HelixZkClient.ZkConnectionConfig zkConnectionConfig =
+          new HelixZkClient.ZkConnectionConfig("localhost:" + port).setSessionTimeout(10000);
+      HelixZkClient client =
+          DedicatedZkClientFactory.getInstance().buildZkClient(zkConnectionConfig);
       client.waitUntilConnected(10L, TimeUnit.SECONDS);
       client.close();
 

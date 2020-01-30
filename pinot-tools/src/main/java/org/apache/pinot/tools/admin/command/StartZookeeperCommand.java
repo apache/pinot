@@ -21,7 +21,7 @@ package org.apache.pinot.tools.admin.command;
 import com.google.common.io.Files;
 import java.io.File;
 import java.io.IOException;
-import org.I0Itec.zkclient.IDefaultNameSpace;
+import org.apache.helix.zookeeper.api.zkclient.IDefaultNameSpace;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.tools.Command;
@@ -107,7 +107,7 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
 
     IDefaultNameSpace _defaultNameSpace = new IDefaultNameSpace() {
       @Override
-      public void createDefaultNameSpace(org.I0Itec.zkclient.ZkClient zkClient) {
+      public void createDefaultNameSpace(org.apache.helix.zookeeper.api.zkclient.ZkClient zkClient) {
         // init any zk paths if needed
       }
     };

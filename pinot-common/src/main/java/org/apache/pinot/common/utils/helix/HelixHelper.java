@@ -26,7 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import javax.annotation.Nullable;
-import org.I0Itec.zkclient.exception.ZkBadVersionException;
+import org.apache.helix.zookeeper.api.zkclient.exception.ZkBadVersionException;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;

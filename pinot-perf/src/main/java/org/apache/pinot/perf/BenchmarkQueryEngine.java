@@ -24,7 +24,10 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.I0Itec.zkclient.ZkClient;
+
+import org.apache.helix.manager.zk.client.DedicatedZkClientFactory;
+import org.apache.helix.manager.zk.client.HelixZkClient;
+import org.apache.helix.zookeeper.api.zkclient.ZkClient;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.pinot.broker.requesthandler.OptimizationFlags;
@@ -109,7 +112,10 @@ public class BenchmarkQueryEngine {
       _perfBenchmarkDriver.addSegment(TABLE_NAME, segmentMetadata);
     }
 
-    ZkClient client = new ZkClient("localhost:2191", 10000, 10000, new ZNRecordSerializer());
+    HelixZkClient.ZkConnectionConfig zkConnectionConfig =
+        new HelixZkClient.ZkConnectionConfig("localhost:2191")
+            .setSessionTimeout(10000);
+    HelixZkClient client = DedicatedZkClientFactory.getInstance().buildZkClient(zkConnectionConfig);
 
     ZNRecord record = client.readData("/PinotPerfTestCluster/EXTERNALVIEW/" + TABLE_NAME);
     while (true) {

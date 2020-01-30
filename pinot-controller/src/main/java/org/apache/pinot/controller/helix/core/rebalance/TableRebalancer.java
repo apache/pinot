@@ -23,7 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeoutException;
-import org.I0Itec.zkclient.exception.ZkBadVersionException;
+import org.apache.helix.zookeeper.api.zkclient.exception.ZkBadVersionException;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixDataAccessor;

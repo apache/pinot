@@ -20,7 +20,7 @@ package org.apache.pinot.broker.util;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.I0Itec.zkclient.IZkDataListener;
+import org.apache.helix.zookeeper.api.zkclient.IZkDataListener;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;

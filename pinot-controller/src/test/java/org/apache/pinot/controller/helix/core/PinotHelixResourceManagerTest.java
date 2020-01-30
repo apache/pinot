@@ -27,7 +27,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import org.I0Itec.zkclient.ZkClient;
+
+import org.apache.helix.manager.zk.client.DedicatedZkClientFactory;
+import org.apache.helix.manager.zk.client.HelixZkClient;
+import org.apache.helix.zookeeper.api.zkclient.ZkClient;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyPathBuilder;
@@ -121,8 +124,10 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
       Assert.assertEquals(cachedInstanceConfig, realInstanceConfig);
     }
 
-    ZkClient zkClient = new ZkClient(_helixResourceManager.getHelixZkURL(), CONNECTION_TIMEOUT_IN_MILLISECOND,
-        CONNECTION_TIMEOUT_IN_MILLISECOND, new ZNRecordSerializer());
+    HelixZkClient.ZkConnectionConfig zkConnectionConfig =
+        new HelixZkClient.ZkConnectionConfig(_helixResourceManager.getHelixZkURL())
+            .setSessionTimeout(CONNECTION_TIMEOUT_IN_MILLISECOND);
+    HelixZkClient zkClient = DedicatedZkClientFactory.getInstance().buildZkClient(zkConnectionConfig);
 
     modifyExistingInstanceConfig(zkClient);
     addAndRemoveNewInstanceConfig(zkClient);
@@ -130,7 +135,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     zkClient.close();
   }
 
-  private void modifyExistingInstanceConfig(ZkClient zkClient)
+  private void modifyExistingInstanceConfig(HelixZkClient zkClient)
       throws InterruptedException {
     String instanceName = "Server_localhost_" + new Random().nextInt(NUM_INSTANCES);
     String instanceConfigPath = PropertyPathBuilder.instanceConfig(getHelixClusterName(), instanceName);
@@ -162,7 +167,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     zkClient.writeData(instanceConfigPath, znRecord);
   }
 
-  private void addAndRemoveNewInstanceConfig(ZkClient zkClient) {
+  private void addAndRemoveNewInstanceConfig(HelixZkClient zkClient) {
     int biggerRandomNumber = NUM_INSTANCES + new Random().nextInt(NUM_INSTANCES);
     String instanceName = "Server_localhost_" + biggerRandomNumber;
     String instanceConfigPath = PropertyPathBuilder.instanceConfig(getHelixClusterName(), instanceName);
