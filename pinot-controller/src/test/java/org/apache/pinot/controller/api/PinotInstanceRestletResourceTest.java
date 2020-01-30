@@ -64,7 +64,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
       try {
         String getResponse = sendGetRequest(listInstancesUrl);
         JsonNode jsonNode = JsonUtils.stringToJsonNode(getResponse);
-        return (jsonNode != null) && (jsonNode.get("instances") != null) && (jsonNode.get("instances").size() == 1)
+        return (jsonNode != null) && (jsonNode.get("instances") != null) && (jsonNode.get("instances").size() >= 1)
             && (jsonNode.get("instances").get(0).asText().startsWith(Helix.PREFIX_OF_CONTROLLER_INSTANCE));
       } catch (Exception e) {
         throw new RuntimeException(e);
@@ -187,7 +187,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
       try {
         String getResponse = sendGetRequest(listInstancesUrl);
         JsonNode jsonNode = JsonUtils.stringToJsonNode(getResponse);
-        return (jsonNode != null) && (jsonNode.get("instances") != null) && (jsonNode.get("instances").size() == 1)
+        return (jsonNode != null) && (jsonNode.get("instances") != null) && (jsonNode.get("instances").size() >= 1)
             && (jsonNode.get("instances").get(0).asText().startsWith(Helix.PREFIX_OF_CONTROLLER_INSTANCE));
       } catch (Exception e) {
         throw new RuntimeException(e);
