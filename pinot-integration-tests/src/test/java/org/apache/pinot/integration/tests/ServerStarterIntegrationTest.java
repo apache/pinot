@@ -24,6 +24,8 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.NetUtil;
+import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
@@ -143,6 +145,6 @@ public class ServerStarterIntegrationTest extends ControllerTest {
         new HelixServerStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, serverConf);
 
     // Verify the serverId, host and port are set correctly in Zk.
-    verifyZkConfigData(helixServerStarter, "Server_localhost_8098", "Server_localhost", "8098");
-  }
+    verifyZkConfigData(helixServerStarter, StringUtil.join("_", "Server", NetUtil.getHostnameOrAddress(), "8098"),
+        StringUtil.join("_", "Server", NetUtil.getHostnameOrAddress()), "8098");  }
 }
