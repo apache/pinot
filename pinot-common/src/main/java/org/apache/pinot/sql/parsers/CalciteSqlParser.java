@@ -40,6 +40,8 @@ import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlSelectKeyword;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.sql.parser.SqlParserImplFactory;
+import org.apache.calcite.sql.parser.babel.SqlBabelParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.function.FunctionDefinitionRegistry;
@@ -217,7 +219,9 @@ public class CalciteSqlParser {
   private static PinotQuery compileCalciteSqlToPinotQuery(String sql) {
     SqlParser.ConfigBuilder parserBuilder = SqlParser.configBuilder();
     parserBuilder.setLex(PINOT_LEX);
-    parserBuilder.setConformance(SqlConformanceEnum.LENIENT);
+    // BABEL is a very liberal conformance value that allows anything supported by any dialect
+    parserBuilder.setConformance(SqlConformanceEnum.BABEL);
+    parserBuilder.setParserFactory(SqlBabelParserImpl.FACTORY);
     SqlParser sqlParser = SqlParser.create(sql, parserBuilder.build());
     final SqlNode sqlNode;
     try {
