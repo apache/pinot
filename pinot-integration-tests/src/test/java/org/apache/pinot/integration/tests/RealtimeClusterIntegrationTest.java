@@ -170,4 +170,11 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
       throws Exception {
     super.testHardcodedSqlQueries();
   }
+
+  @Test
+  @Override
+  public void testSqlQueriesFromQueryFile()
+      throws Exception {
+    super.testSqlQueriesFromQueryFile();
+  }
 }
