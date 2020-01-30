@@ -189,4 +189,9 @@ public class DefaultCommitterRealtimeIntegrationTest extends RealtimeClusterInte
   public void testQueryExceptions()
       throws Exception {
   }
+
+  @Override
+  public void testSqlQueriesFromQueryFile()
+      throws Exception {
+  }
 }

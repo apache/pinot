@@ -851,6 +851,9 @@ public class ClusterIntegrationTestUtils {
 
     // broker response
     JsonNode pinotResponse = ClusterTest.postSqlQuery(pinotQuery, brokerUrl);
+    if (pinotResponse.get("exceptions").size() > 0) {
+      throw new RuntimeException("Got Exceptions from Query Response: " + pinotResponse);
+    }
     JsonNode brokerResponseRows = pinotResponse.get("resultTable").get("rows");
     long pinotNumRecordsSelected = pinotResponse.get("numDocsScanned").asLong();
 

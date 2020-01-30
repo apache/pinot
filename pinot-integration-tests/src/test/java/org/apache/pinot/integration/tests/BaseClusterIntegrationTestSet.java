@@ -37,6 +37,8 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 
 
@@ -46,10 +48,14 @@ import org.testng.Assert;
  */
 @SuppressWarnings("unused")
 public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrationTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTestSet.class);
   private static final Random RANDOM = new Random();
 
   // Default settings
-  private static final String DEFAULT_QUERY_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K";
+  private static final String DEFAULT_PQL_QUERY_FILE_NAME =
+      "On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K";
+  private static final String DEFAULT_SQL_QUERY_FILE_NAME =
+      "On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K.sql";
   private static final int DEFAULT_NUM_QUERIES_TO_GENERATE = 100;
   private static final int DEFAULT_MAX_NUM_QUERIES_TO_SKIP_IN_QUERY_FILE = 200;
 
@@ -57,7 +63,14 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    * Can be overridden to change default setting
    */
   protected String getQueryFileName() {
-    return DEFAULT_QUERY_FILE_NAME;
+    return DEFAULT_PQL_QUERY_FILE_NAME;
+  }
+
+  /**
+   * Can be overridden to change default setting
+   */
+  protected String getSqlQueryFileName() {
+    return DEFAULT_SQL_QUERY_FILE_NAME;
   }
 
   /**
@@ -158,6 +171,13 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   public void testHardcodedSqlQueries()
       throws Exception {
     String query;
+    List<String> h2queries;
+    query = "SELECT DistanceGroup FROM mytable WHERE \"Month\" BETWEEN 1 AND 1 AND DivAirportSeqIDs IN (1078102, 1142303, 1530402, 1172102, 1291503) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10";
+    h2queries = Arrays.asList("SELECT DistanceGroup FROM mytable WHERE Month BETWEEN 1 AND 1 AND (DivAirportSeqIDs__MV0 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV1 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV2 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV3 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV4 IN (1078102, 1142303, 1530402, 1172102, 1291503)) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10000");
+    testSqlQuery(query, h2queries);
+    query = "SELECT MAX(Quarter), MAX(FlightNum) FROM mytable LIMIT 8";
+    h2queries = Arrays.asList("SELECT MAX(Quarter),MAX(FlightNum) FROM mytable LIMIT 10000");
+    testSqlQuery(query, h2queries);
     query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16312 AND Carrier = 'DL'";
     testSqlQuery(query, Collections.singletonList(query));
     query = "SELECT SUM(ArrTime) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL'";
@@ -186,9 +206,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     testSqlQuery(query, Collections.singletonList(query));
     query =
         "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10, ADD(ArrTime + 5, ArrDelay), ADD(ArrTime * 5, ArrDelay) FROM mytable WHERE mult((ArrTime - 100), (5 + ArrDelay))> 0";
-    String h2query =
-        "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10, ArrTime + 5 + ArrDelay, ArrTime * 5 + ArrDelay FROM mytable WHERE (ArrTime - 100) * (5 + ArrDelay)> 0";
-    testSqlQuery(query, Collections.singletonList(h2query));
+    h2queries = Arrays.asList(
+        "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10, ArrTime + 5 + ArrDelay, ArrTime * 5 + ArrDelay FROM mytable WHERE (ArrTime - 100) * (5 + ArrDelay)> 0");
+    testSqlQuery(query, h2queries);
   }
 
   /**
@@ -275,7 +295,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    */
   public void testSqlQueriesFromQueryFile()
       throws Exception {
-    URL resourceUrl = BaseClusterIntegrationTestSet.class.getClassLoader().getResource(getQueryFileName());
+    URL resourceUrl = BaseClusterIntegrationTestSet.class.getClassLoader().getResource(getSqlQueryFileName());
     Assert.assertNotNull(resourceUrl);
     File queryFile = new File(resourceUrl.getFile());
 
@@ -286,7 +306,6 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         for (int i = 0; i < numQueriesSkipped; i++) {
           reader.readLine();
         }
-
         String queryString = reader.readLine();
         // Reach end of file.
         if (queryString == null) {
@@ -294,14 +313,22 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         }
 
         JsonNode query = JsonUtils.stringToJsonNode(queryString);
-        String sqlQuery = query.get("pql").asText();
+        String sqlQuery = query.get("sql").asText();
         JsonNode hsqls = query.get("hsqls");
         List<String> sqlQueries = new ArrayList<>();
-        int length = hsqls.size();
-        for (int i = 0; i < length; i++) {
-          sqlQueries.add(hsqls.get(i).asText());
+        if (hsqls == null || hsqls.size() == 0) {
+          sqlQueries.add(sqlQuery);
+        } else {
+          for (int i = 0; i < hsqls.size(); i++) {
+            sqlQueries.add(hsqls.get(i).asText());
+          }
         }
-        testSqlQuery(sqlQuery, sqlQueries);
+        try {
+          testSqlQuery(sqlQuery, sqlQueries);
+        } catch (Exception e) {
+          LOGGER.error("Failed to test SQL query: {} with H2 queries: {}.", sqlQuery, sqlQueries, e);
+          throw e;
+        }
       }
     }
   }
