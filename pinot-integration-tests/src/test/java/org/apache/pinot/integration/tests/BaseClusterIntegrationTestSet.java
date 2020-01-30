@@ -306,13 +306,17 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     File queryFile = new File(resourceUrl.getFile());
 
     int maxNumQueriesToSkipInQueryFile = getMaxNumQueriesToSkipInQueryFile();
+    int queryId = 0;
     try (BufferedReader reader = new BufferedReader(new FileReader(queryFile))) {
       while (true) {
         int numQueriesSkipped = RANDOM.nextInt(maxNumQueriesToSkipInQueryFile);
         for (int i = 0; i < numQueriesSkipped; i++) {
           reader.readLine();
+          queryId++;
         }
         String queryString = reader.readLine();
+        queryId++;
+        LOGGER.info("Processing query id - {}", queryId);
         // Reach end of file.
         if (queryString == null) {
           return;
@@ -332,6 +336,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         try {
           testSqlQuery(sqlQuery, sqlQueries);
         } catch (Exception e) {
+          e.printStackTrace();
           LOGGER.error("Failed to test SQL query: {} with H2 queries: {}.", sqlQuery, sqlQueries, e);
           throw e;
         }
