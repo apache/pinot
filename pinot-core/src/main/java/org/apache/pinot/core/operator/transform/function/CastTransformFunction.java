@@ -56,12 +56,16 @@ public class CastTransformFunction extends BaseTransformFunction {
       _toFormat = ((LiteralTransformFunction)castFormatTransformFunction).getLiteral().toUpperCase();
       switch (_toFormat) {
         case "INT":
+        case "INTEGER":
         case "LONG":
           _resultMetadata = LONG_SV_NO_DICTIONARY_METADATA;
+          break;
         case "FLOAT":
         case "DOUBLE":
           _resultMetadata = DOUBLE_SV_NO_DICTIONARY_METADATA;
+          break;
         case "STRING":
+        case "VARCHAR":
           _resultMetadata = STRING_SV_NO_DICTIONARY_METADATA;
           break;
         default:
