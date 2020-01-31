@@ -186,8 +186,9 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
       yamlConfigMap.put(PROP_REFERENCE_LINKS, refLinks);
     }
     if (refLinks.isEmpty()) {
+      refLinks.put("How to label Anomalies?", "https://go/howtolabel");
       refLinks.put("ThirdEye User Guide", "https://go/thirdeyeuserguide");
-      refLinks.put("Add Reference Links", "https://go/thirdeyealertreflink");
+      refLinks.put("See how to add links", "https://go/thirdeyealertreflink");
     }
     alertConfigDTO.setReferenceLinks(ConfigUtils.getMap(yamlConfigMap.get(PROP_REFERENCE_LINKS)));
 
