@@ -30,7 +30,7 @@
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>0.3.3-SNAPSHOT</version>
+  <version>0.3.3</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
@@ -96,7 +96,7 @@
 
   <scm>
     <developerConnection>scm:git:gitolite@code.uber.internal:data/pinot</developerConnection>
-    <tag>HEAD</tag>
+    <tag>pinot-0.3.3</tag>
   </scm>
   <distributionManagement>
     <repository>
