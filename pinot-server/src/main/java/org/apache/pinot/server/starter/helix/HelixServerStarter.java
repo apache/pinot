@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -31,7 +33,7 @@ import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationUtils;
 import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixException;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
@@ -57,11 +59,11 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,41 +94,40 @@ public class HelixServerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixServerStarter.class);
 
   private final String _helixClusterName;
+  private final String _zkAddress;
   private final Configuration _serverConf;
   private final String _instanceId;
   private final HelixManager _helixManager;
   private final HelixAdmin _helixAdmin;
   private final ServerInstance _serverInstance;
   private final AdminApiApplication _adminApiApplication;
-  private final String _zkServers;
 
-  public HelixServerStarter(String helixClusterName, String zkServer, Configuration serverConf)
+  public HelixServerStarter(String helixClusterName, String zkAddress, Configuration serverConf)
       throws Exception {
     LOGGER.info("Starting Pinot server");
     long startTimeMs = System.currentTimeMillis();
-    _helixClusterName = helixClusterName;
 
+    _helixClusterName = helixClusterName;
+    _zkAddress = zkAddress;
     // Make a clone so that changes to the config won't propagate to the caller
     _serverConf = ConfigurationUtils.cloneConfiguration(serverConf);
 
+    String host = _serverConf.getString(KEY_OF_SERVER_NETTY_HOST,
+        _serverConf.getBoolean(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil
+            .getHostnameOrAddress() : NetUtil.getHostAddress());
+    int port = _serverConf.getInt(KEY_OF_SERVER_NETTY_PORT, DEFAULT_SERVER_NETTY_PORT);
     if (_serverConf.containsKey(CONFIG_OF_INSTANCE_ID)) {
       _instanceId = _serverConf.getString(CONFIG_OF_INSTANCE_ID);
     } else {
-      String host = _serverConf.getString(KEY_OF_SERVER_NETTY_HOST,
-          _serverConf.getBoolean(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtil
-              .getHostnameOrAddress() : NetUtil.getHostAddress());
-
-      int port = _serverConf.getInt(KEY_OF_SERVER_NETTY_PORT, DEFAULT_SERVER_NETTY_PORT);
       _instanceId = PREFIX_OF_SERVER_INSTANCE + host + "_" + port;
       _serverConf.addProperty(CONFIG_OF_INSTANCE_ID, _instanceId);
     }
 
-    LOGGER.info("Initializing Helix manager");
+    LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
+        _helixClusterName, _instanceId);
     setupHelixSystemProperties();
-    // Replace all white-spaces from list of zkServers.
-    _zkServers = zkServer.replaceAll("\\s+", "");
     _helixManager =
-        HelixManagerFactory.getZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkServers);
+        HelixManagerFactory.getZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
 
     LOGGER.info("Initializing server instance and registering state model factory");
     Utils.logVersions();
@@ -147,7 +148,7 @@ public class HelixServerStarter {
     LOGGER.info("Connecting Helix manager");
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
-    updateInstanceConfigIfNeeded(helixClusterName, _instanceId, serverConf);
+    updateInstanceConfigIfNeeded(host, port);
 
     // Start restlet server for admin API endpoint
     int adminApiPort = _serverConf.getInt(CONFIG_OF_ADMIN_API_PORT, DEFAULT_ADMIN_API_PORT);
@@ -267,10 +268,12 @@ public class HelixServerStarter {
     _helixAdmin.setConfig(scope, props);
   }
 
-  private void updateInstanceConfigIfNeeded(String clusterName, String instanceName, Configuration serverConf) {
-    InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(clusterName, instanceName);
+  private void updateInstanceConfigIfNeeded(String host, int port) {
+    InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_helixClusterName, _instanceId);
+    boolean needToUpdateInstanceConfig = false;
+
+    // Add default instance tags if not exist
     List<String> instanceTags = instanceConfig.getTags();
-    boolean toUpdateHelixRecord = false;
     if (instanceTags == null || instanceTags.size() == 0) {
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
         instanceConfig.addTag(TagNameUtils.getOfflineTagForTenant(null));
@@ -278,42 +281,35 @@ public class HelixServerStarter {
       } else {
         instanceConfig.addTag(UNTAGGED_SERVER_INSTANCE);
       }
-      toUpdateHelixRecord = true;
+      needToUpdateInstanceConfig = true;
     }
 
-    // If the server config has both instance_id and host/port info, overwrite the host/port info in zk. Without the
-    // overwrite, Helix will extract host/port from the instance_id instead of use those in config.
-    // Use serverConf instead of _serverConf as the latter has been modified.
-    if (serverConf.containsKey(CONFIG_OF_INSTANCE_ID)) {
-      // Internally, Helix use instanceId to derive Hostname and Port. To decouple them, explicitly set the hostname/port
-      // field in zk.
-      String hostName = serverConf.getString(KEY_OF_SERVER_NETTY_HOST);
-      if (hostName != null && !hostName.equals(instanceConfig.getHostName())) {
-        instanceConfig.setHostName(hostName);
-        toUpdateHelixRecord = true;
-      }
-
-      if (serverConf.containsKey(KEY_OF_SERVER_NETTY_PORT)) {
-        String portStr = Integer.toString(serverConf.getInt(KEY_OF_SERVER_NETTY_PORT));
-        if (portStr != null && !portStr.equals(instanceConfig.getPort())) {
-          instanceConfig.setPort(portStr);
-          toUpdateHelixRecord = true;
-        }
-      }
+    // Update host and port if needed
+    if (!host.equals(instanceConfig.getHostName())) {
+      instanceConfig.setHostName(host);
+      needToUpdateInstanceConfig = true;
     }
-    if (!toUpdateHelixRecord) {
+    String portStr = Integer.toString(port);
+    if (!portStr.equals(instanceConfig.getPort())) {
+      instanceConfig.setPort(portStr);
+      needToUpdateInstanceConfig = true;
+    }
+
+    if (needToUpdateInstanceConfig) {
+      LOGGER.info("Updating instance config for instance: {} with instance tags: {}, host: {}, port: {}", _instanceId,
+          instanceTags, host, port);
+    } else {
+      LOGGER.info("Instance config for instance: {} has instance tags: {}, host: {}, port: {}, no need to update",
+          _instanceId, instanceTags, host, port);
       return;
     }
-    // Use setProperty instead of _helixAdmin.setInstanceConfig because the latter explicitly forbids instance host
-    // port modification.
-    if(_helixManager.getHelixDataAccessor().setProperty(
-        _helixManager.getHelixDataAccessor().keyBuilder().instanceConfig(instanceName), instanceConfig)) {
-      LOGGER.info("Updated server hostname/port successfully for server id {} to {}:", instanceName, instanceConfig);
-    } else {
-      LOGGER.error("Failed to update hostname/port for instance: {}", instanceName);
-      // Treat this is as a fatal error.
-      throw new HelixException("Failed to update hostname/port for instance " + instanceName);
-    }
+
+    // NOTE: Use HelixDataAccessor.setProperty() instead of HelixAdmin.setInstanceConfig() because the latter explicitly
+    // forbids instance host/port modification
+    HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
+    Preconditions.checkState(
+        helixDataAccessor.setProperty(helixDataAccessor.keyBuilder().instanceConfig(_instanceId), instanceConfig),
+        "Failed to update instance config");
   }
 
   private void setupHelixSystemProperties() {
@@ -457,7 +453,7 @@ public class HelixServerStarter {
 
     HelixAdmin helixAdmin = null;
     try {
-      helixAdmin = new ZKHelixAdmin(_zkServers);
+      helixAdmin = new ZKHelixAdmin(_zkAddress);
 
       // Monitor all enabled table resources that the server serves
       Set<String> resourcesToMonitor = new HashSet<>();
@@ -546,8 +542,9 @@ public class HelixServerStarter {
     return true;
   }
 
-  public HelixManager getHelixManager() {
-    return _helixManager;
+  @VisibleForTesting
+  public String getInstanceId() {
+    return _instanceId;
   }
 
   /**

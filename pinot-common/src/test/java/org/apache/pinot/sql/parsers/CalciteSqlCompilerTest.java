@@ -1216,4 +1216,61 @@ public class CalciteSqlCompilerTest {
             .getFunctionCall().getOperands().get(0).getIdentifier().getName(), "time");
     Assert.assertEquals(pinotQuery.getGroupByList().get(0).getIdentifier().getName(), "group");
   }
+  
+  @Test
+  public void testCastTransformation() {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("select CAST(25.65 AS int) from myTable");
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals("CAST", pinotQuery.getSelectList().get(0).getFunctionCall().getOperator());
+    Assert.assertEquals(25.65,
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getLiteral().getDoubleValue());
+    Assert.assertEquals("INTEGER",
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue());
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT CAST('20170825' AS LONG) from myTable");
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals("CAST", pinotQuery.getSelectList().get(0).getFunctionCall().getOperator());
+    Assert.assertEquals("20170825",
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getLiteral().getStringValue());
+    Assert.assertEquals("LONG",
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue());
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT CAST(20170825.0 AS Float) from myTable");
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals("CAST", pinotQuery.getSelectList().get(0).getFunctionCall().getOperator());
+    Assert.assertEquals(20170825.0,
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getLiteral().getDoubleValue());
+    Assert.assertEquals("FLOAT",
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue());
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT CAST(20170825.0 AS dOuble) from myTable");
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals("CAST", pinotQuery.getSelectList().get(0).getFunctionCall().getOperator());
+    Assert.assertEquals(20170825.0,
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getLiteral().getDoubleValue());
+    Assert.assertEquals("DOUBLE",
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue());
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT CAST(column1 AS STRING) from myTable");
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals("CAST", pinotQuery.getSelectList().get(0).getFunctionCall().getOperator());
+    Assert.assertEquals("column1",
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName());
+    Assert.assertEquals("STRING",
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue());
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT CAST(column1 AS varchar) from myTable");
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals("CAST", pinotQuery.getSelectList().get(0).getFunctionCall().getOperator());
+    Assert.assertEquals("column1",
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName());
+    Assert.assertEquals("VARCHAR",
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue());
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT SUM(CAST(CAST(ArrTime AS STRING) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL'");
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals("SUM", pinotQuery.getSelectList().get(0).getFunctionCall().getOperator());
+    Assert.assertEquals("CAST", pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator());
+    Assert.assertEquals("CAST", pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator());
+  }
 }

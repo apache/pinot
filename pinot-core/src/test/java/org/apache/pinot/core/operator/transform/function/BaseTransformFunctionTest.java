@@ -157,6 +157,13 @@ public abstract class BaseTransformFunctionTest {
     }
   }
 
+  protected void testTransformFunction(TransformFunction transformFunction, String[] expectedValues) {
+    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(stringValues[i], expectedValues[i]);
+    }
+  }
+
   @AfterClass
   public void tearDown() {
     FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));

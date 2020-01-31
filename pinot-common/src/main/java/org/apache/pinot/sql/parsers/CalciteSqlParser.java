@@ -29,6 +29,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.calcite.config.Lex;
 import org.apache.calcite.sql.SqlBasicCall;
+import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
@@ -187,7 +188,7 @@ public class CalciteSqlParser {
     return false;
   }
 
-  private static Set<String> extractIdentifiers(List<Expression> expressions) {
+  public static Set<String> extractIdentifiers(List<Expression> expressions) {
     Set<String> identifiers = new HashSet<>();
     for (Expression expression : expressions) {
       if (expression.getIdentifier() != null) {
@@ -444,6 +445,10 @@ public class CalciteSqlParser {
         return RequestUtils.getIdentifierExpression(node.toString());
       case LITERAL:
         return RequestUtils.getLiteralExpression((SqlLiteral) node);
+      case OTHER:
+        if (node instanceof SqlDataTypeSpec) {
+          return RequestUtils.getLiteralExpression(((SqlDataTypeSpec) node).getTypeName().getSimple());
+        }
       default:
         SqlBasicCall funcSqlNode = (SqlBasicCall) node;
         String funcName = funcSqlNode.getOperator().getKind().name();
