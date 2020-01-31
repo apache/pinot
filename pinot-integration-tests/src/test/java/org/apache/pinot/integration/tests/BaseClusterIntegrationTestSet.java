@@ -212,9 +212,11 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     testSqlQuery(query, Collections.singletonList(query));
     query =
         "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10, ADD(ArrTime + 5, ArrDelay), ADD(ArrTime * 5, ArrDelay) FROM mytable WHERE mult((ArrTime - 100), (5 + ArrDelay))> 0";
-    h2queries = Arrays.asList(
+    h2queries = Collections.singletonList(
         "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10, ArrTime + 5 + ArrDelay, ArrTime * 5 + ArrDelay FROM mytable WHERE (ArrTime - 100) * (5 + ArrDelay)> 0");
     testSqlQuery(query, h2queries);
+    query = "SELECT COUNT(*) AS \"date\", MAX(ArrTime) AS \"group\", MIN(ArrTime) AS min FROM myTable";
+    testSqlQuery(query, Collections.singletonList(query));
   }
 
   /**
