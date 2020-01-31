@@ -29,11 +29,16 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.core.util.QueryOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -42,6 +47,8 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
  */
 @ThreadSafe
 public class BrokerReduceService {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerReduceService.class);
 
   public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest,
       Map<ServerRoutingInstance, DataTable> dataTableMap, @Nullable BrokerMetrics brokerMetrics) {
@@ -178,7 +185,45 @@ public class BrokerReduceService {
     }
 
     DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(brokerRequest);
-    dataTableReducer.reduceAndSetResults(tableName, cachedDataSchema, dataTableMap, brokerResponseNative, brokerMetrics);
+    dataTableReducer
+        .reduceAndSetResults(tableName, cachedDataSchema, dataTableMap, brokerResponseNative, brokerMetrics);
+    updateAliasToSchemaName(brokerRequest, brokerResponseNative);
     return brokerResponseNative;
+  }
+
+  private static void updateAliasToSchemaName(BrokerRequest brokerRequest, BrokerResponseNative brokerResponseNative) {
+    if (brokerRequest.getPinotQuery() == null) {
+      return;
+    }
+    QueryOptions queryOptions = new QueryOptions(brokerRequest.getQueryOptions());
+    if (!queryOptions.isResponseFormatSQL()) {
+      return;
+    }
+    DataSchema dataSchema = brokerResponseNative.getResultTable().getDataSchema();
+    List<Expression> selectList = brokerRequest.getPinotQuery().getSelectList();
+    String[] columnNames = dataSchema.getColumnNames();
+    if (columnNames.length != selectList.size()) {
+      LOGGER.error("Response schema size {} is different from number of selection expressions {}", columnNames.length,
+          selectList.size());
+      return;
+    }
+    for (int i = 0; i < selectList.size(); i++) {
+      if (selectList.get(i).getFunctionCall() != null && selectList.get(i).getFunctionCall().getOperator()
+          .equalsIgnoreCase("AS")) {
+        String aliasName = null;
+        if (selectList.get(i).getFunctionCall().getOperands().get(1).getIdentifier() != null) {
+          aliasName = selectList.get(i).getFunctionCall().getOperands().get(1).getIdentifier().getName();
+        }
+        Literal aliasLiteral = selectList.get(i).getFunctionCall().getOperands().get(1).getLiteral();
+        if (aliasLiteral != null) {
+          if (aliasLiteral.isSetStringValue()) {
+            aliasName = aliasLiteral.getStringValue();
+          }
+        }
+        if (aliasName != null) {
+          columnNames[i] = aliasName;
+        }
+      }
+    }
   }
 }
