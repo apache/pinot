@@ -27,7 +27,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.helix.manager.zk.client.DedicatedZkClientFactory;
 import org.apache.helix.manager.zk.client.HelixZkClient;
-import org.apache.helix.zookeeper.api.zkclient.ZkClient;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.pinot.broker.requesthandler.OptimizationFlags;
@@ -115,7 +114,8 @@ public class BenchmarkQueryEngine {
     HelixZkClient.ZkConnectionConfig zkConnectionConfig =
         new HelixZkClient.ZkConnectionConfig("localhost:2191")
             .setSessionTimeout(10000);
-    HelixZkClient client = DedicatedZkClientFactory.getInstance().buildZkClient(zkConnectionConfig);
+    HelixZkClient client = DedicatedZkClientFactory.getInstance().buildZkClient(zkConnectionConfig,
+        new HelixZkClient.ZkClientConfig().setZkSerializer(new ZNRecordSerializer()));
 
     ZNRecord record = client.readData("/PinotPerfTestCluster/EXTERNALVIEW/" + TABLE_NAME);
     while (true) {

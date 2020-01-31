@@ -30,7 +30,6 @@ import java.util.Set;
 
 import org.apache.helix.manager.zk.client.DedicatedZkClientFactory;
 import org.apache.helix.manager.zk.client.HelixZkClient;
-import org.apache.helix.zookeeper.api.zkclient.ZkClient;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyPathBuilder;
@@ -127,7 +126,9 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     HelixZkClient.ZkConnectionConfig zkConnectionConfig =
         new HelixZkClient.ZkConnectionConfig(_helixResourceManager.getHelixZkURL())
             .setSessionTimeout(CONNECTION_TIMEOUT_IN_MILLISECOND);
-    HelixZkClient zkClient = DedicatedZkClientFactory.getInstance().buildZkClient(zkConnectionConfig);
+    HelixZkClient zkClient = DedicatedZkClientFactory.getInstance()
+        .buildZkClient(zkConnectionConfig,
+            new HelixZkClient.ZkClientConfig().setZkSerializer(new ZNRecordSerializer()));
 
     modifyExistingInstanceConfig(zkClient);
     addAndRemoveNewInstanceConfig(zkClient);
