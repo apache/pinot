@@ -276,7 +276,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
   }
 
   private void runAndVerifyInterSegmentQuery(String query, String serialized) {
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
     Assert.assertEquals(aggregationResults.size(), 1);
     Serializable value = aggregationResults.get(0).getValue();

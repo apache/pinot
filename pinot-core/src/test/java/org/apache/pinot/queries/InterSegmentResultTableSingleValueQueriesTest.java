@@ -52,7 +52,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     dataSchema =
         new DataSchema(new String[]{"count(*)"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
@@ -62,7 +62,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 0L, 120000L, rows, expectedResultsSize, dataSchema);
 
     // filter
-    brokerResponse = getBrokerResponseForQuery(query + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{24516L});
     QueriesTestUtils
@@ -70,7 +70,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
 
     // group by
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column9", "count(*)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
@@ -81,7 +81,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
 
     // filter + group by
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{"296467636", 17080L});
     QueriesTestUtils
@@ -89,7 +89,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
 
     // empty results
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + " where column5='non-existent-value'", queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + " where column5='non-existent-value'", queryOptions);
     rows = new ArrayList<>();
     expectedResultsSize = 0;
     QueriesTestUtils
@@ -109,7 +109,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
 
     // Query should be answered by MetadataBasedAggregationOperator, so check if numEntriesScannedInFilter and
     // numEntriesScannedPostFilter are 0
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     dataSchema = new DataSchema(new String[]{"max(column1)", "max(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
@@ -118,7 +118,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 0L, 120000L, rows, expectedResultsSize, dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{2146952047.0, 999813884.0});
     QueriesTestUtils
@@ -126,7 +126,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
 
     query = "select max(column1) from testTable";
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column9", "max(column1)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
@@ -136,7 +136,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{"296467636", 2146952047.0});
     QueriesTestUtils
@@ -155,7 +155,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
 
     // Query should be answered by MetadataBasedAggregationOperator, so check if numEntriesScannedInFilter and
     // numEntriesScannedPostFilter are 0
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     dataSchema = new DataSchema(new String[]{"min(column1)", "min(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
@@ -164,7 +164,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 0L, 120000L, rows, expectedResultsSize, dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{101116473.0, 20396372.0});
     QueriesTestUtils
@@ -172,7 +172,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
 
     query = "SELECT MIN(column3) FROM testTable";
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column9", "min(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
@@ -182,7 +182,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{"296467636", 20396372.0});
     QueriesTestUtils
@@ -199,7 +199,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     dataSchema = new DataSchema(new String[]{"sum(column1)", "sum(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
@@ -209,7 +209,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{27503790384288.0, 12429178874916.0});
     QueriesTestUtils
@@ -217,7 +217,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
 
     query = "SELECT SUM(column3) FROM testTable";
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column9", "sum(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
@@ -227,7 +227,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{"296467636", 8606725456500.0});
     QueriesTestUtils
@@ -244,7 +244,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     dataSchema = new DataSchema(new String[]{"avg(column1)", "avg(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
@@ -254,7 +254,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{1121871038.680372, 506982332.9627998});
     QueriesTestUtils
@@ -262,7 +262,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
 
     query = "select avg(column3) from testTable";
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column9", "avg(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
@@ -272,7 +272,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{"438926263", 999309554.0});
     QueriesTestUtils
@@ -290,7 +290,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     dataSchema = new DataSchema(new String[]{"minmaxrange(column1)", "minmaxrange(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
@@ -299,7 +299,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 0L, 120000L, rows, expectedResultsSize, dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{2045835574.0, 979417512.0});
     QueriesTestUtils
@@ -307,7 +307,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
 
     query = "SELECT MINMAXRANGE(column1) FROM testTable";
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column9", "minmaxrange(column1)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
@@ -317,7 +317,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{"296467636", 2044094181.0});
     QueriesTestUtils
@@ -334,7 +334,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     dataSchema = new DataSchema(new String[]{"distinctcount(column1)", "distinctcount(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
     rows = new ArrayList<>();
@@ -344,7 +344,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{1872, 4556});
     QueriesTestUtils
@@ -352,7 +352,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
 
     query = "SELECT DISTINCTCOUNT(column3) FROM testTable";
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column9", "distinctcount(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
     rows = new ArrayList<>();
@@ -362,7 +362,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{"296467636", 3289});
     QueriesTestUtils
@@ -379,7 +379,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     dataSchema = new DataSchema(new String[]{"distinctcounthll(column1)", "distinctcounthll(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
@@ -389,7 +389,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{1886L, 4492L});
     QueriesTestUtils
@@ -397,7 +397,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
 
     query = "SELECT DISTINCTCOUNTHLL(column1) FROM testTable";
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column9", "distinctcounthll(column1)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
@@ -407,7 +407,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{"296467636", 1324L});
     QueriesTestUtils
@@ -424,7 +424,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     dataSchema = new DataSchema(new String[]{"distinctcountrawhll(column1)", "distinctcountrawhll(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
     rows = new ArrayList<>();
@@ -437,7 +437,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Assert.assertEquals(HllUtil.buildHllFromBytes(BytesUtils.toBytes(row0[0].toString())).cardinality(), expectedRow0[0]);
     Assert.assertEquals(HllUtil.buildHllFromBytes(BytesUtils.toBytes(row0[1].toString())).cardinality(), expectedRow0[1]);
 
-    brokerResponse = getBrokerResponseForQuery(query + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     expectedRow0 = new Object[]{1886L, 4492L};
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
@@ -447,7 +447,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Assert.assertEquals(HllUtil.buildHllFromBytes(BytesUtils.toBytes(row0[1].toString())).cardinality(), expectedRow0[1]);
 
     query = "SELECT DISTINCTCOUNTRAWHLL(column1) FROM testTable";
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column9", "distinctcountrawhll(column1)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
     expectedRow0 = new Object[]{"296467636", 3592L};
@@ -459,7 +459,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Assert.assertEquals(row0[0], expectedRow0[0]);
     Assert.assertEquals(HllUtil.buildHllFromBytes(BytesUtils.toBytes(row0[1].toString())).cardinality(), expectedRow0[1]);
 
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + getFilter(), queryOptions);
     expectedRow0 = new Object[]{"296467636", 1324L};
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 24516L, 336536L, 49032L, 120000L, rows, expectedResultsSize,
@@ -478,7 +478,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     dataSchema = new DataSchema(new String[]{"percentile50(column1)", "percentile50(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
@@ -488,7 +488,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{1139674505.0, 505053732.0});
     QueriesTestUtils
@@ -496,7 +496,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
 
     query = "SELECT PERCENTILE50(column3) FROM testTable";
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column9", "percentile50(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
@@ -506,7 +506,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{"438926263", 999309554.0});
     QueriesTestUtils
@@ -523,7 +523,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     dataSchema = new DataSchema(new String[]{"percentile90(column1)", "percentile90(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
@@ -533,7 +533,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{1936730975.0, 899534534.0});
     QueriesTestUtils
@@ -541,7 +541,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
 
     query = "SELECT PERCENTILE90(column3) FROM testTable";
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column9", "percentile90(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
@@ -551,7 +551,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{"438926263", 999309554.0});
     QueriesTestUtils
@@ -568,7 +568,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     dataSchema = new DataSchema(new String[]{"percentile95(column1)", "percentile95(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
@@ -578,7 +578,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{2096857943.0, 947763150.0});
     QueriesTestUtils
@@ -586,7 +586,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
 
     query = "SELECT PERCENTILE95(column3) FROM testTable";
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column9", "percentile95(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
@@ -596,7 +596,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{"438926263", 999309554.0});
     QueriesTestUtils
@@ -613,7 +613,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     dataSchema = new DataSchema(new String[]{"percentile99(column1)", "percentile99(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
@@ -623,7 +623,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{2146232405.0, 990669195.0});
     QueriesTestUtils
@@ -631,7 +631,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
 
     query = "SELECT PERCENTILE99(column3) FROM testTable";
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column9", "percentile99(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.DOUBLE});
     rows = new ArrayList<>();
@@ -641,7 +641,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{"438926263", 999309554.0});
     QueriesTestUtils
@@ -658,7 +658,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     dataSchema = new DataSchema(new String[]{"percentileest50(column1)", "percentileest50(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
@@ -668,7 +668,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{1139674505L, 509607935L});
     QueriesTestUtils
@@ -676,7 +676,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
 
     query = "SELECT PERCENTILEEST50(column3) FROM testTable";
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column9", "percentileest50(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
@@ -686,7 +686,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{"438926263", 999309554L});
     QueriesTestUtils
@@ -703,7 +703,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     dataSchema = new DataSchema(new String[]{"percentileest90(column1)", "percentileest90(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
@@ -713,7 +713,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{1939865599L, 902299647L});
     QueriesTestUtils
@@ -721,7 +721,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
 
     query = "SELECT PERCENTILEEST90(column3) FROM testTable";
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column9", "percentileest90(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
@@ -731,7 +731,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{"438926263", 999309554L});
     QueriesTestUtils
@@ -748,7 +748,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     dataSchema = new DataSchema(new String[]{"percentileest95(column1)", "percentileest95(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
@@ -758,7 +758,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{2109734911L, 950009855L});
     QueriesTestUtils
@@ -766,7 +766,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
 
     query = "SELECT PERCENTILEEST95(column3) FROM testTable";
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column9", "percentileest95(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
@@ -776,7 +776,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{"438926263", 999309554L});
     QueriesTestUtils
@@ -793,7 +793,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
 
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     dataSchema = new DataSchema(new String[]{"percentileest99(column1)", "percentileest99(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
@@ -803,7 +803,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{2146232405L, 991952895L});
     QueriesTestUtils
@@ -811,7 +811,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
             dataSchema);
 
     query = "SELECT PERCENTILEEST99(column3) FROM testTable";
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY, queryOptions);
     dataSchema = new DataSchema(new String[]{"column9", "percentileest99(column3)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
     rows = new ArrayList<>();
@@ -821,7 +821,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
         .testInterSegmentResultTable(brokerResponse, 120000L, 0L, 240000L, 120000L, rows, expectedResultsSize,
             dataSchema);
 
-    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY + getFilter(), queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query + GROUP_BY + getFilter(), queryOptions);
     rows = new ArrayList<>();
     rows.add(new Object[]{"438926263", 999309554L});
     QueriesTestUtils
@@ -841,7 +841,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     String query = "SELECT DISTINCT(column1) FROM testTable LIMIT 1000000";
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     ResultTable resultTable = brokerResponse.getResultTable();
     Assert.assertEquals(resultTable.getDataSchema().size(), 1);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), new String[]{"column1"});
@@ -850,7 +850,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Assert.assertEquals(resultTable.getRows().size(), 6582);
 
     query = "SELECT DISTINCT(column1, column3) FROM testTable LIMIT 1000000";
-    brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     resultTable = brokerResponse.getResultTable();
     Assert.assertEquals(resultTable.getDataSchema().size(), 2);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), new String[]{"column1", "column3"});
@@ -859,7 +859,7 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     Assert.assertEquals(resultTable.getRows().size(), 21968);
 
     query = "SELECT DISTINCT(column1, column5, column3) FROM testTable LIMIT 1000000";
-    brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     resultTable = brokerResponse.getResultTable();
     Assert.assertEquals(resultTable.getDataSchema().size(), 3);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), new String[]{"column1", "column5", "column3"});
@@ -875,10 +875,10 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
   public void testSelection() {
     // select *
     String query = "SELECT * FROM testTable";
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     SelectionResults selectionResults = brokerResponse.getSelectionResults();
     query = "SELECT * FROM testTable option(responseFormat=sql)";
-    BrokerResponseNative brokerResponseSQL = getBrokerResponseForQuery(query);
+    BrokerResponseNative brokerResponseSQL = getBrokerResponseForPqlQuery(query);
     ResultTable resultTable = brokerResponseSQL.getResultTable();
 
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames().length, 11);
@@ -889,10 +889,10 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
 
     // select * limit infinite
     query = "SELECT * FROM testTable limit 50";
-    brokerResponse = getBrokerResponseForQuery(query);
+    brokerResponse = getBrokerResponseForPqlQuery(query);
     selectionResults = brokerResponse.getSelectionResults();
     query = "SELECT * FROM testTable LIMIT 50 option(responseFormat=sql)";
-    brokerResponseSQL = getBrokerResponseForQuery(query);
+    brokerResponseSQL = getBrokerResponseForPqlQuery(query);
     resultTable = brokerResponseSQL.getResultTable();
 
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames().length, 11);
@@ -903,10 +903,10 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
 
     // select 1
     query = "SELECT column3 FROM testTable";
-    brokerResponse = getBrokerResponseForQuery(query);
+    brokerResponse = getBrokerResponseForPqlQuery(query);
     selectionResults = brokerResponse.getSelectionResults();
     query = "SELECT column3 FROM testTable option(responseFormat=sql)";
-    brokerResponseSQL = getBrokerResponseForQuery(query);
+    brokerResponseSQL = getBrokerResponseForPqlQuery(query);
     resultTable = brokerResponseSQL.getResultTable();
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames().length, 1);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), new String[]{"column3"});
@@ -917,10 +917,10 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
 
     // select 3
     query = "SELECT column1, column3, column11 FROM testTable";
-    brokerResponse = getBrokerResponseForQuery(query);
+    brokerResponse = getBrokerResponseForPqlQuery(query);
     selectionResults = brokerResponse.getSelectionResults();
     query = "SELECT column1, column3, column11 FROM testTable option(responseFormat=sql)";
-    brokerResponseSQL = getBrokerResponseForQuery(query);
+    brokerResponseSQL = getBrokerResponseForPqlQuery(query);
     resultTable = brokerResponseSQL.getResultTable();
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames().length, 3);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), new String[]{"column1", "column3", "column11"});
@@ -931,10 +931,10 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
 
     // select + order by
     query = "SELECT column1, column3 FROM testTable ORDER BY column3 option(preserveType=true)";
-    brokerResponse = getBrokerResponseForQuery(query);
+    brokerResponse = getBrokerResponseForPqlQuery(query);
     selectionResults = brokerResponse.getSelectionResults();
     query = "SELECT column1, column3 FROM testTable ORDER BY column3 option(responseFormat=sql)";
-    brokerResponseSQL = getBrokerResponseForQuery(query);
+    brokerResponseSQL = getBrokerResponseForPqlQuery(query);
     resultTable = brokerResponseSQL.getResultTable();
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames().length, 2);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), new String[]{"column1", "column3"});
@@ -952,10 +952,10 @@ public class InterSegmentResultTableSingleValueQueriesTest extends BaseSingleVal
     }
 
     query = "SELECT column1, column3 FROM testTable ORDER BY column3 option(preserveType=true)";
-    brokerResponse = getBrokerResponseForQuery(query);
+    brokerResponse = getBrokerResponseForPqlQuery(query);
     selectionResults = brokerResponse.getSelectionResults();
     query = "SELECT column1, column3 FROM testTable ORDER BY column3 option(responseFormat=sql)";
-    brokerResponseSQL = getBrokerResponseForQuery(query);
+    brokerResponseSQL = getBrokerResponseForPqlQuery(query);
     resultTable = brokerResponseSQL.getResultTable();
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames().length, 2);
     Assert.assertEquals(resultTable.getDataSchema().getColumnNames(), new String[]{"column1", "column3"});

@@ -454,7 +454,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    * @param expectedSize expected result size
    */
   private void interSegmentInterServerTestHelper(String query, int expectedSize) {
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
     final SelectionResults selectionResults = brokerResponse.getSelectionResults();
 
     Assert.assertEquals(selectionResults.getColumns().size(), 4);
@@ -724,7 +724,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   }
 
   private void runQueryInterSegmentWithOrderBy(String query, List<Record> orderedResults, String[] columnNames) {
-    BrokerResponseNative brokerResponseNative = getBrokerResponseForQuery(query);
+    BrokerResponseNative brokerResponseNative = getBrokerResponseForPqlQuery(query);
     final SelectionResults selectionResults = brokerResponseNative.getSelectionResults();
     Assert.assertEquals(selectionResults.getColumns(), Lists.newArrayList(columnNames));
     List<Serializable[]> rows = selectionResults.getRows();

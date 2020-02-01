@@ -176,7 +176,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   @Test
   public void testInterSegmentAggregation() {
     for (int percentile = 0; percentile <= 100; percentile++) {
-      BrokerResponseNative brokerResponse = getBrokerResponseForQuery(getAggregationQuery(percentile));
+      BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(getAggregationQuery(percentile));
       List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
       Assert.assertNotNull(aggregationResults);
       Assert.assertEquals(aggregationResults.size(), 3);
@@ -208,7 +208,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   @Test
   public void testInterSegmentGroupBy() {
     for (int percentile = 0; percentile <= 100; percentile++) {
-      BrokerResponseNative brokerResponse = getBrokerResponseForQuery(getGroupByQuery(percentile));
+      BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(getGroupByQuery(percentile));
       List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
       Assert.assertNotNull(aggregationResults);
       Assert.assertEquals(aggregationResults.size(), 3);
