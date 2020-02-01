@@ -802,6 +802,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   protected boolean buildSegmentAndReplace() {
+    if (!(closePartitionLevelConsumer() && closeStreamMetadataProvider())) {
+      return false;
+    }
+
     SegmentBuildDescriptor descriptor = buildSegmentInternal(false);
     if (descriptor == null) {
       return false;
@@ -809,6 +813,36 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
     return true;
+  }
+
+  private boolean closePartitionLevelConsumer() {
+    if (_partitionLevelConsumer == null) {
+      return true;
+    }
+    try {
+      _partitionLevelConsumer.close();
+      return true;
+    } catch (Exception e) {
+      segmentLogger.warn("Could not close stream consumer", e);
+      return false;
+    } finally {
+      _partitionLevelConsumer = null;
+    }
+  }
+
+  private boolean closeStreamMetadataProvider() {
+    if (_streamMetadataProvider == null) {
+      return true;
+    }
+    try {
+      _streamMetadataProvider.close();
+      return true;
+    } catch (Exception e) {
+      segmentLogger.warn("Could not close stream metadata provider", e);
+      return false;
+    } finally {
+      _streamMetadataProvider = null;
+    }
   }
 
   protected void hold() {
@@ -931,6 +965,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   protected void downloadSegmentAndReplace(LLCRealtimeSegmentZKMetadata metadata) {
+    closePartitionLevelConsumer();
+    closeStreamMetadataProvider();
     _realtimeTableDataManager.downloadAndReplaceSegment(_segmentNameStr, metadata, _indexLoadingConfig);
   }
 
@@ -968,16 +1004,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       segmentLogger.error("Could not stop consumer thread");
     }
     _realtimeSegment.destroy();
-    try {
-      _partitionLevelConsumer.close();
-    } catch (Exception e) {
-      segmentLogger.warn("Could not close stream consumer", e);
-    }
-    try {
-      _streamMetadataProvider.close();
-    } catch (Exception e) {
-      segmentLogger.warn("Could not close stream metadata provider", e);
-    }
+
+    closePartitionLevelConsumer();
+    closeStreamMetadataProvider();
   }
 
   protected void start() {
@@ -1162,13 +1191,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
    * @param reason
    */
   private void makeStreamConsumer(String reason) {
-    if (_partitionLevelConsumer != null) {
-      try {
-        _partitionLevelConsumer.close();
-      } catch (Exception e) {
-        segmentLogger.warn("Could not close stream consumer");
-      }
-    }
+    closePartitionLevelConsumer();
     segmentLogger.info("Creating new stream consumer, reason: {}", reason);
     _partitionLevelConsumer = _streamConsumerFactory.createPartitionLevelConsumer(_clientId, _streamPartitionId);
   }
@@ -1178,13 +1201,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
    * @param reason
    */
   private void makeStreamMetadataProvider(String reason) {
-    if (_streamMetadataProvider != null) {
-      try {
-        _streamMetadataProvider.close();
-      } catch (Exception e) {
-        segmentLogger.warn("Could not close stream metadata provider");
-      }
-    }
+    closeStreamMetadataProvider();
     segmentLogger.info("Creating new stream metadata provider, reason: {}", reason);
     _streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _streamPartitionId);
   }
