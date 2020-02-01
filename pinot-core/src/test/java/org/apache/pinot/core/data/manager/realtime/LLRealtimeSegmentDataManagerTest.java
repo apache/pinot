@@ -24,7 +24,10 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Map;
+import java.util.concurrent.Semaphore;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -82,19 +85,21 @@ public class LLRealtimeSegmentDataManagerTest {
           + "    \"segmentFormatVersion\": null, \n" + "    \"sortedColumn\": [], \n" + "    \"streamConfigs\": {\n"
           + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS + "\": \"" + String
           .valueOf(maxRowsInSegment) + "\", \n" + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME
-          + "\": \"" + maxTimeForSegmentCloseMs + "\", \n" + "      \"stream.fakeStream.broker.list\": \"broker:7777\", \n"
+          + "\": \"" + maxTimeForSegmentCloseMs + "\", \n"
+          + "      \"stream.fakeStream.broker.list\": \"broker:7777\", \n"
           + "      \"stream.fakeStream.consumer.prop.auto.offset.reset\": \"smallest\", \n"
           + "      \"stream.fakeStream.consumer.type\": \"simple\", \n"
-          + "      \"stream.fakeStream.consumer.factory.class.name\": \"" + FakeStreamConsumerFactory.class.getName()+ "\", \n"
-          + "      \"stream.fakeStream.decoder.class.name\": \"" + FakeStreamMessageDecoder.class.getName() + "\", \n"
+          + "      \"stream.fakeStream.consumer.factory.class.name\": \"" + FakeStreamConsumerFactory.class.getName()
+          + "\", \n" + "      \"stream.fakeStream.decoder.class.name\": \"" + FakeStreamMessageDecoder.class.getName()
+          + "\", \n"
           + "      \"stream.fakeStream.decoder.prop.schema.registry.rest.url\": \"http://schema-registry-host.corp.ceo:1766/schemas\", \n"
           + "      \"stream.fakeStream.decoder.prop.schema.registry.schema.name\": \"UnknownSchema\", \n"
           + "      \"stream.fakeStream.hlc.zk.connect.string\": \"zoo:2181/kafka-queuing\", \n"
           + "      \"stream.fakeStream.topic.name\": \"" + _topicName + "\", \n"
           + "      \"stream.fakeStream.zk.broker.url\": \"kafka-broker:2181/kafka-queuing\", \n"
-          + "      \"streamType\": \"fakeStream\"\n" + "    }\n" + "  }, \n" + "  \"tableName\": \"Coffee_REALTIME\", \n"
-          + "  \"tableType\": \"realtime\", \n" + "  \"tenants\": {\n" + "    \"broker\": \"shared\", \n"
-          + "    \"server\": \"server-1\"\n" + "  }\n" + "}";
+          + "      \"streamType\": \"fakeStream\"\n" + "    }\n" + "  }, \n"
+          + "  \"tableName\": \"Coffee_REALTIME\", \n" + "  \"tableType\": \"realtime\", \n" + "  \"tenants\": {\n"
+          + "    \"broker\": \"shared\", \n" + "    \"server\": \"server-1\"\n" + "  }\n" + "}";
 
   private String makeSchema() {
     return "{" + "  \"schemaName\":\"SchemaTest\"," + "  \"metricFieldSpecs\":[" + "    {\"name\":\"m\",\"dataType\":\""
@@ -138,10 +143,11 @@ public class LLRealtimeSegmentDataManagerTest {
     RealtimeTableDataManager tableDataManager = createTableDataManager();
     String resourceDir = _segmentDir;
     Schema schema = Schema.fromString(makeSchema());
+    Map<Integer, Semaphore> partitionIdToSemaphoreMap = new HashMap<>();
     ServerMetrics serverMetrics = new ServerMetrics(new MetricsRegistry());
     FakeLLRealtimeSegmentDataManager segmentDataManager =
         new FakeLLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, tableDataManager,
-            resourceDir, schema, serverMetrics);
+            resourceDir, schema, partitionIdToSemaphoreMap, serverMetrics);
     return segmentDataManager;
   }
 
@@ -639,10 +645,10 @@ public class LLRealtimeSegmentDataManagerTest {
 
     public FakeLLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
         InstanceZKMetadata instanceZKMetadata, RealtimeTableDataManager realtimeTableDataManager,
-        String resourceDataDir, Schema schema, ServerMetrics serverMetrics)
+        String resourceDataDir, Schema schema, Map<Integer, Semaphore> semaphoreMap, ServerMetrics serverMetrics)
         throws Exception {
       super(segmentZKMetadata, tableConfig, instanceZKMetadata, realtimeTableDataManager, resourceDataDir,
-          new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, serverMetrics);
+          new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, semaphoreMap, serverMetrics);
       _state = LLRealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
       _shouldStop = LLRealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");

@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
@@ -203,6 +204,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final String _resourceDataDir;
   private final IndexLoadingConfig _indexLoadingConfig;
   private final Schema _schema;
+  private final Semaphore _partitionConsumerSemaphore;
+  private final AtomicBoolean _isConsumerConnected;
   private final String _metricKeyName;
   private final ServerMetrics _serverMetrics;
   private final MutableSegmentImpl _realtimeSegment;
@@ -578,7 +581,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 // We could not build the segment. Go into error state.
                 _state = State.ERROR;
               } else {
-                success = commitSegment(response.getControllerVipUrl(), response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit());
+                success = commitSegment(response.getControllerVipUrl(),
+                    response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit());
                 if (success) {
                   _state = State.COMMITTED;
                 } else {
@@ -802,6 +806,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   protected boolean buildSegmentAndReplace() {
+    if (!(closePartitionLevelConsumer() && closeStreamMetadataProvider())) {
+      return false;
+    }
+    if (_isConsumerConnected.compareAndSet(true, false)) {
+      _partitionConsumerSemaphore.release();
+    }
+
     SegmentBuildDescriptor descriptor = buildSegmentInternal(false);
     if (descriptor == null) {
       return false;
@@ -809,6 +820,26 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
     return true;
+  }
+
+  private boolean closePartitionLevelConsumer() {
+    try {
+      _partitionLevelConsumer.close();
+      return true;
+    } catch (Exception e) {
+      segmentLogger.warn("Could not close stream consumer", e);
+      return false;
+    }
+  }
+
+  private boolean closeStreamMetadataProvider() {
+    try {
+      _streamMetadataProvider.close();
+      return true;
+    } catch (Exception e) {
+      segmentLogger.warn("Could not close stream metadata provider", e);
+      return false;
+    }
   }
 
   protected void hold() {
@@ -931,6 +962,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   protected void downloadSegmentAndReplace(LLCRealtimeSegmentZKMetadata metadata) {
+    closePartitionLevelConsumer();
+    closeStreamMetadataProvider();
+    if (_isConsumerConnected.compareAndSet(true, false)) {
+      _partitionConsumerSemaphore.release();
+    }
     _realtimeTableDataManager.downloadAndReplaceSegment(_segmentNameStr, metadata, _indexLoadingConfig);
   }
 
@@ -968,15 +1004,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       segmentLogger.error("Could not stop consumer thread");
     }
     _realtimeSegment.destroy();
-    try {
-      _partitionLevelConsumer.close();
-    } catch (Exception e) {
-      segmentLogger.warn("Could not close stream consumer", e);
-    }
-    try {
-      _streamMetadataProvider.close();
-    } catch (Exception e) {
-      segmentLogger.warn("Could not close stream metadata provider", e);
+
+    closePartitionLevelConsumer();
+    closeStreamMetadataProvider();
+    if (_isConsumerConnected.compareAndSet(true, false)) {
+      _partitionConsumerSemaphore.release();
     }
   }
 
@@ -1008,7 +1040,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   // If the transition is OFFLINE to ONLINE, the caller should have downloaded the segment and we don't reach here.
   public LLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
       InstanceZKMetadata instanceZKMetadata, RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir,
-      IndexLoadingConfig indexLoadingConfig, Schema schema, ServerMetrics serverMetrics) {
+      IndexLoadingConfig indexLoadingConfig, Schema schema, Map<Integer, Semaphore> partitionIdToSemaphoreMap,
+      ServerMetrics serverMetrics) {
     _segBuildSemaphore = realtimeTableDataManager.getSegmentBuildSemaphore();
     _segmentZKMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
     _tableConfig = tableConfig;
@@ -1031,6 +1064,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _segmentName = new LLCSegmentName(_segmentNameStr);
     _streamPartitionId = _segmentName.getPartitionId();
+    _partitionConsumerSemaphore = partitionIdToSemaphoreMap.getOrDefault(_streamPartitionId, new Semaphore(1));
+    _isConsumerConnected = new AtomicBoolean(false);
     _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     _metricKeyName = _tableNameWithType + "-" + _streamTopic + "-" + _streamPartitionId;
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
@@ -1097,8 +1132,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setInvertedIndexColumns(invertedIndexColumns).setRealtimeSegmentZKMetadata(segmentZKMetadata)
             .setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
-            .setAggregateMetrics(indexingConfig.isAggregateMetrics())
-            .setNullHandlingEnabled(_nullHandlingEnabled);
+            .setAggregateMetrics(indexingConfig.isAggregateMetrics()).setNullHandlingEnabled(_nullHandlingEnabled);
 
     // Create message decoder
     _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, _schema);
@@ -1106,6 +1140,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // Create record transformer
     _recordTransformer = CompositeTransformer.getDefaultTransformer(schema);
+
+    // Acquire semaphore to create Kafka consumers
+    try {
+      _partitionConsumerSemaphore.acquire();
+      _isConsumerConnected.set(true);
+    } catch (InterruptedException e) {
+      String errorMsg = "InterruptedException when acquiring semaphore for Segment: " + _segmentNameStr;
+      segmentLogger.error(errorMsg);
+      throw new RuntimeException(errorMsg);
+    }
     makeStreamConsumer("Starting");
     makeStreamMetadataProvider("Starting");
 
@@ -1163,11 +1207,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
    */
   private void makeStreamConsumer(String reason) {
     if (_partitionLevelConsumer != null) {
-      try {
-        _partitionLevelConsumer.close();
-      } catch (Exception e) {
-        segmentLogger.warn("Could not close stream consumer");
-      }
+      closePartitionLevelConsumer();
     }
     segmentLogger.info("Creating new stream consumer, reason: {}", reason);
     _partitionLevelConsumer = _streamConsumerFactory.createPartitionLevelConsumer(_clientId, _streamPartitionId);
@@ -1178,13 +1218,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
    * @param reason
    */
   private void makeStreamMetadataProvider(String reason) {
-    if (_streamMetadataProvider != null) {
-      try {
-        _streamMetadataProvider.close();
-      } catch (Exception e) {
-        segmentLogger.warn("Could not close stream metadata provider");
-      }
-    }
+    closeStreamMetadataProvider();
     segmentLogger.info("Creating new stream metadata provider, reason: {}", reason);
     _streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _streamPartitionId);
   }
