@@ -85,6 +85,13 @@ public class PluginManagerTest {
     }
   }
 
+  @Test
+  public void testBackwardCompatible() {
+    Assert.assertEquals(PluginManager.loadClassWithBackwardCompatibleCheck("oldTestRecordReader"), "oldTestRecordReader");
+    PluginManager.PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP.put("oldTestRecordReader","TestRecordReader");
+    Assert.assertEquals(PluginManager.loadClassWithBackwardCompatibleCheck("oldTestRecordReader"), "TestRecordReader");
+  }
+
   @AfterClass
   public void tearDown() {
     tempDir.delete();

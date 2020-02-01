@@ -46,7 +46,7 @@ public class PluginManager {
   private static PluginManager PLUGIN_MANAGER = new PluginManager();
 
   // For backward compatibility, this map holds a mapping from old plugins class name to its new class name.
-  private static final Map<String, String> PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP = new HashMap<String, String>(){
+  static final Map<String, String> PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP = new HashMap<String, String>(){
     {
       // MessageDecoder
       put("org.apache.pinot.core.realtime.stream.SimpleAvroMessageDecoder", "org.apache.pinot.plugin.inputformat.avro.SimpleAvroMessageDecoder");
@@ -199,12 +199,15 @@ public class PluginManager {
   public Class<?> loadClass(String pluginName, String className)
       throws ClassNotFoundException {
     // Backward compatible check.
-    if (PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP.containsKey(className)) {
-      className = PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP.get(className);
-    }
-    return _registry.get(new Plugin(pluginName)).loadClass(className, true);
+    return _registry.get(new Plugin(pluginName)).loadClass(loadClassWithBackwardCompatibleCheck(className), true);
   }
 
+  public static String loadClassWithBackwardCompatibleCheck(String className) {
+    if (PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP.containsKey(className)) {
+      return PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP.get(className);
+    }
+    return className;
+  }
   /**
    * Create an instance of the className. The className can be in any of the following formats
    * <li>com.x.y.foo</li> loads the class in the default class path
@@ -261,12 +264,8 @@ public class PluginManager {
   public <T> T createInstance(String pluginName, String className, Class[] argTypes, Object[] argValues)
       throws Exception {
     PluginClassLoader pluginClassLoader = PLUGIN_MANAGER._registry.get(new Plugin(pluginName));
-    // Backward compatible check.
-    if (PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP.containsKey(className)) {
-      className = PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP.get(className);
-    }
     try {
-      Class<T> loadedClass = (Class<T>) pluginClassLoader.loadClass(className, true);
+      Class<T> loadedClass = (Class<T>) pluginClassLoader.loadClass(loadClassWithBackwardCompatibleCheck(className), true);
       Constructor<?> constructor;
       constructor = loadedClass.getConstructor(argTypes);
       Object instance = constructor.newInstance(argValues);
