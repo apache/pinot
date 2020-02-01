@@ -46,6 +46,25 @@ import org.testng.annotations.Test;
 public class CalciteSqlCompilerTest {
 
   @Test
+  public void testMaxSelectionBehavior() {
+    Pql2Compiler.MAX_QUERY_SELECTION_LIMIT = 1000;
+    PinotQuery pinotQuery;
+    pinotQuery =
+        CalciteSqlParser.compileToPinotQuery("select * from vegetables LIMIT 999");
+    Assert.assertEquals(pinotQuery.getLimit(), 999);
+    pinotQuery =
+        CalciteSqlParser.compileToPinotQuery("select * from vegetables LIMIT 1000");
+    Assert.assertEquals(pinotQuery.getLimit(), 1000);
+    pinotQuery =
+        CalciteSqlParser.compileToPinotQuery("select * from vegetables LIMIT 10001");
+    Assert.assertEquals(pinotQuery.getLimit(), 1000);
+    pinotQuery =
+        CalciteSqlParser.compileToPinotQuery("select * from vegetables LIMIT 10000");
+    Assert.assertEquals(pinotQuery.getLimit(), 1000);
+    Pql2Compiler.MAX_QUERY_SELECTION_LIMIT = -1;
+  }
+
+  @Test
   public void testQuotedStrings() {
     PinotQuery pinotQuery =
         CalciteSqlParser.compileToPinotQuery("select * from vegetables where origin = 'Martha''s Vineyard'");

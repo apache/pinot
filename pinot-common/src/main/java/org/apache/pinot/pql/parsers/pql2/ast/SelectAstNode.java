@@ -25,6 +25,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 
 
 /**
@@ -165,6 +166,11 @@ public class SelectAstNode extends BaseAstNode {
       brokerRequest.setLimit(_recordLimit);
     } else {
       brokerRequest.setLimit(DEFAULT_RECORD_LIMIT);
+    }
+    // Update Selection query limit if MAX_QUERY_SELECTION_LIMIT is set.
+    int limit = brokerRequest.getLimit();
+    if ((Pql2Compiler.MAX_QUERY_SELECTION_LIMIT > 0) && (limit > Pql2Compiler.MAX_QUERY_SELECTION_LIMIT)) {
+      brokerRequest.setLimit(Pql2Compiler.MAX_QUERY_SELECTION_LIMIT);
     }
 
     // Pinot quirk: if there is both a selection and an aggregation, remove the selection
