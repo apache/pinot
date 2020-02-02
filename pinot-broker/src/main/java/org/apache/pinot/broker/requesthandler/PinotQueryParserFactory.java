@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.requesthandler;
 
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.parsers.AbstractCompiler;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -31,6 +32,7 @@ public class PinotQueryParserFactory {
 
   private static final Pql2Compiler PQL_2_COMPILER = new Pql2Compiler();
   private static final CalciteSqlCompiler CALCITE_SQL_COMPILER = new CalciteSqlCompiler();
+  public static int MAX_QUERY_SELECTION_LIMIT = CommonConstants.Helix.DEFAULT_MAX_QUERY_SELECTION_LIMIT;
 
   public static AbstractCompiler get(String queryFormat) {
     switch (queryFormat) {

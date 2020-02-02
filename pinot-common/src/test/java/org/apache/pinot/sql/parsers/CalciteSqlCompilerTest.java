@@ -47,7 +47,7 @@ public class CalciteSqlCompilerTest {
 
   @Test
   public void testMaxSelectionBehavior() {
-    Pql2Compiler.MAX_QUERY_SELECTION_LIMIT = 1000;
+    PinotQueryParserFactory.MAX_QUERY_SELECTION_LIMIT = 1000;
     PinotQuery pinotQuery;
     pinotQuery =
         CalciteSqlParser.compileToPinotQuery("select * from vegetables LIMIT 999");
@@ -61,7 +61,7 @@ public class CalciteSqlCompilerTest {
     pinotQuery =
         CalciteSqlParser.compileToPinotQuery("select * from vegetables LIMIT 10000");
     Assert.assertEquals(pinotQuery.getLimit(), 1000);
-    Pql2Compiler.MAX_QUERY_SELECTION_LIMIT = -1;
+    PinotQueryParserFactory.MAX_QUERY_SELECTION_LIMIT = -1;
   }
 
   @Test

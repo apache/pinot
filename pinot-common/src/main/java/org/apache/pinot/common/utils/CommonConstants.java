@@ -42,7 +42,8 @@ public class CommonConstants {
 
     public static final String LEAD_CONTROLLER_RESOURCE_ENABLED_KEY = "RESOURCE_ENABLED";
     public static final String ENABLE_CASE_INSENSITIVE_PQL_KEY = "enable.case.insensitive.pql";
-
+    public static final String MAX_QUERY_SELECTION_LIMIT_KEY = "max.query.selection.limit";
+    public static final Integer DEFAULT_MAX_QUERY_SELECTION_LIMIT = -1; // -1 means disable.
 
 
     // More information on why these numbers are set can be found in the following doc:
