@@ -41,7 +41,6 @@ import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlSelectKeyword;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
-import org.apache.calcite.sql.parser.SqlParserImplFactory;
 import org.apache.calcite.sql.parser.babel.SqlBabelParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.pinot.common.function.AggregationFunctionType;
@@ -281,8 +280,8 @@ public class CalciteSqlParser {
         } else {
           // Update Selection query limit if MAX_QUERY_SELECTION_LIMIT is set.
           int limit = pinotQuery.getLimit();
-          if ((Pql2Compiler.MAX_QUERY_SELECTION_LIMIT > 0) && (limit > Pql2Compiler.MAX_QUERY_SELECTION_LIMIT)) {
-            pinotQuery.setLimit(Pql2Compiler.MAX_QUERY_SELECTION_LIMIT);
+          if ((PinotQueryParserFactory.MAX_QUERY_SELECTION_LIMIT > 0) && (limit > PinotQueryParserFactory.MAX_QUERY_SELECTION_LIMIT)) {
+            pinotQuery.setLimit(PinotQueryParserFactory.MAX_QUERY_SELECTION_LIMIT);
           }
         }
         break;

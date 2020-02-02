@@ -76,6 +76,7 @@ public class HelixSetupUtils {
           new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(helixClusterName).build();
       admin.setConfig(configScope, Collections.singletonMap(ZKHelixManager.ALLOW_PARTICIPANT_AUTO_JOIN, "true"));
       admin.setConfig(configScope, Collections.singletonMap(ENABLE_CASE_INSENSITIVE_PQL_KEY, Boolean.FALSE.toString()));
+      admin.setConfig(configScope, Collections.singletonMap(MAX_QUERY_SELECTION_LIMIT_KEY, DEFAULT_MAX_QUERY_SELECTION_LIMIT.toString()));
       LOGGER.info("New Helix cluster: {} created", helixClusterName);
     }
   }

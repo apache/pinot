@@ -72,7 +72,6 @@ public class Pql2Compiler implements AbstractCompiler {
       Boolean.valueOf(System.getProperty("pinot.query.converter.fail_on_error", "false"));
   public static String ENABLE_DISTINCT_KEY = "pinot.distinct.enabled";
   public static boolean ENABLE_DISTINCT = Boolean.valueOf(System.getProperty(ENABLE_DISTINCT_KEY, "true"));
-  public static int MAX_QUERY_SELECTION_LIMIT = Integer.valueOf(System.getProperty("pinot.query.selection.limit", "-1"));
 
   private static class ErrorListener extends BaseErrorListener {
 

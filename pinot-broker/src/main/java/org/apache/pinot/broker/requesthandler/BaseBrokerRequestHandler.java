@@ -60,7 +60,6 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.request.FilterQueryMap;
-import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
@@ -122,6 +121,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     } else {
       _tableCache = null;
     }
+
+    PinotQueryParserFactory.MAX_QUERY_SELECTION_LIMIT = _config.getInt(CommonConstants.Helix.MAX_QUERY_SELECTION_LIMIT_KEY, CommonConstants.Helix.DEFAULT_MAX_QUERY_SELECTION_LIMIT);
+
     _brokerId = config.getString(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     _brokerTimeoutMs = config.getLong(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _queryResponseLimit =
