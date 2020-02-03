@@ -377,7 +377,7 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig(null, NUM_PARTITION);
 
     // Create the routing config
-    RoutingConfig routingConfig = new RoutingConfig("PartitionAwareOffline", null);
+    RoutingConfig routingConfig = new RoutingConfig("PartitionAwareOffline", null, null, null);
 
     // Create table config
     TableConfig tableConfig =

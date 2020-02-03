@@ -20,21 +20,32 @@ package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 
 
 public class RoutingConfig extends BaseJsonConfig {
+  public static final String PARTITION_SEGMENT_PRUNER_TYPE = "partition";
+  public static final String REPLICA_GROUP_INSTANCE_SELECTOR_TYPE = "replicaGroup";
+
   public static final String ENABLE_DYNAMIC_COMPUTING_KEY = "enableDynamicComputing";
 
   private final String _routingTableBuilderName;
   private final Map<String, String> _routingTableBuilderOptions;
 
+  private final List<String> _segmentPrunerTypes;
+  private final String _instanceSelectorType;
+
   @JsonCreator
   public RoutingConfig(@JsonProperty("routingTableBuilderName") @Nullable String routingTableBuilderName,
-      @JsonProperty("routingTableBuilderOptions") @Nullable Map<String, String> routingTableBuilderOptions) {
+      @JsonProperty("routingTableBuilderOptions") @Nullable Map<String, String> routingTableBuilderOptions,
+      @JsonProperty("segmentPrunerType") @Nullable List<String> segmentPrunerTypes,
+      @JsonProperty("instanceSelectorType") @Nullable String instanceSelectorType) {
     _routingTableBuilderName = routingTableBuilderName;
     _routingTableBuilderOptions = routingTableBuilderOptions;
+    _segmentPrunerTypes = segmentPrunerTypes;
+    _instanceSelectorType = instanceSelectorType;
   }
 
   @Nullable
@@ -45,5 +56,15 @@ public class RoutingConfig extends BaseJsonConfig {
   @Nullable
   public Map<String, String> getRoutingTableBuilderOptions() {
     return _routingTableBuilderOptions;
+  }
+
+  @Nullable
+  public List<String> getSegmentPrunerTypes() {
+    return _segmentPrunerTypes;
+  }
+
+  @Nullable
+  public String getInstanceSelectorType() {
+    return _instanceSelectorType;
   }
 }

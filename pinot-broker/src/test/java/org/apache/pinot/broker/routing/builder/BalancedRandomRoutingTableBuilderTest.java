@@ -77,8 +77,8 @@ public class BalancedRandomRoutingTableBuilderTest {
 
     TableConfig tableConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName(tableNameWithType)
         .setRoutingConfig(
-            new RoutingConfig(null, Collections.singletonMap(RoutingConfig.ENABLE_DYNAMIC_COMPUTING_KEY, "true")))
-        .build();
+            new RoutingConfig(null, Collections.singletonMap(RoutingConfig.ENABLE_DYNAMIC_COMPUTING_KEY, "true"), null,
+                null)).build();
     routingTableBuilder.init(new BaseConfiguration(), tableConfig, null, null);
 
     // Create external view
