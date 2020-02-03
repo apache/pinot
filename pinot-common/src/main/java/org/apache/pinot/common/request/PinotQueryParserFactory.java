@@ -16,9 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.requesthandler;
+package org.apache.pinot.common.request;
 
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.parsers.AbstractCompiler;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
