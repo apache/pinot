@@ -2,19 +2,21 @@ language: java
 sudo: false
 dist: trusty
 
+before_install:
+  - mkdir -p ~/bin && curl -sSL -o ~/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 && chmod +x ~/bin/jq
+  - export PATH=$PATH:~/bin
+  - jq --version
+
 env:
   global:
     - JOBS=1
   matrix:
-    - RUN_INTEGRATION_TESTS=true
+    - TEST_CATEGORY=INTEGRATION_TEST
       KAFKA_VERSION=2.0
-    - RUN_INTEGRATION_TESTS=false
+    - TEST_CATEGORY=UNIT_TEST
       KAFKA_VERSION=2.0
-    - RUN_INTEGRATION_TESTS=true
-      KAFKA_VERSION=0.9
-    - RUN_INTEGRATION_TESTS=false
-      KAFKA_VERSION=0.9
-
+    - TEST_CATEGORY=QUICKSTART
+      KAFKA_VERSION=2.0
 jdk:
   - oraclejdk8
 
