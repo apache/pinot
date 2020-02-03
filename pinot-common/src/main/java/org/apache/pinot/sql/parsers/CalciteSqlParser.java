@@ -465,9 +465,10 @@ public class CalciteSqlParser {
         return asFuncExpr;
       case OTHER:
         if (node instanceof SqlDataTypeSpec) {
+          // This is to handle expression like: CAST(col AS INT)
           return RequestUtils.getLiteralExpression(((SqlDataTypeSpec) node).getTypeName().getSimple());
         } else {
-          // Keep processing default logic.
+          // Move on to process default logic.
         }
       default:
         SqlBasicCall funcSqlNode = (SqlBasicCall) node;
