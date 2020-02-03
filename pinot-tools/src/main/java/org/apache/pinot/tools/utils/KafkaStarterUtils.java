@@ -36,7 +36,7 @@ public class KafkaStarterUtils {
 
   public static final String PORT = "port";
   public static final String BROKER_ID = "broker.id";
-  private static final String ZOOKEEPER_CONNECT = "zookeeper.connect";
+  public static final String ZOOKEEPER_CONNECT = "zookeeper.connect";
   private static final String LOG_DIRS = "log.dirs";
 
   public static final String KAFKA_SERVER_STARTABLE_CLASS_NAME =

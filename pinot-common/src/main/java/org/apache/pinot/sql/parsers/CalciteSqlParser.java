@@ -29,6 +29,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.calcite.config.Lex;
 import org.apache.calcite.sql.SqlBasicCall;
+import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
@@ -40,6 +41,8 @@ import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlSelectKeyword;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.sql.parser.SqlParserImplFactory;
+import org.apache.calcite.sql.parser.babel.SqlBabelParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.function.FunctionDefinitionRegistry;
@@ -185,7 +188,7 @@ public class CalciteSqlParser {
     return false;
   }
 
-  private static Set<String> extractIdentifiers(List<Expression> expressions) {
+  public static Set<String> extractIdentifiers(List<Expression> expressions) {
     Set<String> identifiers = new HashSet<>();
     for (Expression expression : expressions) {
       if (expression.getIdentifier() != null) {
@@ -217,7 +220,9 @@ public class CalciteSqlParser {
   private static PinotQuery compileCalciteSqlToPinotQuery(String sql) {
     SqlParser.ConfigBuilder parserBuilder = SqlParser.configBuilder();
     parserBuilder.setLex(PINOT_LEX);
-    parserBuilder.setConformance(SqlConformanceEnum.LENIENT);
+    // BABEL is a very liberal conformance value that allows anything supported by any dialect
+    parserBuilder.setConformance(SqlConformanceEnum.BABEL);
+    parserBuilder.setParserFactory(SqlBabelParserImpl.FACTORY);
     SqlParser sqlParser = SqlParser.create(sql, parserBuilder.build());
     final SqlNode sqlNode;
     try {
@@ -440,6 +445,10 @@ public class CalciteSqlParser {
         return RequestUtils.getIdentifierExpression(node.toString());
       case LITERAL:
         return RequestUtils.getLiteralExpression((SqlLiteral) node);
+      case OTHER:
+        if (node instanceof SqlDataTypeSpec) {
+          return RequestUtils.getLiteralExpression(((SqlDataTypeSpec) node).getTypeName().getSimple());
+        }
       default:
         SqlBasicCall funcSqlNode = (SqlBasicCall) node;
         String funcName = funcSqlNode.getOperator().getKind().name();

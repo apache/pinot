@@ -773,6 +773,11 @@
         </exclusions>
       </dependency>
       <dependency>
+        <groupId>org.apache.calcite</groupId>
+        <artifactId>calcite-babel</artifactId>
+        <version>${calcite.version}</version>
+      </dependency>
+      <dependency>
         <groupId>com.jcabi</groupId>
         <artifactId>jcabi-log</artifactId>
         <version>0.17.1</version>

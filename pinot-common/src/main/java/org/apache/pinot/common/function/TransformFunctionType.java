@@ -38,6 +38,7 @@ public enum TransformFunctionType {
   LN("ln"),
   SQRT("sqrt"),
 
+  CAST("cast"),
   TIMECONVERT("timeConvert"),
   DATETIMECONVERT("dateTimeConvert"),
   DATETRUNC("dateTrunc"),

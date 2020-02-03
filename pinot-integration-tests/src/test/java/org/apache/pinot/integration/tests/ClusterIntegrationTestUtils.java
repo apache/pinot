@@ -30,6 +30,7 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -70,6 +71,7 @@ import org.apache.pinot.server.util.SegmentTestUtils;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.testng.Assert;
 
@@ -851,6 +853,9 @@ public class ClusterIntegrationTestUtils {
 
     // broker response
     JsonNode pinotResponse = ClusterTest.postSqlQuery(pinotQuery, brokerUrl);
+    if (pinotResponse.get("exceptions").size() > 0) {
+      throw new RuntimeException("Got Exceptions from Query Response: " + pinotResponse);
+    }
     JsonNode brokerResponseRows = pinotResponse.get("resultTable").get("rows");
     long pinotNumRecordsSelected = pinotResponse.get("numDocsScanned").asLong();
 
@@ -872,8 +877,45 @@ public class ClusterIntegrationTestUtils {
     BrokerRequest brokerRequest =
         PinotQueryParserFactory.get(CommonConstants.Broker.Request.SQL).compileToBrokerRequest(pinotQuery);
     if (brokerRequest.getSelections() != null) { // selection
+      // TODO: compare results for selection queries, w/o order by
 
-      // TODO: compare results for selection queries, w/ and w/o order by
+      // Compare results for selection queries, with order by
+      if (brokerRequest.getOrderBy() != null && brokerRequest.getOrderBy().size() > 0) {
+        // don't compare query with multi-value column.
+        if (sqlQuery.contains("_MV")) {
+          return;
+        }
+        Set<String> orderByColumns =
+            CalciteSqlParser.extractIdentifiers(brokerRequest.getPinotQuery().getOrderByList());
+        Set<String> selectionColumns =
+            CalciteSqlParser.extractIdentifiers(brokerRequest.getPinotQuery().getSelectList());
+        if (!selectionColumns.containsAll(orderByColumns)) {
+          // Selection columns has no overlap with order by column, don't compare.
+          return;
+        }
+        if (h2ResultSet.first()) {
+          for (int i = 0; i < brokerResponseRows.size(); i++) {
+            for (int c = 0; c < numColumns; c++) {
+              String h2Value = h2ResultSet.getString(c + 1);
+              String brokerValue = brokerResponseRows.get(i).get(c).asText();
+              String connectionValue = resultTableResultSet.getString(i, c);
+              if (orderByColumns.containsAll(CalciteSqlParser
+                  .extractIdentifiers(Arrays.asList(brokerRequest.getPinotQuery().getSelectList().get(c))))) {
+                boolean error = fuzzyCompare(h2Value, brokerValue, connectionValue);
+                if (error) {
+                  String failureMessage =
+                      "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
+                          + ", got client value:" + connectionValue;
+                  failure(pinotQuery, Lists.newArrayList(sqlQuery), failureMessage);
+                }
+              }
+            }
+            if (!h2ResultSet.next()) {
+              return;
+            }
+          }
+        }
+      }
     } else { // aggregation
       if (!brokerRequest.isSetGroupBy()) { // aggregation only
         // compare the single row
@@ -898,20 +940,7 @@ public class ClusterIntegrationTestUtils {
           String connectionValue = resultTableResultSet.getString(0, c);
 
           // Fuzzy compare expected value and actual value
-          boolean error = false;
-          if (NumberUtils.isParsable(h2Value)) {
-            double expectedValue = Double.parseDouble(h2Value);
-            double actualValueBroker = Double.parseDouble(brokerValue);
-            double actualValueConnection = Double.parseDouble(connectionValue);
-            if (!DoubleMath.fuzzyEquals(actualValueBroker, expectedValue, 1.0) || !DoubleMath
-                .fuzzyEquals(actualValueConnection, expectedValue, 1.0)) {
-              error = true;
-            }
-          } else {
-            if (!h2Value.equals(brokerValue) || !h2Value.equals(connectionValue)) {
-              error = true;
-            }
-          }
+          boolean error = fuzzyCompare(h2Value, brokerValue, connectionValue);
           if (error) {
             String failureMessage =
                 "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
@@ -920,9 +949,55 @@ public class ClusterIntegrationTestUtils {
           }
         }
       } else { // aggregation group by
-        // TODO: compare results for aggregation group by queries, w/ and w/o order by
+        // TODO: compare results for aggregation group by queries w/o order by
+
+        // Compare results for aggregation group by queries with order by
+        if (brokerRequest.getOrderBy() != null && brokerRequest.getOrderBy().size() > 0) {
+          // don't compare query with multi-value column.
+          if (sqlQuery.contains("_MV")) {
+            return;
+          }
+          if (h2ResultSet.first()) {
+            for (int i = 0; i < brokerResponseRows.size(); i++) {
+              for (int c = 0; c < numColumns; c++) {
+                String h2Value = h2ResultSet.getString(c + 1);
+                String brokerValue = brokerResponseRows.get(i).get(c).asText();
+                String connectionValue = resultTableResultSet.getString(i, c);
+                boolean error = fuzzyCompare(h2Value, brokerValue, connectionValue);
+                if (error) {
+                  String failureMessage =
+                      "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
+                          + ", got client value:" + connectionValue;
+                  failure(pinotQuery, Lists.newArrayList(sqlQuery), failureMessage);
+                }
+              }
+              if (!h2ResultSet.next()) {
+                return;
+              }
+            }
+          }
+        }
       }
     }
+  }
+
+  private static boolean fuzzyCompare(String h2Value, String brokerValue, String connectionValue) {
+    // Fuzzy compare expected value and actual value
+    boolean error = false;
+    if (NumberUtils.isParsable(h2Value)) {
+      double expectedValue = Double.parseDouble(h2Value);
+      double actualValueBroker = Double.parseDouble(brokerValue);
+      double actualValueConnection = Double.parseDouble(connectionValue);
+      if (!DoubleMath.fuzzyEquals(actualValueBroker, expectedValue, 1.0) || !DoubleMath
+          .fuzzyEquals(actualValueConnection, expectedValue, 1.0)) {
+        error = true;
+      }
+    } else {
+      if (!h2Value.equals(brokerValue) || !h2Value.equals(connectionValue)) {
+        error = true;
+      }
+    }
+    return error;
   }
 
   /**
