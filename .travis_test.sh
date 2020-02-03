@@ -29,7 +29,7 @@ if [ $? -eq 0 ]; then
     exit 0
   fi
 
-  if [ "$RUN_INTEGRATION_TESTS" == 'false' ]; then
+  if [ "$TEST_CATEGORY" == 'UNIT_TEST' ]; then
     echo 'Skip ThirdEye tests when integration tests off'
     rm -rf ~/.m2/repository/com/linkedin/pinot ~/.m2/repository/com/linkedin/thirdeye
     exit 0
@@ -68,24 +68,45 @@ if [ "$KAFKA_VERSION" != '2.0' ]; then
 fi
 
 # Only run integration tests if needed
-if [ "$RUN_INTEGRATION_TESTS" != 'false' ]; then
+if [ "$TEST_CATEGORY" == 'INTEGRATION_TEST' ]; then
   mvn test -B -P travis,travis-integration-tests-only ${KAFKA_BUILD_OPTS}
   if [ $? -eq 0 ]; then
     passed=1
   fi
-else
+fi
+
+# Unit test
+if [ "$TEST_CATEGORY" == 'UNIT_TEST' ]; then
   mvn test -B -P travis,travis-no-integration-tests ${KAFKA_BUILD_OPTS}
   if [ $? -eq 0 ]; then
     passed=1
   fi
 fi
 
+# Quickstart
+if [ "$TEST_CATEGORY" == 'QUICKSTART' ]; then
+  mvn clean install -DskipTests -Pbin-dist ${KAFKA_BUILD_OPTS}
+  DIST_BIN_DIR=`ls -d pinot-distribution/target/apache-pinot-*/apache-pinot-*`
+  cd $DIST_BIN_DIR
+  sh bin/quick-start-batch.sh &
+  PID=$!
+  sleep 60
+  COUNT_STAR_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from baseballStats limit 1","trace":false}' http://localhost:8000/query/sql |grep ':\[\[97889\]\]'`
+  RES_LENGTH=${#COUNT_STAR_RES}
+  if [ ${RES_LENGTH} -gt 300 ]; then
+    passed=1
+  fi
+  kill $PID
+fi
+
 # Remove Pinot files from local Maven repository to avoid a useless cache rebuild
 rm -rf ~/.m2/repository/com/linkedin/pinot
 
 if [ $passed -eq 1 ]; then
-  # Only send code coverage data if passed
-  bash <(cat .codecov_bash)
+  if [ -f ".codecov_bash" ]; then
+    # Only send code coverage data if passed
+    bash <(cat .codecov_bash)
+  fi
   exit 0
 else
   exit 1
