@@ -24,12 +24,15 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
@@ -202,27 +205,16 @@ public class BrokerReduceService {
     DataSchema dataSchema = brokerResponseNative.getResultTable().getDataSchema();
     List<Expression> selectList = brokerRequest.getPinotQuery().getSelectList();
     String[] columnNames = dataSchema.getColumnNames();
-    if (columnNames.length != selectList.size()) {
-      LOGGER.error("Response schema size {} is different from number of selection expressions {}", columnNames.length,
-          selectList.size());
+    int selectListSize = selectList.size();
+    // For query like `SELECT *`, we skip alias update.
+    if (columnNames.length != selectListSize) {
       return;
     }
-    for (int i = 0; i < selectList.size(); i++) {
-      if (selectList.get(i).getFunctionCall() != null && selectList.get(i).getFunctionCall().getOperator()
-          .equalsIgnoreCase("AS")) {
-        String aliasName = null;
-        if (selectList.get(i).getFunctionCall().getOperands().get(1).getIdentifier() != null) {
-          aliasName = selectList.get(i).getFunctionCall().getOperands().get(1).getIdentifier().getName();
-        }
-        Literal aliasLiteral = selectList.get(i).getFunctionCall().getOperands().get(1).getLiteral();
-        if (aliasLiteral != null) {
-          if (aliasLiteral.isSetStringValue()) {
-            aliasName = aliasLiteral.getStringValue();
-          }
-        }
-        if (aliasName != null) {
-          columnNames[i] = aliasName;
-        }
+    for (int i = 0; i < selectListSize; i++) {
+      Function selectFunc = selectList.get(i).getFunctionCall();
+      if (selectFunc != null && selectFunc.getOperator()
+          .equalsIgnoreCase(SqlKind.AS.toString())) {
+        columnNames[i] = selectFunc.getOperands().get(1).getIdentifier().getName();
       }
     }
   }

@@ -119,7 +119,7 @@ public class CalciteSqlParser {
   private static void matchIdentifierInAliasMap(Expression selectExpr, Set<String> aliasKeys)
       throws SqlCompilationException {
     if (selectExpr.getFunctionCall() != null) {
-      if (selectExpr.getFunctionCall().getOperator().equalsIgnoreCase("AS")) {
+      if (selectExpr.getFunctionCall().getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
         matchIdentifierInAliasMap(selectExpr.getFunctionCall().getOperands().get(0), aliasKeys);
       } else {
         for (Expression operand : selectExpr.getFunctionCall().getOperands()) {
@@ -146,7 +146,7 @@ public class CalciteSqlParser {
         boolean foundInGroupByClause = false;
         Expression selectionToCheck;
         if (selectExpression.getFunctionCall() != null && selectExpression.getFunctionCall().getOperator()
-            .equalsIgnoreCase("AS")) {
+            .equalsIgnoreCase(SqlKind.AS.toString())) {
           selectionToCheck = selectExpression.getFunctionCall().getOperands().get(0);
         } else {
           selectionToCheck = selectExpression;
@@ -330,7 +330,7 @@ public class CalciteSqlParser {
       if (functionCall == null) {
         continue;
       }
-      if (functionCall.getOperator().equalsIgnoreCase("AS")) {
+      if (functionCall.getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
         Expression identifierExpr = functionCall.getOperands().get(1);
         aliasMap.put(identifierExpr.getIdentifier(), functionCall.getOperands().get(0));
       }
@@ -445,9 +445,29 @@ public class CalciteSqlParser {
         return RequestUtils.getIdentifierExpression(node.toString());
       case LITERAL:
         return RequestUtils.getLiteralExpression((SqlLiteral) node);
+      case AS:
+        SqlBasicCall asFuncSqlNode = (SqlBasicCall) node;
+        final Expression asFuncExpr = RequestUtils.getFunctionExpression(SqlKind.AS.toString());
+        asFuncExpr.getFunctionCall().addToOperands(toExpression(asFuncSqlNode.getOperands()[0]));
+        SqlNode aliasSqlNode = asFuncSqlNode.getOperands()[1];
+        String aliasName;
+        switch (aliasSqlNode.getKind()) {
+          case IDENTIFIER:
+            aliasName = ((SqlIdentifier) aliasSqlNode).getSimple();
+            break;
+          case LITERAL:
+            aliasName = ((SqlLiteral) aliasSqlNode).toValue();
+            break;
+          default:
+            throw new SqlCompilationException("Unsupported Alias sql node - " + aliasSqlNode);
+        }
+        asFuncExpr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(aliasName));
+        return asFuncExpr;
       case OTHER:
         if (node instanceof SqlDataTypeSpec) {
           return RequestUtils.getLiteralExpression(((SqlDataTypeSpec) node).getTypeName().getSimple());
+        } else {
+          // Keep processing default logic.
         }
       default:
         SqlBasicCall funcSqlNode = (SqlBasicCall) node;

@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.BiFunction;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.AggregationInfo;
@@ -263,7 +264,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     // Handle all functions
     if (expression.getFunctionCall() != null) {
       // handle AS
-      if (expression.getFunctionCall().getOperator().equalsIgnoreCase("AS")) {
+      if (expression.getFunctionCall().getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
         return getExpressionMapIdx(expression.getFunctionCall().getOperands().get(0), nextAggregationIdx);
       }
       // Return next aggregation idx.

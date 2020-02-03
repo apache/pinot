@@ -120,6 +120,10 @@ public class PinotQuery2BrokerRequestConverter {
     List<AggregationInfo> aggregationInfoList = null;
     for (Expression expression : pinotQuery.getSelectList()) {
       ExpressionType type = expression.getType();
+      if (type == ExpressionType.FUNCTION && expression.getFunctionCall().getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
+        expression = expression.getFunctionCall().getOperands().get(0);
+        type = expression.getType();
+      }
       switch (type) {
         case LITERAL:
           if (selection == null) {
@@ -134,9 +138,6 @@ public class PinotQuery2BrokerRequestConverter {
           selection.addToSelectionColumns(expression.getIdentifier().getName());
           break;
         case FUNCTION:
-          if (expression.getFunctionCall().getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
-            expression = expression.getFunctionCall().getOperands().get(0);
-          }
           Function functionCall = expression.getFunctionCall();
           String functionName = functionCall.getOperator();
           if (FunctionDefinitionRegistry.isAggFunc(functionName)) {
