@@ -20,6 +20,7 @@ package org.apache.pinot.tools.admin.command;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Properties;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.Command;
@@ -45,7 +46,7 @@ public class StartKafkaCommand extends AbstractBaseAdminCommand implements Comma
   private int _brokerId = KafkaStarterUtils.DEFAULT_BROKER_ID;
 
   @Option(name = "-zkAddress", required = false, metaVar = "<string>", usage = "Address of Zookeeper.")
-  private String _zkAddress = "localhost:2181";
+  private String _zkAddress = KafkaStarterUtils.DEFAULT_ZK_STR;
   private StreamDataServerStartable _kafkaStarter;
 
   @Override
@@ -71,15 +72,18 @@ public class StartKafkaCommand extends AbstractBaseAdminCommand implements Comma
   @Override
   public boolean execute()
       throws IOException {
+    Properties kafkaConfiguration = KafkaStarterUtils.getDefaultKafkaConfiguration();
+    kafkaConfiguration.put(KafkaStarterUtils.BROKER_ID, _brokerId);
+    kafkaConfiguration.put(KafkaStarterUtils.PORT, _port);
+    kafkaConfiguration.put(KafkaStarterUtils.ZOOKEEPER_CONNECT, _zkAddress);
     try {
-      _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, KafkaStarterUtils.getDefaultKafkaConfiguration());
+      _kafkaStarter = StreamDataProvider
+          .getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, kafkaConfiguration);
     } catch (Exception e) {
       throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }
     _kafkaStarter.start();
-
     LOGGER.info("Start kafka at localhost:" + _port + " in thread " + Thread.currentThread().getName());
-
     savePID(System.getProperty("java.io.tmpdir") + File.separator + ".kafka.pid");
     return true;
   }
