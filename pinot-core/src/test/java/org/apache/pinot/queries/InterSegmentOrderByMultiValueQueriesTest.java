@@ -41,7 +41,7 @@ public class InterSegmentOrderByMultiValueQueriesTest extends BaseMultiValueQuer
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(Request.QueryOptionKey.GROUP_BY_MODE, Request.SQL);
     queryOptions.put(Request.QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, 400000L, 0, expectedNumEntriesScannedPostFilter, 400000L,
             expectedResults, expectedResults.size(), expectedDataSchema);

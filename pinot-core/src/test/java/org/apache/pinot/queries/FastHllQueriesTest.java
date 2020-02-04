@@ -137,14 +137,14 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(((HyperLogLog) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).cardinality(), 691L);
 
     // Test inter segments base query
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(BASE_QUERY);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(BASE_QUERY);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 4L, 0L, 8L, 120000L, new String[]{"21", "1762"});
     // Test inter segments query with filter
-    brokerResponse = getBrokerResponseForQueryWithFilter(BASE_QUERY);
+    brokerResponse = getBrokerResponseForPqlQueryWithFilter(BASE_QUERY);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 449916L, 49032L, 120000L,
         new String[]{"17", "1197"});
     // Test inter segments query with group-by
-    brokerResponse = getBrokerResponseForQuery(BASE_QUERY + GROUP_BY);
+    brokerResponse = getBrokerResponseForPqlQuery(BASE_QUERY + GROUP_BY);
     QueriesTestUtils
         .testInterSegmentAggregationResult(brokerResponse, 18452L, 0L, 55356L, 120000L, new String[]{"21", "1762"});
 
@@ -185,15 +185,15 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(((HyperLogLog) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).cardinality(), 691L);
 
     // Test inter segments base query
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(BASE_QUERY);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(BASE_QUERY);
     QueriesTestUtils
         .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L, new String[]{"21", "1762"});
     // Test inter segments query with filter
-    brokerResponse = getBrokerResponseForQueryWithFilter(BASE_QUERY);
+    brokerResponse = getBrokerResponseForPqlQueryWithFilter(BASE_QUERY);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
         new String[]{"17", "1197"});
     // Test inter segments query with group-by
-    brokerResponse = getBrokerResponseForQuery(BASE_QUERY + GROUP_BY);
+    brokerResponse = getBrokerResponseForPqlQuery(BASE_QUERY + GROUP_BY);
     QueriesTestUtils
         .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L, new String[]{"21", "1762"});
 

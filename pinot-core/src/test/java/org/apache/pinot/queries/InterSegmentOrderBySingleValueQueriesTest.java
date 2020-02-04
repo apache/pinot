@@ -49,7 +49,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.GROUP_BY_MODE, Request.SQL);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     QueriesTestUtils
         .testInterSegmentResultTable(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,
             expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, expectedResults, expectedResults.size(),
@@ -63,13 +63,13 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     Map<String, String> queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.GROUP_BY_MODE, Request.SQL);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.PQL);
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     QueriesTestUtils.testInterSegmentGroupByOrderByResultPQL(brokerResponse, expectedNumDocsScanned,
         expectedNumEntriesScannedInFilter, expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, expectedGroups,
         expectedValues, false);
 
     queryOptions.put(QueryOptionKey.PRESERVE_TYPE, "true");
-    brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     QueriesTestUtils.testInterSegmentGroupByOrderByResultPQL(brokerResponse, expectedNumDocsScanned,
         expectedNumEntriesScannedInFilter, expectedNumEntriesScannedPostFilter, expectedNumTotalDocs, expectedGroups,
         expectedValues, true);
@@ -88,7 +88,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     Map<String, String> queryOptions = null;
 
     // default PQL, PQL
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     Assert.assertNotNull(brokerResponse.getAggregationResults());
     Assert.assertNull(brokerResponse.getResultTable());
 
@@ -96,7 +96,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     queryOptions = new HashMap<>(2);
     queryOptions.put(QueryOptionKey.GROUP_BY_MODE, Request.PQL);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.PQL);
-    brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     Assert.assertNotNull(brokerResponse.getAggregationResults());
     Assert.assertNull(brokerResponse.getResultTable());
 
@@ -104,7 +104,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     query = "SELECT SUM(column1) FROM testTable GROUP BY column11 ORDER BY column11";
     queryOptions.put(QueryOptionKey.GROUP_BY_MODE, Request.PQL);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
-    brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     Assert.assertNull(brokerResponse.getAggregationResults());
     Assert.assertNotNull(brokerResponse.getResultTable());
 
@@ -112,7 +112,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     query = "SELECT SUM(column1), MIN(column6) FROM testTable GROUP BY column11 ORDER BY column11";
     queryOptions.put(QueryOptionKey.GROUP_BY_MODE, Request.SQL);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.PQL);
-    brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     Assert.assertNotNull(brokerResponse.getAggregationResults());
     Assert.assertNull(brokerResponse.getResultTable());
     List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
@@ -128,7 +128,7 @@ public class InterSegmentOrderBySingleValueQueriesTest extends BaseSingleValueQu
     // SQL, SQL - execute order by, return resultsTable
     queryOptions.put(QueryOptionKey.GROUP_BY_MODE, Request.SQL);
     queryOptions.put(QueryOptionKey.RESPONSE_FORMAT, Request.SQL);
-    brokerResponse = getBrokerResponseForQuery(query, queryOptions);
+    brokerResponse = getBrokerResponseForPqlQuery(query, queryOptions);
     Assert.assertNull(brokerResponse.getAggregationResults());
     Assert.assertNotNull(brokerResponse.getResultTable());
     DataSchema dataSchema = brokerResponse.getResultTable().getDataSchema();

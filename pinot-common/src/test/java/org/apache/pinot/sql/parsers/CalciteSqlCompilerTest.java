@@ -990,13 +990,13 @@ public class CalciteSqlCompilerTest {
     sql = "SELECT C1 AS ALIAS_C1, C2 AS ALIAS_C2, ADD(C1, C2) FROM Foo";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "AS");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), SqlKind.AS.toString());
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "C1");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "ALIAS_C1");
 
-    Assert.assertEquals(pinotQuery.getSelectList().get(1).getFunctionCall().getOperator(), "AS");
+    Assert.assertEquals(pinotQuery.getSelectList().get(1).getFunctionCall().getOperator(), SqlKind.AS.toString());
     Assert.assertEquals(
         pinotQuery.getSelectList().get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "C2");
     Assert.assertEquals(
