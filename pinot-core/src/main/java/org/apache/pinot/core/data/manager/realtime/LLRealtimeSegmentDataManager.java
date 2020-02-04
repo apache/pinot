@@ -205,7 +205,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final IndexLoadingConfig _indexLoadingConfig;
   private final Schema _schema;
   private final Semaphore _partitionConsumerSemaphore;
-  private final AtomicBoolean _isConsumerConnected;
+  private final AtomicBoolean _acquireConsumerSemaphore;
   private final String _metricKeyName;
   private final ServerMetrics _serverMetrics;
   private final MutableSegmentImpl _realtimeSegment;
@@ -675,6 +675,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return _segmentBuildDescriptor;
   }
 
+  @VisibleForTesting
+  protected Semaphore getPartitionConsumerSemaphore() {
+    return _partitionConsumerSemaphore;
+  }
+
+  @VisibleForTesting
+  protected AtomicBoolean getAcquireConsumerSemaphore() {
+    return _acquireConsumerSemaphore;
+  }
+
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
     try {
       final long startTimeMillis = now();
@@ -809,7 +819,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (!(closePartitionLevelConsumer() && closeStreamMetadataProvider())) {
       return false;
     }
-    if (_isConsumerConnected.compareAndSet(true, false)) {
+    if (_acquireConsumerSemaphore.compareAndSet(true, false)) {
       _partitionConsumerSemaphore.release();
     }
 
@@ -964,7 +974,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   protected void downloadSegmentAndReplace(LLCRealtimeSegmentZKMetadata metadata) {
     closePartitionLevelConsumer();
     closeStreamMetadataProvider();
-    if (_isConsumerConnected.compareAndSet(true, false)) {
+    if (_acquireConsumerSemaphore.compareAndSet(true, false)) {
       _partitionConsumerSemaphore.release();
     }
     _realtimeTableDataManager.downloadAndReplaceSegment(_segmentNameStr, metadata, _indexLoadingConfig);
@@ -1007,7 +1017,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     closePartitionLevelConsumer();
     closeStreamMetadataProvider();
-    if (_isConsumerConnected.compareAndSet(true, false)) {
+    if (_acquireConsumerSemaphore.compareAndSet(true, false)) {
       _partitionConsumerSemaphore.release();
     }
   }
@@ -1064,8 +1074,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _segmentName = new LLCSegmentName(_segmentNameStr);
     _streamPartitionId = _segmentName.getPartitionId();
-    _partitionConsumerSemaphore = partitionIdToSemaphoreMap.getOrDefault(_streamPartitionId, new Semaphore(1));
-    _isConsumerConnected = new AtomicBoolean(false);
+    partitionIdToSemaphoreMap.putIfAbsent(_streamPartitionId, new Semaphore(1));
+    _partitionConsumerSemaphore = partitionIdToSemaphoreMap.get(_streamPartitionId);
+    _acquireConsumerSemaphore = new AtomicBoolean(false);
     _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     _metricKeyName = _tableNameWithType + "-" + _streamTopic + "-" + _streamPartitionId;
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
@@ -1144,7 +1155,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Acquire semaphore to create Kafka consumers
     try {
       _partitionConsumerSemaphore.acquire();
-      _isConsumerConnected.set(true);
+      _acquireConsumerSemaphore.set(true);
     } catch (InterruptedException e) {
       String errorMsg = "InterruptedException when acquiring semaphore for Segment: " + _segmentNameStr;
       segmentLogger.error(errorMsg);
@@ -1218,7 +1229,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
    * @param reason
    */
   private void makeStreamMetadataProvider(String reason) {
-    closeStreamMetadataProvider();
+    if (_streamMetadataProvider != null) {
+      closeStreamMetadataProvider();
+    }
     segmentLogger.info("Creating new stream metadata provider, reason: {}", reason);
     _streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _streamPartitionId);
   }
