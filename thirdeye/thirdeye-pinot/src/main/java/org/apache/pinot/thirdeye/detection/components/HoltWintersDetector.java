@@ -22,6 +22,7 @@ import java.time.DayOfWeek;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.math3.analysis.MultivariateFunction;
 import org.apache.commons.math3.optim.InitialGuess;
@@ -134,7 +135,7 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
   public TimeSeries computePredictedTimeSeries(MetricSlice slice) {
     MetricEntity metricEntity = MetricEntity.fromSlice(slice, 0);
     Interval window = new Interval(slice.getStart(), slice.getEnd());
-    DateTime trainStart = getTrainingStartTime(window);
+    DateTime trainStart = getTrainingStartTime(window.getStart());
 
     DatasetConfigDTO datasetConfig = this.dataFetcher.fetchData(new InputDataSpec()
         .withMetricIdsForDataset(Collections.singleton(metricEntity.getId()))).getDatasetForMetricId()
@@ -152,16 +153,16 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
     return TimeSeries.fromDataFrame(resultDF);
   }
 
-  private DateTime getTrainingStartTime(Interval window) {
+  private DateTime getTrainingStartTime(DateTime windowStart) {
     DateTime trainStart;
     if (isMultiDayGranularity()) {
-      trainStart = window.getStart().minusDays(timeGranularity.getSize() * LOOKBACK);
+      trainStart = windowStart.minusDays(timeGranularity.getSize() * LOOKBACK);
     } else if (this.monitoringGranularity.endsWith(TimeGranularity.MONTHS)) {
-      trainStart = window.getStart().minusMonths(LOOKBACK);
+      trainStart = windowStart.minusMonths(LOOKBACK);
     } else if (this.monitoringGranularity.endsWith(TimeGranularity.WEEKS)) {
-      trainStart = window.getStart().withTimeAtStartOfDay().withDayOfWeek(weekStart.getValue()).minusWeeks(LOOKBACK);
+      trainStart = windowStart.minusWeeks(LOOKBACK);
     } else {
-      trainStart = window.getStart().minusDays(LOOKBACK);
+      trainStart = windowStart.minusDays(LOOKBACK);
     }
     return trainStart;
   }
@@ -169,7 +170,13 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
   @Override
   public DetectionResult runDetection(Interval window, String metricUrn) {
     MetricEntity metricEntity = MetricEntity.fromURN(metricUrn);
-    DateTime trainStart = getTrainingStartTime(window);
+    DateTime windowStart = window.getStart();
+    // align start day to the user specified week start
+    if (Objects.nonNull(this.weekStart)) {
+      windowStart = window.getStart().withTimeAtStartOfDay().withDayOfWeek(weekStart.getValue()).minusWeeks(1);
+    }
+
+    DateTime trainStart = getTrainingStartTime(windowStart);
 
     DatasetConfigDTO datasetConfig = this.dataFetcher.fetchData(new InputDataSpec()
         .withMetricIdsForDataset(Collections.singleton(metricEntity.getId()))).getDatasetForMetricId()
@@ -193,7 +200,7 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
     }
 
     DataFrame dfCurr = new DataFrame(dfInput).renameSeries(COL_VALUE, COL_CURR);
-    DataFrame dfBase = computePredictionInterval(dfInput, window.getStartMillis(), datasetConfig.getTimezone());
+    DataFrame dfBase = computePredictionInterval(dfInput, windowStart.getMillis(), datasetConfig.getTimezone());
     DataFrame df = new DataFrame(dfCurr).addSeries(dfBase, COL_VALUE, COL_ERROR);
     df.addSeries(COL_DIFF, df.getDoubles(COL_CURR).subtract(df.get(COL_VALUE)));
     df.addSeries(COL_ANOMALY, BooleanSeries.fillValues(df.size(), false));
