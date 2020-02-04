@@ -56,7 +56,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-
+@Test(enabled=false)
 public class HadoopSegmentBuildPushOfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final Logger LOGGER = LoggerFactory.getLogger(HadoopSegmentBuildPushOfflineClusterIntegrationTest.class);
   private static final int NUM_BROKERS = 1;
@@ -134,28 +134,28 @@ public class HadoopSegmentBuildPushOfflineClusterIntegrationTest extends BaseClu
     FileUtils.deleteDirectory(_tempDir);
   }
 
-  @Test
+  @Test(enabled=false)
   @Override
   public void testQueriesFromQueryFile()
       throws Exception {
     super.testQueriesFromQueryFile();
   }
 
-  @Test
+  @Test(enabled=false)
   @Override
   public void testGeneratedQueriesWithMultiValues()
       throws Exception {
     super.testGeneratedQueriesWithMultiValues();
   }
 
-  @Test
+  @Test(enabled=false)
   @Override
   public void testQueryExceptions()
       throws Exception {
     super.testQueryExceptions();
   }
 
-  @Test
+  @Test(enabled=false)
   @Override
   public void testInstanceShutdown()
       throws Exception {
