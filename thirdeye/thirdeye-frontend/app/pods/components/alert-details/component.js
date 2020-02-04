@@ -392,25 +392,10 @@ export default Component.extend({
     'selectedDimension',
     'showRules',
     function() {
-      let filteredAnomaliesOld = [];
       const {
         metricUrn, anomaliesOld, selectedRule, showRules
       } = getProperties(this, 'metricUrn', 'anomaliesOld', 'selectedRule', 'showRules');
-      if (!_.isEmpty(anomaliesOld)) {
-
-        filteredAnomaliesOld = anomaliesOld.filter(anomaly => {
-          if (anomaly.metricUrn === metricUrn) {
-            if(showRules && anomaly.properties && typeof anomaly.properties === 'object' && selectedRule && typeof selectedRule === 'object') {
-              return ((anomaly.properties.detectorComponentName || '').includes(selectedRule.detectorName));
-            } else if (!showRules) {
-              // This is necessary until we surface rule selector in Alert Overview
-              return true;
-            }
-          }
-          return false;
-        });
-      }
-      return filteredAnomaliesOld;
+      return this._filterAnomalies(anomaliesOld, metricUrn, showRules, selectedRule);
     }
   ),
 
@@ -427,25 +412,10 @@ export default Component.extend({
     'selectedDimension',
     'showRules',
     function() {
-      let filteredAnomaliesCurrent = [];
       const {
         metricUrn, anomaliesCurrent, selectedRule, showRules
       } = getProperties(this, 'metricUrn', 'anomaliesCurrent', 'selectedRule', 'showRules');
-      if (!_.isEmpty(anomaliesCurrent)) {
-
-        filteredAnomaliesCurrent = anomaliesCurrent.filter(anomaly => {
-          if (anomaly.metricUrn === metricUrn) {
-            if(showRules && anomaly.properties && typeof anomaly.properties === 'object' && selectedRule && typeof selectedRule === 'object') {
-              return (anomaly.properties.detectorComponentName.includes(selectedRule.detectorName));
-            } else if (!showRules) {
-              // This is necessary until we surface rule selector in Alert Overview
-              return true;
-            }
-          }
-          return false;
-        });
-      }
-      return filteredAnomaliesCurrent;
+      return this._filterAnomalies(anomaliesCurrent, metricUrn, showRules, selectedRule);
     }
   ),
 
@@ -1153,8 +1123,32 @@ export default Component.extend({
     set(this, 'errorBaseline', null);
   },
 
-  _filterAnomalies(rows) {
-    return rows.filter(row => (row.startTime && row.endTime && !row.child));
+  /**
+   * Helper function to implement logic for filtering a set of anomalies
+   * returns set of anomalies to display in graph based on selections
+   * @method _filterAnomalies
+   * @param anomalies - an array of anomaly objects
+   * @param metricUrn - the metricUrn currently selected for time series chart
+   * @param showRules - whether we are showing detection rules and bounds in time series chart
+   * @param selectedRule - which detection rule selected for time series chart 
+   * @return {Array}
+   */
+  _filterAnomalies(anomalies, metricUrn, showRules, selectedRule) {
+    let filteredAnomalies = [];
+    if (!_.isEmpty(anomalies)) {
+      filteredAnomalies = anomalies.filter(anomaly => {
+        if (anomaly.metricUrn === metricUrn) {
+          if(showRules && anomaly.properties && typeof anomaly.properties === 'object' && selectedRule && typeof selectedRule === 'object') {
+            return ((anomaly.properties.detectorComponentName || '').includes(selectedRule.detectorName));
+          } else if (!showRules) {
+            // This is necessary until we surface rule selector in Alert Overview
+            return true;
+          }
+        }
+        return false;
+      });
+    }
+    return filteredAnomalies;
   },
 
   _formatAnomaly(anomaly) {
