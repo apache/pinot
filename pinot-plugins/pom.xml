@@ -61,7 +61,10 @@
     <profile>
       <id>build-shaded-jar</id>
       <activation>
-        <activeByDefault>true</activeByDefault>
+        <property>
+          <name>skipShade</name>
+          <value>!true</value>
+        </property>
       </activation>
       <build>
         <plugins>
