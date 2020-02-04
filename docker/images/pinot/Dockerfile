@@ -17,7 +17,7 @@
 # under the License.
 #
 
-FROM openjdk:8
+FROM openjdk:8 AS pinot_build_env
 
 LABEL MAINTAINER=dev@pinot.apache.org
 
@@ -57,12 +57,17 @@ RUN git clone ${PINOT_GIT_URL} ${PINOT_BUILD_DIR} && \
     mkdir -p ${PINOT_HOME}/configs && \
     mkdir -p ${PINOT_HOME}/data && \
     cp -r pinot-distribution/target/apache-pinot-*-bin/apache-pinot-*-bin/* ${PINOT_HOME}/. && \
-    chmod +x ${PINOT_HOME}/bin/*.sh && \
-    mvn dependency:purge-local-repository -DactTransitively=false -DreResolve=false --fail-at-end && \
-    rm -rf ${PINOT_BUILD_DIR} ${MAVEN_HOME} ${MAVEN_CONFIG}
+    chmod +x ${PINOT_HOME}/bin/*.sh
+
+FROM openjdk:8-jdk-slim
+
+LABEL MAINTAINER=dev@pinot.apache.org
+
+ENV PINOT_HOME=/opt/pinot
 
 VOLUME ["${PINOT_HOME}/configs", "${PINOT_HOME}/data"]
 
+COPY --from=pinot_build_env ${PINOT_HOME} ${PINOT_HOME}
 COPY ingestion-job-specs ${PINOT_HOME}/examples/docker/ingestion-job-specs
 COPY table-configs ${PINOT_HOME}/examples/docker/table-configs
 
