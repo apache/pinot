@@ -230,7 +230,7 @@ public class HadoopPinotFS extends PinotFS {
         try {
           if (!UserGroupInformation.getCurrentUser().hasKerberosCredentials() || !UserGroupInformation.getCurrentUser()
               .getUserName().equals(principal)) {
-            LOGGER.info("Trying to authenticate user [%s] with keytab [%s]..", principal, keytab);
+            LOGGER.info("Trying to authenticate user {} with keytab {}..", principal, keytab);
             UserGroupInformation.loginUserFromKeytab(principal, keytab);
           }
         } catch (IOException e) {
