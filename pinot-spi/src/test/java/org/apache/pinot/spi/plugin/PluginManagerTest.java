@@ -85,6 +85,58 @@ public class PluginManagerTest {
     }
   }
 
+  @Test
+  public void testBackwardCompatible() {
+    Assert.assertEquals(PluginManager
+            .loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.realtime.stream.SimpleAvroMessageDecoder"),
+        "org.apache.pinot.plugin.inputformat.avro.SimpleAvroMessageDecoder");
+    Assert.assertEquals(PluginManager
+            .loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.realtime.stream.SimpleAvroMessageDecoder"),
+        "org.apache.pinot.plugin.inputformat.avro.SimpleAvroMessageDecoder");
+    Assert.assertEquals(PluginManager
+            .loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder"),
+        "org.apache.pinot.plugin.inputformat.avro.KafkaAvroMessageDecoder");
+    Assert.assertEquals(PluginManager
+            .loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder"),
+        "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
+
+    // RecordReader
+    Assert.assertEquals(
+        PluginManager.loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.data.readers.AvroRecordReader"),
+        "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader");
+    Assert.assertEquals(
+        PluginManager.loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.data.readers.CSVRecordReader"),
+        "org.apache.pinot.plugin.inputformat.csv.CSVRecordReader");
+    Assert.assertEquals(
+        PluginManager.loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.data.readers.JSONRecordReader"),
+        "org.apache.pinot.plugin.inputformat.json.JSONRecordReader");
+    Assert.assertEquals(
+        PluginManager.loadClassWithBackwardCompatibleCheck("org.apache.pinot.orc.data.readers.ORCRecordReader"),
+        "org.apache.pinot.plugin.inputformat.orc.ORCRecordReader");
+    Assert.assertEquals(
+        PluginManager.loadClassWithBackwardCompatibleCheck("org.apache.pinot.parquet.data.readers.ParquetRecordReader"),
+        "org.apache.pinot.plugin.inputformat.parquet.ParquetRecordReader");
+    Assert.assertEquals(
+        PluginManager.loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.data.readers.ThriftRecordReader"),
+        "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader");
+
+    // PinotFS
+    Assert.assertEquals(PluginManager.loadClassWithBackwardCompatibleCheck("org.apache.pinot.filesystem.AzurePinotFS"),
+        "org.apache.pinot.plugin.filesystem.AzurePinotFS");
+    Assert.assertEquals(PluginManager.loadClassWithBackwardCompatibleCheck("org.apache.pinot.filesystem.HadoopPinotFS"),
+        "org.apache.pinot.plugin.filesystem.HadoopPinotFS");
+    Assert.assertEquals(PluginManager.loadClassWithBackwardCompatibleCheck("org.apache.pinot.filesystem.LocalPinotFS"),
+        "org.apache.pinot.spi.filesystem.LocalPinotFS");
+
+    // StreamConsumerFactory
+    Assert.assertEquals(PluginManager
+            .loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory"),
+        "org.apache.pinot.plugin.stream.kafka09.KafkaConsumerFactory");
+    Assert.assertEquals(PluginManager
+            .loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory"),
+        "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory");
+  }
+
   @AfterClass
   public void tearDown() {
     tempDir.delete();

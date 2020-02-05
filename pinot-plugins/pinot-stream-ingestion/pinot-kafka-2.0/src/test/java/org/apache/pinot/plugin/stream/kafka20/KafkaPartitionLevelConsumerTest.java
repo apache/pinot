@@ -112,7 +112,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
-    streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     streamConfigMap.put("stream.kafka.fetcher.size", "10000");
     streamConfigMap.put("stream.kafka.fetcher.minBytes", "20000");
@@ -160,7 +160,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.topic.name", TEST_TOPIC_1);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
-    streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
@@ -173,7 +173,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.topic.name", TEST_TOPIC_2);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
-    streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
@@ -196,7 +196,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
-    streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
@@ -226,7 +226,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.topic.name", topic);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
-    streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
@@ -262,7 +262,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.topic.name", topic);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
-    streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
@@ -294,5 +294,9 @@ public class KafkaPartitionLevelConsumerTest {
         Assert.assertEquals(new String(msg), "sample_msg_" + (10 + i));
       }
     }
+  }
+
+  protected String getKafkaConsumerFactoryName() {
+    return KafkaConsumerFactory.class.getName();
   }
 }
