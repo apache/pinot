@@ -686,6 +686,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
+    closeKafkaConsumers();
     try {
       final long startTimeMillis = now();
       if (_segBuildSemaphore != null) {
@@ -816,13 +817,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   protected boolean buildSegmentAndReplace() {
-    if (!(closePartitionLevelConsumer() && closeStreamMetadataProvider())) {
-      return false;
-    }
-    if (_acquireConsumerSemaphore.compareAndSet(true, false)) {
-      _partitionConsumerSemaphore.release();
-    }
-
     SegmentBuildDescriptor descriptor = buildSegmentInternal(false);
     if (descriptor == null) {
       return false;
@@ -830,6 +824,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
     return true;
+  }
+
+  private void closeKafkaConsumers() {
+    closePartitionLevelConsumer();
+    closeStreamMetadataProvider();
+    if (_acquireConsumerSemaphore.compareAndSet(true, false)) {
+      _partitionConsumerSemaphore.release();
+    }
   }
 
   private boolean closePartitionLevelConsumer() {
@@ -972,11 +974,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   protected void downloadSegmentAndReplace(LLCRealtimeSegmentZKMetadata metadata) {
-    closePartitionLevelConsumer();
-    closeStreamMetadataProvider();
-    if (_acquireConsumerSemaphore.compareAndSet(true, false)) {
-      _partitionConsumerSemaphore.release();
-    }
+    closeKafkaConsumers();
     _realtimeTableDataManager.downloadAndReplaceSegment(_segmentNameStr, metadata, _indexLoadingConfig);
   }
 
@@ -1014,12 +1012,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       segmentLogger.error("Could not stop consumer thread");
     }
     _realtimeSegment.destroy();
-
-    closePartitionLevelConsumer();
-    closeStreamMetadataProvider();
-    if (_acquireConsumerSemaphore.compareAndSet(true, false)) {
-      _partitionConsumerSemaphore.release();
-    }
+    closeKafkaConsumers();
   }
 
   protected void start() {
