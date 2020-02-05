@@ -46,7 +46,7 @@ public class PluginManager {
   private static PluginManager PLUGIN_MANAGER = new PluginManager();
 
   // For backward compatibility, this map holds a mapping from old plugins class name to its new class name.
-  static final Map<String, String> PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP = new HashMap<String, String>(){
+  private static final Map<String, String> PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP = new HashMap<String, String>(){
     {
       // MessageDecoder
       put("org.apache.pinot.core.realtime.stream.SimpleAvroMessageDecoder", "org.apache.pinot.plugin.inputformat.avro.SimpleAvroMessageDecoder");
@@ -203,11 +203,9 @@ public class PluginManager {
   }
 
   public static String loadClassWithBackwardCompatibleCheck(String className) {
-    if (PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP.containsKey(className)) {
-      return PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP.get(className);
-    }
-    return className;
+    return PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP.getOrDefault(className, className);
   }
+
   /**
    * Create an instance of the className. The className can be in any of the following formats
    * <li>com.x.y.foo</li> loads the class in the default class path
