@@ -284,7 +284,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   @Test
   public void testInterSegmentAggregation()
       throws Exception {
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(getAggregationQuery());
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(getAggregationQuery());
     List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
     assertNotNull(aggregationResults);
     assertEquals(aggregationResults.size(), 5);
@@ -450,7 +450,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   @Test
   public void testInterSegmentSVGroupBy()
       throws Exception {
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(getSVGroupByQuery());
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(getSVGroupByQuery());
     List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
     assertNotNull(aggregationResults);
     assertEquals(aggregationResults.size(), 5);
@@ -655,7 +655,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   @Test
   public void testInterSegmentMVGroupBy()
       throws Exception {
-    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(getMVGroupByQuery());
+    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(getMVGroupByQuery());
     List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
     assertNotNull(aggregationResults);
     assertEquals(aggregationResults.size(), 5);

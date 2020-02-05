@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.JobQueue;
 import org.apache.helix.task.TaskConfig;
@@ -55,7 +54,7 @@ public class PinotHelixTaskResourceManager {
 
   private final TaskDriver _taskDriver;
 
-  public PinotHelixTaskResourceManager(@Nonnull TaskDriver taskDriver) {
+  public PinotHelixTaskResourceManager(TaskDriver taskDriver) {
     _taskDriver = taskDriver;
   }
 
@@ -64,7 +63,6 @@ public class PinotHelixTaskResourceManager {
    *
    * @return Set of all task types
    */
-  @Nonnull
   public synchronized Set<String> getTaskTypes() {
     Set<String> helixJobQueues = _taskDriver.getWorkflows().keySet();
     Set<String> taskTypes = new HashSet<>(helixJobQueues.size());
@@ -105,7 +103,7 @@ public class PinotHelixTaskResourceManager {
    *
    * @param taskType Task type
    */
-  public synchronized void cleanUpTaskQueue(@Nonnull String taskType) {
+  public synchronized void cleanUpTaskQueue(String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     LOGGER.info("Cleaning up task queue: {} for task type: {}", helixJobQueueName, taskType);
     _taskDriver.cleanupQueue(helixJobQueueName);
@@ -116,8 +114,7 @@ public class PinotHelixTaskResourceManager {
    *
    * @param taskType Task type
    */
-  public synchronized void stopTaskQueue(@Nonnull String taskType)
-      throws InterruptedException {
+  public synchronized void stopTaskQueue(String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     LOGGER.info("Stopping task queue: {} for task type: {}", helixJobQueueName, taskType);
     _taskDriver.stop(helixJobQueueName);
@@ -128,7 +125,7 @@ public class PinotHelixTaskResourceManager {
    *
    * @param taskType Task type
    */
-  public synchronized void resumeTaskQueue(@Nonnull String taskType) {
+  public synchronized void resumeTaskQueue(String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     LOGGER.info("Resuming task queue: {} for task type: {}", helixJobQueueName, taskType);
     _taskDriver.resume(helixJobQueueName);
@@ -138,12 +135,20 @@ public class PinotHelixTaskResourceManager {
    * Delete the task queue for the given task type.
    *
    * @param taskType Task type
+   * @param forceDelete Expert only option to force deleting the task queue without going through the Helix transitions.
+   *                    CAUTION: if set true, workflow and all of its jobs' related ZNodes will be deleted immediately,
+   *                    no matter whether there are jobs running or not.
+   *                    Enabling this option can cause ZooKeeper delete failure as Helix might inadvertently try to
+   *                    write the deleted ZNodes back to ZooKeeper. Also this option might corrupt Task Framework cache.
    */
-  public synchronized void deleteTaskQueue(@Nonnull String taskType) {
+  public synchronized void deleteTaskQueue(String taskType, boolean forceDelete) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
-    LOGGER.info("Deleting task queue: {} for task type: {}", helixJobQueueName, taskType);
-    // NOTE: set force delete to true to remove the task queue from ZooKeeper immediately
-    _taskDriver.delete(helixJobQueueName, true);
+    if (forceDelete) {
+      LOGGER.warn("Force deleting task queue: {} for task type: {}", helixJobQueueName, taskType);
+    } else {
+      LOGGER.info("Deleting task queue: {} for task type: {}", helixJobQueueName, taskType);
+    }
+    _taskDriver.delete(helixJobQueueName, forceDelete);
   }
 
   /**
@@ -161,7 +166,7 @@ public class PinotHelixTaskResourceManager {
    * @param taskType Task type
    * @return Task queue state
    */
-  public synchronized TaskState getTaskQueueState(@Nonnull String taskType) {
+  public synchronized TaskState getTaskQueueState(String taskType) {
     return _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType)).getWorkflowState();
   }
 
@@ -172,9 +177,7 @@ public class PinotHelixTaskResourceManager {
    * @param numConcurrentTasksPerInstance Maximum number of concurrent tasks allowed per instance
    * @return Name of the submitted parent task
    */
-  @Nonnull
-  public synchronized String submitTask(@Nonnull List<PinotTaskConfig> pinotTaskConfigs,
-      int numConcurrentTasksPerInstance) {
+  public synchronized String submitTask(List<PinotTaskConfig> pinotTaskConfigs, int numConcurrentTasksPerInstance) {
     return submitTask(pinotTaskConfigs, Helix.UNTAGGED_MINION_INSTANCE, numConcurrentTasksPerInstance);
   }
 
@@ -186,9 +189,8 @@ public class PinotHelixTaskResourceManager {
    * @param numConcurrentTasksPerInstance Maximum number of concurrent tasks allowed per instance
    * @return Name of the submitted parent task
    */
-  @Nonnull
-  public synchronized String submitTask(@Nonnull List<PinotTaskConfig> pinotTaskConfigs,
-      @Nonnull String minionInstanceTag, int numConcurrentTasksPerInstance) {
+  public synchronized String submitTask(List<PinotTaskConfig> pinotTaskConfigs, String minionInstanceTag,
+      int numConcurrentTasksPerInstance) {
     int numChildTasks = pinotTaskConfigs.size();
     Preconditions.checkState(numChildTasks > 0);
     Preconditions.checkState(numConcurrentTasksPerInstance > 0);
@@ -228,8 +230,7 @@ public class PinotHelixTaskResourceManager {
    * @param taskType Task type
    * @return Set of task names
    */
-  @Nonnull
-  public synchronized Set<String> getTasks(@Nonnull String taskType) {
+  public synchronized Set<String> getTasks(String taskType) {
     Set<String> helixJobs = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType)).getJobStates().keySet();
     Set<String> tasks = new HashSet<>(helixJobs.size());
     for (String helixJobName : helixJobs) {
@@ -244,8 +245,7 @@ public class PinotHelixTaskResourceManager {
    * @param taskType Task type
    * @return Map from task name to task state
    */
-  @Nonnull
-  public synchronized Map<String, TaskState> getTaskStates(@Nonnull String taskType) {
+  public synchronized Map<String, TaskState> getTaskStates(String taskType) {
     Map<String, TaskState> helixJobStates =
         _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType)).getJobStates();
     Map<String, TaskState> taskStates = new HashMap<>(helixJobStates.size());
@@ -261,7 +261,7 @@ public class PinotHelixTaskResourceManager {
    * @param taskName Task name
    * @return Task state
    */
-  public synchronized TaskState getTaskState(@Nonnull String taskName) {
+  public synchronized TaskState getTaskState(String taskName) {
     String taskType = getTaskType(taskName);
     return _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType)).getJobState(getHelixJobName(taskName));
   }
@@ -272,8 +272,7 @@ public class PinotHelixTaskResourceManager {
    * @param taskName Task name
    * @return List of child task configs
    */
-  @Nonnull
-  public synchronized List<PinotTaskConfig> getTaskConfigs(@Nonnull String taskName) {
+  public synchronized List<PinotTaskConfig> getTaskConfigs(String taskName) {
     Collection<TaskConfig> helixTaskConfigs =
         _taskDriver.getJobConfig(getHelixJobName(taskName)).getTaskConfigMap().values();
     List<PinotTaskConfig> taskConfigs = new ArrayList<>(helixTaskConfigs.size());
@@ -290,8 +289,7 @@ public class PinotHelixTaskResourceManager {
    * @param taskType Task type
    * @return Helix JobQueue name
    */
-  @Nonnull
-  public static String getHelixJobQueueName(@Nonnull String taskType) {
+  public static String getHelixJobQueueName(String taskType) {
     return TASK_QUEUE_PREFIX + taskType;
   }
 
@@ -302,8 +300,7 @@ public class PinotHelixTaskResourceManager {
    * @param pinotTaskName Pinot task name
    * @return helixJobName Helix Job name
    */
-  @Nonnull
-  private static String getHelixJobName(@Nonnull String pinotTaskName) {
+  private static String getHelixJobName(String pinotTaskName) {
     return getHelixJobQueueName(getTaskType(pinotTaskName)) + TASK_NAME_SEPARATOR + pinotTaskName;
   }
 
@@ -314,8 +311,7 @@ public class PinotHelixTaskResourceManager {
    * @param helixJobName Helix Job name
    * @return Pinot task name
    */
-  @Nonnull
-  private static String getPinotTaskName(@Nonnull String helixJobName) {
+  private static String getPinotTaskName(String helixJobName) {
     return helixJobName.substring(TASK_QUEUE_PREFIX.length() + getTaskType(helixJobName).length() + 1);
   }
 
@@ -328,8 +324,7 @@ public class PinotHelixTaskResourceManager {
    * @param name Pinot task name, Helix JobQueue name or Helix Job name
    * @return Task type
    */
-  @Nonnull
-  private static String getTaskType(@Nonnull String name) {
+  private static String getTaskType(String name) {
     return name.split(TASK_NAME_SEPARATOR)[1];
   }
 }

@@ -64,6 +64,8 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   private static final String TABLE_NAME_2 = "testTable2";
   private static final String TABLE_NAME_3 = "testTable3";
   private static final int NUM_MINIONS = 1;
+  private static final long STATE_TRANSITION_TIMEOUT_MS = 60_000L;  // 1 minute
+
   private static final AtomicBoolean HOLD = new AtomicBoolean();
   private static final AtomicBoolean TASK_START_NOTIFIED = new AtomicBoolean();
   private static final AtomicBoolean TASK_SUCCESS_NOTIFIED = new AtomicBoolean();
@@ -102,8 +104,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   }
 
   @Test
-  public void testStopAndResumeTaskQueue()
-      throws Exception {
+  public void testStopResumeDeleteTaskQueue() {
     // Hold the task
     HOLD.set(true);
 
@@ -132,7 +133,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       assertFalse(TASK_CANCELLED_NOTIFIED.get());
       assertFalse(TASK_ERROR_NOTIFIED.get());
       return true;
-    }, 60_000L, "Failed to get all tasks IN_PROGRESS");
+    }, STATE_TRANSITION_TIMEOUT_MS, "Failed to get all tasks IN_PROGRESS");
 
     // Stop the task queue
     _helixTaskResourceManager.stopTaskQueue(TestTaskGenerator.TASK_TYPE);
@@ -151,7 +152,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       assertTrue(TASK_CANCELLED_NOTIFIED.get());
       assertFalse(TASK_ERROR_NOTIFIED.get());
       return true;
-    }, 60_000L, "Failed to get all tasks STOPPED");
+    }, STATE_TRANSITION_TIMEOUT_MS, "Failed to get all tasks STOPPED");
 
     // Resume the task queue, and let the task complete
     _helixTaskResourceManager.resumeTaskQueue(TestTaskGenerator.TASK_TYPE);
@@ -171,13 +172,15 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       assertTrue(TASK_CANCELLED_NOTIFIED.get());
       assertFalse(TASK_ERROR_NOTIFIED.get());
       return true;
-    }, 60_000L, "Failed to get all tasks COMPLETED");
+    }, STATE_TRANSITION_TIMEOUT_MS, "Failed to get all tasks COMPLETED");
 
     // Delete the task queue
-    // Note: Comment out the api for now since there is a known race condition
-    // where helix controller might write a deleted workflow back to ZK because it's still caching it.
-    // TODO: revert this after merging the fix
-//    _helixTaskResourceManager.deleteTaskQueue(TestTaskGenerator.TASK_TYPE);
+    _helixTaskResourceManager.deleteTaskQueue(TestTaskGenerator.TASK_TYPE, false);
+
+    // Wait at most 60 seconds for task queue to be deleted
+    TestUtils.waitForCondition(input -> {
+      return !_helixTaskResourceManager.getTaskTypes().contains(TestTaskGenerator.TASK_TYPE);
+    }, STATE_TRANSITION_TIMEOUT_MS, "Failed to delete the task queue");
   }
 
   @AfterClass

@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -181,12 +182,9 @@ public class PinotTaskRestletResource {
   @Path("/tasks/taskqueue/{taskType}")
   @ApiOperation("Delete a task queue")
   public SuccessResponse deleteTaskQueue(
-      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
-    try {
-      _pinotHelixTaskResourceManager.deleteTaskQueue(taskType);
-      return new SuccessResponse("Successfully deleted task queue for task type: " + taskType);
-    } catch (Exception e) {
-      throw new WebApplicationException(e);
-    }
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
+      @ApiParam(value = "Whether to force delete the task queue (expert only option, enable with cautious") @DefaultValue("false") @QueryParam("forceDelete") boolean forceDelete) {
+    _pinotHelixTaskResourceManager.deleteTaskQueue(taskType, forceDelete);
+    return new SuccessResponse("Successfully deleted task queue for task type: " + taskType);
   }
 }

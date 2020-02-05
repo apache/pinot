@@ -45,10 +45,10 @@ RUN git clone ${PRESTO_GIT_URL} ${PRESTO_BUILD_DIR} && \
     mkdir -p ${PRESTO_HOME}/data && \
     cp -r presto-server/target/presto-server-*/presto-server-*/* ${PRESTO_HOME} && \
     mkdir -p ${PRESTO_HOME}/plugin/pinot && cp -r presto-pinot/target/presto-pinot-*/* ${PRESTO_HOME}/plugin/pinot/ && \
-    mvn dependency:purge-local-repository -DactTransitively=false -DreResolve=false --fail-at-end && \
-    rm -rf ${PRESTO_BUILD_DIR}
+    rm -rf ${PRESTO_BUILD_DIR} ${PRESTO_HOME}/.m2
 
 COPY etc ${PRESTO_HOME}/etc
+
 EXPOSE 8080
 
 VOLUME ["${PRESTO_HOME}/etc", "${PRESTO_HOME}/data"]

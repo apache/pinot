@@ -37,13 +37,15 @@ import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
 
 /**
  * Base class for queries tests.
  */
 public abstract class BaseQueriesTest {
-  private static final Pql2Compiler COMPILER = new Pql2Compiler();
+  private static final Pql2Compiler PQL_COMPILER = new Pql2Compiler();
+  private static final CalciteSqlCompiler SQL_COMPILER = new CalciteSqlCompiler();
   private static final PlanMaker PLAN_MAKER = new InstancePlanMakerImplV2();
   private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(2);
 
@@ -62,7 +64,7 @@ public abstract class BaseQueriesTest {
    */
   @SuppressWarnings("unchecked")
   protected <T extends Operator> T getOperatorForQuery(String query) {
-    return (T) PLAN_MAKER.makeInnerSegmentPlan(getIndexSegment(), COMPILER.compileToBrokerRequest(query)).run();
+    return (T) PLAN_MAKER.makeInnerSegmentPlan(getIndexSegment(), PQL_COMPILER.compileToBrokerRequest(query)).run();
   }
 
   /**
@@ -85,8 +87,8 @@ public abstract class BaseQueriesTest {
    * @param planMaker Plan maker.
    * @return broker response.
    */
-  protected BrokerResponseNative getBrokerResponseForQuery(String query, PlanMaker planMaker) {
-    return getBrokerResponseForQuery(query, planMaker, null);
+  protected BrokerResponseNative getBrokerResponseForPqlQuery(String query, PlanMaker planMaker) {
+    return getBrokerResponseForPqlQuery(query, planMaker, null);
   }
 
   /**
@@ -98,9 +100,66 @@ public abstract class BaseQueriesTest {
    * @param planMaker Plan maker.
    * @return broker response.
    */
-  private BrokerResponseNative getBrokerResponseForQuery(String query, PlanMaker planMaker,
+  private BrokerResponseNative getBrokerResponseForPqlQuery(String query, PlanMaker planMaker,
       Map<String, String> queryOptions) {
-    BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
+    BrokerRequest brokerRequest = PQL_COMPILER.compileToBrokerRequest(query);
+    return getBrokerResponseForBrokerRequest(brokerRequest, planMaker, queryOptions);
+  }
+
+  /**
+   * Run query on multiple index segments.
+   * <p>Use this to test the whole flow from server to broker.
+   * <p>The result should be equivalent to querying 4 identical index segments.
+   *
+   * @param query SQL query.
+   * @return broker response.
+   */
+  protected BrokerResponseNative getBrokerResponseForSqlQuery(String query) {
+    return getBrokerResponseForSqlQuery(query, PLAN_MAKER);
+  }
+
+  /**
+   * Run query on multiple index segments with custom plan maker.
+   * <p>Use this to test the whole flow from server to broker.
+   * <p>The result should be equivalent to querying 4 identical index segments.
+   *
+   * @param query SQL query.
+   * @param planMaker Plan maker.
+   * @return broker response.
+   */
+  protected BrokerResponseNative getBrokerResponseForSqlQuery(String query, PlanMaker planMaker) {
+    HashMap<String, String> queryOptions = new HashMap<>();
+    queryOptions.put("groupByMode", "sql");
+    queryOptions.put("responseFormat", "sql");
+    return getBrokerResponseForSqlQuery(query, planMaker, queryOptions);
+  }
+
+  /**
+   * Run query on multiple index segments with custom plan maker and queryOptions.
+   * <p>Use this to test the whole flow from server to broker.
+   * <p>The result should be equivalent to querying 4 identical index segments.
+   *
+   * @param query SQL query.
+   * @param planMaker Plan maker.
+   * @return broker response.
+   */
+  private BrokerResponseNative getBrokerResponseForSqlQuery(String query, PlanMaker planMaker,
+      Map<String, String> queryOptions) {
+    BrokerRequest brokerRequest = SQL_COMPILER.compileToBrokerRequest(query);
+    return getBrokerResponseForBrokerRequest(brokerRequest, planMaker, queryOptions);
+  }
+
+  /**
+   * Run query on multiple index segments with custom plan maker and queryOptions.
+   * <p>Use this to test the whole flow from server to broker.
+   * <p>The result should be equivalent to querying 4 identical index segments.
+   *
+   * @param brokerRequest broker request.
+   * @param planMaker Plan maker.
+   * @return broker response.
+   */
+  private BrokerResponseNative getBrokerResponseForBrokerRequest(BrokerRequest brokerRequest, PlanMaker planMaker,
+      Map<String, String> queryOptions) {
     Map<String, String> allQueryOptions = new HashMap<>();
 
     if (queryOptions != null) {
@@ -134,8 +193,8 @@ public abstract class BaseQueriesTest {
    * @param query PQL query.
    * @return broker response.
    */
-  protected BrokerResponseNative getBrokerResponseForQuery(String query) {
-    return getBrokerResponseForQuery(query, PLAN_MAKER);
+  protected BrokerResponseNative getBrokerResponseForPqlQuery(String query) {
+    return getBrokerResponseForPqlQuery(query, PLAN_MAKER);
   }
 
   /**
@@ -146,8 +205,8 @@ public abstract class BaseQueriesTest {
    * @param query PQL query.
    * @return broker response.
    */
-  protected BrokerResponseNative getBrokerResponseForQuery(String query, Map<String, String> queryOptions) {
-    return getBrokerResponseForQuery(query, PLAN_MAKER, queryOptions);
+  protected BrokerResponseNative getBrokerResponseForPqlQuery(String query, Map<String, String> queryOptions) {
+    return getBrokerResponseForPqlQuery(query, PLAN_MAKER, queryOptions);
   }
 
   /**
@@ -158,7 +217,19 @@ public abstract class BaseQueriesTest {
    * @param query PQL query without any filter.
    * @return broker response.
    */
-  protected BrokerResponseNative getBrokerResponseForQueryWithFilter(String query) {
-    return getBrokerResponseForQuery(query + getFilter());
+  protected BrokerResponseNative getBrokerResponseForPqlQueryWithFilter(String query) {
+    return getBrokerResponseForPqlQuery(query + getFilter());
+  }
+
+  /**
+   * Run query with hard-coded filter on multiple index segments.
+   * <p>Use this to test the whole flow from server to broker.
+   * <p>The result should be equivalent to querying 4 identical index segments.
+   *
+   * @param query SQL query without any filter.
+   * @return broker response.
+   */
+  protected BrokerResponseNative getBrokerResponseForSqlQueryWithFilter(String query) {
+    return getBrokerResponseForSqlQuery(query + getFilter());
   }
 }
