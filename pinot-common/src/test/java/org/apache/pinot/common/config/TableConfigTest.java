@@ -19,11 +19,17 @@
 package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.Lists;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
+import javafx.scene.control.Tab;
 import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
 import org.apache.pinot.common.config.instance.InstanceConstraintConfig;
@@ -32,6 +38,7 @@ import org.apache.pinot.common.config.instance.InstanceTagPoolConfig;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.startree.hll.HllConfig;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -321,6 +328,46 @@ public class TableConfigTest {
       checkTableConfigWithInstanceAssignmentConfigMap(TableConfig.fromJsonConfig(tableConfig.toJsonConfig()));
       checkTableConfigWithInstanceAssignmentConfigMap(TableConfig.fromZnRecord(tableConfig.toZNRecord()));
     }
+    {
+      Map<String, String> properties = new HashMap<>();
+      properties.put(FieldConfig.TEXT_INDEX_REALTIME_READER_REFRESH_KEY, "100");
+      FieldConfig fieldConfigTextCol = new FieldConfig("text_col", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, properties);
+      FieldConfig fieldConfigInvCol = new FieldConfig("inv_index_col", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, null);
+      FieldConfig fieldConfigRawCol = new FieldConfig("raw_index_col", FieldConfig.EncodingType.RAW, null, null);
+      Map<String, String> properties1 = new HashMap<>();
+      properties1.put(FieldConfig.VAR_LENGTH_DICTIONARY_COLUMN_KEY, "true");
+      FieldConfig fieldConfigSortedCol = new FieldConfig("sorted_index_col", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.SORTED, properties1);
+      TableConfig tableConfig = tableConfigBuilder.setFieldConfigList(Lists.newArrayList(fieldConfigTextCol, fieldConfigInvCol, fieldConfigRawCol, fieldConfigSortedCol)).build();
+
+      TableConfig toCompare = TableConfig.fromJsonConfig(tableConfig.toJsonConfig());
+      List<FieldConfig> fieldConfigs = toCompare.getFieldConfigList();
+      Assert.assertNotNull(fieldConfigs);
+      Assert.assertEquals(4, fieldConfigs.size());
+
+      FieldConfig config = fieldConfigs.get(0);
+      checkFieldConfigList(config, properties, "text_col", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT);
+      config = fieldConfigs.get(1);
+      checkFieldConfigList(config, null, "inv_index_col", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED);
+      config = fieldConfigs.get(2);
+      checkFieldConfigList(config, null, "raw_index_col", FieldConfig.EncodingType.RAW, null);
+      config = fieldConfigs.get(3);
+      checkFieldConfigList(config, properties1, "sorted_index_col", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.SORTED);
+
+      TableConfig tableConfigWithoutFieldConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName("foo").build();
+      toCompare = TableConfig.fromJsonConfig(tableConfigWithoutFieldConfig.toJsonConfig());
+      Assert.assertNull(toCompare.getFieldConfigList());
+      toCompare = TableConfig.fromZnRecord(tableConfigWithoutFieldConfig.toZNRecord());
+      Assert.assertNull(toCompare.getFieldConfigList());
+    }
+  }
+
+  private void checkFieldConfigList(FieldConfig config, Map<String, String> expectedProperties,
+      String expectedColumn, FieldConfig.EncodingType expectedEncodingType, FieldConfig.IndexType expectedIndexType) {
+    Assert.assertEquals(expectedColumn, config.getName());
+    Assert.assertEquals(expectedEncodingType, config.getEncodingType());
+    Assert.assertEquals(expectedIndexType, config.getIndexType());
+    Map<String, String> properties = config.getProperties();
+    Assert.assertEquals(properties, expectedProperties);
   }
 
   private void checkTableConfigWithAssignmentConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {
