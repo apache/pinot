@@ -167,11 +167,6 @@ public class SelectAstNode extends BaseAstNode {
     } else {
       brokerRequest.setLimit(DEFAULT_RECORD_LIMIT);
     }
-    // Update Selection query limit if MAX_QUERY_SELECTION_LIMIT is set.
-    int limit = brokerRequest.getLimit();
-    if ((PinotQueryParserFactory.MAX_QUERY_SELECTION_LIMIT > 0) && (limit > PinotQueryParserFactory.MAX_QUERY_SELECTION_LIMIT)) {
-      brokerRequest.setLimit(PinotQueryParserFactory.MAX_QUERY_SELECTION_LIMIT);
-    }
 
     // Pinot quirk: if there is both a selection and an aggregation, remove the selection
     if (brokerRequest.getAggregationsInfoSize() != 0 && brokerRequest.isSetSelections()) {

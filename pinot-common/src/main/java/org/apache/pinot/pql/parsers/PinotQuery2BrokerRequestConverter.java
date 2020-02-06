@@ -75,6 +75,7 @@ public class PinotQuery2BrokerRequestConverter {
     brokerRequest.setQueryOptions(pinotQuery.getQueryOptions());
     //brokerRequest.setBucketHashKey();
     //brokerRequest.setDuration();
+    brokerRequest.setLimit(pinotQuery.getLimit());
     brokerRequest.setPinotQuery(pinotQuery);
 
     return brokerRequest;

@@ -49,25 +49,6 @@ public class Pql2CompilerTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(Pql2Compiler.class);
 
   @Test
-  public void testMaxSelectionBehavior() {
-    PinotQueryParserFactory.MAX_QUERY_SELECTION_LIMIT = 1000;
-    BrokerRequest brokerRequest;
-    brokerRequest =
-        COMPILER.compileToBrokerRequest("select * from vegetables LIMIT 999");
-    Assert.assertEquals(brokerRequest.getLimit(), 999);
-    brokerRequest =
-        COMPILER.compileToBrokerRequest("select * from vegetables LIMIT 1000");
-    Assert.assertEquals(brokerRequest.getLimit(), 1000);
-    brokerRequest =
-        COMPILER.compileToBrokerRequest("select * from vegetables LIMIT 10001");
-    Assert.assertEquals(brokerRequest.getLimit(), 1000);
-    brokerRequest =
-        COMPILER.compileToBrokerRequest("select * from vegetables LIMIT 10000");
-    Assert.assertEquals(brokerRequest.getLimit(), 1000);
-    PinotQueryParserFactory.MAX_QUERY_SELECTION_LIMIT = -1;
-  }
-
-  @Test
   public void testQuotedStrings() {
     BrokerRequest brokerRequest =
         COMPILER.compileToBrokerRequest("select * from vegetables where origin = 'Martha''s Vineyard'");

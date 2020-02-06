@@ -105,6 +105,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final AtomicInteger _numDroppedLog;
 
   private final boolean _enableCaseInsensitivePql;
+  private final int _maxQuerySelectionLimit;
   private final TableCache _tableCache;
 
   public BaseBrokerRequestHandler(Configuration config, RoutingTable routingTable,
@@ -124,7 +125,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _tableCache = null;
     }
 
-    PinotQueryParserFactory.MAX_QUERY_SELECTION_LIMIT = _config.getInt(CommonConstants.Helix.MAX_QUERY_SELECTION_LIMIT_KEY, CommonConstants.Helix.DEFAULT_MAX_QUERY_SELECTION_LIMIT);
+    _maxQuerySelectionLimit = _config.getInt(CommonConstants.Helix.MAX_QUERY_SELECTION_LIMIT_KEY, CommonConstants.Helix.DEFAULT_MAX_QUERY_SELECTION_LIMIT);
 
     _brokerId = config.getString(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     _brokerTimeoutMs = config.getLong(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
@@ -179,6 +180,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
               e.getMessage());
         }
       }
+      handleMaxQuerySelectionLimit(brokerRequest, _maxQuerySelectionLimit);
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling request {}: {}, {}", requestId, query, e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
@@ -364,6 +366,25 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _numDroppedLog.incrementAndGet();
     }
     return brokerResponse;
+  }
+
+  /**
+   * Reset limit for selection query if it exceeds maxQuerySelectionLimit.
+   * @param brokerRequest
+   * @param maxQuerySelectionLimit
+   *
+   */
+  static void handleMaxQuerySelectionLimit(BrokerRequest brokerRequest, int maxQuerySelectionLimit) {
+    if (maxQuerySelectionLimit > 0) {
+      if ((brokerRequest.getGroupBy() == null) && (brokerRequest.getLimit() > maxQuerySelectionLimit)) {
+        brokerRequest.setLimit(maxQuerySelectionLimit);
+      }
+      if ((brokerRequest.getPinotQuery()!= null) && (brokerRequest.getPinotQuery().getGroupByList() == null)) {
+        if (brokerRequest.getPinotQuery().getLimit() > maxQuerySelectionLimit) {
+          brokerRequest.getPinotQuery().setLimit(maxQuerySelectionLimit);
+        }
+      }
+    }
   }
 
   /**
