@@ -104,6 +104,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Override
   public synchronized void shutDown() {
+    for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
+      tableDataManager.shutDown();
+    }
     LOGGER.info("Helix instance data manager shut down");
   }
 
