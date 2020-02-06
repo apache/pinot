@@ -278,12 +278,6 @@ public class CalciteSqlParser {
         }
         if (selectSqlNode.getGroup() != null) {
           pinotQuery.setGroupByList(convertSelectList(selectSqlNode.getGroup()));
-        } else {
-          // Update Selection query limit if MAX_QUERY_SELECTION_LIMIT is set.
-          int limit = pinotQuery.getLimit();
-          if ((PinotQueryParserFactory.MAX_QUERY_SELECTION_LIMIT > 0) && (limit > PinotQueryParserFactory.MAX_QUERY_SELECTION_LIMIT)) {
-            pinotQuery.setLimit(PinotQueryParserFactory.MAX_QUERY_SELECTION_LIMIT);
-          }
         }
         break;
       default:
