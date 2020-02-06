@@ -203,7 +203,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final String _resourceDataDir;
   private final IndexLoadingConfig _indexLoadingConfig;
   private final Schema _schema;
+  // Semaphore for each partitionId only. See the comments in {@link RealtimeTableDataManager}.
   private final Semaphore _partitionConsumerSemaphore;
+  // A boolean flag to check whether the current thread acquires the semaphore, so that the semaphore be released only once within the same thread.
   private final AtomicBoolean _acquireConsumerSemaphore;
   private final String _metricKeyName;
   private final ServerMetrics _serverMetrics;
@@ -833,23 +835,19 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  private boolean closePartitionLevelConsumer() {
+  private void closePartitionLevelConsumer() {
     try {
       _partitionLevelConsumer.close();
-      return true;
     } catch (Exception e) {
       segmentLogger.warn("Could not close stream consumer", e);
-      return false;
     }
   }
 
-  private boolean closeStreamMetadataProvider() {
+  private void closeStreamMetadataProvider() {
     try {
       _streamMetadataProvider.close();
-      return true;
     } catch (Exception e) {
       segmentLogger.warn("Could not close stream metadata provider", e);
-      return false;
     }
   }
 
@@ -1041,9 +1039,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   // Assume that this is called only on OFFLINE to CONSUMING transition.
   // If the transition is OFFLINE to ONLINE, the caller should have downloaded the segment and we don't reach here.
   public LLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
-      RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir,
-      IndexLoadingConfig indexLoadingConfig, Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionConsumerSemaphore,
-      ServerMetrics serverMetrics) {
+      RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, IndexLoadingConfig indexLoadingConfig,
+      Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionConsumerSemaphore, ServerMetrics serverMetrics) {
     _segBuildSemaphore = realtimeTableDataManager.getSegmentBuildSemaphore();
     _segmentZKMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
     _tableConfig = tableConfig;

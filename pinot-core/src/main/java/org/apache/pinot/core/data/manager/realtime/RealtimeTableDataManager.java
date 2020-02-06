@@ -63,7 +63,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private SegmentBuildTimeLeaseExtender _leaseExtender;
   private RealtimeSegmentStatsHistory _statsHistory;
   private final Semaphore _segmentBuildSemaphore;
-  private Map<Integer, Semaphore> _partitionIdToSemaphoreMap = new ConcurrentHashMap<>();
+  // Maintains a map for the partitionIds and its related semaphores, which is to prevent two different Kafka consumers
+  // from consuming with the same partitionId in parallel in the same host.
+  // The semaphores will stay in the hash map even if the consuming partitions move to a different host.
+  // We expect that there will be a small number of semaphores, but that may be ok.
+  private final Map<Integer, Semaphore> _partitionIdToSemaphoreMap = new ConcurrentHashMap<>();
 
   // The old name of the stats file used to be stats.ser which we changed when we moved all packages
   // from com.linkedin to org.apache because of not being able to deserialize the old files using the newer classes

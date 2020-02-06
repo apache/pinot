@@ -50,7 +50,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.*;
 
 
@@ -121,8 +120,8 @@ public class LLRealtimeSegmentDataManagerTest {
     RealtimeTableDataManager tableDataManager = mock(RealtimeTableDataManager.class);
     when(tableDataManager.getServerInstance()).thenReturn(instanceId);
     RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
-    when(statsHistory.getEstimatedCardinality(any(String.class))).thenReturn(200);
-    when(statsHistory.getEstimatedAvgColSize(any(String.class))).thenReturn(32);
+    when(statsHistory.getEstimatedCardinality(anyString())).thenReturn(200);
+    when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
     when(tableDataManager.getStatsHistory()).thenReturn(statsHistory);
     return tableDataManager;
   }
@@ -669,7 +668,14 @@ public class LLRealtimeSegmentDataManagerTest {
         secondSegmentDataManager.getPartitionConsumerSemaphore());
     Assert.assertTrue(secondSegmentDataManager.getAcquireConsumerSemaphore().get());
     Assert.assertEquals(firstSegmentDataManager.getPartitionConsumerSemaphore().availablePermits(), 0);
+
+    // Call destroy method the 2nd time on the first segment manager, the permits in semaphore won't increase.
+    firstSegmentDataManager.destroy();
+    Assert.assertEquals(firstSegmentDataManager.getPartitionConsumerSemaphore().availablePermits(), 0);
+
+    // The permit finally gets released in the Semaphore.
     secondSegmentDataManager.destroy();
+    Assert.assertEquals(secondSegmentDataManager.getPartitionConsumerSemaphore().availablePermits(), 1);
   }
 
   public static class FakeLLRealtimeSegmentDataManager extends LLRealtimeSegmentDataManager {
